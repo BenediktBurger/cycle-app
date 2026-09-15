@@ -1,5 +1,7 @@
 # Zyklus-App (Arbeitstitel) / Cycle App
 
+[![CI](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml/badge.svg)](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml)
+
 A local-first, open-source mobile app (Android + iOS, PWA bonus) for tracking
 menstrual-cycle symptoms and manually evaluating them per **NER rules
 (Rötzer), in the INER spirit** — the user places the marks and stays the
@@ -21,9 +23,25 @@ decision-maker.
 
 ## Getting started
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for environment setup (Flutter SDK,
-platform scaffolding, run/analyze/test/build commands) and the current
-implementation status.
+```sh
+flutter pub get
+flutter run -d chrome
+```
+
+Requires a Flutter stable SDK (any location with `<sdk>/bin` on PATH). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full setup, platform scaffolding,
+and the analyze/test/build commands.
+
+## Tech stack
+
+- **Flutter** stable (web as iteration target, per
+  [ADR-0003](docs/adr/0003-target-platforms-web-iteration.md); product
+  targets Android + iOS)
+- **flutter_riverpod** for state management
+  ([ADR-0004](docs/adr/0004-riverpod-flchart-flutter.md))
+- **drift / SQLite** for local-first storage
+  ([ADR-0005](docs/adr/0005-storage-and-encryption.md); wired in Phase 2)
+- **`flutter gen-l10n`** for localization, German-first with English mirrored
 
 ## Project layout / docs
 
@@ -31,6 +49,9 @@ implementation status.
   requirements.
 - [docs/adr/README.md](docs/adr/README.md) — architecture decision records
   (ADR-0001 … ADR-0006).
+- [docs/dev-notes.md](docs/dev-notes.md) — operational lessons and how-tos.
+- [docs/roadmap.md](docs/roadmap.md) — open work / upcoming milestones
+  (to-do list; history lives in git).
 - `.github/workflows/ci.yml` — GitHub Actions CI: `flutter analyze`,
   `flutter test`, `flutter build web` (ADR-0006).
 
@@ -39,4 +60,10 @@ implementation status.
 Phase-1 scaffold: app shell (Riverpod `ProviderScope` → `MaterialApp`,
 Material-3 `NavigationBar` with 4 placeholder tabs Tagebuch / Zyklus /
 Statistik / Einstellungen), German-first localization via `flutter gen-l10n`
-with English mirrored, no database yet (data layer lands in Phase 2).
+with English mirrored, no database yet (data layer lands in Phase 2). Upcoming milestones and open work are tracked in
+[docs/roadmap.md](docs/roadmap.md).
+
+## License
+
+**TBD** — no license has been chosen yet; it will likely be GPL-3-compatible
+eventually. Do not treat the tree as licensed until one is chosen.
