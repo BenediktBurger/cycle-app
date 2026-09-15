@@ -26,6 +26,7 @@
 import 'dart:convert';
 
 import 'date_only.dart';
+import 'models.dart';
 
 /// Bump when the document shape changes; importers accept older/newer
 /// documents per the rules in [parseExportJson].
@@ -162,8 +163,9 @@ final class ImportSummary {
   /// Entries present on this device (to overwrite, per the merge policy).
   final int entriesOverwritten;
 
-  /// Rows rejected because they are structurally invalid (bad date,
-  /// bad bleeding name, out-of-scale mucus value, ...).
+  /// Rows rejected because they are structurally invalid (bad/missing date
+  /// or profile id, bleeding outside the stored vocabulary — exactly the
+  /// rows the db writer drops, see the shared helpers used by both sides).
   final int entriesInvalid;
 
   /// Rows whose (profile, date) key appears twice IN the document itself;
@@ -215,8 +217,8 @@ ImportSummary planMerge(
   // Profiles in the document that the device does not know yet must be
   // re-created with their DOCUMENTED OWN data (name/ordinal).
   for (final row in doc.profiles) {
-    final id = row['id'];
-    if (id is int && !existingProfileIds.contains(id)) {
+    final id = parseExportId(row['id']);
+    if (id != null && !existingProfileIds.contains(id)) {
       profilesToInsert++;
     }
   }
@@ -224,10 +226,18 @@ ImportSummary planMerge(
   final seenEntryKeys = <String>{};
 
   for (final row in doc.entries) {
-    final profileId = _asId(row['profile_id']);
+    // Same field-level gates as the db writer (tryDailyEntryFromExport):
+    // profile id and day through the shared helpers, and bleeding through
+    // the SHARED vocabulary helper tryParseBleeding (models.dart) instead of
+    // a planner-local rule — the writer rejecting a field must never happen
+    // after the planner counted the row as a write. The writer's remaining
+    // field handling (bbt/flags defaults, mucus/entries coercion to null)
+    // never drops a row, so no further planner gate exists.
+    final profileId = parseExportId(row['profile_id']);
     final day =
         row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
-    if (profileId == null || day == null) {
+    final bleeding = tryParseBleeding(row['bleeding']);
+    if (profileId == null || day == null || bleeding == null) {
       entriesInvalid++;
       continue;
     }
@@ -245,7 +255,7 @@ ImportSummary planMerge(
   }
 
   for (final row in doc.marks) {
-    final profileId = _asId(row['profile_id']);
+    final profileId = parseExportId(row['profile_id']);
     final day = row['entry_date'] is String
         ? tryParseIsoDay(row['entry_date'] as String)
         : null;
@@ -274,9 +284,11 @@ ImportSummary planMerge(
   );
 }
 
-/// Numeric ids may arrive as int, or boxed from lossy systems (some tools
-/// serialize ids as strings); anything else is invalid.
-int? _asId(Object? raw) {
+/// Parses a numeric export id that may arrive as `int`, or as a numeric
+/// string (boxed from lossy systems — some tools serialize ids as strings);
+/// anything else is invalid. Plan counting and every row writer MUST use
+/// this same helper so a counted row is always a written row.
+int? parseExportId(Object? raw) {
   if (raw is int) return raw;
   if (raw is String) return int.tryParse(raw);
   return null;

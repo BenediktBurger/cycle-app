@@ -209,6 +209,77 @@ Future<void> main() async {
   // Import-summary structure intact after the round trips.
   check(remapSummary.duplicateEntryRows == 0, 'no duplicate rows counted');
 
+  // --- numeric-string ids must import exactly once, like int ids -----------
+  // Some tools serialize profile ids as strings ('"profile_id": "1"');
+  // the merge planner accepts them, so the writer must too. Pre-fix these
+  // rows were counted in the summary but silently skipped (entries) or
+  // aborted the whole transaction (marks: `as int?` TypeError).
+  final stringIdTarget = CycleDatabase(NativeDatabase.memory());
+  final stringIdDoc = buildExportJson(ExportBlob(
+    exportedAt: DateTime(2026, 4, 1),
+    profiles: const [
+      {'id': '1', 'name': 'main', 'ordinal': 0},
+    ],
+    entries: [
+      {'profile_id': '1', 'date': '2026-04-02', 'bleeding': 'period'},
+    ],
+    marks: [
+      {
+        'profile_id': '1',
+        'entry_date': '2026-04-03',
+        'mark_type': 'baseline',
+        'author': 'user',
+      },
+    ],
+  ));
+  final stringIdSummary = await importJsonToDatabase(stringIdTarget, stringIdDoc);
+  check(
+      stringIdSummary.entriesNew == 1 &&
+          stringIdSummary.marksNew == 1 &&
+          stringIdSummary.profilesToInsert == 0,
+      'string-id document planned as counted: $stringIdSummary');
+  final stringIdRows = await stringIdTarget.entriesDao.allEntriesForAllProfiles();
+  check(stringIdRows.length == 1 && stringIdRows.single.profileId == 1,
+      'string id "1" addresses the known device profile 1');
+  check(
+      (await stringIdTarget.marksDao.allMarksForAllProfiles()).length == 1,
+      'string-id mark landed under profile 1');
+  check(await stringIdTarget.profilesDao.allProfiles().then((p) => p.length) == 1,
+      'no duplicate profile created for the string id');
+
+  // --- invalid bleeding vocabulary: plan counts only writable rows ---------
+  // tryDailyEntryFromExport drops rows whose bleeding value is not in the
+  // enum vocabulary, so the merge planner must count such rows in the
+  // invalid bucket instead of as writes (counted == written).
+  final invalidBleedingTarget = CycleDatabase(NativeDatabase.memory());
+  final invalidBleedingDoc = buildExportJson(ExportBlob(
+    exportedAt: DateTime(2026, 4, 1),
+    profiles: const [],
+    entries: [
+      {'profile_id': 1, 'date': '2026-04-05', 'bleeding': 'monsoon'},
+      {'profile_id': 1, 'date': '2026-04-06', 'bleeding': 'period'},
+    ],
+    marks: const [],
+  ));
+  final invalidPlan =
+      await planDatabaseImport(invalidBleedingTarget, invalidBleedingDoc);
+  check(
+      invalidPlan.entriesInvalid == 1 &&
+          invalidPlan.entriesNew == 1 &&
+          invalidPlan.entriesOverwritten == 0,
+      'plan buckets the unparsable-bleeding row as invalid ($invalidPlan)');
+  final invalidSummary =
+      await importJsonToDatabase(invalidBleedingTarget, invalidBleedingDoc);
+  check(
+      invalidSummary.entriesInvalid == 1 && invalidSummary.entriesNew == 1,
+      'invalid-bleeding row reported invalid, not written: $invalidSummary');
+  check(
+      (await invalidBleedingTarget.entriesDao.allEntriesForAllProfiles())
+              .length ==
+          1,
+      'only the valid-bleeding row reached the database');
+  await invalidBleedingTarget.close();
+
   // --- storage-level failure surfaces as ONE typed error -------------------
   // After close, any engine error must be wrapped (transaction rolled back,
   // nothing half-imported) instead of leaking a raw driver state.

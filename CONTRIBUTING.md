@@ -93,15 +93,16 @@ core assertions without the test runner (useful when hunting failures):
 ~/flutter/bin/dart run tool/smoke_export_import.dart # export/import round trip
 ```
 
-## 5. JSON export/import limits (by design in M1)
+## 5. JSON export/import limits
 
 - **Export paths differ per platform on purpose** — no file-picker/share
-  dependencies were added: Settings → JSON export shows the whole document
+  plugin dependencies: Settings → JSON export shows the whole document
   as copyable text on ALL platforms; a file save/download additionally
   exists on web (browser download) and on desktop (written next to the
   user's home directory, when `HOME`/`USERPROFILE` is set).
-- **Android/iOS:** the copy-text path is the supported route for now
-  (a share sheet / SAF picker needs plugin dependencies, deferred).
+- **Android/iOS:** iOS offers the copy path instead of a share sheet today;
+  a share/picker requires a plugin dependency, to be added when the need
+  arises.
 - **Import:** paste the exported JSON into the settings import dialog
   (web additionally offers a file picker). Merge policy: merges by
   (profile, day) with **overwrite** of conflicting days; known marks are

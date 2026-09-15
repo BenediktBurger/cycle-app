@@ -8,6 +8,20 @@ import 'date_only.dart';
 /// Stored as TEXT in SQLite (the enum name) — see lib/db/converters.dart.
 enum Bleeding { none, period, spotting }
 
+/// Parses an export/storage bleeding name into the enum ([Bleeding.values]
+/// vocabulary), null for anything else. SHARED by the import planner and the
+/// db writer — the single source of truth for this field's validation, like
+/// parseExportId for ids, so a row a writer would drop is never counted as a
+/// write (and never vice versa). Accepts `Object?` (see tryParseBleeding's
+/// callers: export rows arrive JSON-decoded as the loosest possible shape).
+Bleeding? tryParseBleeding(Object? raw) {
+  if (raw is! String) return null;
+  for (final b in Bleeding.values) {
+    if (b.name == raw) return b;
+  }
+  return null;
+}
+
 /// One tracked day of cycle symptoms, decoupled from any storage layer.
 ///
 /// Date semantics: [date] must be a calendar-day-only value (see

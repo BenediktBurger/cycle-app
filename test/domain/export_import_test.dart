@@ -126,6 +126,37 @@ void main() {
       expect(summary.marksSkipped, 1);
     });
 
+    test('unparsable bleeding values are counted invalid, never as writes',
+        () {
+      final doc = ExportBlob(
+        profiles: const [],
+        entries: const <Map<String, Object?>>[
+          // Unknown vocabulary — the db writer drops this row.
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'heavy'},
+          // Missing entirely — the writer cannot produce an enum either.
+          {'profile_id': 1, 'date': '2026-03-02'},
+          {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15),
+      );
+
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+
+      // The plan counts EXACTLY what the writer will write: the two
+      // unparsable rows land in the invalid bucket, only the valid one is
+      // counted as new.
+      expect(summary.entriesInvalid, 2);
+      expect(summary.entriesNew, 1);
+      expect(summary.entriesOverwritten, 0);
+      expect(summary.entriesWritten, 1);
+    });
+
     test('repeated (profile, date) rows inside one document are reported', () {
       final doc = ExportBlob(
         profiles: const [],
@@ -146,6 +177,42 @@ void main() {
       expect(summary.duplicateEntryRows, 1);
       // The first occurrence wins; the later one is the counted duplicate.
       expect(summary.entriesNew, 1);
+    });
+
+    test('numeric-string profile ids plan the same as int ids', () {
+      final doc = ExportBlob(
+        profiles: const [
+          {'id': '5', 'name': 'from-another-tool', 'ordinal': 0},
+        ],
+        entries: const <Map<String, Object?>>[
+          {'profile_id': '5', 'date': '2026-03-01', 'bleeding': 'period'},
+          // Same id, boxed differently: must count as a duplicate key.
+          {'profile_id': 5, 'date': '2026-03-01', 'bleeding': 'none'},
+        ],
+        marks: const <Map<String, Object?>>[
+          {
+            'profile_id': '5',
+            'entry_date': '2026-03-02',
+            'mark_type': 'baseline',
+            'author': 'user',
+          },
+        ],
+        exportedAt: DateTime.utc(2026, 9, 15),
+      );
+
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {},
+      );
+
+      // The writer re-creates the profile for these rows, so the plan must
+      // count it, and one written row must exist per counted row.
+      expect(summary.profilesToInsert, 1);
+      expect(summary.entriesNew, 1, reason: 'the second row is a duplicate');
+      expect(summary.duplicateEntryRows, 1);
+      expect(summary.marksNew, 1);
     });
 
     test('entry/mark key helpers are stable and unambiguous', () {

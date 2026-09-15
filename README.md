@@ -40,7 +40,7 @@ and the analyze/test/build commands.
 - **flutter_riverpod** for state management
   ([ADR-0004](docs/adr/0004-riverpod-flchart-flutter.md))
 - **drift / SQLite** for local-first storage
-  ([ADR-0005](docs/adr/0005-storage-and-encryption.md); wired in Phase 2)
+  ([ADR-0005](docs/adr/0005-storage-and-encryption.md))
 - **`flutter gen-l10n`** for localization, German-first with English mirrored
 
 ## Project layout / docs
@@ -48,20 +48,20 @@ and the analyze/test/build commands.
 - [docs/product/vision.md](docs/product/vision.md) — product vision and
   requirements.
 - [docs/adr/README.md](docs/adr/README.md) — architecture decision records
-  (ADR-0001 … ADR-0006).
+  (ADR-0001 … ADR-0007 — 0007 is the language policy).
 - [docs/dev-notes.md](docs/dev-notes.md) — operational lessons and how-tos.
 - [docs/roadmap.md](docs/roadmap.md) — open work / upcoming milestones
   (to-do list; history lives in git).
 - `.github/workflows/ci.yml` — GitHub Actions CI: `flutter analyze`,
   `flutter test`, `flutter build web` (ADR-0006).
 
-## Status: Milestone 1 (phase 1)
+## Status
 
-Phase-1 scaffold: app shell (Riverpod `ProviderScope` → `MaterialApp`,
-Material-3 `NavigationBar` with 4 placeholder tabs Tagebuch / Zyklus /
-Statistik / Einstellungen), German-first localization via `flutter gen-l10n`
-with English mirrored, no database yet (data layer lands in Phase 2). Upcoming milestones and open work are tracked in
-[docs/roadmap.md](docs/roadmap.md).
+Working app: Tagebuch / Zyklus / Statistik / Einstellungen on a local
+drift database (SQLite file on Android/iOS, WebAssembly/OPFS in the
+browser; data persists across reloads), with JSON export/import. The UI is
+German-first with an English switch. Still open: the Mode-M marking UI
+([docs/roadmap.md](docs/roadmap.md)).
 
 ## License
 

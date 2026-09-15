@@ -410,6 +410,85 @@ void main() {
       expect(DateOnly.sameDay(mark.entryDate, DateTime(2026, 4, 20)), isTrue);
     });
 
+    test('numeric-string profile ids import exactly once (tolerant ids)',
+        () async {
+      // Some exporters/tools serialize ids as strings; the merge planner
+      // accepts int or numeric-string ids, so the writer must too — a
+      // mismatch would count rows in the summary while silently skipping
+      // the actual writes.
+      ExportBlob stringIdDoc() => ExportBlob(
+            exportedAt: DateTime.utc(2026, 4, 1),
+            profiles: const [
+              {'id': '1', 'name': 'main', 'ordinal': 0},
+            ],
+            entries: [
+              {'profile_id': '1', 'date': '2026-04-02', 'bleeding': 'period'},
+            ],
+            marks: [
+              {
+                'profile_id': '1',
+                'entry_date': '2026-04-03',
+                'mark_type': 'baseline',
+                'author': 'user',
+              },
+            ],
+          );
+
+      final summary =
+          await importJsonToDatabase(db, buildExportJson(stringIdDoc()));
+      expect(summary.entriesNew, 1,
+          reason: 'the plan counts the row, so it must be written too');
+      expect(summary.marksNew, 1);
+
+      final rows = await db.entriesDao.allEntriesForAllProfiles();
+      expect(rows, hasLength(1),
+          reason: 'string id "1" addresses the known device profile 1');
+      expect(rows.single.profileId, 1);
+      expect(await db.marksDao.allMarksForAllProfiles(), hasLength(1));
+      expect(await db.profilesDao.allProfiles(), hasLength(1),
+          reason: 'no duplicate profile is created for the string id');
+    });
+
+    test('unparsable bleeding rows are reported invalid and NOT written',
+        () async {
+      // The counting-vs-writing guarantee for field-level gates: the plan
+      // counts exactly the rows the writer produces, so a row the writer
+      // drops (unknown bleeding vocabulary) must appear in the invalid
+      // bucket and must not reach the database.
+      final doc = buildExportJson(ExportBlob(
+        exportedAt: DateTime.utc(2026, 4, 1),
+        profiles: const [],
+        entries: [
+          {'profile_id': 1, 'date': '2026-05-01', 'bleeding': 'heavy'},
+          {'profile_id': 1, 'date': '2026-05-02', 'bleeding': 'period'},
+        ],
+        marks: [
+          {
+            'profile_id': 1,
+            'entry_date': '2026-05-03',
+            'mark_type': 'baseline',
+            'author': 'user',
+          },
+        ],
+      ));
+
+      final summary = await planDatabaseImport(db, doc);
+      expect(summary.entriesInvalid, 1);
+      expect(summary.entriesNew, 1);
+      expect(summary.entriesWritten, 1);
+
+      final summary2 = await importJsonToDatabase(db, doc);
+      expect(summary2.entriesInvalid, 1);
+      expect(summary2.entriesNew, 1);
+      final rows = await db.entriesDao.allEntriesForAllProfiles();
+      expect(rows, hasLength(1),
+          reason: 'the unparsable-bleeding row is never stored');
+      expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)),
+          isTrue);
+      // The mark row was untouched by the entry gate.
+      expect(await db.marksDao.allMarksForAllProfiles(), hasLength(1));
+    });
+
     test('unexpected errors surface as ImportFailedException', () async {
       // Nothing half-imported survives a mid-transaction/prepare failure:
       // the wrapper turns any engine error into the typed failure the UI

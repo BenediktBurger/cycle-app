@@ -162,7 +162,9 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
       // 3) Marks idempotently (addMark skips existing ones silently), under
       //    the remapped profile ids as well.
       for (final row in doc.marks) {
-        final docProfileId = row['profile_id'] as int?;
+        // Shared id tolerance (planner + writers); a raw `as int?` cast
+        // would abort the whole transaction on a numeric-string id.
+        final docProfileId = parseExportId(row['profile_id']);
         final actualProfileId =
             docProfileId == null ? null : remap[docProfileId];
         final day = row['entry_date'] is String
@@ -207,32 +209,34 @@ Future<Map<int, int>> _prepareProfiles(
   Set<int> deviceProfileIds,
 ) async {
   final referenced = <int>{};
+  Map<String, Object?>? definitionOf(int id) => _firstProfileDefinition(
+      doc.profiles, (p) => parseExportId(p['id']) == id);
+
   String? nameOf(int id) {
-    final row = _firstProfileDefinition(
-        doc.profiles, (p) => p['id'] is int && p['id'] == id);
+    final row = definitionOf(id);
     if (row == null) return null;
     final name = row['name'];
     return name is String && name.isNotEmpty ? name : null;
   }
 
   int? ordinalOf(int id) {
-    final row = _firstProfileDefinition(
-        doc.profiles, (p) => p['id'] is int && p['id'] == id);
-    final ordinal = row?['ordinal'];
+    final ordinal = definitionOf(id)?['ordinal'];
     return ordinal is int ? ordinal : null;
   }
 
+  // Same shared id tolerance as the planner (parser accepts numeric
+  // strings); ids the planner already accepted must still be prepared here.
   for (final row in doc.entries) {
-    final id = row['profile_id'];
-    if (id is int) referenced.add(id);
+    final id = parseExportId(row['profile_id']);
+    if (id != null) referenced.add(id);
   }
   for (final row in doc.marks) {
-    final id = row['profile_id'];
-    if (id is int) referenced.add(id);
+    final id = parseExportId(row['profile_id']);
+    if (id != null) referenced.add(id);
   }
   for (final row in doc.profiles) {
-    final id = row['id'];
-    if (id is int) referenced.add(id);
+    final id = parseExportId(row['id']);
+    if (id != null) referenced.add(id);
   }
 
   final remap = <int, int>{
@@ -279,17 +283,23 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 }
 
 /// Row map -> [DailyEntry], or null when structurally invalid (bad date,
-/// unknown bleeding value, out-of-scale mucus value, ...).
+/// unknown/missing bleeding value, ...) — the exact gates the merge planner
+/// applies, so a counted row is always written. Out-of-scale values in
+/// coercible fields (bbt, flags, mucus_nfp via clampedMucusNfp) are nulled
+/// by the field parsers below, NOT rejected.
 DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
-  final profileId = row['profile_id'] is int ? row['profile_id'] as int : null;
+  // parseExportId (shared with the merge planner) accepts numeric-string
+  // ids as well — otherwise planner-counted rows would be silently skipped
+  // here.
+  final profileId = parseExportId(row['profile_id']);
   final day =
       row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
   if (profileId == null || day == null) return null;
 
-  final bleedingRaw = row['bleeding'];
-  final bleeding = bleedingRaw is String
-      ? Bleeding.values.where((b) => b.name == bleedingRaw).firstOrNull
-      : null;
+  // Shared vocabulary helper (models.dart) — the SAME function the planner
+  // validates bleeding with; a planner-local duplicate is exactly what let
+  // counted and written rows diverge before.
+  final bleeding = tryParseBleeding(row['bleeding']);
   if (bleeding == null) return null;
 
   final bbt = row['bbt_c'];
