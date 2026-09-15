@@ -33,6 +33,8 @@ analysis_benchmark.json
 .packages.generated
 
 # Flutter/Dart/Pub related
+# Flutter gen-l10n outputs (regenerated from lib/l10n/*.arb via generate: true)
+lib/l10n/app_localizations*.dart
 **/doc/api/
 .dart_tool/
 .flutter-plugins

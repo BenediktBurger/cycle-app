@@ -1,20 +1,356 @@
+// Einstellungen screen: language switcher (de/en), the PIN-lock stub
+// (non-functional in M1 by design, ADR-0005), and JSON export/import.
+//
+// Export UX (no new dependencies, see lib/ui/file_transfer.dart): an
+// always-available JSON text screen with a copy button on every platform,
+// plus a file save/download where the platform supports it (web, desktop
+// with a home directory). Import: paste-JSON dialog everywhere, plus a file
+// picker on web.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../db/export_adapter.dart';
+import '../domain/export_import.dart';
 import '../l10n/app_localizations.dart';
+import '../providers.dart';
+import 'file_transfer.dart';
 
-/// Placeholder Einstellungen screen (Phase 1). Language switcher, PIN lock
-/// stub (ADR-005) and JSON export/import arrive in Phase 2 (see
-/// docs/roadmap.md).
-/// No database access here.
-class EinstellungenScreen extends StatelessWidget {
+/// Export file name used by the save/download path.
+const String exportFileName = 'cycle_app_export.json';
+
+class EinstellungenScreen extends ConsumerWidget {
   const EinstellungenScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final locale = ref.watch(localeProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.navEinstellungen)),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          // --- language ------------------------------------------------
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsLanguage,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(
+                        value: 'de',
+                        label: Text(l10n.languageGerman),
+                      ),
+                      ButtonSegment(
+                        value: 'en',
+                        label: Text(l10n.languageEnglish),
+                      ),
+                    ],
+                    selected: {locale.languageCode},
+                    onSelectionChanged: (selection) => ref
+                        .read(localeProvider.notifier)
+                        .state = Locale(selection.first),
+                  ),
+                  const SizedBox(height: 8),
+                  // In-memory ONLY: reset to German after a web reload by
+                  // design for this milestone (documented on
+                  // localeProvider + docs/roadmap.md).
+                  Text(l10n.settingsLanguageNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- PIN lock stub -------------------------------------------
+          // Disabled ON PURPOSE: flipping it on would falsely signal that a
+          // protection exists. The lock story (native SQLCipher later, web
+          // PIN limitations) is set out in ADR-0005.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile.adaptive(
+                    value: false,
+                    onChanged: null,
+                    title: Text(l10n.settingsPinLock),
+                  ),
+                  Text(l10n.settingsPinLockNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- JSON export / import ------------------------------------
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsExport,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(l10n.settingsExportNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _openExport(context, ref),
+                    icon: const Icon(Icons.download_outlined),
+                    label: Text(l10n.settingsExport),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(l10n.settingsImport,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(l10n.settingsImportNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _openImportDialog(context, ref),
+                    icon: const Icon(Icons.upload_outlined),
+                    label: Text(l10n.settingsImport),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openExport(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final db = await ref.read(databaseProvider.future);
+    final json = await exportDatabaseToJson(db);
+    // An export without any content is not useful as a file; communicate
+    // instead of producing an empty document in the user's Downloads.
+    final doc = parseExportJson(json);
+    if (doc.profiles.isEmpty && doc.entries.isEmpty && doc.marks.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      return;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => _ExportPreviewPage(json: json),
+      ),
+    );
+  }
+
+  Future<void> _openImportDialog(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    // The Apply action must react to BOTH the pasted text and the running
+    // import, so the dialog listens to controller + pending flag together
+    // (a one-time build here would freeze the button — there is no widget
+    // rebuild of the actions while the user types).
+    final running = ValueNotifier<bool>(false);
+    final listenable = Listenable.merge([controller, running]);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.importTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canPickFile) ...[
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final text = await pickJsonFileText();
+                      if (text != null) {
+                        controller.text = text;
+                      }
+                    },
+                    icon: const Icon(Icons.file_open_outlined),
+                    label: Text(l10n.importPickFile),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  controller: controller,
+                  maxLines: 10,
+                  decoration: InputDecoration(hintText: l10n.importHint),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+              ),
+            ),
+            ListenableBuilder(
+              listenable: listenable,
+              builder: (context, _) {
+                final busy = running.value;
+                final hasText = controller.text.trim().isNotEmpty;
+                return FilledButton(
+                  onPressed: !hasText || busy
+                      ? null
+                      : () async {
+                          final raw = controller.text;
+                          running.value = true;
+                          try {
+                            await _applyImport(
+                                dialogContext, context, ref, raw);
+                          } finally {
+                            running.value = false;
+                          }
+                        },
+                  child: Text(l10n.importApply),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    running.dispose();
+  }
+
+  Future<void> _applyImport(
+    BuildContext dialogContext,
+    BuildContext screenContext,
+    WidgetRef ref,
+    String raw,
+  ) async {
+    final l10n = AppLocalizations.of(dialogContext);
+    try {
+      final db = await ref.read(databaseProvider.future);
+      final summary = await importJsonToDatabase(db, raw);
+      if (!dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+      if (!screenContext.mounted) return;
+      ScaffoldMessenger.of(screenContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            summary.entriesWritten == 0 && summary.marksNew == 0
+                ? l10n.importEmpty
+                : l10n.importSummary(
+                    summary.profilesToInsert,
+                    summary.entriesNew,
+                    summary.entriesOverwritten,
+                    summary.duplicateEntryRows,
+                    summary.entriesInvalid,
+                    summary.marksNew,
+                    summary.marksSkipped,
+                  ),
+          ),
+        ),
+      );
+    } on FormatException {
+      // The DOCUMENT is invalid (not JSON, wrong schema) — nothing was
+      // written; the import dialog stays open for correcting the text.
+      if (!dialogContext.mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(content: Text(l10n.importInvalid)),
+      );
+    } catch (_) {
+      // The transaction rolled back (import is all-or-nothing): the stored
+      // data is unchanged, so tell the user exactly that instead of
+      // crashing (ImportFailedException and anything below it).
+      if (!dialogContext.mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(content: Text(l10n.importFailed)),
+      );
+    }
+  }
+}
+
+/// Full-screen JSON preview: the export text with a copy button for every
+/// platform, and a file save/download where the platform supports it.
+final class _ExportPreviewPage extends StatelessWidget {
+  const _ExportPreviewPage({required this.json});
+
+  final String json;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navEinstellungen)),
-      body: Center(child: Text(l10n.navEinstellungen)),
+      appBar: AppBar(title: Text(l10n.exportTitle)),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: json));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.exportCopied)),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_outlined),
+                  label: Text(l10n.exportCopy),
+                ),
+                if (canSaveFile)
+                  FilledButton.icon(
+                    onPressed: () async {
+                      final ok = await saveFile(exportFileName, json);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok ? l10n.exportSaved : l10n.exportSaveFailed,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(l10n.exportSaveFile),
+                  )
+                else
+                  Text(
+                    l10n.exportNativeHint,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                json,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -22,6 +22,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # The drift tests use NativeDatabase on the host VM: the
+      # sqlite3 dart package dlopens libsqlite3.so — install the dev lib
+      # (ubuntu runners ship the runtime .so.0 but not the dev .so).
+      - name: Install sqlite3 (host-VM database tests)
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
       - name: Analyze
         run: flutter analyze
 

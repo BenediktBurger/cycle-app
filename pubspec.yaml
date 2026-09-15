@@ -10,27 +10,40 @@ version: 0.1.0
 environment:
   sdk: ">=3.5.0 <4.0.0"
 
-# Version notes — chosen WITHOUT a local Flutter SDK (see CONTRIBUTING.md for
-# environment setup); all ranges float within their major/minor line so pub
-# picks a version compatible with the installed SDK:
+# Version notes — all ranges float within their major/minor line so pub picks
+# a version compatible with the installed SDK (resolved on Flutter 3.47.4 /
+# Dart 3.13.3, 2026-09-15):
 #
 # flutter_riverpod: ^2.6.0 is a known-stable 2.x release. Deliberately stays on
 #   the Riverpod 2.x line (3.x changes APIs).
-# drift / drift_dev: ^2.20.0. Keep these two in sync with each other when
-#   bumping. drift_dev is not used yet (DB lands in Phase 2, WP2.1) but is
-#   declared now so the Phase-1 toolchain is complete.
-# sqlite3_flutter_libs: ^0.5.0. Bundles SQLite for native platforms so drift
-#   (Phase 2) works out of the box; not referenced by code yet.
+# drift / drift_dev: ^2.35.0. Both bumped together in lockstep:
+#   2.35 is also the version whose release ships the vendored web assets
+#   (web/sqlite3.wasm + web/drift_worker.js) — keeping the runtime on the
+#   same release line avoids wasm/worker binding mismatches. drift_dev runs
+#   the codegen for the database (lib/db/*.g.dart via build_runner).
+# sqlite3_flutter_libs: ^0.6.0. Bundles SQLite for native platforms so drift
+#   works out of the box (referenced via sqlite3's ffi backend underneath
+#   drift; drift_flutter brings it transitively too — kept as an explicit
+#   dependency since ADR-0005 names it).
+# drift_flutter: ^0.3.0. The drift-recommended `driftDatabase()` factory:
+#   one line wires native (LazyDatabase over path_provider's application-
+#   support directory + sqlite3_flutter_libs) AND web (drift WasmDatabase +
+#   OPFS/IndexedDB probing) without hand-written conditional imports.
+#   0.3.x requires the sqlite3 3.x line (matches drift 2.35); 0.2.x would
+#   silently downgrade drift below 2.32. Justified further in
+#   lib/db/database_opener.dart (openCycleDatabase).
+# fl_chart: ^1.0.0. Temperature curve on the Zyklus screen.
 # intl: any — flutter_localizations pins `intl` to the version matching the
 #   installed Flutter SDK; `any` defers to that pin. This deliberately avoids a
 #   hard failure when the SDK pins a different intl than a guessed caret range.
 #   Pin it explicitly later (CONTRIBUTING.md) if so desired.
 #
 # Deliberately NOT here: sqlcipher_flutter_libs (ADR-005 — only when encryption
-# is wired, later milestone), fl_chart (Phase 2, WP2.2), pdf/printing (deferred
-# past M1), and no Android-only plugins (ADR-003). ERROR NOTE: if this file
-# ever reverts to "A new Flutter project" defaults, a `flutter create` run has
-# clobbered it — restore from git history.
+# is wired, later milestone), pdf/printing (deferred past M1), file pickers
+# (M1 exports/imports are copy-to-clipboard + web download + paste, see
+# lib/ui/einstellungen.dart), and no Android-only plugins (ADR-003). ERROR
+# NOTE: if this file ever reverts to "A new Flutter project" defaults, a
+# `flutter create` run has clobbered it — restore from git history.
 
 dependencies:
   flutter:
@@ -39,15 +52,19 @@ dependencies:
     sdk: flutter
   intl: any
   flutter_riverpod: ^2.6.0
-  drift: ^2.20.0
-  sqlite3_flutter_libs: ^0.5.0
+  drift: ^2.35.0
+  drift_flutter: ^0.3.0
+  sqlite3_flutter_libs: ^0.6.0
+  # Temperature curve chart; version range chosen to stay compatible
+  # with the installed Flutter/Dart (resolved against Dart 3.13 — see lock).
+  fl_chart: ^1.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
-  drift_dev: ^2.20.0
+  drift_dev: ^2.35.0
 
 flutter:
   uses-material-design: true

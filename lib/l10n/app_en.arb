@@ -8,6 +8,136 @@
   "entryDate": "Date",
   "temperature": "Temperature",
   "bleeding": "Bleeding",
-  "mucus": "Mucus",
-  "notes": "Notes"
+  "notes": "Notes",
+  "splashLoadingDatabase": "Loading database …",
+  "dbErrorTitle": "Database could not be opened",
+  "dbErrorRetry": "Try again",
+  "dbErrorHint": "On web the database is stored in the browser (OPFS/IndexedDB). In private mode or with missing asset files, opening fails.",
+  "save": "Save",
+  "saved": "Saved.",
+  "noEntriesYet": "No entries yet. Enter your first day above.",
+  "loadFailed": "Loading failed",
+  "bleedingNone": "none",
+  "bleedingPeriod": "period",
+  "bleedingSpotting": "spotting",
+  "excludeIllness": "illness",
+  "excludeAlcohol": "alcohol",
+  "excludeTravel": "travel",
+  "excludeOther": "other",
+  "excludesCaption": "Interrupted days (count as disturbed for evaluation):",
+  "mucusFeeling": "Mucus feeling",
+  "mucusFeelingUnset": "—",
+  "mucusDry": "dry",
+  "mucusSticky": "sticky, tacky",
+  "mucusCreamy": "milky, creamy",
+  "mucusMoist": "moist, smooth",
+  "mucusWet": "wet, slippery",
+  "mucusStretchy": "stretchy, like egg white",
+  "mucusNfpValue": "NFP value (mucus)",
+  "mucusMappingTitle": "Suggested mapping feeling → NFP",
+  "mucusMappingNote": "Preliminary mapping to be reviewed with INER experts (ADR-0001).",
+  "cervix": "Cervix (optional)",
+  "pain": "pain",
+  "mood": "mood",
+  "desire": "desire",
+  "sex": "sex",
+  "errorTemperature": "One temperature using comma or dot, two decimals max",
+  "errorTemperatureRange": "Plausibility: temperatures between 25 and 45 °C",
+  "cycleGroupLeading": "Without period onset (until {day})",
+  "@cycleGroupLeading": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleGroupOnset": "Cycle from {day}",
+  "@cycleGroupOnset": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleDays": "{n} days",
+  "@cycleDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleTapToEdit": "Tap a day to edit it",
+  "zyklusLegendTemperature": "BBT (temperature)",
+  "zyklusLegendBleeding": "Bleeding",
+  "zyklusLegendMucus": "NFP mucus value",
+  "zyklusNoData": "The temperature curve appears once days with measurements exist.",
+  "zyklusArithmeticNote": "Pure signal recording — no evaluation, no fertility statement. Marks (e.g. baseline/coverline) follow later (Mode M, ADR-0001).",
+  "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption, to be reviewed with experts (ADR-0001).",
+  "statistikNoData": "Cycle lengths appear once two period onsets are recorded.",
+  "statistikCycles": "Cycle lengths",
+  "statistikOnsets": "Period onsets",
+  "statistikAverage": "Average",
+  "statistikShortest": "Shortest",
+  "statistikLongest": "Longest",
+  "statistikDistribution": "Distribution",
+  "statistikDays": "{n} days",
+  "@statistikDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsLanguage": "Language",
+  "settingsLanguageNote": "In-memory only — reverts to German after reload (persistent storage planned).",
+  "languageGerman": "Deutsch",
+  "languageEnglish": "English",
+  "settingsPinLock": "PIN lock (placeholder)",
+  "settingsPinLockNote": "Not implemented yet: encryption/lock is planned in ADR-0005 (native later via SQLCipher, web via PIN).",
+  "settingsExport": "JSON export",
+  "settingsExportNote": "All profiles, entries and marks as one JSON document.",
+  "settingsImport": "JSON import",
+  "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
+  "exportTitle": "JSON preview",
+  "exportCopy": "Copy",
+  "exportCopied": "JSON copied to clipboard.",
+  "exportSaved": "File saved.",
+  "exportSaveFile": "Save as file",
+  "exportSaveFailed": "Saving the file failed.",
+  "exportNativeHint": "On Android/iOS: copy the text above (a share sheet will follow).",
+  "exportNothing": "Database is empty — nothing to export.",
+  "importTitle": "Paste JSON",
+  "importHint": "Paste an export document (schema_version 1) here …",
+  "importPickFile": "Pick file (web only)",
+  "importApply": "Apply import",
+  "importInvalid": "Invalid document (not an export / schema_version 1).",
+  "importFailed": "Import failed — the data was not changed.",
+  "importSummary": "New profiles: {profiles}, days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
+  "@importSummary": {
+    "placeholders": {
+      "profiles": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newMarks": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "importEmpty": "Import: nothing to change (document empty or already identical)."
 }

@@ -1,0 +1,163 @@
+// Tests for the JSON export/import domain logic (export document assembly,
+// parsing/validation, and the (profile, date) overwrite merge plan).
+// Pure Dart — no DB, no Flutter — runs on the host VM / CI.
+
+import 'dart:convert';
+
+import 'package:cycle_app/domain/export_import.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('export/import JSON codec', () {
+    test('buildExportJson assembles the schema-version document', () {
+      final json = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: const [
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15, 12),
+      ));
+
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      expect(decoded['schema_version'], exportSchemaVersion);
+      expect(
+          (decoded['exported_at'] as String).startsWith('2026-09-15'), isTrue);
+      expect((decoded['profiles'] as List).length, 1);
+      expect((decoded['entries'] as List).length, 1);
+      expect(decoded['marks'] as List, isEmpty);
+    });
+
+    test('parseExportJson round-trips a document it built', () {
+      final json = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 2, 'name': 'partner', 'ordinal': 1},
+        ],
+        entries: const [
+          {'profile_id': 2, 'date': '2026-04-10', 'bleeding': 'spotting'},
+        ],
+        marks: const [
+          {
+            'profile_id': 2,
+            'entry_date': '2026-04-10',
+            'mark_type': 'baseline',
+            'author': 'user',
+          },
+        ],
+        exportedAt: DateTime.utc(2026, 9, 15, 12),
+      ));
+
+      final doc = parseExportJson(json);
+      expect(doc.profiles.single['name'], 'partner');
+      expect(doc.entries.single['date'], '2026-04-10');
+      expect(doc.marks.single['mark_type'], 'baseline');
+    });
+
+    test('parseExportJson validates the exported-at timestamp', () {
+      expect(
+          () => parseExportJson(jsonEncode(<String, Object?>{
+                'schema_version': exportSchemaVersion,
+                // exported_at is missing entirely
+                'profiles': <Object?>[],
+                'entries': <Object?>[],
+                'marks': <Object?>[],
+              })),
+          throwsA(isA<FormatException>()));
+    });
+
+    test('parseExportJson rejects malformed documents', () {
+      expect(() => parseExportJson('not json at all'),
+          throwsA(isA<FormatException>()));
+      expect(() => parseExportJson(jsonEncode(<String, Object?>{})),
+          throwsA(isA<FormatException>()));
+      expect(
+          () => parseExportJson(jsonEncode(<String, Object?>{
+                'schema_version': 99,
+                'exported_at': '2026-09-15T00:00:00Z',
+                'profiles': <Object?>[],
+                'entries': <Object?>[],
+                'marks': <Object?>[],
+              })),
+          throwsA(isA<FormatException>()));
+    });
+
+    test('planMerge counts new entries, overwrites and marks correctly', () {
+      final doc = ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: const <Map<String, Object?>>[
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+          {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'none'},
+          // overwrites the existing day (merge policy: overwrite)
+          {'profile_id': 1, 'date': '2026-03-05', 'bleeding': 'spotting'},
+        ],
+        marks: const <Map<String, Object?>>[
+          {
+            'profile_id': 1,
+            'entry_date': '2026-03-03',
+            'mark_type': 'baseline',
+            'author': 'user',
+          },
+          {
+            'profile_id': 1,
+            'entry_date': '2026-03-04',
+            'mark_type': 'baseline',
+            'author': 'user',
+          },
+        ],
+        exportedAt: DateTime.utc(2026, 9, 15),
+      );
+
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {importEntryKey(1, '2026-03-05')},
+        existingMarkKeys: {importMarkKey(1, '2026-03-03', 'baseline')},
+        existingProfileIds: const {1},
+      );
+
+      expect(summary.profilesToInsert, 0, reason: 'profile 1 does exist');
+      expect(summary.duplicateEntryRows, 0, reason: 'no date repeated in doc');
+      expect(summary.entriesNew, 2, reason: '03-01, 03-02');
+      expect(summary.entriesOverwritten, 1, reason: '03-05 exists');
+      expect(summary.marksNew, 1, reason: '03-04 only; 03-03 exists');
+      expect(summary.marksSkipped, 1);
+    });
+
+    test('repeated (profile, date) rows inside one document are reported', () {
+      final doc = ExportBlob(
+        profiles: const [],
+        entries: const <Map<String, Object?>>[
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'none'},
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15),
+      );
+
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.duplicateEntryRows, 1);
+      // The first occurrence wins; the later one is the counted duplicate.
+      expect(summary.entriesNew, 1);
+    });
+
+    test('entry/mark key helpers are stable and unambiguous', () {
+      expect(importEntryKey(1, '2026-03-05'), contains('|2026-03-05'));
+      expect(importEntryKey(12, '2026-03-05'),
+          isNot(importEntryKey(1, '2026-03-05'.padLeft(10, '1'))));
+      expect(importMarkKey(1, '2026-03-05', 'baseline'),
+          isNot(importMarkKey(1, '2026-03-05', 'mucusPeakDay')));
+    });
+
+    test('merge policy constant documents the overwrite behaviour', () {
+      expect(exportMergePolicy, 'overwrite');
+    });
+  });
+}

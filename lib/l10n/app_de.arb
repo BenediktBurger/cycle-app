@@ -11,6 +11,136 @@
   "entryDate": "Datum",
   "temperature": "Temperatur",
   "bleeding": "Blutung",
-  "mucus": "Schleim",
-  "notes": "Notizen"
+  "notes": "Notizen",
+  "splashLoadingDatabase": "Lade Datenbank …",
+  "dbErrorTitle": "Datenbank konnte nicht geöffnet werden",
+  "dbErrorRetry": "Erneut versuchen",
+  "dbErrorHint": "Auf Web wird die Datenbank im Browser (OPFS/IndexedDB) gespeichert. Bei privatem Modus oder fehlenden Asset-Dateien schlägt das Öffnen fehl.",
+  "save": "Speichern",
+  "saved": "Gespeichert.",
+  "noEntriesYet": "Noch keine Einträge. Trage oben deinen ersten Tag ein.",
+  "loadFailed": "Laden fehlgeschlagen",
+  "bleedingNone": "keine",
+  "bleedingPeriod": "Periode",
+  "bleedingSpotting": "Schmierblutung",
+  "excludeIllness": "Krank",
+  "excludeAlcohol": "Alkohol",
+  "excludeTravel": "Reise",
+  "excludeOther": "Sonstiges",
+  "excludesCaption": "Störungstage (werten bewertungstechnisch wie unterbrochen):",
+  "mucusFeeling": "Schleimgefühl",
+  "mucusFeelingUnset": "—",
+  "mucusDry": "trocken",
+  "mucusSticky": "klebrig, dassig",
+  "mucusCreamy": "milchig, cremeartig",
+  "mucusMoist": "feucht, glatt",
+  "mucusWet": "nass, rutschig",
+  "mucusStretchy": "fädenziehend, wie Eiweiß",
+  "mucusNfpValue": "NFP-Wert (Schleim)",
+  "mucusMappingTitle": "Vorschlagstabelle Gefühl → NFP",
+  "mucusMappingNote": "Vorläufige Zuordnung, prüft mit INER-Experten (ADR-0001).",
+  "cervix": "Muttermund (freiwillig)",
+  "pain": "Schmerzen",
+  "mood": "Stimmung",
+  "desire": "Lust",
+  "sex": "Sex",
+  "errorTemperature": "Nur eine Temperatur mit Komma oder Punkt, zwei Dezimalstellen",
+  "errorTemperatureRange": "Plausibilität: Temperaturen zwischen 25 und 45 °C",
+  "cycleGroupLeading": "Ohne Periodenbeginn (bis {day})",
+  "@cycleGroupLeading": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleGroupOnset": "Zyklus ab {day}",
+  "@cycleGroupOnset": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleDays": "{n} Tage",
+  "@cycleDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleTapToEdit": "Tippen, um den Tag zu bearbeiten",
+  "zyklusLegendTemperature": "BBT (Temperatur)",
+  "zyklusLegendBleeding": "Blutung",
+  "zyklusLegendMucus": "NFP-Schleimwert",
+  "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
+  "zyklusArithmeticNote": "Reine Aufzeichnung der Signale — keine Auswertung, keine Fruchtbarkeitsangabe. Markierungen (z. B. Baseline/Deckblatt) folgen später (Mode M, ADR-0001).",
+  "statistikNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme, prüft mit den Fachleuten (ADR-0001).",
+  "statistikNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
+  "statistikCycles": "Zykluslängen",
+  "statistikOnsets": "Regelbeginne",
+  "statistikAverage": "Durchschnitt",
+  "statistikShortest": "Kürzester",
+  "statistikLongest": "Längster",
+  "statistikDistribution": "Verteilung",
+  "statistikDays": "{n} Tage",
+  "@statistikDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsLanguage": "Sprache",
+  "settingsLanguageNote": "Nur im Speicher — nach Neuladen wieder Deutsch (geplant: persistenter Speicher).",
+  "languageGerman": "Deutsch",
+  "languageEnglish": "English",
+  "settingsPinLock": "PIN-Sperre (Platzhalter)",
+  "settingsPinLockNote": "Noch nicht umgesetzt: Verschlüsselung/Sperre ist in ADR-0005 geplant (native später mit SQLCipher, Web über PIN).",
+  "settingsExport": "JSON-Export",
+  "settingsExportNote": "Alle Profile, Einträge und Markierungen als JSON-Dokument.",
+  "settingsImport": "JSON-Import",
+  "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
+  "exportTitle": "JSON-Vorschau",
+  "exportCopy": "Kopieren",
+  "exportCopied": "JSON in die Zwischenablage kopiert.",
+  "exportSaved": "Datei gespeichert.",
+  "exportSaveFile": "Als Datei speichern",
+  "exportSaveFailed": "Speichern fehlgeschlagen.",
+  "exportNativeHint": "Auf Android/iOS: Text oben kopieren (Freigabe-Funktion folgt).",
+  "exportNothing": "Datenbank ist leer — nichts zu exportieren.",
+  "importTitle": "JSON einfügen",
+  "importHint": "Exportdokument (schema_version 1) hier einfügen …",
+  "importPickFile": "Datei wählen (nur Web)",
+  "importApply": "Import durchführen",
+  "importInvalid": "Ungültiges Dokument (kein Export-Format/schema_version 1).",
+  "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
+  "importSummary": "Neue Profile: {profiles}, Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
+  "@importSummary": {
+    "placeholders": {
+      "profiles": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newMarks": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch)."
 }

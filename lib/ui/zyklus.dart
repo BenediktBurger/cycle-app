@@ -1,18 +1,402 @@
+// Zyklus screen: the recorded temperature curve plus the bleeding/mucus
+// symbol row underneath, purely as signals. NOTHING is evaluated here —
+// no baseline, no coverline, no fertile-window hints. That analysis is
+// Mode-M territory (user-placed marks), deferred past this milestone per
+// ADR-0001 (status: Hypothesis).
+//
+// Tapping a chart day or a symbol cell jumps to the Tagebuch form with that
+// date pre-selected (shared via selectedDateProvider + tabIndexProvider).
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/date_only.dart';
+import '../domain/models.dart';
 import '../l10n/app_localizations.dart';
+import '../providers.dart';
 
-/// Placeholder Zyklus screen (Phase 1). The temperature curve (fl_chart)
-/// arrives in Phase 2 (see docs/roadmap.md). No database access here.
-class ZyklusScreen extends StatelessWidget {
+class ZyklusScreen extends ConsumerWidget {
   const ZyklusScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final entriesAsync = ref.watch(dailyEntriesProvider);
+
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navZyklus)),
-      body: Center(child: Text(l10n.navZyklus)),
+      body: entriesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text(l10n.loadFailed)),
+        data: (entries) {
+          if (entries.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(l10n.zyklusNoData),
+              ),
+            );
+          }
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              _CycleChart(entries: entries),
+              const SizedBox(height: 12),
+              const _Legend(),
+              const SizedBox(height: 4),
+              Text(
+                l10n.zyklusArithmeticNote,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
+}
+
+/// The chart data view model for one recorded range: day index -> signal.
+final class _ChartDays {
+  _ChartDays(List<DailyEntry> entries) {
+    final sorted = [...entries]
+      ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
+    firstDay = DateOnly.normalize(sorted.first.date);
+    dayCount =
+        DateOnly.daysBetween(DateOnly.normalize(sorted.last.date), firstDay) +
+            1;
+    for (final e in sorted) {
+      byIndex[DateOnly.daysBetween(DateOnly.normalize(e.date), firstDay)] = e;
+    }
+  }
+
+  /// UTC-midnight of the first recorded day (day index 0).
+  late final DateTime firstDay;
+
+  /// Index range length (>= number of recorded days; gaps included).
+  late final int dayCount;
+
+  final Map<int, DailyEntry> byIndex = {};
+
+  DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
+}
+
+/// fl_chart line chart over all measured days plus a per-day symbol row.
+///
+/// The x axis is a plain day index over the recorded range: calendar gaps
+/// (days without any measurement) stay honest as distance, not compressed.
+/// Y bounds are rounded to the nearest half degree so the gridlines carry
+/// typical 0.25 °C steps without a "good range" being implied.
+final class _CycleChart extends ConsumerStatefulWidget {
+  const _CycleChart({required this.entries});
+
+  final List<DailyEntry> entries;
+
+  @override
+  ConsumerState<_CycleChart> createState() => _CycleChartState();
+}
+
+final class _CycleChartState extends ConsumerState<_CycleChart> {
+  late final _ChartDays _days;
+
+  @override
+  void initState() {
+    super.initState();
+    _days = _ChartDays(widget.entries);
+  }
+
+  void _openDayInForm(int index) {
+    // Tapping the curve means: edit (or at least review) that day.
+    ref.read(selectedDateProvider.notifier).state = _days.dayAt(index);
+    ref.read(tabIndexProvider.notifier).state = 0; // Tagebuch tab
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = <FlSpot>[
+      for (final entry in _days.byIndex.entries)
+        if (entry.value.bbtC != null)
+          FlSpot(entry.key.toDouble(), entry.value.bbtC!),
+    ];
+
+    if (spots.isEmpty) {
+      return Text(
+        AppLocalizations.of(context).zyklusNoData,
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
+    final values = spots.map((s) => s.y).toList();
+    var yMin = _floorToHalf(values.reduce((a, b) => a < b ? a : b) - 0.4)
+        .clamp(34.0, 40.0);
+    var yMax = _ceilToHalf(values.reduce((a, b) => a > b ? a : b) + 0.4)
+        .clamp(35.5, 42.0);
+    if (yMax <= yMin) {
+      // Never let degenerate bounds through to the chart.
+      yMax = yMin + 0.5;
+    }
+
+    final xInterval = (_days.dayCount / 8).ceil().toDouble().max(1);
+    // fl_chart requires minX < maxX; a single recorded day gets a 1-day
+    // tick window instead of a degenerate zero-width axis.
+    final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 260,
+          child: LineChart(
+            LineChartData(
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: false,
+                  barWidth: 1.6,
+                  color: Theme.of(context).colorScheme.primary,
+                  dotData: const FlDotData(show: true),
+                ),
+              ],
+              minX: 0,
+              maxX: maxX,
+              minY: yMin,
+              maxY: yMax,
+              gridData: const FlGridData(drawVerticalLine: false),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: const AxisTitles(
+                  sideTitles: SideTitles(
+                    reservedSize: 44,
+                    showTitles: true,
+                    interval: 0.5,
+                    getTitlesWidget: _yTitle,
+                  ),
+                ),
+                topTitles: const AxisTitles(),
+                rightTitles: const AxisTitles(),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    reservedSize: 22,
+                    showTitles: true,
+                    interval: xInterval,
+                    getTitlesWidget: (value, meta) => _xTitle(
+                      value,
+                      meta,
+                      firstDay: _days.firstDay,
+                    ),
+                  ),
+                ),
+              ),
+              lineTouchData: LineTouchData(
+                enabled: true,
+                handleBuiltInTouches: false,
+                touchCallback: (event, response) {
+                  final tapLike =
+                      event is FlTapUpEvent || event is FlLongPressEnd;
+                  if (!tapLike) return;
+                  final touched = response?.lineBarSpots;
+                  if (touched == null || touched.isEmpty) return;
+                  final index =
+                      touched.first.x.round().clamp(0, _days.dayCount - 1);
+                  _openDayInForm(index);
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _SymbolRow(days: _days, onDayTap: _openDayInForm),
+      ],
+    );
+  }
+}
+
+/// One narrow cell per calendar day under the chart, aligned by the same
+/// even day spacing as the chart: bleeding marker on top, the recorded NFP
+/// mucus value (if any) below. Pure recording, no interpretation.
+final class _SymbolRow extends StatelessWidget {
+  const _SymbolRow({required this.days, required this.onDayTap});
+
+  final _ChartDays days;
+  final void Function(int index) onDayTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < days.dayCount; i++)
+          Expanded(
+            child: InkWell(
+              onTap: () => onDayTap(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: _SymbolCell(entry: days.byIndex[i]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+final class _SymbolCell extends StatelessWidget {
+  const _SymbolCell({required this.entry});
+
+  final DailyEntry? entry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entry == null) {
+      return const SizedBox(height: 26);
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Bleeding marker (top): filled = period, hollow = spotting.
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: entry!.bleeding == Bleeding.period
+                ? Theme.of(context).colorScheme.error
+                : Colors.transparent,
+            border: Border.all(
+              width: 1.5,
+              color: entry!.bleeding == Bleeding.none
+                  ? Colors.transparent
+                  : Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        // Mucus NFP value (bottom); empty when nothing recorded.
+        Text(
+          entry!.mucusNfp == null ? '' : '${entry!.mucusNfp}',
+          style: TextStyle(
+            fontSize: 9,
+            height: 1.1,
+            color: Theme.of(context).colorScheme.tertiary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+final class _Legend extends StatelessWidget {
+  const _Legend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 4,
+      children: [
+        _LegendDot(
+          color: Theme.of(context).colorScheme.primary,
+          label: AppLocalizations.of(context).zyklusLegendTemperature,
+          shape: _LegendShape.dot,
+        ),
+        _LegendDot(
+          color: Theme.of(context).colorScheme.error,
+          label: AppLocalizations.of(context).zyklusLegendBleeding,
+          shape: _LegendShape.ring,
+        ),
+        _LegendDot(
+          color: Theme.of(context).colorScheme.tertiary,
+          label: AppLocalizations.of(context).zyklusLegendMucus,
+          shape: _LegendShape.text,
+        ),
+      ],
+    );
+  }
+}
+
+enum _LegendShape { dot, ring, text }
+
+final class _LegendDot extends StatelessWidget {
+  const _LegendDot({
+    required this.color,
+    required this.label,
+    required this.shape,
+  });
+
+  final Color color;
+  final String label;
+  final _LegendShape shape;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget symbol = switch (shape) {
+      _LegendShape.dot => Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+      _LegendShape.ring => Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            shape: BoxShape.circle,
+            border: Border.all(width: 1.5, color: color),
+          ),
+        ),
+      _LegendShape.text => Text('3',
+          style: TextStyle(
+            fontSize: 10,
+            height: 1.1,
+            color: color,
+            fontWeight: FontWeight.w600,
+          )),
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        symbol,
+        const SizedBox(width: 6),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+// --- axis title helpers ----------------------------------------------------
+
+/// Y axis: plain degree labels ("36.5" — numeric, sidebar-localized).
+Widget _yTitle(double value, TitleMeta meta) => Text(
+      _formatHalfDegree(value),
+      style: const TextStyle(fontSize: 10),
+    );
+
+/// X axis: day-of-month labels ("14.") at the interval ticks.
+Widget _xTitle(double value, TitleMeta meta, {required DateTime firstDay}) {
+  final i = value.round();
+  if (value != i.toDouble() || i < 0) return const SizedBox.shrink();
+  final day = DateOnly.addDays(firstDay, i);
+  return Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Text(
+      '${day.day}.',
+      style: const TextStyle(fontSize: 10),
+    ),
+  );
+}
+
+String _formatHalfDegree(double value) {
+  final rounded = (value * 100).round() / 100;
+  return rounded % 1 == 0
+      ? rounded.toStringAsFixed(0)
+      : rounded.toStringAsFixed(1);
+}
+
+double _floorToHalf(double v) => (v * 2).floorToDouble() / 2;
+
+double _ceilToHalf(double v) => (v * 2).ceilToDouble() / 2;
+
+extension _MaxNum on num {
+  double max(num other) => this > other ? toDouble() : other.toDouble();
 }

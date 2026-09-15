@@ -23,22 +23,26 @@ comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 
 ## Phase 2 — data layer & real screens (WP2.x)
 
-- [ ] **WP2.2 / WP2.2.1** — wire `openCycleDatabase()`: platform executors
-      (lazy native file / web wasm) now exist only as a stub
-      (`lib/db/cycle_database.dart`); schema, DAOs and mappers (WP2.1) are in
-      the tree
-- [ ] **WP2.2 (web)** — bundle `sqlite3.wasm` + drift worker assets so the
-      app runs with a database on web; update the run note in
-      [CONTRIBUTING.md](../CONTRIBUTING.md) §3 when this lands
-- [ ] **WP2.2.2** — language switcher in the settings screen (German-first
-      localization is in place, switching itself is not wired)
-- [ ] **WP2.2.3** — JSON export → modify → import round-trip
-- [ ] **WP2.2.4** — real Tagebuch entry form (replaces the placeholder
-      screen)
-- [ ] **WP2.2.5** — *(not derivable from the repo; from the plan file — owner
-      to slot in)*
-- [ ] **WP2.2.6** — Zyklus temperature curve with `fl_chart`
-- [ ] **WP2.2.7** — real Statistik screens — **arithmetic only**, no
+- [x] **WP2.2 / WP2.2.1** — `openCycleDatabase()` wired: native = lazy
+      background-isolate file DB, web = drift wasm (`web/sqlite3.wasm` +
+      `web/drift_worker.js` vendored); wrapped as the Riverpod
+      `databaseProvider` behind the splash gate
+- [x] **WP2.2 (web)** — wasm + worker assets vendored from the drift 2.35.0
+      release; run note updated in [CONTRIBUTING.md](../CONTRIBUTING.md) §3
+- [x] **WP2.2.2** — language switcher (de/en) in settings; in-memory only
+      (resets to German on reload — documented limitation)
+- [x] **WP2.2.3** — JSON export/import in settings: copy-text path on all
+      platforms, browser download + file input on web, home-directory file
+      on desktop; merge policy (profile, date) = overwrite with counts
+- [x] **WP2.2.4** — real Tagebuch entry form (full field set incl. the
+      NFP mucus mapping table, marked as a review-pending assumption)
+- [x] **WP2.2.5** — Tagebuch entries list grouped by cycle: live entry
+      stream → domain cycle grouping, newest cycle first; per-day tiles
+      carry bleeding/exclusion/BBT/NFP/notes and load the day back into
+      the entry form on tap
+- [x] **WP2.2.6** — Zyklus temperature curve (fl_chart) + bleeding/mucus
+      symbol row; tapping a day opens the entry form on that date
+- [x] **WP2.2.7** — real Statistik screens — **arithmetic only**, no
       interpretive or status conclusions (flagged for INER expert review,
       ADR-001)
 
