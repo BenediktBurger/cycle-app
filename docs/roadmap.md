@@ -48,6 +48,12 @@ round-trips, Statistik shows arithmetic only.
 
 ## Later milestones (not yet broken down)
 
+- [ ] Rename all German-named code files to English identifiers — at the
+      time of writing: `lib/ui/{einstellungen,zyklus,statistik,tagebuch}.dart`
+      → `{settings,cycle,statistics,diary}.dart`, plus any German-named
+      files that appear meanwhile; mechanical, no behavior change. Policy:
+      [ADR-0007](adr/0007-language-policy.md).
+
 Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 stubs), the pin-lock stub, PDF export, and whatever follows WP2.2 — to be
 slotted in as the plan file solidifies.
