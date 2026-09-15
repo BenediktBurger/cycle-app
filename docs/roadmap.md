@@ -61,3 +61,39 @@ round-trips, Statistik shows arithmetic only.
 Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 stubs), the pin-lock stub, PDF export, and whatever follows WP2.2 — to be
 slotted in as the plan file solidifies.
+
+## Backlog — issues & improvements
+
+Collector for real issues and improvement ideas that are not (yet) part of a
+milestone or the internal plan. When an item is done, it is **removed** from
+here, not ticked — the sections above track planned work, git history keeps
+the record (see [`AGENTS.md`](../AGENTS.md)).
+
+### Bugs
+
+- [ ] Temperature curve only connects measurements on *consecutive* days:
+      when a day without a measurement lies between two measured days, the
+      line breaks. It should connect across the gap.
+
+### Necessary
+
+- [ ] Language default: system language when available, otherwise English;
+      the settings offer switching between "system" and the individual
+      languages (de/en) — see
+      [ADR-0007](adr/0007-language-policy.md).
+- [ ] Rename ui classes to English according to ADR 0007
+- [ ] Missing translation term falls back to **English** (non-Germans likely
+      know English, but not German) instead of German.
+- [ ] Analysis marks: place evaluation marks (cervix peak etc.); the "first
+      higher measurement" adds the baseline automatically, based on the
+      preceding measurements.
+- [ ] Data entry aligned with the NER scheme: different bleeding levels,
+      time of day for sex (morning/midday/evening), …
+- [ ] Building the actual app (as captured: "building an app" — scope to be
+      clarified: release/packaging vs. remaining placeholder screens).
+
+### Convenience
+
+- [ ] Dark mode, following the device setting.
+- [ ] Password protection for the database (relates to the encryption stub
+      in [ADR-005](adr/0005-storage-and-encryption.md)).

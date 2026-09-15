@@ -5,6 +5,22 @@ Guidance for coding agents (and human contributors). Start with
 conventions; open work lives in [`docs/roadmap.md`](docs/roadmap.md),
 decisions in [`docs/adr/`](docs/adr/README.md).
 
+## Improvement notes: three destinations, never lost
+
+Issues, dislikes, and improvement ideas go where they can actually take
+effect, not into a generic pile:
+
+- **Agent behavior you want changed** → a rule in **this file**. Do not
+  backlog it — a backlog entry would let it recur instead of fixing it.
+- **Doubt about a decision** → the ADR in question (unresolved assumptions
+  are marked there, e.g. `TODO(user-review)`; they are questions for INER
+  experts, not settled behavior).
+- **Actual work items** (bugs, missing features, conveniences) → the
+  `## Backlog` section of [`docs/roadmap.md`](docs/roadmap.md), grouped as
+  bugs / necessary / convenience. No work-package IDs there: backlog items
+  are not derived from the plan file. Necessary items take priority over
+  convenience items unless the owner decides otherwise.
+
 ## Work-package IDs stay in docs/roadmap.md only
 
 The internal plan file that defines the `WP1.x` / `WP2.x` numbering is
@@ -20,7 +36,9 @@ single durable mapping of those IDs. Therefore:
   milestone-appropriate context, source code is not.
 - When an item lands, rewrite comments that deferred to it so they describe
   current behavior instead of the plan, and tick the roadmap checkbox only
-  until the item is folded into history (see the roadmap preamble).
+  until the item is folded into history (see the roadmap preamble). The same
+  applies to the backlog section: **done backlog items are removed** — the
+  roadmap is a queue, git history is the diary.
 
 ## File roles
 
