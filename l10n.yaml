@@ -1,0 +1,12 @@
+arb-dir: lib/l10n
+template-arb-file: app_de.arb
+output-localization-file: app_localizations.dart
+nullable-getter: false
+# Generated-code placement: this project generates REAL files into arb-dir
+# (lib/l10n, imported as `package:cycle_app/l10n/app_localizations.dart`)
+# instead of the deprecated synthetic package:flutter_gen. Historical note:
+# the `synthetic-package: false` opt-in switch that was required on older
+# Flutter releases is now DEPRECATED — Flutter 3.47 warns `synthetic-package`
+# "no longer has any effect" (real files are the only supported behavior), so
+# the switch was removed in the 2026-09-15 repair. Keep it out of this file.
+# Requires `flutter: generate: true` in pubspec.yaml (see comment there).

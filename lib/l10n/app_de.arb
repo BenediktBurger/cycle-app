@@ -1,0 +1,16 @@
+{
+  "@@locale": "de",
+  "appTitle": "Zyklus-App (Arbeitstitel)",
+  "@appTitle": {
+    "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
+  },
+  "navTagebuch": "Tagebuch",
+  "navZyklus": "Zyklus",
+  "navStatistik": "Statistik",
+  "navEinstellungen": "Einstellungen",
+  "entryDate": "Datum",
+  "temperature": "Temperatur",
+  "bleeding": "Blutung",
+  "mucus": "Schleim",
+  "notes": "Notizen"
+}

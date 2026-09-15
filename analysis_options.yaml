@@ -1,0 +1,9 @@
+# Analyzer + lint configuration. flutter_lints is the standard low-strictness
+# baseline for Flutter apps.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+include: package:flutter_lints/flutter.yaml

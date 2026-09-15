@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "appTitle": "Cycle App (working title)",
+  "navTagebuch": "Diary",
+  "navZyklus": "Cycle",
+  "navStatistik": "Statistics",
+  "navEinstellungen": "Settings",
+  "entryDate": "Date",
+  "temperature": "Temperature",
+  "bleeding": "Bleeding",
+  "mucus": "Mucus",
+  "notes": "Notes"
+}

@@ -1,0 +1,57 @@
+name: cycle_app
+# PLACEHOLDER package name (ADR-0002): rename = change this one line and re-run
+# `flutter create --platforms=android,ios --project-name cycle_app .`.
+description: >-
+  Local-first cycle evaluation app (NER/Rötzer, INER). German-first with
+  English support. No cloud, no analytics.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+# Version notes — chosen WITHOUT a local Flutter SDK (see CONTRIBUTING.md for
+# environment setup); all ranges float within their major/minor line so pub
+# picks a version compatible with the installed SDK:
+#
+# flutter_riverpod: ^2.6.0 is a known-stable 2.x release. Deliberately stays on
+#   the Riverpod 2.x line (3.x changes APIs).
+# drift / drift_dev: ^2.20.0. Keep these two in sync with each other when
+#   bumping. drift_dev is not used yet (DB lands in Phase 2, WP2.1) but is
+#   declared now so the Phase-1 toolchain is complete.
+# sqlite3_flutter_libs: ^0.5.0. Bundles SQLite for native platforms so drift
+#   (Phase 2) works out of the box; not referenced by code yet.
+# intl: any — flutter_localizations pins `intl` to the version matching the
+#   installed Flutter SDK; `any` defers to that pin. This deliberately avoids a
+#   hard failure when the SDK pins a different intl than a guessed caret range.
+#   Pin it explicitly later (CONTRIBUTING.md) if so desired.
+#
+# Deliberately NOT here: sqlcipher_flutter_libs (ADR-005 — only when encryption
+# is wired, later milestone), fl_chart (Phase 2, WP2.2), pdf/printing (deferred
+# past M1), and no Android-only plugins (ADR-003). ERROR NOTE: if this file
+# ever reverts to "A new Flutter project" defaults, a `flutter create` run has
+# clobbered it — restore from git history.
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  flutter_riverpod: ^2.6.0
+  drift: ^2.20.0
+  sqlite3_flutter_libs: ^0.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.0
+  drift_dev: ^2.20.0
+
+flutter:
+  uses-material-design: true
+  # Required by Flutter 3.47: makes `flutter pub get`/`flutter test`/build run
+  # `gen-l10n` automatically using l10n.yaml, so the real generated files under
+  # lib/l10n (output configured in l10n.yaml) are produced before compile.
+  generate: true
