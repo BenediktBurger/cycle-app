@@ -5,12 +5,15 @@
 // always-available JSON text screen with a copy button on every platform,
 // plus a file save/download where the platform supports it (web, desktop
 // with a home directory). Import: paste-JSON dialog everywhere, plus a file
-// picker on web.
+// picker on web. The drip CSV import (below the JSON card) reuses the same
+// dialog shape: the mapper turns the CSV into an export document that goes
+// through the existing importJsonToDatabase (merge policy for free).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/export_adapter.dart';
+import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
@@ -134,6 +137,32 @@ class EinstellungenScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // --- drip CSV import ------------------------------------------
+          // Drip (sibling project) exports calendar days as a CSV; the
+          // mapper produces a normal export document, so the merge policy,
+          // transaction and summary counting are the existing import ones.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.dripImportTitle,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(l10n.dripImportNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _openDripImportDialog(context, ref),
+                    icon: const Icon(Icons.upload_outlined),
+                    label: Text(l10n.dripImportTitle),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -183,7 +212,7 @@ class EinstellungenScreen extends ConsumerWidget {
                 if (canPickFile) ...[
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final text = await pickJsonFileText();
+                      final text = await pickFileText();
                       if (text != null) {
                         controller.text = text;
                       }
