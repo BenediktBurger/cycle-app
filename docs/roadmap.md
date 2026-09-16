@@ -72,14 +72,13 @@ the sections above track planned work, git history keeps the record (see
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - [ ] Time of temperature measurement (can be prefilled with current time)
-- Datenbankschema überarbeiten (manche Dinge pro Zyklus nicht pro Tag speichern? )
-- [ ] allow different levels of bleeding
-- [ ] show excluded temperature measurements in a lighter color (also the connection line, if possible)
-- exclude (Temperatur, Blutung) als negative Zahl?
-- set markings (temperature rising etc.) on the cycle tab
+- Datenbankschema überarbeiten (manche Dinge pro Zyklus (erste höhere Messung)/als Event (z.B: Messmethode) nicht pro Tag speichern? )
+- mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
+- [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date
+- [ ] show on cycle tab also day of month (and replace the first day with a short form of the month)
 
 ### Convenience
 
@@ -89,6 +88,7 @@ the sections above track planned work, git history keeps the record (see
       pin down the storage decision; implementation then follows it.
 - Import from drip
 - [ ] Wochenende farblich hervorheben
+- [ ] make mode selectable: light mode, dark mode, system setting
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
