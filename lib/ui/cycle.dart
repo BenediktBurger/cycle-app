@@ -15,6 +15,7 @@ import '../domain/models.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'cycle_curve.dart';
 import 'mucus_symbol.dart';
 
 class ZyklusScreen extends ConsumerWidget {
@@ -115,23 +116,25 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 
   @override
   Widget build(BuildContext context) {
-    final spots = <FlSpot>[
-      for (final entry in _days.byIndex.entries)
-        if (entry.value.bbtC != null)
-          FlSpot(entry.key.toDouble(), entry.value.bbtC!),
-    ];
+    // The curve is split into runs of adjacent measured days (curve helpers,
+    // lib/ui/cycle_curve.dart): the line connects two temperatures only when
+    // their calendar days are adjacent, so a day without a temperature
+    // (missing entry or entry without bbtC) breaks the line.
+    final runs = curveRuns(_days.byIndex);
+    final segments = curveSegments(runs);
+    final points = [for (final run in runs) ...run.points];
 
-    if (spots.isEmpty) {
+    if (points.isEmpty) {
       return Text(
         AppLocalizations.of(context).zyklusNoData,
         style: Theme.of(context).textTheme.bodyMedium,
       );
     }
 
-    final values = spots.map((s) => s.y).toList();
-    var yMin = _floorToHalf(values.reduce((a, b) => a < b ? a : b) - 0.4)
+    final yValues = [for (final point in points) point.bbtC];
+    var yMin = _floorToHalf(yValues.reduce((a, b) => a < b ? a : b) - 0.4)
         .clamp(34.0, 40.0);
-    var yMax = _ceilToHalf(values.reduce((a, b) => a > b ? a : b) + 0.4)
+    var yMax = _ceilToHalf(yValues.reduce((a, b) => a > b ? a : b) + 0.4)
         .clamp(35.5, 42.0);
     if (yMax <= yMin) {
       // Never let degenerate bounds through to the chart.
@@ -139,6 +142,15 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     }
 
     final xInterval = (_days.dayCount / 8).ceil().toDouble().max(1);
+    // Interrupted (excluded) TEMPERATURES read lighter: the scheme color at
+    // a fraction of the alpha. The dark scheme's primary is a bright color,
+    // so the dimmed tint still keeps darkness-readable contrast (asserted
+    // by the dark-mode chart tests).
+    final temperatureColor = Theme.of(context).colorScheme.primary;
+    final interruptedColor = temperatureColor.withValues(alpha: 0.4);
+    final interruptedByIndex = <int, bool>{
+      for (final point in points) point.dayIndex: point.excluded,
+    };
     // fl_chart requires minX < maxX; a single recorded day gets a 1-day
     // tick window instead of a degenerate zero-width axis.
     final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
@@ -177,13 +189,41 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
           child: LineChart(
             LineChartData(
               lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: false,
-                  barWidth: 1.6,
-                  color: Theme.of(context).colorScheme.primary,
-                  dotData: const FlDotData(show: true),
-                ),
+                // The line: one two-spot bar per adjacent-day pair, so a
+                // segment touching an interrupted (excluded) day can render
+                // lighter while the others keep the full-strength color.
+                // Dots are painted afterwards by the dot bars below.
+                for (final segment in segments)
+                  LineChartBarData(
+                    spots: [
+                      FlSpot(segment.a.dayIndex.toDouble(), segment.a.bbtC),
+                      FlSpot(segment.b.dayIndex.toDouble(), segment.b.bbtC),
+                    ],
+                    isCurved: false,
+                    barWidth: 1.6,
+                    color:
+                        segment.lighter ? interruptedColor : temperatureColor,
+                    dotData: const FlDotData(show: false),
+                  ),
+                // The dots: invisible-line bars (transparent color) holding
+                // each run's spots, so the per-spot dot painter can render
+                // an interrupted day's dot lighter than the others.
+                for (final run in runs)
+                  LineChartBarData(
+                    spots: [
+                      for (final point in run.points)
+                        FlSpot(point.dayIndex.toDouble(), point.bbtC),
+                    ],
+                    color: Colors.transparent,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, _, bar, __) => FlDotCirclePainter(
+                        color: interruptedByIndex[spot.x.round()] ?? false
+                            ? interruptedColor
+                            : temperatureColor,
+                      ),
+                    ),
+                  ),
               ],
               minX: 0,
               maxX: maxX,

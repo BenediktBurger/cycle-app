@@ -57,10 +57,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-- [ ] Temperature curve only connects measurements on *consecutive* days:
-      when a day without a measurement lies between two measured days, the
-      line breaks. It should connect across the gap.
-
 ### Necessary
 
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
