@@ -6,4 +6,4 @@ const bool canPickFile = false;
 
 Future<bool> saveFile(String filename, String content) async => false;
 
-Future<String?> pickJsonFileText() async => null;
+Future<String?> pickFileText({String accept = 'application/json,.json'}) async => null;

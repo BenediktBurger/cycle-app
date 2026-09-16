@@ -314,6 +314,142 @@ class EinstellungenScreen extends ConsumerWidget {
       );
     }
   }
+
+  /// Drip CSV import dialog: same shape as [_openImportDialog] — a paste
+  /// textarea everywhere, a file picker on web (accepting CSV), and a
+  /// shared controller + busy-flag listener so Apply tracks both.
+  Future<void> _openDripImportDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    final running = ValueNotifier<bool>(false);
+    final listenable = Listenable.merge([controller, running]);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.dripImportTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canPickFile) ...[
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final text =
+                          await pickFileText(accept: '.csv,text/csv');
+                      if (text != null) {
+                        controller.text = text;
+                      }
+                    },
+                    icon: const Icon(Icons.file_open_outlined),
+                    label: Text(l10n.importPickFile),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  controller: controller,
+                  maxLines: 10,
+                  decoration: InputDecoration(hintText: l10n.dripImportHint),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+              ),
+            ),
+            ListenableBuilder(
+              listenable: listenable,
+              builder: (context, _) {
+                final busy = running.value;
+                final hasText = controller.text.trim().isNotEmpty;
+                return FilledButton(
+                  onPressed: !hasText || busy
+                      ? null
+                      : () async {
+                          final raw = controller.text;
+                          running.value = true;
+                          try {
+                            await _applyDripImport(
+                                dialogContext, context, ref, raw);
+                          } finally {
+                            running.value = false;
+                          }
+                        },
+                  child: Text(l10n.dripImportApply),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    running.dispose();
+  }
+
+  /// Maps the pasted CSV into an export document and feeds it through the
+  /// EXISTING write path ([importJsonToDatabase]) — merge policy, the
+  /// all-or-nothing transaction and idempotence come from there.
+  Future<void> _applyDripImport(
+    BuildContext dialogContext,
+    BuildContext screenContext,
+    WidgetRef ref,
+    String raw,
+  ) async {
+    final l10n = AppLocalizations.of(dialogContext);
+    try {
+      // Parse first: a non-drip file fails here before anything is written
+      // (bad header = FormatException = "not a drip CSV" message, dialog
+      // stays open for correction).
+      final parsed = dripCsvToExportJson(raw);
+      final db = await ref.read(databaseProvider.future);
+      final summary = await importJsonToDatabase(db, parsed.json);
+      if (!dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+      if (!screenContext.mounted) return;
+      ScaffoldMessenger.of(screenContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            parsed.stats.rowsImported == 0 &&
+                    summary.entriesNew == 0 &&
+                    summary.entriesOverwritten == 0
+                ? l10n.importEmpty
+                : l10n.dripImportSummary(
+                    parsed.stats.rowsImported,
+                    parsed.stats.rowsSkippedEmpty,
+                    parsed.stats.rowsInvalid,
+                    summary.entriesNew,
+                    summary.entriesOverwritten,
+                  ),
+          ),
+        ),
+      );
+    } on FormatException {
+      // The text is not a drip CSV export (no "date" header column);
+      // nothing was written, the dialog stays open.
+      if (!dialogContext.mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(content: Text(l10n.dripImportInvalid)),
+      );
+    } catch (_) {
+      // The transaction rolled back (import is all-or-nothing): the stored
+      // data is unchanged, so tell the user exactly that instead of
+      // crashing (ImportFailedException and anything below it).
+      if (!dialogContext.mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(content: Text(l10n.importFailed)),
+      );
+    }
+  }
 }
 
 /// Full-screen JSON preview: the export text with a copy button for every
