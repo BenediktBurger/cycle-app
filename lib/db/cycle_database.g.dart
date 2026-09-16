@@ -260,11 +260,11 @@ class $CycleEntriesTable extends CycleEntries
       $customConstraints:
           'CHECK (measured_at_minutes IS NULL OR (measured_at_minutes BETWEEN 0 AND 1439))');
   @override
-  late final GeneratedColumnWithTypeConverter<Bleeding, String> bleeding =
-      GeneratedColumn<String>('bleeding', aliasedName, false,
-              type: DriftSqlType.string,
+  late final GeneratedColumnWithTypeConverter<Bleeding, int> bleeding =
+      GeneratedColumn<int>('bleeding', aliasedName, false,
+              type: DriftSqlType.int,
               requiredDuringInsert: false,
-              defaultValue: const Constant('none'))
+              defaultValue: const Constant(0))
           .withConverter<Bleeding>($CycleEntriesTable.$converterbleeding);
   static const VerificationMeta _excludeIllnessMeta =
       const VerificationMeta('excludeIllness');
@@ -524,7 +524,7 @@ class $CycleEntriesTable extends CycleEntries
           DriftSqlType.int, data['${effectivePrefix}measured_at_minutes']),
       bleeding: $CycleEntriesTable.$converterbleeding.fromSql(attachedDatabase
           .typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}bleeding'])!),
+          .read(DriftSqlType.int, data['${effectivePrefix}bleeding'])!),
       excludeIllness: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}exclude_illness'])!,
       excludeAlcohol: attachedDatabase.typeMapping
@@ -563,8 +563,8 @@ class $CycleEntriesTable extends CycleEntries
 
   static TypeConverter<DateTime, int> $converterdate =
       const EpochDayConverter();
-  static JsonTypeConverter2<Bleeding, String, String> $converterbleeding =
-      const EnumNameConverter<Bleeding>(Bleeding.values);
+  static TypeConverter<Bleeding, int> $converterbleeding =
+      const BleedingLevelConverter();
 }
 
 class CycleEntry extends DataClass implements Insertable<CycleEntry> {
@@ -585,12 +585,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// future import path) cannot write an impossible time.
   final int? measuredAtMinutes;
 
-  /// Bleeding vocabulary: none(0) / spotting(1) / light(2) / medium(3) /
-  /// heavy(4) — the enum names as TEXT tokens, while the enum itself carries
-  /// each member's numeric scale value ([Bleeding.level]); every mapping
-  /// derives from that field, never from the declaration index.
-  /// Note: textEnum's Dart-level builder type is String, so the default is
-  /// the SQL-level enum name.
+  /// Bleeding intensity on the shared 5-step numeric scale, stored as the
+  /// INTEGER [Bleeding.level]: none(0) / spotting(1) / light(2) / medium(3) /
+  /// heavy(4). The converter derives every mapping from [Bleeding.level],
+  /// never from the declaration index; an unknown stored number throws so
+  /// corrupt data is surfaced instead of silently mapped. The default 0
+  /// stores an explicit `none` (a day with no observation still has a value).
   final Bleeding bleeding;
   final bool excludeIllness;
   final bool excludeAlcohol;
@@ -599,7 +599,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
 
   /// Fertility sign recorded on the day: NULL when no observation, else one
   /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
-  /// names — TEXT like bleeding, never numbers, never display glyphs).
+  /// names — TEXT, unlike bleeding's numeric column; never display glyphs).
   /// customConstraint replaces drift's own constraints, which is fine here:
   /// SQLite columns admit NULL unless NOT NULL is written, and the check
   /// below allows exactly NULL or the vocabulary.
@@ -656,8 +656,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       map['measured_at_minutes'] = Variable<int>(measuredAtMinutes);
     }
     {
-      map['bleeding'] = Variable<String>(
-          $CycleEntriesTable.$converterbleeding.toSql(bleeding));
+      map['bleeding'] =
+          Variable<int>($CycleEntriesTable.$converterbleeding.toSql(bleeding));
     }
     map['exclude_illness'] = Variable<bool>(excludeIllness);
     map['exclude_alcohol'] = Variable<bool>(excludeAlcohol);
@@ -726,8 +726,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       date: serializer.fromJson<DateTime>(json['date']),
       bbtC: serializer.fromJson<double?>(json['bbtC']),
       measuredAtMinutes: serializer.fromJson<int?>(json['measuredAtMinutes']),
-      bleeding: $CycleEntriesTable.$converterbleeding
-          .fromJson(serializer.fromJson<String>(json['bleeding'])),
+      bleeding: serializer.fromJson<Bleeding>(json['bleeding']),
       excludeIllness: serializer.fromJson<bool>(json['excludeIllness']),
       excludeAlcohol: serializer.fromJson<bool>(json['excludeAlcohol']),
       excludeTravel: serializer.fromJson<bool>(json['excludeTravel']),
@@ -753,8 +752,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'date': serializer.toJson<DateTime>(date),
       'bbtC': serializer.toJson<double?>(bbtC),
       'measuredAtMinutes': serializer.toJson<int?>(measuredAtMinutes),
-      'bleeding': serializer.toJson<String>(
-          $CycleEntriesTable.$converterbleeding.toJson(bleeding)),
+      'bleeding': serializer.toJson<Bleeding>(bleeding),
       'excludeIllness': serializer.toJson<bool>(excludeIllness),
       'excludeAlcohol': serializer.toJson<bool>(excludeAlcohol),
       'excludeTravel': serializer.toJson<bool>(excludeTravel),
@@ -1001,7 +999,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<int>? date,
     Expression<double>? bbtC,
     Expression<int>? measuredAtMinutes,
-    Expression<String>? bleeding,
+    Expression<int>? bleeding,
     Expression<bool>? excludeIllness,
     Expression<bool>? excludeAlcohol,
     Expression<bool>? excludeTravel,
@@ -1106,7 +1104,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       map['measured_at_minutes'] = Variable<int>(measuredAtMinutes.value);
     }
     if (bleeding.present) {
-      map['bleeding'] = Variable<String>(
+      map['bleeding'] = Variable<int>(
           $CycleEntriesTable.$converterbleeding.toSql(bleeding.value));
     }
     if (excludeIllness.present) {
@@ -1896,7 +1894,7 @@ class $$CycleEntriesTableFilterComposer
       column: $table.measuredAtMinutes,
       builder: (column) => ColumnFilters(column));
 
-  ColumnWithTypeConverterFilters<Bleeding, Bleeding, String> get bleeding =>
+  ColumnWithTypeConverterFilters<Bleeding, Bleeding, int> get bleeding =>
       $composableBuilder(
           column: $table.bleeding,
           builder: (column) => ColumnWithTypeConverterFilters(column));
@@ -1988,7 +1986,7 @@ class $$CycleEntriesTableOrderingComposer
       column: $table.measuredAtMinutes,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get bleeding => $composableBuilder(
+  ColumnOrderings<int> get bleeding => $composableBuilder(
       column: $table.bleeding, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get excludeIllness => $composableBuilder(
@@ -2080,7 +2078,7 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<int> get measuredAtMinutes => $composableBuilder(
       column: $table.measuredAtMinutes, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<Bleeding, String> get bleeding =>
+  GeneratedColumnWithTypeConverter<Bleeding, int> get bleeding =>
       $composableBuilder(column: $table.bleeding, builder: (column) => column);
 
   GeneratedColumn<bool> get excludeIllness => $composableBuilder(

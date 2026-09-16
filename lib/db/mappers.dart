@@ -60,8 +60,9 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     excludeAlcohol: Value(d.excludeAlcohol),
     excludeTravel: Value(d.excludeTravel),
     excludeOther: Value(d.excludeOther),
-    // Stable enum-name TEXT tokens (like bleeding), written post-sanitize so
-    // the pair can never violate the SQL CHECK.
+    // Stable enum-name TEXT tokens (bleeding itself is the numeric level
+    // column), written post-sanitize so the pair can never violate the SQL
+    // CHECK.
     mucusSign: Value(mucus.sign?.name),
     mucusQuality: Value(mucus.quality?.name),
     cervix: Value(d.cervix),

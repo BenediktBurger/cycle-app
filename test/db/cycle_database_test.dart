@@ -31,7 +31,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v3)', () {
+  group('schema & migration (v4)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -263,7 +263,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 3,
+      expect(userVersion.data['user_version'], 4,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
