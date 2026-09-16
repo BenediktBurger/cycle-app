@@ -20,6 +20,13 @@ effect, not into a generic pile:
   bugs / necessary / convenience. No work-package IDs there: backlog items
   are not derived from the plan file. Necessary items take priority over
   convenience items unless the owner decides otherwise.
+- **Backlog readiness convention**: a plain bullet means *needs discussion*
+  — not startable; the line says what must be resolved first. An unchecked
+  checkbox (`- [ ]`) means *ready to be implemented*. Agents pick work only
+  from checkbox rows, never from plain bullets, and never by guessing the
+  scope of an unclear item — asking or converting a bullet into a checkbox
+  is the owner's job (except pure mechanical fixes, where the checkbox row
+  itself states the caveat).
 
 ## Work-package IDs stay in docs/roadmap.md only
 

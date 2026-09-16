@@ -13,13 +13,8 @@ comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 
 ## Milestone 1 — Phase 1 (app shell)
 
-- [ ] `flutter test` passes in a normal terminal (compile-clean already
-      verified; runtime hasn't been observed yet — see
-      [`dev-notes.md`](dev-notes.md) for the sandbox caveat)
 - [ ] CI green on GitHub (`flutter analyze` + `flutter test` +
       `flutter build web`)
-- [ ] `flutter run -d chrome` manual smoke test: app shell opens with tabs
-      **Tagebuch / Zyklus / Statistik / Einstellungen** in German
 
 ## Phase 2 — data layer & real screens (WP2.x)
 
@@ -50,24 +45,15 @@ Manual acceptance for each Phase-2 screen (once wired): data survives a page
 reload (persistence), language switch reflects immediately, export/import
 round-trips, Statistik shows arithmetic only.
 
-## Later milestones (not yet broken down)
-
-- [ ] Rename all German-named code files to English identifiers — at the
-      time of writing: `lib/ui/{einstellungen,zyklus,statistik,tagebuch}.dart`
-      → `{settings,cycle,statistics,diary}.dart`, plus any German-named
-      files that appear meanwhile; mechanical, no behavior change. Policy:
-      [ADR-0007](adr/0007-language-policy.md).
-
-Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
-stubs), the pin-lock stub, PDF export, and whatever follows WP2.2 — to be
-slotted in as the plan file solidifies.
-
 ## Backlog — issues & improvements
 
 Collector for real issues and improvement ideas that are not (yet) part of a
-milestone or the internal plan. When an item is done, it is **removed** from
-here, not ticked — the sections above track planned work, git history keeps
-the record (see [`AGENTS.md`](../AGENTS.md)).
+milestone or the internal plan. Readiness convention: **a plain bullet means
+needs discussion** — not startable, the line states what must be resolved
+first; **an unchecked checkbox means ready to be implemented** — an agent may
+pick it up. When an item is done, it is **removed** from here, not ticked —
+the sections above track planned work, git history keeps the record (see
+[`AGENTS.md`](../AGENTS.md)).
 
 ### Bugs
 
@@ -81,19 +67,39 @@ the record (see [`AGENTS.md`](../AGENTS.md)).
       the settings offer switching between "system" and the individual
       languages (de/en) — see
       [ADR-0007](adr/0007-language-policy.md).
-- [ ] Rename ui classes to English according to ADR 0007
+- [ ] Rename all German-named code files to English identifiers — at the
+      time of writing: `lib/ui/{einstellungen,zyklus,statistik,tagebuch}.dart`
+      → `{settings,cycle,statistics,diary}.dart`, plus any German-named
+      files that appear meanwhile; mechanical, no behavior change. Policy:
+      [ADR-0007](adr/0007-language-policy.md).
 - [ ] Missing translation term falls back to **English** (non-Germans likely
       know English, but not German) instead of German.
-- [ ] Analysis marks: place evaluation marks (cervix peak etc.); the "first
-      higher measurement" adds the baseline automatically, based on the
-      preceding measurements.
-- [ ] Data entry aligned with the NER scheme: different bleeding levels,
-      time of day for sex (morning/midday/evening), …
-- [ ] Building the actual app (as captured: "building an app" — scope to be
-      clarified: release/packaging vs. remaining placeholder screens).
+- [ ] Use Zeichen der Fruchtbarkeit from Cheat Sheet (maybe even as string)?
+- [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
+      higher measurement" adds the baseline automatically, based on the preceding measurements
+      User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
+- Data entry aligned with the NER scheme: different bleeding levels, time
+  of day for sex (morning/midday/evening), … — the exact term list must be
+  specified first.
+- Building the actual app (as captured: "building an app" — scope to be
+  clarified: release/packaging vs. remaining placeholder screens).
+- [ ] Time of temperature measurement (can be prefilled with current time)
+- Datenbankschema überarbeiten (manche Dinge pro Zyklus nicht pro Tag speichern? )
+- exclude (Temperatur, Blutung) als negative Zahl?
+- set markings (temperature rising etc.) on the cycle tab
+- Schleim als String, nicht als Zahl speichern?
+- [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
+- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
+- pdf export for consultants (one cycle per sheet?)
 
 ### Convenience
 
 - [ ] Dark mode, following the device setting.
-- [ ] Password protection for the database (relates to the encryption stub
-      in [ADR-005](adr/0005-storage-and-encryption.md)).
+- [ ] Password protection for the database — first revisit
+      [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
+      pin down the storage decision; implementation then follows it.
+- Import from drip
+- [ ] Wochenende farblich hervorheben
+- exclude unabhängig von krank etc machen
+- Fahrenheit unterstützen: Wie Daten speichern?
+- Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
