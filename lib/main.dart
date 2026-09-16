@@ -7,10 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'db/cycle_database.dart';
 import 'l10n/app_localizations.dart';
 import 'providers.dart';
-import 'ui/einstellungen.dart';
-import 'ui/statistik.dart';
-import 'ui/tagebuch.dart';
-import 'ui/zyklus.dart';
+import 'ui/cycle.dart';
+import 'ui/diary.dart';
+import 'ui/settings.dart';
+import 'ui/statistics.dart';
 
 void main() {
   runApp(const ProviderScope(child: CycleApp()));

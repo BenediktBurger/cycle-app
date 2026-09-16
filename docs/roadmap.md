@@ -67,11 +67,6 @@ the sections above track planned work, git history keeps the record (see
       the settings offer switching between "system" and the individual
       languages (de/en) — see
       [ADR-0007](adr/0007-language-policy.md).
-- [ ] Rename all German-named code files to English identifiers — at the
-      time of writing: `lib/ui/{einstellungen,zyklus,statistik,tagebuch}.dart`
-      → `{settings,cycle,statistics,diary}.dart`, plus any German-named
-      files that appear meanwhile; mechanical, no behavior change. Policy:
-      [ADR-0007](adr/0007-language-policy.md).
 - [ ] Missing translation term falls back to **English** (non-Germans likely
       know English, but not German) instead of German.
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
@@ -101,3 +96,4 @@ the sections above track planned work, git history keeps the record (see
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
+- [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
