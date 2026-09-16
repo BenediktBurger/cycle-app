@@ -3,10 +3,12 @@
 // Export document shape (schema version 1):
 //
 //   {
-//     "schema_version": 1,
+//     "schema_version": 2,
 //     "exported_at": "<ISO 8601 UTC>",
 //     "profiles": [{"id": 1, "name": "main", "ordinal": 0}, ...],
 //     "entries":  [{"profile_id": 1, "date": "2026-03-01", "bbt_c": 36.6,
+//                    "measured_at_minutes": 405, (nullable, v2+; minutes
+//                    since midnight, when the temperature was measured)
 //                    "bleeding": "period", "exclude_illness": false,
 //                    "mucus_sign": "s", "mucus_quality": "ew", (both
 //                    nullable; quality only ever together with S)
@@ -31,8 +33,10 @@ import 'date_only.dart';
 import 'models.dart';
 
 /// Bump when the document shape changes; importers accept older/newer
-/// documents per the rules in [parseExportJson].
-const int exportSchemaVersion = 1;
+/// documents per the rules in [parseExportJson]. Version 2 added the
+/// `measured_at_minutes` entry field (records when the temperature was
+/// measured); a v1 entry simply omits the field.
+const int exportSchemaVersion = 2;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and
 /// documented in CONTRIBUTING; importers MUST behave exactly like this).
@@ -94,9 +98,12 @@ String buildExportJson(ExportBlob blob) {
 ///
 /// Throws a [FormatException] when the input is not JSON, not an object,
 /// carries an unsupported schema version, or has a broken exported_at /
-/// table list. Unknown/extra keys are ignored (forward compatibility); the
-/// schema version itself is intentionally strict (v1 documents only) so no
-/// data is silently mis-read — version negotiation is future work.
+/// table list. The accepted schema-version set is `{1 .. exportSchemaVersion}`:
+/// old exports exist as real files on user devices, so every shape ever
+/// published stays importable, while anything AFTER the current version is
+/// rejected strictly — future-version negotiation is explicitly future work
+/// (no data may be silently mis-read). Unknown/extra keys are ignored
+/// (forward compatibility).
 ExportBlob parseExportJson(String raw) {
   final Object? decoded;
   try {
@@ -109,7 +116,7 @@ ExportBlob parseExportJson(String raw) {
   }
 
   final version = decoded['schema_version'];
-  if (version is! int || version != exportSchemaVersion) {
+  if (version is! int || version < 1 || version > exportSchemaVersion) {
     throw FormatException('unsupported schema_version: $version');
   }
 

@@ -71,7 +71,6 @@ the sections above track planned work, git history keeps the record (see
   specified first.
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
-- [ ] Time of temperature measurement (can be prefilled with current time)
 - Datenbankschema überarbeiten (manche Dinge pro Zyklus (erste höhere Messung)/als Event (z.B: Messmethode) nicht pro Tag speichern? )
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen

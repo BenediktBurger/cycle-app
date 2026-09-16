@@ -91,14 +91,68 @@ void main() {
       );
     });
 
-    test('bleeding is stored and read as the drift enum vocabulary', () async {
+    test('bleeding round-trips as each of the five levels', () async {
+      for (final (index, level) in Bleeding.values.indexed) {
+        final day = DateTime(2026, 6).add(Duration(days: index));
+        await db.entriesDao
+            .upsertDaily(DailyEntry(date: day, bleeding: level));
+        final row = await db.entriesDao.entryFor(1, day);
+        expect(row!.bleeding, level,
+            reason: '${level.name} (level ${level.level}) must survive the '
+                'db round trip by its stored number');
+      }
+    });
+
+    test('bleeding is stored as the numeric level, never a string token',
+        () async {
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2026, 6, 15), bleeding: Bleeding.heavy),
+      );
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['bleeding'], Bleeding.heavy.level,
+          reason: 'the decided storage representation is the integer level '
+              '(4), not a vocabulary name');
+    });
+
+    test('bleeding defaults to 0: a row written without it reads none',
+        () async {
+      await db.into(db.cycleEntries).insert(
+            CycleEntriesCompanion.insert(date: DateTime(2026, 6, 20)),
+          );
+      final row = await db.entriesDao.entryFor(1, DateTime(2026, 6, 20));
+      expect(row!.bleeding, Bleeding.none);
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['bleeding'], 0, reason: 'the column default is 0');
+    });
+
+    test('raw SQL INSERT stores an integer level that reads back heavy',
+        () async {
+      // Hand-written SQL (e.g. a future import path) stores the int directly:
+      // 4 must read back as Bleeding.heavy (by LEVEL, not by declaration
+      // index).
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, bleeding) "
-        "VALUES (1, 20000, 'medium')",
+        'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+        'VALUES (1, 20000, 4)',
       );
       final row =
           await db.entriesDao.entryFor(1, DateTime(2024, 10, 4)); // day 20000
-      expect(row!.bleeding, Bleeding.medium);
+      expect(row!.bleeding, Bleeding.heavy);
+    });
+
+    test('an unknown stored level is surfaced as an error, not silently '
+        'mapped', () async {
+      await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+        'VALUES (1, 20001, 7)',
+      );
+      await expectLater(
+        db.entriesDao.entryFor(1, DateTime(2024, 10, 5)), // day 20001
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('cycle entries reference existing profiles (foreign keys on)',
