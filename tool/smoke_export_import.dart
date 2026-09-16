@@ -35,11 +35,20 @@ Future<void> main() async {
   check(!isWithinBbtRange(51.0), 'BBT range gate upper bound');
   check(isWithinBbtRange(36.5), 'BBT range gate accepts normal value');
 
-  check(MucusFeeling.dry.mappedNfp == 0, 'NFP mapping: dry = 0');
-  check(MucusFeeling.stretchy.mappedNfp == 4, 'NFP mapping: stretchy = 4');
-  check(MucusFeeling.tryFromName('creamy') == MucusFeeling.creamy,
-      'NFP mapping by stable storage name');
-  check(feelingForNfp(3) == MucusFeeling.wet, 'NFP inverse mapping');
+  check(tryParseMucusSign('s') == MucusSign.s,
+      'fertility sign parses by stable token');
+  check(tryParseMucusSign('wet') == null, 'out-of-vocabulary sign is null');
+  check(tryParseMucusQuality('gl') == MucusQuality.gl &&
+      tryParseMucusQuality('glb') == MucusQuality.glb &&
+      MucusQuality.gl != MucusQuality.glb,
+      ' glasig (gl) and gelblich (glb) are distinct qualities');
+  check(
+      sanitizeMucusPair(sign: MucusSign.f, quality: MucusQuality.w).quality ==
+          null,
+      'quality collapses without the S sign');
+  check(mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew).superscript ==
+          'EW',
+      'S with EW quality renders the uppercase superscript token');
 
   check(formatIsoDay(DateTime(2026, 3, 5)) == '2026-03-05',
       'ISO day formatting padded');
@@ -64,8 +73,8 @@ Future<void> main() async {
       date: DateTime(2026, 3, 3),
       bleeding: Bleeding.period,
       bbtC: 36.05,
-      mucusFeeling: MucusFeeling.creamy.name,
-      mucusNfp: MucusFeeling.creamy.mappedNfp,
+      mucusSign: MucusSign.s,
+      mucusQuality: MucusQuality.mi,
     ),
   );
   await source.marksDao.addMark(1, DateTime(2026, 3, 12), 'baseline');
@@ -78,6 +87,9 @@ Future<void> main() async {
   final json = await exportDatabaseToJson(source);
   check(
       json.contains('"schema_version": 1'), 'document carries schema version');
+  check(json.contains('"mucus_sign": "s"') &&
+          json.contains('"mucus_quality": "mi"'),
+      'export carries the fertility-sign tokens');
   check(json.contains('partner'), 'profile list exported');
 
   // Malformed documents must be rejected BEFORE any write.
@@ -121,7 +133,10 @@ Future<void> main() async {
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
   check(day2.bleeding == Bleeding.period && day2.bbtC == 36.05,
       'import OVERWROTE the existing day with document content');
-  check(day2.mucusNfp == 2, 'mucus NFP value survives the round trip');
+  // CycleEntry exposes raw TEXT tokens (the enum mapping happens in the
+  // mapper layer); check that the tokens survived.
+  check(day2.mucusSign == 's' && day2.mucusQuality == 'mi',
+      'mucus fertility-sign tokens survive the round trip');
 
   final targetProfiles = await target.profilesDao.allProfiles();
   check(targetProfiles.where((p) => p.name == 'partner').length == 1,

@@ -1,77 +1,111 @@
-// Mucus observation vocabulary and the feeling -> NFP 0..4 scale mapping.
+// The "Zeichen der Fruchtbarkeit" vocabulary from the INER cheat sheet
+// (docs/cheatsheet.md): fertility signs t / Ø (nichts) / f / S, with quality
+// qualifiers that are ONLY valid together with the sign S.
 //
-// TODO(user-review): the mapping below is a first, pragmatic encoding of the
-// NFP (Rötzer) mucus scale 0–4 from everyday feelings, recorded as a working
-// assumption pending expert review (ADR-0001,
-// docs/adr/0001-iner-mode-m-hypothesis.md). If experts correct it, edit the
-// `mappedNfp` values in exactly ONE place — this table — nothing else.
-// Keep the SHARED `enum` NAMES stable: they are stored verbatim in the
-// database and in the export schema, so a rename is a data migration.
+// Mode M posture (ADR-0001, docs/adr/0001-iner-mode-m-hypothesis.md): the app
+// records these observations faithfully and NEVER interprets them — no rule
+// from the cheat sheet evaluation is encoded here or anywhere in the code.
 //
-// The scale itself (NFP convention, in numbers):
-//   0 = no mucus feeling / dry
-//   1 = first moist, barely fertile-relevant mucus
-//   2 = more moist / creamy mucus
-//   3 = clearly wet and/or stretchy mucus, day(s) before the peak
-//   4 = peak-like, very stretchy and slippery (egg-white) mucus
-//
-// UI consequence: the entry form shows the mapped value as a suggestion and
-// lets the user override it per day — the mapping is only an assistant.
+// Storage rule: the enum NAMES are the TEXT tokens stored in the database and
+// in the export document, exactly like the Bleeding enum. A rename of any
+// value is therefore a data migration — the tests pin every token; treat a
+// rename as a schema change, not a refactor. Display glyphs (Ø, EW, …) are
+// derived helpers, never stored.
 
-enum MucusFeeling {
-  /// No moist mucus feeling.
-  dry(0),
+/// A fertility sign observed on a day:
+///
+/// - `t`: trocken (dry)
+/// - `nothing`: nichts gesehen/gespürt — displays as `Ø`
+/// - `f`: feucht, reine Empfindung (moist feeling, no mucus)
+/// - `s`: S = Schleim aus den Krypten des Gebärmutterhalses (mucus)
+enum MucusSign { t, nothing, f, s }
 
-  /// Sticky, opaque, bread-porridge-like.
-  sticky(1),
+/// A quality qualifier of the mucus sign S (bare S without a qualifier is
+/// equally valid). ONE vocabulary from the cheat sheet, split only by the
+/// sheet's "lesser" / "best" table columns:
+///
+/// - lesser: `w` (weißlich/dicklich/klebrig/zäh), `mi` (milchig), `cr`
+///   (cremig), `kl` (klumpig), `glb` (gelblich, dünnflüssiger), `g`
+///   (deutlich gelb)
+/// - best: `ew` (rohes Eiweiß/Eiklar, fadenziehend — displays `EW`), `gl`
+///   (glasig/glasklar/dehnbar), `fl` (flüssig), `ns` (nass/schlüpfrig)
+///
+/// Note the token collision: `gl` (glasig) and `glb` (gelblich) share a
+/// prefix but are two DIFFERENT values — never normalize one into the other.
+enum MucusQuality { w, mi, cr, kl, glb, g, ew, gl, fl, ns }
 
-  /// Milky, creamy, hand-lotion-like.
-  creamy(2),
-
-  /// Moist without clearly sticky consistency.
-  moist(2),
-
-  /// Clearly wet and starting to become slippery.
-  wet(3),
-
-  /// Stringy/stretchy and slippery, like raw egg white (peak-like).
-  stretchy(4);
-
-  const MucusFeeling(this.mappedNfp);
-
-  /// The NFP scale value this feeling maps to (0..4). The user can freely
-  /// override it per day in the entry form.
-  final int mappedNfp;
-
-  /// Parses a storage/export identifier back into a feeling, or null.
-  static MucusFeeling? tryFromName(String name) {
-    for (final f in MucusFeeling.values) {
-      if (f.name == name) return f;
-    }
-    return null;
-  }
-}
-
-/// The feeling an entry displays when only the numeric NFP value is known
-/// (e.g. from a previous version/import): the inverse mapping (first
-/// feeling with that value, preferring canonical names in declaration
-/// order). Returns null for out-of-scale or null input.
-MucusFeeling? feelingForNfp(int? nfp) {
-  if (nfp == null || nfp < 0 || nfp > mucusNfpMax) return null;
-  for (final f in MucusFeeling.values) {
-    if (f.mappedNfp == nfp) return f;
+/// Parses a stored/exported sign token back into the enum, or null for
+/// anything else. SHARED by the db layer and the export/import writer — the
+/// single source of truth for this field's validation, like tryParseBleeding
+/// (models.dart), so a row a writer would drop is never counted as a write.
+/// Accepts `Object?`: export rows arrive JSON-decoded as the loosest shape.
+MucusSign? tryParseMucusSign(Object? raw) {
+  if (raw is! String) return null;
+  for (final sign in MucusSign.values) {
+    if (sign.name == raw) return sign;
   }
   return null;
 }
 
-/// Guards the mucus NFP value the same way the database CHECK constraint
-/// does (cycle_entries.mucus_nfp); returns null for out-of-scale input.
-int? clampedMucusNfp(Object? raw) {
-  if (raw is! int) return null;
-  if (raw < 0 || raw > mucusNfpMax) return null;
-  return raw;
+/// Parses a stored/exported quality token back into the enum, or null for
+/// anything else. Same contract as [tryParseMucusSign]; the returned value is
+/// NOT yet checked against the sign (see [sanitizeMucusPair] for that rule).
+MucusQuality? tryParseMucusQuality(Object? raw) {
+  if (raw is! String) return null;
+  for (final quality in MucusQuality.values) {
+    if (quality.name == raw) return quality;
+  }
+  return null;
 }
 
-/// Scale max, matching the DailyEntry assertion in models.dart and the SQL
-/// CHECK constraint on cycle_entries.mucus_nfp.
-const int mucusNfpMax = 4;
+/// The (sign, quality) pair after the quality-requires-S rule.
+///
+/// Dart record type so the guard can round-trip BOTH fields; `quality` is
+/// null whenever the sign does not permit one.
+typedef MucusPair = ({MucusSign? sign, MucusQuality? quality});
+
+/// Enforces "a quality only exists together with sign S" — the one Dart
+/// counterpart of the SQL CHECK constraint on cycle_entries.mucus_quality:
+/// for any sign other than S (including no sign at all) the quality
+/// collapses to null; bare S keeps its (possibly null) quality. The import
+/// writer uses this before constructing a [MucusPair] from foreign data.
+MucusPair sanitizeMucusPair({
+  MucusSign? sign,
+  MucusQuality? quality,
+}) =>
+    (
+      sign: sign,
+      quality: sign == MucusSign.s ? quality : null,
+    );
+
+/// Display glyph of a sign (cheat sheet): `t`, `Ø` for `nothing`, `f`, `S`.
+String mucusSignSymbol(MucusSign sign) => switch (sign) {
+      MucusSign.t => 't',
+      MucusSign.nothing => 'Ø',
+      MucusSign.f => 'f',
+      MucusSign.s => 'S',
+    };
+
+/// Display token of a quality (cheat sheet): everything keeps its token
+/// letter-case except `ew`, which the sheet writes as uppercase `EW`.
+String mucusQualityToken(MucusQuality quality) =>
+    quality == MucusQuality.ew ? 'EW' : quality.name;
+
+/// The rendered shape of a mucus observation: a base symbol (plus, for S,
+/// the quality as a superscript token). Both fields may be null — the UI
+/// composes them into `Text.rich` (`Sᴱᵂ`-style) and renders nothing at all
+/// when the whole record is null (no observation recorded that day).
+typedef MucusDisplay = ({String? symbol, String? superscript});
+
+/// Builds the display record for a (sign, quality) pair. Any `quality` on a
+/// sign other than S (or without one) is dropped first via
+/// [sanitizeMucusPair], so a mismatched raw pair can never render a
+/// superscript on a non-S glyph.
+MucusDisplay mucusDisplay({MucusSign? sign, MucusQuality? quality}) {
+  final sanitized = sanitizeMucusPair(sign: sign, quality: quality);
+  final symbol =
+      sanitized.sign == null ? null : mucusSignSymbol(sanitized.sign!);
+  final superscript =
+      sanitized.quality == null ? null : mucusQualityToken(sanitized.quality!);
+  return (symbol: symbol, superscript: superscript);
+}

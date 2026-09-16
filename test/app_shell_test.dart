@@ -76,6 +76,54 @@ void main() {
     }
   });
 
+  testWidgets('mucus form: sign picker with conditional quality picker',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_appScope());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tagebuch').first);
+    await tester.pumpAndSettle();
+
+    // The sign picker offers the unset option plus the four glyphs
+    // t / Ø / f / S (glyphs are the display, per cheat-sheet convention).
+    const signGlyphs = ['—', 't', 'Ø', 'f', 'S'];
+    for (final glyph in signGlyphs) {
+      expect(
+        find.text(glyph),
+        findsWidgets,
+        reason: 'Sign segment "$glyph" should be present',
+      );
+    }
+
+    // The quality picker stays hidden until the sign S is selected.
+    expect(find.text('Qualität'), findsNothing);
+    await tester.ensureVisible(find.text('S'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('S'));
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsOneWidget);
+    const qualityTokens = ['w', 'mi', 'cr', 'kl', 'glb', 'g', 'EW', 'gl', 'fl', 'ns'];
+    for (final token in qualityTokens) {
+      expect(
+        find.text(token),
+        findsOneWidget,
+        reason: 'Quality chip "$token" should be offered on S',
+      );
+    }
+
+    // Selecting a quality keeps the picker; switching to another sign
+    // hides it again (a quality only exists together with S).
+    await tester.ensureVisible(find.text('EW'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EW'));
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsOneWidget);
+    await tester.ensureVisible(find.text('Ø'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ø'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsNothing);
+  });
+
   testWidgets('PIN lock stub is visible and non-interactive',
       (WidgetTester tester) async {
     // The stub must be visibly NOT interactive (onChanged: null) — flipping

@@ -297,21 +297,24 @@ class $CycleEntriesTable extends CycleEntries
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("exclude_other" IN (0, 1))'),
       defaultValue: const Constant(false));
-  static const VerificationMeta _mucusFeelingMeta =
-      const VerificationMeta('mucusFeeling');
+  static const VerificationMeta _mucusSignMeta =
+      const VerificationMeta('mucusSign');
   @override
-  late final GeneratedColumn<String> mucusFeeling = GeneratedColumn<String>(
-      'mucus_feeling', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _mucusNfpMeta =
-      const VerificationMeta('mucusNfp');
-  @override
-  late final GeneratedColumn<int> mucusNfp = GeneratedColumn<int>(
-      'mucus_nfp', aliasedName, true,
-      type: DriftSqlType.int,
+  late final GeneratedColumn<String> mucusSign = GeneratedColumn<String>(
+      'mucus_sign', aliasedName, true,
+      type: DriftSqlType.string,
       requiredDuringInsert: false,
       $customConstraints:
-          'CHECK (mucus_nfp IS NULL OR (mucus_nfp BETWEEN 0 AND 4))');
+          'CHECK (mucus_sign IS NULL OR mucus_sign IN (\'t\', \'nothing\', \'f\', \'s\'))');
+  static const VerificationMeta _mucusQualityMeta =
+      const VerificationMeta('mucusQuality');
+  @override
+  late final GeneratedColumn<String> mucusQuality = GeneratedColumn<String>(
+      'mucus_quality', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'CHECK (mucus_quality IS NULL OR (mucus_sign = \'s\' AND mucus_quality IN (\'w\', \'mi\', \'cr\', \'kl\', \'glb\', \'g\', \'ew\', \'gl\', \'fl\', \'ns\')))');
   static const VerificationMeta _cervixMeta = const VerificationMeta('cervix');
   @override
   late final GeneratedColumn<String> cervix = GeneratedColumn<String>(
@@ -385,8 +388,8 @@ class $CycleEntriesTable extends CycleEntries
         excludeAlcohol,
         excludeTravel,
         excludeOther,
-        mucusFeeling,
-        mucusNfp,
+        mucusSign,
+        mucusQuality,
         cervix,
         pain,
         mood,
@@ -441,15 +444,15 @@ class $CycleEntriesTable extends CycleEntries
           excludeOther.isAcceptableOrUnknown(
               data['exclude_other']!, _excludeOtherMeta));
     }
-    if (data.containsKey('mucus_feeling')) {
-      context.handle(
-          _mucusFeelingMeta,
-          mucusFeeling.isAcceptableOrUnknown(
-              data['mucus_feeling']!, _mucusFeelingMeta));
+    if (data.containsKey('mucus_sign')) {
+      context.handle(_mucusSignMeta,
+          mucusSign.isAcceptableOrUnknown(data['mucus_sign']!, _mucusSignMeta));
     }
-    if (data.containsKey('mucus_nfp')) {
-      context.handle(_mucusNfpMeta,
-          mucusNfp.isAcceptableOrUnknown(data['mucus_nfp']!, _mucusNfpMeta));
+    if (data.containsKey('mucus_quality')) {
+      context.handle(
+          _mucusQualityMeta,
+          mucusQuality.isAcceptableOrUnknown(
+              data['mucus_quality']!, _mucusQualityMeta));
     }
     if (data.containsKey('cervix')) {
       context.handle(_cervixMeta,
@@ -512,10 +515,10 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.bool, data['${effectivePrefix}exclude_travel'])!,
       excludeOther: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}exclude_other'])!,
-      mucusFeeling: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}mucus_feeling']),
-      mucusNfp: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}mucus_nfp']),
+      mucusSign: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}mucus_sign']),
+      mucusQuality: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}mucus_quality']),
       cervix: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cervix']),
       pain: attachedDatabase.typeMapping
@@ -567,15 +570,18 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   final bool excludeTravel;
   final bool excludeOther;
 
-  /// Free-text mucus description entered by the user.
-  final String? mucusFeeling;
-
-  /// NFP mucus scale value 0..4 (nullable). Constrained at the SQL level so
-  /// broken data (e.g. from a future import path) cannot be written.
+  /// Fertility sign recorded on the day: NULL when no observation, else one
+  /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
+  /// names — TEXT like bleeding, never numbers, never display glyphs).
   /// customConstraint replaces drift's own constraints, which is fine here:
   /// SQLite columns admit NULL unless NOT NULL is written, and the check
-  /// below allows exactly NULL or 0..4.
-  final int? mucusNfp;
+  /// below allows exactly NULL or the vocabulary.
+  final String? mucusSign;
+
+  /// Quality qualifier of the mucus sign S; NULL for every sign other than
+  /// 's' and for days without a sign. Enforced at the engine level so broken
+  /// data (e.g. from a future import path) cannot be written.
+  final String? mucusQuality;
 
   /// Optional cervix observation (free text).
   final String? cervix;
@@ -596,8 +602,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       required this.excludeAlcohol,
       required this.excludeTravel,
       required this.excludeOther,
-      this.mucusFeeling,
-      this.mucusNfp,
+      this.mucusSign,
+      this.mucusQuality,
       this.cervix,
       required this.pain,
       required this.mood,
@@ -626,11 +632,11 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     map['exclude_alcohol'] = Variable<bool>(excludeAlcohol);
     map['exclude_travel'] = Variable<bool>(excludeTravel);
     map['exclude_other'] = Variable<bool>(excludeOther);
-    if (!nullToAbsent || mucusFeeling != null) {
-      map['mucus_feeling'] = Variable<String>(mucusFeeling);
+    if (!nullToAbsent || mucusSign != null) {
+      map['mucus_sign'] = Variable<String>(mucusSign);
     }
-    if (!nullToAbsent || mucusNfp != null) {
-      map['mucus_nfp'] = Variable<int>(mucusNfp);
+    if (!nullToAbsent || mucusQuality != null) {
+      map['mucus_quality'] = Variable<String>(mucusQuality);
     }
     if (!nullToAbsent || cervix != null) {
       map['cervix'] = Variable<String>(cervix);
@@ -658,12 +664,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       excludeAlcohol: Value(excludeAlcohol),
       excludeTravel: Value(excludeTravel),
       excludeOther: Value(excludeOther),
-      mucusFeeling: mucusFeeling == null && nullToAbsent
+      mucusSign: mucusSign == null && nullToAbsent
           ? const Value.absent()
-          : Value(mucusFeeling),
-      mucusNfp: mucusNfp == null && nullToAbsent
+          : Value(mucusSign),
+      mucusQuality: mucusQuality == null && nullToAbsent
           ? const Value.absent()
-          : Value(mucusNfp),
+          : Value(mucusQuality),
       cervix:
           cervix == null && nullToAbsent ? const Value.absent() : Value(cervix),
       pain: Value(pain),
@@ -691,8 +697,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       excludeAlcohol: serializer.fromJson<bool>(json['excludeAlcohol']),
       excludeTravel: serializer.fromJson<bool>(json['excludeTravel']),
       excludeOther: serializer.fromJson<bool>(json['excludeOther']),
-      mucusFeeling: serializer.fromJson<String?>(json['mucusFeeling']),
-      mucusNfp: serializer.fromJson<int?>(json['mucusNfp']),
+      mucusSign: serializer.fromJson<String?>(json['mucusSign']),
+      mucusQuality: serializer.fromJson<String?>(json['mucusQuality']),
       cervix: serializer.fromJson<String?>(json['cervix']),
       pain: serializer.fromJson<bool>(json['pain']),
       mood: serializer.fromJson<bool>(json['mood']),
@@ -717,8 +723,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'excludeAlcohol': serializer.toJson<bool>(excludeAlcohol),
       'excludeTravel': serializer.toJson<bool>(excludeTravel),
       'excludeOther': serializer.toJson<bool>(excludeOther),
-      'mucusFeeling': serializer.toJson<String?>(mucusFeeling),
-      'mucusNfp': serializer.toJson<int?>(mucusNfp),
+      'mucusSign': serializer.toJson<String?>(mucusSign),
+      'mucusQuality': serializer.toJson<String?>(mucusQuality),
       'cervix': serializer.toJson<String?>(cervix),
       'pain': serializer.toJson<bool>(pain),
       'mood': serializer.toJson<bool>(mood),
@@ -740,8 +746,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           bool? excludeAlcohol,
           bool? excludeTravel,
           bool? excludeOther,
-          Value<String?> mucusFeeling = const Value.absent(),
-          Value<int?> mucusNfp = const Value.absent(),
+          Value<String?> mucusSign = const Value.absent(),
+          Value<String?> mucusQuality = const Value.absent(),
           Value<String?> cervix = const Value.absent(),
           bool? pain,
           bool? mood,
@@ -760,9 +766,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
         excludeTravel: excludeTravel ?? this.excludeTravel,
         excludeOther: excludeOther ?? this.excludeOther,
-        mucusFeeling:
-            mucusFeeling.present ? mucusFeeling.value : this.mucusFeeling,
-        mucusNfp: mucusNfp.present ? mucusNfp.value : this.mucusNfp,
+        mucusSign: mucusSign.present ? mucusSign.value : this.mucusSign,
+        mucusQuality:
+            mucusQuality.present ? mucusQuality.value : this.mucusQuality,
         cervix: cervix.present ? cervix.value : this.cervix,
         pain: pain ?? this.pain,
         mood: mood ?? this.mood,
@@ -791,10 +797,10 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       excludeOther: data.excludeOther.present
           ? data.excludeOther.value
           : this.excludeOther,
-      mucusFeeling: data.mucusFeeling.present
-          ? data.mucusFeeling.value
-          : this.mucusFeeling,
-      mucusNfp: data.mucusNfp.present ? data.mucusNfp.value : this.mucusNfp,
+      mucusSign: data.mucusSign.present ? data.mucusSign.value : this.mucusSign,
+      mucusQuality: data.mucusQuality.present
+          ? data.mucusQuality.value
+          : this.mucusQuality,
       cervix: data.cervix.present ? data.cervix.value : this.cervix,
       pain: data.pain.present ? data.pain.value : this.pain,
       mood: data.mood.present ? data.mood.value : this.mood,
@@ -818,8 +824,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('excludeAlcohol: $excludeAlcohol, ')
           ..write('excludeTravel: $excludeTravel, ')
           ..write('excludeOther: $excludeOther, ')
-          ..write('mucusFeeling: $mucusFeeling, ')
-          ..write('mucusNfp: $mucusNfp, ')
+          ..write('mucusSign: $mucusSign, ')
+          ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
           ..write('pain: $pain, ')
           ..write('mood: $mood, ')
@@ -843,8 +849,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       excludeAlcohol,
       excludeTravel,
       excludeOther,
-      mucusFeeling,
-      mucusNfp,
+      mucusSign,
+      mucusQuality,
       cervix,
       pain,
       mood,
@@ -866,8 +872,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.excludeAlcohol == this.excludeAlcohol &&
           other.excludeTravel == this.excludeTravel &&
           other.excludeOther == this.excludeOther &&
-          other.mucusFeeling == this.mucusFeeling &&
-          other.mucusNfp == this.mucusNfp &&
+          other.mucusSign == this.mucusSign &&
+          other.mucusQuality == this.mucusQuality &&
           other.cervix == this.cervix &&
           other.pain == this.pain &&
           other.mood == this.mood &&
@@ -888,8 +894,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<bool> excludeAlcohol;
   final Value<bool> excludeTravel;
   final Value<bool> excludeOther;
-  final Value<String?> mucusFeeling;
-  final Value<int?> mucusNfp;
+  final Value<String?> mucusSign;
+  final Value<String?> mucusQuality;
   final Value<String?> cervix;
   final Value<bool> pain;
   final Value<bool> mood;
@@ -908,8 +914,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.excludeAlcohol = const Value.absent(),
     this.excludeTravel = const Value.absent(),
     this.excludeOther = const Value.absent(),
-    this.mucusFeeling = const Value.absent(),
-    this.mucusNfp = const Value.absent(),
+    this.mucusSign = const Value.absent(),
+    this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
     this.pain = const Value.absent(),
     this.mood = const Value.absent(),
@@ -929,8 +935,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.excludeAlcohol = const Value.absent(),
     this.excludeTravel = const Value.absent(),
     this.excludeOther = const Value.absent(),
-    this.mucusFeeling = const Value.absent(),
-    this.mucusNfp = const Value.absent(),
+    this.mucusSign = const Value.absent(),
+    this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
     this.pain = const Value.absent(),
     this.mood = const Value.absent(),
@@ -950,8 +956,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<bool>? excludeAlcohol,
     Expression<bool>? excludeTravel,
     Expression<bool>? excludeOther,
-    Expression<String>? mucusFeeling,
-    Expression<int>? mucusNfp,
+    Expression<String>? mucusSign,
+    Expression<String>? mucusQuality,
     Expression<String>? cervix,
     Expression<bool>? pain,
     Expression<bool>? mood,
@@ -971,8 +977,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (excludeAlcohol != null) 'exclude_alcohol': excludeAlcohol,
       if (excludeTravel != null) 'exclude_travel': excludeTravel,
       if (excludeOther != null) 'exclude_other': excludeOther,
-      if (mucusFeeling != null) 'mucus_feeling': mucusFeeling,
-      if (mucusNfp != null) 'mucus_nfp': mucusNfp,
+      if (mucusSign != null) 'mucus_sign': mucusSign,
+      if (mucusQuality != null) 'mucus_quality': mucusQuality,
       if (cervix != null) 'cervix': cervix,
       if (pain != null) 'pain': pain,
       if (mood != null) 'mood': mood,
@@ -994,8 +1000,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<bool>? excludeAlcohol,
       Value<bool>? excludeTravel,
       Value<bool>? excludeOther,
-      Value<String?>? mucusFeeling,
-      Value<int?>? mucusNfp,
+      Value<String?>? mucusSign,
+      Value<String?>? mucusQuality,
       Value<String?>? cervix,
       Value<bool>? pain,
       Value<bool>? mood,
@@ -1014,8 +1020,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
       excludeTravel: excludeTravel ?? this.excludeTravel,
       excludeOther: excludeOther ?? this.excludeOther,
-      mucusFeeling: mucusFeeling ?? this.mucusFeeling,
-      mucusNfp: mucusNfp ?? this.mucusNfp,
+      mucusSign: mucusSign ?? this.mucusSign,
+      mucusQuality: mucusQuality ?? this.mucusQuality,
       cervix: cervix ?? this.cervix,
       pain: pain ?? this.pain,
       mood: mood ?? this.mood,
@@ -1059,11 +1065,11 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (excludeOther.present) {
       map['exclude_other'] = Variable<bool>(excludeOther.value);
     }
-    if (mucusFeeling.present) {
-      map['mucus_feeling'] = Variable<String>(mucusFeeling.value);
+    if (mucusSign.present) {
+      map['mucus_sign'] = Variable<String>(mucusSign.value);
     }
-    if (mucusNfp.present) {
-      map['mucus_nfp'] = Variable<int>(mucusNfp.value);
+    if (mucusQuality.present) {
+      map['mucus_quality'] = Variable<String>(mucusQuality.value);
     }
     if (cervix.present) {
       map['cervix'] = Variable<String>(cervix.value);
@@ -1104,8 +1110,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('excludeAlcohol: $excludeAlcohol, ')
           ..write('excludeTravel: $excludeTravel, ')
           ..write('excludeOther: $excludeOther, ')
-          ..write('mucusFeeling: $mucusFeeling, ')
-          ..write('mucusNfp: $mucusNfp, ')
+          ..write('mucusSign: $mucusSign, ')
+          ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
           ..write('pain: $pain, ')
           ..write('mood: $mood, ')
@@ -1754,8 +1760,8 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<bool> excludeAlcohol,
   Value<bool> excludeTravel,
   Value<bool> excludeOther,
-  Value<String?> mucusFeeling,
-  Value<int?> mucusNfp,
+  Value<String?> mucusSign,
+  Value<String?> mucusQuality,
   Value<String?> cervix,
   Value<bool> pain,
   Value<bool> mood,
@@ -1776,8 +1782,8 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<bool> excludeAlcohol,
   Value<bool> excludeTravel,
   Value<bool> excludeOther,
-  Value<String?> mucusFeeling,
-  Value<int?> mucusNfp,
+  Value<String?> mucusSign,
+  Value<String?> mucusQuality,
   Value<String?> cervix,
   Value<bool> pain,
   Value<bool> mood,
@@ -1846,11 +1852,11 @@ class $$CycleEntriesTableFilterComposer
   ColumnFilters<bool> get excludeOther => $composableBuilder(
       column: $table.excludeOther, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get mucusFeeling => $composableBuilder(
-      column: $table.mucusFeeling, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get mucusSign => $composableBuilder(
+      column: $table.mucusSign, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get mucusNfp => $composableBuilder(
-      column: $table.mucusNfp, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get mucusQuality => $composableBuilder(
+      column: $table.mucusQuality, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnFilters(column));
@@ -1934,12 +1940,12 @@ class $$CycleEntriesTableOrderingComposer
       column: $table.excludeOther,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get mucusFeeling => $composableBuilder(
-      column: $table.mucusFeeling,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get mucusSign => $composableBuilder(
+      column: $table.mucusSign, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get mucusNfp => $composableBuilder(
-      column: $table.mucusNfp, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get mucusQuality => $composableBuilder(
+      column: $table.mucusQuality,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnOrderings(column));
@@ -2019,11 +2025,11 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<bool> get excludeOther => $composableBuilder(
       column: $table.excludeOther, builder: (column) => column);
 
-  GeneratedColumn<String> get mucusFeeling => $composableBuilder(
-      column: $table.mucusFeeling, builder: (column) => column);
+  GeneratedColumn<String> get mucusSign =>
+      $composableBuilder(column: $table.mucusSign, builder: (column) => column);
 
-  GeneratedColumn<int> get mucusNfp =>
-      $composableBuilder(column: $table.mucusNfp, builder: (column) => column);
+  GeneratedColumn<String> get mucusQuality => $composableBuilder(
+      column: $table.mucusQuality, builder: (column) => column);
 
   GeneratedColumn<String> get cervix =>
       $composableBuilder(column: $table.cervix, builder: (column) => column);
@@ -2102,8 +2108,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<bool> excludeAlcohol = const Value.absent(),
             Value<bool> excludeTravel = const Value.absent(),
             Value<bool> excludeOther = const Value.absent(),
-            Value<String?> mucusFeeling = const Value.absent(),
-            Value<int?> mucusNfp = const Value.absent(),
+            Value<String?> mucusSign = const Value.absent(),
+            Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
             Value<bool> pain = const Value.absent(),
             Value<bool> mood = const Value.absent(),
@@ -2123,8 +2129,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             excludeAlcohol: excludeAlcohol,
             excludeTravel: excludeTravel,
             excludeOther: excludeOther,
-            mucusFeeling: mucusFeeling,
-            mucusNfp: mucusNfp,
+            mucusSign: mucusSign,
+            mucusQuality: mucusQuality,
             cervix: cervix,
             pain: pain,
             mood: mood,
@@ -2144,8 +2150,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<bool> excludeAlcohol = const Value.absent(),
             Value<bool> excludeTravel = const Value.absent(),
             Value<bool> excludeOther = const Value.absent(),
-            Value<String?> mucusFeeling = const Value.absent(),
-            Value<int?> mucusNfp = const Value.absent(),
+            Value<String?> mucusSign = const Value.absent(),
+            Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
             Value<bool> pain = const Value.absent(),
             Value<bool> mood = const Value.absent(),
@@ -2165,8 +2171,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             excludeAlcohol: excludeAlcohol,
             excludeTravel: excludeTravel,
             excludeOther: excludeOther,
-            mucusFeeling: mucusFeeling,
-            mucusNfp: mucusNfp,
+            mucusSign: mucusSign,
+            mucusQuality: mucusQuality,
             cervix: cervix,
             pain: pain,
             mood: mood,

@@ -17,6 +17,7 @@ import '../domain/models.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'mucus_symbol.dart';
 
 class TagebuchScreen extends ConsumerStatefulWidget {
   const TagebuchScreen({super.key});
@@ -36,8 +37,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   bool _excludeAlcohol = false;
   bool _excludeTravel = false;
   bool _excludeOther = false;
-  MucusFeeling? _feeling;
-  int? _mucusNfp;
+  MucusSign? _sign;
+  MucusQuality? _quality;
   bool _pain = false;
   bool _mood = false;
   bool _desire = false;
@@ -76,10 +77,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _excludeAlcohol = entry?.excludeAlcohol ?? false;
     _excludeTravel = entry?.excludeTravel ?? false;
     _excludeOther = entry?.excludeOther ?? false;
-    _feeling = entry?.mucusFeeling == null
-        ? null
-        : MucusFeeling.tryFromName(entry!.mucusFeeling!);
-    _mucusNfp = entry?.mucusNfp;
+    // DailyEntry already enforces quality-only-with-S (constructor assert),
+    // so the form state can mirror the loaded pair untouched.
+    _sign = entry?.mucusSign;
+    _quality = entry?.mucusQuality;
     _pain = entry?.pain ?? false;
     _mood = entry?.mood ?? false;
     _desire = entry?.desire ?? false;
@@ -108,6 +109,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) return;
     final date = ref.read(selectedDateProvider);
+    // Enforce the domain rule once more at the save boundary: any quality
+    // on a sign other than S collapses to null (mirrors the SQL CHECK).
+    final (:sign, :quality) =
+        sanitizeMucusPair(sign: _sign, quality: _quality);
     final entry = DailyEntry(
       date: date,
       profileId: defaultProfileId,
@@ -117,8 +122,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       excludeAlcohol: _excludeAlcohol,
       excludeTravel: _excludeTravel,
       excludeOther: _excludeOther,
-      mucusFeeling: _feeling?.name,
-      mucusNfp: _mucusNfp,
+      mucusSign: sign,
+      mucusQuality: quality,
       cervix: _cervixController.text.trim().isEmpty
           ? null
           : _cervixController.text.trim(),
@@ -148,23 +153,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         locale: locale,
         decimalDigits: 2,
       ).format(bbt);
-
-  String _feelingLabel(MucusFeeling f, AppLocalizations l10n) {
-    switch (f) {
-      case MucusFeeling.dry:
-        return l10n.mucusDry;
-      case MucusFeeling.sticky:
-        return l10n.mucusSticky;
-      case MucusFeeling.creamy:
-        return l10n.mucusCreamy;
-      case MucusFeeling.moist:
-        return l10n.mucusMoist;
-      case MucusFeeling.wet:
-        return l10n.mucusWet;
-      case MucusFeeling.stretchy:
-        return l10n.mucusStretchy;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,69 +289,50 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // --- mucus: feeling -> auto NFP value, override allowed ---
-              DropdownButtonFormField<MucusFeeling?>(
-                initialValue: _feeling,
-                decoration: InputDecoration(labelText: l10n.mucusFeeling),
-                items: [
-                  DropdownMenuItem<MucusFeeling?>(
-                    value: null,
-                    child: Text(l10n.mucusFeelingUnset),
-                  ),
-                  ...MucusFeeling.values.map(
-                    (f) => DropdownMenuItem<MucusFeeling?>(
-                      value: f,
-                      child: Text(
-                        '${_feelingLabel(f, l10n)} → NFP ${f.mappedNfp}',
-                      ),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => setState(() {
-                  _feeling = value;
-                  // Auto-mapping: picking a feeling pre-selects the mapped
-                  // NFP value. The user can override it afterwards using
-                  // the segmented row below (pure assistant, no evaluation).
-                  if (value != null) _mucusNfp = value.mappedNfp;
-                }),
-              ),
-              const SizedBox(height: 8),
-              Text(l10n.mucusNfpValue),
+              // --- mucus: fertility sign, quality qualifier only on S -----
+              // Segments show the cheat-sheet glyphs themselves (t/Ø/f/S);
+              // a quality exists only together with S, so the quality
+              // picker appears only while S is selected (hidden otherwise).
+              Text(l10n.mucusSign),
               const SizedBox(height: 4),
-              SegmentedButton<int>(
+              SegmentedButton<MucusSign?>(
                 segments: [
-                  for (var n = 0; n <= 4; n++)
-                    ButtonSegment(value: n, label: Text('$n')),
+                  ButtonSegment(
+                    value: null,
+                    label: Text(l10n.mucusSignUnset),
+                  ),
+                  for (final sign in MucusSign.values)
+                    ButtonSegment(
+                      value: sign,
+                      label: Text(mucusSignSymbol(sign)),
+                    ),
                 ],
-                selected: _mucusNfp != null ? {_mucusNfp!} : <int>{},
-                emptySelectionAllowed: true,
+                selected: {_sign},
                 onSelectionChanged: (selection) => setState(() {
-                  _mucusNfp = selection.isEmpty ? null : selection.first;
+                  _sign = selection.first;
+                  if (_sign != MucusSign.s) _quality = null;
                 }),
               ),
-              ExpansionTile(
-                title: Text(l10n.mucusMappingTitle,
-                    style: Theme.of(context).textTheme.bodyMedium),
-                children: [
-                  ...MucusFeeling.values.map(
-                    (f) => ListTile(
-                      dense: true,
-                      title: Text(_feelingLabel(f, l10n)),
-                      trailing: Text(
-                        'NFP ${f.mappedNfp}',
-                        style: Theme.of(context).textTheme.titleSmall,
+              if (_sign == MucusSign.s) ...[
+                const SizedBox(height: 8),
+                Text(l10n.mucusQuality),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final quality in MucusQuality.values)
+                      ChoiceChip(
+                        label: Text(mucusQualityToken(quality)),
+                        selected: _quality == quality,
+                        onSelected: (selected) => setState(() {
+                          // Tapping the selected chip returns to bare S.
+                          _quality = selected ? quality : null;
+                        }),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      l10n.mucusMappingNote,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               // --- cervix (optional) -----------------------------------
               TextFormField(
@@ -486,16 +455,21 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               '${_formatBbt(day.bbtC!, locale)} °C',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-          if (day.mucusNfp != null) ...[
+          if (day.mucusSign != null) ...[
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.tertiaryContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text('NFP ${day.mucusNfp}',
-                  style: Theme.of(context).textTheme.labelSmall),
+              child: MucusSymbolText(
+                display: mucusDisplay(
+                  sign: day.mucusSign,
+                  quality: day.mucusQuality,
+                ),
+                color: Theme.of(context).colorScheme.onTertiaryContainer,
+              ),
             ),
           ],
         ],

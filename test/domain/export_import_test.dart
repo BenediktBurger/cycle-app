@@ -1,10 +1,15 @@
 // Tests for the JSON export/import domain logic (export document assembly,
 // parsing/validation, and the (profile, date) overwrite merge plan).
-// Pure Dart — no DB, no Flutter — runs on the host VM / CI.
+// Pure Dart — no DB instances, runs on the host VM / CI. The writer-parity
+// group additionally pins the row converter of lib/db/export_adapter.dart,
+// which is a pure row-map function exercising the domain vocabulary helpers
+// (still no database needed).
 
 import 'dart:convert';
 
+import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/domain/export_import.dart';
+import 'package:cycle_app/domain/mucus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -126,8 +131,7 @@ void main() {
       expect(summary.marksSkipped, 1);
     });
 
-    test('unparsable bleeding values are counted invalid, never as writes',
-        () {
+    test('unparsable bleeding values are counted invalid, never as writes', () {
       final doc = ExportBlob(
         profiles: const [],
         entries: const <Map<String, Object?>>[
@@ -225,6 +229,76 @@ void main() {
 
     test('merge policy constant documents the overwrite behaviour', () {
       expect(exportMergePolicy, 'overwrite');
+    });
+  });
+
+  group('mucus tokens ride along as coercible fields', () {
+    ExportBlob docWithMucus(Map<String, Object?> mucusFields) => ExportBlob(
+          profiles: const [],
+          entries: [
+            {
+              'profile_id': 1,
+              'date': '2026-03-01',
+              'bleeding': 'period',
+              ...mucusFields,
+            },
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        );
+
+    test('planner: out-of-vocabulary mucus tokens never invalidate a row', () {
+      final summary = planMerge(
+        docWithMucus(const {'mucus_sign': 'zzz', 'mucus_quality': 'qqq'}),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'mucus content is coerced, not gated');
+      expect(summary.entriesWritten, 1,
+          reason: 'mucus never drops an otherwise valid row');
+    });
+
+    test('writer: out-of-vocabulary mucus tokens are nulled, row is kept', () {
+      final entry = tryDailyEntryFromExport(<String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'mucus_sign': 'zzz',
+        'mucus_quality': 'qqq',
+      });
+      expect(entry, isNotNull,
+          reason: 'the plan counted this row, so it must be written');
+      expect(entry!.mucusSign, isNull);
+      expect(entry.mucusQuality, isNull);
+    });
+
+    test('writer: quality without an S sign is kept as a row, quality null',
+        () {
+      final entry = tryDailyEntryFromExport(<String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'mucus_sign': 'f',
+        'mucus_quality': 'w',
+      });
+      expect(entry, isNotNull, reason: 'planner/writer parity: not a drop');
+      expect(entry!.mucusSign, MucusSign.f);
+      expect(entry.mucusQuality, isNull,
+          reason: 'only an S sign may carry a quality');
+    });
+
+    test('writer: an S sign with a quality token survives verbatim', () {
+      final entry = tryDailyEntryFromExport(<String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'mucus_sign': 's',
+        'mucus_quality': 'ew',
+      });
+      expect(entry!.mucusSign, MucusSign.s);
+      expect(entry.mucusQuality, MucusQuality.ew);
     });
   });
 }

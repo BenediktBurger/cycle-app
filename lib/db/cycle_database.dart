@@ -1,4 +1,4 @@
-// The app's drift database (schema version 1).
+// The app's drift database (schema version 2).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // profiles_dao.dart) are PARTS of this library. That is the standard drift
@@ -37,7 +37,7 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,8 +48,10 @@ class CycleDatabase extends _$CycleDatabase {
           await into(profiles).insert(ProfilesCompanion.insert(name: 'main'));
         },
         onUpgrade: (m, from, to) async {
-          // v1 -> future: extend here, one version step at a time. Nothing
-          // to do yet: this is schema version 1.
+          if (from < 2) {
+            await _rebuildCycleEntriesWithoutLegacyMucusColumns(m);
+          }
+          // v2 -> future: extend here, one version step at a time.
         },
         // SQLite only enforces FOREIGN KEY constraints when the pragma is
         // enabled for the connection; make that explicit. Idempotent if
@@ -58,4 +60,49 @@ class CycleDatabase extends _$CycleDatabase {
           await customStatement('PRAGMA foreign_keys = ON;');
         },
       );
+
+  /// v1 -> v2 upgrade step: removes the two retired legacy mucus columns
+  /// (a free-text feeling column and a numeric 0–4 value column) from
+  /// cycle_entries and introduces mucus_sign / mucus_quality as NULL.
+  ///
+  /// Plain `ALTER TABLE ... DROP COLUMN` is deliberately NOT used, verified
+  /// against the runtime SQLite here: it only succeeds for a column whose
+  /// CHECK is written inline (the check is then dropped along with the
+  /// column); a table-level CHECK referencing it fails with
+  /// "no such column". That nuance alone makes the explicit rebuild the
+  /// safer, schema-faithful route, and it re-creates the table exactly as
+  /// drift now generates it. The classic rename-copy-drop pattern runs
+  /// inside drift's migration transaction (a failure rolls everything back):
+  ///
+  ///   1. RENAME the old table away
+  ///   2. create a fresh cycle_entries from the CURRENT drift schema
+  ///   3. copy the surviving columns across (the old column VALUES are
+  ///      deliberately not migrated — old days keep every other field and
+  ///      start without a mucus observation)
+  ///   4. drop the old table
+  ///   5. re-create the unique index, which was dropped with the old table
+  ///
+  /// No data migration of the dropped values (app unpublished, decided in
+  /// the feature plan).
+  Future<void> _rebuildCycleEntriesWithoutLegacyMucusColumns(Migrator m) async {
+    const survivingColumns =
+        'id, profile_id, date, bbt_c, bleeding, exclude_illness, '
+        'exclude_alcohol, exclude_travel, exclude_other, cervix, pain, '
+        'mood, desire, sex, notes, created_at, updated_at';
+
+    await customStatement(
+      'ALTER TABLE cycle_entries RENAME TO cycle_entries_old;',
+    );
+    await m.createTable(cycleEntries);
+    await customStatement(
+      'INSERT INTO cycle_entries ($survivingColumns) '
+      'SELECT $survivingColumns FROM cycle_entries_old;',
+    );
+    await customStatement('DROP TABLE cycle_entries_old;');
+
+    // Dropping the old table dropped its unique
+    // cycle_entries_profile_date_unique index with it; recreate it so the
+    // EntriesDao upsert keeps its conflict target.
+    await m.createIndex(cycleEntriesProfileDateUnique);
+  }
 }
