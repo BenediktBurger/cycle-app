@@ -247,13 +247,15 @@ void main() {
       final sub = db.entriesDao
           .watchRange(1, DateTime(2026, 1, 1), DateTime(2026, 1, 31))
           .listen(events.add);
+      // Failure-safe: the subscription is cancelled by the test harness even
+      // if an assertion above fails and abandons the test body.
+      addTearDown(sub.cancel);
 
       // One event-loop turn is enough for NativeDatabase.memory() (which
       // executes synchronously once scheduled) to deliver the snapshot.
       await Future<void>.delayed(Duration.zero);
-      expect(events, [
-        <CycleEntry>[]
-      ], reason: 'initial snapshot of an empty table');
+      expect(events, [<CycleEntry>[]],
+          reason: 'initial snapshot of an empty table');
 
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 1, 10),
@@ -491,8 +493,7 @@ void main() {
       final rows = await db.entriesDao.allEntriesForAllProfiles();
       expect(rows, hasLength(1),
           reason: 'the unparsable-bleeding row is never stored');
-      expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)),
-          isTrue);
+      expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)), isTrue);
       // The mark row was untouched by the entry gate.
       expect(await db.marksDao.allMarksForAllProfiles(), hasLength(1));
     });
@@ -502,6 +503,16 @@ void main() {
       // the wrapper turns any engine error into the typed failure the UI
       // can message instead of a raw crash. The engine fails here because
       // the database is closed.
+      // The `broken` instance is alive next to the per-test `db` for this one
+      // test, so drift's singleton debug warning would print on every run —
+      // scope-limited suppression. The flag must be set BEFORE the database
+      // is constructed (the warning fires at construction time) and is
+      // restored by the harness afterwards.
+      final previousWarningFlag =
+          driftRuntimeOptions.dontWarnAboutMultipleDatabases;
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+      addTearDown(() => driftRuntimeOptions.dontWarnAboutMultipleDatabases =
+          previousWarningFlag);
       final broken = CycleDatabase(NativeDatabase.memory());
       // Ensure the lazy native executor has actually opened before closing —
       // closing a never-opened database is a no-op for drift, and the import
