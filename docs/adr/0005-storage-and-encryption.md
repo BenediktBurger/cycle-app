@@ -39,6 +39,12 @@ plumbing uninitialized outside our control and is out of scope).
 - Pros: strongly typed schema, DAOs, migrations for schema evolution across
   milestones; one storage API for mobile and web; reactive streams map
   cleanly to Riverpod providers.
+- WIP exception — destructive upgrades while the app is unpublished: until
+  the first published release, every schema upgrade recreates the database
+  from the current schema and discards all data (a change is just a
+  schema-version bump). From that release on, upgrades must be real
+  incremental migrations, one version step at a time, that preserve user
+  data.
 - Web limitation must be surfaced to the user visibly (PIN lock placeholder +
   docs), and it is acceptable because web is the **iteration target**, not the
   product's privacy guarantee — native mobile is where the real

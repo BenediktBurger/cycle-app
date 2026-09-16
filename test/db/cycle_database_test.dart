@@ -127,263 +127,95 @@ void main() {
     });
   });
 
-  group('migration v1 -> v2 (mucus column rebuild)', () {
+  group('destructive upgrade from an older schemaVersion', () {
     late Directory tempDir;
     late File dbFile;
-    CycleDatabase? migrated;
+    CycleDatabase? upgraded;
 
     setUp(() {
-      tempDir = Directory.systemTemp.createTempSync('cycle_migration_fixt_');
+      tempDir = Directory.systemTemp.createTempSync('cycle_upgrade_fixt_');
       addTearDown(() => tempDir.deleteSync(recursive: true));
-      dbFile = File('${tempDir.path}/v1.db');
+      dbFile = File('${tempDir.path}/old.db');
       addTearDown(() async {
-        await migrated?.close();
-        migrated = null;
+        await upgraded?.close();
+        upgraded = null;
       });
-      // The group-level `db` (fresh in-memory instance every test, see the
-      // outer setUp) is unused here — the fixture opens its own file-backed
-      // databases. Closing the unused one first avoids drift's
-      // multiple-databases warning (idempotent: the outer tearDown is a
-      // no-op afterwards).
+      // The outer `db` (fresh in-memory instance, see the outer setUp) is
+      // unused here — this group works on its own file-backed database.
+      // Closing the unused one first avoids drift's multiple-databases
+      // warning (idempotent: the outer tearDown is a no-op afterwards).
       db.close();
     });
 
-    /// Builds the REAL v1-era database on disk: the schema as drift generated
-    /// it before the fertility-sign rework, with seeded rows and the file's
-    /// drift user_version pinned to 1 — so opening it through CycleDatabase
-    /// (schema version 2) runs the table-rebuild onUpgrade.
-    Future<void> buildV1Database() async {
-      createV1Schema(Database raw) {
-        raw.execute(
-          'CREATE TABLE "profiles" ("id" INTEGER PRIMARY KEY AUTOINCREMENT '
-          'NOT NULL, "name" TEXT NOT NULL, "ordinal" INTEGER NOT NULL '
-          'DEFAULT 0);',
-        );
-        raw.execute(
-          'CREATE TABLE "user_marks" ("id" INTEGER PRIMARY KEY AUTOINCREMENT '
-          'NOT NULL, "profile_id" INTEGER NOT NULL DEFAULT 1 '
-          'REFERENCES profiles (id), "entry_date" INTEGER NOT NULL, '
-          '"mark_type" TEXT NOT NULL, "author" TEXT NOT NULL DEFAULT \'user\');',
-        );
-        raw.execute(
-          'CREATE TABLE "cycle_entries" ("id" INTEGER PRIMARY KEY '
-          'AUTOINCREMENT NOT NULL, "profile_id" INTEGER NOT NULL DEFAULT 1 '
-          'REFERENCES profiles (id), "date" INTEGER NOT NULL, '
-          '"bbt_c" REAL NULL, "bleeding" TEXT NOT NULL DEFAULT \'none\', '
-          '"exclude_illness" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_illness" IN (0, 1)), '
-          '"exclude_alcohol" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_alcohol" IN (0, 1)), '
-          '"exclude_travel" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_travel" IN (0, 1)), '
-          '"exclude_other" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_other" IN (0, 1)), '
-          '"mucus_feeling" TEXT NULL, '
-          // Historical constraint, written inline by drift (customConstraint):
-          '"mucus_nfp" INTEGER NULL '
-          'CHECK (mucus_nfp IS NULL OR (mucus_nfp BETWEEN 0 AND 4)), '
-          '"cervix" TEXT NULL, '
-          '"pain" INTEGER NOT NULL DEFAULT 0 CHECK ("pain" IN (0, 1)), '
-          '"mood" INTEGER NOT NULL DEFAULT 0 CHECK ("mood" IN (0, 1)), '
-          '"desire" INTEGER NOT NULL DEFAULT 0 CHECK ("desire" IN (0, 1)), '
-          '"sex" INTEGER NOT NULL DEFAULT 0 CHECK ("sex" IN (0, 1)), '
-          '"notes" TEXT NULL, '
-          '"created_at" INTEGER NOT NULL '
-          'DEFAULT (strftime(\'%s\', CURRENT_TIMESTAMP)), '
-          '"updated_at" INTEGER NOT NULL '
-          'DEFAULT (strftime(\'%s\', CURRENT_TIMESTAMP)));',
-        );
-        raw.execute(
-          'CREATE UNIQUE INDEX cycle_entries_profile_date_unique '
-          'ON cycle_entries (profile_id, date);',
-        );
-        raw.execute(
-          'CREATE UNIQUE INDEX user_marks_profile_date_type_unique '
-          'ON user_marks (profile_id, entry_date, mark_type);',
-        );
-      }
-
+    /// Builds a file whose drift user_version is stale (1) and whose
+    /// cycle_entries has an outdated shape with legacy columns and a junk
+    /// row. Not a faithful reconstruction of any historical release schema —
+    /// the pre-release upgrade policy discards everything anyway; the point
+    /// is that opening through CycleDatabase recreates from the CURRENT
+    /// schema instead of migrating.
+    Future<CycleDatabase> openThroughAppSchema() async {
       final raw = sqlite3.open(dbFile.path);
       try {
-        createV1Schema(raw);
         raw.execute(
-          'INSERT INTO profiles (id, name, ordinal) '
-          "VALUES (1, 'main', 0), (2, 'zweit', 3);",
+          'CREATE TABLE profiles (id INTEGER PRIMARY KEY, '
+          'name TEXT NOT NULL, ordinal INTEGER NOT NULL);',
         );
         raw.execute(
-          'INSERT INTO cycle_entries '
-          '(id, profile_id, date, bbt_c, bleeding, exclude_travel, '
-          'mucus_feeling, mucus_nfp, pain, notes, created_at, updated_at) '
-          'VALUES (101, 2, 20000, 36.55, \'period\', 1, \'milky\', 2, 1, '
-          "'v1 note', 1700000000, 1700000001), "
-          '(102, 1, 20001, NULL, \'none\', 0, NULL, NULL, 0, NULL, '
-          '1700000002, 1700000002);',
+          'CREATE TABLE cycle_entries (id INTEGER PRIMARY KEY, '
+          'profile_id INTEGER NOT NULL, date INTEGER NOT NULL, '
+          'mucus_feeling TEXT NULL);',
         );
-        raw.execute(
-          'INSERT INTO user_marks (id, profile_id, entry_date, mark_type, '
-          "author) VALUES (201, 1, 20001, 'baseline', 'user');",
-        );
+        raw.execute("INSERT INTO profiles VALUES (1, 'stale', 0);");
+        raw.execute("INSERT INTO cycle_entries VALUES (101, 1, 20000, 'x');");
         raw.execute('PRAGMA user_version = 1;');
       } finally {
         raw.close();
       }
-    }
-
-    Future<CycleDatabase> openThroughAppSchema() async {
       final db = CycleDatabase(NativeDatabase(dbFile));
-      migrated = db;
+      upgraded = db;
       // Opening a query forces the executor to open, which runs the
-      // v1 -> v2 upgrade before the first statement completes.
+      // destructive upgrade before the first statement completes.
       await db.profilesDao.allProfiles();
       return db;
     }
 
-    test('rebuild preserves rows and non-mucus fields; new columns enter '
-        'as NULL', () async {
-      await buildV1Database();
+    test('opening a lower-version file recreates the schema, discarding old '
+        'data', () async {
       final db = await openThroughAppSchema();
 
-      final profiles = await db.profilesDao.allProfiles();
-      expect(profiles.map((p) => p.name), ['main', 'zweit']);
-      expect(profiles.singleWhere((p) => p.id == 2).ordinal, 3);
-
-      final entries = await db.entriesDao.allEntriesForAllProfiles();
-      expect(entries, hasLength(2), reason: 'both v1 rows survive');
-
-      final oldDay = entries.singleWhere((e) => e.id == 101);
-      expect(oldDay.profileId, 2);
-      expect(oldDay.date.day, 4, reason: 'day 20000 = 2024-10-04');
-      expect(oldDay.bbtC, 36.55);
-      expect(oldDay.bleeding, Bleeding.period);
-      expect(oldDay.excludeTravel, isTrue);
-      expect(oldDay.pain, isTrue);
-      expect(oldDay.notes, 'v1 note');
-      expect(oldDay.mucusSign, isNull,
-          reason: 'v1 mucus values are dropped without data migration');
-      expect(oldDay.mucusQuality, isNull);
-
-      final emptyDay = entries.singleWhere((e) => e.id == 102);
-      expect(emptyDay.bleeding, Bleeding.none);
-      expect(emptyDay.mucusSign, isNull);
-
-      final marks = await db.marksDao.allMarksForAllProfiles();
-      expect(marks, hasLength(1));
-      expect(marks.single.id, 201);
-    });
-
-    test('schema is physically rebuilt: new columns + CHECKs present, old '
-        'columns gone', () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      final userVersion = await db.customSelect('PRAGMA user_version')
-          .getSingle();
+      final userVersion =
+          await db.customSelect('PRAGMA user_version').getSingle();
       expect(userVersion.data['user_version'], 2,
-          reason: 'drift records the run upgrade');
+          reason: 'drift records the upgrade run');
 
+      // Stale rows are gone; the main profile is re-seeded as id 1 so the
+      // profile_id defaults reference a valid row from the first open.
+      final profiles = await db.profilesDao.allProfiles();
+      expect(profiles, hasLength(1));
+      expect(profiles.single.id, 1);
+      expect(profiles.single.name, 'main');
+
+      // The rebuilt table has the CURRENT shape: new columns with their
+      // engine-level CHECKs, legacy columns gone.
       final ddl = await db
           .customSelect(
               "SELECT sql FROM sqlite_master WHERE type = 'table' AND "
               "name = 'cycle_entries'")
           .getSingle();
       final sql = ddl.data['sql']! as String;
-      expect(sql, contains('mucus_sign'), reason: 'new column exists');
-      expect(sql, contains('mucus_quality'));
-      expect(sql, isNot(contains('mucus_feeling')),
-          reason: 'retired columns are removed from the DDL');
-      expect(sql, isNot(contains('mucus_nfp')));
-      expect(sql, contains("mucus_sign IS NULL OR mucus_sign IN"),
-          reason: 'the engine-level vocabulary CHECK is present post-migration');
+      expect(sql, contains('mucus_sign IS NULL OR mucus_sign IN'));
+      expect(sql, isNot(contains('mucus_feeling')));
 
-      // The unique index was lost with the old table and must exist again:
-      final indexCount = await db.customSelect(
-              "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = "
-              "'index' AND name = 'cycle_entries_profile_date_unique'")
-          .getSingle();
-      expect(indexCount.data['count'], 1);
-    });
-
-    test('upsert and the recreated unique index work on the migrated rows',
-        () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      // EntriesDao (stream/upsert flows) works on the rebuilt table.
-      await db.entriesDao.upsertDaily(
-        DailyEntry(
-          date: DateTime(2026, 6, 15),
-          mucusSign: MucusSign.s,
-          mucusQuality: MucusQuality.ew,
-        ),
-      );
-      final row = (await db.entriesDao.allEntriesForAllProfiles())
-          .singleWhere((e) => e.date.month == 6);
-      // CycleEntry exposes the raw TEXT tokens (enum mapping happens in the
-      // mapper layer, tested above).
-      expect(row.mucusSign, 's');
-      expect(row.mucusQuality, 'ew');
-
-      // A duplicate (profile, date) insert still hits the unique index.
-      await expectLater(
-        db.into(db.cycleEntries).insert(
-              CycleEntriesCompanion.insert(date: DateTime(2026, 6, 15)),
-            ),
-        throwsA(isA<Exception>()),
-      );
-    });
-
-    test('foreign keys stay enabled across the migration and a fresh reopen',
-        () async {
-      await buildV1Database();
-      Future<Object?> foreignKeyState(CycleDatabase d) async => (await d
-              .customSelect('PRAGMA foreign_keys')
-              .getSingle())
-          .data['foreign_keys'];
-
-      final db = await openThroughAppSchema();
-      expect(await foreignKeyState(db), 1);
-
-      // The app schema's FK is intact: an unknown profile is rejected.
-      await expectLater(
-        db.into(db.cycleEntries).insert(
-              CycleEntriesCompanion.insert(
-                date: DateTime(2026, 7, 1),
-                profileId: const Value(99),
-              ),
-            ),
-        throwsA(isA<Exception>()),
-      );
-
-      // Reopen the settled v2 file with a fresh connection: the pragma is
-      // re-enabled by the app's beforeOpen hook, and the rebuild must NOT
-      // rerun (drift sees user_version == 2).
-      await db.close();
-      migrated = null;
-      final reopened = CycleDatabase(NativeDatabase(dbFile));
-      migrated = reopened;
-      await reopened.profilesDao.allProfiles();
-      expect(await foreignKeyState(reopened), 1);
-      expect(await reopened.entriesDao.allEntriesForAllProfiles(), hasLength(2),
-          reason: 'the rebuild ran exactly once');
-    });
-
-    test('the engine enforces the new CHECKs on a migrated database',
-        () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      await expectLater(
-        db.customStatement(
-            "INSERT INTO cycle_entries (profile_id, date, mucus_sign) "
-            "VALUES (1, 30000, 'wet')"),
-        throwsA(isA<Exception>()),
-      );
-      await expectLater(
-        db.customStatement(
-            "INSERT INTO cycle_entries (profile_id, date, mucus_sign, "
-            "mucus_quality) VALUES (1, 30001, 'f', 'w')"),
-        throwsA(isA<Exception>()),
-      );
+      // The unique index came back with the recreated table, foreign keys
+      // are enforced again (beforeOpen), and a normal DAO write works.
+      final foreignKeys =
+          await db.customSelect('PRAGMA foreign_keys').getSingle();
+      expect(foreignKeys.data['foreign_keys'], 1);
+      await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
+      final row = await db.entriesDao.entryFor(1, DateTime(2026, 6, 15));
+      expect(row, isNotNull);
+      expect(row!.profileId, 1,
+          reason: 'FK default resolves to the re-seeded profile');
     });
   });
 
