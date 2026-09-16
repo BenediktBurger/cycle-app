@@ -1,5 +1,5 @@
-// Drift table definitions for the cycle app (schema version 2; the version
-// number lives in cycle_database.dart).
+// Drift table definitions for the cycle app (the schema version number
+// lives in cycle_database.dart).
 //
 // SQL-level naming: drift converts camelCase getter names to snake_case
 // column names, matching the naming used in the plan and migration notes.
@@ -37,7 +37,19 @@ class CycleEntries extends Table {
   /// Basal body temperature in degrees Celsius, when measured.
   RealColumn get bbtC => real().nullable()();
 
-  /// Bleeding level: none / period / spotting (enum name as TEXT).
+  /// Time-of-day of the temperature measurement, minutes since midnight
+  /// (0–1439), NULL when not recorded. Engine-level CHECK mirrors the
+  /// shared parse helper (lib/domain/models.dart) so foreign data (e.g. a
+  /// future import path) cannot write an impossible time.
+  IntColumn get measuredAtMinutes => integer().nullable().customConstraint(
+        'CHECK (measured_at_minutes IS NULL OR '
+        '(measured_at_minutes BETWEEN 0 AND 1439))',
+      )();
+
+  /// Bleeding vocabulary: none(0) / spotting(1) / light(2) / medium(3) /
+  /// heavy(4) — the enum names as TEXT tokens, while the enum itself carries
+  /// each member's numeric scale value ([Bleeding.level]); every mapping
+  /// derives from that field, never from the declaration index.
   /// Note: textEnum's Dart-level builder type is String, so the default is
   /// the SQL-level enum name.
   TextColumn get bleeding =>

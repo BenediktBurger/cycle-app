@@ -93,7 +93,7 @@ Future<void> main() async {
   final first = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
     DailyEntry(
       date: DateTime(2026, 3, 1),
-      bleeding: Bleeding.period,
+      bleeding: Bleeding.medium,
       bbtC: 36.1,
     ),
   ));
@@ -171,18 +171,18 @@ Future<void> main() async {
     return DailyEntry(
       date: DateTime(y, m, day),
       bleeding: bleeding,
-      excludeIllness: interrupted && bleeding == Bleeding.period,
-      excludeTravel: interrupted && bleeding != Bleeding.period,
+      excludeIllness: interrupted && bleeding == Bleeding.medium,
+      excludeTravel: interrupted && bleeding != Bleeding.medium,
     );
   }
 
   final entries = [
-    d(2026, 3, 2, bleeding: Bleeding.period),
-    d(2026, 3, 3, bleeding: Bleeding.period),
+    d(2026, 3, 2, bleeding: Bleeding.medium),
+    d(2026, 3, 3, bleeding: Bleeding.medium),
     d(2026, 3, 4),
-    d(2026, 3, 30, bleeding: Bleeding.period),
+    d(2026, 3, 30, bleeding: Bleeding.medium),
     d(2026, 4, 10, bleeding: Bleeding.spotting),
-    d(2026, 4, 27, bleeding: Bleeding.period),
+    d(2026, 4, 27, bleeding: Bleeding.medium),
     d(2026, 4, 28),
   ];
   final cycles = groupIntoCycles(entries);
@@ -195,9 +195,9 @@ Future<void> main() async {
 
   // interrupted period day does not start a cycle
   final interrupted = [
-    d(2026, 4, 1, bleeding: Bleeding.period),
-    d(2026, 4, 29, bleeding: Bleeding.period, interrupted: true),
-    d(2026, 4, 30, bleeding: Bleeding.period),
+    d(2026, 4, 1, bleeding: Bleeding.medium),
+    d(2026, 4, 29, bleeding: Bleeding.medium, interrupted: true),
+    d(2026, 4, 30, bleeding: Bleeding.medium),
   ];
   check(
     menstruationOnsetDates(interrupted).length == 2 &&
@@ -208,7 +208,7 @@ Future<void> main() async {
   // --- statistics ---------------------------------------------------------
   // 28-day entries have 3 onsets -> 2 interval lengths; add a 4th onset to
   // exercise the third interval (mirrors threeCycleData in the test suite).
-  final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.period)];
+  final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.medium)];
   final lengths = cycleLengthsInDays(statsEntries);
   check(eq(lengths, [28, 28, 28]), 'cycle lengths 28/28/28 ($lengths)');
   final summary = summarizeCycleLengths(lengths);

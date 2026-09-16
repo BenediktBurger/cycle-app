@@ -255,13 +255,15 @@ final class _SymbolCell extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Bleeding marker (top): filled = period, hollow = spotting.
+        // Bleeding marker (top): filled = menstruation level (light or
+        // heavier), hollow = lighter observation (spotting); none draws no
+        // ring at all.
         Container(
           width: 10,
           height: 10,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: entry!.bleeding == Bleeding.period
+            color: entry!.bleeding.level >= 2
                 ? Theme.of(context).colorScheme.error
                 : Colors.transparent,
             border: Border.all(

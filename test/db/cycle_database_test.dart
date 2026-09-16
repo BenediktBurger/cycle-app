@@ -31,7 +31,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v2)', () {
+  group('schema & migration (v3)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -94,11 +94,11 @@ void main() {
     test('bleeding is stored and read as the drift enum vocabulary', () async {
       await db.customStatement(
         "INSERT INTO cycle_entries (profile_id, date, bleeding) "
-        "VALUES (1, 20000, 'period')",
+        "VALUES (1, 20000, 'medium')",
       );
       final row =
           await db.entriesDao.entryFor(1, DateTime(2024, 10, 4)); // day 20000
-      expect(row!.bleeding, Bleeding.period);
+      expect(row!.bleeding, Bleeding.medium);
     });
 
     test('cycle entries reference existing profiles (foreign keys on)',
@@ -124,6 +124,30 @@ void main() {
       expect(row!.date.year, 2026);
       expect(row.date.month, 3);
       expect(row.date.day, 4);
+    });
+
+    test('measured time-of-day is rejected outside the minute range',
+        () async {
+      // Engine-level CHECK, like the mucus constraint: 0–1439 or NULL.
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+          "VALUES (1, 20000, 1440)",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+          "VALUES (1, 20000, -1)",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      // Sanity: an in-range value goes through.
+      await db.customStatement(
+        "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+        "VALUES (1, 20001, 405)",
+      );
     });
   });
 
@@ -185,7 +209,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 2,
+      expect(userVersion.data['user_version'], 3,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
@@ -205,6 +229,9 @@ void main() {
       final sql = ddl.data['sql']! as String;
       expect(sql, contains('mucus_sign IS NULL OR mucus_sign IN'));
       expect(sql, isNot(contains('mucus_feeling')));
+      expect(sql, contains('measured_at_minutes'),
+          reason: 'the shred-and-recreate upgrade yields the current schema, '
+              'including the newest column');
 
       // The unique index came back with the recreated table, foreign keys
       // are enforced again (beforeOpen), and a normal DAO write works.
@@ -223,12 +250,12 @@ void main() {
     test('inserts one row on the first write of a day', () async {
       await db.entriesDao.upsertByDate(
         CycleEntriesCompanion.insert(date: DateTime(2026, 3, 1)).copyWith(
-          bleeding: const Value(Bleeding.period),
+          bleeding: const Value(Bleeding.medium),
         ),
       );
       final rows = await db.entriesDao.allEntries(1);
       expect(rows, hasLength(1));
-      expect(rows.single.bleeding, Bleeding.period);
+      expect(rows.single.bleeding, Bleeding.medium);
     });
 
     test(
@@ -237,7 +264,7 @@ void main() {
       final first = await db.entriesDao.upsertByDate(
         dailyEntryToCompanion(DailyEntry(
           date: DateTime(2026, 3, 1),
-          bleeding: Bleeding.period,
+          bleeding: Bleeding.medium,
           bbtC: 36.1,
         )),
       );
@@ -343,6 +370,36 @@ void main() {
       expect(row.mucusQuality, isNull);
       expect(row.mucusSign, isNull);
       expect(row.notes, isNull);
+    });
+
+    test('measured time round-trips as minutes since midnight (or stays null)',
+        () async {
+      final measured = await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        bbtC: 36.4,
+        measuredAtMinutes: 407, // 06:47
+      ));
+      expect(measured.measuredAtMinutes, 407);
+      final mapped = dailyEntryFromDrift(measured);
+      expect(mapped.measuredAtMinutes, 407);
+
+      final unmeasured = await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 16),
+        bbtC: 36.0,
+      ));
+      expect(unmeasured.measuredAtMinutes, isNull);
+    });
+
+    test('updating a day without a measured time clears it (full replace)',
+        () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        measuredAtMinutes: 407,
+      ));
+      await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
+
+      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 6, 15)))!;
+      expect(row.measuredAtMinutes, isNull);
     });
 
     test('S with quality round-trips through the stored tokens and the mapper',
@@ -669,6 +726,48 @@ void main() {
       expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)), isTrue);
       // The mark row was untouched by the entry gate.
       expect(await db.marksDao.allMarksForAllProfiles(), hasLength(1));
+    });
+
+    group('measured time-of-day in the EXPORT version boundary', () {
+      test('export carries the stored minutes; fresh db keeps it on import',
+          () async {
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 2),
+          bbtC: 36.4,
+          measuredAtMinutes: 405, // 06:45
+        ));
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, contains('"measured_at_minutes": 405'));
+
+        final target = CycleDatabase(NativeDatabase.memory());
+        addTearDown(target.close);
+        final summary = await importJsonToDatabase(target, json);
+        expect(summary.entriesNew, 1);
+        final row = await target.entriesDao.entryFor(1, DateTime(2026, 4, 2));
+        expect(row!.measuredAtMinutes, 405);
+      });
+
+      test('old export documents without the field import with no time',
+          () async {
+        // A v1 document (shape published before the field existed). Raw JSON
+        // on purpose: this pins the backward compatibility of the actual
+        // file content, not of a hand-built blob.
+        const oldJson = '{"schema_version": 1, '
+            '"exported_at": "2026-04-01T00:00:00Z", '
+            '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+            '"entries": [{"profile_id": 1, "date": "2026-05-01", '
+            '"bbt_c": 36.4, "bleeding": "none"}], '
+            '"marks": []}';
+        final summary = await importJsonToDatabase(db, oldJson);
+        expect(summary.entriesNew, 1);
+
+        final row = await db.entriesDao.entryFor(1, DateTime(2026, 5, 1));
+        expect(row!.bbtC, 36.4);
+        expect(row.measuredAtMinutes, isNull,
+            reason: 'pre-field exports carry no time; that must not fail '
+                'and must not fabricate one either');
+      });
     });
 
     test('unexpected errors surface as ImportFailedException', () async {

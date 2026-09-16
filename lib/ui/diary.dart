@@ -37,6 +37,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   bool _excludeAlcohol = false;
   bool _excludeTravel = false;
   bool _excludeOther = false;
+  TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
   bool _pain = false;
@@ -77,6 +78,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _excludeAlcohol = entry?.excludeAlcohol ?? false;
     _excludeTravel = entry?.excludeTravel ?? false;
     _excludeOther = entry?.excludeOther ?? false;
+    // Measured time: a fresh day (nothing stored yet) starts from the
+    // CURRENT time as a convenience; a re-opened day keeps what was stored
+    // — including deliberately cleared days (stored null), which never
+    // re-prefill.
+    _measuredAt = entry == null
+        ? TimeOfDay.fromDateTime(ref.read(nowProvider))
+        : _minutesToTime(entry.measuredAtMinutes);
     // DailyEntry already enforces quality-only-with-S (constructor assert),
     // so the form state can mirror the loaded pair untouched.
     _sign = entry?.mucusSign;
@@ -105,6 +113,26 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(picked);
   }
 
+  /// Material time picker dialog. Initial value: the stored (or prefilled)
+  /// time, or — for still-unset days — the current time as a starting point.
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _measuredAt ??
+          TimeOfDay.fromDateTime(ref.read(nowProvider)),
+    );
+    if (picked == null) return;
+    setState(() => _measuredAt = picked);
+  }
+
+  /// Minutes since midnight form-state helper, in both directions
+  /// ([DailyEntry.measuredAtMinutes] vocabulary and [TimeOfDay] inputs).
+  TimeOfDay? _minutesToTime(int? minutes) => minutes == null
+      ? null
+      : TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+
+  static int _timeToMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+
   Future<void> _save(AppLocalizations l10n) async {
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) return;
@@ -117,6 +145,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       date: date,
       profileId: defaultProfileId,
       bbtC: parseDecimalInput(_bbtController.text),
+      // null = the user cleared the time (or never set one); no invented
+      // value is written for days without a recorded time.
+      measuredAtMinutes: _measuredAt == null
+          ? null
+          : _timeToMinutes(_measuredAt!),
       bleeding: _bleeding,
       excludeIllness: _excludeIllness,
       excludeAlcohol: _excludeAlcohol,
@@ -233,6 +266,33 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 },
               ),
               const SizedBox(height: 12),
+              // --- measured time -------------------------------------
+              // Prefilled with the current time when the day has none yet
+              // (see _applyEntry); explicit clearing sets "not recorded".
+              Row(
+                children: [
+                  const Icon(Icons.schedule_outlined),
+                  const SizedBox(width: 8),
+                  Text(l10n.measuredTime),
+                  const Spacer(),
+                  OutlinedButton(
+                    onPressed: _pickTime,
+                    child: Text(
+                      _measuredAt == null
+                          ? l10n.measuredTimeUnset
+                          : MaterialLocalizations.of(context)
+                              .formatTimeOfDay(_measuredAt!),
+                    ),
+                  ),
+                  if (_measuredAt != null)
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => setState(() => _measuredAt = null),
+                      tooltip: l10n.measuredTimeUnset,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
               Text(l10n.bleeding),
               const SizedBox(height: 4),
@@ -243,7 +303,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     label: Text(l10n.bleedingNone),
                   ),
                   ButtonSegment(
-                    value: Bleeding.period,
+                    value: Bleeding.medium,
                     label: Text(l10n.bleedingPeriod),
                   ),
                   ButtonSegment(
@@ -455,6 +515,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               '${_formatBbt(day.bbtC!, locale)} °C',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+          // Measured time, subtle: only when recorded that day, small type
+          // right after the temperature it belongs to.
+          if (day.measuredAtMinutes != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              MaterialLocalizations.of(context).formatTimeOfDay(
+                _minutesToTime(day.measuredAtMinutes!)!,
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           if (day.mucusSign != null) ...[
             const SizedBox(width: 8),
             Container(
@@ -491,7 +562,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Widget _bleedingMarker(DailyEntry day) {
     final color = switch (day.bleeding) {
       Bleeding.none => Theme.of(context).colorScheme.outlineVariant,
-      Bleeding.period => Theme.of(context).colorScheme.error,
+      // All menstruation levels share the full error color; spotting keeps
+      // the faint tint.
+      Bleeding.light || Bleeding.medium || Bleeding.heavy =>
+        Theme.of(context).colorScheme.error,
       Bleeding.spotting =>
         Theme.of(context).colorScheme.error.withValues(alpha: 0.4),
     };

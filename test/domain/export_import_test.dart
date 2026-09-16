@@ -9,6 +9,7 @@ import 'dart:convert';
 
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/domain/export_import.dart';
+import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -230,6 +231,70 @@ void main() {
     test('merge policy constant documents the overwrite behaviour', () {
       expect(exportMergePolicy, 'overwrite');
     });
+
+    test('documents of both published schema versions parse', () {
+      ExportBlob blobFor(int version) => parseExportJson(jsonEncode(
+            <String, Object?>{
+              'schema_version': version,
+              'exported_at': '2026-09-15T12:00:00Z',
+              'profiles': <Object?>[],
+              'entries': <Object?>[],
+              'marks': <Object?>[],
+            },
+          ));
+
+      // Old exports live on as real files on user devices, so every shape
+      // ever published stays importable until an explicit retirement rule
+      // says otherwise; anything AFTER the current version stays rejected.
+      expect(blobFor(1).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents from before the measured-time field import');
+      expect(blobFor(2).exportedAt, DateTime.utc(2026, 9, 15, 12));
+      expect(() => parseExportJson('{"schema_version": 3, "exported_at": '
+          '"2026-09-15T12:00:00Z"}'), throwsA(isA<FormatException>()));
+    });
+  });
+
+  group('tryParseBleeding: dual-format bleeding parser', () {
+    test('int 0-4 map to the five levels by their stored level', () {
+      // Mapped BY the numeric level, never by declaration index: the
+      // name/number pairs below hold even if the enum is ever re-declared
+      // in a different member order.
+      expect(tryParseBleeding(0)?.name, 'none');
+      expect(tryParseBleeding(1)?.name, 'spotting');
+      expect(tryParseBleeding(2)?.name, 'light');
+      expect(tryParseBleeding(3)?.name, 'medium');
+      expect(tryParseBleeding(4)?.name, 'heavy');
+    });
+
+    test('values outside the accepted shapes are invalid', () {
+      const invalid = <Object?>[
+        null, // missing field
+        true, // bool sneaks through as int in JS-land, not here
+        false,
+        -1, // below the scale
+        5, // above the scale
+        '2', // numeric STRING is not a level
+        'light', // NEW names are not valid string tokens (only legacy ones)
+        'medium',
+        'heavy',
+        '', // empty token
+        'monsoon', // out-of-vocabulary token
+        36.6, // double
+        <String, Object?>{}, // nested junk never parses
+      ];
+      for (final bad in invalid) {
+        expect(tryParseBleeding(bad), isNull, reason: '$bad must be invalid');
+      }
+    });
+
+    test('legacy v1 tokens survive with period pinned to medium', () {
+      // The v1 export vocabulary stored generic menstruation without
+      // heaviness; `period` degrades to the central menstruation level
+      // (medium) on import. TODO(user-review): experts re-check the default.
+      expect(tryParseBleeding('period')?.name, 'medium');
+      expect(tryParseBleeding('none')?.name, 'none');
+      expect(tryParseBleeding('spotting')?.name, 'spotting');
+    });
   });
 
   group('mucus tokens ride along as coercible fields', () {
@@ -299,6 +364,82 @@ void main() {
       });
       expect(entry!.mucusSign, MucusSign.s);
       expect(entry.mucusQuality, MucusQuality.ew);
+    });
+  });
+
+  group('measured time-of-day rides along as a coercible field', () {
+    test('the vocabulary helper accepts exactly the valid minute range', () {
+      expect(tryParseMeasuredAtMinutes(0), 0);
+      expect(tryParseMeasuredAtMinutes(1439), 1439);
+      expect(tryParseMeasuredAtMinutes(405), 405);
+
+      // Null is "not recorded", never invalid; numeric strings survive the
+      // same lossy-export tolerance as ids; anything else is not a time.
+      expect(tryParseMeasuredAtMinutes(null), isNull);
+      expect(tryParseMeasuredAtMinutes('405'), 405);
+      expect(tryParseMeasuredAtMinutes('06:45'), isNull);
+      expect(tryParseMeasuredAtMinutes(1439 + 1), isNull);
+      expect(tryParseMeasuredAtMinutes(-1), isNull);
+      expect(tryParseMeasuredAtMinutes(36.5), isNull);
+      expect(tryParseMeasuredAtMinutes(true), isNull);
+    });
+
+    test('planner gates unchanged: the minutes field never invalidates a row',
+        () {
+      final summary = planMerge(
+        ExportBlob(
+          profiles: const [],
+          entries: const <Map<String, Object?>>[
+            {
+              'profile_id': 1,
+              'date': '2026-03-01',
+              'bleeding': 'period',
+              'measured_at_minutes': 9999,
+            },
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'a broken time is coerced, not gated');
+      expect(summary.entriesWritten, 1);
+    });
+
+    test('writer: a measured document carries the stored minutes over', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'measured_at_minutes': 405,
+      });
+      expect(entry!.measuredAtMinutes, 405);
+    });
+
+    test('writer: out-of-range minutes collapse to null, row is kept', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'measured_at_minutes': 9999,
+      });
+      expect(entry, isNotNull,
+          reason: 'the plan counted this row, so it must be written');
+      expect(entry!.measuredAtMinutes, isNull);
+    });
+
+    test('writer: document rows without the field import with no time',
+        () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+      });
+      expect(entry!.measuredAtMinutes, isNull,
+          reason: 'older exports omit the field; that is null, not "now"');
     });
   });
 }

@@ -18,16 +18,16 @@ DailyEntry d(
 /// Three clean cycles: onsets Mar 2 / Mar 30 / Apr 27 / May 25.
 /// Consecutive lengths: 28, 28, 28.
 List<DailyEntry> threeCycleData() => [
-      d(2026, 3, 2, bleeding: Bleeding.period),
-      d(2026, 3, 3, bleeding: Bleeding.period),
+      d(2026, 3, 2, bleeding: Bleeding.medium),
+      d(2026, 3, 3, bleeding: Bleeding.medium),
       d(2026, 3, 4),
-      d(2026, 3, 30, bleeding: Bleeding.period),
+      d(2026, 3, 30, bleeding: Bleeding.medium),
       d(2026, 4, 1),
       d(2026, 4, 10, bleeding: Bleeding.spotting),
-      d(2026, 4, 27, bleeding: Bleeding.period),
+      d(2026, 4, 27, bleeding: Bleeding.medium),
       d(2026, 5, 1),
-      d(2026, 5, 25, bleeding: Bleeding.period),
-      d(2026, 5, 26, bleeding: Bleeding.period),
+      d(2026, 5, 25, bleeding: Bleeding.medium),
+      d(2026, 5, 26, bleeding: Bleeding.medium),
     ];
 
 void main() {
@@ -38,14 +38,14 @@ void main() {
 
     test('excludes interrupted (excluded) bleeding days as boundaries', () {
       final entries = [
-        d(2026, 4, 1, bleeding: Bleeding.period),
+        d(2026, 4, 1, bleeding: Bleeding.medium),
         // interrupted period day shortly before the real next onset:
         DailyEntry(
           date: DateTime(2026, 4, 28),
-          bleeding: Bleeding.period,
+          bleeding: Bleeding.medium,
           excludeIllness: true,
         ),
-        d(2026, 4, 29, bleeding: Bleeding.period), // true onset
+        d(2026, 4, 29, bleeding: Bleeding.medium), // true onset
       ];
       // Apr 29 is the only later onset -> single length from Apr 1 to Apr 29.
       expect(cycleLengthsInDays(entries), [28]);
@@ -53,8 +53,8 @@ void main() {
 
     test('incomplete trailing cycle contributes no length', () {
       final entries = [
-        d(2026, 1, 5, bleeding: Bleeding.period),
-        d(2026, 2, 2, bleeding: Bleeding.period),
+        d(2026, 1, 5, bleeding: Bleeding.medium),
+        d(2026, 2, 2, bleeding: Bleeding.medium),
         // no known next onset: cycle 2 is open-ended
       ];
       expect(cycleLengthsInDays(entries), [28]);

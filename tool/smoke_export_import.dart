@@ -63,7 +63,7 @@ Future<void> main() async {
   await source.entriesDao.upsertDaily(
     DailyEntry(
       date: DateTime(2026, 3, 2),
-      bleeding: Bleeding.period,
+      bleeding: Bleeding.medium,
       bbtC: 36.1,
       excludeTravel: true,
     ),
@@ -71,7 +71,7 @@ Future<void> main() async {
   await source.entriesDao.upsertDaily(
     DailyEntry(
       date: DateTime(2026, 3, 3),
-      bleeding: Bleeding.period,
+      bleeding: Bleeding.medium,
       bbtC: 36.05,
       mucusSign: MucusSign.s,
       mucusQuality: MucusQuality.mi,
@@ -85,8 +85,8 @@ Future<void> main() async {
   );
 
   final json = await exportDatabaseToJson(source);
-  check(
-      json.contains('"schema_version": 1'), 'document carries schema version');
+  check(json.contains('"schema_version": $exportSchemaVersion'),
+      'document carries schema version');
   check(json.contains('"mucus_sign": "s"') &&
           json.contains('"mucus_quality": "mi"'),
       'export carries the fertility-sign tokens');
@@ -131,7 +131,7 @@ Future<void> main() async {
   final migrated = await target.entriesDao.allEntriesForAllProfiles();
   check(migrated.length == 3, 'import wrote 3 entry rows total');
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
-  check(day2.bleeding == Bleeding.period && day2.bbtC == 36.05,
+  check(day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
       'import OVERWROTE the existing day with document content');
   // CycleEntry exposes raw TEXT tokens (the enum mapping happens in the
   // mapper layer); check that the tokens survived.
@@ -310,5 +310,5 @@ Future<void> main() async {
 
   await source.close();
   await target.close();
-  print('\nAll Phase-2 runtime smoke checks passed.');
+  print('\nAll export/import runtime smoke checks passed.');
 }
