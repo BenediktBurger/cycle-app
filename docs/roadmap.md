@@ -74,7 +74,6 @@ the sections above track planned work, git history keeps the record (see
       [ADR-0007](adr/0007-language-policy.md).
 - [ ] Missing translation term falls back to **English** (non-Germans likely
       know English, but not German) instead of German.
-- [ ] Use Zeichen der Fruchtbarkeit from Cheat Sheet (maybe even as string)?
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
       higher measurement" adds the baseline automatically, based on the preceding measurements
       User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
@@ -87,7 +86,6 @@ the sections above track planned work, git history keeps the record (see
 - Datenbankschema überarbeiten (manche Dinge pro Zyklus nicht pro Tag speichern? )
 - exclude (Temperatur, Blutung) als negative Zahl?
 - set markings (temperature rising etc.) on the cycle tab
-- Schleim als String, nicht als Zahl speichern?
 - [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
@@ -95,7 +93,7 @@ the sections above track planned work, git history keeps the record (see
 ### Convenience
 
 - [ ] Dark mode, following the device setting.
-- [ ] Password protection for the database — first revisit
+- Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
 - Import from drip
