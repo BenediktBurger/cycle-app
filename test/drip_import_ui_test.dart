@@ -76,12 +76,12 @@ void main() {
         greaterThan(cardIndex('JSON-Import')),
         reason: 'The drip card must sit below the JSON import card');
 
-    // Opening the drip dialog: the button in the drip card (the LAST
-    // 'Drip-Daten importieren' text — heading comes first, button second).
-    final dripButton = find.ancestor(
-      of: find.text('Drip-Daten importieren').last,
-      matching: find.byType(FilledButton),
-    );
+    // Opening the drip dialog: the launch button is pinned by its dedicated
+    // label (dripImportButton, "CSV importieren"), distinct from the card
+    // heading ("Drip-Daten importieren") AND from the dialog's Apply action
+    // (checked after the dialog opens below).
+    final dripButton =
+        find.widgetWithText(FilledButton, 'CSV importieren').first;
     await tester.tap(dripButton);
     await tester.pumpAndSettle();
 
@@ -91,8 +91,11 @@ void main() {
     expect(dialogTextFields, findsOneWidget);
 
     // Apply is disabled until CSV text is present …
-    Finder applyButton() =>
-        find.widgetWithText(FilledButton, 'CSV importieren');
+    // (The card's own launch button shares the "CSV importieren" label —
+    // scoping to the dialog isolates the dialog's Apply action.)
+    Finder applyButton() => find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'CSV importieren'));
     expect(tester.widget<FilledButton>(applyButton()).onPressed, isNull);
 
     // … and enabled once the textarea holds text.

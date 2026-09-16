@@ -157,7 +157,7 @@ class EinstellungenScreen extends ConsumerWidget {
                   FilledButton.tonalIcon(
                     onPressed: () => _openDripImportDialog(context, ref),
                     icon: const Icon(Icons.upload_outlined),
-                    label: Text(l10n.dripImportTitle),
+                    label: Text(l10n.dripImportButton),
                   ),
                 ],
               ),

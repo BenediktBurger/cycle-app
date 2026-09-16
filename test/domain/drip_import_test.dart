@@ -298,6 +298,32 @@ void main() {
       expect(entryOf(cells('2026-01-01', {4: '2'}))['cervix'], isNull);
     });
 
+    test('desire: intensity values 0/1/2 count, literal false does not', () {
+      // drip's desire vocabulary is 0=low/1=medium/2=high — not a boolean;
+      // any present value means "desire happened", intensity is lost.
+      expect(entryOf(cells('2026-01-01', {12: '0'}))['desire'], true);
+      expect(entryOf(cells('2026-01-01', {12: '1'}))['desire'], true);
+      expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
+      // A hypothetically rendered literal `false` is NOT data and NOT
+      // desire — same treatment as an empty cell. Trimmed, since drip
+      // lowercases but a spreadsheet round-trip may add padding.
+      expect(entryOf(cells('2026-01-01', {12: 'false', 4: '2'}))['desire'],
+          isFalse, reason: 'false is ignored for the flag');
+      expect(
+          entryOf(cells('2026-01-01', {12: ' false ', 1: '36.2'}))['desire'],
+          isFalse,
+          reason: 'false is ignored even with padding');
+      // A false-only row carries no data at all → skipped empty, exactly
+      // like the mapping table's data rule.
+      final result = dripCsvToExportJson(dripOneRowCsv(dripHeader,
+          cells('2026-01-01', {12: 'false'})));
+      expect(result.stats.rowsImported, 0,
+          reason: 'a desire=false row is not a data row');
+      expect(result.stats.rowsSkippedEmpty, 1);
+      final doc = jsonDecode(result.json) as Map<String, Object?>;
+      expect(doc['entries'] as List, isEmpty);
+    });
+
     test('desire/sex/pain/mood: flags and note-only days', () {
       expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
       expect(entryOf(cells('2026-01-01', {13: 'true'}))['sex'], true);

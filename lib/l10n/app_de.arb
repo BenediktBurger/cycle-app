@@ -138,6 +138,7 @@
   },
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
   "dripImportTitle": "Drip-Daten importieren",
+  "dripImportButton": "CSV importieren",
   "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Import läuft in das Hauptprofil; Störungskennzeichen pro Symptom (außer Temperatur) fallen weg.",
   "dripImportApply": "CSV importieren",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",

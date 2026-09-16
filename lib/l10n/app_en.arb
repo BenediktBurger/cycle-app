@@ -141,6 +141,7 @@
   },
   "importEmpty": "Import: nothing to change (document empty or already identical).",
   "dripImportTitle": "Import drip data",
+  "dripImportButton": "Import CSV",
   "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. Imports into the main profile; per-symptom interrupt flags (except temperature) are dropped.",
   "dripImportApply": "Import CSV",
   "dripImportHint": "Paste a drip CSV export here …",

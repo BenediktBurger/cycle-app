@@ -237,7 +237,14 @@ DripCsvImport dripCsvToExportJson(String raw) {
       firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
-    final desire = cell(dataRow, 'desire.value') != null;
+    // desire.value is drip's 0=low/1=medium/2=high intensity vocabulary —
+    // NOT a real boolean (the flag collapses it: intensity is not storable
+    // here, see the mapping table). Any present cell means desire; only a
+    // literal trimmed `false` is ignored entirely — not data, not desire
+    // (drip lowercases every string cell, so a real export says just
+    // `false`).
+    final desireCell = cell(dataRow, 'desire.value');
+    final desire = desireCell != null && desireCell.trim() != 'false';
     final sex = boolCell(dataRow, 'sex.solo') || boolCell(dataRow, 'sex.partner');
 
     final dayNote = cell(dataRow, 'note.value');

@@ -166,7 +166,6 @@ void main() {
       expect(rows, hasLength(28), reason: 'no duplicates on re-import');
 
       final afterSecond = await storedEntries();
-      expect(afterSecond, hasLength(afterFirst.length));
       // Full-row equality for EVERY affected day, list-ordered.
       expect(afterSecond, afterFirst);
     });
