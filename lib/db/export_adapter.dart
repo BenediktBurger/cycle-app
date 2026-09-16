@@ -98,6 +98,18 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 Future<String> exportDatabaseToJson(CycleDatabase db) =>
     exportDatabaseToBlob(db).then(buildExportJson);
 
+/// The bleeding token an export document carries for a stored bleeding
+/// value: the legacy vocabulary (none / period / spotting) for the
+/// menstruation levels, exactly the way the shared parser reads those tokens
+/// back (period -> medium, lib/domain/models.dart). Written this way so a
+/// document cycle-app itself produces can always be re-imported by it; the
+/// per-level numeric field is the successor of this token.
+String _legacyBleedingToken(Bleeding b) => switch (b) {
+      Bleeding.none => 'none',
+      Bleeding.spotting => 'spotting',
+      Bleeding.light || Bleeding.medium || Bleeding.heavy => 'period',
+    };
+
 // --- import (JSON string -> ExportBlob -> plan -> writes) -----------------
 
 /// Earliest neutral profile name for rows whose document doesn't describe

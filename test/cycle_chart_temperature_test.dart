@@ -89,7 +89,7 @@ void main() {
       // no entry at all behind it: neither gap may be bridged by the curve.
       await tester.pumpWidget(_chartHarness(entries: [
         DailyEntry(date: _thu, bbtC: 36.5),
-        DailyEntry(date: _fri, bleeding: Bleeding.period),
+        DailyEntry(date: _fri, bleeding: Bleeding.medium),
         DailyEntry(date: _sat, bbtC: 36.7),
         DailyEntry(date: _sun, bbtC: 36.8),
       ]));

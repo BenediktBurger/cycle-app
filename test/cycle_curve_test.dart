@@ -30,7 +30,7 @@ void main() {
         0: _entry(0, bbt: 36.5),
         // day 1: entry exists, but no temperature measured
         1: DailyEntry(
-            date: DateTime.utc(2026, 9, 4), bleeding: Bleeding.period),
+            date: DateTime.utc(2026, 9, 4), bleeding: Bleeding.medium),
         2: _entry(2, bbt: 36.7),
         3: _entry(3, bbt: 36.8),
       });
