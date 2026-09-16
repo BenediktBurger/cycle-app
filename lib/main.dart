@@ -13,6 +13,11 @@ import 'ui/diary.dart';
 import 'ui/settings.dart';
 import 'ui/statistics.dart';
 
+/// Seed for both brightness' color schemes: Flutter's Material 3 default
+/// seed, i.e. the scheme the app materialized before dark mode was made
+/// explicit — keeping it keeps the light look byte-for-byte familiar.
+const _themeSeedColor = Color(0xFF6750A4);
+
 void main() {
   runApp(const ProviderScope(child: CycleApp()));
 }
@@ -29,6 +34,20 @@ class CycleApp extends ConsumerWidget {
     // settings choice is always applied as-is.
     final Locale? explicitLocale = ref.watch(localeProvider);
     return MaterialApp(
+      // Theme: explicit Material 3 color schemes from one seed. The light
+      // scheme is Flutter's own default seed, so light mode looks exactly
+      // as before; dark mode derives from the same seed
+      // (ColorScheme.fromSeed(brightness: dark)) so both schemes stay in
+      // the same tonal neighborhood, and the app follows the device
+      // brightness setting (themeMode: system).
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: _themeSeedColor),
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: _themeSeedColor, brightness: Brightness.dark),
+      ),
       locale: explicitLocale,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       localizationsDelegates: const [

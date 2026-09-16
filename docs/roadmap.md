@@ -89,7 +89,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Convenience
 
-- [ ] Dark mode, following the device setting.
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
