@@ -40,6 +40,34 @@ single durable mapping of those IDs. Therefore:
   applies to the backlog section: **done backlog items are removed** — the
   roadmap is a queue, git history is the diary.
 
+## Running tests
+
+Run tests with `flutter test`; the default `compact` reporter redraws one
+line with carriage returns, so captured agent logs end up mangled and
+failures only surface in a summary at the end. Instead:
+
+- **Iteration** (fixing one thing, fast loop):
+  `flutter test test/domain/<file>_test.dart --fail-fast --no-pub -r expanded`
+  (`--plain-name '<substring>'` or `--name '<regexp>'` to narrow further).
+- **Full gate** before "done" (matches CI):
+  `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
+  suite still runs.
+- **Judge by the exit code, not the text.** `flutter test` exits non-zero on
+  failure; a green-looking log tail can still hide a failure (and packages
+  like `libsqlite3-dev` missing on Linux fail the `test/db/` suite at load
+  time, which only `expanded`/`json` output shows clearly).
+- **Machine-readable results**: `--file-reporter json:<path>` plus
+  `-r failures-only` — keep this for scripted parsing (counts, timings,
+  failure attribution). `-r expanded -r json`? No: use one reporter for
+  stdout and `--file-reporter` for the JSON file. `flutter test --machine`
+  is a hidden legacy alias for `-r json` (it even prepends one non-JSON
+  handshake line) — prefer `-r json`/`--file-reporter` directly.
+- **Sandbox note (resolved)**: an earlier omac sandbox denied `flutter test`
+  (loopback bind) — that restriction is lifted; run `flutter test` directly
+  (see [`docs/dev-notes.md`](docs/dev-notes.md) for the dated lesson). The
+  host-VM smoke scripts remain useful fallbacks when hunting failures:
+  `dart run tool/db_smoke.dart` / `dart run tool/smoke_export_import.dart`.
+
 ## File roles
 
 - `docs/roadmap.md` — the to-do list: open work only, no diaries.

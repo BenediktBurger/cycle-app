@@ -9,15 +9,16 @@ the input for the next fix round. Ticking = you observed it passing.
 - [ ] 1. Flutter stable SDK installed per [CONTRIBUTING.md](../CONTRIBUTING.md)
        §1 (`flutter --version` prints a stable release).
 - [ ] 2. `flutter pub get` succeeds (also runs gen-l10n for the ARBs).
-- [ ] 3. `flutter analyze` → **0 issues** (already verified in the agent
-       sandbox, but re-run as your own gate).
+- [ ] 3. `flutter analyze` → **0 issues** (verified in the agent sandbox,
+       including the full 2026-09-16 fix round, but re-run as your own gate).
 
 ## Automated tests
 
 `flutter test` runs directly after `flutter pub get` (no special sandbox
-exclusions apply anymore). Its first full runtime pass was observed by the
-coding agent in the 2026-09-16 fix round; ticking these boxes remains YOUR
-own gate:
+exclusions apply anymore). In the 2026-09-16 fix round the coding agent
+observed the full suite green — 59/59 tests pass, `flutter analyze` clean
+(see the fix-round commits in git history for details). Ticking these boxes
+remains YOUR own gate:
 
 - [ ] 4. `flutter test` → all tests pass, in particular:
        - `test/db/cycle_database_test.dart` (schema, DAOs, constraints)
