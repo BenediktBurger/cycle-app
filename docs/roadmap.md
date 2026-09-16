@@ -79,6 +79,8 @@ the sections above track planned work, git history keeps the record (see
   clarified: release/packaging vs. remaining placeholder screens).
 - [ ] Time of temperature measurement (can be prefilled with current time)
 - Datenbankschema überarbeiten (manche Dinge pro Zyklus nicht pro Tag speichern? )
+- [ ] allow different levels of bleeding
+- [ ] show excluded temperature measurements in a lighter color (also the connection line, if possible)
 - exclude (Temperatur, Blutung) als negative Zahl?
 - set markings (temperature rising etc.) on the cycle tab
 - [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
