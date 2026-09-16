@@ -1,5 +1,6 @@
-// Root widget: Material app, German-first localization (switchable in the
-// settings screen), and the database gating shell.
+// Root widget: Material app, German-first localization with English as the
+// fallback language (switchable in the settings screen), and the database
+// gating shell.
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,8 +33,14 @@ class CycleApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('de'), // German first — base language of the app.
+        // English first, German second: Flutter's locale resolution ends at
+        // the first supported locale when nothing matches, so an active
+        // locale outside the supported set (or none at all) falls back to
+        // English — the app's fallback language, never German
+        // (docs/adr/0007-language-policy.md). Setting a supported locale
+        // explicitly, as the language switcher does, is unaffected.
         Locale('en'),
+        Locale('de'),
       ],
       home: const _DatabaseGate(),
     );

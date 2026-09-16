@@ -1,6 +1,9 @@
 {
   "@@locale": "en",
   "appTitle": "Cycle App (working title)",
+  "@appTitle": {
+    "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
+  },
   "navTagebuch": "Diary",
   "navZyklus": "Cycle",
   "navStatistik": "Statistics",
