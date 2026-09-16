@@ -143,6 +143,32 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     // tick window instead of a degenerate zero-width axis.
     final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
 
+    // Weekend highlighting (owner decision: temperature curve only, not the
+    // Tagebuch list). A subtle vertical band behind each weekend day's chart
+    // column (Saturday/Sunday by calendar date via DateOnly.isWeekend, never
+    // by column index). fl_chart's rangeAnnotations paints these regions
+    // behind the grid, line and dots — the lightest-touch approach. The tint
+    // is the theme's on-color at a whisper of opacity, so it works on the
+    // light as well as the dark surface (dark: light overlay).
+    final weekendBandColor =
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
+    final lastX = (_days.dayCount - 1).toDouble();
+    final weekendBands = <VerticalRangeAnnotation>[];
+    for (var i = 0; i < _days.dayCount; i++) {
+      if (!DateOnly.isWeekend(_days.dayAt(i))) continue;
+      // Half a day left and right of the day's x position, clipped to the
+      // really recorded range (edge days keep a narrower band).
+      var x1 = (i - 0.5).clamp(0, lastX).toDouble();
+      var x2 = (i + 0.5).clamp(0, lastX).toDouble();
+      // Single-day chart: maxX widens to 1.0 while lastX is 0, so the clamp
+      // collapses the band to zero width — extend the right edge instead so
+      // the weekend still shows (left of the day lies outside minX 0).
+      if (x2 <= x1) x2 = x1 + 0.5;
+      weekendBands.add(
+        VerticalRangeAnnotation(x1: x1, x2: x2, color: weekendBandColor),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -163,6 +189,9 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
               maxX: maxX,
               minY: yMin,
               maxY: yMax,
+              rangeAnnotations: RangeAnnotations(
+                verticalRangeAnnotations: weekendBands,
+              ),
               gridData: const FlGridData(drawVerticalLine: false),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(

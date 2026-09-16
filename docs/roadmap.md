@@ -92,8 +92,6 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- Import from drip
-- [ ] Wochenende farblich hervorheben
 - [ ] make mode selectable: light mode, dark mode, system setting
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?

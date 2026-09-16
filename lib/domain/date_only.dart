@@ -26,4 +26,12 @@ abstract final class DateOnly {
 
   /// The calendar day before [d].
   static DateTime previousDay(DateTime d) => addDays(d, -1);
+
+  /// True when [d] falls on a Saturday or Sunday, judged by the calendar
+  /// day the value refers to (normalized first, so the verdict is a pure
+  /// date fact and never shifts with the value's timezone representation).
+  static bool isWeekend(DateTime d) {
+    final day = normalize(d);
+    return day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+  }
 }
