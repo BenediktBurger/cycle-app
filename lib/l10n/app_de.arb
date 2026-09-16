@@ -105,10 +105,10 @@
   "exportNativeHint": "Auf Android/iOS: Text oben kopieren (Freigabe-Funktion folgt).",
   "exportNothing": "Datenbank ist leer — nichts zu exportieren.",
   "importTitle": "JSON einfügen",
-  "importHint": "Exportdokument (schema_version 1, 2 oder 3) hier einfügen …",
+  "importHint": "Exportiertes cycle-app-Dokument hier einfügen …",
   "importPickFile": "Datei wählen (nur Web)",
   "importApply": "Import durchführen",
-  "importInvalid": "Ungültiges Dokument (kein Export-Format/schema_version 1 bis 3).",
+  "importInvalid": "Ungültiges Dokument (kein gültiger cycle-app-Export).",
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
   "importSummary": "Neue Profile: {profiles}, Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
   "@importSummary": {

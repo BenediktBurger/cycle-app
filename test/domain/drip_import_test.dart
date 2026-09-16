@@ -13,7 +13,7 @@
 // The mapping tests replicate drip's observation vocabularies (0-based,
 // drip: components/helpers/labels.js) and drip's own getNfpMucus numerics
 // (its test/nfp-mucus.spec.js), then pin how each maps onto the cycle-app
-// export document (schema_version 1, mucus as sign/quality tokens).
+// export document (current schema version, mucus as sign/quality tokens).
 
 import 'dart:convert';
 import 'dart:io' show File;
@@ -518,6 +518,108 @@ void main() {
       // pain flag + pain-note day
       expect(by('2026-08-25')['pain'], true);
       expect(by('2026-08-25')['notes'], '[pain] tender in the evening');
+      // temperature measurement times ride through as measured_at_minutes
+      expect(by('2026-07-05')['measured_at_minutes'], 7 * 60 + 15,
+          reason: 'drip temperature.time 07:15');
+      expect(by('2026-08-02')['measured_at_minutes'], 6 * 60 + 50,
+          reason: 'drip temperature.time 06:50');
+      // a temperature without a recorded time stays null, never fabricated
+      expect(by('2026-09-13')['measured_at_minutes'], isNull,
+          reason: '2026-09-13 has a temperature but no time cell');
+      expect(by('2026-08-20')['measured_at_minutes'], isNull,
+          reason: 'no temperature at all on 2026-08-20');
+    });
+
+    group('temperature.time → measured_at_minutes', () {
+      /// Header as drip writes it for a row carrying a measured temperature;
+      /// the bleeding cell stays empty on purpose (the temperature fields
+      /// already make the row a data row).
+      const timeHeader = [
+        'date',
+        'temperature.value',
+        'temperature.time',
+        'bleeding.value',
+      ];
+
+      List<String> timeCells(String date, String value, String time) =>
+          [date, value, time, ''];
+
+      test('HH:MM parses to minutes since midnight', () {
+        for (final (hhmm, minutes) in [
+          ('07:15', 7 * 60 + 15),
+          ('06:50', 6 * 60 + 50),
+          ('0:00', 0), // midnight
+          ('23:59', 23 * 60 + 59), // last minute of the day
+          ('7:05', 7 * 60 + 5), // single-digit hour tolerated
+          ('07:15:00', 7 * 60 + 15), // optional trailing seconds dropped
+          (' 09:30 ', 9 * 60 + 30), // spreadsheet round-trip padding
+        ]) {
+          final e = entryOf(
+            timeCells('2026-01-01', '36.2', hhmm),
+            header: timeHeader,
+          );
+          expect(
+            e['measured_at_minutes'],
+            minutes,
+            reason: 'drip time "$hhmm" → $minutes minutes',
+          );
+        }
+      });
+
+      test('no time cell on the sheet stays null (not fabricated)', () {
+        final absent = entryOf(
+          timeCells('2026-01-01', '36.2', ''),
+          header: timeHeader,
+        );
+        expect(absent['measured_at_minutes'], isNull);
+      });
+
+      test('a dropped temperature.time column stays null', () {
+        // Header-driven parser: a drip version that never records the time
+        // behaves exactly like an empty cell.
+        final e = entryOf(cells('2026-01-01', {1: '36.2'}));
+        expect(e['measured_at_minutes'], isNull);
+      });
+
+      test('malformed or out-of-range times degrade to null, row survives',
+          () {
+        for (final bad in [
+          '25:00', // hour out of range
+          '07:60', // minute out of range
+          '-07:15', // negative
+          'random', // no time shape
+          '0715', // no colon (drip always writes HH:MM)
+          '12', // bare number, ambiguous
+          'ab:cd', // non-numeric parts
+        ]) {
+          final result = dripCsvToExportJson(
+            dripOneRowCsv(
+              timeHeader,
+              timeCells('2026-01-01', '36.2', bad),
+            ),
+          );
+          final doc = jsonDecode(result.json) as Map<String, Object?>;
+          final entries = doc['entries']! as List;
+          expect(entries, hasLength(1),
+              reason: '"$bad" must not drop the row');
+          expect(
+            (entries.single as Map)['measured_at_minutes'],
+            isNull,
+            reason: '"$bad" is not a recording time',
+          );
+        }
+      });
+
+      test('a time cell alone is not data (row skipped when else empty)', () {
+        final timeOnlyHeader = ['date', 'temperature.time'];
+        final result = dripCsvToExportJson(dripOneRowCsv(
+          timeOnlyHeader,
+          const ['2026-01-01', '07:15'],
+        ));
+        expect(result.stats.rowsImported, 0,
+            reason: 'a lone time without its measurement is meaningless');
+        expect(result.stats.rowsSkippedEmpty, 1);
+      });
     });
   });
 }

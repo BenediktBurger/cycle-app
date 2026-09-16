@@ -144,6 +144,21 @@ void main() {
       expect(dates, hasLength(28));
     });
 
+    test('temperature measurement times persist through the import → db '
+        'round trip', () async {
+      final mapping = dripCsvToExportJson(fixtureRaw);
+      await importJsonToDatabase(db, mapping.json);
+
+      // The two fixture rows carrying temperature.time values.
+      expect((await dayRow('2026-07-05')).measuredAtMinutes, 7 * 60 + 15);
+      expect((await dayRow('2026-08-02')).measuredAtMinutes, 6 * 60 + 50);
+      // A temperature day without a time cell: null, never fabricated.
+      expect((await dayRow('2026-09-13')).measuredAtMinutes, isNull);
+
+      // The full-row equality re-import test below additionally proves the
+      // times survive a second import untouched.
+    });
+
     test('full-row equality of every stored day across a double import',
         () async {
       final mapping = dripCsvToExportJson(fixtureRaw);

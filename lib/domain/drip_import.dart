@@ -13,7 +13,7 @@
 //    file, so all parsing is header-driven: unknown columns are ignored,
 //    known-but-missing columns simply carry no data.
 //
-// Output is a standard schema-version-1 export document (see
+// Output is a standard export document of the CURRENT schema version (see
 // lib/domain/export_import.dart) that the write phase feeds through the
 // EXISTING importJsonToDatabase — no second db writer for this feature.
 //
@@ -150,7 +150,7 @@ final class DripCsvStats {
 final class DripCsvImport {
   const DripCsvImport({required this.json, required this.stats});
 
-  /// A schema-version-1 export document (see lib/domain/export_import.dart)
+  /// A current-version export document (see lib/domain/export_import.dart)
   /// with the seeded main profile `[{id: 1, name: 'main', ordinal: 0}]`,
   /// entries only, and an empty marks list — drip has no mark analogue.
   final String json;
@@ -225,13 +225,17 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // mapped to cycle-app's day-level excludeOther (interrupted day) because
     // drip has no reason field; per-symptom excludes have no storage here.
     final excludeOther = boolCell(dataRow, 'temperature.exclude');
+    // drip records the measurement's time of day in temperature.time as
+    // plain `HH:MM` (24 h). A time belongs to its measurement — hasData
+    // below deliberately does not count a lone time cell as data.
+    final measuredAtMinutes =
+        _parseDripTimeMinutes(cell(dataRow, 'temperature.time'));
     final bleeding = _parseBleeding(cell(dataRow, 'bleeding.value'));
     final mucus = _mucusObservation(
       nfpNumber: cell(dataRow, 'mucus.value'),
       feeling: cell(dataRow, 'mucus.feeling'),
       texture: cell(dataRow, 'mucus.texture'),
     );
-    // TODO(user-review): time of measurement is lost (no storage field).
     final cervix = _cervixText(
       opening: cell(dataRow, 'cervix.opening'),
       firmness: cell(dataRow, 'cervix.firmness'),
@@ -256,9 +260,10 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final mood = flagInFamily(dataRow, 'mood') || moodNote != null;
 
     // A row is only worth an entry when something mappable was recorded.
-    // Dropped columns (temperature.time, bleeding/mucus/cervix excludes,
-    // contraceptive flags without activity, symptom-flag FALSEs) are NOT
-    // data — otherwise every blank drip day would import.
+    // Dropped columns (bleeding/mucus/cervix excludes, contraceptive flags
+    // without activity, symptom-flag FALSEs) are NOT data — otherwise every
+    // blank drip day would import. A measured time belongs to its
+    // measurement, so a time cell alone never makes a blank day an entry.
     final hasData = bbtC != null ||
         excludeOther ||
         bleeding != null ||
@@ -296,6 +301,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'profile_id': 1,
       'date': formatIsoDay(day),
       'bbt_c': bbtC,
+      'measured_at_minutes': measuredAtMinutes,
       'bleeding': bleeding?.name ?? Bleeding.none.name,
       'exclude_illness': false,
       'exclude_alcohol': false,
@@ -338,6 +344,29 @@ DripCsvImport dripCsvToExportJson(String raw) {
 /// Parses a drip temperature cell (`36.2`); any non-number means no
 /// measurement (dot decimals only, as drip writes them).
 double? _parseBbtC(String? raw) => raw == null ? null : double.tryParse(raw);
+
+/// Parses drip's `temperature.time` cell into minutes since midnight — the
+/// vocabulary of [DailyEntry.measuredAtMinutes] / the export document's
+/// `measured_at_minutes` field.
+///
+/// drip writes plain `HH:MM` (24 h, zero-padded); tolerated on top: a
+/// single-digit hour, optional `:SS` seconds (ignored — minute is the
+/// storage grain), and surrounding whitespace from spreadsheet round-trips.
+/// Anything else — an absent/malformed/out-of-range cell (25:00, 07:60,
+/// no time shape at all, a bare number) — is null: a time is only stored
+/// when drip actually recorded one, never fabricated. Mirrors the
+/// tolerant-parse pattern of [tryParseMeasuredAtMinutes] (lib/domain/
+/// models.dart), which the db writer re-runs on the produced document.
+int? _parseDripTimeMinutes(String? raw) {
+  final m = RegExp(r'^\s*(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*$').firstMatch(
+    raw ?? '',
+  );
+  if (m == null) return null;
+  final hour = int.parse(m.group(1)!);
+  final minute = int.parse(m.group(2)!);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
 
 /// Drip's bleeding heaviness scale: 0=spotting, 1=light, 2=medium, 3=heavy.
 /// 1–3 collapse to the day-level `period` value — cycle-app stores no
