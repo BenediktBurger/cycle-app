@@ -12,11 +12,12 @@ the input for the next fix round. Ticking = you observed it passing.
 - [ ] 3. `flutter analyze` → **0 issues** (already verified in the agent
        sandbox, but re-run as your own gate).
 
-## Automated tests (first runtime observation)
+## Automated tests
 
-`flutter test` could not run in the coding-agent sandbox (it must bind a
-loopback socket), so the runtime pass of every test file is first observed
-HERE:
+`flutter test` runs directly after `flutter pub get` (no special sandbox
+exclusions apply anymore). Its first full runtime pass was observed by the
+coding agent in the 2026-09-16 fix round; ticking these boxes remains YOUR
+own gate:
 
 - [ ] 4. `flutter test` → all tests pass, in particular:
        - `test/db/cycle_database_test.dart` (schema, DAOs, constraints)

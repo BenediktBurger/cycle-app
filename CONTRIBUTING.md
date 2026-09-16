@@ -72,6 +72,7 @@ clearing site data/private windows do not (expected browser behaviour).
 ## 4. Analyze, test, build
 
 ```sh
+flutter pub get    # prerequisite of test runs (also runs gen-l10n)
 flutter analyze
 flutter test
 flutter build web

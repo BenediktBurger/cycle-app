@@ -1,13 +1,13 @@
 // Database + domain runtime smoke-verification (NOT part of the shipped
+// test suite).
 //
-// `flutter test` cannot run in the omac sandbox (flutter_tester needs a
-// 127.0.0.1 bind that is denied). BUT the drift NativeDatabase backend and
-// lib/domain are pure Dart, and the host has libsqlite3 — so this host-VM
-// script executes the core assertions of test/db/cycle_database_test.dart
-// and test/domain/*_test.dart.
+// Purpose: the drift NativeDatabase backend and lib/domain are pure Dart —
+// this host-VM script executes the core assertions of
+// test/db/cycle_database_test.dart and test/domain/*_test.dart quickly and
+// with fewer moving parts than the test runner (handy when hunting failures;
+// see CONTRIBUTING.md §4 for the Linux libsqlite3 prerequisite).
 //
 // Run from repo root:  ~/flutter/bin/dart run tool/db_smoke.dart
-// The REAL test execution happens user-side / in CI; this is evidence only.
 // (flutter analyze calls this production code; it is a CLT tool, prints are
 // expected there — lint suppressed locally.)
 

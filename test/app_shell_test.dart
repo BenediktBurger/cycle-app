@@ -7,10 +7,40 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// One test database override shared by the widget smoke tests.
+///
+/// `closeStreamsSynchronously: true` is drift's documented remedy for widget
+/// tests failing with "A Timer is still pending even after the widget tree
+/// was disposed": without it, drift delays query-stream cancellation by one
+/// event-loop turn (Timer.run), and streams cancelled while Riverpod disposes
+/// the ProviderScope during tree teardown can never reach that turn in the
+/// test's fake async zone.
+ProviderScope _appScope() => ProviderScope(
+      overrides: [
+        // In-memory database: no files, no platform channels, no FFI paths.
+        // ref.onDispose closes it together with the test's ProviderScope
+        // (same closing semantics as the production provider).
+        databaseProvider.overrideWith(
+          (ref) {
+            final db = CycleDatabase(
+              DatabaseConnection(
+                NativeDatabase.memory(),
+                closeStreamsSynchronously: true,
+              ),
+            );
+            ref.onDispose(db.close);
+            return db;
+          },
+        ),
+      ],
+      child: const CycleApp(),
+    );
 
 void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (
@@ -18,23 +48,7 @@ void main() {
   ) async {
     // German is the default locale for M1; the language switcher is covered
     // by its own (manual) verification — see docs/verification-m1.md.
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          // In-memory database: no files, no platform channels, no FFI paths.
-          // ref.onDispose closes it together with the test's ProviderScope
-          // (same closing semantics as the production provider).
-          databaseProvider.overrideWith(
-            (ref) {
-              final db = CycleDatabase(NativeDatabase.memory());
-              ref.onDispose(db.close);
-              return db;
-            },
-          ),
-        ],
-        child: const CycleApp(),
-      ),
-    );
+    await tester.pumpWidget(_appScope());
     // Let the gated shell resolve the (already-synchronous-ish) database
     // future, then settle screens and any transcription animations.
     await tester.pumpAndSettle();
@@ -66,20 +80,7 @@ void main() {
       (WidgetTester tester) async {
     // The stub must be visibly NOT interactive (onChanged: null) — flipping
     // it would falsely signal an existing protection (ADR-0005).
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          databaseProvider.overrideWith(
-            (ref) {
-              final db = CycleDatabase(NativeDatabase.memory());
-              ref.onDispose(db.close);
-              return db;
-            },
-          ),
-        ],
-        child: const CycleApp(),
-      ),
-    );
+    await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
     await tester.tap(find.text('Einstellungen').first);
     await tester.pumpAndSettle();

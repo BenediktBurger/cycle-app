@@ -117,7 +117,8 @@ void main() {
       ];
       final cycles = groupIntoCycles(entries);
       expect(cycles, hasLength(1));
-      expect(menstruationOnsetDates(entries), [DateTime(2026, 6, 1)]);
+      expect(menstruationOnsetDates(entries),
+          [DateOnly.normalize(DateTime(2026, 6, 1))]);
     });
 
     test('empty input produces no cycles', () {

@@ -30,7 +30,8 @@ flutter run -d chrome
 
 Requires a Flutter stable SDK (any location with `<sdk>/bin` on PATH). See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup, platform scaffolding,
-and the analyze/test/build commands.
+and the analyze/test/build commands — notably `flutter pub get` before
+`flutter test`.
 
 ## Tech stack
 

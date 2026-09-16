@@ -1,11 +1,9 @@
 // DB-layer tests: schema, DAOs, constraints.
 //
 // Pure Dart against NativeDatabase.memory() — no platform channels, no web.
-// NOTE (2026-09-15): this omac sandbox cannot execute `flutter test` (it
-// denies bind() on 127.0.0.1, which flutter_tester needs). These tests are
-// therefore compile-verified via `flutter analyze` here; execution happens
-// on the user's machine / CI. On Linux CI hosts, package:sqlite3 needs the
-// system sqlite library (see the apt step in .github/workflows/ci.yml).
+// Runs with a normal `flutter pub get && flutter test` (on Linux, package
+// sqlite3 additionally needs the system sqlite library — see the apt step in
+// .github/workflows/ci.yml; macOS ships it, Linux CI/dev hosts install it).
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -20,13 +18,14 @@ import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/db/tables.dart';
 
 void main() {
-  late final CycleDatabase db;
+  // Not final: setUp assigns a fresh in-memory database before every test
+  // (closed again by the per-test tearDown registered inside setUp).
+  late CycleDatabase db;
 
   setUp(() {
     db = CycleDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
   });
-
-  tearDown(() => db.close());
 
   group('schema & migration v1', () {
     test('seeds exactly one profile named main', () async {
@@ -67,7 +66,8 @@ void main() {
         "INSERT INTO cycle_entries (profile_id, date, bleeding) "
         "VALUES (1, 20000, 'period')",
       );
-      final row = await db.entriesDao.entryFor(1, DateTime(2024, 10, 14));
+      final row =
+          await db.entriesDao.entryFor(1, DateTime(2024, 10, 4)); // day 20000
       expect(row!.bleeding, Bleeding.period);
     });
 
@@ -240,23 +240,31 @@ void main() {
     });
 
     test('watchRange emits rows as they are upserted', () async {
-      final stream = db.entriesDao
-          .watchRange(1, DateTime(2026, 1, 1), DateTime(2026, 1, 31));
+      // Buffer events instead of emit-counting matchers: drift delivers the
+      // stream snapshot asynchronously, and the initial (empty) snapshot must
+      // be observed BEFORE the write below to keep its ordering meaningful.
+      final events = <List<CycleEntry>>[];
+      final sub = db.entriesDao
+          .watchRange(1, DateTime(2026, 1, 1), DateTime(2026, 1, 31))
+          .listen(events.add);
 
-      expectLater(
-        stream,
-        emitsInOrder([
-          <Object>[], // initial snapshot: empty
-          // one row after the upsert below
-          predicate<List<CycleEntry>>((rows) =>
-              rows.length == 1 && rows.single.bleeding == Bleeding.spotting),
-        ]),
-      );
+      // One event-loop turn is enough for NativeDatabase.memory() (which
+      // executes synchronously once scheduled) to deliver the snapshot.
+      await Future<void>.delayed(Duration.zero);
+      expect(events, [
+        <CycleEntry>[]
+      ], reason: 'initial snapshot of an empty table');
 
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 1, 10),
         bleeding: Bleeding.spotting,
       ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, hasLength(2));
+      expect(events[1].length, 1);
+      expect(events[1].single.bleeding, Bleeding.spotting);
+      await sub.cancel();
     });
   });
 
@@ -495,6 +503,10 @@ void main() {
       // can message instead of a raw crash. The engine fails here because
       // the database is closed.
       final broken = CycleDatabase(NativeDatabase.memory());
+      // Ensure the lazy native executor has actually opened before closing —
+      // closing a never-opened database is a no-op for drift, and the import
+      // below would casually reopen it.
+      await broken.profilesDao.allProfiles();
       await broken.close();
       await expectLater(
         importJsonToDatabase(broken, buildExportJson(remapDoc())),

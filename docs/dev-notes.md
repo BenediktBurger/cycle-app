@@ -42,11 +42,17 @@ A related tripwire lives in `pubspec.yaml`: if that file ever reverts to
 "A new Flutter project" defaults, a `flutter create` run has clobbered it —
 restore from git history.
 
-## `flutter test` cannot run inside the omac sandbox
+## Lesson learned: `flutter test` and loopback sockets (2026-09-15, resolved)
 
-The omac coding-agent sandbox denies `bind()` on any 127.0.0.1 port, while
-`flutter test` spawns `flutter_tester`, which opens a temporary loopback
-WebSocket server socket (`Failed to create server socket (OS Error:
-Permission denied, errno = 13)`). Run `flutter test` in a normal terminal
-outside the sandbox — or rely on CI. (An intent was declared in the omac
-sandbox log so this limitation is on record.)
+`flutter_tester` (spawned by `flutter test`) opens a temporary loopback
+WebSocket server socket, so a sandbox that denies `bind()` on 127.0.0.1
+ports breaks it (`Failed to create server socket (OS Error: Permission
+denied, errno = 13)`). An omac sandbox version used to behave that way, and
+an intent was documented in its sandbox log.
+
+Resolved 2026-09-16: in the current environment `flutter test` runs directly
+inside the sandbox — agents/editors just execute `flutter pub get` and then
+`flutter test` like anyone else. If it ever starts failing with the bind
+error above again, the cause is the sandbox profile, not the tests; verify
+against the log and fall back to `flutter analyze` plus the host-VM smoke
+scripts (§4 of CONTRIBUTING.md) until it is lifted again.

@@ -1,13 +1,9 @@
-// Runtime smoke-verification for the data-layer additions (NOT part of the
-// shipped test suite). Same environmental situation as the earlier DB smoke
-// script, tool/db_smoke.dart: `flutter test` cannot bind its loopback socket
-// inside the agent sandbox, so this pure-Dart host script executes the
-// core assertions against the REAL drift engine (NativeDatabase.memory())
-// — this time for the export/import pipeline and the new pure logic.
+// Runtime smoke-verification for the export/import pipeline (NOT part of the
+// shipped test suite). Host-VM twin of the plain test suite: it executes
+// core assertions against the REAL drift engine (NativeDatabase.memory()) —
+// quickly and with fewer moving parts than the test runner.
 //
 // Run from repo root:  ~/flutter/bin/dart run tool/smoke_export_import.dart
-// The REAL test execution (test/domain/*, test/db/*, widget tests) happens
-// user-side / in CI.
 //
 // (flutter analyze analyzes this production code; it is a CLT tool, prints
 // are expected there — lint suppressed locally.)
