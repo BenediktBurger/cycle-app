@@ -82,7 +82,8 @@
     }
   },
   "settingsLanguage": "Sprache",
-  "settingsLanguageNote": "Nur im Speicher — nach Neuladen wieder Deutsch (geplant: persistenter Speicher).",
+  "settingsLanguageNote": "Nur im Speicher — nach Neuladen wieder Einstellung „System“ (geplant: persistenter Speicher).",
+  "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
@@ -131,5 +132,30 @@
       }
     }
   },
-  "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch)."
+  "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
+  "dripImportTitle": "Drip-Daten importieren",
+  "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Import läuft in das Hauptprofil; Störungskennzeichen pro Symptom (außer Temperatur) fallen weg.",
+  "dripImportApply": "CSV importieren",
+  "dripImportHint": "Drip-CSV-Export hier einfügen …",
+  "dripImportInvalid": "Das ist kein Drip-CSV-Export (keine „date“-Spalte in der Kopfzeile).",
+  "dripImportSummary": "{imported} Tage importiert, {skipped} leere Tage übersprungen, {invalid} ungültige Zeilen; Tage neu: {newDays}, Tage überschrieben: {overwritten}.",
+  "@dripImportSummary": {
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      }
+    }
+  }
 }

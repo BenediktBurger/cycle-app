@@ -25,7 +25,7 @@ comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 - [x] **WP2.2 (web)** — wasm + worker assets vendored from the drift 2.35.0
       release; run note updated in [CONTRIBUTING.md](../CONTRIBUTING.md) §3
 - [x] **WP2.2.2** — language switcher (de/en) in settings; in-memory only
-      (resets to German on reload — documented limitation)
+      (resets to the system default on reload — documented limitation)
 - [x] **WP2.2.3** — JSON export/import in settings: copy-text path on all
       platforms, browser download + file input on web, home-directory file
       on desktop; merge policy (profile, date) = overwrite with counts
@@ -63,10 +63,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- [ ] Language default: system language when available, otherwise English;
-      the settings offer switching between "system" and the individual
-      languages (de/en) — see
-      [ADR-0007](adr/0007-language-policy.md).
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
       higher measurement" adds the baseline automatically, based on the preceding measurements
       User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules

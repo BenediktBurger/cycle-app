@@ -85,7 +85,8 @@
     }
   },
   "settingsLanguage": "Language",
-  "settingsLanguageNote": "In-memory only — reverts to German after reload (persistent storage planned).",
+  "settingsLanguageNote": "In-memory only — reverts to the System setting after reload (persistent storage planned).",
+  "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsPinLock": "PIN lock (placeholder)",
@@ -134,5 +135,30 @@
       }
     }
   },
-  "importEmpty": "Import: nothing to change (document empty or already identical)."
+  "importEmpty": "Import: nothing to change (document empty or already identical).",
+  "dripImportTitle": "Import drip data",
+  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. Imports into the main profile; per-symptom interrupt flags (except temperature) are dropped.",
+  "dripImportApply": "Import CSV",
+  "dripImportHint": "Paste a drip CSV export here …",
+  "dripImportInvalid": "Not a drip CSV export (no \"date\" column in the header row).",
+  "dripImportSummary": "{imported} days imported, {skipped} empty days skipped, {invalid} invalid rows; days new: {newDays}, days overwritten: {overwritten}.",
+  "@dripImportSummary": {
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      }
+    }
+  }
 }

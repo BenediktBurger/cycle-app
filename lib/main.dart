@@ -1,6 +1,6 @@
-// Root widget: Material app, German-first localization with English as the
-// fallback language (switchable in the settings screen), and the database
-// gating shell.
+// Root widget: Material app, German-first localization whose language
+// follows the system until overridden in the settings screen, and the
+// database gating shell.
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,9 +22,14 @@ class CycleApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final locale = ref.watch(localeProvider);
+    // null (the localeProvider default) = follow the system language: the
+    // platform's locale list is then resolved against supportedLocales,
+    // which picks German for German devices and English for everything
+    // else (English is the fallback language, ADR-0007). An explicit
+    // settings choice is always applied as-is.
+    final Locale? explicitLocale = ref.watch(localeProvider);
     return MaterialApp(
-      locale: locale,
+      locale: explicitLocale,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -33,12 +38,13 @@ class CycleApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        // English first, German second: Flutter's locale resolution ends at
-        // the first supported locale when nothing matches, so an active
-        // locale outside the supported set (or none at all) falls back to
-        // English — the app's fallback language, never German
-        // (docs/adr/0007-language-policy.md). Setting a supported locale
-        // explicitly, as the language switcher does, is unaffected.
+        // English first, German second: when nothing is matched explicitly,
+        // Flutter's locale resolution ends at the first supported locale, so
+        // anything outside the supported set (or no system locale at all,
+        // or the system following "System") falls back to English — the
+        // app's fallback language, never German
+        // (docs/adr/0007-language-policy.md). An explicit supported locale,
+        // as the language switcher sets it, is unaffected.
         Locale('en'),
         Locale('de'),
       ],

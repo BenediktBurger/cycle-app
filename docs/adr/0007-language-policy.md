@@ -29,17 +29,17 @@ the product language is German.
 - **The project's technical language is English**: code identifiers, file
   and class names, comments, commit messages, and internal documentation
   (`docs/`, including ADRs) are written in English.
-- Existing German-named files are a historical exception to be
-  **mechanically renamed to English identifiers** — this is tracked as an
-  open item in the roadmap; the rename carries no behavior change.
+- Existing German-named files were a historical exception and have been
+  **mechanically renamed to English identifiers**; the rename carried no
+  behavior change.
 
 ## Consequences
 
 - Naming no longer depends on the current product language; contributors
   who don't read German can navigate the codebase.
-- The rename must eventually touch `lib/ui/*` imports, `main.dart`, and the
-  prose mentions in `README.md` and the roadmap — trivial, but it should
-  land as its own commit, separate from feature work.
-- New files start with English names from now on, so the listed rename
-  candidates ("and any others") stay a finite set; there is no renumbering
+- The rename touched `lib/ui/*` imports, `main.dart`, and the prose
+  mentions in `README.md` and the roadmap; as intended, it landed as its
+  own commit, separate from feature work.
+- New files start with English names from now on, so the renamed set was
+  finite; there is no renumbering
   or archive step for historical commits that used the German names.

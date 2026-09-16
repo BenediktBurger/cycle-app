@@ -136,7 +136,8 @@ report the full analyzer/test output back so issues can be fixed promptly.
   (`lib/domain/statistics.dart`). Treat marked comments like
   `// TODO(user-review)` as questions to bring to INER experts, not as
   settled behavior.
-- **In-memory-only state for now**: the language selection resets to German
-  on web reload by design (persisting it — e.g. a settings table or
-  localStorage — is future work; see `localeProvider` in
+- **In-memory-only state for now**: the language selection resets to the
+  system-language default on web reload by design (system language when
+  available, otherwise English; persisting an explicit choice — e.g. a
+  settings table or localStorage — is future work; see `localeProvider` in
   `lib/providers.dart`).
