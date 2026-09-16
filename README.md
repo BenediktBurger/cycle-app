@@ -64,6 +64,34 @@ browser; data persists across reloads), with JSON export/import. The UI is
 German-first with an English switch. Still open: the Mode-M marking UI
 ([docs/roadmap.md](docs/roadmap.md)).
 
+## Import from drip
+
+The Einstellungen screen can import a **CSV export of the drip cycle
+tracker** (a sibling project): paste it anywhere (a file picker is offered
+on the web). Rows merge into the **main profile** with the same
+overwrite-by-date policy as the JSON import, so re-importing the same export
+adds no duplicates. Per day, drip's bleeding, temperature, mucus (including
+the S+ → slippery egg-white decode), desire, sex, pain, mood, cervix words,
+and notes are mapped into the NFP diary. **Lost in the import**: the
+per-symptom exclude flags other than the temperature one (an excluded
+temperature just marks the day) and the temperature measurement time.
+
+Five mapping decisions below are **awaiting NFP expert (INER) review** —
+they are also marked `TODO(user-review)` in the code:
+
+- Light/medium/heavy bleeding all collapse into a single "period" entry.
+- Drip's "temperature excluded" becomes a generic interrupted day; the
+  reason for the exclusion is not stored.
+- The mucus decode works on drip's combined NFP number, so texture nuances
+  are lost: any NFP 4 — including one drip derived from a slippery
+  feeling — imports as S with egg-white quality (≙ S+), whereas a slippery
+  feeling recorded without a texture imports no mucus at all (mirrors
+  drip; the creamy nuance is likewise lost).
+- Cervix observations become free-text English words, and out-of-range
+  indices are clamped to the nearest valid one.
+- Symptom notes concatenate after the day note as
+  `[temp]`/`[pain]`/`[sex]`/`[mood]` prefixed lines.
+
 ## License
 
 **TBD** — no license has been chosen yet; it will likely be GPL-3-compatible
