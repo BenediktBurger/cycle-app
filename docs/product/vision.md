@@ -21,7 +21,8 @@ override) **and A** (automatic) are explicitly deferred.
 
 1. **Daily symptom entry**: BBT, bleeding (incl. exclude flags for
    interruptions — illness, alcohol, travel — and spotting), cervical mucus
-   (NFP 0–4 mapping from feeling/texture), optional cervix, plus
+   (the cheat sheet's fertility-sign vocabulary: t / Ø / f / S, with
+   superscript quality qualifiers on S), optional cervix, plus
    pain/mood/desire/sex/notes.
 2. **Assisted marking tools for NER evaluation** (first-higher-measurement,
    baseline/coverline from six prior low measurements, mucus peak day, calendar

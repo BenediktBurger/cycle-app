@@ -82,8 +82,8 @@ class CycleDatabase extends _$CycleDatabase {
   ///   4. drop the old table
   ///   5. re-create the unique index, which was dropped with the old table
   ///
-  /// No data migration of the dropped values (app unpublished, decided in
-  /// the feature plan).
+  /// No data migration of the dropped values (app unpublished; no
+  /// compatibility obligations).
   Future<void> _rebuildCycleEntriesWithoutLegacyMucusColumns(Migrator m) async {
     const survivingColumns =
         'id, profile_id, date, bbt_c, bleeding, exclude_illness, '

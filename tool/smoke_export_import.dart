@@ -41,7 +41,7 @@ Future<void> main() async {
   check(tryParseMucusQuality('gl') == MucusQuality.gl &&
       tryParseMucusQuality('glb') == MucusQuality.glb &&
       MucusQuality.gl != MucusQuality.glb,
-      ' glasig (gl) and gelblich (glb) are distinct qualities');
+      'glasig (gl) and gelblich (glb) are distinct qualities');
   check(
       sanitizeMucusPair(sign: MucusSign.f, quality: MucusQuality.w).quality ==
           null,

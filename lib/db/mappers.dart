@@ -43,25 +43,30 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
 /// Domain model -> companion. Every domain field is written explicitly
 /// (Value(null) for nulls), which makes the EntriesDao upsert a genuine
 /// FULL replacement of the day's entry rather than a sparse patch.
-CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) =>
-    CycleEntriesCompanion(
-      profileId: Value(d.profileId),
-      date: Value(DateOnly.normalize(d.date)),
-      bbtC: Value(d.bbtC),
-      bleeding: Value(d.bleeding),
-      excludeIllness: Value(d.excludeIllness),
-      excludeAlcohol: Value(d.excludeAlcohol),
-      excludeTravel: Value(d.excludeTravel),
-      excludeOther: Value(d.excludeOther),
-      // Stable enum-name TEXT tokens (like bleeding); DailyEntry enforces
-      // quality-only-with-S, so the pair written here always satisfies the
-      // SQL CHECK.
-      mucusSign: Value(d.mucusSign?.name),
-      mucusQuality: Value(d.mucusQuality?.name),
-      cervix: Value(d.cervix),
-      pain: Value(d.pain),
-      mood: Value(d.mood),
-      desire: Value(d.desire),
-      sex: Value(d.sex),
-      notes: Value(d.notes),
-    );
+CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
+  // Belt-and-braces parity with the read direction: the shared guard runs at
+  // the write boundary too. DailyEntry's constructor already enforces
+  // quality-only-with-S; sanitizing here as well means the tokens written
+  // always satisfy the SQL CHECK even if that invariant ever weakens.
+  final mucus = sanitizeMucusPair(sign: d.mucusSign, quality: d.mucusQuality);
+  return CycleEntriesCompanion(
+    profileId: Value(d.profileId),
+    date: Value(DateOnly.normalize(d.date)),
+    bbtC: Value(d.bbtC),
+    bleeding: Value(d.bleeding),
+    excludeIllness: Value(d.excludeIllness),
+    excludeAlcohol: Value(d.excludeAlcohol),
+    excludeTravel: Value(d.excludeTravel),
+    excludeOther: Value(d.excludeOther),
+    // Stable enum-name TEXT tokens (like bleeding), written post-sanitize so
+    // the pair can never violate the SQL CHECK.
+    mucusSign: Value(mucus.sign?.name),
+    mucusQuality: Value(mucus.quality?.name),
+    cervix: Value(d.cervix),
+    pain: Value(d.pain),
+    mood: Value(d.mood),
+    desire: Value(d.desire),
+    sex: Value(d.sex),
+    notes: Value(d.notes),
+  );
+}
