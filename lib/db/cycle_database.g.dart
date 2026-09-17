@@ -314,7 +314,7 @@ class $CycleEntriesTable extends CycleEntries
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       $customConstraints:
-          'CHECK (mucus_sign IS NULL OR mucus_sign IN (\'t\', \'nothing\', \'f\', \'s\'))');
+          'CHECK (mucus_sign IS NULL OR mucus_sign IN (\'t\', \'nothing\', \'f\', \'s\', \'a\'))');
   static const VerificationMeta _mucusQualityMeta =
       const VerificationMeta('mucusQuality');
   @override
@@ -347,6 +347,15 @@ class $CycleEntriesTable extends CycleEntries
       requiredDuringInsert: false,
       $customConstraints:
           'CHECK (cervix_opening IS NULL OR cervix_opening IN (\'closed\', \'middle\', \'open\'))');
+  static const VerificationMeta _cervixFirmnessMeta =
+      const VerificationMeta('cervixFirmness');
+  @override
+  late final GeneratedColumn<String> cervixFirmness = GeneratedColumn<String>(
+      'cervix_firmness', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'CHECK (cervix_firmness IS NULL OR cervix_firmness IN (\'hard\', \'halfSoft\', \'soft\'))');
   static const VerificationMeta _painBreastMeta =
       const VerificationMeta('painBreast');
   @override
@@ -385,15 +394,16 @@ class $CycleEntriesTable extends CycleEntries
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("desire" IN (0, 1))'),
       defaultValue: const Constant(false));
-  static const VerificationMeta _sexMeta = const VerificationMeta('sex');
+  static const VerificationMeta _sexTimingsMeta =
+      const VerificationMeta('sexTimings');
   @override
-  late final GeneratedColumn<bool> sex = GeneratedColumn<bool>(
-      'sex', aliasedName, false,
-      type: DriftSqlType.bool,
+  late final GeneratedColumn<int> sexTimings = GeneratedColumn<int>(
+      'sex_timings', aliasedName, false,
+      type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("sex" IN (0, 1))'),
-      defaultValue: const Constant(false));
+      $customConstraints:
+          'NOT NULL DEFAULT 0 CHECK (sex_timings BETWEEN 0 AND 7)',
+      defaultValue: const CustomExpression('0'));
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -432,11 +442,12 @@ class $CycleEntriesTable extends CycleEntries
         cervix,
         cervixPosition,
         cervixOpening,
+        cervixFirmness,
         painBreast,
         painMittelschmerz,
         mood,
         desire,
-        sex,
+        sexTimings,
         notes,
         createdAt,
         updatedAt
@@ -518,6 +529,12 @@ class $CycleEntriesTable extends CycleEntries
           cervixOpening.isAcceptableOrUnknown(
               data['cervix_opening']!, _cervixOpeningMeta));
     }
+    if (data.containsKey('cervix_firmness')) {
+      context.handle(
+          _cervixFirmnessMeta,
+          cervixFirmness.isAcceptableOrUnknown(
+              data['cervix_firmness']!, _cervixFirmnessMeta));
+    }
     if (data.containsKey('pain_breast')) {
       context.handle(
           _painBreastMeta,
@@ -538,9 +555,11 @@ class $CycleEntriesTable extends CycleEntries
       context.handle(_desireMeta,
           desire.isAcceptableOrUnknown(data['desire']!, _desireMeta));
     }
-    if (data.containsKey('sex')) {
+    if (data.containsKey('sex_timings')) {
       context.handle(
-          _sexMeta, sex.isAcceptableOrUnknown(data['sex']!, _sexMeta));
+          _sexTimingsMeta,
+          sexTimings.isAcceptableOrUnknown(
+              data['sex_timings']!, _sexTimingsMeta));
     }
     if (data.containsKey('notes')) {
       context.handle(
@@ -595,6 +614,8 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.string, data['${effectivePrefix}cervix_position']),
       cervixOpening: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cervix_opening']),
+      cervixFirmness: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cervix_firmness']),
       painBreast: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}pain_breast'])!,
       painMittelschmerz: attachedDatabase.typeMapping.read(
@@ -603,8 +624,8 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.bool, data['${effectivePrefix}mood'])!,
       desire: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}desire'])!,
-      sex: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}sex'])!,
+      sexTimings: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sex_timings'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
       createdAt: attachedDatabase.typeMapping
@@ -656,11 +677,11 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   final bool excludeOther;
 
   /// Fertility sign recorded on the day: NULL when no observation, else one
-  /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
-  /// names — TEXT, unlike bleeding's numeric column; never display glyphs).
-  /// customConstraint replaces drift's own constraints, which is fine here:
-  /// SQLite columns admit NULL unless NOT NULL is written, and the check
-  /// below allows exactly NULL or the vocabulary.
+  /// of the stable tokens 't' / 'nothing' / 'f' / 's' / 'a' (the MucusSign
+  /// enum names — TEXT, unlike bleeding's numeric column; never display
+  /// glyphs). customConstraint replaces drift's own constraints, which is
+  /// fine here: SQLite columns admit NULL unless NOT NULL is written, and
+  /// the check below allows exactly NULL or the vocabulary.
   final String? mucusSign;
 
   /// Quality qualifier of the mucus sign S; NULL for every sign other than
@@ -686,6 +707,14 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// offen). Independent of cervix_position.
   final String? cervixOpening;
 
+  /// Muttermund (cervix) FIRMNESS of the day, as above: NULL when not
+  /// observed, else 'hard' / 'halfSoft' / 'soft' (paper shorthand h / h/w /
+  /// w — fest / teils fest, teils weich / weich). Stored like mucus_sign
+  /// (TEXT enum-name tokens, engine CHECK on the vocabulary; the tokens
+  /// never collide with a position or opening token). German display labels
+  /// live in the l10n arbs.
+  final String? cervixFirmness;
+
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and
   /// ovulation pain / Mittelschmerz (painMittelschmerz, letter M). Modeled
@@ -694,7 +723,17 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   final bool painMittelschmerz;
   final bool mood;
   final bool desire;
-  final bool sex;
+
+  /// Times of day sex happened, as an INTEGER bitmask of [SexTiming.bit]:
+  /// start(1) / middle(2) / end(4), OR-combined — multiple bits mean
+  /// multiple times on the same day; 0 = not recorded. "Sex happened, time
+  /// unknown" is deliberately NOT representable (the observation is only
+  /// recorded together with a concrete time slot), so the mask fully
+  /// replaces the former plain `sex` boolean. customConstraint replaces
+  /// drift's own constraints, so NOT NULL and the column default 0 are
+  /// written out explicitly here (see writeColumnDefinition: a custom
+  /// constraint suppresses drift's NOT NULL/DEFAULT emission).
+  final int sexTimings;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -714,11 +753,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       this.cervix,
       this.cervixPosition,
       this.cervixOpening,
+      this.cervixFirmness,
       required this.painBreast,
       required this.painMittelschmerz,
       required this.mood,
       required this.desire,
-      required this.sex,
+      required this.sexTimings,
       this.notes,
       required this.createdAt,
       required this.updatedAt});
@@ -760,11 +800,14 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     if (!nullToAbsent || cervixOpening != null) {
       map['cervix_opening'] = Variable<String>(cervixOpening);
     }
+    if (!nullToAbsent || cervixFirmness != null) {
+      map['cervix_firmness'] = Variable<String>(cervixFirmness);
+    }
     map['pain_breast'] = Variable<bool>(painBreast);
     map['pain_mittelschmerz'] = Variable<bool>(painMittelschmerz);
     map['mood'] = Variable<bool>(mood);
     map['desire'] = Variable<bool>(desire);
-    map['sex'] = Variable<bool>(sex);
+    map['sex_timings'] = Variable<int>(sexTimings);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -801,11 +844,14 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       cervixOpening: cervixOpening == null && nullToAbsent
           ? const Value.absent()
           : Value(cervixOpening),
+      cervixFirmness: cervixFirmness == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cervixFirmness),
       painBreast: Value(painBreast),
       painMittelschmerz: Value(painMittelschmerz),
       mood: Value(mood),
       desire: Value(desire),
-      sex: Value(sex),
+      sexTimings: Value(sexTimings),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
       createdAt: Value(createdAt),
@@ -832,11 +878,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       cervix: serializer.fromJson<String?>(json['cervix']),
       cervixPosition: serializer.fromJson<String?>(json['cervixPosition']),
       cervixOpening: serializer.fromJson<String?>(json['cervixOpening']),
+      cervixFirmness: serializer.fromJson<String?>(json['cervixFirmness']),
       painBreast: serializer.fromJson<bool>(json['painBreast']),
       painMittelschmerz: serializer.fromJson<bool>(json['painMittelschmerz']),
       mood: serializer.fromJson<bool>(json['mood']),
       desire: serializer.fromJson<bool>(json['desire']),
-      sex: serializer.fromJson<bool>(json['sex']),
+      sexTimings: serializer.fromJson<int>(json['sexTimings']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -861,11 +908,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'cervix': serializer.toJson<String?>(cervix),
       'cervixPosition': serializer.toJson<String?>(cervixPosition),
       'cervixOpening': serializer.toJson<String?>(cervixOpening),
+      'cervixFirmness': serializer.toJson<String?>(cervixFirmness),
       'painBreast': serializer.toJson<bool>(painBreast),
       'painMittelschmerz': serializer.toJson<bool>(painMittelschmerz),
       'mood': serializer.toJson<bool>(mood),
       'desire': serializer.toJson<bool>(desire),
-      'sex': serializer.toJson<bool>(sex),
+      'sexTimings': serializer.toJson<int>(sexTimings),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -888,11 +936,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           Value<String?> cervix = const Value.absent(),
           Value<String?> cervixPosition = const Value.absent(),
           Value<String?> cervixOpening = const Value.absent(),
+          Value<String?> cervixFirmness = const Value.absent(),
           bool? painBreast,
           bool? painMittelschmerz,
           bool? mood,
           bool? desire,
-          bool? sex,
+          int? sexTimings,
           Value<String?> notes = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
@@ -917,11 +966,13 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
             cervixPosition.present ? cervixPosition.value : this.cervixPosition,
         cervixOpening:
             cervixOpening.present ? cervixOpening.value : this.cervixOpening,
+        cervixFirmness:
+            cervixFirmness.present ? cervixFirmness.value : this.cervixFirmness,
         painBreast: painBreast ?? this.painBreast,
         painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
         mood: mood ?? this.mood,
         desire: desire ?? this.desire,
-        sex: sex ?? this.sex,
+        sexTimings: sexTimings ?? this.sexTimings,
         notes: notes.present ? notes.value : this.notes,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -959,6 +1010,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       cervixOpening: data.cervixOpening.present
           ? data.cervixOpening.value
           : this.cervixOpening,
+      cervixFirmness: data.cervixFirmness.present
+          ? data.cervixFirmness.value
+          : this.cervixFirmness,
       painBreast:
           data.painBreast.present ? data.painBreast.value : this.painBreast,
       painMittelschmerz: data.painMittelschmerz.present
@@ -966,7 +1020,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           : this.painMittelschmerz,
       mood: data.mood.present ? data.mood.value : this.mood,
       desire: data.desire.present ? data.desire.value : this.desire,
-      sex: data.sex.present ? data.sex.value : this.sex,
+      sexTimings:
+          data.sexTimings.present ? data.sexTimings.value : this.sexTimings,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -991,11 +1046,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('cervix: $cervix, ')
           ..write('cervixPosition: $cervixPosition, ')
           ..write('cervixOpening: $cervixOpening, ')
+          ..write('cervixFirmness: $cervixFirmness, ')
           ..write('painBreast: $painBreast, ')
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
           ..write('desire: $desire, ')
-          ..write('sex: $sex, ')
+          ..write('sexTimings: $sexTimings, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1020,11 +1076,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         cervix,
         cervixPosition,
         cervixOpening,
+        cervixFirmness,
         painBreast,
         painMittelschmerz,
         mood,
         desire,
-        sex,
+        sexTimings,
         notes,
         createdAt,
         updatedAt
@@ -1048,11 +1105,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.cervix == this.cervix &&
           other.cervixPosition == this.cervixPosition &&
           other.cervixOpening == this.cervixOpening &&
+          other.cervixFirmness == this.cervixFirmness &&
           other.painBreast == this.painBreast &&
           other.painMittelschmerz == this.painMittelschmerz &&
           other.mood == this.mood &&
           other.desire == this.desire &&
-          other.sex == this.sex &&
+          other.sexTimings == this.sexTimings &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -1074,11 +1132,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<String?> cervix;
   final Value<String?> cervixPosition;
   final Value<String?> cervixOpening;
+  final Value<String?> cervixFirmness;
   final Value<bool> painBreast;
   final Value<bool> painMittelschmerz;
   final Value<bool> mood;
   final Value<bool> desire;
-  final Value<bool> sex;
+  final Value<int> sexTimings;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1098,11 +1157,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.cervix = const Value.absent(),
     this.cervixPosition = const Value.absent(),
     this.cervixOpening = const Value.absent(),
+    this.cervixFirmness = const Value.absent(),
     this.painBreast = const Value.absent(),
     this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
     this.desire = const Value.absent(),
-    this.sex = const Value.absent(),
+    this.sexTimings = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1123,11 +1183,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.cervix = const Value.absent(),
     this.cervixPosition = const Value.absent(),
     this.cervixOpening = const Value.absent(),
+    this.cervixFirmness = const Value.absent(),
     this.painBreast = const Value.absent(),
     this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
     this.desire = const Value.absent(),
-    this.sex = const Value.absent(),
+    this.sexTimings = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1148,11 +1209,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<String>? cervix,
     Expression<String>? cervixPosition,
     Expression<String>? cervixOpening,
+    Expression<String>? cervixFirmness,
     Expression<bool>? painBreast,
     Expression<bool>? painMittelschmerz,
     Expression<bool>? mood,
     Expression<bool>? desire,
-    Expression<bool>? sex,
+    Expression<int>? sexTimings,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1173,11 +1235,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (cervix != null) 'cervix': cervix,
       if (cervixPosition != null) 'cervix_position': cervixPosition,
       if (cervixOpening != null) 'cervix_opening': cervixOpening,
+      if (cervixFirmness != null) 'cervix_firmness': cervixFirmness,
       if (painBreast != null) 'pain_breast': painBreast,
       if (painMittelschmerz != null) 'pain_mittelschmerz': painMittelschmerz,
       if (mood != null) 'mood': mood,
       if (desire != null) 'desire': desire,
-      if (sex != null) 'sex': sex,
+      if (sexTimings != null) 'sex_timings': sexTimings,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1200,11 +1263,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<String?>? cervix,
       Value<String?>? cervixPosition,
       Value<String?>? cervixOpening,
+      Value<String?>? cervixFirmness,
       Value<bool>? painBreast,
       Value<bool>? painMittelschmerz,
       Value<bool>? mood,
       Value<bool>? desire,
-      Value<bool>? sex,
+      Value<int>? sexTimings,
       Value<String?>? notes,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
@@ -1224,11 +1288,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       cervix: cervix ?? this.cervix,
       cervixPosition: cervixPosition ?? this.cervixPosition,
       cervixOpening: cervixOpening ?? this.cervixOpening,
+      cervixFirmness: cervixFirmness ?? this.cervixFirmness,
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
       desire: desire ?? this.desire,
-      sex: sex ?? this.sex,
+      sexTimings: sexTimings ?? this.sexTimings,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1285,6 +1350,9 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (cervixOpening.present) {
       map['cervix_opening'] = Variable<String>(cervixOpening.value);
     }
+    if (cervixFirmness.present) {
+      map['cervix_firmness'] = Variable<String>(cervixFirmness.value);
+    }
     if (painBreast.present) {
       map['pain_breast'] = Variable<bool>(painBreast.value);
     }
@@ -1297,8 +1365,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (desire.present) {
       map['desire'] = Variable<bool>(desire.value);
     }
-    if (sex.present) {
-      map['sex'] = Variable<bool>(sex.value);
+    if (sexTimings.present) {
+      map['sex_timings'] = Variable<int>(sexTimings.value);
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
@@ -1330,11 +1398,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('cervix: $cervix, ')
           ..write('cervixPosition: $cervixPosition, ')
           ..write('cervixOpening: $cervixOpening, ')
+          ..write('cervixFirmness: $cervixFirmness, ')
           ..write('painBreast: $painBreast, ')
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
           ..write('desire: $desire, ')
-          ..write('sex: $sex, ')
+          ..write('sexTimings: $sexTimings, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1984,11 +2053,12 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<String?> cervix,
   Value<String?> cervixPosition,
   Value<String?> cervixOpening,
+  Value<String?> cervixFirmness,
   Value<bool> painBreast,
   Value<bool> painMittelschmerz,
   Value<bool> mood,
   Value<bool> desire,
-  Value<bool> sex,
+  Value<int> sexTimings,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -2010,11 +2080,12 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<String?> cervix,
   Value<String?> cervixPosition,
   Value<String?> cervixOpening,
+  Value<String?> cervixFirmness,
   Value<bool> painBreast,
   Value<bool> painMittelschmerz,
   Value<bool> mood,
   Value<bool> desire,
-  Value<bool> sex,
+  Value<int> sexTimings,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -2098,6 +2169,10 @@ class $$CycleEntriesTableFilterComposer
   ColumnFilters<String> get cervixOpening => $composableBuilder(
       column: $table.cervixOpening, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get cervixFirmness => $composableBuilder(
+      column: $table.cervixFirmness,
+      builder: (column) => ColumnFilters(column));
+
   ColumnFilters<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => ColumnFilters(column));
 
@@ -2111,8 +2186,8 @@ class $$CycleEntriesTableFilterComposer
   ColumnFilters<bool> get desire => $composableBuilder(
       column: $table.desire, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<bool> get sex => $composableBuilder(
-      column: $table.sex, builder: (column) => ColumnFilters(column));
+  ColumnFilters<int> get sexTimings => $composableBuilder(
+      column: $table.sexTimings, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
@@ -2203,6 +2278,10 @@ class $$CycleEntriesTableOrderingComposer
       column: $table.cervixOpening,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get cervixFirmness => $composableBuilder(
+      column: $table.cervixFirmness,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => ColumnOrderings(column));
 
@@ -2216,8 +2295,8 @@ class $$CycleEntriesTableOrderingComposer
   ColumnOrderings<bool> get desire => $composableBuilder(
       column: $table.desire, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<bool> get sex => $composableBuilder(
-      column: $table.sex, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<int> get sexTimings => $composableBuilder(
+      column: $table.sexTimings, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
@@ -2300,6 +2379,9 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<String> get cervixOpening => $composableBuilder(
       column: $table.cervixOpening, builder: (column) => column);
 
+  GeneratedColumn<String> get cervixFirmness => $composableBuilder(
+      column: $table.cervixFirmness, builder: (column) => column);
+
   GeneratedColumn<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => column);
 
@@ -2312,8 +2394,8 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<bool> get desire =>
       $composableBuilder(column: $table.desire, builder: (column) => column);
 
-  GeneratedColumn<bool> get sex =>
-      $composableBuilder(column: $table.sex, builder: (column) => column);
+  GeneratedColumn<int> get sexTimings => $composableBuilder(
+      column: $table.sexTimings, builder: (column) => column);
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
@@ -2383,11 +2465,12 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> cervix = const Value.absent(),
             Value<String?> cervixPosition = const Value.absent(),
             Value<String?> cervixOpening = const Value.absent(),
+            Value<String?> cervixFirmness = const Value.absent(),
             Value<bool> painBreast = const Value.absent(),
             Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
             Value<bool> desire = const Value.absent(),
-            Value<bool> sex = const Value.absent(),
+            Value<int> sexTimings = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -2408,11 +2491,12 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             cervix: cervix,
             cervixPosition: cervixPosition,
             cervixOpening: cervixOpening,
+            cervixFirmness: cervixFirmness,
             painBreast: painBreast,
             painMittelschmerz: painMittelschmerz,
             mood: mood,
             desire: desire,
-            sex: sex,
+            sexTimings: sexTimings,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -2433,11 +2517,12 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> cervix = const Value.absent(),
             Value<String?> cervixPosition = const Value.absent(),
             Value<String?> cervixOpening = const Value.absent(),
+            Value<String?> cervixFirmness = const Value.absent(),
             Value<bool> painBreast = const Value.absent(),
             Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
             Value<bool> desire = const Value.absent(),
-            Value<bool> sex = const Value.absent(),
+            Value<int> sexTimings = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -2458,11 +2543,12 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             cervix: cervix,
             cervixPosition: cervixPosition,
             cervixOpening: cervixOpening,
+            cervixFirmness: cervixFirmness,
             painBreast: painBreast,
             painMittelschmerz: painMittelschmerz,
             mood: mood,
             desire: desire,
-            sex: sex,
+            sexTimings: sexTimings,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,

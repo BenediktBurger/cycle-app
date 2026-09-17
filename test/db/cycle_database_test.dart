@@ -33,7 +33,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v6)', () {
+  group('schema & migration (v7)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -96,8 +96,7 @@ void main() {
     test('bleeding round-trips as each of the five levels', () async {
       for (final (index, level) in Bleeding.values.indexed) {
         final day = DateTime(2026, 6).add(Duration(days: index));
-        await db.entriesDao
-            .upsertDaily(DailyEntry(date: day, bleeding: level));
+        await db.entriesDao.upsertDaily(DailyEntry(date: day, bleeding: level));
         final row = await db.entriesDao.entryFor(1, day);
         expect(row!.bleeding, level,
             reason: '${level.name} (level ${level.level}) must survive the '
@@ -145,7 +144,8 @@ void main() {
       expect(row!.bleeding, Bleeding.heavy);
     });
 
-    test('an unknown stored level is surfaced as an error, not silently '
+    test(
+        'an unknown stored level is surfaced as an error, not silently '
         'mapped', () async {
       await db.customStatement(
         'INSERT INTO cycle_entries (profile_id, date, bleeding) '
@@ -182,8 +182,7 @@ void main() {
       expect(row.date.day, 4);
     });
 
-    test('measured time-of-day is rejected outside the minute range',
-        () async {
+    test('measured time-of-day is rejected outside the minute range', () async {
       // Engine-level CHECK, like the mucus constraint: 0–1439 or NULL.
       await expectLater(
         db.customStatement(
@@ -204,6 +203,28 @@ void main() {
         "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
         "VALUES (1, 20001, 405)",
       );
+    });
+
+    test('the removed sex bool column is gone; firmness and timings exist',
+        () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        cervixFirmness: CervixFirmness.halfSoft,
+        sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+      ));
+      // The old boolean column must not even be addressable any more.
+      await expectLater(
+        db.customSelect('SELECT sex FROM cycle_entries').get(),
+        throwsA(isA<Exception>()),
+      );
+      // The replacements carry the observation in their decided shapes: the
+      // firmness as its TEXT enum-name token, the timings as the mask.
+      final raw = await db
+          .customSelect(
+              'SELECT cervix_firmness, sex_timings FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['cervix_firmness'], 'halfSoft');
+      expect(raw.data['sex_timings'], 5);
     });
   });
 
@@ -259,13 +280,14 @@ void main() {
       return db;
     }
 
-    test('opening a lower-version file recreates the schema, discarding old '
+    test(
+        'opening a lower-version file recreates the schema, discarding old '
         'data', () async {
       final db = await openThroughAppSchema();
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 6,
+      expect(userVersion.data['user_version'], 7,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
@@ -398,11 +420,12 @@ void main() {
         cervix: 'closed, low',
         cervixPosition: CervixPosition.veryHigh,
         cervixOpening: CervixOpening.open,
+        cervixFirmness: CervixFirmness.soft,
         painBreast: true,
         painMittelschmerz: true,
         mood: true,
         desire: true,
-        sex: true,
+        sexTimings: SexTiming.start.bit | SexTiming.end.bit,
         notes: 'Notiz am Rande.',
       );
 
@@ -410,6 +433,10 @@ void main() {
       final mapped = dailyEntryFromDrift(stored);
 
       expect(mapped, input); // DailyEntry == compares all fields + same day
+      expect(stored.cervixFirmness, 'soft',
+          reason: 'the firmness is stored as its TEXT enum-name token');
+      expect(stored.sexTimings, 5,
+          reason: 'the timings are stored as the INTEGER mask');
       expect(stored.date.year, 2026);
       expect(stored.date.month, 6);
       expect(stored.date.day, 15);
@@ -442,6 +469,8 @@ void main() {
         date: DateTime(2026, 6, 15),
         mucusSign: MucusSign.s,
         mucusQuality: MucusQuality.ew,
+        cervixFirmness: CervixFirmness.halfSoft,
+        sexTimings: 6,
         notes: 'old note',
       ));
       await db.entriesDao.upsertDaily(
@@ -451,6 +480,10 @@ void main() {
       final row = (await db.entriesDao.entryFor(1, DateTime(2026, 6, 15)))!;
       expect(row.mucusQuality, isNull);
       expect(row.mucusSign, isNull);
+      expect(row.cervixFirmness, isNull);
+      expect(row.sexTimings, 0,
+          reason: 'the mask column resets to its default 0, not to a stale '
+              'value');
       expect(row.notes, isNull);
     });
 
@@ -542,7 +575,8 @@ void main() {
         painMittelschmerz: false,
         mood: false,
         desire: false,
-        sex: false,
+        cervixFirmness: null,
+        sexTimings: 0,
         createdAt: DateTime(2026, 6, 15),
         updatedAt: DateTime(2026, 6, 15),
       );
@@ -712,7 +746,8 @@ void main() {
       final mapped = cycleMarkFromDrift(stored);
 
       expect(DateOnly.sameDay(mapped.date, day), isTrue);
-      expect(mapped.date.isUtc, isTrue, reason: 'domain dates are UTC midnight');
+      expect(mapped.date.isUtc, isTrue,
+          reason: 'domain dates are UTC midnight');
       expect(mapped.date.hour, 0);
       expect(mapped.date.minute, 0);
 
@@ -726,13 +761,15 @@ void main() {
       expect(await db.marksDao.marksForDay(1, day), hasLength(1));
     });
 
-    test('a duplicate (profile, date, type) insert bypassing addMark hits '
+    test(
+        'a duplicate (profile, date, type) insert bypassing addMark hits '
         'the unique index', () async {
       await db.marksDao.addMark(1, day, CycleMarkTypes.baseline);
       await expectLater(
         db.into(db.userMarks).insert(
               cycleMarkToCompanion(
-                CycleMark(profileId: 1, date: day, type: CycleMarkTypes.baseline),
+                CycleMark(
+                    profileId: 1, date: day, type: CycleMarkTypes.baseline),
               ),
             ),
         throwsA(isA<Exception>()), // UNIQUE constraint failed
@@ -759,8 +796,8 @@ void main() {
       // duplicated into CycleMarkTypes — this test is the tripwire keeping
       // the two definitions in sync.
       expect(CycleMarkTypes.mucusPeakDay, MarkTypes.mucusPeakDay);
-      expect(
-          CycleMarkTypes.firstHigherMeasurement, MarkTypes.firstHigherMeasurement);
+      expect(CycleMarkTypes.firstHigherMeasurement,
+          MarkTypes.firstHigherMeasurement);
       expect(CycleMarkTypes.baseline, MarkTypes.baseline);
       expect(CycleMarkTypes.fertileWindow, MarkTypes.fertileWindow);
       expect(CycleMarkTypes.interruption, MarkTypes.interruption);
@@ -788,8 +825,8 @@ void main() {
       await db.profilesDao.addProfile('partner'); // id 2
       await db.marksDao.addMark(1, otherDay, CycleMarkTypes.baseline);
       await db.marksDao.addMark(1, day, CycleMarkTypes.mucusPeakDay);
-      await db.marksDao.addMark(2, day, CycleMarkTypes.baseline,
-          author: 'user');
+      await db.marksDao
+          .addMark(2, day, CycleMarkTypes.baseline, author: 'user');
       await Future<void>.delayed(Duration.zero);
 
       // Content, not event counting: drift re-emits on ANY write to the
@@ -990,9 +1027,8 @@ void main() {
         // document must not carry the stray time — what it carries is what
         // a re-import would store.
         final legacyDay = DateTime(2026, 6, 20);
-        final legacyEpochDay = DateOnly.normalize(legacyDay)
-            .difference(DateTime.utc(1970))
-            .inDays;
+        final legacyEpochDay =
+            DateOnly.normalize(legacyDay).difference(DateTime.utc(1970)).inDays;
         await db.customStatement(
           'INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) '
           'VALUES (1, $legacyEpochDay, 405)',
@@ -1031,7 +1067,8 @@ void main() {
     });
 
     group('bleeding levels in the export version boundary', () {
-      test('export carries numeric bleeding levels and the current schema'
+      test(
+          'export carries numeric bleeding levels and the current schema'
           ' version', () async {
         await db.entriesDao.upsertDaily(DailyEntry(
           date: DateTime(2026, 4, 2),
@@ -1070,7 +1107,8 @@ void main() {
         expect(summary.entriesInvalid, 0);
         expect(summary.entriesWritten, 2);
 
-        expect((await db.entriesDao.entryFor(1, DateTime(2026, 5, 1)))!.bleeding,
+        expect(
+            (await db.entriesDao.entryFor(1, DateTime(2026, 5, 1)))!.bleeding,
             Bleeding.medium,
             reason: 'period (generic menstruation) degrades to medium');
         expect(
@@ -1101,10 +1139,10 @@ void main() {
         final targetRows = await target.entriesDao.allEntriesForAllProfiles();
         expect(targetRows, hasLength(levels.length));
         for (var i = 0; i < levels.length; i++) {
-          final source = sourceRows
-              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
-          final imported = targetRows
-              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          final source = sourceRows.singleWhere(
+              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          final imported = targetRows.singleWhere(
+              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
           expect(imported.bleeding, source.bleeding,
               reason: '${levels[i].name} must survive the round trip exactly '
                   '(no degradation to medium)');

@@ -72,8 +72,7 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           // constructor rule so legacy rows (written before the rule, e.g.
           // by an older app version) export clean too — the export → import
           // round trip is idempotent.
-          'measured_at_minutes':
-              e.bbtC == null ? null : e.measuredAtMinutes,
+          'measured_at_minutes': e.bbtC == null ? null : e.measuredAtMinutes,
           'bleeding': e.bleeding.level,
           'exclude_illness': e.excludeIllness,
           'exclude_alcohol': e.excludeAlcohol,
@@ -88,7 +87,6 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'pain_mittelschmerz': e.painMittelschmerz,
           'mood': e.mood,
           'desire': e.desire,
-          'sex': e.sex,
           'notes': e.notes,
         },
     ],
@@ -358,7 +356,6 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       painMittelschmerz: flag('pain_mittelschmerz'),
       mood: flag('mood'),
       desire: flag('desire'),
-      sex: flag('sex'),
       notes: row['notes'] is String ? row['notes'] as String : null,
     );
   } on AssertionError {

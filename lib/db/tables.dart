@@ -66,13 +66,14 @@ class CycleEntries extends Table {
   BoolColumn get excludeOther => boolean().withDefault(const Constant(false))();
 
   /// Fertility sign recorded on the day: NULL when no observation, else one
-  /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
-  /// names — TEXT, unlike bleeding's numeric column; never display glyphs).
-  /// customConstraint replaces drift's own constraints, which is fine here:
-  /// SQLite columns admit NULL unless NOT NULL is written, and the check
-  /// below allows exactly NULL or the vocabulary.
+  /// of the stable tokens 't' / 'nothing' / 'f' / 's' / 'a' (the MucusSign
+  /// enum names — TEXT, unlike bleeding's numeric column; never display
+  /// glyphs). customConstraint replaces drift's own constraints, which is
+  /// fine here: SQLite columns admit NULL unless NOT NULL is written, and
+  /// the check below allows exactly NULL or the vocabulary.
   TextColumn get mucusSign => text().nullable().customConstraint(
-        "CHECK (mucus_sign IS NULL OR mucus_sign IN ('t', 'nothing', 'f', 's'))",
+        "CHECK (mucus_sign IS NULL OR mucus_sign IN "
+        "('t', 'nothing', 'f', 's', 'a'))",
       )();
 
   /// Quality qualifier of the mucus sign S; NULL for every sign other than
@@ -108,18 +109,39 @@ class CycleEntries extends Table {
         "('closed', 'middle', 'open'))",
       )();
 
+  /// Muttermund (cervix) FIRMNESS of the day, as above: NULL when not
+  /// observed, else 'hard' / 'halfSoft' / 'soft' (paper shorthand h / h/w /
+  /// w — fest / teils fest, teils weich / weich). Stored like mucus_sign
+  /// (TEXT enum-name tokens, engine CHECK on the vocabulary; the tokens
+  /// never collide with a position or opening token). German display labels
+  /// live in the l10n arbs.
+  TextColumn get cervixFirmness => text().nullable().customConstraint(
+        "CHECK (cervix_firmness IS NULL OR cervix_firmness IN "
+        "('hard', 'halfSoft', 'soft'))",
+      )();
+
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and
   /// ovulation pain / Mittelschmerz (painMittelschmerz, letter M). Modeled
   /// like the exclusion flags: plain booleans, no interval system.
-  BoolColumn get painBreast =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get painBreast => boolean().withDefault(const Constant(false))();
   BoolColumn get painMittelschmerz =>
       boolean().withDefault(const Constant(false))();
 
   BoolColumn get mood => boolean().withDefault(const Constant(false))();
   BoolColumn get desire => boolean().withDefault(const Constant(false))();
-  BoolColumn get sex => boolean().withDefault(const Constant(false))();
+
+  /// Times of day sex happened, as an INTEGER bitmask of [SexTiming.bit]:
+  /// start(1) / middle(2) / end(4), OR-combined — multiple bits mean
+  /// multiple times on the same day; 0 = not recorded. "Sex happened, time
+  /// unknown" is deliberately NOT representable (the observation is only
+  /// recorded together with a concrete time slot). customConstraint replaces
+  /// drift's own constraints, so NOT NULL and the column default 0 are
+  /// written out explicitly inside the constraint string (a bare CHECK
+  /// would silently drop both, leaving the column nullable).
+  IntColumn get sexTimings =>
+      integer().withDefault(const Constant(0)).customConstraint(
+          'NOT NULL DEFAULT 0 CHECK (sex_timings BETWEEN 0 AND 7)')();
 
   TextColumn get notes => text().nullable()();
 

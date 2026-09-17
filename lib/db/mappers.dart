@@ -37,11 +37,14 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     cervix: e.cervix,
     cervixPosition: tryParseCervixPosition(e.cervixPosition),
     cervixOpening: tryParseCervixOpening(e.cervixOpening),
+    cervixFirmness: tryParseCervixFirmness(e.cervixFirmness),
     painBreast: e.painBreast,
     painMittelschmerz: e.painMittelschmerz,
     mood: e.mood,
     desire: e.desire,
-    sex: e.sex,
+    // Stored as the mask itself (0..7, engine CHECK); no per-bit conversion
+    // happens on either side — the SexTiming.bit values ARE the storage.
+    sexTimings: e.sexTimings,
     notes: e.notes,
   );
 }
@@ -75,11 +78,15 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     // constraints on the columns accept exactly this vocabulary.
     cervixPosition: Value(d.cervixPosition?.name),
     cervixOpening: Value(d.cervixOpening?.name),
+    cervixFirmness: Value(d.cervixFirmness?.name),
     painBreast: Value(d.painBreast),
     painMittelschmerz: Value(d.painMittelschmerz),
     mood: Value(d.mood),
     desire: Value(d.desire),
-    sex: Value(d.sex),
+    // The mask as-is (DailyEntry's constructor already asserts 0..7, which
+    // the SQL CHECK mirrors); the SexTiming.bit values ARE the storage, no
+    // per-bit conversion happens here either.
+    sexTimings: Value(d.sexTimings),
     notes: Value(d.notes),
   );
 }
