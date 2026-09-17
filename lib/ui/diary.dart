@@ -30,7 +30,6 @@ class TagebuchScreen extends ConsumerStatefulWidget {
 final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bbtController = TextEditingController();
-  final _cervixController = TextEditingController();
   final _notesController = TextEditingController();
 
   Bleeding _bleeding = Bleeding.none;
@@ -63,7 +62,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   @override
   void dispose() {
     _bbtController.dispose();
-    _cervixController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -104,7 +102,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _sexTimings = entry?.sexTimings ?? 0;
     final bbt = entry?.bbtC;
     _bbtController.text = bbt == null ? '' : bbt.toString();
-    _cervixController.text = entry?.cervix ?? '';
     _notesController.text = entry?.notes ?? '';
   }
 
@@ -179,9 +176,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       excludeOther: _excludeOther,
       mucusSign: sign,
       mucusQuality: quality,
-      cervix: _cervixController.text.trim().isEmpty
-          ? null
-          : _cervixController.text.trim(),
       cervixPosition: _cervixPosition,
       cervixOpening: _cervixOpening,
       cervixFirmness: _cervixFirmness,
@@ -569,12 +563,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                       }),
                     ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              // --- cervix note (optional free text next to the chips) ---
-              TextFormField(
-                controller: _cervixController,
-                decoration: InputDecoration(labelText: l10n.cervix),
               ),
               const SizedBox(height: 12),
               // --- toggles ----------------------------------------------

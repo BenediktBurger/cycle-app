@@ -54,23 +54,23 @@ void main() {
   }
 
   group('drip csv through importJsonToDatabase', () {
-    test('first import stores exactly the 27 mapped days under the main '
+    test('first import stores exactly the 28 mapped days under the main '
         'profile', () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
       final summary = await importJsonToDatabase(db, mapping.json);
 
       // Full accounting: nothing invalid, nothing new beyond the new days.
       expect(summary.entriesInvalid, 0);
-      expect(summary.entriesNew, 27);
+      expect(summary.entriesNew, 28);
       expect(summary.entriesOverwritten, 0);
-      expect(summary.entriesWritten, 27);
+      expect(summary.entriesWritten, 28);
       expect(summary.marksNew, 0);
       expect(summary.profilesToInsert, 0,
           reason: 'document profile 1 is the seeded main profile');
 
       final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(27),
-          reason: '27 data rows, 46 blank calendar days skipped');
+      expect(rows, hasLength(28),
+          reason: '28 data rows, 45 blank calendar days skipped');
       expect(rows.every((r) => r.profileId == 1), isTrue,
           reason: 'drip has no multi-profile concept');
 
@@ -87,12 +87,10 @@ void main() {
 
       // 2026-07-15: mucus day — drip nfp value 2 wins over the 2+1 parts →
       // sign f, no quality (the amended number-level mapping), firmness
-      // index 2 clamps to soft — in the free text AND in the structured
-      // cervixFirmness field.
+      // index 2 clamps to soft in the structured cervixFirmness field.
       final mucusDay = await dayRow('2026-07-15');
       expect(mucusDay.mucusSign, MucusSign.f);
       expect(mucusDay.mucusQuality, isNull);
-      expect(mucusDay.cervix, 'medium, soft, medium');
       expect(mucusDay.cervixFirmness, CervixFirmness.soft);
       expect(mucusDay.bbtC, isNull);
       expect(mucusDay.bleeding, Bleeding.none);
@@ -143,6 +141,13 @@ void main() {
       final soloDay = await dayRow('2026-09-12');
       expect(soloDay.sexTimings, 0, reason: 'solo is not partner sex');
       expect(soloDay.notes, '[sex] morning');
+
+      // 2026-08-16: partner sex whose only contraceptive info is
+      // condom=false/pill=false — no method flag set, so the day maps to
+      // the sex observation (no explicit "none" confirmation needed).
+      final noMethodDay = await dayRow('2026-08-16');
+      expect(noMethodDay.sexTimings, SexTiming.middle.bit,
+          reason: 'partner without any method flag → the mapped variant');
     });
 
     test('blank calendar days are absent from the database', () async {
@@ -152,8 +157,6 @@ void main() {
 
       final dates = rows.map((r) => formatIsoDay(r.date)).toSet();
       // 2026-07-10..14, 19, 21, 22 are all-empty rows in the fixture.
-      // 2026-08-16 (partner sex, ambiguous contraceptive info) carries no
-      // mappable data either under the sex rule — it must not be stored.
       for (final blank in [
         '2026-07-10',
         '2026-07-11',
@@ -163,12 +166,11 @@ void main() {
         '2026-07-19',
         '2026-07-21',
         '2026-07-22',
-        '2026-08-16',
       ]) {
         expect(dates.contains(blank), isFalse,
             reason: '$blank is an empty drip day and must not be stored');
       }
-      expect(dates, hasLength(27));
+      expect(dates, hasLength(28));
     });
 
     test('temperature measurement times persist through the import → db '
@@ -241,12 +243,12 @@ void main() {
 
       // Idempotence in the counters: nothing new, everything merged.
       expect(summary2.entriesNew, 0);
-      expect(summary2.entriesOverwritten, 27);
+      expect(summary2.entriesOverwritten, 28);
       expect(summary2.entriesInvalid, 0);
       expect(summary2.marksNew, 0);
 
       final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(27), reason: 'no duplicates on re-import');
+      expect(rows, hasLength(28), reason: 'no duplicates on re-import');
 
       final afterSecond = await storedEntries();
       // Full-row equality for EVERY affected day, list-ordered.
@@ -268,12 +270,12 @@ void main() {
       final summary = await importJsonToDatabase(db, mapping.json);
 
       // The drip days overwrite/merge independently of the resident day.
-      expect(summary.entriesNew, 27);
+      expect(summary.entriesNew, 28);
       expect(summary.entriesOverwritten, 0);
 
       final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(28),
-          reason: '27 drip days + the unrelated pre-existing day');
+      expect(rows, hasLength(29),
+          reason: '28 drip days + the unrelated pre-existing day');
       final storedList = rows.map(dailyEntryFromDrift).toList();
 
       final kept = storedList

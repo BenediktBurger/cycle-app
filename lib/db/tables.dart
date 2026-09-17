@@ -85,10 +85,6 @@ class CycleEntries extends Table {
         "'fl', 'ns')))",
       )();
 
-  /// Optional cervix observation (free text, e.g. a note next to the two
-  /// categorical Muttermund options below).
-  TextColumn get cervix => text().nullable()();
-
   /// Muttermund (cervix) POSITION of the day, as a nullable TEXT token from
   /// the [CervixPosition] enum-name vocabulary: NULL when not observed,
   /// else 'low' / 'medium' / 'high' / 'veryHigh' / 'unreachable' (tief …

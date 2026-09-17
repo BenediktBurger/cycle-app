@@ -80,7 +80,6 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'exclude_other': e.excludeOther,
           'mucus_sign': e.mucusSign,
           'mucus_quality': e.mucusQuality,
-          'cervix': e.cervix,
           'cervix_position': e.cervixPosition,
           'cervix_opening': e.cervixOpening,
           'cervix_firmness': e.cervixFirmness,
@@ -360,7 +359,6 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       excludeOther: flag('exclude_other'),
       mucusSign: mucus.sign,
       mucusQuality: mucus.quality,
-      cervix: row['cervix'] is String ? row['cervix'] as String : null,
       // Muttermund options through the shared vocabulary helpers
       // (lib/domain/cervix.dart): out-of-vocabulary / non-string tokens
       // collapse to null — NEVER row killers, same principle as mucus.

@@ -121,7 +121,6 @@ final class DailyEntry {
     this.excludeOther = false,
     this.mucusSign,
     this.mucusQuality,
-    this.cervix,
     this.cervixPosition,
     this.cervixOpening,
     this.cervixFirmness,
@@ -183,9 +182,6 @@ final class DailyEntry {
   /// `MucusSign.s` (constructor assert mirrors the SQL CHECK constraint).
   final MucusQuality? mucusQuality;
 
-  /// Optional cervix observation note (e.g. open/closed, position).
-  final String? cervix;
-
   /// Muttermund (cervix) observation of the day, as three independent
   /// categorical options: how deep the cervix sat ([CervixPosition],
   /// tief … unerreichbar), how far it was open ([CervixOpening],
@@ -235,7 +231,6 @@ final class DailyEntry {
     bool? excludeOther,
     Object? mucusSign = _sentinel,
     Object? mucusQuality = _sentinel,
-    Object? cervix = _sentinel,
     Object? cervixPosition = _sentinel,
     Object? cervixOpening = _sentinel,
     Object? cervixFirmness = _sentinel,
@@ -263,7 +258,6 @@ final class DailyEntry {
       mucusQuality: mucusQuality == _sentinel
           ? this.mucusQuality
           : mucusQuality as MucusQuality?,
-      cervix: cervix == _sentinel ? this.cervix : cervix as String?,
       cervixPosition: cervixPosition == _sentinel
           ? this.cervixPosition
           : cervixPosition as CervixPosition?,
@@ -299,7 +293,6 @@ final class DailyEntry {
         excludeOther == other.excludeOther &&
         mucusSign == other.mucusSign &&
         mucusQuality == other.mucusQuality &&
-        cervix == other.cervix &&
         cervixPosition == other.cervixPosition &&
         cervixOpening == other.cervixOpening &&
         cervixFirmness == other.cervixFirmness &&
@@ -326,7 +319,6 @@ final class DailyEntry {
         excludeOther,
         mucusSign,
         mucusQuality,
-        cervix,
         cervixPosition,
         cervixOpening,
         cervixFirmness,

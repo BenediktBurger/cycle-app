@@ -242,19 +242,11 @@ DripCsvImport dripCsvToExportJson(String raw) {
       feeling: cell(dataRow, 'mucus.feeling'),
       texture: cell(dataRow, 'mucus.texture'),
     );
-    final cervix = _cervixText(
-      opening: cell(dataRow, 'cervix.opening'),
-      firmness: cell(dataRow, 'cervix.firmness'),
-      position: cell(dataRow, 'cervix.position'),
-    );
     // drip ALSO carries the cervix vocabulary indexes (0-based), which map
     // onto the structured Muttermund fields: position low/medium/high,
     // opening closed/medium/open, and firmness hard/soft (an out-of-range
-    // firmness index clamps to the nearest valid one — the same clamping
-    // rule as the free-text line below). Out-of-range or non-numeric
-    // position/opening indexes map to null per field. The free text keeps
-    // its (clamping) behavior and is written IN ADDITION to the structured
-    // fields — historical fidelity for the hand-authored specimen rows.
+    // firmness index clamps to the nearest valid one). Out-of-range or
+    // non-numeric position/opening indexes map to null per field.
     final cervixObservation = _cervixObservation(
       opening: cell(dataRow, 'cervix.opening'),
       firmness: cell(dataRow, 'cervix.firmness'),
@@ -270,25 +262,26 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final desire = desireCell != null && desireCell.trim() != 'false';
     // drip tracks sex as activity (solo/partner) plus the contraceptive
     // methods used (condom, pill, iud, patch, ring, implant, diaphragm,
-    // other — and `none`, the explicit "no contraception used" choice;
+    // other — and `none`, the "no contraception used" choice;
     // drip: components/helpers/labels.js). cycle-app's sex observation
-    // models partner sex WITHOUT contraception, so only a positive
-    // confirmation of both halves maps: sex.partner=true AND sex.none=true
-    // AND no contraceptive method flag true — and it stores as the MIDDLE
-    // time of day, because drip carries no time-of-day for sex (owner
-    // decision, see the TODO below). Every other variant — solo sex, a
-    // method used, a missing contraceptive answer (partner with no
-    // contraceptive column set at all), even none=true next to a method —
-    // maps to nothing and is NOT data: a row carrying only such flags is
-    // skipped entirely (see the data rule below). The [sex] note line
-    // keeps its note-driven behavior independent of the flag.
+    // models partner sex WITHOUT contraception, so the mapped variant is
+    // sex.partner=true with no contraceptive method flag true — the
+    // explicit `none` confirmation is NOT required: an unfilled method
+    // column also counts as no contraception (owner decision,
+    // 2026-09-17 — drip is a single non-authoritative import source and
+    // must not force the app's sex model to demand a positive "none"
+    // answer). The stored variant keeps the MIDDLE time of day, because
+    // drip carries no time-of-day for sex. Every other activity variant —
+    // solo sex, a method used, even none=true next to a method — maps to
+    // nothing and is NOT data: a row carrying only such flags is skipped
+    // entirely (see the data rule below). The [sex] note line keeps its
+    // note-driven behavior independent of the flag.
     // TODO(user-review): solo sex and the contraceptive methods have no
     // storage option; whether solo sex deserves an option of its own. The
     // middle-of-day choice for the mapped variant is likewise a mapping
     // convenience: drip is a single non-authoritative import source and
     // must not force the app's design.
     final sexPartner = boolCell(dataRow, 'sex.partner');
-    final sexNone = boolCell(dataRow, 'sex.none');
     final sexMethod = [
       'sex.condom',
       'sex.pill',
@@ -299,7 +292,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'sex.diaphragm',
       'sex.other',
     ].any((name) => boolCell(dataRow, name));
-    final sex = sexPartner && sexNone && !sexMethod;
+    final sex = sexPartner && !sexMethod;
 
     final dayNote = cell(dataRow, 'note.value');
     final tempNote = cell(dataRow, 'temperature.note');
@@ -319,9 +312,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final mood = flagInFamily(dataRow, 'mood') || moodNote != null;
 
     // A row is only worth an entry when something mappable was recorded.
-    // Dropped columns (bleeding/mucus/cervix excludes, the sex variants that
-    // do not map — solo, a contraceptive method, missing contraceptive
-    // info —, unmappable pain kinds, symptom-flag FALSEs) are
+    // Dropped columns (bleeding/mucus/cervix excludes, the sex variants
+    // that do not map — solo, a contraceptive method —, unmappable pain
+    // kinds, symptom-flag FALSEs) are
     // NOT data — otherwise every blank drip day would import. A measured
     // time belongs to its measurement, so a time cell alone never makes a
     // blank day an entry.
@@ -329,7 +322,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
         excludeOther ||
         bleeding != null ||
         mucus != null ||
-        cervix != null ||
+        cervixObservation != null ||
         desire ||
         sex ||
         painBreast ||
@@ -372,7 +365,6 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'exclude_other': excludeOther,
       'mucus_sign': mucus?.sign?.name,
       'mucus_quality': mucus?.quality?.name,
-      'cervix': cervix,
       'cervix_position': cervixObservation?.position?.name,
       'cervix_opening': cervixObservation?.opening?.name,
       'cervix_firmness': cervixObservation?.firmness?.name,
@@ -508,39 +500,6 @@ int? _resolveNfp({
   return nfpF > nfpT ? nfpF : nfpT; // Math.max
 }
 
-/// Builds the free-text cervix note from drip's 0-based vocabularies
-/// (drip: labels.js — opening closed/medium/open, firmness hard/soft,
-/// position low/medium/high), joined `, ` in reading order
-/// (opening, firmness, position). Out-of-range indexes clamp to the nearest
-/// valid one (the shipped hand-authored specimen contains
-/// `cervix.firmness=2`); a fully empty triple is null.
-/// TODO(user-review): the English wording and the clamping rule.
-String? _cervixText({
-  required String? opening,
-  required String? firmness,
-  required String? position,
-}) {
-  const openingWords = ['closed', 'medium', 'open'];
-  const firmnessWords = ['hard', 'soft'];
-  const positionWords = ['low', 'medium', 'high'];
-
-  String? word(String? raw, List<String> vocabulary) {
-    if (raw == null) return null;
-    final v = int.tryParse(raw);
-    if (v == null) return null;
-    final clamped = v < 0 ? 0 : (v > vocabulary.length - 1 ? vocabulary.length - 1 : v);
-    return vocabulary[clamped];
-  }
-
-  final parts = [
-    word(opening, openingWords),
-    word(firmness, firmnessWords),
-    word(position, positionWords),
-  ].whereType<String>().toList();
-  if (parts.isEmpty) return null;
-  return parts.join(', ');
-}
-
 /// Structured Muttermund tokens of a drip row, decoded from drip's 0-based
 /// vocabularies (drip: labels.js): position {0: CervixPosition.low,
 /// 1: medium, 2: high}, opening {0: CervixOpening.closed, 1: middle,
@@ -551,11 +510,10 @@ String? _cervixText({
 /// lib/domain/cervix.dart for the deliberate token distinction). A
 /// position/opening index outside the vocabulary means no stored
 /// observation for that dimension; a firmness index outside its two-step
-/// vocabulary CLAMPS to the nearest valid one — the same clamping rule the
-/// free-text line applies (the shipped hand-authored specimen contains
-/// `cervix.firmness=2`). TODO(user-review): whether that clamping asymmetry
-/// is acceptable (position/opening null, firmness clamped) now that the
-/// structured firmness field exists — the free-text line clamps either way.
+/// vocabulary CLAMPS to the nearest valid one (the shipped hand-authored
+/// specimen contains `cervix.firmness=2`). TODO(user-review): whether that
+/// clamping asymmetry is acceptable (position/opening null, firmness
+/// clamped).
 ({CervixPosition? position, CervixOpening? opening, CervixFirmness? firmness})?
     _cervixObservation({
   required String? opening,

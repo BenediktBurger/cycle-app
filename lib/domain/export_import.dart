@@ -17,8 +17,8 @@
 //                    nullable; quality only ever together with S)
 //                    "pain_breast": false, "pain_mittelschmerz": false,
 //                    (the letter-coded pain options B and M, v4+)
-//                    "cervix": null, (free-text note) "cervix_position":
-//                    "high", "cervix_opening": "open", (Muttermund
+//                    "cervix_position": "high",
+//                    "cervix_opening": "open", (Muttermund
 //                    observation tokens, see the v4 note below)
 //                    "cervix_firmness": "hard", (Muttermund firmness token,
 //                    v4, see the version note below)
@@ -48,9 +48,12 @@
 // place instead of growing a v5 — the old v4 `sex` boolean is REPLACED by
 // the `sex_timings` bitmask (0..7, the SexTiming bits; see models.dart) and
 // `cervix_firmness` (the lib/domain/cervix.dart firmness token) extends v4
-// ADDITIVELY. No legacy tolerance shims exist for either key: there are no
-// v4 documents in the wild with the old shape, and a stray `sex` flag is
-// simply ignored (unknown keys never error — see below).
+// ADDITIVELY. The free-text `cervix` note key was later dropped from v4 the
+// same way (owner decision: the three Muttermund vocabularies carry the
+// observation; prose belongs in `notes`). No legacy tolerance shims exist
+// for any of these keys: there are no v4 documents in the wild with an old
+// shape, and a stray `sex` or `cervix` key is simply ignored (unknown keys
+// never error — see below).
 //
 // Additive fields without a version bump: v4 ALSO carries the two
 // Muttermund (cervix) observation fields `cervix_position` /

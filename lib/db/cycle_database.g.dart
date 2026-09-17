@@ -324,11 +324,6 @@ class $CycleEntriesTable extends CycleEntries
       requiredDuringInsert: false,
       $customConstraints:
           'CHECK (mucus_quality IS NULL OR (mucus_sign = \'s\' AND mucus_quality IN (\'w\', \'mi\', \'cr\', \'kl\', \'glb\', \'g\', \'ew\', \'gl\', \'fl\', \'ns\')))');
-  static const VerificationMeta _cervixMeta = const VerificationMeta('cervix');
-  @override
-  late final GeneratedColumn<String> cervix = GeneratedColumn<String>(
-      'cervix', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _cervixPositionMeta =
       const VerificationMeta('cervixPosition');
   @override
@@ -439,7 +434,6 @@ class $CycleEntriesTable extends CycleEntries
         excludeOther,
         mucusSign,
         mucusQuality,
-        cervix,
         cervixPosition,
         cervixOpening,
         cervixFirmness,
@@ -512,10 +506,6 @@ class $CycleEntriesTable extends CycleEntries
           _mucusQualityMeta,
           mucusQuality.isAcceptableOrUnknown(
               data['mucus_quality']!, _mucusQualityMeta));
-    }
-    if (data.containsKey('cervix')) {
-      context.handle(_cervixMeta,
-          cervix.isAcceptableOrUnknown(data['cervix']!, _cervixMeta));
     }
     if (data.containsKey('cervix_position')) {
       context.handle(
@@ -608,8 +598,6 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.string, data['${effectivePrefix}mucus_sign']),
       mucusQuality: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}mucus_quality']),
-      cervix: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}cervix']),
       cervixPosition: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cervix_position']),
       cervixOpening: attachedDatabase.typeMapping
@@ -689,10 +677,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// data (e.g. from a future import path) cannot be written.
   final String? mucusQuality;
 
-  /// Optional cervix observation (free text, e.g. a note next to the two
-  /// categorical Muttermund options below).
-  final String? cervix;
-
   /// Muttermund (cervix) POSITION of the day, as a nullable TEXT token from
   /// the [CervixPosition] enum-name vocabulary: NULL when not observed,
   /// else 'low' / 'medium' / 'high' / 'veryHigh' / 'unreachable' (tief …
@@ -731,8 +715,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// recorded together with a concrete time slot), so the mask fully
   /// replaces the former plain `sex` boolean. customConstraint replaces
   /// drift's own constraints, so NOT NULL and the column default 0 are
-  /// written out explicitly here (see writeColumnDefinition: a custom
-  /// constraint suppresses drift's NOT NULL/DEFAULT emission).
+  /// written out explicitly inside the constraint string (a bare CHECK
+  /// would silently drop both, leaving the column nullable).
   final int sexTimings;
   final String? notes;
   final DateTime createdAt;
@@ -750,7 +734,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       required this.excludeOther,
       this.mucusSign,
       this.mucusQuality,
-      this.cervix,
       this.cervixPosition,
       this.cervixOpening,
       this.cervixFirmness,
@@ -790,9 +773,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     }
     if (!nullToAbsent || mucusQuality != null) {
       map['mucus_quality'] = Variable<String>(mucusQuality);
-    }
-    if (!nullToAbsent || cervix != null) {
-      map['cervix'] = Variable<String>(cervix);
     }
     if (!nullToAbsent || cervixPosition != null) {
       map['cervix_position'] = Variable<String>(cervixPosition);
@@ -836,8 +816,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       mucusQuality: mucusQuality == null && nullToAbsent
           ? const Value.absent()
           : Value(mucusQuality),
-      cervix:
-          cervix == null && nullToAbsent ? const Value.absent() : Value(cervix),
       cervixPosition: cervixPosition == null && nullToAbsent
           ? const Value.absent()
           : Value(cervixPosition),
@@ -875,7 +853,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       excludeOther: serializer.fromJson<bool>(json['excludeOther']),
       mucusSign: serializer.fromJson<String?>(json['mucusSign']),
       mucusQuality: serializer.fromJson<String?>(json['mucusQuality']),
-      cervix: serializer.fromJson<String?>(json['cervix']),
       cervixPosition: serializer.fromJson<String?>(json['cervixPosition']),
       cervixOpening: serializer.fromJson<String?>(json['cervixOpening']),
       cervixFirmness: serializer.fromJson<String?>(json['cervixFirmness']),
@@ -905,7 +882,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'excludeOther': serializer.toJson<bool>(excludeOther),
       'mucusSign': serializer.toJson<String?>(mucusSign),
       'mucusQuality': serializer.toJson<String?>(mucusQuality),
-      'cervix': serializer.toJson<String?>(cervix),
       'cervixPosition': serializer.toJson<String?>(cervixPosition),
       'cervixOpening': serializer.toJson<String?>(cervixOpening),
       'cervixFirmness': serializer.toJson<String?>(cervixFirmness),
@@ -933,7 +909,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           bool? excludeOther,
           Value<String?> mucusSign = const Value.absent(),
           Value<String?> mucusQuality = const Value.absent(),
-          Value<String?> cervix = const Value.absent(),
           Value<String?> cervixPosition = const Value.absent(),
           Value<String?> cervixOpening = const Value.absent(),
           Value<String?> cervixFirmness = const Value.absent(),
@@ -961,7 +936,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         mucusSign: mucusSign.present ? mucusSign.value : this.mucusSign,
         mucusQuality:
             mucusQuality.present ? mucusQuality.value : this.mucusQuality,
-        cervix: cervix.present ? cervix.value : this.cervix,
         cervixPosition:
             cervixPosition.present ? cervixPosition.value : this.cervixPosition,
         cervixOpening:
@@ -1003,7 +977,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       mucusQuality: data.mucusQuality.present
           ? data.mucusQuality.value
           : this.mucusQuality,
-      cervix: data.cervix.present ? data.cervix.value : this.cervix,
       cervixPosition: data.cervixPosition.present
           ? data.cervixPosition.value
           : this.cervixPosition,
@@ -1043,7 +1016,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('excludeOther: $excludeOther, ')
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
-          ..write('cervix: $cervix, ')
           ..write('cervixPosition: $cervixPosition, ')
           ..write('cervixOpening: $cervixOpening, ')
           ..write('cervixFirmness: $cervixFirmness, ')
@@ -1073,7 +1045,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         excludeOther,
         mucusSign,
         mucusQuality,
-        cervix,
         cervixPosition,
         cervixOpening,
         cervixFirmness,
@@ -1102,7 +1073,6 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.excludeOther == this.excludeOther &&
           other.mucusSign == this.mucusSign &&
           other.mucusQuality == this.mucusQuality &&
-          other.cervix == this.cervix &&
           other.cervixPosition == this.cervixPosition &&
           other.cervixOpening == this.cervixOpening &&
           other.cervixFirmness == this.cervixFirmness &&
@@ -1129,7 +1099,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<bool> excludeOther;
   final Value<String?> mucusSign;
   final Value<String?> mucusQuality;
-  final Value<String?> cervix;
   final Value<String?> cervixPosition;
   final Value<String?> cervixOpening;
   final Value<String?> cervixFirmness;
@@ -1154,7 +1123,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.excludeOther = const Value.absent(),
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
-    this.cervix = const Value.absent(),
     this.cervixPosition = const Value.absent(),
     this.cervixOpening = const Value.absent(),
     this.cervixFirmness = const Value.absent(),
@@ -1180,7 +1148,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.excludeOther = const Value.absent(),
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
-    this.cervix = const Value.absent(),
     this.cervixPosition = const Value.absent(),
     this.cervixOpening = const Value.absent(),
     this.cervixFirmness = const Value.absent(),
@@ -1206,7 +1173,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<bool>? excludeOther,
     Expression<String>? mucusSign,
     Expression<String>? mucusQuality,
-    Expression<String>? cervix,
     Expression<String>? cervixPosition,
     Expression<String>? cervixOpening,
     Expression<String>? cervixFirmness,
@@ -1232,7 +1198,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (excludeOther != null) 'exclude_other': excludeOther,
       if (mucusSign != null) 'mucus_sign': mucusSign,
       if (mucusQuality != null) 'mucus_quality': mucusQuality,
-      if (cervix != null) 'cervix': cervix,
       if (cervixPosition != null) 'cervix_position': cervixPosition,
       if (cervixOpening != null) 'cervix_opening': cervixOpening,
       if (cervixFirmness != null) 'cervix_firmness': cervixFirmness,
@@ -1260,7 +1225,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<bool>? excludeOther,
       Value<String?>? mucusSign,
       Value<String?>? mucusQuality,
-      Value<String?>? cervix,
       Value<String?>? cervixPosition,
       Value<String?>? cervixOpening,
       Value<String?>? cervixFirmness,
@@ -1285,7 +1249,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       excludeOther: excludeOther ?? this.excludeOther,
       mucusSign: mucusSign ?? this.mucusSign,
       mucusQuality: mucusQuality ?? this.mucusQuality,
-      cervix: cervix ?? this.cervix,
       cervixPosition: cervixPosition ?? this.cervixPosition,
       cervixOpening: cervixOpening ?? this.cervixOpening,
       cervixFirmness: cervixFirmness ?? this.cervixFirmness,
@@ -1341,9 +1304,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (mucusQuality.present) {
       map['mucus_quality'] = Variable<String>(mucusQuality.value);
     }
-    if (cervix.present) {
-      map['cervix'] = Variable<String>(cervix.value);
-    }
     if (cervixPosition.present) {
       map['cervix_position'] = Variable<String>(cervixPosition.value);
     }
@@ -1395,7 +1355,6 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('excludeOther: $excludeOther, ')
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
-          ..write('cervix: $cervix, ')
           ..write('cervixPosition: $cervixPosition, ')
           ..write('cervixOpening: $cervixOpening, ')
           ..write('cervixFirmness: $cervixFirmness, ')
@@ -2050,7 +2009,6 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<bool> excludeOther,
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
-  Value<String?> cervix,
   Value<String?> cervixPosition,
   Value<String?> cervixOpening,
   Value<String?> cervixFirmness,
@@ -2077,7 +2035,6 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<bool> excludeOther,
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
-  Value<String?> cervix,
   Value<String?> cervixPosition,
   Value<String?> cervixOpening,
   Value<String?> cervixFirmness,
@@ -2158,9 +2115,6 @@ class $$CycleEntriesTableFilterComposer
 
   ColumnFilters<String> get mucusQuality => $composableBuilder(
       column: $table.mucusQuality, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get cervix => $composableBuilder(
-      column: $table.cervix, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get cervixPosition => $composableBuilder(
       column: $table.cervixPosition,
@@ -2267,9 +2221,6 @@ class $$CycleEntriesTableOrderingComposer
       column: $table.mucusQuality,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get cervix => $composableBuilder(
-      column: $table.cervix, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<String> get cervixPosition => $composableBuilder(
       column: $table.cervixPosition,
       builder: (column) => ColumnOrderings(column));
@@ -2370,9 +2321,6 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<String> get mucusQuality => $composableBuilder(
       column: $table.mucusQuality, builder: (column) => column);
 
-  GeneratedColumn<String> get cervix =>
-      $composableBuilder(column: $table.cervix, builder: (column) => column);
-
   GeneratedColumn<String> get cervixPosition => $composableBuilder(
       column: $table.cervixPosition, builder: (column) => column);
 
@@ -2462,7 +2410,6 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<bool> excludeOther = const Value.absent(),
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
-            Value<String?> cervix = const Value.absent(),
             Value<String?> cervixPosition = const Value.absent(),
             Value<String?> cervixOpening = const Value.absent(),
             Value<String?> cervixFirmness = const Value.absent(),
@@ -2488,7 +2435,6 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             excludeOther: excludeOther,
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
-            cervix: cervix,
             cervixPosition: cervixPosition,
             cervixOpening: cervixOpening,
             cervixFirmness: cervixFirmness,
@@ -2514,7 +2460,6 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<bool> excludeOther = const Value.absent(),
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
-            Value<String?> cervix = const Value.absent(),
             Value<String?> cervixPosition = const Value.absent(),
             Value<String?> cervixOpening = const Value.absent(),
             Value<String?> cervixFirmness = const Value.absent(),
@@ -2540,7 +2485,6 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             excludeOther: excludeOther,
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
-            cervix: cervix,
             cervixPosition: cervixPosition,
             cervixOpening: cervixOpening,
             cervixFirmness: cervixFirmness,

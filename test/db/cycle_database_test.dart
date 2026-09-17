@@ -33,7 +33,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v7)', () {
+  group('schema & migration (v8)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -205,16 +205,21 @@ void main() {
       );
     });
 
-    test('the removed sex bool column is gone; firmness and timings exist',
-        () async {
+    test(
+        'the removed sex bool and free-text cervix columns are gone; firmness '
+        'and timings exist', () async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 6, 15),
         cervixFirmness: CervixFirmness.halfSoft,
         sexTimings: SexTiming.start.bit | SexTiming.end.bit,
       ));
-      // The old boolean column must not even be addressable any more.
+      // The old columns must not even be addressable any more.
       await expectLater(
         db.customSelect('SELECT sex FROM cycle_entries').get(),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customSelect('SELECT cervix FROM cycle_entries').get(),
         throwsA(isA<Exception>()),
       );
       // The replacements carry the observation in their decided shapes: the
@@ -287,7 +292,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 7,
+      expect(userVersion.data['user_version'], 8,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
@@ -417,7 +422,6 @@ void main() {
         excludeOther: true,
         mucusSign: MucusSign.s,
         mucusQuality: MucusQuality.ew,
-        cervix: 'closed, low',
         cervixPosition: CervixPosition.veryHigh,
         cervixOpening: CervixOpening.open,
         cervixFirmness: CervixFirmness.soft,

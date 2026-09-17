@@ -34,7 +34,6 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     excludeOther: e.excludeOther,
     mucusSign: mucus.sign,
     mucusQuality: mucus.quality,
-    cervix: e.cervix,
     cervixPosition: tryParseCervixPosition(e.cervixPosition),
     cervixOpening: tryParseCervixOpening(e.cervixOpening),
     cervixFirmness: tryParseCervixFirmness(e.cervixFirmness),
@@ -73,7 +72,6 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     // CHECK.
     mucusSign: Value(mucus.sign?.name),
     mucusQuality: Value(mucus.quality?.name),
-    cervix: Value(d.cervix),
     // Stable enum-name TEXT tokens (like mucusSign/mucusQuality); the CHECK
     // constraints on the columns accept exactly this vocabulary.
     cervixPosition: Value(d.cervixPosition?.name),

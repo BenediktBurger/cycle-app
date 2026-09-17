@@ -189,7 +189,6 @@ Future<void> main() async {
     excludeOther: true,
     mucusSign: MucusSign.s,
     mucusQuality: MucusQuality.gl,
-    cervix: 'closed, low',
     cervixPosition: CervixPosition.veryHigh,
     cervixOpening: CervixOpening.open,
     painBreast: true,

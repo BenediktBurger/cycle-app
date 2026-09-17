@@ -316,24 +316,20 @@ void main() {
       expect(e['mucus_quality'], isNull);
     });
 
-    test('cervix: english words, opening/firmness/position order, clamp', () {
+    test('cervix: the free-text composite key stays dropped', () {
+      // The owner re-confirmed (2026-09-17) that drip's free-text cervix
+      // composite stays dropped: the opening/firmness/position vocabulary
+      // indexes map ONLY into the structured fields (pinned in the
+      // structured and firmness tests below), never into a `cervix`
+      // string — whatever cells the row carries.
       expect(
           entryOf(
               cells('2026-01-01', {8: '1', 9: '1', 10: '1'}))['cervix'],
-          'medium, soft, medium');
-      expect(
-          entryOf(
-              cells('2026-01-01', {8: '2', 9: '0', 10: '0'}))['cervix'],
-          'open, hard, low');
-      // the specimen's firmness index 2 is out of range → clamps to soft
-      expect(
-          entryOf(
-              cells('2026-01-01', {8: '1', 9: '2', 10: '1'}))['cervix'],
-          'medium, soft, medium');
-      // partial observations still map
-      expect(entryOf(cells('2026-01-01', {8: '0'}))['cervix'], 'closed');
-      expect(entryOf(cells('2026-01-01', {10: '2'}))['cervix'], 'high');
-      // a fully empty triple → no cervix field
+          isNull);
+      // partial observations map only structurally, too
+      expect(entryOf(cells('2026-01-01', {8: '0'}))['cervix'], isNull);
+      expect(entryOf(cells('2026-01-01', {10: '2'}))['cervix'], isNull);
+      // and a fully empty triple carries no cervix key either
       expect(entryOf(cells('2026-01-01', {4: '2'}))['cervix'], isNull);
     });
 
@@ -551,14 +547,20 @@ void main() {
             reason: 'a recorded method contradicts the none confirmation');
       });
 
-      test('partner without any contraceptive info → not sex (ambiguous)', () {
-        // No generous defaults: only an explicit none=true confirms "no
-        // contraception"; absent columns are unknown, not "none".
+      test('partner with no contraceptive info at all → the sex observation '
+          '(absence of methods counts as none)', () {
+        // There is no explicit none=true requirement any more (owner
+        // decision, 2026-09-17): partner sex with no contraceptive method
+        // flag set — including no method column filled in at all — counts
+        // as partner sex without contraception. drip is a single
+        // non-authoritative import source; its absent method answer must
+        // not force the app's sex model to demand a positive "none"
+        // confirmation.
         final result = dripCsvToExportJson(dripOneRowCsv(
             sexHeader, sexCells('2026-01-01', {2: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
-        expect(e['sex_timings'], 0);
+        expect(e['sex_timings'], SexTiming.middle.bit);
         expect(e['notes'], '[sex] n');
       });
 
@@ -572,19 +574,16 @@ void main() {
         expect(e['notes'], '[sex] n');
       });
 
-      test('solo-only / partner-only / method-only rows are skipped entirely',
-          () {
+      test('solo-only / method-only rows are skipped entirely', () {
         // Unmappable sex flags alone are NOT data — the same rule as the
         // unmappable pain kinds (the row carries no other mapped field).
+        // Under the owner rule of 2026-09-17 partner-without-method IS
+        // mapped data, so the skipped set shrunk to the activity-less and
+        // solo-only variants.
         for (final Map<int, String> variant in [
           {1: 'true'}, // solo
-          {2: 'true'}, // partner, no contraceptive info
           {3: 'true'}, // condom
           {10: 'true'}, // none, no activity
-          {
-            1: 'true',
-            2: 'true',
-          }, // solo + partner without contraceptive info
         ]) {
           final result = dripCsvToExportJson(
               dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)));
@@ -594,13 +593,30 @@ void main() {
               reason: 'variant $variant is not data');
         }
       });
+
+      test('partner-only and solo+partner rows map (solo is ignored)', () {
+        // The mapping rule keys on partner plus the absence of a method;
+        // a co-recorded solo flag changes nothing about that.
+        for (final Map<int, String> variant in [
+          {2: 'true'}, // partner, no contraceptive info
+          {1: 'true', 2: 'true'}, // solo + partner
+        ]) {
+          final result = dripCsvToExportJson(
+              dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)));
+          expect(result.stats.rowsImported, 1,
+              reason: 'variant $variant is partner sex without contraception');
+          final doc = jsonDecode(result.json) as Map<String, Object?>;
+          final e = (doc['entries']! as List).single as Map<String, Object?>;
+          expect(e['sex_timings'], SexTiming.middle.bit,
+              reason: 'variant $variant maps to the middle time of day');
+        }
+      });
     });
 
     test('desire/sex/pain/mood: flags and note-only days', () {
       expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
-      // Solo sex and partner sex WITHOUT the positive "no contraception"
-      // confirmation are dropped (the detailed variants are pinned in the
-      // dedicated sex group below) — such rows carry no data at all.
+      // Solo sex maps to nothing (the detailed sex variants are pinned in
+      // the dedicated sex group below).
       final soloOnly =
           dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
             13: 'true',
@@ -612,9 +628,10 @@ void main() {
           dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
             14: 'true',
           })));
-      expect(partnerOnly.stats.rowsImported, 0,
-          reason: 'partner sex without contraception info is not mapped');
-      expect(partnerOnly.stats.rowsSkippedEmpty, 1);
+      expect(partnerOnly.stats.rowsImported, 1,
+          reason: 'partner sex without a method flag is mapped data '
+              '(no explicit none needed)');
+      expect(partnerOnly.stats.rowsSkippedEmpty, 0);
       // contraceptive columns are ignored (no model for them) — a row with
       // no activity beyond them is data-less and skipped entirely (its
       // stats are pinned separately below)
@@ -789,7 +806,9 @@ void main() {
           entries.where((e) => e['date'] == date).single;
       // mucus day: value 2 ('f') wins over the 2+1 parts, firmness clamps
       expect(by('2026-07-15')['mucus_sign'], 'f');
-      expect(by('2026-07-15')['cervix'], 'medium, soft, medium');
+      expect(by('2026-07-15')['cervix'], isNull,
+          reason: 'the free-text cervix composite stays dropped; the '
+              'firmness index maps only into the structured field');
       expect(by('2026-07-15')['cervix_firmness'], 'soft',
           reason: 'the specimen firmness index 2 clamps to soft, also '
               'in the structured field');
@@ -807,15 +826,16 @@ void main() {
       // desire + mood-flag day
       expect(by('2026-08-20')['desire'], true);
       expect(by('2026-08-20')['mood'], true);
-      // Sex observations: only with-partner-without-contraception days map
-      // to the sex timings mask. The specimen's sex days all fail that
-      // rule — 2026-07-17 (partner WITH a condom), 2026-08-16 (partner,
-      // but the only contraceptive info is condom=false/pill=false: no
-      // explicit none, the rest unknown → ambiguous, dropped entirely),
-      // 2026-09-12 (solo) — so no day carries a set sex_timings mask.
-      expect(entries.any((e) => e['date'] == '2026-08-16'), isFalse,
-          reason: 'ambiguous partner day without contraception info: '
-              'not sex, not data');
+      // Sex observations: partner days without a contraceptive method map
+      // to the sex timings mask (an unfilled method column counts as "no
+      // method" — owner rule of 2026-09-17). Of the specimen's sex days
+      // only 2026-08-16 passes that rule (partner, the only contraceptive
+      // info being condom=false/pill=false); 2026-07-17 carries a condom
+      // and 2026-09-12 is solo — both stay mask-free.
+      final noMethodNamed = by('2026-08-16');
+      expect(noMethodNamed['sex_timings'], SexTiming.middle.bit,
+          reason: 'partner with condom=false/pill=false and nothing else: '
+              'no method flag set → the mapped variant');
       final withCondom = by('2026-07-17');
       expect(withCondom['sex_timings'], 0,
           reason: 'partner sex with a condom is not the mapped variant');
