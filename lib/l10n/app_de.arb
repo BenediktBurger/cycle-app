@@ -134,14 +134,8 @@
   "cycleSheetRemoveSuzEvening": "SUZ ab heute Abend entfernen",
   "cycleSheetSetSuzMorning": "SUZ ab heute Morgen",
   "cycleSheetRemoveSuzMorning": "SUZ ab heute Morgen entfernen",
-  "cycleSheetSuzSuggestion": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend (Regel {rule})",
-  "@cycleSheetSuzSuggestion": {
-    "placeholders": {
-      "rule": {
-        "type": "String"
-      }
-    }
-  },
+  "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend (Regel D)",
+  "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh (Regel E)",
   "cycleLegendMeasuredAt": "Messzeitpunkt",
   "cycleLegendSex": "Sex",
   "cycleLegendPain": "Schmerz (B Brust, M Mittelschmerz)",

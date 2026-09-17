@@ -8,11 +8,13 @@
 // removes the other) — plus the computed info lines for the day.
 //
 // The SUZ suggestion follows the locked decision (the app SUGGESTS, the
-// user PLACES): on the computed suzBeginsEvening day the sheet shows a
-// suggestion line naming which rule (D/E) fired — as long as NO user SUZ
-// mark exists anywhere in that cycle. The computed SUZ is never persisted
-// and never renders on the chart; a manual SUZ mark in turn never alters
-// the arithmetic (compute-only separation, ADR-0001).
+// user PLACES): on the computed suzBegins day the sheet shows a suggestion
+// line naming which rule (D/E) fired, with the rule's time of day — rule D
+// suggests the EVENING phrasing (the SUZ begins that evening, "gegen
+// Abendessen"), rule E the MORNING phrasing (the SUZ begins that morning) —
+// as long as NO user SUZ mark exists anywhere in that cycle. The computed
+// SUZ is never persisted and never renders on the chart; a manual SUZ mark
+// in turn never alters the arithmetic (compute-only separation, ADR-0001).
 //
 // HARD RULE (ADR-0001): the user places marks, the app only computes. The
 // sheet writes nothing derived — mark toggles go through the MarksDao
@@ -160,8 +162,9 @@ final class CycleDaySheet extends ConsumerWidget {
   /// only on the day after the break — the domain does not report the break
   /// day, and the whole-cycle notice reads clearly enough in practice.
   ///
-  /// On the computed suzBeginsEvening day the sheet shows the SUZ
-  /// suggestion (naming which rule fired) as long as NO user SUZ mark
+  /// On the computed suzBegins day the sheet shows the SUZ
+  /// suggestion (naming which rule fired and its time of day — evening for
+  /// rule D, morning for rule E) as long as NO user SUZ mark
   /// exists anywhere in that cycle — the app suggests, the user places.
   ///
   /// Empty when no evaluation data exists for the day (no marks yet, or the
@@ -215,17 +218,23 @@ final class CycleDaySheet extends ConsumerWidget {
         }
       }
       // The SUZ suggestion (locked decision: the app suggests, the user
-      // places): only on the computed suzBeginsEvening day, naming which
-      // rule (D/E) fired, and only while NO user SUZ mark exists anywhere
-      // in that cycle. The computed SUZ is never persisted; a manual SUZ
-      // mark never alters this arithmetic in return (compute-only
-      // separation, ADR-0001).
-      final suzEvening = evaluation.suzBeginsEvening;
-      if (suzEvening != null &&
-          DateOnly.sameDay(suzEvening, day) &&
+      // places): only on the computed suzBegins day, naming which rule
+      // (D/E) fired with that rule's time of day (D → evening phrasing,
+      // E → morning phrasing — the rule-to-time mapping lives on SuzRule
+      // in lib/domain/evaluation.dart), and only while NO user SUZ mark
+      // exists anywhere in that cycle. The computed SUZ is never persisted;
+      // a manual SUZ mark never alters this arithmetic in return
+      // (compute-only separation, ADR-0001).
+      final suzDay = evaluation.suzBegins;
+      if (suzDay != null &&
+          DateOnly.sameDay(suzDay, day) &&
           !_cycleHasSuzMark(evaluations, e, marks)) {
+        final line = switch (evaluation.suzRule!) {
+          SuzRule.d => l10n.cycleSheetSuzSuggestionEvening,
+          SuzRule.e => l10n.cycleSheetSuzSuggestionMorning,
+        };
         lines.add((
-          l10n.cycleSheetSuzSuggestion(evaluation.suzRule!.name.toUpperCase()),
+          line,
           const ValueKey('cycleSheetSuzSuggestion'),
         ));
       }

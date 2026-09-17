@@ -9,7 +9,7 @@
 // from the marks stream), the 1–6 low numbering, the baseline SEGMENT from
 // low #6 to the last marked candidate (R10) and the user-placed SUZ bars
 // (sicher unfruchtbare Zeit; ONLY user-placed marks render — the computed
-// suzBeginsEvening drives the sheet's suggestion instead).
+// suzBegins drives the sheet's suggestion instead).
 // lib/ui/cycle_marks.dart over evaluateCycles. No derived artifact is
 // persisted; the SUZ arithmetic stays domain-only and a manual SUZ mark
 // never alters it (see lib/domain/evaluation.dart).
@@ -525,7 +525,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                 // suzEvening) plus a right-pointing arrow
                                 // whose base starts at the bar. Only
                                 // user-placed marks render — the computed
-                                // suzBeginsEvening drives the sheet's
+                                // suzBegins drives the sheet's
                                 // suggestion instead, never the chart.
                                 // The bar rides inside fl_chart as a
                                 // two-spot bar; only the small arrow glyph

@@ -13,8 +13,10 @@
 // candidate from the marked rise onward is an ARROW while the mucus peak is
 // unset or the day is at or before the peak day, and a CIRCLE after the peak
 // day. Ordinals count WITHIN each kind (arrows 1–4, circles 1–4); the circle
-// ordinal drives the SUZ rules D/E, the arrow ordinal expresses the arrow
-// cap. Candidates beyond their kind's cap stay in the sequence unnumbered.
+// ordinal drives the SUZ rules D/E — rule D begins the SUZ the EVENING of
+// the 3rd circle (≥ +0.2 K above the baseline), rule E the MORNING of the
+// 4th circle (any margin) — the arrow ordinal expresses the arrow cap.
+// Candidates beyond their kind's cap stay in the sequence unnumbered.
 //
 // Anchors (owner-confirmed): the MOST RECENT mark of each type inside a
 // cycle drives the evaluation — the latest mucus-peak mark ("Höhepunkt =
@@ -163,7 +165,7 @@ void main() {
     test('SUZ begins the evening of the 3rd circle via rule D', () {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
       expect(e.suzRule, SuzRule.d);
       expect(e.evaluationStopped, isFalse);
     });
@@ -190,7 +192,7 @@ void main() {
       expect(e.higherMeasurements, isEmpty);
       // R10: no marked candidate → no baseline segment.
       expect(e.baselineSpan, isNull);
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -215,7 +217,7 @@ void main() {
         [(10, MarkKind.circle, 1)],
       );
       expect(e.higherMeasurements.single.differenceK, closeTo(0.01, 1e-9));
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
     });
   });
 
@@ -247,7 +249,7 @@ void main() {
           (13, MarkKind.circle, 3),
         ],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
       expect(e.suzRule, SuzRule.d);
       expect(e.evaluationStopped, isFalse);
     });
@@ -275,7 +277,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.ordinal)),
         [(10, 1), (12, 2), (13, 3)],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -312,7 +314,7 @@ void main() {
         ],
       );
       expect(e.evaluationStopped, isFalse);
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
     });
 
     test(
@@ -343,7 +345,7 @@ void main() {
           (11, MarkKind.arrow, 2),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isTrue);
     });
 
@@ -372,7 +374,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isTrue);
     });
@@ -400,7 +402,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isTrue);
     });
 
@@ -428,7 +430,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
   });
@@ -471,7 +473,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(20, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -499,7 +501,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(11, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
   });
@@ -554,7 +556,7 @@ void main() {
       // only, and without circles there is nothing to count (the
       // TODO(user-review) in lib/domain/evaluation.dart cites the cheat
       // sheet's "umrandete" wording).
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
     });
@@ -596,7 +598,7 @@ void main() {
       );
       // Only two circles so far: neither rule D (needs a 3rd circle) nor
       // rule E (needs a 4th) has triggered.
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
     });
@@ -615,7 +617,7 @@ void main() {
           (12, MarkKind.circle, 2),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -638,7 +640,7 @@ void main() {
           (13, MarkKind.circle, 1),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -676,7 +678,7 @@ void main() {
           (18, MarkKind.circle, 4), // rule E fires here (any margin)
         ],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 18)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 18)));
       expect(e.suzRule, SuzRule.e);
       expect(e.evaluationStopped, isFalse);
     });
@@ -703,7 +705,7 @@ void main() {
           (14, MarkKind.arrow, null),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
   });
@@ -766,7 +768,7 @@ void main() {
       // Rules D/E count circles only; under the late peak the 3rd circle
       // (36.7 ≥ 36.4 + 0.2) triggers rule D on Mar 15 — NOT on Mar 12
       // (which would be the 3rd circle under an early-peak anchor).
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 15)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 15)));
       expect(e.suzRule, SuzRule.d);
       expect(e.evaluationStopped, isFalse);
     });
@@ -857,7 +859,7 @@ void main() {
           (12, MarkKind.arrow, 3),
         ],
       );
-      expect(e.suzBeginsEvening, isNull,
+      expect(e.suzBegins, isNull,
           reason: 'an all-arrow sequence yields no circles, so rules D and '
               'E cannot fire — even though the 3rd candidate is ≥ +0.2 K');
       expect(e.suzRule, isNull);
@@ -915,7 +917,7 @@ void main() {
           (14, MarkKind.circle, 2),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse,
           reason: 'the re-anchored sequence is simply short — no break');
     });
@@ -947,14 +949,14 @@ void main() {
       // 36.4 + 0.2 is binary-floating-point-imprecise; the arithmetic must
       // still recognize 36.6 as exactly +0.2 K (epsilon in
       // lib/domain/evaluation.dart).
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 14)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 14)));
       expect(e.suzRule, SuzRule.d);
       expect(e.evaluationStopped, isFalse);
     });
 
     test(
         'rule E: 3rd circle below the margin, 4th circle at ANY margin → '
-        'SUZ that evening of the 4th circle', () {
+        'SUZ begins the MORNING of the 4th circle', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -982,7 +984,11 @@ void main() {
           (13, MarkKind.circle, 4),
         ],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)),
+          reason: 'rule E: the SUZ begins the MORNING of the 4th circled '
+              'measurement day — the D→evening / E→morning mapping IS the '
+              'time-of-day semantics: the domain reports the day plus the '
+              'rule, the sheet renders the matching phrasing');
       expect(e.suzRule, SuzRule.e);
       expect(e.evaluationStopped, isFalse);
     });
@@ -1015,7 +1021,7 @@ void main() {
           (12, MarkKind.circle, 3),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse,
           reason: 'the data simply ran out — not a connectedness break');
@@ -1055,7 +1061,7 @@ void main() {
           (14, MarkKind.circle, 3),
         ],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 14)),
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 14)),
           reason: 'the 3rd circle (Mar 14) triggers rule D — not the 3rd '
               'candidate (Mar 12), which was only the 1st circle');
       expect(e.suzRule, SuzRule.d);
@@ -1092,7 +1098,7 @@ void main() {
           (12, MarkKind.circle, 3),
         ],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isTrue);
     });
@@ -1115,7 +1121,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.higherMeasurements, hasLength(2));
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
     });
@@ -1154,7 +1160,7 @@ void main() {
           (13, MarkKind.circle, 3),
         ],
       );
-      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -1181,7 +1187,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isTrue);
     });
   });
@@ -1484,7 +1490,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
     });
   });
 
@@ -1516,7 +1522,7 @@ void main() {
         e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.arrow, 1)],
       );
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -1544,7 +1550,7 @@ void main() {
       expect(e.baseline, isNull);
       expect(e.higherMeasurements, isEmpty);
       expect(e.baselineSpan, isNull);
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -1601,7 +1607,7 @@ void main() {
           (13, MarkKind.circle, 3),
         ],
       );
-      expect(a.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(a.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
       expect(a.suzRule, SuzRule.d);
       expect(a.evaluationStopped, isFalse);
 
@@ -1610,7 +1616,7 @@ void main() {
       expect(b.firstHigherDay, DateOnly.normalize(DateTime(2026, 4, 14)));
       expect(b.baseline!.value, 36.4);
       expect(b.baseline!.date, DateOnly.normalize(DateTime(2026, 4, 9)));
-      expect(b.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 4, 16)));
+      expect(b.suzBegins, DateOnly.normalize(DateTime(2026, 4, 16)));
       expect(b.suzRule, SuzRule.d);
       expect(b.evaluationStopped, isFalse);
     });
@@ -1637,7 +1643,7 @@ void main() {
       expect(e.firstHigherDay, isNull);
       expect(e.numberedLows, isEmpty);
       expect(e.higherMeasurements, isEmpty);
-      expect(e.suzBeginsEvening, isNull);
+      expect(e.suzBegins, isNull);
     });
 
     test('empty input yields no evaluations', () {

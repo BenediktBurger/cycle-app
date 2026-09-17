@@ -18,7 +18,7 @@
 // driven from the marks stream so peaks render even when no evaluation
 // exists). The SUZ renders ONLY user-placed marks (a vertical bar spanning
 // the plot height plus a right-pointing arrow from the bar); the computed
-// suzBeginsEvening drives the sheet's suggestion instead — clean
+// suzBegins drives the sheet's suggestion instead — clean
 // compute-only/manual separation. Rendered across fl_chart's dot painters +
 // line bars, with the glyph shapes painted by hand where fl_chart has no
 // facility (ADR-0004 anticipates this custom-paint fallback — used here
@@ -142,7 +142,7 @@ final class EvaluationOverlay {
 
   /// The user-placed SUZ marks (suzMorning/suzEvening), one overlay entry
   /// per mark inside an evaluated cycle. ONLY user-placed SUZ marks are
-  /// listed — the computed suzBeginsEvening drives the sheet's suggestion
+  /// listed — the computed suzBegins drives the sheet's suggestion
   /// and never renders here.
   final List<SuzOverlayMark> suzMarks;
 }

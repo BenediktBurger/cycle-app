@@ -675,7 +675,7 @@ void main() {
 
     testWidgets(
         'no SUZ glyph renders without a user mark — the computed '
-        'suzBeginsEvening suggests only, it never renders', (tester) async {
+        'suzBegins suggests only, it never renders', (tester) async {
       // The main scenario's arithmetic fires rule D on 9/16 — but no user
       // SUZ mark exists, so the chart draws no SUZ bar and no arrow.
       await tester.pumpWidget(_harness(entries: _entries, marks: _marks));

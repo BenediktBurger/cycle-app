@@ -8,7 +8,7 @@
 // (CycleMarkTypes.mucusPeakDay) and the first higher measurement
 // (CycleMarkTypes.firstHigherMeasurement); the 1–6 numbering, the baseline,
 // the circled/arrowed higher measurements, the baseline segment and the SUZ
-// evening date are derived.
+// start day are derived.
 //
 // Rules implemented here (owner-reviewed; the per-candidate mark kinds and
 // the baseline segment are the latest owner corrections):
@@ -53,11 +53,12 @@
 //       speaks of the "umrandete" — circled — higher measurement; the
 //       circle ordinal within its own kind drives the trigger, arrows never
 //       start the SUZ). D: the 3rd CIRCLE at least 0.2 K above the baseline
-//       starts the SUZ that evening ("gegen Abendessen"). E: when the 3rd
-//       circle is below that margin, the 4th CIRCLE — ANY margin — starts
-//       the SUZ that evening. Both require R2 connectedness; a break before
-//       the trigger leaves the SUZ undetermined. Once a rule fires the
-//       sequence is complete — later candidates stay unmarked.
+//       starts the SUZ the EVENING of that day ("gegen Abendessen"). E:
+//       when the 3rd circle is below that margin, the 4th CIRCLE — ANY
+//       margin — starts the SUZ in the MORNING of that day. Both require
+//       R2 connectedness; a break before the trigger leaves the SUZ
+//       undetermined. Once a rule fires the sequence is complete — later
+//       candidates stay unmarked.
 //   R7  Every marked candidate carries its difference to the baseline
 //       (differenceK) so the UI can render it without arithmetic.
 //   R9  The six-low numbering and the baseline are unchanged (see the
@@ -142,10 +143,17 @@ import 'models.dart';
 /// (the peak day's own above-baseline candidate is an arrow).
 enum MarkKind { circle, arrow }
 
-/// Which SUZ rule determined the SUZ evening: D (3rd circled candidate
-/// ≥ 0.2 K above the baseline) or E (4th circled candidate at any margin,
-/// after a 3rd circle below that margin). Null while the SUZ is not yet
-/// determined.
+/// Which SUZ rule determined the SUZ start. The rule also fixes the
+/// time of day the SUZ begins at (the D→evening / E→morning mapping IS the
+/// time-of-day semantics — the domain reports only the day, see
+/// [CycleEvaluation.suzBegins]):
+///
+/// - [d]: the 3rd circled candidate ≥ 0.2 K above the baseline — the SUZ
+///   begins the EVENING of that day ("gegen Abendessen").
+/// - [e]: the 4th circled candidate at any margin, after a 3rd circle below
+///   that margin — the SUZ begins the MORNING of that day.
+///
+/// Null while the SUZ is not yet determined.
 enum SuzRule { d, e }
 
 /// One of the (up to) six numbered low measurements before the first higher
@@ -241,7 +249,7 @@ final class CycleEvaluation {
     required this.baseline,
     required this.higherMeasurements,
     required this.baselineSpan,
-    required this.suzBeginsEvening,
+    required this.suzBegins,
     required this.suzRule,
     required this.evaluationStopped,
   });
@@ -275,14 +283,20 @@ final class CycleEvaluation {
   /// marked candidate (no segment is drawn).
   final BaselineSpan? baselineSpan;
 
-  /// The evening date on which the sicher unfruchtbare Zeit begins, or null
-  /// when rules D and E have not triggered (fewer than three/four CIRCLED
+  /// The day on which the sicher unfruchtbare Zeit begins, or null when
+  /// rules D and E have not triggered (fewer than three/four CIRCLED
   /// candidates, a sequence without circles, or a connectedness break).
-  final DateTime? suzBeginsEvening;
+  ///
+  /// The time of day follows the rule (owner-corrected): under rule D the
+  /// SUZ begins the EVENING of this day ("gegen Abendessen"); under rule E
+  /// it begins the MORNING of this day. The domain carries only the day —
+  /// the rule-to-time mapping lives on [SuzRule] and the sheet renders the
+  /// matching phrasing. Computed only, never persisted.
+  final DateTime? suzBegins;
 
-  /// Which rule determined [suzBeginsEvening]: D (3rd circled candidate
-  /// ≥ 0.2 K) or E (4th circled candidate at any margin). Null while the
-  /// SUZ is not determined.
+  /// Which rule determined [suzBegins]: D (3rd circled candidate ≥ 0.2 K —
+  /// SUZ that evening) or E (4th circled candidate at any margin — SUZ that
+  /// morning). Null while the SUZ is not determined.
   final SuzRule? suzRule;
 
   /// True when the automatic evaluation stopped mid-sequence (R2: more
@@ -504,7 +518,7 @@ CycleEvaluation _evaluateCycle(
   // transition — the kind changes per candidate, the connectedness does not.
   final higherMeasurements = <HigherMeasurement>[];
   var evaluationStopped = false;
-  DateTime? suzBeginsEvening;
+  DateTime? suzBegins;
   SuzRule? suzRule;
   BaselineSpan? baselineSpan;
 
@@ -581,8 +595,9 @@ CycleEvaluation _evaluateCycle(
         if (ordinal == 3) {
           if (value >= baseline.value + _suzRuleDAboveBaselineK - _epsilon) {
             // Rule D: the 3rd circled candidate is at least 0.2 K above
-            // the baseline — SUZ begins this evening ("gegen Abendessen").
-            suzBeginsEvening = day;
+            // the baseline — SUZ begins this EVENING ("gegen Abendessen");
+            // the rule carries the time of day (see SuzRule).
+            suzBegins = day;
             suzRule = SuzRule.d;
             break;
           }
@@ -590,8 +605,8 @@ CycleEvaluation _evaluateCycle(
         } else if (ordinal == 4) {
           // Rule E: the 3rd circle was below the margin (rule D would have
           // fired and ended the sequence otherwise), so the 4th circle —
-          // ANY margin — starts the SUZ.
-          suzBeginsEvening = day;
+          // ANY margin — starts the SUZ, in the MORNING of this day.
+          suzBegins = day;
           suzRule = SuzRule.e;
           break;
         }
@@ -624,7 +639,7 @@ CycleEvaluation _evaluateCycle(
     baseline: baseline,
     higherMeasurements: List.unmodifiable(higherMeasurements),
     baselineSpan: baselineSpan,
-    suzBeginsEvening: suzBeginsEvening,
+    suzBegins: suzBegins,
     suzRule: suzRule,
     evaluationStopped: evaluationStopped,
   );
