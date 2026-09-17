@@ -95,7 +95,8 @@ void main() {
       );
       expect(e.numberedLows.map((l) => l.value),
           [36.1, 36.0, 36.1, 36.3, 36.2, 36.4]);
-      // Mar 3 stays unnumbered: it is the 7th usable day before the rise.
+      // Mar 3 stays unnumbered: it is the 8th usable day before the rise
+      // (Mar 4 is the 7th; both fall outside the 1–6 window).
     });
 
     test('draws the baseline through the HIGHEST of the six lows', () {
@@ -443,7 +444,9 @@ void main() {
         d(2026, 3, 7, t: 36.2),
         d(2026, 3, 8, t: 36.3),
         d(2026, 3, 9, t: 36.2),
-        d(2026, 3, 10, t: 36.3), // peak day — 7th usable, outside the window
+        d(2026, 3, 10, t: 36.3), // peak day — the 8th usable day in this
+        // cycle's data, so INSIDE the six-low window: Mar 11 is low #1,
+        // this day low #2.
         d(2026, 3, 11, t: 36.4), // exactly at the baseline → NOT higher
         d(2026, 3, 12, t: 36.6), // exactly +0.2 K → higher (1st circled)
       ];

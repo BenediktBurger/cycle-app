@@ -287,7 +287,7 @@ class _NumberCell extends StatelessWidget {
 /// The arrow-up glyph as a standalone widget for the legend, painted with
 /// the exact shape the chart's [ArrowUpDotPainter] uses.
 final class ArrowUpGlyph extends StatelessWidget {
-  const ArrowUpGlyph({super.key, this.color = Colors.black});
+  const ArrowUpGlyph({super.key, required this.color});
 
   final Color color;
 
