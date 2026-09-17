@@ -186,8 +186,8 @@ void main() {
     expect(_bbtText(tester), '36.4',
         reason: 'the discarded edit never reached the database');
 
-    final stored1 = await _db!.entriesDao.entryFor(1, _day1);
-    final stored2 = await _db!.entriesDao.entryFor(1, _day2);
+    final stored1 = await _db!.entriesDao.entryFor(defaultProfileId, _day1);
+    final stored2 = await _db!.entriesDao.entryFor(defaultProfileId, _day2);
     expect(stored1!.bbtC, 36.4,
         reason: 'navigation must not write the unsaved edit');
     expect(stored2!.bbtC, 36.9);

@@ -316,45 +316,50 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // The measurement time is metadata OF the temperature (the
               // domain model never stores it without one — see
               // DailyEntry.measuredAtMinutes), so the row only shows while
-              // a temperature is entered. When it does, a fresh day is
-              // prefilled with the current time (see _applyEntry); explicit
-              // clearing sets "not recorded".
+              // a temperature that can actually be saved is entered: the
+              // same plausibility gate the validator applies
+              // (isWithinBbtRange) — an implausible number like "999"
+              // exposes the row just as little as an unparsable one. When
+              // it shows, a fresh day is prefilled with the current time
+              // (see _applyEntry); explicit clearing sets "not recorded".
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: _bbtController,
-                builder: (context, value, _) =>
-                    parseDecimalInput(value.text) == null
-                        ? const SizedBox.shrink()
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.schedule_outlined),
-                                  const SizedBox(width: 8),
-                                  Text(l10n.measuredTime),
-                                  const Spacer(),
-                                  OutlinedButton(
-                                    onPressed: _pickTime,
-                                    child: Text(
-                                      _measuredAt == null
-                                          ? l10n.measuredTimeUnset
-                                          : MaterialLocalizations.of(
-                                              context,
-                                            ).formatTimeOfDay(_measuredAt!),
-                                    ),
+                builder: (context, value, _) {
+                  final parsed = parseDecimalInput(value.text);
+                  return parsed == null || !isWithinBbtRange(parsed)
+                      ? const SizedBox.shrink()
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule_outlined),
+                                const SizedBox(width: 8),
+                                Text(l10n.measuredTime),
+                                const Spacer(),
+                                OutlinedButton(
+                                  onPressed: _pickTime,
+                                  child: Text(
+                                    _measuredAt == null
+                                        ? l10n.measuredTimeUnset
+                                        : MaterialLocalizations.of(
+                                            context,
+                                          ).formatTimeOfDay(_measuredAt!),
                                   ),
-                                  if (_measuredAt != null)
-                                    IconButton(
-                                      icon: const Icon(Icons.close),
-                                      onPressed: () =>
-                                          setState(() => _measuredAt = null),
-                                      tooltip: l10n.measuredTimeUnset,
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                          ),
+                                ),
+                                if (_measuredAt != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () =>
+                                        setState(() => _measuredAt = null),
+                                    tooltip: l10n.measuredTimeUnset,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                },
               ),
               // --- bleeding --------------------------------------------
               // All five levels of the numeric scale, none first. Wrap of

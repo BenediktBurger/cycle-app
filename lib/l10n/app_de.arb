@@ -176,6 +176,7 @@
   "languageEnglish": "English",
   "settingsThemeMode": "Design",
   "settingsThemeModeNote": "Nur im Speicher — nach Neuladen wieder Einstellung „System“ (geplant: persistenter Speicher).",
+  "themeSystem": "System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",

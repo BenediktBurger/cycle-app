@@ -179,6 +179,7 @@
   "languageEnglish": "English",
   "settingsThemeMode": "Theme",
   "settingsThemeModeNote": "In-memory only — reverts to the System setting after reload (persistent storage planned).",
+  "themeSystem": "System",
   "themeLight": "Light",
   "themeDark": "Dark",
   "settingsPinLock": "PIN lock (placeholder)",

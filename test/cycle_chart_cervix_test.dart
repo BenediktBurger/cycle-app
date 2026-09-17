@@ -57,8 +57,6 @@ void main() {
     // (ValueKey convention 'symbolCell-$i'): low..unreachable days 0..4, day
     // 5 carries NO Muttermund observation and must render no glyph. The
     // scoping matters: the legend shows a sample glyph too.
-    Finder cell(int i) => find.descendant(
-        of: find.byKey(ValueKey('symbolCell-$i')), matching: find.text(''));
     final glyphOf = {
       0: 't', // low (tief)
       1: 'm', // medium
@@ -76,8 +74,18 @@ void main() {
             'curve inside its own cell',
       );
     }
-    expect(cell(5), findsNothing,
-        reason: 'no glyph for a day without an observation');
+    // Negative assertion against ALL five glyph letters (not a vacuous
+    // find.text('') match): day 5 has no cervix observation, so none of
+    // them may appear inside its symbol cell.
+    for (final glyph in glyphOf.values) {
+      expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('symbolCell-5')),
+            matching: find.text(glyph)),
+        findsNothing,
+        reason: 'no "$glyph" glyph for a day without an observation',
+      );
+    }
   });
 
   testWidgets('the legend names the Muttermund symbol', (tester) async {

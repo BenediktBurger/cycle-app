@@ -336,6 +336,57 @@ void main() {
       expect(entryOf(cells('2026-01-01', {4: '2'}))['cervix'], isNull);
     });
 
+    test(
+        'cervix: structured tokens decode the 0-based vocabulary indexes '
+        'by position, out-of-range → null', () {
+      // The structured observation (_cervixObservation) is INDEX-based:
+      // position {0: low, 1: medium, 2: high}, opening {0: closed,
+      // 1: middle, 2: open}. These pins exist so an enum reorder or an
+      // index shift (CervixPosition.values[p]) fails loudly here instead of
+      // silently importing shifted values. Header indices: 8 = opening,
+      // 10 = position.
+      // position 0/1/2 → low/medium/high, with a neutral opening.
+      expect(entryOf(cells('2026-01-01', {10: '0', 8: '0'}))['cervix_position'],
+          'low');
+      expect(entryOf(cells('2026-01-01', {10: '1', 8: '0'}))['cervix_position'],
+          'medium');
+      expect(entryOf(cells('2026-01-01', {10: '2', 8: '0'}))['cervix_position'],
+          'high');
+      // opening 0/1/2 → closed/middle/open (drip's "medium" → cycle-app's
+      // "middle" — same value, different storage name), with a neutral
+      // position.
+      expect(entryOf(cells('2026-01-01', {8: '0', 10: '0'}))['cervix_opening'],
+          'closed');
+      expect(entryOf(cells('2026-01-01', {8: '1', 10: '0'}))['cervix_opening'],
+          'middle');
+      expect(entryOf(cells('2026-01-01', {8: '2', 10: '0'}))['cervix_opening'],
+          'open');
+      // Out-of-range indexes → null for THAT dimension only; the other
+      // dimension (and the clamping free-text line) keep their values. The
+      // bleeding cell keeps the row a data row in the non-numeric case.
+      expect(entryOf(cells('2026-01-01', {10: '3', 8: '1'}))['cervix_position'],
+          isNull, reason: 'position index 3 is outside 0..2');
+      expect(entryOf(cells('2026-01-01', {10: '3', 8: '1'}))['cervix_opening'],
+          'middle');
+      expect(entryOf(cells('2026-01-01', {8: '7', 10: '1'}))['cervix_opening'],
+          isNull, reason: 'opening index 7 is outside 0..2');
+      expect(entryOf(cells('2026-01-01', {8: '7', 10: '1'}))['cervix_position'],
+          'medium');
+      expect(entryOf(cells('2026-01-01', {10: '-1', 8: '0'}))['cervix_position'],
+          isNull, reason: 'a negative index is out of range');
+      // Non-numeric cells never map structurally (they also stay out of
+      // the clamping free text), so the row needs another data anchor.
+      expect(entryOf(cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))
+          ['cervix_opening'], isNull);
+      expect(entryOf(cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))
+          ['cervix_position'], isNull);
+      // Absent columns behave like empty cells (no structured tokens).
+      final absent =
+          entryOf(['2026-01-01', '2'], header: ['date', 'bleeding.value']);
+      expect(absent['cervix_position'], isNull);
+      expect(absent['cervix_opening'], isNull);
+    });
+
     test('desire: intensity values 0/1/2 count, literal false does not', () {
       // drip's desire vocabulary is 0=low/1=medium/2=high — not a boolean;
       // any present value means "desire happened", intensity is lost.

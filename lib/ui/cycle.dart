@@ -752,12 +752,15 @@ final class _SymbolCell extends StatelessWidget {
     if (entry == null) {
       return const SizedBox(height: 38);
     }
+    // The null check above makes the bang safe once; everything below reads
+    // the promoted value through this local instead of repeating `entry!`.
+    final day = entry!;
     // Bleeding marker (top): none draws nothing; spotting is the hollow
     // ring; light..heavy fill the circle with the error color at the same
     // graded opacity as the diary day tiles (light 0.6 / medium 0.8 /
     // heavy 1.0), so the heaviness reads the same in both views.
     final bleedingColor = Theme.of(context).colorScheme.error;
-    final bleeding = entry!.bleeding;
+    final bleeding = day.bleeding;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -820,8 +823,8 @@ final class _SymbolCell extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: MucusSymbolText(
               display: mucusDisplay(
-                sign: entry!.mucusSign,
-                quality: entry!.mucusQuality,
+                sign: day.mucusSign,
+                quality: day.mucusQuality,
               ),
               fontSize: 9,
               color: Theme.of(context).colorScheme.tertiary,
@@ -835,13 +838,13 @@ final class _SymbolCell extends StatelessWidget {
         // TODO(user-review) in cervix.dart. Neutral on-surface ink: no
         // scheme hue is claimed, so the glyph cannot be confused with the
         // temperature/bleeding/mucus/baseline signal colors.
-        if (entry!.cervixPosition != null)
+        if (day.cervixPosition case final position?)
           SizedBox(
             height: 10,
             child: Align(
               alignment: Alignment.topCenter,
               child: Text(
-                cervixPositionSymbol(entry!.cervixPosition!),
+                cervixPositionSymbol(position),
                 style: TextStyle(
                   fontSize: 9,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -863,7 +866,7 @@ final class _SymbolCell extends StatelessWidget {
         // TODO(user-review): the NER cheat sheet defines no measurement-
         // time glyph — the clock icon is an ad-hoc display choice the
         // experts may want replaced (e.g. by a scheme-conform mark).
-        if (entry!.measuredAtMinutes != null)
+        if (day.measuredAtMinutes != null)
           SizedBox(
             height: 10,
             child: Align(
@@ -886,7 +889,7 @@ final class _SymbolCell extends StatelessWidget {
         // TODO(user-review): the X is the provisional glyph from the
         // product wishlist; experts may want a different mark (and the
         // time-of-day distinction once the data model carries it).
-        if (entry!.sex)
+        if (day.sex)
           SizedBox(
             height: 10,
             child: Align(
@@ -912,14 +915,14 @@ final class _SymbolCell extends StatelessWidget {
         // TODO(user-review): the letters mirror the vocabulary of the
         // entry form ("Brustschmerzen (B)" / "Mittelschmerz (M)") — the
         // same ad-hoc glyph caveat as the cervix letters applies.
-        if (entry!.painBreast || entry!.painMittelschmerz)
+        if (day.painBreast || day.painMittelschmerz)
           SizedBox(
             height: 10,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (entry!.painBreast)
+                if (day.painBreast)
                   Text(
                     'B',
                     style: TextStyle(
@@ -927,9 +930,9 @@ final class _SymbolCell extends StatelessWidget {
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
-                if (entry!.painBreast && entry!.painMittelschmerz)
+                if (day.painBreast && day.painMittelschmerz)
                   const SizedBox(width: 1),
-                if (entry!.painMittelschmerz)
+                if (day.painMittelschmerz)
                   Text(
                     'M',
                     style: TextStyle(

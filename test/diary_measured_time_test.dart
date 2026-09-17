@@ -98,6 +98,21 @@ void main() {
             'prefill');
   });
 
+  testWidgets('an implausible temperature keeps the time row hidden',
+      (WidgetTester tester) async {
+    // The row mirrors the validator's plausibility gate (isWithinBbtRange):
+    // "999" parses as a number but can never be saved as a temperature, so
+    // no measurement time may be recorded for it.
+    await tester.pumpWidget(_scope());
+    await tester.pumpAndSettle();
+
+    await enterTemperature(tester, '999');
+
+    expect(find.text('Gemessen um'), findsNothing,
+        reason: 'a temperature outside the BBT range can never be saved, '
+            'so there is nothing to record a measurement time for');
+  });
+
   testWidgets('a stored time stays on re-open for editing (no re-prefill)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_scope(seed: (db) async {

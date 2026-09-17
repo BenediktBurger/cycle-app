@@ -93,14 +93,15 @@ class EinstellungenScreen extends ConsumerWidget {
                       style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   // System follows the device brightness (the MaterialApp
-                  // default); the explicit choices win over the platform.
-                  // The "System" label is shared with the language switcher
-                  // — same word, same meaning ("follow the device").
+                  // default); the explicit choices win over the platform
+                  // (its own `themeSystem` label — not the language
+                  // switcher's `languageSystem`, so the two switchers can
+                  // evolve independently).
                   SegmentedButton<ThemeMode>(
                     segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        label: Text(l10n.languageSystem),
+                        label: Text(l10n.themeSystem),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
