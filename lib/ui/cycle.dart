@@ -5,11 +5,14 @@
 // candidate strictly after the peak day), arrow-up glyphs for candidates at
 // or before the peak day or with the peak unset (decided PER CANDIDATE by
 // the domain, R4), the solid peak dot ABOVE the mucus entry in the symbol
-// row (the peak never touches the curve), the 1–6 low numbering and the
-// baseline SEGMENT from low #6 to the last marked candidate (R10;
-// lib/ui/cycle_marks.dart over evaluateCycles). No derived artifact is
-// persisted, and no fertility statement is made (SUZ arithmetic stays
-// domain-only; see lib/domain/evaluation.dart).
+// row (the peak never touches the curve; EVERY placed peak renders, driven
+// from the marks stream), the 1–6 low numbering, the baseline SEGMENT from
+// low #6 to the last marked candidate (R10) and the user-placed SUZ bars
+// (sicher unfruchtbare Zeit; ONLY user-placed marks render — the computed
+// suzBeginsEvening drives the sheet's suggestion instead).
+// lib/ui/cycle_marks.dart over evaluateCycles. No derived artifact is
+// persisted; the SUZ arithmetic stays domain-only and a manual SUZ mark
+// never alters it (see lib/domain/evaluation.dart).
 //
 // Tapping a chart day or a symbol cell opens the day's mark-entry bottom
 // sheet (lib/ui/cycle_mark_sheet.dart): edit day (jumps to the Tagebuch
@@ -295,6 +298,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
     final overlay = buildEvaluationOverlay(
       evaluations: evaluateCycles(widget.entries, marks),
+      marks: marks,
       firstDay: _days.firstDay,
       dayCount: _days.dayCount,
     );
@@ -331,10 +335,13 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     // by the dark-mode chart tests).
     final temperatureColor = Theme.of(context).colorScheme.primary;
     final interruptedColor = temperatureColor.withValues(alpha: 0.4);
-    // The baseline is theme-derived too (secondary: the one scheme color the
-    // temperature/bleeding/mucus rendering does not use — see _Legend). It
-    // feeds the dashed R10 segment bars below, not a full-width line.
-    final baselineColor = Theme.of(context).colorScheme.secondary;
+    // The evaluation-artifact accent is theme-derived too (secondary: the
+    // one scheme color the temperature/bleeding/mucus rendering does not
+    // use — see _Legend). It feeds the dashed R10 baseline segment bars
+    // (not a full-width line) AND the user-placed SUZ bars — both are
+    // derived evaluation artifacts, so they share the family color; the
+    // segment is dashed-horizontal, the SUZ bar solid-vertical.
+    final evaluationColor = Theme.of(context).colorScheme.secondary;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -507,10 +514,60 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                     ],
                                     isCurved: false,
                                     barWidth: 1,
-                                    color: baselineColor,
+                                    color: evaluationColor,
                                     dashArray: const [6, 4],
                                     dotData: const FlDotData(show: false),
                                   ),
+                                // The user-placed SUZ marks: a VERTICAL
+                                // bar spanning the plot height at the SUZ
+                                // day's column (column START x − 0.5 for
+                                // suzMorning, column MIDDLE x for
+                                // suzEvening) plus a right-pointing arrow
+                                // whose base starts at the bar. Only
+                                // user-placed marks render — the computed
+                                // suzBeginsEvening drives the sheet's
+                                // suggestion instead, never the chart.
+                                // The bar rides inside fl_chart as a
+                                // two-spot bar; only the small arrow glyph
+                                // is hand-painted (ADR-0004 fallback).
+                                for (final suz in overlay.suzMarks) ...[
+                                  LineChartBarData(
+                                    spots: [
+                                      // The bar: column START (x − 0.5) for
+                                      // suzMorning, column MIDDLE (x) for
+                                      // suzEvening, clamped to the
+                                      // recorded range like the weekend
+                                      // bands (edge days keep a narrower
+                                      // offset).
+                                      FlSpot(suz.barX.clamp(0.0, lastX), yMin),
+                                      FlSpot(suz.barX.clamp(0.0, lastX), yMax),
+                                    ],
+                                    isCurved: false,
+                                    barWidth: 2,
+                                    color: evaluationColor,
+                                    dotData: const FlDotData(show: false),
+                                  ),
+                                  // The arrow: a single-spot dot bar whose
+                                  // painter draws the glyph — base at the
+                                  // bar, anchored at the cycle's baseline
+                                  // value when one exists, else the plot
+                                  // middle (TODO(user-review): the
+                                  // arrow's vertical anchor is an
+                                  // owner-eyeball rendering detail).
+                                  LineChartBarData(
+                                    spots: [
+                                      FlSpot(suz.barX.clamp(0.0, lastX),
+                                          suz.arrowValueY ?? (yMin + yMax) / 2),
+                                    ],
+                                    color: Colors.transparent,
+                                    dotData: FlDotData(
+                                      show: true,
+                                      getDotPainter: (_, __, ___, ____) =>
+                                          SuzArrowDotPainter(
+                                              color: evaluationColor),
+                                    ),
+                                  ),
+                                ],
                               ],
                               minX: 0,
                               maxX: maxX,
@@ -614,8 +671,10 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 }
 
 /// One narrow cell per calendar day under the chart, aligned by the same
-/// even day spacing as the chart: bleeding marker on top, the recorded
-/// fertility sign (`Sᴱᵂ` style) below. Pure recording, no interpretation.
+/// even day spacing as the chart: a vertical stack of recorded-fact glyphs
+/// (bleeding marker, mucus peak dot, fertility sign, cervix letter, the
+/// temperature measurement time, sex, the pain letters) — pure recording,
+/// no interpretation.
 ///
 /// Only the window's cells are built: days outside
 /// [windowStart]..[windowEnd] stay unbuilt, and the leading spacer keeps the
@@ -792,6 +851,97 @@ final class _SymbolCell extends StatelessWidget {
           )
         else
           const SizedBox(height: 10),
+        const SizedBox(height: 2),
+        // Temperature measurement time (fourth line): a small clock glyph
+        // whenever a temperature with a RECORDED measurement time exists —
+        // measuredAtMinutes is normalized to exist only together with bbtC
+        // (the DailyEntry constructor drops a time without a temperature),
+        // so the glyph never claims a time for a temperature-free day. The
+        // glyph only signals THAT a time was recorded; the value itself
+        // would not fit the minimum 24 px column and lives in the day
+        // sheet ("Measurement time: …", shown when a day is tapped).
+        // TODO(user-review): the NER cheat sheet defines no measurement-
+        // time glyph — the clock icon is an ad-hoc display choice the
+        // experts may want replaced (e.g. by a scheme-conform mark).
+        if (entry!.measuredAtMinutes != null)
+          SizedBox(
+            height: 10,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Icon(
+                Icons.schedule,
+                size: 10,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 10),
+        const SizedBox(height: 2),
+        // Sex (fifth line): the X glyph (the recorded fact only — the
+        // roadmap's morning/midday/evening distinction has no data yet,
+        // DailyEntry.sex is a plain bool). No collision with an exclusion
+        // marker: interrupted days render as LIGHTER CURVE POINTS, there
+        // is no exclusion letter on the chart.
+        // TODO(user-review): the X is the provisional glyph from the
+        // product wishlist; experts may want a different mark (and the
+        // time-of-day distinction once the data model carries it).
+        if (entry!.sex)
+          SizedBox(
+            height: 10,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                'X',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 10),
+        const SizedBox(height: 2),
+        // Pain (sixth line): the letter-coded pain options of the cheat
+        // sheet — B (Brust, breast tenderness) and M (Mittelschmerz) —
+        // each flag its own letter so a single flag stays legible alone.
+        // The UPPERCASE letters keep them distinguishable from the
+        // lowercase cervix letters on the line above; both lines share the
+        // same neutral on-surface ink (no scheme hue claimed).
+        // TODO(user-review): the letters mirror the vocabulary of the
+        // entry form ("Brustschmerzen (B)" / "Mittelschmerz (M)") — the
+        // same ad-hoc glyph caveat as the cervix letters applies.
+        if (entry!.painBreast || entry!.painMittelschmerz)
+          SizedBox(
+            height: 10,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (entry!.painBreast)
+                  Text(
+                    'B',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                if (entry!.painBreast && entry!.painMittelschmerz)
+                  const SizedBox(width: 1),
+                if (entry!.painMittelschmerz)
+                  Text(
+                    'M',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+              ],
+            ),
+          )
+        else
+          const SizedBox(height: 10),
       ],
     );
   }
@@ -928,12 +1078,44 @@ final class _Legend extends StatelessWidget {
           label: AppLocalizations.of(context).zyklusLegendBaseline,
           shape: _LegendShape.line,
         ),
+        _LegendDot(
+          color: scheme.secondary,
+          label: AppLocalizations.of(context).zyklusLegendSuz,
+          shape: _LegendShape.suz,
+        ),
+        _LegendDot(
+          color: scheme.onSurface,
+          label: AppLocalizations.of(context).zyklusLegendMeasuredAt,
+          shape: _LegendShape.clock,
+        ),
+        _LegendDot(
+          color: scheme.onSurface,
+          label: AppLocalizations.of(context).zyklusLegendSex,
+          shape: _LegendShape.sex,
+        ),
+        _LegendDot(
+          color: scheme.onSurface,
+          label: AppLocalizations.of(context).zyklusLegendPain,
+          shape: _LegendShape.pain,
+        ),
       ],
     );
   }
 }
 
-enum _LegendShape { dot, ring, text, circledDot, arrowUp, line, cervix }
+enum _LegendShape {
+  dot,
+  ring,
+  text,
+  circledDot,
+  arrowUp,
+  line,
+  cervix,
+  suz,
+  clock,
+  sex,
+  pain,
+}
 
 final class _LegendDot extends StatelessWidget {
   const _LegendDot({
@@ -992,6 +1174,28 @@ final class _LegendDot extends StatelessWidget {
           style: TextStyle(fontSize: 10, color: color),
         ),
       _LegendShape.line => Container(width: 16, height: 2, color: color),
+      // The SUZ glyph: the chart's vertical bar plus the right-pointing
+      // arrow from it (same shapes as the chart's painter).
+      _LegendShape.suz => SuzArrowGlyph(color: color),
+      // Sample measurement-time glyph: the same clock icon the symbol row
+      // renders on days with a recorded measurement time.
+      _LegendShape.clock => Icon(Icons.schedule, size: 12, color: color),
+      // Sample sex glyph: the X, exactly how a recorded sex day renders in
+      // the symbol row above.
+      _LegendShape.sex => Text(
+          'X',
+          style: TextStyle(fontSize: 10, color: color),
+        ),
+      // Sample pain glyphs: B and M, the letter-coded pain options the
+      // symbol row renders per flag.
+      _LegendShape.pain => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('B', style: TextStyle(fontSize: 10, color: color)),
+            const SizedBox(width: 1),
+            Text('M', style: TextStyle(fontSize: 10, color: color)),
+          ],
+        ),
     };
     return Row(
       mainAxisSize: MainAxisSize.min,

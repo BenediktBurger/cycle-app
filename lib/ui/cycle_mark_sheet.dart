@@ -1,9 +1,18 @@
 // The mark-entry bottom sheet of the cycle tab (Mode M, ADR-0001): tapping
 // a chart day opens this sheet instead of jumping straight to the entry
 // form. It offers the preserved "edit day" jump (the old tap behavior) and
-// the contextual set/remove toggles for the two user-placed marks — the
-// mucus peak and the first higher measurement (both may live on one day,
-// two independent toggles) — plus the computed info lines for the day.
+// the contextual set/remove toggles for the user-placed marks — the mucus
+// peak, the first higher measurement (both may live on one day, two
+// independent toggles) and the SUZ start (from a morning or from an
+// evening; the two variants are mutually exclusive per day: placing one
+// removes the other) — plus the computed info lines for the day.
+//
+// The SUZ suggestion follows the locked decision (the app SUGGESTS, the
+// user PLACES): on the computed suzBeginsEvening day the sheet shows a
+// suggestion line naming which rule (D/E) fired — as long as NO user SUZ
+// mark exists anywhere in that cycle. The computed SUZ is never persisted
+// and never renders on the chart; a manual SUZ mark in turn never alters
+// the arithmetic (compute-only separation, ADR-0001).
 //
 // HARD RULE (ADR-0001): the user places marks, the app only computes. The
 // sheet writes nothing derived — mark toggles go through the MarksDao
@@ -11,9 +20,10 @@
 // databaseProvider; everything the sheet SHOWS as evaluation data is
 // recomputed from (entries, marks) at render time: the 1–6 numbering, the
 // baseline value, the difference to the baseline for marked candidates
-// (R7) and the stopped-evaluation notice (R2). No provider state is
-// mutated outside the streams: a write re-emits through marksProvider, so
-// the sheet labels, the chart overlay and the info lines all update live.
+// (R7), the stopped-evaluation notice (R2) and the SUZ suggestion. No
+// provider state is mutated outside the streams: a write re-emits through
+// marksProvider, so the sheet labels, the chart overlay and the info lines
+// all update live.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -88,6 +98,26 @@ final class CycleDaySheet extends ConsumerWidget {
     }
   }
 
+  /// The SUZ mark-writing action: set through [MarksDao.addMark] (after
+  /// removing the OTHER variant on the same day — the two variants are
+  /// mutually exclusive: placing one removes the other), remove through
+  /// [MarksDao.deleteMark]. Same no-invalidation pattern as [_writeMark].
+  Future<void> _writeSuzMark(
+    WidgetRef ref, {
+    required String type,
+    required String otherType,
+    required bool remove,
+  }) async {
+    final db = await ref.read(databaseProvider.future);
+    if (remove) {
+      await db.marksDao.deleteMark(defaultProfileId, day, type);
+      return;
+    }
+    // Variant switch first, then the add — never two variants on one day.
+    await db.marksDao.deleteMark(defaultProfileId, day, otherType);
+    await db.marksDao.addMark(defaultProfileId, day, type);
+  }
+
   /// The old tap behavior, preserved as the sheet's "edit day" action:
   /// write the pre-selected date and switch the shell to the Tagebuch tab,
   /// then close the sheet.
@@ -95,6 +125,31 @@ final class CycleDaySheet extends ConsumerWidget {
     ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(day);
     ref.read(tabIndexProvider.notifier).state = 0; // Tagebuch tab
     Navigator.of(context).pop();
+  }
+
+  /// Whether a user SUZ mark (either variant) exists inside [evaluation]'s
+  /// cycle window. The cycle's window is [startDate, next cycle start) —
+  /// the same attribution the domain's evaluateCycles uses for its own
+  /// mark lookups; the sheet reconstructs it from the evaluations list
+  /// (the last cycle's window is open-ended).
+  bool _cycleHasSuzMark(
+    List<CycleEvaluation> evaluations,
+    int index,
+    List<CycleMark> marks,
+  ) {
+    final windowStart = DateOnly.normalize(evaluations[index].cycle.startDate);
+    final windowEnd = index + 1 < evaluations.length
+        ? DateOnly.normalize(evaluations[index + 1].cycle.startDate)
+        : null;
+    return marks.any((m) {
+      final isSuz = m.type == CycleMarkTypes.suzEvening ||
+          m.type == CycleMarkTypes.suzMorning;
+      if (!isSuz) return false;
+      final d = DateOnly.normalize(m.date);
+      if (d.isBefore(windowStart)) return false;
+      if (windowEnd != null && !d.isBefore(windowEnd)) return false;
+      return true;
+    });
   }
 
   /// The computed info lines for [day], in evaluation order: the 1-6 low
@@ -113,11 +168,15 @@ final class CycleDaySheet extends ConsumerWidget {
   /// only on the day after the break — the domain does not report the break
   /// day, and the whole-cycle notice reads clearly enough in practice.
   ///
+  /// On the computed suzBeginsEvening day the sheet shows the SUZ
+  /// suggestion (naming which rule fired) as long as NO user SUZ mark
+  /// exists anywhere in that cycle — the app suggests, the user places.
+  ///
   /// Empty when no evaluation data exists for the day (no marks yet, or the
   /// day lies outside every derivation window).
   ///
   /// Each entry carries the line text plus an optional test-visible key
-  /// (the stopped-evaluation notice gets one).
+  /// (the stopped-evaluation notice and the SUZ suggestion get one).
   List<(String, Key?)> _infoLines(BuildContext context, AppLocalizations l10n,
       List<DailyEntry> entries, List<CycleMark> marks) {
     final locale = Localizations.localeOf(context).toString();
@@ -127,8 +186,10 @@ final class CycleDaySheet extends ConsumerWidget {
         ).format(value);
 
     final lines = <(String, Key?)>[];
-    for (final evaluation
-        in evaluateCycles(entries, marks, profileId: defaultProfileId)) {
+    final evaluations =
+        evaluateCycles(entries, marks, profileId: defaultProfileId);
+    for (var e = 0; e < evaluations.length; e++) {
+      final evaluation = evaluations[e];
       for (final low in evaluation.numberedLows) {
         if (DateOnly.sameDay(low.date, day)) {
           lines.add((l10n.cycleSheetLowInfo(low.number), null));
@@ -161,6 +222,21 @@ final class CycleDaySheet extends ConsumerWidget {
           lines.add((l10n.cycleSheetCircledInfo(higher.ordinal!), null));
         }
       }
+      // The SUZ suggestion (locked decision: the app suggests, the user
+      // places): only on the computed suzBeginsEvening day, naming which
+      // rule (D/E) fired, and only while NO user SUZ mark exists anywhere
+      // in that cycle. The computed SUZ is never persisted; a manual SUZ
+      // mark never alters this arithmetic in return (compute-only
+      // separation, ADR-0001).
+      final suzEvening = evaluation.suzBeginsEvening;
+      if (suzEvening != null &&
+          DateOnly.sameDay(suzEvening, day) &&
+          !_cycleHasSuzMark(evaluations, e, marks)) {
+        lines.add((
+          l10n.cycleSheetSuzSuggestion(evaluation.suzRule!.name.toUpperCase()),
+          const ValueKey('cycleSheetSuzSuggestion'),
+        ));
+      }
       if (evaluation.evaluationStopped &&
           !day.isBefore(evaluation.cycle.startDate) &&
           !DateOnly.normalize(evaluation.cycle.endDate).isBefore(day)) {
@@ -183,53 +259,112 @@ final class CycleDaySheet extends ConsumerWidget {
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
     final hasFirstHigher =
         _hasMark(marks, CycleMarkTypes.firstHigherMeasurement);
+    final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
+    final hasSuzMorning = _hasMark(marks, CycleMarkTypes.suzMorning);
     final infoLines = _infoLines(context, l10n, entries, marks);
 
+    // The recorded fact the chart glyph cannot carry: the temperature
+    // measurement time — the symbol row renders only a clock glyph on days
+    // with a recorded time (the tiny 24 px column cannot spell a value).
+    // Sex and pain need no sheet line: their glyphs (X, B/M) already carry
+    // the full binary/letter information.
+    int? measuredAt;
+    for (final entry in entries) {
+      if (DateOnly.sameDay(entry.date, day)) {
+        measuredAt = entry.measuredAtMinutes;
+      }
+    }
+
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The computed info line(s): what the arithmetic derives for this
-          // day — display only, no persisted copy (ADR-0001). The
-          // stopped-evaluation notice carries a test-visible key.
-          for (final (line, key) in infoLines)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                line,
-                key: key,
-                style: Theme.of(context).textTheme.bodySmall,
+      // Scrollable: the sheet's actions grew (peak, first higher, two SUZ
+      // variants) — on short viewports the column would otherwise overflow
+      // the modal sheet's maximum height.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The recorded measurement time (see above), locale-formatted
+            // via the same mechanism the Tagebuch form uses.
+            if (measuredAt != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  l10n.cycleSheetMeasuredAt(
+                    MaterialLocalizations.of(context).formatTimeOfDay(
+                      TimeOfDay(
+                          hour: measuredAt ~/ 60, minute: measuredAt % 60),
+                    ),
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
+            // The computed info line(s): what the arithmetic derives for this
+            // day — display only, no persisted copy (ADR-0001). The
+            // stopped-evaluation notice and the SUZ suggestion carry
+            // test-visible keys.
+            for (final (line, key) in infoLines)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  line,
+                  key: key,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            const SizedBox(height: 4),
+            _SheetAction(
+              icon: Icons.edit_outlined,
+              label: l10n.cycleSheetEditDay,
+              onTap: () => _editDay(context, ref),
             ),
-          const SizedBox(height: 4),
-          _SheetAction(
-            icon: Icons.edit_outlined,
-            label: l10n.cycleSheetEditDay,
-            onTap: () => _editDay(context, ref),
-          ),
-          _SheetAction(
-            // The action icons are affordances for the two user-placed
-            // marks: the circle outline for the mucus peak (which renders
-            // as a solid dot in the symbol row, R6) and the circled dot
-            // for the first higher measurement.
-            icon: Icons.radio_button_unchecked,
-            label: hasPeak
-                ? l10n.cycleSheetRemoveMucusPeak
-                : l10n.cycleSheetSetMucusPeak,
-            onTap: () => _writeMark(ref,
-                type: CycleMarkTypes.mucusPeakDay, remove: hasPeak),
-          ),
-          _SheetAction(
-            icon: Icons.adjust,
-            label: hasFirstHigher
-                ? l10n.cycleSheetRemoveFirstHigher
-                : l10n.cycleSheetSetFirstHigher,
-            onTap: () => _writeMark(ref,
-                type: CycleMarkTypes.firstHigherMeasurement,
-                remove: hasFirstHigher),
-          ),
-          const SizedBox(height: 8),
-        ],
+            _SheetAction(
+              // The action icons are affordances for the two user-placed
+              // marks: the circle outline for the mucus peak (which renders
+              // as a solid dot in the symbol row, R6) and the circled dot
+              // for the first higher measurement.
+              icon: Icons.radio_button_unchecked,
+              label: hasPeak
+                  ? l10n.cycleSheetRemoveMucusPeak
+                  : l10n.cycleSheetSetMucusPeak,
+              onTap: () => _writeMark(ref,
+                  type: CycleMarkTypes.mucusPeakDay, remove: hasPeak),
+            ),
+            _SheetAction(
+              icon: Icons.adjust,
+              label: hasFirstHigher
+                  ? l10n.cycleSheetRemoveFirstHigher
+                  : l10n.cycleSheetSetFirstHigher,
+              onTap: () => _writeMark(ref,
+                  type: CycleMarkTypes.firstHigherMeasurement,
+                  remove: hasFirstHigher),
+            ),
+            // The SUZ start, placeable on ANY day, from a morning or from an
+            // evening. The two variants are mutually exclusive per day:
+            // placing one removes the other (variant switch), and the row
+            // flips to its removal label while its variant is present.
+            _SheetAction(
+              icon: Icons.nightlight_outlined,
+              label: hasSuzEvening
+                  ? l10n.cycleSheetRemoveSuzEvening
+                  : l10n.cycleSheetSetSuzEvening,
+              onTap: () => _writeSuzMark(ref,
+                  type: CycleMarkTypes.suzEvening,
+                  otherType: CycleMarkTypes.suzMorning,
+                  remove: hasSuzEvening),
+            ),
+            _SheetAction(
+              icon: Icons.wb_sunny_outlined,
+              label: hasSuzMorning
+                  ? l10n.cycleSheetRemoveSuzMorning
+                  : l10n.cycleSheetSetSuzMorning,
+              onTap: () => _writeSuzMark(ref,
+                  type: CycleMarkTypes.suzMorning,
+                  otherType: CycleMarkTypes.suzEvening,
+                  remove: hasSuzMorning),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

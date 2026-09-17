@@ -418,4 +418,156 @@ void main() {
         find.byKey(const ValueKey('cycleSheetEvaluationStopped')), findsNothing,
         reason: 'the evaluation did not stop — no notice');
   });
+
+  group('SUZ mark + suggestion (the app suggests, the user places)', () {
+    testWidgets('the computed SUZ evening suggests the start, naming rule D',
+        (tester) async {
+      // Main scenario: the 3rd circled candidate (9/16, 37.0) is >= 0.2 K
+      // above the baseline 36.4 -> rule D fires, SUZ begins 9/16 evening.
+      await _pump(tester,
+          entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+
+      await _tapDay(tester, 10); // 9/16: the computed suzBeginsEvening
+
+      expect(
+          find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsOneWidget,
+          reason: 'the viewed day equals the computed suzBeginsEvening and '
+              'no user SUZ mark exists anywhere in the cycle');
+      expect(find.textContaining('(rule D)'), findsOneWidget,
+          reason: 'the suggestion names which rule fired');
+    });
+
+    testWidgets('the suggestion names rule E when the 4th circle fires',
+        (tester) async {
+      // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd circled
+      // candidate is below the rule-D margin, so the 4th (9/17) fires
+      // rule E.
+      final entries = [
+        ..._entries.take(8),
+        DailyEntry(date: _d(14), bbtC: 36.5),
+        DailyEntry(date: _d(15), bbtC: 36.5),
+        DailyEntry(date: _d(16), bbtC: 36.5),
+        DailyEntry(date: _d(17), bbtC: 36.5),
+      ];
+      await _pump(tester,
+          entries: entries, seedMarks: [_peakMark, _firstHigherMark]);
+
+      await _tapDay(tester, 11); // 9/17: the computed suzBeginsEvening
+
+      expect(find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
+          findsOneWidget);
+      expect(find.textContaining('(rule E)'), findsOneWidget,
+          reason: 'the suggestion names which rule fired');
+    });
+
+    testWidgets(
+        'the suggestion is suppressed once a user SUZ mark exists in the '
+        'cycle', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [
+        _peakMark,
+        _firstHigherMark,
+        CycleMark(
+            profileId: defaultProfileId,
+            date: _d(13),
+            type: CycleMarkTypes.suzMorning),
+      ]);
+
+      await _tapDay(tester, 10); // 9/16: the computed suzBeginsEvening
+
+      expect(
+          find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsNothing,
+          reason: 'a user SUZ mark anywhere in the cycle suppresses the '
+              'suggestion');
+    });
+
+    testWidgets('no suggestion on days that are not the computed SUZ evening',
+        (tester) async {
+      await _pump(tester,
+          entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+
+      await _tapDay(tester, 8); // 9/14: the marked rise, not the SUZ day
+
+      expect(
+          find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsNothing);
+    });
+
+    testWidgets(
+        'SUZ actions on any day: set evening, variant-switch to morning, '
+        'remove', (tester) async {
+      await _pump(tester, entries: _entries);
+      await _tapDay(tester, 4); // 9/10 — an arbitrary day (actions on ANY day)
+
+      await tester.tap(find.text('SUZ from this evening'));
+      await tester.pumpAndSettle();
+      expect(await _storedTypes(_d(10)), contains(CycleMarkTypes.suzEvening),
+          reason: 'the SUZ mark is persisted through the MarksDao');
+      expect(find.text('Remove SUZ from this evening'), findsOneWidget,
+          reason: 'the removal label when the variant is present');
+
+      // Variant switch: placing the other variant removes the one present.
+      await tester.tap(find.text('SUZ from this morning'));
+      await tester.pumpAndSettle();
+      expect(await _storedTypes(_d(10)),
+          unorderedEquals([CycleMarkTypes.suzMorning]),
+          reason: 'placing one variant removes the other');
+      expect(find.text('Remove SUZ from this morning'), findsOneWidget);
+      expect(find.text('SUZ from this evening'), findsOneWidget,
+          reason: 'the evening action flips back to its set label');
+
+      await tester.tap(find.text('Remove SUZ from this morning'));
+      await tester.pumpAndSettle();
+      expect(await _storedTypes(_d(10)), isEmpty,
+          reason: 'the removal action deletes the mark');
+      expect(find.text('SUZ from this morning'), findsOneWidget,
+          reason: 'the morning action flips back to its set label');
+    });
+
+    testWidgets('the sheet shows the day\'s recorded measurement time',
+        (tester) async {
+      // The symbol row only carries a clock GLYPH — the tiny column cannot
+      // spell a time value; the sheet is where the value itself surfaces.
+      final entries = [..._entries];
+      entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
+      await _pump(tester, entries: entries);
+
+      await _tapDay(tester, 4); // 9/10
+
+      expect(find.textContaining('Measurement time:'), findsOneWidget,
+          reason: 'the recorded measurement time value is shown in the day '
+              'sheet');
+      expect(find.textContaining('6:30'), findsOneWidget,
+          reason: 'the time itself is locale-formatted into the line');
+    });
+
+    testWidgets('no measurement-time line on a day without a recorded time',
+        (tester) async {
+      await _pump(tester, entries: _entries);
+
+      await _tapDay(tester, 4); // 9/10: temperature without a recorded time
+
+      expect(find.textContaining('Measurement time:'), findsNothing,
+          reason: 'nothing is shown when no measurement time was recorded');
+    });
+
+    testWidgets(
+        'a manual SUZ mark never alters the arithmetic — the evaluation '
+        'info lines stay as computed', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [
+        _peakMark,
+        _firstHigherMark,
+        CycleMark(
+            profileId: defaultProfileId,
+            date: _d(12),
+            type: CycleMarkTypes.suzEvening),
+      ]);
+
+      await _tapDay(tester, 8); // 9/14: circled candidate #1
+
+      expect(find.text('+0.50 K above the baseline'), findsOneWidget,
+          reason: 'the difference to the baseline is unchanged by the SUZ '
+              'mark (compute-only separation)');
+      expect(find.text('Circled higher measurement 1'), findsOneWidget,
+          reason: 'the candidate sequence is unchanged by the SUZ mark');
+    });
+  });
 }

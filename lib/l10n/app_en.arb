@@ -130,6 +130,30 @@
     "description": "The difference of a circled/arrowed higher measurement to the baseline (R7); the value is pre-formatted with the locale's decimal style."
   },
   "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
+  "zyklusLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
+  "cycleSheetSetSuzEvening": "SUZ from this evening",
+  "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",
+  "cycleSheetSetSuzMorning": "SUZ from this morning",
+  "cycleSheetRemoveSuzMorning": "Remove SUZ from this morning",
+  "cycleSheetSuzSuggestion": "Suggested: sicher unfruchtbare Zeit begins this evening (rule {rule})",
+  "@cycleSheetSuzSuggestion": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "zyklusLegendMeasuredAt": "Measurement time",
+  "zyklusLegendSex": "Sex",
+  "zyklusLegendPain": "Pain (B breast, M Mittelschmerz)",
+  "cycleSheetMeasuredAt": "Measurement time: {time}",
+  "@cycleSheetMeasuredAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
   "statistikNoData": "Cycle lengths appear once two period onsets are recorded.",
   "statistikCycles": "Cycle lengths",
