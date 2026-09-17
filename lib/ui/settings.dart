@@ -1,5 +1,6 @@
-// Einstellungen screen: language switcher (System/de/en), the PIN-lock stub
-// (non-functional in M1 by design, ADR-0005), and JSON export/import.
+// Einstellungen screen: language switcher (System/de/en), theme-mode
+// switcher (System/light/dark), the PIN-lock stub (non-functional in M1 by
+// design, ADR-0005), and JSON export/import.
 //
 // Export UX (no new dependencies, see lib/ui/file_transfer.dart): an
 // always-available JSON text screen with a copy button on every platform,
@@ -75,6 +76,51 @@ class EinstellungenScreen extends ConsumerWidget {
                   // reload by design for this milestone (documented on
                   // localeProvider + docs/roadmap.md).
                   Text(l10n.settingsLanguageNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- theme mode ----------------------------------------------
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsThemeMode,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  // System follows the device brightness (the MaterialApp
+                  // default); the explicit choices win over the platform.
+                  // The "System" label is shared with the language switcher
+                  // — same word, same meaning ("follow the device").
+                  SegmentedButton<ThemeMode>(
+                    segments: [
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        label: Text(l10n.languageSystem),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        label: Text(l10n.themeLight),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        label: Text(l10n.themeDark),
+                      ),
+                    ],
+                    selected: {ref.watch(themeModeProvider)},
+                    onSelectionChanged: (selection) => ref
+                        .read(themeModeProvider.notifier)
+                        .state = selection.first,
+                  ),
+                  const SizedBox(height: 8),
+                  // In-memory ONLY: resets to the system default after a
+                  // web reload by design (documented on themeModeProvider +
+                  // docs/roadmap.md; mirrors the language switcher).
+                  Text(l10n.settingsThemeModeNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),

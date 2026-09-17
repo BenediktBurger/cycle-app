@@ -108,32 +108,43 @@ void main() {
     await tester.tap(find.text('Einstellungen').first);
     await tester.pumpAndSettle();
 
+    // Scope to the language switcher: the settings screen now also carries a
+    // theme-mode switcher whose "System" segment would otherwise collide
+    // with the language option of the same name.
+    final languageSwitcher = find.byType(SegmentedButton<String>);
+    expect(languageSwitcher, findsOneWidget);
+
     // All three options are offered.
     for (final option in ['System', 'Deutsch', 'English']) {
-      expect(find.text(option), findsOneWidget,
-          reason: 'Language option "$option" must be offered');
+      expect(
+        find.descendant(of: languageSwitcher, matching: find.text(option)),
+        findsOneWidget,
+        reason: 'Language option "$option" must be offered',
+      );
     }
     final switcher =
-        tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
+        tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher.selected, {'system'},
         reason: 'The default selection must be "System"');
 
     // Switching to an explicit language applies it immediately.
-    await tester.tap(find.text('English'));
+    await tester.tap(find
+        .descendant(of: languageSwitcher, matching: find.text('English')));
     await tester.pumpAndSettle();
     expect(find.text('Diary'), findsOneWidget,
         reason: 'Selecting English must switch the UI to English');
     final switcher2 =
-        tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
+        tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher2.selected, {'en'});
 
     // Back to the system default: the German device locale returns.
-    await tester.tap(find.text('System'));
+    await tester.tap(find
+        .descendant(of: languageSwitcher, matching: find.text('System')));
     await tester.pumpAndSettle();
     expect(find.text('Tagebuch'), findsOneWidget,
         reason: 'Selecting System must follow the device locale again');
     final switcher3 =
-        tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
+        tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher3.selected, {'system'});
   });
 }

@@ -1,5 +1,6 @@
 // Root widget: Material app, German-first localization whose language
-// follows the system until overridden in the settings screen, and the
+// follows the system until overridden in the settings screen, a theme mode
+// that likewise follows the device brightness until overridden, and the
 // database gating shell.
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -33,6 +34,10 @@ class CycleApp extends ConsumerWidget {
     // else (English is the fallback language, ADR-0007). An explicit
     // settings choice is always applied as-is.
     final Locale? explicitLocale = ref.watch(localeProvider);
+    // ThemeMode.system (the themeModeProvider default) follows the device
+    // brightness; an explicit light/dark choice from the settings switcher
+    // wins over the platform.
+    final ThemeMode themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       // Theme: explicit Material 3 color schemes from one seed. The light
       // scheme is Flutter's own default seed, so light mode looks exactly
@@ -40,7 +45,7 @@ class CycleApp extends ConsumerWidget {
       // (ColorScheme.fromSeed(brightness: dark)) so both schemes stay in
       // the same tonal neighborhood, and the app follows the device
       // brightness setting (themeMode: system).
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: _themeSeedColor),
       ),

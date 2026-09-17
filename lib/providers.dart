@@ -6,6 +6,8 @@
 //  - locale resets to the system default on web reload (documented
 //    limitation; see the doc comment on [localeProvider] and
 //    docs/roadmap.md),
+//  - the theme mode resets to System on web reload for the same reason
+//    (see the doc comment on [themeModeProvider]),
 //  - the PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,6 +86,16 @@ final tabIndexProvider = StateProvider<int>((ref) => 0);
 /// - on native, a drift settings table (or SharedPreferences) would fit.
 /// Recorded in docs/roadmap.md as the language-persistence TODO.
 final localeProvider = StateProvider<Locale?>((ref) => null);
+
+/// Theme mode of the whole app: `ThemeMode.system` (the default) follows the
+/// device brightness setting, an explicit light/dark choice from the settings
+/// switcher wins over the platform. The light/dark `ThemeData`s themselves
+/// live in `main.CycleApp` (both derived from one seed color).
+///
+/// In-memory only, mirroring [localeProvider]: switching works immediately
+/// but resets to System on web reload BY DESIGN (see the persistence note
+/// there — no settings table in drift at this milestone).
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when

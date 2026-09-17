@@ -54,14 +54,17 @@ void main() {
     await tester.tap(find.text('Einstellungen').first);
     await tester.pumpAndSettle();
 
-    // The settings list is a lazy ListView; drag up (content moves up = we
-    // look further down) until the drip card is built.
-    for (var i = 0;
-        i < 4 && find.text('Drip-Daten importieren').evaluate().isEmpty;
-        i++) {
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
-      await tester.pumpAndSettle();
-    }
+    // The settings list is a lazy ListView; scroll down until the drip card
+    // is built, then make sure its button is fully on-screen (the list is
+    // allowed to grow above the drip card — e.g. the theme-mode switcher —
+    // so fixed-amount drag loops would be brittle; the card ORDER assertion
+    // below does not depend on how much content sits above).
+    await tester.scrollUntilVisible(
+      find.text('Drip-Daten importieren'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Drip-Daten importieren'), findsWidgets);
 
     // … and it comes AFTER the JSON export/import card in the card config.
@@ -82,6 +85,8 @@ void main() {
     // (checked after the dialog opens below).
     final dripButton =
         find.widgetWithText(FilledButton, 'CSV importieren').first;
+    await tester.ensureVisible(dripButton);
+    await tester.pumpAndSettle();
     await tester.tap(dripButton);
     await tester.pumpAndSettle();
 
