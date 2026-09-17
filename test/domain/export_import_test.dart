@@ -543,7 +543,8 @@ void main() {
     });
   });
 
-  group('sex timings / cervix firmness / mucus A in the writer', () {
+  group('sex timings / cervix firmness / mucus A in the reader (import side)',
+      () {
     Map<String, Object?> rowWith(Map<String, Object?> fields) =>
         <String, Object?>{
           'profile_id': 1,
@@ -552,7 +553,7 @@ void main() {
           ...fields,
         };
 
-    test('writer: the sex_timings mask carries over verbatim within 0..7',
+    test('reader: the sex_timings mask carries over verbatim within 0..7',
         () {
       for (final mask in [0, 1, 2, 4, 5, 7]) {
         final entry = tryDailyEntryFromExport(rowWith({'sex_timings': mask}));
@@ -561,7 +562,7 @@ void main() {
       }
     });
 
-    test('writer: out-of-range / negative / missing sex_timings collapse to 0',
+    test('reader: out-of-range / negative / missing sex_timings collapse to 0',
         () {
       for (final bad in <Object?>[8, -1, 999, '3', null]) {
         final entry = tryDailyEntryFromExport(rowWith({'sex_timings': bad}));
@@ -571,7 +572,7 @@ void main() {
       }
     });
 
-    test('writer: the old boolean `sex` flag is gone from the shape', () {
+    test('reader: the old boolean `sex` flag is gone from the shape', () {
       // v4 was redefined in place pre-release (no published v4 documents
       // exist): `sex_timings` REPLACES `sex`. A row still carrying the old
       // flag loses it silently — no shim, the row stays valid.
@@ -581,7 +582,7 @@ void main() {
           reason: 'the legacy flag has no mask identity');
     });
 
-    test('writer: cervix_firmness tokens parse into the structured field',
+    test('reader: cervix_firmness tokens parse into the structured field',
         () {
       final cases = <String, CervixFirmness>{
         'hard': CervixFirmness.hard,
@@ -599,7 +600,7 @@ void main() {
           reason: 'older documents simply omit the field');
     });
 
-    test('writer: an out-of-vocabulary firmness token collapses to null', () {
+    test('reader: an out-of-vocabulary firmness token collapses to null', () {
       final entry = tryDailyEntryFromExport(rowWith({
         'cervix_firmness': 'zzz',
       }));
@@ -627,7 +628,7 @@ void main() {
       expect(summary.entriesWritten, 1);
     });
 
-    test('writer: the mucus token a flows through to the A sign', () {
+    test('reader: the mucus token a flows through to the A sign', () {
       final entry = tryDailyEntryFromExport(rowWith({'mucus_sign': 'a'}));
       expect(entry!.mucusSign, MucusSign.a);
       expect(entry.mucusQuality, isNull, reason: 'A carries no quality');

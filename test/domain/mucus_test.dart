@@ -17,7 +17,7 @@ void main() {
       );
     });
 
-    test("a (Ausfluss) carries no quality — quality stays S-only", () {
+    test('a (Ausfluss) carries no quality — quality stays S-only', () {
       // 'A' is a discharge observation, not the mucus sign S; like every
       // non-S sign it must never carry a quality qualifier.
       expect(

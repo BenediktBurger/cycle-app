@@ -1,6 +1,6 @@
 // JSON export/import for the whole local database — PURE domain layer.
 //
-// Export document shape (schema version 3):
+// Export document shape (schema version 4):
 //
 //   {
 //     "schema_version": 4,

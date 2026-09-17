@@ -317,7 +317,10 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // kinds, symptom-flag FALSEs) are
     // NOT data — otherwise every blank drip day would import. A measured
     // time belongs to its measurement, so a time cell alone never makes a
-    // blank day an entry.
+    // blank day an entry. A row carrying ONLY an out-of-range cervix
+    // position/opening index is skipped as well — such an index decodes to
+    // no stored observation (the clamp word the old free-text helper
+    // fabricated was noise).
     final hasData = bbtC != null ||
         excludeOther ||
         bleeding != null ||

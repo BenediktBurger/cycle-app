@@ -87,7 +87,7 @@
 //   excluded days anyway). The peak day itself counts as a low when it
 //   falls into the window — its mucus role does not exempt its temperature.
 //   TODO(user-review): Untracked days (data gaps) and unmeasured days
-//   consume no 1–6 slot — do they take one of the six slots?
+//   consume no 1–6 slot today — should they take one of the six slots?
 //   TODO(user-review): Numbering counts BACKWARDS from the first higher
 //   measurement ("zurücknummerieren"): the low directly before it is 1.
 //   The chronological alternative (1..6 ending right before the rise) is
