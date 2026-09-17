@@ -90,7 +90,29 @@
     }
   },
   "cycleTapToEdit": "Tap a day to edit it",
+  "cycleColumnDate": "Date",
+  "@cycleColumnDate": {
+    "description": "Column-header tooltip for the day-of-month prototype (\"14.\") on the cycle chart."
+  },
+  "cycleColumnCycleDay": "Cycle day",
+  "@cycleColumnCycleDay": {
+    "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
+  },
   "cycleLegendTemperature": "BBT (temperature)",
+  "cycleRowBleeding": "Bleeding",
+  "@cycleRowBleeding": {
+    "description": "Row name (corner tooltip/semantics) of the bleeding row on the cycle chart."
+  },
+  "cycleRowMucus": "Fertility sign (mucus)",
+  "cycleRowCervix": "Cervix",
+  "cycleRowSex": "Sex",
+  "cycleRowPain": "Pain",
+  "cycleRowMeasurementTime": "Measurement time",
+  "cycleHelpShow": "Show symbol glossary",
+  "@cycleHelpShow": {
+    "description": "AppBar action tooltip opening the cycle chart's symbol glossary bottom sheet."
+  },
+  "cycleHelpTitle": "Symbol glossary",
   "cycleLegendBleeding": "Bleeding",
   "cycleLegendMucus": "Fertility sign (mucus)",
   "cycleLegendMucusPeak": "Mucus peak",
