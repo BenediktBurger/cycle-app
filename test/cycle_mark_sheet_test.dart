@@ -308,6 +308,13 @@ void main() {
     expect(await _storedTypes(_d(12)),
         unorderedEquals(['mucusPeakDay', 'firstHigherMeasurement']),
         reason: 'both marks may live on one day');
+    // The placement leaves the mark inconsistent (36.20 on 9/12 lies
+    // below the baseline 36.90 of its window 9/6..9/11), so the owner
+    // warning pops; Keep keeps the mark so the toggles stay independent.
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('Keep')));
+    await tester.pumpAndSettle();
 
     // Removing the second mark keeps the first one untouched.
     await tester.tap(find.text('Remove first higher measurement'));
@@ -588,6 +595,153 @@ void main() {
               'mark (compute-only separation)');
       expect(find.text('Circled higher measurement 1'), findsOneWidget,
           reason: 'the candidate sequence is unchanged by the SUZ mark');
+    });
+  });
+
+  group('rise-mark consistency warning (owner decision 2026-09-17)', () {
+    // The six-previous-calendar-day window of a mark on 9/13 is 9/7..9/12,
+    // whose baseline is 36.40 (9/9); the marked day itself carries 36.30 —
+    // NOT strictly above the baseline, so the placement is inconsistent.
+    CycleMark markOn13() => CycleMark(
+        profileId: defaultProfileId,
+        date: _d(13),
+        type: CycleMarkTypes.firstHigherMeasurement);
+
+    testWidgets(
+        'placing an inconsistent mark warns with the arithmetic and '
+        'Keep keeps the mark', (tester) async {
+      await _pump(tester, entries: _entries); // no marks yet
+
+      await _tapDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
+      await tester.tap(find.text('Set first higher measurement'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget,
+          reason: 'the inconsistent placement warns immediately');
+      expect(find.text('First higher measurement'), findsOneWidget,
+          reason: 'the dialog title names the mark, never a verdict');
+      expect(
+          find.text(
+              '36.30 °C on the marked day is not above the baseline 36.40 °C.'),
+          findsOneWidget,
+          reason: 'the dialog shows the arithmetic fact: marked value vs '
+              'baseline value');
+      // Keep (like dismissing the dialog) leaves the mark standing.
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog), matching: find.text('Keep')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing,
+          reason: 'the dialog is non-blocking: Keep only closes it');
+      expect(await _storedTypes(_d(13)), contains('firstHigherMeasurement'),
+          reason: 'Keep keeps the just-placed mark');
+      expect(find.byType(BottomSheet), findsOneWidget,
+          reason: 'the sheet stays open across the warning');
+      expect(find.text('Remove first higher measurement'), findsOneWidget,
+          reason: 'the toggle flipped by the kept mark');
+    });
+
+    testWidgets('the Remove choice removes the just-placed mark',
+        (tester) async {
+      await _pump(tester, entries: _entries);
+
+      await _tapDay(tester, 7);
+      await tester.tap(find.text('Set first higher measurement'));
+      await tester.pumpAndSettle();
+
+      // The sheet action carries the same label once the mark stands —
+      // scope the tap to the dialog's Remove choice.
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Remove first higher measurement')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(await _storedTypes(_d(13)), isEmpty,
+          reason: 'Remove undoes the placement through the toggle path');
+      expect(find.text('Set first higher measurement'), findsOneWidget,
+          reason: 'the toggle flipped back after the removal');
+    });
+
+    testWidgets('placing a consistent mark shows no dialog', (tester) async {
+      await _pump(tester, entries: _entries);
+
+      await _tapDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
+      await tester.tap(find.text('Set first higher measurement'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing,
+          reason: 'only an INCONSISTENT placement warns');
+      expect(await _storedTypes(_d(14)), contains('firstHigherMeasurement'),
+          reason: 'the consistent mark is placed without the choice');
+    });
+
+    testWidgets(
+        'a marked day without a usable temperature warns without a '
+        'value arithmetic', (tester) async {
+      final entries = [
+        ..._entries.take(7), // 9/6..9/12 measured
+        DailyEntry(date: _d(13)), // 9/13 tracked but UNMEASURED
+        ..._entries.skip(8),
+      ];
+      await _pump(tester, entries: entries);
+
+      await _tapDay(tester, 7); // 9/13: the unmeasured day (baseline 36.40)
+      await tester.tap(find.text('Set first higher measurement'));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.text(
+              'The marked day carries no usable temperature (unmeasured or '
+              'interrupted).'),
+          findsOneWidget,
+          reason: 'without a marked value only the fact is stated');
+    });
+
+    testWidgets(
+        'a merely-opened sheet for an existing inconsistent mark shows '
+        'the PERSISTENT warning, no dialog', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [markOn13()]);
+
+      await _tapDay(tester, 7); // 9/13: the marked day
+
+      expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
+          findsOneWidget,
+          reason: 'the inconsistency stays visible on every sheet open '
+              '(later data edits cannot silently invalidate the mark)');
+      expect(
+          find.text(
+              'No measurement on the marked day is above the baseline 36.40 °C.'),
+          findsOneWidget,
+          reason: 'the warning states the arithmetic fact only');
+      expect(find.byType(AlertDialog), findsNothing,
+          reason: 'merely opening the sheet never pops the dialog');
+    });
+
+    testWidgets(
+        'a later data edit that raises the baseline flips the warning on '
+        '(the persistent line covers edits)', (tester) async {
+      // The mark on 9/14 was placed over the baseline 36.40; an edited
+      // 9/11 temperature 36.95 raises the window's baseline past the
+      // marked 36.90 — the warning must show without re-placing the mark.
+      final entries = [..._entries];
+      entries[5] = entries[5].copyWith(bbtC: 36.95); // 9/11, in the window
+      await _pump(tester, entries: entries, seedMarks: [_firstHigherMark]);
+
+      await _tapDay(tester, 8); // 9/14: the marked day
+
+      expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
+          findsOneWidget,
+          reason: 'the warning recomputes with the changed baseline');
+    });
+
+    testWidgets('a consistent mark shows no warning line', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [_firstHigherMark]);
+
+      await _tapDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
+
+      expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
+          findsNothing);
     });
   });
 }

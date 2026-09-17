@@ -37,7 +37,6 @@
   "mucusSign": "Fertility sign",
   "mucusSignUnset": "—",
   "mucusQuality": "Quality",
-  "cervix": "Cervix (note, optional)",
   "cervixPosition": "Cervix position",
   "cervixPositionUnset": "—",
   "cervixPositionLow": "low",
@@ -163,6 +162,33 @@
     "description": "The difference of a circled/arrowed higher measurement to the baseline (R7); the value is pre-formatted with the locale's decimal style."
   },
   "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
+  "cycleSheetRiseConsistencyTitle": "First higher measurement",
+  "@cycleSheetRiseConsistencyTitle": {
+    "description": "Title of the non-blocking dialog shown after PLACING an inconsistent first-higher-measurement mark (the marked day carries no measured, not-excluded temperature strictly above the baseline). Neutral on purpose — it names the mark, never a verdict."
+  },
+  "cycleSheetRiseConsistencyBelow": "{value} °C on the marked day is not above the baseline {baseline} °C.",
+  "@cycleSheetRiseConsistencyBelow": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      },
+      "baseline": {
+        "type": "String"
+      }
+    },
+    "description": "Body of the rise-mark consistency dialog: the arithmetic fact only (marked value vs baseline value, both pre-formatted with the locale's decimal style). TODO(user-review): the exact wording is pending the expert review."
+  },
+  "cycleSheetRiseConsistencyNoValue": "The marked day carries no usable temperature (unmeasured or interrupted).",
+  "cycleSheetRiseConsistencyKeep": "Keep",
+  "cycleSheetRiseInconsistent": "No measurement on the marked day is above the baseline {value} °C.",
+  "@cycleSheetRiseInconsistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
+  },
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSetSuzEvening": "SUZ from this evening",
   "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",

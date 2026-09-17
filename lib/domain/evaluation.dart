@@ -273,6 +273,7 @@ final class CycleEvaluation {
     required this.suzBegins,
     required this.suzRule,
     required this.evaluationStopped,
+    required this.riseMarkConsistent,
   });
 
   /// The cycle group this evaluation belongs to (start/end for UI framing).
@@ -319,6 +320,25 @@ final class CycleEvaluation {
   /// SUZ that evening) or E (4th circled candidate at any margin — SUZ that
   /// morning). Null while the SUZ is not determined.
   final SuzRule? suzRule;
+
+  /// Whether the user-placed first higher measurement sits on a day whose
+  /// measured, not-excluded temperature lies STRICTLY ABOVE the baseline
+  /// (owner decision 2026-09-17: when it does not, the app warns — the
+  /// user may have chosen a wrong day; any warning wording states the
+  /// arithmetic fact only, never a verdict). Because the baseline derives
+  /// ONLY from the six calendar days before the mark, the check is
+  /// well-defined once the mark exists.
+  ///
+  /// - null when no first-higher mark exists or no baseline could be
+  ///   derived (no usable low measurement in the mark's window) — the
+  ///   check is undefined there;
+  /// - false when the marked day has no usable temperature (no entry,
+  ///   unmeasured, or excluded) or its value is not strictly above the
+  ///   baseline;
+  /// - true otherwise.
+  ///
+  /// Computed only, never persisted.
+  final bool? riseMarkConsistent;
 
   /// True when the automatic evaluation stopped mid-sequence (R2: more
   /// than one intervening missing/at-or-below day between two candidates —
@@ -547,10 +567,28 @@ CycleEvaluation _evaluateCycle(
   SuzRule? suzRule;
   BaselineSpan? baselineSpan;
 
+  // The rise-mark consistency check (owner decision 2026-09-17): the
+  // marked day must carry a measured, not-excluded temperature STRICTLY
+  // above the baseline — otherwise the UI warns (the user may have chosen
+  // a wrong day). The baseline derives ONLY from the six calendar days
+  // before the mark, so the check is well-defined once mark and baseline
+  // exist; without either it stays undefined (null). The check needs the
+  // marked day's entry from the tracked days — the day may carry NO entry
+  // at all (an untracked mark day), which counts as inconsistent.
+  final byDay = {
+    for (final e in cycle.days) DateOnly.normalize(e.date): e,
+  };
+  bool? riseMarkConsistent;
+  if (firstHigherDay != null && baseline != null) {
+    final markedEntry = byDay[firstHigherDay];
+    riseMarkConsistent = markedEntry == null ||
+            markedEntry.bbtC == null ||
+            markedEntry.isExcluded
+        ? false
+        : markedEntry.bbtC! > baseline.value;
+  }
+
   if (baseline != null && firstHigherDay != null) {
-    final byDay = {
-      for (final e in cycle.days) DateOnly.normalize(e.date): e,
-    };
     final lastDay = DateOnly.normalize(cycle.endDate);
 
     var sequenceStarted = false;
@@ -667,5 +705,6 @@ CycleEvaluation _evaluateCycle(
     suzBegins: suzBegins,
     suzRule: suzRule,
     evaluationStopped: evaluationStopped,
+    riseMarkConsistent: riseMarkConsistent,
   );
 }

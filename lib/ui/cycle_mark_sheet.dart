@@ -121,6 +121,101 @@ final class CycleDaySheet extends ConsumerWidget {
     await db.marksDao.addMark(defaultProfileId, day, type);
   }
 
+  /// The first-higher mark-writing action with the owner consistency
+  /// warning (owner decision 2026-09-17): when PLACING the mark leaves it
+  /// INCONSISTENT — the marked day carries no measured, not-excluded
+  /// temperature strictly above the baseline — a NON-BLOCKING dialog shows
+  /// the arithmetic (marked value vs baseline value, or the
+  /// no-usable-temperature fact) with a Keep / Remove choice; Remove goes
+  /// through the existing mark-toggle path, Keep (or dismissing the
+  /// dialog) leaves the just-placed mark standing. Merely OPENING the
+  /// sheet for an existing inconsistent mark never pops the dialog — the
+  /// persistent info-line warning covers that case (see [_infoLines]).
+  /// The dialog wording states the arithmetic fact only, never a verdict:
+  // TODO(user-review): the exact wording is pending the expert review.
+  Future<void> _writeFirstHigherMark(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool remove,
+    required List<DailyEntry> entries,
+    required List<CycleMark> marks,
+  }) async {
+    // Captured before the write-await (the repository's established
+    // pattern — nothing derived from context after an async gap).
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toString();
+    await _writeMark(ref,
+        type: CycleMarkTypes.firstHigherMeasurement, remove: remove);
+    if (remove) return;
+
+    // The mark is written; the provider stream re-emits asynchronously, so
+    // the check evaluates the exact post-write inputs (the placed mark
+    // added to the current marks) instead of racing the stream.
+    final placed = [
+      ...marks,
+      CycleMark(
+        profileId: defaultProfileId,
+        date: day,
+        type: CycleMarkTypes.firstHigherMeasurement,
+      ),
+    ];
+    final evaluations =
+        evaluateCycles(entries, placed, profileId: defaultProfileId);
+    for (var i = 0; i < evaluations.length; i++) {
+      final evaluation = evaluations[i];
+      if (!isDayInCycleWindow(evaluations, i, day)) continue;
+      // Only the ANCHORING mark is checked (the most recent mark of the
+      // cycle drives the evaluation, see R3): a mark superseded by a later
+      // first-higher mark defines no baseline of its own.
+      final anchor = evaluation.firstHigherDay;
+      if (anchor == null || !DateOnly.sameDay(anchor, day)) continue;
+      if (evaluation.riseMarkConsistent != false) return;
+
+      // The marked day's entry (from the evaluation's own cycle days)
+      // decides the dialog body: the value-vs-baseline arithmetic, or the
+      // no-usable-temperature fact.
+      DailyEntry? markedEntry;
+      for (final entry in evaluation.cycle.days) {
+        if (DateOnly.sameDay(entry.date, day)) markedEntry = entry;
+      }
+      String body;
+      if (markedEntry == null ||
+          markedEntry.bbtC == null ||
+          markedEntry.isExcluded) {
+        body = l10n.cycleSheetRiseConsistencyNoValue;
+      } else {
+        body = l10n.cycleSheetRiseConsistencyBelow(
+          _formatValue(locale, markedEntry.bbtC!),
+          _formatValue(locale, evaluation.baseline!.value),
+        );
+      }
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.cycleSheetRiseConsistencyTitle),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n.cycleSheetRiseConsistencyKeep),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                // Remove goes through the existing mark-toggle path.
+                await _writeMark(ref,
+                    type: CycleMarkTypes.firstHigherMeasurement, remove: true);
+              },
+              child: Text(l10n.cycleSheetRemoveFirstHigher),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+  }
+
   /// The old tap behavior, preserved as the sheet's "edit day" action:
   /// write the pre-selected date and switch the shell to the Tagebuch tab,
   /// then close the sheet.
@@ -146,6 +241,16 @@ final class CycleDaySheet extends ConsumerWidget {
     });
   }
 
+  /// Locale-formatted temperature value (two fraction digits — the same
+  /// mechanism the entry form and the info lines use), shared by the info
+  /// lines and the rise-consistency dialog. Takes the locale string (not
+  /// the context) so callers can format across an async gap.
+  String _formatValue(String locale, double value) =>
+      NumberFormat.decimalPatternDigits(
+        locale: locale,
+        decimalDigits: 2,
+      ).format(value);
+
   /// The computed info lines for [day], in evaluation order: the 1-6 low
   /// number, the baseline value (the day the baseline runs through), and —
   /// for a MARKED candidate of that day (R7) — the difference to the
@@ -162,6 +267,14 @@ final class CycleDaySheet extends ConsumerWidget {
   /// only on the day after the break — the domain does not report the break
   /// day, and the whole-cycle notice reads clearly enough in practice.
   ///
+  /// The rise-mark consistency warning (owner decision 2026-09-17) shows
+  /// on the marked first-higher day while the mark stands INCONSISTENT
+  /// (the day carries no measured, not-excluded temperature strictly above
+  /// the baseline) — recomputed at render time, so later data edits that
+  /// change the baseline keep it in sync. The wording states the
+  /// arithmetic fact only, never a verdict (TODO(user-review): pending the
+  /// expert review).
+  ///
   /// On the computed suzBegins day the sheet shows the SUZ
   /// suggestion (naming which rule fired and its time of day — evening for
   /// rule D, morning for rule E) as long as NO user SUZ mark
@@ -175,10 +288,6 @@ final class CycleDaySheet extends ConsumerWidget {
   List<(String, Key?)> _infoLines(BuildContext context, AppLocalizations l10n,
       List<DailyEntry> entries, List<CycleMark> marks) {
     final locale = Localizations.localeOf(context).toString();
-    String formatValue(double value) => NumberFormat.decimalPatternDigits(
-          locale: locale,
-          decimalDigits: 2,
-        ).format(value);
 
     final lines = <(String, Key?)>[];
     final evaluations =
@@ -192,8 +301,10 @@ final class CycleDaySheet extends ConsumerWidget {
       }
       final baseline = evaluation.baseline;
       if (baseline != null && DateOnly.sameDay(baseline.date, day)) {
-        lines.add(
-            (l10n.cycleSheetBaselineInfo(formatValue(baseline.value)), null));
+        lines.add((
+          l10n.cycleSheetBaselineInfo(_formatValue(locale, baseline.value)),
+          null
+        ));
       }
       for (final higher in evaluation.higherMeasurements) {
         if (!DateOnly.sameDay(higher.date, day)) continue;
@@ -206,7 +317,8 @@ final class CycleDaySheet extends ConsumerWidget {
         // option and would be reviewed with the experts.
         lines.add(
           (
-            l10n.cycleSheetDifferenceInfo(formatValue(higher.differenceK)),
+            l10n.cycleSheetDifferenceInfo(
+                _formatValue(locale, higher.differenceK)),
             null
           ),
         );
@@ -244,6 +356,24 @@ final class CycleDaySheet extends ConsumerWidget {
         lines.add((
           l10n.cycleSheetEvaluationStopped,
           const ValueKey('cycleSheetEvaluationStopped'),
+        ));
+      }
+      // The rise-mark consistency warning (owner decision 2026-09-17):
+      // PERSISTENT while the placed first-higher mark stands inconsistent —
+      // shown on the marked day (where the mark lives), recomputed at
+      // render time so LATER DATA EDITS that change the baseline or remove
+      // the marked day's temperature keep the warning in sync. The wording
+      // states the arithmetic fact only, never a verdict.
+      // TODO(user-review): the exact wording (arithmetic fact stated, no
+      // "this is wrong" phrasing) is pending the expert review.
+      final firstHigher = evaluation.firstHigherDay;
+      if (evaluation.riseMarkConsistent == false &&
+          firstHigher != null &&
+          DateOnly.sameDay(firstHigher, day)) {
+        lines.add((
+          l10n.cycleSheetRiseInconsistent(
+              _formatValue(locale, evaluation.baseline!.value)),
+          const ValueKey('cycleSheetRiseConsistency'),
         ));
       }
     }
@@ -335,9 +465,8 @@ final class CycleDaySheet extends ConsumerWidget {
               label: hasFirstHigher
                   ? l10n.cycleSheetRemoveFirstHigher
                   : l10n.cycleSheetSetFirstHigher,
-              onTap: () => _writeMark(ref,
-                  type: CycleMarkTypes.firstHigherMeasurement,
-                  remove: hasFirstHigher),
+              onTap: () => _writeFirstHigherMark(context, ref,
+                  remove: hasFirstHigher, entries: entries, marks: marks),
             ),
             // The SUZ start, placeable on ANY day, from a morning or from an
             // evening. The two variants are mutually exclusive per day:

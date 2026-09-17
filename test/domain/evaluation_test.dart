@@ -1605,6 +1605,97 @@ void main() {
     });
   });
 
+  group('rise-mark consistency (owner decision 2026-09-17)', () {
+    // Shared fixture: the six-calendar-day window before the Mar 11 mark
+    // is Mar 5..Mar 10 (36.2, 36.4, 36.1, unmeasured, 36.3, 36.2), so the
+    // baseline is the 36.4 on Mar 6 — the highest not-excluded measured
+    // temperature inside the window. The marked day itself varies per test.
+    final baseEntries = [
+      d(2026, 3, 2, bleeding: Bleeding.medium),
+      d(2026, 3, 5, t: 36.2), // rise−6
+      d(2026, 3, 6, t: 36.4), // rise−5 — highest in the window → baseline
+      d(2026, 3, 7, t: 36.1),
+      d(2026, 3, 8), // rise−4: tracked but unmeasured
+      d(2026, 3, 9, t: 36.3),
+      d(2026, 3, 10, t: 36.2),
+      d(2026, 3, 11, t: 36.9), // the marked rise day
+    ];
+    final riseMark = [rise(2026, 3, 11)];
+
+    test('true when the marked day lies strictly above the baseline', () {
+      final e = evalFor(baseEntries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.baseline!.value, 36.4);
+      expect(e.riseMarkConsistent, isTrue);
+    });
+
+    test(
+        'false when the marked value is NOT strictly above the baseline '
+        '(equal or below)', () {
+      // 36.4 equals the baseline; the check demands STRICTLY above.
+      final equal = [
+        ...baseEntries.take(7),
+        d(2026, 3, 11, t: 36.4),
+      ];
+      final eEqual = evalFor(equal, riseMark, DateTime(2026, 3, 2));
+      expect(eEqual.riseMarkConsistent, isFalse,
+          reason: '36.4 is not STRICTLY above the baseline 36.4');
+
+      // 36.3 lies below the baseline 36.4.
+      final below = [
+        ...baseEntries.take(7),
+        d(2026, 3, 11, t: 36.3),
+      ];
+      final eBelow = evalFor(below, riseMark, DateTime(2026, 3, 2));
+      expect(eBelow.riseMarkConsistent, isFalse);
+    });
+
+    test('false when the marked day is tracked but unmeasured', () {
+      final entries = [
+        ...baseEntries.take(7),
+        d(2026, 3, 11), // no temperature recorded
+      ];
+      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.baseline!.value, 36.4);
+      expect(e.riseMarkConsistent, isFalse);
+    });
+
+    test('false when the marked day is excluded', () {
+      final entries = [
+        ...baseEntries.take(7),
+        d(2026, 3, 11, t: 37.0, excluded: true), // fever day
+      ];
+      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.riseMarkConsistent, isFalse,
+          reason: 'an excluded temperature is not usable for the check');
+    });
+
+    test('null when no first-higher mark exists', () {
+      final e = evalFor(baseEntries, [peak(2026, 3, 9)], DateTime(2026, 3, 2));
+
+      expect(e.firstHigherDay, isNull);
+      expect(e.riseMarkConsistent, isNull);
+    });
+
+    test('null when no baseline exists (no usable low in the window)', () {
+      // The window Mar 5..Mar 10 of the Mar 11 mark carries no measured,
+      // not-excluded temperature — without a baseline the check is
+      // undefined (null), even though the marked day is measured.
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 11, t: 36.9), // marked rise; Mar 3..10 untracked
+      ];
+      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.baseline, isNull);
+      expect(e.riseMarkConsistent, isNull);
+    });
+  });
   group('edge matrix', () {
     test(
         'missing peak: numbering + baseline still work; the candidates '
