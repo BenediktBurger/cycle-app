@@ -349,7 +349,7 @@ void main() {
     // warnIfMissed: false — the tap point may fall on the cell's fixed-height
     // sign slot, which does not absorb hits itself; the enclosing InkWell's
     // pointer listener still receives it (same as the marks-row taps above).
-    await tester.tap(find.byKey(const ValueKey('symbolCell-2')),
+    await tester.tap(find.byKey(const ValueKey('bleedingCell-2')),
         warnIfMissed: false); // 9/8
     await tester.pumpAndSettle();
 
@@ -537,8 +537,9 @@ void main() {
 
     testWidgets('the sheet shows the day\'s recorded measurement time',
         (tester) async {
-      // The symbol row only carries a clock GLYPH — the tiny column cannot
-      // spell a time value; the sheet is where the value itself surfaces.
+      // Wide chart columns spell the time as text in the time row, but the
+      // sheet remains where the value surfaces unconditionally (at narrow
+      // column widths the row cell stays empty).
       final entries = [..._entries];
       entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
       await _pump(tester, entries: entries);
@@ -548,8 +549,14 @@ void main() {
       expect(find.textContaining('Measurement time:'), findsOneWidget,
           reason: 'the recorded measurement time value is shown in the day '
               'sheet');
-      expect(find.textContaining('6:30'), findsOneWidget,
-          reason: 'the time itself is locale-formatted into the line');
+      expect(
+          find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.textContaining('6:30')),
+          findsOneWidget,
+          reason: 'the time itself is locale-formatted into the sheet line '
+              '(the chart\'s time cell may spell the same text, so the '
+              'assertion is scoped to the sheet)');
     });
 
     testWidgets('no measurement-time line on a day without a recorded time',

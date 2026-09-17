@@ -1,0 +1,169 @@
+// Widget tests of the cycle tab's symbol glossary (help sheet): the
+// legend left the screen — the Zyklus AppBar carries an info_outline
+// action whose long-press-friendly tooltip opens a bottom sheet with the
+// full symbol glossary (every entry the on-screen legend carried) plus
+// the evaluation-arithmetic note. Localized in en and de.
+//
+// Same harness pattern as test/cycle_chart_rows_test.dart.
+import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
+import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/cycle.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+final _seedColor = const Color(0xFF6750A4);
+
+List<DailyEntry> _entries(int count) => [
+      for (var i = 0; i < count; i++)
+        DailyEntry(date: DateTime.utc(2026, 9, 7 + i), bbtC: 36.5),
+    ];
+
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  Locale locale = const Locale('en'),
+}) =>
+    ProviderScope(
+      overrides: [
+        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
+        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
+        selectedDateProvider.overrideWith((ref) => entries.first.date),
+      ],
+      child: MaterialApp(
+        themeMode: ThemeMode.system,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
+        ),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: locale,
+        home: const ZyklusScreen(),
+      ),
+    );
+
+/// The glossary entries the on-screen legend carried (en wording); each is
+/// asserted inside the help sheet.
+const _glossaryEn = [
+  'BBT (temperature)',
+  'Bleeding',
+  'Fertility sign (mucus)',
+  'Mucus peak',
+  'Circled higher measurements',
+  'Higher measurement (arrow)',
+  'Baseline',
+  'Sicher unfruchtbare Zeit (SUZ)',
+  'Cervix position',
+  'Cervix firmness',
+  'Measurement time',
+  'Sex (X per time of day)',
+  'Pain (B breast, M Mittelschmerz)',
+];
+
+const _glossaryDe = [
+  'BBT (Temperatur)',
+  'Blutung',
+  'Zeichen der Fruchtbarkeit (Schleim)',
+  'Schleimhöhepunkt',
+  'Umrandete höhere Messungen',
+  'höhere Messung (Pfeil)',
+  'Basislinie',
+  'Sicher unfruchtbare Zeit (SUZ)',
+  'Muttermund-Position',
+  'Muttermund-Festigkeit',
+  'Messzeitpunkt',
+  'Sex (X je Zeitpunkt)',
+  'Schmerz (B Brust, M Mittelschmerz)',
+];
+
+const _arithmeticNoteEn =
+    'Evaluation marks: you place the mucus peak and the first higher '
+    'measurement; numbering, baseline and circles are computed for display '
+    'only — no fertility statement.';
+
+const _arithmeticNoteDe =
+    'Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung '
+    'setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur '
+    'für die Anzeige berechnet — keine Fruchtbarkeitsangabe.';
+
+void main() {
+  group('help sheet', () {
+    testWidgets(
+        'the Zyklus AppBar carries an info_outline action with a localized '
+        'tooltip, and the glossary is NOT on the screen otherwise',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries(5)));
+      await tester.pumpAndSettle();
+
+      final action =
+          tester.widget<IconButton>(find.byKey(const ValueKey('cycleHelpAction')));
+      expect(action.icon, isA<Icon>().having(
+          (i) => i.icon, 'icon', Icons.info_outline),
+          reason: 'the affordance is the info_outline icon');
+      expect(action.tooltip, 'Show symbol glossary',
+          reason: 'the action carries its localized tooltip');
+
+      // The legend is gone from the screen: no glossary text renders
+      // outside the sheet.
+      for (final entry in _glossaryEn) {
+        expect(find.text(entry), findsNothing,
+            reason: '"$entry" no longer sits on the screen');
+      }
+    });
+
+    testWidgets('tapping the action opens the full symbol glossary (en)',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries(5)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget,
+          reason: 'the action opens a bottom sheet');
+      expect(find.byKey(const ValueKey('cycleHelpSheet')), findsOneWidget,
+          reason: 'the sheet carries its test key');
+      expect(find.text('Symbol glossary'), findsOneWidget,
+          reason: 'the sheet is titled');
+      for (final entry in _glossaryEn) {
+        expect(find.text(entry), findsOneWidget,
+            reason: 'the glossary explains "$entry"');
+      }
+      // The sheet also carries the evaluation-arithmetic note (which stays
+      // on the screen below the chart card too — scoped to the sheet here).
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text(_arithmeticNoteEn)),
+          findsOneWidget);
+    });
+
+    testWidgets('the glossary uses the German wording in de',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(
+          entries: _entries(5), locale: const Locale('de')));
+      await tester.pumpAndSettle();
+
+      expect(
+          tester
+                  .widget<IconButton>(
+                      find.byKey(const ValueKey('cycleHelpAction')))
+                  .tooltip,
+          'Zeichenerklärung anzeigen');
+
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Zeichenerklärung'), findsOneWidget);
+      for (final entry in _glossaryDe) {
+        expect(find.text(entry), findsOneWidget, reason: 'de: "$entry"');
+      }
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text(_arithmeticNoteDe)),
+          findsOneWidget);
+    });
+  });
+}

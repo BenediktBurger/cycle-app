@@ -1,7 +1,7 @@
 // Widget tests of the cycle tab's viewport-limited day window: for long
 // recorded ranges only the days that fit usefully on screen are rendered,
-// the whole chart block scrolls horizontally (curve + marks row + symbol
-// row together), the FIRST data frame auto-scrolls so the MOST RECENT days
+// the whole chart block scrolls horizontally (curve + signal
+// rows together), the FIRST data frame auto-scrolls so the MOST RECENT days
 // fill the viewport, a later entries re-emit never re-jumps (the user's
 // scrolled position survives), and a jump-to-date affordance moves the
 // window onto a picked calendar day. Tapping a day inside the scrolled
@@ -33,7 +33,7 @@ List<DailyEntry> _shortEntries() => [
       for (var i = 0; i < 5; i++) DailyEntry(date: _day(i), bbtC: 36.5),
     ];
 
-Finder _symbolCell(int index) => find.byKey(ValueKey('symbolCell-$index'));
+Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
 
 // The chart's day-column geometry at the test viewport (800 wide, 12 body
 // padding on each side): a 60-day range overflows, so columns render at the
@@ -77,9 +77,9 @@ void main() {
       // The newest days sit at the content's right edge, so the initial
       // auto-scroll jumped the viewport to the maximum scroll extent: the
       // last day column fills the window, the earliest days are off-screen.
-      expect(_symbolCell(59), findsOneWidget,
+      expect(_bleedingCell(59), findsOneWidget,
           reason: 'the newest days fill the viewport after the first frame');
-      expect(_symbolCell(0), findsNothing,
+      expect(_bleedingCell(0), findsNothing,
           reason: 'the earliest days are outside the initial window');
 
       // The jump is instant (no animation): the offset sits at the maximum
@@ -116,9 +116,9 @@ void main() {
       await tester.drag(_hScrollView(), const Offset(1000, 0));
       await tester.pumpAndSettle();
 
-      expect(_symbolCell(59), findsNothing,
+      expect(_bleedingCell(59), findsNothing,
           reason: 'the newest days scrolled out of the window');
-      expect(_symbolCell(0), findsOneWidget,
+      expect(_bleedingCell(0), findsOneWidget,
           reason: 'the earliest days appear once scrolled to');
 
       // The temperature scale must NOT rescale per window: the y bounds are
@@ -162,14 +162,14 @@ void main() {
 
       expect(state.position.pixels, offsetAfterDrag,
           reason: 'a later re-emit must not re-run the initial auto-scroll');
-      expect(_symbolCell(59), findsNothing,
+      expect(_bleedingCell(59), findsNothing,
           reason: 'the view stayed where the user dragged it, not at the end');
       // The dragged-to window still renders: at the dragged offset the
       // visible window starts around floor((offset − strip) / columnWidth)
       // — the scroll content leads with the chart's y-axis strip, so the
       // strip is subtracted before flooring onto the column grid.
       final firstVisible = ((offsetAfterDrag - 44.0) / _columnWidth).floor();
-      expect(_symbolCell(firstVisible + 2), findsOneWidget,
+      expect(_bleedingCell(firstVisible + 2), findsOneWidget,
           reason: 'the dragged-to window cells are still rendered');
     });
 
@@ -196,7 +196,7 @@ void main() {
           of: _hScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the first non-empty data frame jumps to the newest days');
-      expect(_symbolCell(59), findsOneWidget);
+      expect(_bleedingCell(59), findsOneWidget);
     });
 
     testWidgets(
@@ -222,13 +222,13 @@ void main() {
       // partially visible day is floor((offset − strip) / columnWidth).
       final leftmostVisible = ((offset - 44.0) / _columnWidth).floor();
 
-      expect(_symbolCell(leftmostVisible), findsOneWidget,
+      expect(_bleedingCell(leftmostVisible), findsOneWidget,
           reason: 'the leftmost visible day is rendered');
       // The window carries one day of margin before the visible edge, but
       // no further: the day BEFORE the margin must not render.
-      expect(_symbolCell(leftmostVisible - 1), findsOneWidget,
+      expect(_bleedingCell(leftmostVisible - 1), findsOneWidget,
           reason: 'the one-day margin before the visible edge renders');
-      expect(_symbolCell(leftmostVisible - 2), findsNothing,
+      expect(_bleedingCell(leftmostVisible - 2), findsNothing,
           reason: 'the window does not reach past the margin — the strip is '
               'accounted for, the window does not lag behind the scroll');
     });
@@ -253,9 +253,9 @@ void main() {
       await tester.tap(find.text('OK'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(_symbolCell(19), findsOneWidget,
+      expect(_bleedingCell(19), findsOneWidget,
           reason: 'the picked day is now inside the rendered window');
-      expect(_symbolCell(0), findsNothing,
+      expect(_bleedingCell(0), findsNothing,
           reason: 'the window jumped away from the first day');
     });
 
@@ -329,7 +329,7 @@ void main() {
       await tester.pumpAndSettle();
 
       for (var i = 0; i < 5; i++) {
-        expect(_symbolCell(i), findsOneWidget,
+        expect(_bleedingCell(i), findsOneWidget,
             reason: 'a short range fits usefully on one screen');
       }
 

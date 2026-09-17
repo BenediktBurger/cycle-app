@@ -1,5 +1,5 @@
 // Widget test of the Muttermund (cervix) display on the Zyklus chart: the
-// recorded position renders as a glyph in the symbol row under the
+// recorded position renders as a glyph in the cervix row under the
 // temperature curve, the firmness glyph renders BESIDE the position glyph
 // (one cervix line, two observations), days without an observation stay
 // empty, and the legend names the position symbol. Same harness pattern as
@@ -59,8 +59,8 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    // One glyph per position category, checked inside its own symbol cell
-    // (ValueKey convention 'symbolCell-$i'): low..unreachable days 0..4, day
+    // One glyph per position category, checked inside its own cervix cell
+    // (ValueKey convention 'cervixCell-$i'): low..unreachable days 0..4, day
     // 5 carries NO Muttermund observation and must render no glyph. The
     // scoping matters: the legend shows a sample glyph too.
     final glyphOf = {
@@ -73,7 +73,7 @@ void main() {
     for (final MapEntry(:key, :value) in glyphOf.entries) {
       expect(
         find.descendant(
-            of: find.byKey(ValueKey('symbolCell-$key')),
+            of: find.byKey(ValueKey('cervixCell-$key')),
             matching: find.text(value)),
         findsOneWidget,
         reason: 'position category index $key renders its glyph under the '
@@ -82,11 +82,11 @@ void main() {
     }
     // Negative assertion against ALL five glyph letters (not a vacuous
     // find.text('') match): day 5 has no cervix observation, so none of
-    // them may appear inside its symbol cell.
+    // them may appear inside its cervix cell.
     for (final glyph in glyphOf.values) {
       expect(
         find.descendant(
-            of: find.byKey(const ValueKey('symbolCell-5')),
+            of: find.byKey(const ValueKey('cervixCell-5')),
             matching: find.text(glyph)),
         findsNothing,
         reason: 'no "$glyph" glyph for a day without an observation',
@@ -104,7 +104,7 @@ void main() {
     // soft, distinct from every position letter).
     expect(
       find.descendant(
-          of: find.byKey(const ValueKey('symbolCell-0')),
+          of: find.byKey(const ValueKey('cervixCell-0')),
           matching: find.text('w')),
       findsOneWidget,
       reason: 'the firmness glyph renders beside the position glyph in the '
@@ -112,10 +112,13 @@ void main() {
     );
   });
 
-  testWidgets('the legend names the Muttermund symbol', (tester) async {
+  testWidgets('the help sheet names the Muttermund symbol', (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
+    // The on-screen legend moved into the help sheet.
+    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+    await tester.pumpAndSettle();
     expect(find.text('Cervix position'), findsOneWidget,
         reason: 'the glyph row needs a legend entry');
   });

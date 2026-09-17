@@ -73,9 +73,9 @@ void main() {
 
     for (var i = 0; i < 5; i++) {
       final dotX = _dotX(tester, i);
-      expect(dotX, closeTo(_cellCenterX(tester, 'symbolCell-$i'), 0.5),
-          reason: 'day $i: the chart dot must sit at the symbol cell\'s '
-              'horizontal center');
+      expect(dotX, closeTo(_cellCenterX(tester, 'bleedingCell-$i'), 0.5),
+          reason: 'day $i: the chart dot must sit at the bleeding row\'s '
+              'cell horizontal center');
       expect(dotX, closeTo(_cellCenterX(tester, 'dayLabel-$i'), 0.5),
           reason: 'day $i: the chart dot must sit at the day label cell\'s '
               'horizontal center');
@@ -93,7 +93,7 @@ void main() {
 
     // The lone day's dot sits at its column center — the domain is kept at
     // −0.5..0.5 (one full column wide) instead of collapsing.
-    expect(_dotX(tester, 0), closeTo(_cellCenterX(tester, 'symbolCell-0'), 0.5),
+    expect(_dotX(tester, 0), closeTo(_cellCenterX(tester, 'bleedingCell-0'), 0.5),
         reason: 'the single day\'s column center matches its dot');
 
     // Tapping the plot area opens the one recorded day's sheet.

@@ -13,7 +13,7 @@
 // low days, the baseline SEGMENT (R10: from the left edge of low #6's day
 // column to half a day past the last marked candidate's column, from the
 // domain's baselineSpan; a cycle with no marked candidate draws no segment)
-// and the solid peak dot ABOVE the mucus entry in the symbol row (R6 — the
+// and the solid peak dot ABOVE the mucus entry in the mucus row (R6 — the
 // peak no longer touches the temperature curve; EVERY placed peak renders,
 // driven from the marks stream so peaks render even when no evaluation
 // exists). The SUZ renders ONLY user-placed marks (a vertical bar spanning
@@ -29,9 +29,9 @@
 // docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
 //
 //   TODO(user-review): A peak day without a recorded entry renders NO dot
-//   in the symbol row (the row shows recorded observations only). The
+//   in the mucus row (the rows show recorded observations only). The
 //   old chart-anchored question is gone with the curve ring: the peak
-//   dot lives in the symbol row, where a day without an entry has no
+//   dot lives in the mucus row, where a day without an entry has no
 //   cell content to hang it on.
 //   TODO(user-review): Days after the SUZ trigger or after a
 //   connectedness break render as ordinary temperature dots (the domain
@@ -410,13 +410,31 @@ final class SuzArrowDotPainter extends FlDotPainter {
 
 // --- widget-level pieces ----------------------------------------------------
 
+/// The day-cell separator of the chart card's rows: a hairline matching
+/// the chart's vertical day grid lines (a subtle onSurface tint), thickened
+/// to the SOLID cycle-start line on cycle boundaries (the separator sits at
+/// x = nextCycleStart − 0.5 — i.e. on the RIGHT edge of the cell before the
+/// new cycle's first day). Shared by every row of the card (day header,
+/// signal rows, the 1–6 numbering row) so the vertical lines run through
+/// the whole card.
+BorderSide cycleDayCellBorderSide(BuildContext context,
+    {required bool isCycleBoundary}) {
+  final onSurface = Theme.of(context).colorScheme.onSurface;
+  return isCycleBoundary
+      ? BorderSide(width: 2, color: onSurface)
+      : BorderSide(width: 0.5, color: onSurface.withValues(alpha: 0.12));
+}
+
 /// The 1–6 numbering under the chart: one narrow tappable cell per
 /// calendar day, aligned by the same even day spacing as the chart and
-/// the symbol row (mirrors _SymbolRow in cycle.dart). The leading strip
+/// the signal rows (mirrors the rows in cycle.dart). The leading strip
 /// matches the chart's y-axis reservation — the curve's columns start
 /// right of it — so day cell i is centered at leadingStrip +
 /// (i + 0.5) * cellWidth, exactly where the chart draws day i's dot. Days
-/// outside the six-low windows render an empty fixed-height slot.
+/// outside the six-low windows render an empty fixed-height slot. The
+/// cells carry the card's day-cell separators (hairline, thickened on
+/// cycle boundaries) so the vertical lines run through the whole card;
+/// the numbering semantics themselves stay untouched.
 final class EvaluationMarksRow extends StatelessWidget {
   const EvaluationMarksRow({
     super.key,
@@ -425,6 +443,7 @@ final class EvaluationMarksRow extends StatelessWidget {
     required this.cellWidth,
     required this.numbersByIndex,
     required this.onDayTap,
+    this.isCycleBoundary,
   });
 
   final int dayCount;
@@ -437,6 +456,11 @@ final class EvaluationMarksRow extends StatelessWidget {
   final Map<int, int> numbersByIndex;
   final void Function(int index) onDayTap;
 
+  /// The shared cycle-boundary predicate (see _ChartDays.isCycleBoundary
+  /// in cycle.dart): when given, cell i's right border thickens on the
+  /// cell before a cycle start (day i + 1 opens a cycle).
+  final bool Function(int index)? isCycleBoundary;
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -448,9 +472,17 @@ final class EvaluationMarksRow extends StatelessWidget {
             width: cellWidth,
             child: InkWell(
               onTap: () => onDayTap(i),
-              child: _NumberCell(
-                key: ValueKey('marksCell-$i'),
-                number: numbersByIndex[i],
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    right: cycleDayCellBorderSide(context,
+                        isCycleBoundary: isCycleBoundary?.call(i + 1) ?? false),
+                  ),
+                ),
+                child: _NumberCell(
+                  key: ValueKey('marksCell-$i'),
+                  number: numbersByIndex[i],
+                ),
               ),
             ),
           ),

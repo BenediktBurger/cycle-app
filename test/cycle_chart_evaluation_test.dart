@@ -2,7 +2,7 @@
 // ADR-0001): the user places the mucus-peak and first-higher marks; the UI
 // derives and renders the candidate circles/arrows (kind decided PER
 // CANDIDATE: arrows at or before the peak day, circles strictly after — R4),
-// the solid peak dot in the symbol row, the 1–6 low numbering and the
+// the solid peak dot in the mucus row, the 1–6 low numbering and the
 // baseline SEGMENT (low #6 to the last marked candidate — R10). Derived
 // artifacts are computed at render time only — these tests pin how the
 // artifacts of lib/domain/evaluation.dart surface on the chart.
@@ -46,7 +46,7 @@ final _fri18 = DateTime.utc(2026, 9, 18);
 /// - 9/8..9/13 (idx 2..7): the six low measurements, numbered BACK from the
 ///   first higher (9/13 = 1 ... 9/8 = 6).
 /// - 9/9 (idx 3, 36.4): the HIGHEST of the six lows -> baseline 36.4.
-/// - 9/12 (idx 6): mucus-peak mark -> SOLID DOT in the symbol row (R6),
+/// - 9/12 (idx 6): mucus-peak mark -> SOLID DOT in the mucus row (R6),
 ///   NO ring on the temperature curve.
 /// - 9/14 (idx 8): first-higher mark; 36.9 -> circled #1.
 /// - 9/15 (idx 9): 36.9 -> circled #2.
@@ -184,7 +184,7 @@ Finder _peakDot(int dayIndex) => find.byKey(ValueKey('peakDot-$dayIndex'));
 
 void main() {
   group(
-      'R6 — the peak renders as a solid dot in the symbol row, not on '
+      'R6 — the peak renders as a solid dot in the mucus row, not on '
       'the curve', () {
     testWidgets(
         'the peak day keeps a plain temperature dot — no ring on '
@@ -228,11 +228,11 @@ void main() {
 
     testWidgets(
         'the peak renders as a solid dot ABOVE the mucus glyph in '
-        'the symbol row (classic NER position)', (tester) async {
+        'the mucus row (classic NER position)', (tester) async {
       await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
       await tester.pumpAndSettle();
 
-      // 9/12 (idx 6) carries the peak mark -> solid dot in the symbol row.
+      // 9/12 (idx 6) carries the peak mark -> solid dot in the mucus row.
       expect(_peakDot(6), findsOneWidget);
       // Neighboring days carry no peak dot.
       expect(_peakDot(5), findsNothing);
@@ -243,7 +243,7 @@ void main() {
       final mucusTop = tester
           .getTopLeft(find
               .descendant(
-                of: find.byKey(const ValueKey('symbolCell-6')),
+                of: find.byKey(const ValueKey('mucusCell-6')),
                 matching: find.byType(MucusSymbolText),
               )
               .first)
@@ -262,14 +262,14 @@ void main() {
     testWidgets(
         'a peak day without an entry keeps rendering no dot and '
         'does not crash', (tester) async {
-      // 9/12 has NO entry at all: the symbol cell stays empty (flagged
+      // 9/12 has NO entry at all: the mucus cell stays empty (flagged
       // rendering assumption, see cycle.dart).
       final entries = _entries.where((e) => !_sameDay(e, _sat12)).toList();
       await tester.pumpWidget(_harness(entries: entries, marks: _marks));
       await tester.pumpAndSettle();
 
       expect(_peakDot(6), findsNothing,
-          reason: 'no entry -> the symbol row renders nothing for the day');
+          reason: 'no entry -> the mucus row renders nothing for the day');
       for (final bar in _dotBars(tester)) {
         for (final spot in bar.spots) {
           final painter =
@@ -536,11 +536,15 @@ void main() {
     });
   });
 
-  group('legend', () {
+  group('legend (the symbol glossary help sheet)', () {
     testWidgets(
-        'the legend explains the new glyphs: solid peak dot, '
+        'the help sheet explains the new glyphs: solid peak dot, '
         'circled and arrowed higher measurements, baseline', (tester) async {
       await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
+      await tester.pumpAndSettle();
+
+      // The legend moved into the help sheet: open it first.
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
       await tester.pumpAndSettle();
 
       expect(find.text('Mucus peak'), findsOneWidget,
@@ -553,10 +557,12 @@ void main() {
       expect(find.text('Higher measurement before the peak'), findsNothing);
     });
 
-    testWidgets('the legend explains the SUZ glyph', (tester) async {
+    testWidgets('the help sheet explains the SUZ glyph', (tester) async {
       await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+      await tester.pumpAndSettle();
       expect(find.text('Sicher unfruchtbare Zeit (SUZ)'), findsOneWidget,
           reason: 'the SUZ bar+arrow glyph has its own legend entry');
     });

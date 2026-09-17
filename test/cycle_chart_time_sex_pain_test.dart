@@ -1,12 +1,13 @@
-// Widget tests of the cycle tab's recorded-fact glyphs in the symbol row
-// under the temperature curve: the temperature measurement time (a small
-// clock glyph whenever a temperature with a recorded measurement time
-// exists), the sex time slots (one X glyph per SET SexTiming bit, drawn at
+// Widget tests of the cycle tab's recorded-fact glyphs in the per-signal
+// rows under the temperature curve: the measurement time renders as
+// localized HH:mm text in its own row when the column is wide enough (the
+// old per-day clock glyph is gone — the clock lives only in the row
+// corner), the sex time slots (one X glyph per SET SexTiming bit, drawn at
 // that slot's third of the day column — multiple bits render multiple X
-// marks), and the letter-coded pain flags B (breast) and M (Mittelschmerz).
-// Days without the respective fact render nothing, and the legend names the
-// symbols. Same harness pattern as test/cycle_chart_cervix_test.dart
-// (localized en, plus a de legend check).
+// marks), and the letter-coded pain flags B (breast) and M
+// (Mittelschmerz). Days without the respective fact render nothing. Same
+// harness pattern as test/cycle_chart_cervix_test.dart (localized en, plus
+// a de wording check).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -54,10 +55,10 @@ List<DailyEntry> _entries() => [
       ),
     ];
 
-Finder _cell(int i) => find.byKey(ValueKey('symbolCell-$i'));
+Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
 
-Finder _inCell(int i, Finder inner) =>
-    find.descendant(of: _cell(i), matching: inner);
+Finder _inCell(int i, String row, Finder inner) =>
+    find.descendant(of: _cell(i, row), matching: inner);
 
 Widget _chartHarness({
   required List<DailyEntry> entries,
@@ -82,21 +83,27 @@ Widget _chartHarness({
     );
 
 void main() {
-  testWidgets('the measurement time renders a clock glyph on days with a '
-      'recorded measurement time — and nowhere else', (tester) async {
+  testWidgets('the measurement time renders localized HH:mm text on days '
+      'with a recorded measurement time — and nothing elsewhere',
+      (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(0, find.byIcon(Icons.schedule)), findsOneWidget,
-        reason: 'the temperature day WITH a recorded time shows the clock '
-            'glyph');
-    expect(_inCell(1, find.byIcon(Icons.schedule)), findsNothing,
-        reason: 'a temperature WITHOUT a recorded time shows no clock glyph');
-    expect(_inCell(2, find.byIcon(Icons.schedule)), findsNothing,
+    // 8+1 chart days fit the viewport comfortably, so the columns are wide
+    // enough for the time text.
+    expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget,
+        reason: 'the temperature day WITH a recorded time shows the HH:mm '
+            'text in its own time cell');
+    expect(_inCell(1, 'time', find.text('06:30')), findsNothing,
+        reason: 'a temperature WITHOUT a recorded time shows no time text');
+    expect(_inCell(2, 'time', find.byType(Text)), findsNothing,
         reason: 'a temperature-free day can never carry a measurement time '
             '(the domain drops the time without a temperature)');
-    expect(_inCell(6, find.byIcon(Icons.schedule)), findsNothing,
-        reason: 'a plain temperature day without a time shows no glyph');
+    expect(_inCell(6, 'time', find.byType(Text)), findsNothing,
+        reason: 'a plain temperature day without a time shows nothing');
+    expect(_inCell(2, 'time', find.byIcon(Icons.schedule)), findsNothing,
+        reason: 'no per-day clock icon — the clock lives only in the row '
+            'corner slot');
   });
 
   testWidgets('sex renders X marks only on days with recorded time slots',
@@ -104,11 +111,11 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(2, find.text('X')), findsOneWidget,
+    expect(_inCell(2, 'sex', find.text('X')), findsOneWidget,
         reason: 'the sex day shows the X glyph in its own cell');
-    expect(_inCell(0, find.text('X')), findsNothing,
+    expect(_inCell(0, 'sex', find.text('X')), findsNothing,
         reason: 'no X on a temperature day without sex');
-    expect(_inCell(6, find.text('X')), findsNothing);
+    expect(_inCell(6, 'sex', find.text('X')), findsNothing);
   });
 
   testWidgets('every set sex time slot renders its own X — multiple slots '
@@ -116,9 +123,9 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(5, find.text('X')), findsNWidgets(2),
+    expect(_inCell(5, 'sex', find.text('X')), findsNWidgets(2),
         reason: 'two recorded slots (start + end) render two X marks');
-    expect(_inCell(2, find.text('X')), findsOneWidget,
+    expect(_inCell(2, 'sex', find.text('X')), findsOneWidget,
         reason: 'a single recorded slot renders exactly one X');
   });
 
@@ -130,14 +137,14 @@ void main() {
     double fractionOf(Rect cell, Rect glyph) =>
         (glyph.center.dx - cell.left) / cell.width;
 
-    final cell2 = tester.getRect(find.byKey(const ValueKey('symbolCell-2')));
-    final startX = tester.getRect(_inCell(2, find.text('X')));
+    final cell2 = tester.getRect(_cell(2, 'sex'));
+    final startX = tester.getRect(_inCell(2, 'sex', find.text('X')));
     expect(fractionOf(cell2, startX), closeTo(1 / 6, 0.05),
         reason: 'a start-slot X renders in the START third (center ~1/6) of '
             'the day column');
 
-    final cell5 = tester.getRect(find.byKey(const ValueKey('symbolCell-5')));
-    final xRects = _inCell(5, find.text('X')).evaluate().map((element) {
+    final cell5 = tester.getRect(_cell(5, 'sex'));
+    final xRects = _inCell(5, 'sex', find.text('X')).evaluate().map((element) {
       final box = element.renderObject! as RenderBox;
       return box.localToGlobal(Offset.zero) & box.size;
     }).toList()
@@ -155,19 +162,19 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(3, find.text('B')), findsOneWidget,
+    expect(_inCell(3, 'pain', find.text('B')), findsOneWidget,
         reason: 'breast pain shows the B letter');
-    expect(_inCell(3, find.text('M')), findsNothing,
+    expect(_inCell(3, 'pain', find.text('M')), findsNothing,
         reason: 'no Mittelschmerz letter without the flag');
-    expect(_inCell(4, find.text('M')), findsOneWidget,
+    expect(_inCell(4, 'pain', find.text('M')), findsOneWidget,
         reason: 'Mittelschmerz shows the M letter');
-    expect(_inCell(4, find.text('B')), findsNothing,
+    expect(_inCell(4, 'pain', find.text('B')), findsNothing,
         reason: 'no breast letter without the flag');
-    expect(_inCell(5, find.text('B')), findsOneWidget);
-    expect(_inCell(5, find.text('M')), findsOneWidget);
-    expect(_inCell(6, find.text('B')), findsNothing,
+    expect(_inCell(5, 'pain', find.text('B')), findsOneWidget);
+    expect(_inCell(5, 'pain', find.text('M')), findsOneWidget);
+    expect(_inCell(6, 'pain', find.text('B')), findsNothing,
         reason: 'a plain day shows neither pain letter');
-    expect(_inCell(6, find.text('M')), findsNothing);
+    expect(_inCell(6, 'pain', find.text('M')), findsNothing);
   });
 
   testWidgets('a combined day carries the sex X marks alongside both pain '
@@ -175,8 +182,12 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(5, find.text('X')), findsNWidgets(2),
-        reason: 'the sex X marks and the pain letters coexist in one cell');
+    expect(_inCell(5, 'sex', find.text('X')), findsNWidgets(2),
+        reason: 'the sex X marks render in their own row');
+    expect(_inCell(5, 'pain', find.text('B')), findsOneWidget,
+        reason: 'the pain letters render in their own row beside the sex '
+            'row');
+    expect(_inCell(5, 'pain', find.text('M')), findsOneWidget);
   });
 
   testWidgets('a firmness-only day renders its glyph with no position '
@@ -184,21 +195,24 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(7, find.text('w')), findsOneWidget,
+    expect(_inCell(7, 'cervix', find.text('w')), findsOneWidget,
         reason: 'the soft-firmness glyph (paper shorthand w) renders in its '
             'own cell');
     for (final glyph in ['t', 'm', 'h', 'sh', 'u']) {
-      expect(_inCell(7, find.text(glyph)), findsNothing,
+      expect(_inCell(7, 'cervix', find.text(glyph)), findsNothing,
           reason: 'no position letter ($glyph) without a position '
               'observation');
     }
   });
 
-  testWidgets('the legend names the measurement time, sex, firmness, and '
-      'pain symbols', (tester) async {
+  testWidgets('the help sheet names the measurement time, sex, firmness, '
+      'and pain symbols', (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
+    // The on-screen legend moved into the help sheet.
+    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+    await tester.pumpAndSettle();
     expect(find.text('Measurement time'), findsOneWidget,
         reason: 'the clock glyph needs a legend entry');
     expect(find.text('Sex (X per time of day)'), findsOneWidget,
@@ -211,11 +225,14 @@ void main() {
         reason: 'the B/M letters need a legend entry');
   });
 
-  testWidgets('the German legend uses the German wording', (tester) async {
+  testWidgets('the German help sheet uses the German wording',
+      (tester) async {
     await tester.pumpWidget(_chartHarness(
         entries: _entries(), locale: const Locale('de')));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+    await tester.pumpAndSettle();
     expect(find.text('Messzeitpunkt'), findsOneWidget);
     expect(find.text('Sex (X je Zeitpunkt)'), findsOneWidget,
         reason: 'the diary already uses "Sex" in the German vocabulary');

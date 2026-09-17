@@ -264,4 +264,49 @@ void main() {
           reason: 'the lighter segments keep darkness-readable contrast');
     });
   });
+
+  group('adaptive chart height', () {
+    double chartHeight(WidgetTester tester) =>
+        tester.getRect(find.byType(LineChart)).height;
+
+    testWidgets('a small y-span keeps the base height of 260',
+        (tester) async {
+      // Five days around 36.5: the rounded bounds span 1 °C.
+      await tester.pumpWidget(_chartHarness(entries: [
+        for (var i = 0; i < 5; i++)
+          DailyEntry(date: _thu.add(Duration(days: i)), bbtC: 36.5),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(chartHeight(tester), closeTo(260, 0.5),
+          reason: 'a comfortable ~1 °C span needs the base height');
+    });
+
+    testWidgets('the height grows with the y-span', (tester) async {
+      // 36.5 .. 40.0 → rounded bounds 36.0..40.5 (span 4.5 °C): 260 base
+      // plus 1.5 °C beyond the comfortable 3 °C at 80 px per degree.
+      await tester.pumpWidget(_chartHarness(entries: [
+        DailyEntry(date: _thu, bbtC: 36.5),
+        DailyEntry(date: _fri, bbtC: 40.0),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(chartHeight(tester), closeTo(380, 0.5),
+          reason: 'a 4.5 °C span grows the plot: 260 + (4.5 − 3) × 80');
+    });
+
+    testWidgets('the height is capped — a wide span does not grow without '
+        'bounds', (tester) async {
+      // 34.5 .. 41.5 → rounded bounds 34.0..42.0 (span 8 °C, far past the
+      // growth range).
+      await tester.pumpWidget(_chartHarness(entries: [
+        DailyEntry(date: _thu, bbtC: 34.5),
+        DailyEntry(date: _fri, bbtC: 41.5),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(chartHeight(tester), closeTo(400, 0.5),
+          reason: 'the growth is capped at 400');
+    });
+  });
 }
