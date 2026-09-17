@@ -11,40 +11,6 @@ ephemeral and not versioned — this roadmap is therefore the only durable
 record of those IDs. They appear here and nowhere else: not in code
 comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 
-## Milestone 1 — Phase 1 (app shell)
-
-- [ ] CI green on GitHub (`flutter analyze` + `flutter test` +
-      `flutter build web`)
-
-## Phase 2 — data layer & real screens (WP2.x)
-
-- [x] **WP2.2 / WP2.2.1** — `openCycleDatabase()` wired: native = lazy
-      background-isolate file DB, web = drift wasm (`web/sqlite3.wasm` +
-      `web/drift_worker.js` vendored); wrapped as the Riverpod
-      `databaseProvider` behind the splash gate
-- [x] **WP2.2 (web)** — wasm + worker assets vendored from the drift 2.35.0
-      release; run note updated in [CONTRIBUTING.md](../CONTRIBUTING.md) §3
-- [x] **WP2.2.2** — language switcher (de/en) in settings; in-memory only
-      (resets to the system default on reload — documented limitation)
-- [x] **WP2.2.3** — JSON export/import in settings: copy-text path on all
-      platforms, browser download + file input on web, home-directory file
-      on desktop; merge policy (profile, date) = overwrite with counts
-- [x] **WP2.2.4** — real Tagebuch entry form (full field set incl. the
-      NFP mucus mapping table, marked as a review-pending assumption)
-- [x] **WP2.2.5** — Tagebuch entries list grouped by cycle: live entry
-      stream → domain cycle grouping, newest cycle first; per-day tiles
-      carry bleeding/exclusion/BBT/NFP/notes and load the day back into
-      the entry form on tap
-- [x] **WP2.2.6** — Zyklus temperature curve (fl_chart) + bleeding/mucus
-      symbol row; tapping a day opens the entry form on that date
-- [x] **WP2.2.7** — real Statistik screens — **arithmetic only**, no
-      interpretive or status conclusions (flagged for INER expert review,
-      ADR-001)
-
-Manual acceptance for each Phase-2 screen (once wired): data survives a page
-reload (persistence), language switch reflects immediately, export/import
-round-trips, Statistik shows arithmetic only.
-
 ## Backlog — issues & improvements
 
 Collector for real issues and improvement ideas that are not (yet) part of a
@@ -63,13 +29,12 @@ the sections above track planned work, git history keeps the record (see
   (morning/midday/evening), … — the exact term list must be specified first.
   - show sex as an X (and distinguish morning/midday/evening)
   - generic exclude temperature and a note, or keep these different reasons
-  - add "Ausfluss" (A) as an option to mucus
+  - [ ] add "Ausfluss" (A) as an option to mucus
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
-- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
+- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - pdf export for consultants (one cycle per sheet?)
-- [ ] drip importer: only sex with partner without contraception is mapped to sex
 - [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
 - [ ] only store time if temperature is added (not for mucus etc.)
 - [ ] show temperature measurement time, sex, and pain (M, B) on cycle tab
@@ -90,3 +55,5 @@ the sections above track planned work, git history keeps the record (see
 - add descriptions (texts TBD) and tooltips
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?
+
+- Indicate the fourth day after mucus peak without temperature rising with arrow down (↓) - DOMAIN

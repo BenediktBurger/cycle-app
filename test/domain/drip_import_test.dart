@@ -66,6 +66,27 @@ const List<String> painHeader = [
   'pain.note',
 ];
 
+/// The full drip sex-column family in drip's own column order (drip:
+/// labels.js — activity solo/partner, contraceptives condom/pill/iud/patch/
+/// ring/implant/diaphragm/none/other, then the note). Used to pin the sex
+/// observation rule ("only with a partner, without contraception")
+/// separately from the shared minimal header above.
+const List<String> sexHeader = [
+  'date',
+  'sex.solo',
+  'sex.partner',
+  'sex.condom',
+  'sex.pill',
+  'sex.iud',
+  'sex.patch',
+  'sex.ring',
+  'sex.implant',
+  'sex.diaphragm',
+  'sex.none',
+  'sex.other',
+  'sex.note',
+];
+
 /// Builds a drip CSV: [header] plus one data [row] joined the way drip
 /// writes its files (plain comma join, plain newlines).
 String dripOneRowCsv(List<String> header, List<String> row) =>
@@ -379,10 +400,128 @@ void main() {
           reason: 'the pain note is mapped data (the [pain] line)');
     });
 
+    group('sex: only with partner without contraception maps', () {
+      /// Data row cells aligned to [sexHeader] (0 = date, 1..12 the sex
+      /// family in drip's column order).
+      List<String> sexCells(String date, Map<int, String> byIndex) {
+        final c = List.filled(sexHeader.length, '');
+        c[0] = date;
+        byIndex.forEach((i, v) => c[i] = v);
+        return c;
+      }
+
+      // sexHeader indices: 1 solo, 2 partner, 3 condom, 4 pill, 5 iud,
+      // 6 patch, 7 ring, 8 implant, 9 diaphragm, 10 none, 11 other,
+      // 12 note. The note anchors the row in the not-mapped cases (the
+      // unmappable flags alone would leave the row data-less and skipped).
+      test('partner + none → the sex observation (the only mapped variant)',
+          () {
+        final e = entryOf(sexCells('2026-01-01', {2: 'true', 10: 'true'}),
+            header: sexHeader);
+        expect(e['sex'], isTrue);
+      });
+
+      test('partner + none with the note → sex flag and [sex] note line', () {
+        final e = entryOf(
+            sexCells('2026-01-01', {2: 'true', 10: 'true', 12: 'good day'}),
+            header: sexHeader);
+        expect(e['sex'], isTrue);
+        expect(e['notes'], '[sex] good day');
+      });
+
+      test('partner with any contraceptive method → not sex', () {
+        // The [sex] note keeps the day importable in every variant; the
+        // sex observation itself stays unset.
+        for (final method in [3, 4, 5, 6, 7, 8, 9, 11]) {
+          final result = dripCsvToExportJson(
+              dripOneRowCsv(
+                  sexHeader,
+                  sexCells(
+                      '2026-01-01', {2: 'true', method: 'true', 12: 'n'})));
+          final doc = jsonDecode(result.json) as Map<String, Object?>;
+          final e = (doc['entries']! as List).single as Map<String, Object?>;
+          expect(e['sex'], isFalse,
+              reason: 'method index $method is a contraception');
+          expect(e['notes'], '[sex] n');
+        }
+      });
+
+      test('partner + none + a method together → not sex (contradictory)',
+          () {
+        final result = dripCsvToExportJson(dripOneRowCsv(
+            sexHeader,
+            sexCells('2026-01-01',
+                {2: 'true', 10: 'true', 3: 'true', 12: 'n'})));
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        final e = (doc['entries']! as List).single as Map<String, Object?>;
+        expect(e['sex'], isFalse,
+            reason: 'a recorded method contradicts the none confirmation');
+      });
+
+      test('partner without any contraceptive info → not sex (ambiguous)', () {
+        // No generous defaults: only an explicit none=true confirms "no
+        // contraception"; absent columns are unknown, not "none".
+        final result = dripCsvToExportJson(dripOneRowCsv(
+            sexHeader, sexCells('2026-01-01', {2: 'true', 12: 'n'})));
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        final e = (doc['entries']! as List).single as Map<String, Object?>;
+        expect(e['sex'], isFalse);
+        expect(e['notes'], '[sex] n');
+      });
+
+      test('solo never maps to the sex observation, even with none', () {
+        final result = dripCsvToExportJson(dripOneRowCsv(
+            sexHeader,
+            sexCells('2026-01-01', {1: 'true', 10: 'true', 12: 'n'})));
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        final e = (doc['entries']! as List).single as Map<String, Object?>;
+        expect(e['sex'], isFalse, reason: 'solo is not partner sex');
+        expect(e['notes'], '[sex] n');
+      });
+
+      test('solo-only / partner-only / method-only rows are skipped entirely',
+          () {
+        // Unmappable sex flags alone are NOT data — the same rule as the
+        // unmappable pain kinds (the row carries no other mapped field).
+        for (final Map<int, String> variant in [
+          {1: 'true'}, // solo
+          {2: 'true'}, // partner, no contraceptive info
+          {3: 'true'}, // condom
+          {10: 'true'}, // none, no activity
+          {
+            1: 'true',
+            2: 'true',
+          }, // solo + partner without contraceptive info
+        ]) {
+          final result = dripCsvToExportJson(
+              dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)));
+          expect(result.stats.rowsImported, 0,
+              reason: 'variant $variant maps to nothing');
+          expect(result.stats.rowsSkippedEmpty, 1,
+              reason: 'variant $variant is not data');
+        }
+      });
+    });
+
     test('desire/sex/pain/mood: flags and note-only days', () {
       expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
-      expect(entryOf(cells('2026-01-01', {13: 'true'}))['sex'], true);
-      expect(entryOf(cells('2026-01-01', {14: 'true'}))['sex'], true);
+      // Solo sex and partner sex WITHOUT the positive "no contraception"
+      // confirmation are dropped (the detailed variants are pinned in the
+      // dedicated sex group below) — such rows carry no data at all.
+      final soloOnly =
+          dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
+            13: 'true',
+          })));
+      expect(soloOnly.stats.rowsImported, 0,
+          reason: 'solo sex maps to nothing, the row has no other data');
+      expect(soloOnly.stats.rowsSkippedEmpty, 1);
+      final partnerOnly =
+          dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
+            14: 'true',
+          })));
+      expect(partnerOnly.stats.rowsImported, 0,
+          reason: 'partner sex without contraception info is not mapped');
+      expect(partnerOnly.stats.rowsSkippedEmpty, 1);
       // contraceptive columns are ignored (no model for them) — a row with
       // no activity beyond them is data-less and skipped entirely (its
       // stats are pinned separately below)
@@ -572,8 +711,23 @@ void main() {
       // desire + mood-flag day
       expect(by('2026-08-20')['desire'], true);
       expect(by('2026-08-20')['mood'], true);
-      // sex day
-      expect(by('2026-08-16')['sex'], true);
+      // Sex observations: only with-partner-without-contraception days map
+      // to sex. The specimen's sex days all fail that rule — 2026-07-17
+      // (partner WITH a condom), 2026-08-16 (partner, but the only
+      // contraceptive info is condom=false/pill=false: no explicit none,
+      // the rest unknown → ambiguous, dropped entirely), 2026-09-12
+      // (solo) — so no day carries sex=true.
+      expect(entries.any((e) => e['date'] == '2026-08-16'), isFalse,
+          reason: 'ambiguous partner day without contraception info: '
+              'not sex, not data');
+      final withCondom = by('2026-07-17');
+      expect(withCondom['sex'], isFalse,
+          reason: 'partner sex with a condom is not the mapped variant');
+      expect(withCondom['desire'], isTrue);
+      expect(withCondom['notes'], '[sex] with condom, quite good');
+      final soloDay = by('2026-09-12');
+      expect(soloDay['sex'], isFalse, reason: 'solo is not partner sex');
+      expect(soloDay['notes'], '[sex] morning');
       // breast-pain (B) + pain-note day (drip pain.tenderBreasts → B)
       expect(by('2026-08-25')['pain_breast'], true);
       expect(by('2026-08-25')['pain_mittelschmerz'], false);

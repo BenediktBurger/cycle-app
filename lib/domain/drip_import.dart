@@ -260,7 +260,33 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // `false`).
     final desireCell = cell(dataRow, 'desire.value');
     final desire = desireCell != null && desireCell.trim() != 'false';
-    final sex = boolCell(dataRow, 'sex.solo') || boolCell(dataRow, 'sex.partner');
+    // drip tracks sex as activity (solo/partner) plus the contraceptive
+    // methods used (condom, pill, iud, patch, ring, implant, diaphragm,
+    // other — and `none`, the explicit "no contraception used" choice;
+    // drip: components/helpers/labels.js). cycle-app's sex observation
+    // models partner sex WITHOUT contraception, so only a positive
+    // confirmation of both halves maps: sex.partner=true AND sex.none=true
+    // AND no contraceptive method flag true. Every other variant — solo
+    // sex, a method used, a missing contraceptive answer (partner with no
+    // contraceptive column set at all), even none=true next to a method —
+    // maps to nothing and is NOT data: a row carrying only such flags is
+    // skipped entirely (see the data rule below). The [sex] note line
+    // keeps its note-driven behavior independent of the flag.
+    // TODO(user-review): solo sex and the contraceptive methods have no
+    // storage option; whether solo sex deserves an option of its own.
+    final sexPartner = boolCell(dataRow, 'sex.partner');
+    final sexNone = boolCell(dataRow, 'sex.none');
+    final sexMethod = [
+      'sex.condom',
+      'sex.pill',
+      'sex.iud',
+      'sex.patch',
+      'sex.ring',
+      'sex.implant',
+      'sex.diaphragm',
+      'sex.other',
+    ].any((name) => boolCell(dataRow, name));
+    final sex = sexPartner && sexNone && !sexMethod;
 
     final dayNote = cell(dataRow, 'note.value');
     final tempNote = cell(dataRow, 'temperature.note');
@@ -280,8 +306,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final mood = flagInFamily(dataRow, 'mood') || moodNote != null;
 
     // A row is only worth an entry when something mappable was recorded.
-    // Dropped columns (bleeding/mucus/cervix excludes, contraceptive flags
-    // without activity, unmappable pain kinds, symptom-flag FALSEs) are
+    // Dropped columns (bleeding/mucus/cervix excludes, the sex variants that
+    // do not map — solo, a contraceptive method, missing contraceptive
+    // info —, unmappable pain kinds, symptom-flag FALSEs) are
     // NOT data — otherwise every blank drip day would import. A measured
     // time belongs to its measurement, so a time cell alone never makes a
     // blank day an entry.
