@@ -46,7 +46,6 @@ the sections above track planned work, git history keeps the record (see
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)? In the "marks" table – but it is raw data (but not per day).
-- [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
 - add descriptions (texts TBD) and tooltips
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?

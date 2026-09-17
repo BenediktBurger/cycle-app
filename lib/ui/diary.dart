@@ -226,7 +226,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final selected = ref.watch(selectedDateProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navTagebuch)),
+      appBar: AppBar(title: Text(l10n.navDiary)),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

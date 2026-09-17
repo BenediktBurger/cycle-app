@@ -4,10 +4,10 @@
   "@appTitle": {
     "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
   },
-  "navTagebuch": "Diary",
-  "navZyklus": "Cycle",
-  "navStatistik": "Statistics",
-  "navEinstellungen": "Settings",
+  "navDiary": "Diary",
+  "navCycle": "Cycle",
+  "navStatistics": "Statistics",
+  "navSettings": "Settings",
   "entryDate": "Date",
   "entryPreviousDay": "Previous day",
   "entryNextDay": "Next day",
@@ -82,17 +82,17 @@
     }
   },
   "cycleTapToEdit": "Tap a day to edit it",
-  "zyklusLegendTemperature": "BBT (temperature)",
-  "zyklusLegendBleeding": "Bleeding",
-  "zyklusLegendMucus": "Fertility sign (mucus)",
-  "zyklusLegendMucusPeak": "Mucus peak",
-  "zyklusLegendCircledHigher": "Circled higher measurements",
-  "zyklusLegendArrowHigher": "Higher measurement (arrow)",
-  "zyklusLegendBaseline": "Baseline",
-  "zyklusLegendCervix": "Cervix position",
-  "zyklusNoData": "The temperature curve appears once days with measurements exist.",
-  "zyklusJumpToDate": "Jump to date",
-  "zyklusArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
+  "cycleLegendTemperature": "BBT (temperature)",
+  "cycleLegendBleeding": "Bleeding",
+  "cycleLegendMucus": "Fertility sign (mucus)",
+  "cycleLegendMucusPeak": "Mucus peak",
+  "cycleLegendCircledHigher": "Circled higher measurements",
+  "cycleLegendArrowHigher": "Higher measurement (arrow)",
+  "cycleLegendBaseline": "Baseline",
+  "cycleLegendCervix": "Cervix position",
+  "cycleNoData": "The temperature curve appears once days with measurements exist.",
+  "cycleJumpToDate": "Jump to date",
+  "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
   "cycleSheetSetMucusPeak": "Set mucus peak",
   "cycleSheetRemoveMucusPeak": "Remove mucus peak",
@@ -132,7 +132,7 @@
     "description": "The difference of a circled/arrowed higher measurement to the baseline (R7); the value is pre-formatted with the locale's decimal style."
   },
   "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
-  "zyklusLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
+  "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSetSuzEvening": "SUZ from this evening",
   "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",
   "cycleSheetSetSuzMorning": "SUZ from this morning",
@@ -145,9 +145,9 @@
       }
     }
   },
-  "zyklusLegendMeasuredAt": "Measurement time",
-  "zyklusLegendSex": "Sex",
-  "zyklusLegendPain": "Pain (B breast, M Mittelschmerz)",
+  "cycleLegendMeasuredAt": "Measurement time",
+  "cycleLegendSex": "Sex",
+  "cycleLegendPain": "Pain (B breast, M Mittelschmerz)",
   "cycleSheetMeasuredAt": "Measurement time: {time}",
   "@cycleSheetMeasuredAt": {
     "placeholders": {
@@ -156,16 +156,16 @@
       }
     }
   },
-  "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
-  "statistikNoData": "Cycle lengths appear once two period onsets are recorded.",
-  "statistikCycles": "Cycle lengths",
-  "statistikOnsets": "Period onsets",
-  "statistikAverage": "Average",
-  "statistikShortest": "Shortest",
-  "statistikLongest": "Longest",
-  "statistikDistribution": "Distribution",
-  "statistikDays": "{n} days",
-  "@statistikDays": {
+  "statisticsNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
+  "statisticsNoData": "Cycle lengths appear once two period onsets are recorded.",
+  "statisticsCycles": "Cycle lengths",
+  "statisticsOnsets": "Period onsets",
+  "statisticsAverage": "Average",
+  "statisticsShortest": "Shortest",
+  "statisticsLongest": "Longest",
+  "statisticsDistribution": "Distribution",
+  "statisticsDays": "{n} days",
+  "@statisticsDays": {
     "placeholders": {
       "n": {
         "type": "int"

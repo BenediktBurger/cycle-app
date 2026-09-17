@@ -1,10 +1,10 @@
 {
   "@@locale": "de",
   "appTitle": "Zyklus-App (Arbeitstitel)",
-  "navTagebuch": "Tagebuch",
-  "navZyklus": "Zyklus",
-  "navStatistik": "Statistik",
-  "navEinstellungen": "Einstellungen",
+  "navDiary": "Tagebuch",
+  "navCycle": "Zyklus",
+  "navStatistics": "Statistik",
+  "navSettings": "Einstellungen",
   "entryDate": "Datum",
   "entryPreviousDay": "Voriger Tag",
   "entryNextDay": "Nächster Tag",
@@ -79,17 +79,17 @@
     }
   },
   "cycleTapToEdit": "Tippen, um den Tag zu bearbeiten",
-  "zyklusLegendTemperature": "BBT (Temperatur)",
-  "zyklusLegendBleeding": "Blutung",
-  "zyklusLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
-  "zyklusLegendMucusPeak": "Schleimhöhepunkt",
-  "zyklusLegendCircledHigher": "Umrandete höhere Messungen",
-  "zyklusLegendArrowHigher": "höhere Messung (Pfeil)",
-  "zyklusLegendBaseline": "Basislinie",
-  "zyklusLegendCervix": "Muttermund-Position",
-  "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
-  "zyklusJumpToDate": "Zum Datum springen",
-  "zyklusArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
+  "cycleLegendTemperature": "BBT (Temperatur)",
+  "cycleLegendBleeding": "Blutung",
+  "cycleLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
+  "cycleLegendMucusPeak": "Schleimhöhepunkt",
+  "cycleLegendCircledHigher": "Umrandete höhere Messungen",
+  "cycleLegendArrowHigher": "höhere Messung (Pfeil)",
+  "cycleLegendBaseline": "Basislinie",
+  "cycleLegendCervix": "Muttermund-Position",
+  "cycleNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
+  "cycleJumpToDate": "Zum Datum springen",
+  "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
   "cycleSheetSetMucusPeak": "Schleimhöhepunkt setzen",
   "cycleSheetRemoveMucusPeak": "Schleimhöhepunkt entfernen",
@@ -129,7 +129,7 @@
     "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (R7); der Wert ist bereits im Gebietsschema formatiert."
   },
   "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze die erste höhere Messung bei der nächsten höheren Messung neu.",
-  "zyklusLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
+  "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSetSuzEvening": "SUZ ab heute Abend",
   "cycleSheetRemoveSuzEvening": "SUZ ab heute Abend entfernen",
   "cycleSheetSetSuzMorning": "SUZ ab heute Morgen",
@@ -142,9 +142,9 @@
       }
     }
   },
-  "zyklusLegendMeasuredAt": "Messzeitpunkt",
-  "zyklusLegendSex": "Sex",
-  "zyklusLegendPain": "Schmerz (B Brust, M Mittelschmerz)",
+  "cycleLegendMeasuredAt": "Messzeitpunkt",
+  "cycleLegendSex": "Sex",
+  "cycleLegendPain": "Schmerz (B Brust, M Mittelschmerz)",
   "cycleSheetMeasuredAt": "Messzeitpunkt: {time}",
   "@cycleSheetMeasuredAt": {
     "placeholders": {
@@ -153,16 +153,16 @@
       }
     }
   },
-  "statistikNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
-  "statistikNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
-  "statistikCycles": "Zykluslängen",
-  "statistikOnsets": "Regelbeginne",
-  "statistikAverage": "Durchschnitt",
-  "statistikShortest": "Kürzester",
-  "statistikLongest": "Längster",
-  "statistikDistribution": "Verteilung",
-  "statistikDays": "{n} Tage",
-  "@statistikDays": {
+  "statisticsNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
+  "statisticsNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
+  "statisticsCycles": "Zykluslängen",
+  "statisticsOnsets": "Regelbeginne",
+  "statisticsAverage": "Durchschnitt",
+  "statisticsShortest": "Kürzester",
+  "statisticsLongest": "Längster",
+  "statisticsDistribution": "Verteilung",
+  "statisticsDays": "{n} Tage",
+  "@statisticsDays": {
     "placeholders": {
       "n": {
         "type": "int"

@@ -59,7 +59,7 @@ class ZyklusScreen extends ConsumerWidget {
     final entriesAsync = ref.watch(dailyEntriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navZyklus)),
+      appBar: AppBar(title: Text(l10n.navCycle)),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text(l10n.loadFailed)),
@@ -68,7 +68,7 @@ class ZyklusScreen extends ConsumerWidget {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(l10n.zyklusNoData),
+                child: Text(l10n.cycleNoData),
               ),
             );
           }
@@ -80,7 +80,7 @@ class ZyklusScreen extends ConsumerWidget {
               const _Legend(),
               const SizedBox(height: 4),
               Text(
-                l10n.zyklusArithmeticNote,
+                l10n.cycleArithmeticNote,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -314,7 +314,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 
     if (points.isEmpty) {
       return Text(
-        l10n.zyklusNoData,
+        l10n.cycleNoData,
         style: Theme.of(context).textTheme.bodyMedium,
       );
     }
@@ -415,7 +415,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
               child: IconButton(
                 key: const ValueKey('calendarJumpButton'),
                 icon: const Icon(Icons.date_range),
-                tooltip: l10n.zyklusJumpToDate,
+                tooltip: l10n.cycleJumpToDate,
                 onPressed: () => _jumpToDate(context),
               ),
             ),
@@ -1038,64 +1038,64 @@ final class _Legend extends StatelessWidget {
       children: [
         _LegendDot(
           color: scheme.primary,
-          label: AppLocalizations.of(context).zyklusLegendTemperature,
+          label: AppLocalizations.of(context).cycleLegendTemperature,
           shape: _LegendShape.dot,
         ),
         _LegendDot(
           color: scheme.error,
-          label: AppLocalizations.of(context).zyklusLegendBleeding,
+          label: AppLocalizations.of(context).cycleLegendBleeding,
           shape: _LegendShape.ring,
         ),
         _LegendDot(
           color: scheme.tertiary,
-          label: AppLocalizations.of(context).zyklusLegendMucus,
+          label: AppLocalizations.of(context).cycleLegendMucus,
           shape: _LegendShape.text,
         ),
         _LegendDot(
           color: scheme.tertiary,
-          label: AppLocalizations.of(context).zyklusLegendMucusPeak,
+          label: AppLocalizations.of(context).cycleLegendMucusPeak,
           // R6: the peak renders as a SOLID dot above the mucus glyph in
           // the symbol row — the old curve-ring glyph is gone.
           shape: _LegendShape.dot,
         ),
         _LegendDot(
           color: scheme.primary,
-          label: AppLocalizations.of(context).zyklusLegendCircledHigher,
+          label: AppLocalizations.of(context).cycleLegendCircledHigher,
           shape: _LegendShape.circledDot,
         ),
         _LegendDot(
           color: scheme.primary,
-          label: AppLocalizations.of(context).zyklusLegendArrowHigher,
+          label: AppLocalizations.of(context).cycleLegendArrowHigher,
           shape: _LegendShape.arrowUp,
         ),
         _LegendDot(
           color: scheme.onSurface,
-          label: AppLocalizations.of(context).zyklusLegendCervix,
+          label: AppLocalizations.of(context).cycleLegendCervix,
           shape: _LegendShape.cervix,
         ),
         _LegendDot(
           color: scheme.secondary,
-          label: AppLocalizations.of(context).zyklusLegendBaseline,
+          label: AppLocalizations.of(context).cycleLegendBaseline,
           shape: _LegendShape.line,
         ),
         _LegendDot(
           color: scheme.secondary,
-          label: AppLocalizations.of(context).zyklusLegendSuz,
+          label: AppLocalizations.of(context).cycleLegendSuz,
           shape: _LegendShape.suz,
         ),
         _LegendDot(
           color: scheme.onSurface,
-          label: AppLocalizations.of(context).zyklusLegendMeasuredAt,
+          label: AppLocalizations.of(context).cycleLegendMeasuredAt,
           shape: _LegendShape.clock,
         ),
         _LegendDot(
           color: scheme.onSurface,
-          label: AppLocalizations.of(context).zyklusLegendSex,
+          label: AppLocalizations.of(context).cycleLegendSex,
           shape: _LegendShape.sex,
         ),
         _LegendDot(
           color: scheme.onSurface,
-          label: AppLocalizations.of(context).zyklusLegendPain,
+          label: AppLocalizations.of(context).cycleLegendPain,
           shape: _LegendShape.pain,
         ),
       ],
