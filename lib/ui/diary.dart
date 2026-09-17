@@ -294,26 +294,34 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
+              // All five levels of the numeric scale, none first. Wrap of
+              // ChoiceChips like the mucus quality row below: a five-label
+              // SegmentedButton risks overflowing small phone widths.
               Text(l10n.bleeding),
               const SizedBox(height: 4),
-              SegmentedButton<Bleeding>(
-                segments: [
-                  ButtonSegment(
-                    value: Bleeding.none,
-                    label: Text(l10n.bleedingNone),
-                  ),
-                  ButtonSegment(
-                    value: Bleeding.medium,
-                    label: Text(l10n.bleedingPeriod),
-                  ),
-                  ButtonSegment(
-                    value: Bleeding.spotting,
-                    label: Text(l10n.bleedingSpotting),
-                  ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final bleeding in Bleeding.values)
+                    ChoiceChip(
+                      label: Text(
+                        switch (bleeding) {
+                          Bleeding.none => l10n.bleedingNone,
+                          Bleeding.spotting => l10n.bleedingSpotting,
+                          Bleeding.light => l10n.bleedingLight,
+                          Bleeding.medium => l10n.bleedingMedium,
+                          Bleeding.heavy => l10n.bleedingHeavy,
+                        },
+                      ),
+                      selected: _bleeding == bleeding,
+                      onSelected: (selected) => setState(() {
+                        // Tapping the selected chip falls back to none,
+                        // mirroring the mucus quality chips' toggle.
+                        _bleeding = selected ? bleeding : Bleeding.none;
+                      }),
+                    ),
                 ],
-                selected: {_bleeding},
-                onSelectionChanged: (selection) =>
-                    setState(() => _bleeding = selection.first),
               ),
               const SizedBox(height: 12),
               // --- exclusion flags (compact) ---------------------------
@@ -562,12 +570,16 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Widget _bleedingMarker(DailyEntry day) {
     final color = switch (day.bleeding) {
       Bleeding.none => Theme.of(context).colorScheme.outlineVariant,
-      // All menstruation levels share the full error color; spotting keeps
-      // the faint tint.
-      Bleeding.light || Bleeding.medium || Bleeding.heavy =>
-        Theme.of(context).colorScheme.error,
+      // The dot's strength follows the recorded heaviness: spotting is the
+      // faintest error tint, then light/medium step up, heavy gets the full
+      // error color.
       Bleeding.spotting =>
         Theme.of(context).colorScheme.error.withValues(alpha: 0.4),
+      Bleeding.light =>
+        Theme.of(context).colorScheme.error.withValues(alpha: 0.6),
+      Bleeding.medium =>
+        Theme.of(context).colorScheme.error.withValues(alpha: 0.8),
+      Bleeding.heavy => Theme.of(context).colorScheme.error,
     };
     return Stack(
       clipBehavior: Clip.none,
