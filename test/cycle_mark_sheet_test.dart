@@ -1,8 +1,9 @@
 // Widget tests of the mark-entry bottom sheet on the cycle tab (Mode M,
 // ADR-0001): tapping a chart day opens a modal sheet with the "edit day"
 // action, the contextual set/remove actions for the mucus peak and the
-// first higher measurement, and the computed info line (derived artifacts
-// such as the baseline value and the 1-6 low numbering for that day).
+// first higher measurement, and the computed info lines (derived artifacts
+// such as the baseline value, the 1-6 low numbering, the difference to the
+// baseline for marked candidates and the stopped-evaluation notice).
 //
 // Unlike test/cycle_chart_evaluation_test.dart (fixed marks streams), these
 // tests write through the REAL MarksDao against an in-memory database —
@@ -47,8 +48,10 @@ final _entries = <DailyEntry>[
 ];
 
 /// Marks seeded through the DAO BEFORE the UI builds.
-final _peakMark =
-    CycleMark(profileId: defaultProfileId, date: _d(12), type: CycleMarkTypes.mucusPeakDay);
+final _peakMark = CycleMark(
+    profileId: defaultProfileId,
+    date: _d(12),
+    type: CycleMarkTypes.mucusPeakDay);
 final _firstHigherMark = CycleMark(
     profileId: defaultProfileId,
     date: _d(14),
@@ -66,8 +69,8 @@ Future<void> _pump(
   DateTime? selectedDate,
   int initialTab = 0,
 }) async {
-  final initialSelected = DateOnly.normalize(
-      selectedDate ?? DateTime.utc(2026, 9, 1));
+  final initialSelected =
+      DateOnly.normalize(selectedDate ?? DateTime.utc(2026, 9, 1));
   final container = ProviderContainer(
     overrides: [
       databaseProvider.overrideWith((ref) async {
@@ -141,13 +144,11 @@ FlDotPainter? _dotPainter(WidgetTester tester, int dayIndex) {
   return null;
 }
 
-ColorScheme _scheme(WidgetTester tester) =>
-    tester.widget<MaterialApp>(find.byType(MaterialApp)).theme!.colorScheme;
-
 void main() {
   testWidgets('tapping a chart day opens the mark-entry sheet, not the form',
       (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    await _pump(tester,
+        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
 
     await _tapDay(tester, 4); // 9/10, a numbered low (4)
 
@@ -163,11 +164,16 @@ void main() {
         reason: '9/10 is the 4th low of the six before the first higher');
     expect(find.byType(LineChart), findsOneWidget,
         reason: 'the surface stays on the cycle tab');
+    // No stopped-evaluation notice in an intact evaluation.
+    expect(
+        find.byKey(const ValueKey('cycleSheetEvaluationStopped')), findsNothing,
+        reason: 'the evaluation did not stop — no notice');
   });
 
   testWidgets('the info line shows the computed baseline on the baseline day',
       (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    await _pump(tester,
+        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
 
     await _tapDay(tester, 3); // 9/9: highest of the six lows = baseline
 
@@ -177,7 +183,84 @@ void main() {
         reason: 'the baseline day is also the 5th low (both facts hold)');
   });
 
-  testWidgets('setting a mucus peak persists through the DAO and '
+  testWidgets('R7: circled days show the difference to the baseline',
+      (tester) async {
+    await _pump(tester,
+        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+
+    await _tapDay(tester, 8); // 9/14: circled candidate #1, +0.50 K
+
+    expect(find.text('+0.50 K above the baseline'), findsOneWidget,
+        reason: 'the difference to the baseline is shown for easy checking');
+    expect(find.text('Circled higher measurement 1'), findsOneWidget,
+        reason: 'the ordinal of the circled candidate stays visible');
+  });
+
+  testWidgets(
+      'R7: arrowed days show the difference too — without the '
+      'circled ordinal line', (tester) async {
+    // Peak unmarked: the candidates become arrows (R4) — the difference
+    // display applies to circled AND arrowed days.
+    await _pump(tester, entries: _entries, seedMarks: [_firstHigherMark]);
+
+    await _tapDay(tester, 8); // 9/14: arrowed candidate #1, +0.50 K
+
+    expect(find.text('+0.50 K above the baseline'), findsOneWidget,
+        reason: 'arrowed candidates show the difference too (R7)');
+    expect(find.text('Circled higher measurement 1'), findsNothing,
+        reason: 'nothing is circled without a peak before the rise');
+  });
+
+  testWidgets(
+      'a beyond-cap arrow keeps the difference line — it stays a '
+      'marked candidate, just unnumbered (R4)', (tester) async {
+    // Peak unmarked: every candidate is an arrow; the 5th (9/18) is beyond
+    // its kind's four-cap, so it carries no ordinal — but it stays in the
+    // connected sequence (R4) and still shows the R7 difference line.
+    final entries = [
+      ..._entries,
+      DailyEntry(date: _d(17), bbtC: 36.5),
+      DailyEntry(date: _d(18), bbtC: 36.5),
+    ];
+    await _pump(tester, entries: entries, seedMarks: [_firstHigherMark]);
+
+    await _tapDay(tester, 12); // 9/18: beyond-cap arrow, +0.10 K
+
+    expect(find.text('+0.10 K above the baseline'), findsOneWidget,
+        reason: 'beyond-cap candidates stay marked (R4) and show R7');
+    expect(find.text('Circled higher measurement 1'), findsNothing,
+        reason: 'arrow ordinals never surface in the sheet');
+  });
+
+  testWidgets(
+      'R4 per-kind ordinals: the circle ordinal restarts after the '
+      'arrows — the sheet shows the circle number, not the overall count',
+      (tester) async {
+    // Peak 9/15 lies between the marked rise (9/14) and the later
+    // candidates: 9/14 and the peak day itself are arrows, 9/16 is the
+    // FIRST circle — its sheet line counts within the circle kind only.
+    final entries = [..._entries, DailyEntry(date: _d(17), bbtC: 36.5)];
+    await _pump(tester, entries: entries, seedMarks: [
+      CycleMark(
+          profileId: defaultProfileId,
+          date: _d(15),
+          type: CycleMarkTypes.mucusPeakDay),
+      _firstHigherMark,
+    ]);
+
+    await _tapDay(tester, 10); // 9/16: first circle after the arrows
+
+    expect(find.text('Circled higher measurement 1'), findsOneWidget,
+        reason: 'the circle ordinal restarts within its own kind (R4)');
+    expect(find.text('Circled higher measurement 3'), findsNothing,
+        reason: 'the sheet shows the CIRCLE number, not the overall '
+            'candidate count');
+    expect(find.text('+0.60 K above the baseline'), findsOneWidget,
+        reason: '9/16 is 37.0 — 0.60 K above the baseline 36.4');
+  });
+
+  testWidgets(
+      'setting a mucus peak persists through the DAO and '
       're-renders the sheet and the chart', (tester) async {
     await _pump(tester, entries: _entries); // no marks yet
 
@@ -190,15 +273,15 @@ void main() {
     expect(find.text('Remove mucus peak'), findsOneWidget,
         reason: 'the sheet re-renders contextually after the write');
     expect(find.text('Set mucus peak'), findsNothing);
-    final painter = _dotPainter(tester, 6);
-    expect(painter, isA<RingDotPainter>(),
-        reason: 'the chart overlay re-renders from the marks stream');
-    expect((painter as RingDotPainter).ringColor, _scheme(tester).tertiary,
-        reason: 'the mucus peak renders in the mucus color family');
+    // R6: the peak renders as a solid dot in the SYMBOL ROW — not as a
+    // ring on the temperature curve.
+    expect(find.byKey(const ValueKey('peakDot-6')), findsOneWidget,
+        reason: 'the symbol row re-renders from the marks stream');
+    expect(_dotPainter(tester, 6), isNot(isA<RingDotPainter>()),
+        reason: 'the peak day keeps a plain dot on the curve (R6)');
   });
 
-  testWidgets('tapping the same action again removes the mark',
-      (tester) async {
+  testWidgets('tapping the same action again removes the mark', (tester) async {
     await _pump(tester, entries: _entries, seedMarks: [_peakMark]);
 
     await _tapDay(tester, 6);
@@ -237,12 +320,14 @@ void main() {
         reason: 'the first-higher toggle flipped back');
   });
 
-  testWidgets('"edit day" writes the selected date + Tagebuch tab and closes '
+  testWidgets(
+      '"edit day" writes the selected date + Tagebuch tab and closes '
       'the sheet', (tester) async {
-    await _pump(tester,
-        entries: _entries,
-        selectedDate: _d(1),
-        initialTab: 2, // a non-Tagebuch tab, so the write is observable
+    await _pump(
+      tester,
+      entries: _entries,
+      selectedDate: _d(1),
+      initialTab: 2, // a non-Tagebuch tab, so the write is observable
     );
 
     await _tapDay(tester, 4); // 9/10
@@ -258,7 +343,8 @@ void main() {
   });
 
   testWidgets('a symbol-row cell opens the same sheet', (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    await _pump(tester,
+        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
 
     // warnIfMissed: false — the tap point may fall on the cell's fixed-height
     // sign slot, which does not absorb hits itself; the enclosing InkWell's
@@ -272,9 +358,43 @@ void main() {
         reason: '9/8 is the 6th (outermost) low');
   });
 
+  testWidgets(
+      'a broken sequence shows the stopped-evaluation notice '
+      '(R2: the user re-marks the rise)', (tester) async {
+    // Candidate 1 on 9/14, then TWO untracked days (9/15, 9/16), then 9/17
+    // above the baseline: the automatic evaluation stops (R2).
+    final entries = <DailyEntry>[
+      DailyEntry(date: _d(6), bbtC: 36.2),
+      DailyEntry(date: _d(7), bbtC: 36.1),
+      DailyEntry(date: _d(8), bbtC: 36.4),
+      DailyEntry(date: _d(9), bbtC: 36.3),
+      DailyEntry(date: _d(10), bbtC: 36.2),
+      DailyEntry(date: _d(11), bbtC: 36.3),
+      DailyEntry(date: _d(12), bbtC: 36.1), // peak day
+      DailyEntry(date: _d(13), bbtC: 36.3),
+      DailyEntry(date: _d(14), bbtC: 36.8), // marked rise -> candidate 1
+      // 9/15 + 9/16 untracked -> two gap days -> break.
+      DailyEntry(date: _d(17), bbtC: 36.9), // would-be candidate, NOT marked
+    ];
+    await _pump(tester, entries: entries, seedMarks: [
+      CycleMark(
+          profileId: defaultProfileId,
+          date: _d(12),
+          type: CycleMarkTypes.mucusPeakDay),
+      _firstHigherMark,
+    ]);
+
+    await _tapDay(tester, 11); // 9/17: the day after the break
+
+    expect(find.byKey(const ValueKey('cycleSheetEvaluationStopped')),
+        findsOneWidget,
+        reason: 'the broken sequence surfaces the stopped state (R2)');
+  });
+
   testWidgets('a day outside any evaluation data shows no info line',
       (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    await _pump(tester,
+        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
 
     await _tapDay(tester, 0); // 9/6: before the six-low window
 
@@ -288,9 +408,14 @@ void main() {
       'Low measurement 4',
       'Low measurement 5',
       'Low measurement 6',
+      '+0.50 K above the baseline',
+      'Circled higher measurement 1',
     ]) {
       expect(find.text(info), findsNothing,
           reason: 'no derived artifact exists for this day');
     }
+    expect(
+        find.byKey(const ValueKey('cycleSheetEvaluationStopped')), findsNothing,
+        reason: 'the evaluation did not stop — no notice');
   });
 }

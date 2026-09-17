@@ -3,37 +3,67 @@
 // The USER places only the mucus peak and the first higher measurement;
 // everything rendered from this file is DERIVED at render time from
 // evaluateCycles (lib/domain/evaluation.dart) and is never persisted:
-// the ring on the mucus-peak day and around the (up to) three circled
-// higher measurements, the arrow-up glyph for higher measurements before
-// the peak, the 1–6 numbering under the six low days and the baseline
-// line. Rendered across fl_chart's dot painters + extra lines, with the
-// glyph shapes painted by hand where fl_chart has no facility
-// (ADR-0004 anticipates this custom-paint fallback — used here only for
-// small glyphs, the chart itself stays fl_chart).
+// the rings around the circled higher measurements (candidates strictly
+// AFTER the mucus peak day), the arrow-up glyph for the arrow-marked
+// candidates (candidate day at or before the peak day, or the peak unset —
+// R4, decided PER CANDIDATE by the domain), the 1–6 numbering under the six
+// low days, the baseline SEGMENT (R10: from the left edge of low #6's day
+// column to half a day past the last marked candidate's column, from the
+// domain's baselineSpan; a cycle with no marked candidate draws no segment)
+// and the solid peak dot ABOVE the mucus entry in the symbol row (R6 — the
+// peak no longer touches the temperature curve). Rendered across fl_chart's
+// dot painters + dashed bar segments, with the glyph shapes painted by hand
+// where fl_chart has no facility (ADR-0004 anticipates this custom-paint
+// fallback — used here only for small glyphs; the baseline segment fits
+// inside fl_chart as a dashed two-spot bar, so the chart itself stays
+// fl_chart).
 //
 // Rendering assumptions (validate with an expert reviewer, see
 // docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
 //
-//   TODO(user-review): A peak day without a measured temperature has no
-//   dot on the chart and therefore renders NO circle. Anchoring a
-//   floating glyph in an empty chart column (e.g. at the column top) is
-//   not attempted — the chart's y position would be arbitrary.
-//   TODO(user-review): When the peak is unmarked, a higher measurement's
-//   position is unknowable (HigherMeasurement.position is null); it
-//   renders arrow-up (treated like "before the peak"), nothing circled.
-//   TODO(user-review): Higher measurements AFTER the peak beyond the
-//   third circled one render as ordinary temperature dots (the cheat
-//   sheet circles exactly three).
-//   TODO(user-review): The baseline spans the FULL chart width. The
-//   cheat sheet does not bound the line's span; fl_chart's HorizontalLine
-//   has no x-range either, and a region-limited line would need the
-//   ADR-0004 custom-painter fallback for the one piece.
+//   TODO(user-review): A peak day without a recorded entry renders NO dot
+//   in the symbol row (the row shows recorded observations only). The
+//   old chart-anchored question is gone with the curve ring: the peak
+//   dot lives in the symbol row, where a day without an entry has no
+//   cell content to hang it on.
+//   TODO(user-review): Days after the SUZ trigger or after a
+//   connectedness break render as ordinary temperature dots (the domain
+//   lists exactly the marked candidates; there is no automatic
+//   continuation — the user re-marks the rise, R2). Candidates beyond
+//   their kind's four-cap STAY in the sequence (R4) and render as the
+//   ordinary circle/arrow mark, just without a number — the curve never
+//   paints candidate ordinals; the sheet's circle-numbering line is the
+//   only ordinal surface (circles-only, see cycle_mark_sheet.dart).
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
+
+/// One drawn baseline segment, mapped onto the chart's day-index space
+/// (R10). The chart draws it from the LEFT EDGE of [startIndex]'s day
+/// column to HALF A DAY past [endIndex]'s column, clamped to the recorded
+/// range; the extent itself comes straight from the domain's
+/// [BaselineSpan] (no-candidate cycles carry no segment).
+final class BaselineSegment {
+  const BaselineSegment({
+    required this.startIndex,
+    required this.endIndex,
+    required this.value,
+  });
+
+  /// Day index of the segment's start day (low #6 when six lows exist; the
+  /// domain's fallback applies otherwise — see its file-header TODO).
+  final int startIndex;
+
+  /// Day index of the segment's end day (the last marked candidate of the
+  /// cycle's sequence).
+  final int endIndex;
+
+  /// The baseline y-value the segment runs through.
+  final double value;
+}
 
 /// The per-day evaluation artifacts, mapped onto the chart's day-index
 /// space (day index 0 = the first recorded day, see _ChartDays in
@@ -46,14 +76,20 @@ final class EvaluationOverlay {
     this.circledIndexes = const {},
     this.arrowIndexes = const {},
     this.numbersByIndex = const {},
-    this.baselineValues = const [],
+    this.baselineSegments = const [],
   });
 
+  /// Day indexes carrying the mucus-peak mark. R6: the peak renders as a
+  /// solid dot ABOVE the mucus glyph in the symbol row — the curve never
+  /// rings the peak day (the curve's rings wrap only circled candidates).
   final Set<int> peakIndexes;
   final Set<int> circledIndexes;
   final Set<int> arrowIndexes;
   final Map<int, int> numbersByIndex;
-  final List<double> baselineValues;
+
+  /// The baseline segments (R10), one per evaluated cycle with a marked
+  /// candidate; a cycle without candidates has none.
+  final List<BaselineSegment> baselineSegments;
 }
 
 /// Flattens [evaluations] (one per cycle group) into per-day-index
@@ -73,7 +109,7 @@ EvaluationOverlay buildEvaluationOverlay({
   final circled = <int>{};
   final arrows = <int>{};
   final numbers = <int, int>{};
-  final baselines = <double>[];
+  final segments = <BaselineSegment>[];
 
   for (final evaluation in evaluations) {
     if (evaluation.mucusPeakDay != null) {
@@ -87,17 +123,36 @@ EvaluationOverlay buildEvaluationOverlay({
     for (final higher in evaluation.higherMeasurements) {
       final i = indexFor(higher.date);
       if (i == null) continue;
-      // Circle (1st–3rd after the peak) and arrow (before the peak, or
-      // position unknowable) are mutually exclusive by construction.
-      if (higher.circleOrd != null) {
-        circled.add(i);
-      } else if (higher.position == HigherPosition.beforePeak ||
-          higher.position == null) {
-        arrows.add(i);
+      // The mark kind is decided PER CANDIDATE by the domain (R4: arrow
+      // at or before the peak day or with the peak unset, circle strictly
+      // after it) — the UI carries no decision logic of its own and maps
+      // the kind onto the matching painter. Beyond-cap candidates carry a
+      // null ordinal but stay in the sequence: they render as the same
+      // mark, just unnumbered (the curve paints no candidate ordinals).
+      switch (higher.markKind) {
+        case MarkKind.circle:
+          circled.add(i);
+        case MarkKind.arrow:
+          arrows.add(i);
       }
     }
+    // R10: the baseline SEGMENT extent comes straight from the domain
+    // (start = low #6, end = the last marked candidate, defensively
+    // clamped there; null when the cycle has no marked candidate) — the
+    // overlay only maps the span's days onto the chart's day-index space.
+    final span = evaluation.baselineSpan;
     final baseline = evaluation.baseline;
-    if (baseline != null) baselines.add(baseline.value);
+    if (span != null && baseline != null) {
+      final start = indexFor(span.startDay);
+      final end = indexFor(span.endDay);
+      if (start != null && end != null) {
+        segments.add(BaselineSegment(
+          startIndex: start,
+          endIndex: end,
+          value: baseline.value,
+        ));
+      }
+    }
   }
 
   return EvaluationOverlay(
@@ -105,16 +160,18 @@ EvaluationOverlay buildEvaluationOverlay({
     circledIndexes: circled,
     arrowIndexes: arrows,
     numbersByIndex: numbers,
-    baselineValues: baselines,
+    baselineSegments: segments,
   );
 }
 
 // --- dot painters -----------------------------------------------------------
 
 /// Paints the temperature dot plus a RING around it, with a small gap so
-/// the value stays readable: the mucus-peak day (ring in the mucus
-/// color) and the circled higher measurements (ring in the temperature
-/// color).
+/// the value stays readable: the CIRCLED higher measurements — every
+/// candidate strictly after the mucus peak day (R4, decided per
+/// candidate by the domain; the peak day itself never gets a ring, R6).
+/// Candidates beyond the circle kind's four-cap stay circled too, just
+/// unnumbered (the curve paints no ordinals).
 final class RingDotPainter extends FlDotCirclePainter {
   RingDotPainter({
     required super.color,
@@ -152,10 +209,12 @@ final class RingDotPainter extends FlDotCirclePainter {
       ];
 }
 
-/// Paints the temperature dot plus an ARROW-UP glyph above it: a higher
-/// measurement before the peak (or with the peak unmarked) — higher, but
-/// explicitly NOT circled per the rule that only the first higher
-/// measurement after the peak gets circled.
+/// Paints the temperature dot plus an ARROW-UP glyph above it: a marked
+/// candidate whose day is at or before the mucus peak day, or one of a
+/// cycle with the peak unset (R4, decided per candidate by the domain) —
+/// higher, but explicitly NOT circled per the rule that only candidates
+/// after the peak get circled. Beyond the arrow kind's four-cap the
+/// candidate stays arrowed too, just unnumbered.
 final class ArrowUpDotPainter extends FlDotCirclePainter {
   ArrowUpDotPainter({
     required super.color,
@@ -198,18 +257,17 @@ void paintArrowUpGlyph(Canvas canvas, Offset tip, {required Color color}) {
   canvas.drawRect(Rect.fromLTWH(tip.dx - 0.75, tip.dy + 3, 1.5, 5), paint);
 }
 
-/// Chooses the dot painter for one chart day: plain dot, dot with a
-/// ring (mucus peak / circled higher measurement) or dot with an
-/// arrow-up glyph. [dayIndex] and [overlay] indexes share one space.
+/// Chooses the dot painter for one chart day: plain dot, dot with a ring
+/// (circled higher measurement) or dot with an arrow-up glyph (arrowed
+/// candidate). The mucus peak never reaches the curve — it renders as a
+/// solid dot in the symbol row (R6). [dayIndex] and [overlay] indexes
+/// share one space.
 FlDotPainter dotPainterForDay({
   required int dayIndex,
   required Color dotColor,
   required ColorScheme colorScheme,
   required EvaluationOverlay overlay,
 }) {
-  if (overlay.peakIndexes.contains(dayIndex)) {
-    return RingDotPainter(color: dotColor, ringColor: colorScheme.tertiary);
-  }
   if (overlay.circledIndexes.contains(dayIndex)) {
     return RingDotPainter(color: dotColor, ringColor: colorScheme.primary);
   }

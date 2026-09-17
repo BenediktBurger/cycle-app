@@ -81,8 +81,8 @@
   "zyklusLegendBleeding": "Blutung",
   "zyklusLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
   "zyklusLegendMucusPeak": "Schleimhöhepunkt",
-  "zyklusLegendFirstHigher": "erste höhere Messung",
-  "zyklusLegendRiseBeforePeak": "höhere Messung vor dem Höhepunkt",
+  "zyklusLegendCircledHigher": "Umrandete höhere Messungen",
+  "zyklusLegendArrowHigher": "höhere Messung (Pfeil)",
   "zyklusLegendBaseline": "Basislinie",
   "zyklusLegendCervix": "Muttermund-Position",
   "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
@@ -117,6 +117,16 @@
       }
     }
   },
+  "cycleSheetDifferenceInfo": "+{value} K über Basislinie",
+  "@cycleSheetDifferenceInfo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (R7); der Wert ist bereits im Gebietsschema formatiert."
+  },
+  "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze die erste höhere Messung bei der nächsten höheren Messung neu.",
   "statistikNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
   "statistikNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
   "statistikCycles": "Zykluslängen",
