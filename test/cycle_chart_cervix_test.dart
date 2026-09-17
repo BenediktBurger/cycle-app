@@ -1,7 +1,8 @@
-// Widget test of the Muttermund (cervix) position display on the Zyklus
-// chart: the recorded position renders as a glyph in the symbol row under
-// the temperature curve, days without an observation stay empty, and the
-// legend names the symbol. Same harness pattern as
+// Widget test of the Muttermund (cervix) display on the Zyklus chart: the
+// recorded position renders as a glyph in the symbol row under the
+// temperature curve, the firmness glyph renders BESIDE the position glyph
+// (one cervix line, two observations), days without an observation stay
+// empty, and the legend names the position symbol. Same harness pattern as
 // test/cycle_chart_temperature_test.dart (localized en).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -23,6 +24,11 @@ List<DailyEntry> _entries() => [
           // Opening must NOT be displayed on the chart: it only exists in
           // the entry form.
           cervixOpening: CervixOpening.open,
+          // Day 0 additionally records a FIRMNESS, to pin that both cervix
+          // observations render side by side in the same line (the 'w' for
+          // soft stays letter-distinct from every position glyph).
+          cervixFirmness:
+              i == 0 ? CervixFirmness.soft : null,
         ),
       DailyEntry(date: DateTime.utc(2026, 9, 12), bbtC: 37.0),
     ];
@@ -86,6 +92,24 @@ void main() {
         reason: 'no "$glyph" glyph for a day without an observation',
       );
     }
+  });
+
+  testWidgets('the firmness glyph renders beside the position glyph',
+      (tester) async {
+    await tester.pumpWidget(_chartHarness(entries: _entries()));
+    await tester.pumpAndSettle();
+
+    // Day 0 additionally carries the firmness observation: its glyph
+    // renders BESIDE the position letter in the same cervix line ('w' for
+    // soft, distinct from every position letter).
+    expect(
+      find.descendant(
+          of: find.byKey(const ValueKey('symbolCell-0')),
+          matching: find.text('w')),
+      findsOneWidget,
+      reason: 'the firmness glyph renders beside the position glyph in the '
+          'same cervix line',
+    );
   });
 
   testWidgets('the legend names the Muttermund symbol', (tester) async {

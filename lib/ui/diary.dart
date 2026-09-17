@@ -47,7 +47,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   bool _painMittelschmerz = false;
   bool _mood = false;
   bool _desire = false;
-  bool _sex = false;
+  int _sexTimings = 0;
+  CervixFirmness? _cervixFirmness;
 
   @override
   void initState() {
@@ -95,11 +96,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _quality = entry?.mucusQuality;
     _cervixPosition = entry?.cervixPosition;
     _cervixOpening = entry?.cervixOpening;
+    _cervixFirmness = entry?.cervixFirmness;
     _painBreast = entry?.painBreast ?? false;
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _mood = entry?.mood ?? false;
     _desire = entry?.desire ?? false;
-    _sex = entry?.sex ?? false;
+    _sexTimings = entry?.sexTimings ?? 0;
     final bbt = entry?.bbtC;
     _bbtController.text = bbt == null ? '' : bbt.toString();
     _cervixController.text = entry?.cervix ?? '';
@@ -182,11 +184,16 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           : _cervixController.text.trim(),
       cervixPosition: _cervixPosition,
       cervixOpening: _cervixOpening,
+      cervixFirmness: _cervixFirmness,
       painBreast: _painBreast,
       painMittelschmerz: _painMittelschmerz,
       mood: _mood,
       desire: _desire,
-      sex: _sex,
+      // The mask is 0..7 by construction: every chip below toggles exactly
+      // one SexTiming bit, so no extra sanitizing is needed here — the
+      // DailyEntry constructor assert remains the single guard (same
+      // pattern as the mucus-quality save path above).
+      sexTimings: _sexTimings,
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
@@ -426,9 +433,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----
-              // Segments show the cheat-sheet glyphs themselves (t/Ø/f/S);
-              // a quality exists only together with S, so the quality
-              // picker appears only while S is selected (hidden otherwise).
+              // Segments show the cheat-sheet glyphs themselves
+              // (t/Ø/f/S/A); a quality exists only together with S, so the
+              // quality picker appears only while S is selected (hidden
+              // otherwise).
               Text(l10n.mucusSign),
               const SizedBox(height: 4),
               SegmentedButton<MucusSign?>(
@@ -470,9 +478,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              // --- Muttermund: position (5 options), opening (3) -------
-              // Both chips are independent pickers; the leading unset chip
-              // ("—") plus the tap-again-deselects rule return to the
+              // --- Muttermund: position (5), opening (3), firmness (3) --
+              // All three rows are independent pickers; the leading unset
+              // chip ("—") plus the tap-again-deselects rule return to the
               // no-observation state, like the mucus quality chips.
               Text(l10n.cervixPosition),
               const SizedBox(height: 4),
@@ -533,6 +541,35 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Text(l10n.cervixFirmness),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: Text(l10n.cervixFirmnessUnset),
+                    selected: _cervixFirmness == null,
+                    onSelected: (_) => setState(() => _cervixFirmness = null),
+                  ),
+                  for (final firmness in CervixFirmness.values)
+                    ChoiceChip(
+                      label: Text(
+                        switch (firmness) {
+                          CervixFirmness.hard => l10n.cervixFirmnessHard,
+                          CervixFirmness.halfSoft =>
+                            l10n.cervixFirmnessHalfSoft,
+                          CervixFirmness.soft => l10n.cervixFirmnessSoft,
+                        },
+                      ),
+                      selected: _cervixFirmness == firmness,
+                      onSelected: (selected) => setState(() {
+                        _cervixFirmness = selected ? firmness : null;
+                      }),
+                    ),
+                ],
+              ),
               const SizedBox(height: 12),
               // --- cervix note (optional free text next to the chips) ---
               TextFormField(
@@ -564,11 +601,38 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     selected: _desire,
                     onSelected: (v) => setState(() => _desire = v),
                   ),
-                  FilterChip(
-                    label: Text(l10n.sex),
-                    selected: _sex,
-                    onSelected: (v) => setState(() => _sex = v),
-                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // --- sex times (multi-select) ------------------------------
+              // The three time slots are INDEPENDENT toggles: each tap
+              // sets/clears its own bit in the day's sexTimings mask and
+              // several slots can be selected at once. The mask itself
+              // encodes whether sex happened (no bits = not recorded); a
+              // time-less "sex happened" is deliberately not representable
+              // (see DailyEntry.sexTimings).
+              Text(l10n.sex),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final timing in SexTiming.values)
+                    FilterChip(
+                      label: Text(
+                        switch (timing) {
+                          SexTiming.start => l10n.sexTimingStart,
+                          SexTiming.middle => l10n.sexTimingMiddle,
+                          SexTiming.end => l10n.sexTimingEnd,
+                        },
+                      ),
+                      selected: _sexTimings & timing.bit != 0,
+                      onSelected: (selected) => setState(() {
+                        _sexTimings = selected
+                            ? _sexTimings | timing.bit
+                            : _sexTimings & ~timing.bit;
+                      }),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
