@@ -1,7 +1,33 @@
 # Contributing
 
-Setup path, daily commands, and project conventions. Open work and upcoming
-milestones are tracked in [`docs/roadmap.md`](docs/roadmap.md).
+Contributions are very much appreciated — there are many ways to help, and
+several need no code at all:
+
+- **Translations** — add or improve strings in the `.arb` files
+  (German-first with English mirrored).
+- **Bug reports and feature suggestions**
+- **Fixing texts** — wording, grammar, and clarity in UI strings and docs.
+- **Improving the UI** — usability, layout, visual polish.
+- **Implementing features**
+
+Whatever you take on, a few expectations keep the project consistent; the
+details live in [AGENTS.md](AGENTS.md). In brief:
+
+- **Improvement notes have fixed destinations**: agent behavior you want
+  changed → a rule in AGENTS.md; doubts about a decision → the ADR in
+  question; actual work items → the backlog of
+  [`docs/roadmap.md`](docs/roadmap.md).
+- **Roadmap readiness**: only checkbox items (`- [ ]`) are ready to
+  implement; plain bullets are under discussion — ask instead of guessing
+  scope.
+- **No work-package IDs** in code, docs, or tool/file names.
+- **Run the full test gate** before you consider work done:
+  `flutter analyze` and `flutter test --no-pub -r expanded` (why that
+  reporter: [AGENTS.md](AGENTS.md); commands: section 4 below).
+
+Setup path and daily commands below; open work is tracked in
+[`docs/roadmap.md`](docs/roadmap.md), architecture decisions in
+[`docs/adr/`](docs/adr/README.md).
 
 ## 1. Install the Flutter SDK (stable channel)
 

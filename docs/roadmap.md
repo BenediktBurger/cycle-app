@@ -35,7 +35,6 @@ the sections above track planned work, git history keeps the record (see
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - pdf export for consultants (one cycle per sheet?)
-- [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
 - [ ] only store time if temperature is added (not for mucus etc.)
 - [ ] show temperature measurement time, sex, and pain (M, B) on cycle tab
 - bleeding should not always start a new cycle. Either choose to ignore bleeding (opt out) or active choice to start a new cycle (maybe suggested at the first bleeding: do you want to start?)
