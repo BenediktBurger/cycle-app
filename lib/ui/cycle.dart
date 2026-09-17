@@ -269,9 +269,11 @@ final class _SymbolCell extends StatelessWidget {
             color: bleeding.level >= 2
                 ? bleedingColor.withValues(
                     alpha: switch (bleeding) {
+                      // none/spotting are guarded by level >= 2 above.
+                      Bleeding.none || Bleeding.spotting => 1.0,
                       Bleeding.light => 0.6,
                       Bleeding.medium => 0.8,
-                      _ => 1.0,
+                      Bleeding.heavy => 1.0,
                     },
                   )
                 : Colors.transparent,
