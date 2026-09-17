@@ -112,7 +112,7 @@ void main() {
       );
       expect(e.numberedLows.map((l) => l.value),
           [36.1, 36.0, 36.1, 36.3, 36.2, 36.4]);
-      // Mar 3 stays unnumbered: it is the 8th usable day before the rise
+      // Mar 3 stays unnumbered: it is the 8th calendar day before the rise
       // (Mar 4 is the 7th; both fall outside the 1–6 window).
     });
 
@@ -897,7 +897,7 @@ void main() {
       // The later mark supersedes: re-marking the rise (after a broken
       // Hochlage or a delayed second peak) moves the whole evaluation.
       expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 13)));
-      // The six-low window re-anchors to the LATER mark: the six usable
+      // The six-low window re-anchors to the LATER mark: the six calendar
       // days before Mar 13.
       expect(
         e.numberedLows.map((l) => (l.number, l.date.day)),
@@ -1460,7 +1460,8 @@ void main() {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 37.0, excluded: true), // fever — no low slot
+        d(2026, 3, 4, t: 37.0, excluded: true), // fever — before the window,
+        // and excluded anyway: contributes no temperature, hence no low.
         d(2026, 3, 5, t: 36.3),
         d(2026, 3, 6, t: 36.4), // baseline
         d(2026, 3, 7, t: 36.2),

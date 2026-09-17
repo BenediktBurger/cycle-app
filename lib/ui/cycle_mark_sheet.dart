@@ -176,7 +176,10 @@ final class CycleDaySheet extends ConsumerWidget {
       // no-usable-temperature fact.
       DailyEntry? markedEntry;
       for (final entry in evaluation.cycle.days) {
-        if (DateOnly.sameDay(entry.date, day)) markedEntry = entry;
+        if (DateOnly.sameDay(entry.date, day)) {
+          markedEntry = entry;
+          break;
+        }
       }
       String body;
       if (markedEntry == null ||
