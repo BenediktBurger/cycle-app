@@ -163,7 +163,13 @@ class _HomeShell extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final index = ref.watch(tabIndexProvider);
     return Scaffold(
-      body: _screens[index],
+      // All tabs stay mounted in an IndexedStack: switching away and back
+      // preserves each screen's widget state (e.g. the cycle chart's scroll
+      // window survives the Tagebuch→Zyklus roundtrip), and the offstage
+      // screens keep watching their providers so they are up to date when
+      // shown. Offstage children are built and laid out but neither painted
+      // nor hit-testable.
+      body: IndexedStack(index: index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (int newIndex) =>

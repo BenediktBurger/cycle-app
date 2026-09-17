@@ -39,8 +39,7 @@ ProviderScope _appScope({Locale? locale}) => ProviderScope(
     );
 
 void main() {
-  testWidgets(
-      'system-default on a German device resolves to German UI',
+  testWidgets('system-default on a German device resolves to German UI',
       (WidgetTester tester) async {
     tester.platformDispatcher.localesTestValue = const [Locale('de')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -54,8 +53,7 @@ void main() {
         reason: 'The fallback must not kick in for a supported device locale');
   });
 
-  testWidgets(
-      'system-default on a French device resolves to English UI',
+  testWidgets('system-default on a French device resolves to English UI',
       (WidgetTester tester) async {
     tester.platformDispatcher.localesTestValue = const [Locale('fr')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -69,8 +67,7 @@ void main() {
         reason: 'German is never the automatic fallback (ADR-0007)');
   });
 
-  testWidgets(
-      'explicit German choice wins over a French device locale',
+  testWidgets('explicit German choice wins over a French device locale',
       (WidgetTester tester) async {
     tester.platformDispatcher.localesTestValue = const [Locale('fr')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -83,8 +80,7 @@ void main() {
     expect(find.text('Diary'), findsNothing);
   });
 
-  testWidgets(
-      'explicit English choice wins over a German device locale',
+  testWidgets('explicit English choice wins over a German device locale',
       (WidgetTester tester) async {
     tester.platformDispatcher.localesTestValue = const [Locale('de')];
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -105,7 +101,12 @@ void main() {
 
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Einstellungen').first);
+    // Tap scoped to the navigation bar: all tabs stay mounted (IndexedStack),
+    // so the 'Einstellungen' label also matches the offstage screen's AppBar
+    // — and in tree order that AppBar precedes the bar, so a bare .first tap
+    // would miss.
+    await tester.tap(find.descendant(
+        of: find.byType(NavigationBar), matching: find.text('Einstellungen')));
     await tester.pumpAndSettle();
 
     // Scope to the language switcher: the settings screen now also carries a
@@ -122,29 +123,28 @@ void main() {
         reason: 'Language option "$option" must be offered',
       );
     }
-    final switcher =
-        tester.widget<SegmentedButton<String>>(languageSwitcher);
+    final switcher = tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher.selected, {'system'},
         reason: 'The default selection must be "System"');
 
     // Switching to an explicit language applies it immediately.
-    await tester.tap(find
-        .descendant(of: languageSwitcher, matching: find.text('English')));
+    await tester.tap(
+        find.descendant(of: languageSwitcher, matching: find.text('English')));
     await tester.pumpAndSettle();
-    expect(find.text('Diary'), findsOneWidget,
+    // With the shell keeping every tab mounted, the label appears in the
+    // navigation bar AND in the (offstage) diary screen's AppBar.
+    expect(find.text('Diary'), findsWidgets,
         reason: 'Selecting English must switch the UI to English');
-    final switcher2 =
-        tester.widget<SegmentedButton<String>>(languageSwitcher);
+    final switcher2 = tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher2.selected, {'en'});
 
     // Back to the system default: the German device locale returns.
-    await tester.tap(find
-        .descendant(of: languageSwitcher, matching: find.text('System')));
+    await tester.tap(
+        find.descendant(of: languageSwitcher, matching: find.text('System')));
     await tester.pumpAndSettle();
-    expect(find.text('Tagebuch'), findsOneWidget,
+    expect(find.text('Tagebuch'), findsWidgets,
         reason: 'Selecting System must follow the device locale again');
-    final switcher3 =
-        tester.widget<SegmentedButton<String>>(languageSwitcher);
+    final switcher3 = tester.widget<SegmentedButton<String>>(languageSwitcher);
     expect(switcher3.selected, {'system'});
   });
 }

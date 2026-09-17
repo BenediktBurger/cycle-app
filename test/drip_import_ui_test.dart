@@ -8,6 +8,7 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -47,28 +48,42 @@ bool _hasText(Widget w, String text) {
 }
 
 void main() {
-  testWidgets('drip import card sits below the JSON import card and its '
+  testWidgets(
+      'drip import card sits below the JSON import card and its '
       'dialog requires CSV text before applying', (WidgetTester tester) async {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Einstellungen').first);
+    // Tap scoped to the navigation bar: all tabs stay mounted (IndexedStack),
+    // so the 'Einstellungen' label also matches the offstage screen's AppBar
+    // — and in tree order that AppBar precedes the bar, so a bare .first tap
+    // would miss.
+    await tester.tap(find.descendant(
+        of: find.byType(NavigationBar), matching: find.text('Einstellungen')));
     await tester.pumpAndSettle();
 
     // The settings list is a lazy ListView; scroll down until the drip card
     // is built, then make sure its button is fully on-screen (the list is
     // allowed to grow above the drip card — e.g. the theme-mode switcher —
     // so fixed-amount drag loops would be brittle; the card ORDER assertion
-    // below does not depend on how much content sits above).
+    // below does not depend on how much content sits above). Both finders
+    // are scoped to the settings screen: with the shell keeping every tab
+    // mounted, the diary and statistics screens bring their own scrollables
+    // and ListViews into the tree.
     await tester.scrollUntilVisible(
       find.text('Drip-Daten importieren'),
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .descendant(
+              of: find.byType(EinstellungenScreen),
+              matching: find.byType(Scrollable))
+          .first,
     );
     await tester.pumpAndSettle();
     expect(find.text('Drip-Daten importieren'), findsWidgets);
 
     // … and it comes AFTER the JSON export/import card in the card config.
-    final listView = tester.firstWidget<ListView>(find.byType(ListView));
+    final listView = tester.firstWidget<ListView>(find.descendant(
+        of: find.byType(EinstellungenScreen), matching: find.byType(ListView)));
     final children =
         (listView.childrenDelegate as SliverChildListDelegate).children;
     int cardIndex(String text) =>

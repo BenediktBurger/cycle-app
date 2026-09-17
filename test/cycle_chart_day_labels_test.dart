@@ -17,11 +17,15 @@ import 'package:flutter_test/flutter_test.dart';
 // A recorded range starting 2026-01-20 so the day of cycle (1, 2, …) never
 // coincides with the day of month (20., 21., …) — the two label lines stay
 // distinguishable.
-DateTime _day(int index) => DateTime.utc(2026, 1, 20).add(Duration(days: index));
+DateTime _day(int index) =>
+    DateTime.utc(2026, 1, 20).add(Duration(days: index));
 
-List<DailyEntry> _entries(int count, {Map<int, Bleeding> bleeding = const {}}) => [
+List<DailyEntry> _entries(int count,
+        {Map<int, Bleeding> bleeding = const {}}) =>
+    [
       for (var i = 0; i < count; i++)
-        DailyEntry(date: _day(i), bbtC: 36.5, bleeding: bleeding[i] ?? Bleeding.none),
+        DailyEntry(
+            date: _day(i), bbtC: 36.5, bleeding: bleeding[i] ?? Bleeding.none),
     ];
 
 // A recorded range starting `start` (unlike _day above, so month-first
@@ -30,7 +34,8 @@ DateTime _dayFrom(DateTime start, int index) =>
     start.add(Duration(days: index));
 
 List<DailyEntry> _entriesFrom(DateTime start, int count,
-        {Map<int, Bleeding> bleeding = const {}}) => [
+        {Map<int, Bleeding> bleeding = const {}}) =>
+    [
       for (var i = 0; i < count; i++)
         DailyEntry(
           date: _dayFrom(start, i),
@@ -66,12 +71,10 @@ Widget _chartHarness({
       ),
     );
 
-Finder _hScrollView() => find.byWidgetPredicate(
-    (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
-
 void main() {
   group('per-day column labels', () {
-    testWidgets('every day column shows day of month and day of cycle; a '
+    testWidgets(
+        'every day column shows day of month and day of cycle; a '
         'cycle start that is not a month first stays a plain number',
         (tester) async {
       // 5 recorded days, no bleeding onset anywhere: one leading cycle
@@ -102,7 +105,8 @@ void main() {
       expect(find.text('21.'), findsOneWidget);
     });
 
-    testWidgets('the first day of a calendar month shows the localized '
+    testWidgets(
+        'the first day of a calendar month shows the localized '
         'short month form instead of the plain day number', (tester) async {
       // 2026-01-29 .. 2026-02-02: day index 3 is February 1st.
       await tester.pumpWidget(
@@ -140,13 +144,14 @@ void main() {
               '(leading group started 2025-12-29)');
     });
 
-    testWidgets('a month first that is also a cycle start shows the short '
+    testWidgets(
+        'a month first that is also a cycle start shows the short '
         'month form, not the day number', (tester) async {
       // Bleeding onset on 2026-02-01: the cycle start coincides with the
       // first of the month, so the month form wins over the plain "1.".
-      await tester.pumpWidget(_chartHarness(entries: _entriesFrom(
-          DateTime.utc(2026, 2, 1), 3,
-          bleeding: {0: Bleeding.heavy})));
+      await tester.pumpWidget(_chartHarness(
+          entries: _entriesFrom(DateTime.utc(2026, 2, 1), 3,
+              bleeding: {0: Bleeding.heavy})));
       await tester.pumpAndSettle();
 
       expect(_label(0, 'Feb'), findsOneWidget,
@@ -159,7 +164,8 @@ void main() {
       expect(_label(1, '2'), findsOneWidget);
     });
 
-    testWidgets('a new cycle onsets mid-month with a plain day number and '
+    testWidgets(
+        'a new cycle onsets mid-month with a plain day number and '
         'restarts the day-of-cycle count', (tester) async {
       // 40 days (2026-01-20 .. 2026-02-28); menstruation-level bleeding on
       // the first day and again on day index 35 (2026-02-24) after a
@@ -169,13 +175,13 @@ void main() {
         0: Bleeding.heavy,
         35: Bleeding.heavy,
       };
-      await tester.pumpWidget(_chartHarness(entries: _entries(40, bleeding: bleeding)));
+      await tester
+          .pumpWidget(_chartHarness(entries: _entries(40, bleeding: bleeding)));
       await tester.pumpAndSettle();
 
-      // 40 narrow columns overflow the viewport, so the window around
-      // indexes 34–36 only builds after scrolling towards the end.
-      await tester.drag(_hScrollView(), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
+      // The initial auto-scroll puts the window at the newest days: the 40
+      // narrow columns overflow the viewport, so the end of the recorded
+      // range — the window around indexes 34–36 — is on screen right away.
 
       // End of the first cycle: day of cycle 35 on 2026-02-23.
       expect(_label(34, '23.'), findsOneWidget);
@@ -213,26 +219,24 @@ void main() {
     testWidgets('the labels build windowed at their global x positions',
         (tester) async {
       // 60 recorded days (2026-01-20 .. 2026-03-20): far more than one
-      // screen, so only the on-screen window renders labels — and after
-      // scrolling, the later labels carry the content of THEIR day, not of
-      // a re-indexed window.
+      // screen, so only the on-screen window renders labels — and the
+      // initial auto-scroll starts that window at the newest days, where
+      // the later labels carry the content of THEIR day, not of a
+      // re-indexed window.
       await tester.pumpWidget(_chartHarness(entries: _entries(60)));
       await tester.pumpAndSettle();
 
-      expect(_dayLabel(0), findsOneWidget);
-      expect(_dayLabel(40), findsNothing,
-          reason: 'day 40 does not fit usefully on one screen -> not built');
-      expect(_dayLabel(59), findsNothing);
-
-      await tester.drag(_hScrollView(), const Offset(-1000, 0));
-      await tester.pumpAndSettle();
-
       expect(_dayLabel(0), findsNothing,
-          reason: 'the earliest labels scrolled out of the window');
-      expect(_dayLabel(40), findsOneWidget);
+          reason: 'the earliest days are outside the initial (newest-days) '
+              'window');
+      expect(_dayLabel(59), findsOneWidget,
+          reason: 'the newest day fills the initial window');
+
       // Day index 40 = 2026-03-01 (20 + 40 days): a month FIRST, so its
       // label is the short month form instead of "1." — and the day-of-
-      // cycle line is its own (41, counting from 2026-01-20).
+      // cycle line is its own (41, counting from 2026-01-20). The initial
+      // window covers the range's tail, so index 40 renders without any
+      // scrolling.
       expect(_label(40, 'Mar'), findsOneWidget,
           reason: 'March 1st shows the short month form even mid-window');
       expect(_label(40, '1.'), findsNothing);

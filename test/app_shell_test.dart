@@ -49,6 +49,14 @@ ProviderScope _appScope([Locale? locale]) => ProviderScope(
       child: const CycleApp(),
     );
 
+/// The navigation bar carries each tab's label exactly once; scoping the
+/// taps here keeps them unambiguous even though every screen (and its
+/// AppBar) is mounted at once — the shell keeps all tabs mounted in an
+/// IndexedStack, so a bare find.text(label) matches the bar's destination
+/// AND the mounted screen's AppBar title.
+Finder _navLabel(String label) =>
+    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+
 void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (
     WidgetTester tester,
@@ -74,7 +82,7 @@ void main() {
     // carrying the same localized name as its label).
     const switchTargets = ['Zyklus', 'Statistik', 'Einstellungen', 'Tagebuch'];
     for (final label in switchTargets) {
-      await tester.tap(find.text(label));
+      await tester.tap(_navLabel(label));
       await tester.pumpAndSettle();
       expect(
         find.text(label),
@@ -88,7 +96,7 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tagebuch').first);
+    await tester.tap(_navLabel('Tagebuch'));
     await tester.pumpAndSettle();
 
     // The sign picker offers the unset option plus the four glyphs
@@ -109,7 +117,18 @@ void main() {
     await tester.tap(find.text('S'));
     await tester.pumpAndSettle();
     expect(find.text('Qualität'), findsOneWidget);
-    const qualityTokens = ['w', 'mi', 'cr', 'kl', 'glb', 'g', 'EW', 'gl', 'fl', 'ns'];
+    const qualityTokens = [
+      'w',
+      'mi',
+      'cr',
+      'kl',
+      'glb',
+      'g',
+      'EW',
+      'gl',
+      'fl',
+      'ns'
+    ];
     for (final token in qualityTokens) {
       expect(
         find.text(token),
@@ -138,7 +157,7 @@ void main() {
     // it would falsely signal an existing protection (ADR-0005).
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Einstellungen').first);
+    await tester.tap(_navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
     final pinSwitch =

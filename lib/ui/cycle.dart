@@ -186,11 +186,53 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
   int _windowStart = 0;
   int _windowEnd = 0;
 
+  /// The one-time initial auto-scroll: on the first data frame of the
+  /// chart's lifetime the viewport jumps (instantly, no animation) to the
+  /// maximum scroll extent so the MOST RECENT recorded days fill the
+  /// window — the newest days sit at the content's right edge. A later
+  /// entries re-emit (e.g. a diary save while the tab is mounted) must
+  /// never re-jump: the user's scrolled position survives.
+  bool _didInitialAutoScroll = false;
+
+  /// Whether an initial-auto-scroll attempt is already scheduled and has
+  /// not run yet (keeps initState + didUpdateWidget from stacking
+  /// duplicate post-frame callbacks). A skipped attempt — no scroll client
+  /// yet — unsets this again, so the next data frame can retry.
+  bool _initialAutoScrollScheduled = false;
+
+  /// Schedules the one-time initial auto-scroll (see
+  /// [_didInitialAutoScroll]). Runs post-frame so the scroll view is laid
+  /// out (hasClients, maxScrollExtent) when the jump happens; the jump goes
+  /// through the controller, whose scroll listener re-windows to the last
+  /// visible days — no window math here.
+  void _scheduleInitialAutoScroll() {
+    if (_didInitialAutoScroll || _initialAutoScrollScheduled) return;
+    if (widget.entries.isEmpty) return; // no data frame yet — nothing to show
+    _initialAutoScrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initialAutoScrollScheduled = false;
+      if (_didInitialAutoScroll || !mounted || !_scrollController.hasClients) {
+        // No client yet (first frame not laid out): the next data frame
+        // retries. Once an attempt ran, the flag is final — a later
+        // entries re-emit never re-jumps.
+        return;
+      }
+      _didInitialAutoScroll = true;
+      // A short range fits the viewport: max extent 0, nothing to jump.
+      final max = _scrollController.position.maxScrollExtent;
+      if (max <= 0) return;
+      _scrollController.jumpTo(max);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _days = _ChartDays(widget.entries);
     _scrollController.addListener(_onScrolled);
+    // Data may already be present at mount time: schedule the one-time
+    // initial auto-scroll for the end of this frame.
+    _scheduleInitialAutoScroll();
   }
 
   @override
@@ -201,6 +243,10 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     // instead of rendering stale data.
     if (!identical(oldWidget.entries, widget.entries)) {
       _days = _ChartDays(widget.entries);
+      // Only the FIRST data frame (an initial auto-scroll still pending)
+      // may trigger the jump here; once it ran, a later re-emit never
+      // re-jumps and the user's position survives.
+      _scheduleInitialAutoScroll();
     }
   }
 
