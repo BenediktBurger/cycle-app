@@ -24,6 +24,7 @@
 import 'cervix.dart';
 import 'export_import.dart';
 import 'mucus.dart';
+import 'models.dart';
 
 // --- CSV tokenizer ---------------------------------------------------------
 
@@ -246,14 +247,17 @@ DripCsvImport dripCsvToExportJson(String raw) {
       firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
-    // drip ALSO carries the cervix vocabulary indexes (0-based), of which
-    // two map naturally onto the structured Muttermund fields: position
-    // low/medium/high and opening closed/medium/open (firmness has no
-    // storage option and stays in the free-text line above). Out-of-range
-    // or non-numeric indexes map to null per field; the free text keeps
-    // its (clamping) behavior.
+    // drip ALSO carries the cervix vocabulary indexes (0-based), which map
+    // onto the structured Muttermund fields: position low/medium/high,
+    // opening closed/medium/open, and firmness hard/soft (an out-of-range
+    // firmness index clamps to the nearest valid one — the same clamping
+    // rule as the free-text line below). Out-of-range or non-numeric
+    // position/opening indexes map to null per field. The free text keeps
+    // its (clamping) behavior and is written IN ADDITION to the structured
+    // fields — historical fidelity for the hand-authored specimen rows.
     final cervixObservation = _cervixObservation(
       opening: cell(dataRow, 'cervix.opening'),
+      firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
     // desire.value is drip's 0=low/1=medium/2=high intensity vocabulary —
@@ -270,14 +274,19 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // drip: components/helpers/labels.js). cycle-app's sex observation
     // models partner sex WITHOUT contraception, so only a positive
     // confirmation of both halves maps: sex.partner=true AND sex.none=true
-    // AND no contraceptive method flag true. Every other variant — solo
-    // sex, a method used, a missing contraceptive answer (partner with no
+    // AND no contraceptive method flag true — and it stores as the MIDDLE
+    // time of day, because drip carries no time-of-day for sex (owner
+    // decision, see the TODO below). Every other variant — solo sex, a
+    // method used, a missing contraceptive answer (partner with no
     // contraceptive column set at all), even none=true next to a method —
     // maps to nothing and is NOT data: a row carrying only such flags is
     // skipped entirely (see the data rule below). The [sex] note line
     // keeps its note-driven behavior independent of the flag.
     // TODO(user-review): solo sex and the contraceptive methods have no
-    // storage option; whether solo sex deserves an option of its own.
+    // storage option; whether solo sex deserves an option of its own. The
+    // middle-of-day choice for the mapped variant is likewise a mapping
+    // convenience: drip is a single non-authoritative import source and
+    // must not force the app's design.
     final sexPartner = boolCell(dataRow, 'sex.partner');
     final sexNone = boolCell(dataRow, 'sex.none');
     final sexMethod = [
@@ -366,11 +375,12 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'cervix': cervix,
       'cervix_position': cervixObservation?.position?.name,
       'cervix_opening': cervixObservation?.opening?.name,
+      'cervix_firmness': cervixObservation?.firmness?.name,
       'pain_breast': painBreast,
       'pain_mittelschmerz': painMittelschmerz,
       'mood': mood,
       'desire': desire,
-      'sex': sex,
+      'sex_timings': sex ? SexTiming.middle.bit : 0,
       'notes': notes.isEmpty ? null : notes,
     };
     entries.add(entry);
@@ -533,25 +543,47 @@ String? _cervixText({
 
 /// Structured Muttermund tokens of a drip row, decoded from drip's 0-based
 /// vocabularies (drip: labels.js): position {0: CervixPosition.low,
-/// 1: medium, 2: high} and opening {0: CervixOpening.closed, 1: middle,
-/// 2: open}. drip's "medium" opening token maps onto cycle-app's `middle`
-/// (same value, different storage name — see lib/domain/cervix.dart for
-/// the deliberate token distinction). An index outside the vocabulary
-/// means no stored observation for that dimension (the free-text line
-/// clamps instead — TODO(user-review): whether that clamping asymmetry is
-/// acceptable for the hand-authored specimen rows).
-({CervixPosition? position, CervixOpening? opening})? _cervixObservation({
+/// 1: medium, 2: high}, opening {0: CervixOpening.closed, 1: middle,
+/// 2: open}, and firmness {0: CervixFirmness.hard, 1: soft} — drip's
+/// two-step firmness scale (hard/soft) has no half-soft analogue, so only
+/// the two outer values map. drip's "medium" opening token maps onto
+/// cycle-app's `middle` (same value, different storage name — see
+/// lib/domain/cervix.dart for the deliberate token distinction). A
+/// position/opening index outside the vocabulary means no stored
+/// observation for that dimension; a firmness index outside its two-step
+/// vocabulary CLAMPS to the nearest valid one — the same clamping rule the
+/// free-text line applies (the shipped hand-authored specimen contains
+/// `cervix.firmness=2`). TODO(user-review): whether that clamping asymmetry
+/// is acceptable (position/opening null, firmness clamped) now that the
+/// structured firmness field exists — the free-text line clamps either way.
+({CervixPosition? position, CervixOpening? opening, CervixFirmness? firmness})?
+    _cervixObservation({
   required String? opening,
+  required String? firmness,
   required String? position,
 }) {
   final p = position == null ? null : int.tryParse(position);
   final o = opening == null ? null : int.tryParse(opening);
+  final f = firmness == null ? null : int.tryParse(firmness);
   final mappedPosition = p == null || p < 0 || p > 2
       ? null
       : CervixPosition.values[p]; // 0, 1, 2 = the first three values
   final mappedOpening = o == null || o < 0 || o > 2
       ? null
       : CervixOpening.values[o]; // 0, 1, 2 = all three values
-  if (mappedPosition == null && mappedOpening == null) return null;
-  return (position: mappedPosition, opening: mappedOpening);
+  final mappedFirmness = switch (f) {
+    // Clamp both ways, like the free-text `word` helper: drip's vocabulary
+    // is only hard(0)/soft(1), and the specimen's out-of-range 2 lands on
+    // soft exactly as it does in the free text.
+    null => null,
+    final v when v <= 0 => CervixFirmness.hard,
+    _ => CervixFirmness.soft, // anything >= 1 clamps to soft
+  };
+  if (mappedPosition == null &&
+      mappedOpening == null &&
+      mappedFirmness == null) {
+    return null;
+  }
+  return (position: mappedPosition, opening: mappedOpening,
+      firmness: mappedFirmness);
 }

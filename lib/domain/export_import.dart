@@ -8,7 +8,9 @@
 //     "profiles": [{"id": 1, "name": "main", "ordinal": 0}, ...],
 //     "entries":  [{"profile_id": 1, "date": "2026-03-01", "bbt_c": 36.6,
 //                    "measured_at_minutes": 405, (nullable, v2+; minutes
-//                    since midnight, when the temperature was measured)
+//                    since midnight, when the temperature was measured —
+//                    only ever set together with bbt_c; the import side
+//                    drops a stray time, never the row)
 //                    "bleeding": 3, (numeric level, v3; see the version note
 //                    below) "exclude_illness": false,
 //                    "mucus_sign": "s", "mucus_quality": "ew", (both
@@ -18,6 +20,10 @@
 //                    "cervix": null, (free-text note) "cervix_position":
 //                    "high", "cervix_opening": "open", (Muttermund
 //                    observation tokens, see the v4 note below)
+//                    "cervix_firmness": "hard", (Muttermund firmness token,
+//                    v4, see the version note below)
+//                    "sex_timings": 2, (SexTiming bitmask 0..7, v4, see the
+//                    version note below)
 //                    ..., "notes": null}, ...],
 //     "marks":    [{"profile_id": 1, "entry_date": "2026-03-12",
 //                   "mark_type": "baseline", "author": "user"}, ...]
@@ -37,6 +43,15 @@
 // identity, so it is TOLERATED but dropped by the field mapping (the row
 // stays valid, the flag information is not carried over).
 //
+// Version note on the v4 REDEFINITION (pre-release): v4 was never published
+// before the sex/cervix vocabulary landed, so its shape was redefined in
+// place instead of growing a v5 — the old v4 `sex` boolean is REPLACED by
+// the `sex_timings` bitmask (0..7, the SexTiming bits; see models.dart) and
+// `cervix_firmness` (the lib/domain/cervix.dart firmness token) extends v4
+// ADDITIVELY. No legacy tolerance shims exist for either key: there are no
+// v4 documents in the wild with the old shape, and a stray `sex` flag is
+// simply ignored (unknown keys never error — see below).
+//
 // Additive fields without a version bump: v4 ALSO carries the two
 // Muttermund (cervix) observation fields `cervix_position` /
 // `cervix_opening` (tokens of the lib/domain/cervix.dart vocabularies) —
@@ -45,7 +60,8 @@
 // document keep every other field (the new keys are ignored, not an
 // error), and newer apps read old documents that simply omit the fields.
 // An unknown/out-of-vocabulary token collapses to null on import without
-// dropping the row (never a row killer, same principle as mucus).
+// dropping the row (never a row killer, same principle as mucus); an
+// out-of-range `sex_timings` mask likewise collapses to 0.
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in
@@ -71,10 +87,12 @@ import 'models.dart';
 /// the field parser accepts both shapes regardless of the version.
 /// Version 4 replaced the generic `pain` entry flag with the letter-coded
 /// pain options `pain_breast` (B) and `pain_mittelschmerz` (M); the legacy
-/// `pain` flag of ≤v3 documents is tolerated and dropped on import. The
-/// Muttermund observation fields `cervix_position` / `cervix_opening`
-/// extend v4 ADDITIVELY with no version bump — the reader ignores unknown
-/// keys in both directions (see the version note in the header comment).
+/// `pain` flag of ≤v3 documents is tolerated and dropped on import. v4 was
+/// also (pre-release) REDEFINED IN PLACE: the boolean `sex` entry flag is
+/// replaced by the `sex_timings` bitmask (0..7), and the Muttermund fields
+/// `cervix_position` / `cervix_opening` / `cervix_firmness` extend v4
+/// ADDITIVELY with no version bump — the reader ignores unknown keys in
+/// both directions (see the version note in the header comment).
 const int exportSchemaVersion = 4;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and

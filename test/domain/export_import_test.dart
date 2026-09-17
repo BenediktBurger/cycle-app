@@ -8,6 +8,7 @@
 import 'dart:convert';
 
 import 'package:cycle_app/db/export_adapter.dart';
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
@@ -542,12 +543,131 @@ void main() {
     });
   });
 
+  group('sex timings / cervix firmness / mucus A in the writer', () {
+    Map<String, Object?> rowWith(Map<String, Object?> fields) =>
+        <String, Object?>{
+          'profile_id': 1,
+          'date': '2026-03-01',
+          'bleeding': 'none',
+          ...fields,
+        };
+
+    test('writer: the sex_timings mask carries over verbatim within 0..7',
+        () {
+      for (final mask in [0, 1, 2, 4, 5, 7]) {
+        final entry = tryDailyEntryFromExport(rowWith({'sex_timings': mask}));
+        expect(entry, isNotNull, reason: 'mask $mask must never kill the row');
+        expect(entry!.sexTimings, mask, reason: 'mask $mask');
+      }
+    });
+
+    test('writer: out-of-range / negative / missing sex_timings collapse to 0',
+        () {
+      for (final bad in <Object?>[8, -1, 999, '3', null]) {
+        final entry = tryDailyEntryFromExport(rowWith({'sex_timings': bad}));
+        expect(entry, isNotNull,
+            reason: 'a broken mask ($bad) is coerced, not a row killer');
+        expect(entry!.sexTimings, 0, reason: 'bad mask $bad collapses to 0');
+      }
+    });
+
+    test('writer: the old boolean `sex` flag is gone from the shape', () {
+      // v4 was redefined in place pre-release (no published v4 documents
+      // exist): `sex_timings` REPLACES `sex`. A row still carrying the old
+      // flag loses it silently — no shim, the row stays valid.
+      final entry = tryDailyEntryFromExport(rowWith({'sex': true}));
+      expect(entry, isNotNull);
+      expect(entry!.sexTimings, 0,
+          reason: 'the legacy flag has no mask identity');
+    });
+
+    test('writer: cervix_firmness tokens parse into the structured field',
+        () {
+      final cases = <String, CervixFirmness>{
+        'hard': CervixFirmness.hard,
+        'halfSoft': CervixFirmness.halfSoft,
+        'soft': CervixFirmness.soft,
+      };
+      cases.forEach((token, expected) {
+        final entry = tryDailyEntryFromExport(rowWith({
+          'cervix_firmness': token,
+        }));
+        expect(entry!.cervixFirmness, expected, reason: 'token "$token"');
+      });
+      final clean = tryDailyEntryFromExport(rowWith({}));
+      expect(clean!.cervixFirmness, isNull,
+          reason: 'older documents simply omit the field');
+    });
+
+    test('writer: an out-of-vocabulary firmness token collapses to null', () {
+      final entry = tryDailyEntryFromExport(rowWith({
+        'cervix_firmness': 'zzz',
+      }));
+      expect(entry, isNotNull,
+          reason: 'coercible fields never drop an otherwise valid row');
+      expect(entry!.cervixFirmness, isNull);
+    });
+
+    test('planner: sex_timings / cervix_firmness never invalidate a row', () {
+      final summary = planMerge(
+        ExportBlob(
+          profiles: const [],
+          entries: [
+            rowWith({'sex_timings': 8, 'cervix_firmness': 'zzz'}),
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'both fields are coercible, never gated');
+      expect(summary.entriesWritten, 1);
+    });
+
+    test('writer: the mucus token a flows through to the A sign', () {
+      final entry = tryDailyEntryFromExport(rowWith({'mucus_sign': 'a'}));
+      expect(entry!.mucusSign, MucusSign.a);
+      expect(entry.mucusQuality, isNull, reason: 'A carries no quality');
+    });
+
+    test('round trip: a full document keeps the new fields', () {
+      final json = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: [
+          {
+            'profile_id': 1,
+            'date': '2026-03-01',
+            'bleeding': 'none',
+            'sex_timings': 3,
+            'cervix_firmness': 'halfSoft',
+            'mucus_sign': 'a',
+          },
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15, 12),
+      ));
+
+      final doc = parseExportJson(json);
+      final entry = tryDailyEntryFromExport(doc.entries.single)!;
+      expect(entry.sexTimings, 3);
+      expect(entry.cervixFirmness, CervixFirmness.halfSoft);
+      expect(entry.mucusSign, MucusSign.a);
+    });
+  });
+
   group('bleeding levels in the export version boundary', () {
     test('the writer emits the schema version with the pain options', () {
       expect(exportSchemaVersion, 4,
           reason: 'v3 was the numeric-bleeding release; v4 replaces the '
               'generic `pain` flag with the pain_breast / pain_mittelschmerz '
-              'options (B/M)');
+              'options (B/M) and — redefined in place pre-release — the '
+              'boolean `sex` flag with the `sex_timings` mask plus the '
+              'additive `cervix_firmness` field');
     });
 
     test('documents with numeric bleeding build, parse and round-trip', () {

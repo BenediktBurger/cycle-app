@@ -83,10 +83,12 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'cervix': e.cervix,
           'cervix_position': e.cervixPosition,
           'cervix_opening': e.cervixOpening,
+          'cervix_firmness': e.cervixFirmness,
           'pain_breast': e.painBreast,
           'pain_mittelschmerz': e.painMittelschmerz,
           'mood': e.mood,
           'desire': e.desire,
+          'sex_timings': e.sexTimings,
           'notes': e.notes,
         },
     ],
@@ -294,11 +296,14 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 
 /// Row map -> [DailyEntry], or null when structurally invalid (bad date,
 /// unknown/missing bleeding value, ...) — the exact gates the merge planner
-/// applies, so a counted row is always written. Coercible fields are nulled,
-/// NEVER row killers: out-of-vocabulary / non-string mucus_sign and
-/// mucus_quality tokens collapse to null here, and a quality token without
-/// an S sign keeps the row with its quality nulled (both via the shared
-/// mucus parse helpers + the pair sanitize rule, lib/domain/mucus.dart).
+/// applies, so a counted row is always written. Coercible fields are nulled
+/// (or collapsed to their neutral value), NEVER row killers:
+/// out-of-vocabulary / non-string mucus_sign and mucus_quality tokens
+/// collapse to null here, a quality token without an S sign keeps the row
+/// with its quality nulled (both via the shared mucus parse helpers + the
+/// pair sanitize rule, lib/domain/mucus.dart), an out-of-vocabulary
+/// cervix token collapses to null (lib/domain/cervix.dart helpers), and an
+/// out-of-range sex_timings mask collapses to 0.
 DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   // parseExportId (shared with the merge planner) accepts numeric-string
   // ids as well — otherwise planner-counted rows would be silently skipped
@@ -330,6 +335,18 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   final measuredAtMinutes =
       tryParseMeasuredAtMinutes(row['measured_at_minutes']);
 
+  // The sex timings mask: an int within the 0..7 SexTiming vocabulary is
+  // taken verbatim; anything else — a missing key (older documents predate
+  // the field), a non-int, an out-of-range value — collapses to 0 ("no sex
+  // recorded"), never a row killer (same principle as mucus). The
+  // ≤(redefined-v4) boolean `sex` flag is deliberately NOT read here: it
+  // has no mask identity (see export_import.dart's version note on the
+  // pre-release redefinition).
+  final rawTimings = row['sex_timings'];
+  final sexTimings = rawTimings is int && rawTimings >= 0 && rawTimings <= 7
+      ? rawTimings
+      : 0;
+
   try {
     return DailyEntry(
       date: day,
@@ -349,6 +366,8 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       // collapse to null — NEVER row killers, same principle as mucus.
       cervixPosition: tryParseCervixPosition(row['cervix_position']),
       cervixOpening: tryParseCervixOpening(row['cervix_opening']),
+      cervixFirmness: tryParseCervixFirmness(row['cervix_firmness']),
+      sexTimings: sexTimings,
       // The generic `pain` flag of ≤v3 documents is deliberately NOT read
       // here: it has no B/M identity, so the flag is dropped while the row
       // itself stays valid (see export_import.dart's version note).

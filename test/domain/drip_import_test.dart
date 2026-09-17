@@ -20,6 +20,7 @@ import 'dart:io' show File;
 
 import 'package:cycle_app/domain/drip_import.dart';
 import 'package:cycle_app/domain/export_import.dart';
+import 'package:cycle_app/domain/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The committed drip export specimen, read straight from disk (working dir
@@ -387,6 +388,43 @@ void main() {
       expect(absent['cervix_opening'], isNull);
     });
 
+    test(
+        'cervix: firmness maps into the structured field, 0→hard, 1→soft, '
+        'out-of-range clamps like the free text', () {
+      // drip's firmness vocabulary is hard/soft (0-based, length 2). The
+      // structured field is set IN ADDITION to the (clamping) free-text
+      // line. Header index: 9 = cervix.firmness.
+      expect(entryOf(cells('2026-01-01', {9: '0', 4: '2'}))
+              ['cervix_firmness'],
+          'hard');
+      expect(entryOf(cells('2026-01-01', {9: '1', 4: '2'}))
+              ['cervix_firmness'],
+          'soft');
+      // The shipped hand-authored specimen carries firmness=2, out of
+      // drip's vocabulary: it clamps to soft, exactly like the free-text
+      // word (and unlike position/opening, which map out-of-range to null).
+      expect(entryOf(cells('2026-01-01', {9: '2', 4: '2'}))
+              ['cervix_firmness'],
+          'soft',
+          reason: 'the out-of-range specimen index clamps to soft');
+      expect(entryOf(cells('2026-01-01', {9: '-1', 4: '2'}))
+              ['cervix_firmness'],
+          'hard',
+          reason: 'a negative index clamps to the nearest valid one');
+      expect(entryOf(cells('2026-01-01', {9: '7', 4: '2'}))
+              ['cervix_firmness'],
+          'soft',
+          reason: 'a far-out index clamps to the nearest valid one');
+      // Non-numeric cells stay unstructured (and out of the free text too).
+      expect(entryOf(cells('2026-01-01', {9: 'x', 4: '2'}))
+              ['cervix_firmness'],
+          isNull);
+      // Absent column behaves like an empty cell.
+      final absent =
+          entryOf(['2026-01-01', '2'], header: ['date', 'bleeding.value']);
+      expect(absent['cervix_firmness'], isNull);
+    });
+
     test('desire: intensity values 0/1/2 count, literal false does not', () {
       // drip's desire vocabulary is 0=low/1=medium/2=high — not a boolean;
       // any present value means "desire happened", intensity is lost.
@@ -469,20 +507,24 @@ void main() {
           () {
         final e = entryOf(sexCells('2026-01-01', {2: 'true', 10: 'true'}),
             header: sexHeader);
-        expect(e['sex'], isTrue);
+        // Time-less drip sex maps onto the MIDDLE time of day (owner
+        // decision); drip carries no time-of-day for sex itself.
+        expect(e['sex_timings'], SexTiming.middle.bit);
+        expect(e.containsKey('sex'), isFalse,
+            reason: 'the v4 export shape carries no `sex` flag any more');
       });
 
-      test('partner + none with the note → sex flag and [sex] note line', () {
+      test('partner + none with the note → sex mask and [sex] note line', () {
         final e = entryOf(
             sexCells('2026-01-01', {2: 'true', 10: 'true', 12: 'good day'}),
             header: sexHeader);
-        expect(e['sex'], isTrue);
+        expect(e['sex_timings'], SexTiming.middle.bit);
         expect(e['notes'], '[sex] good day');
       });
 
       test('partner with any contraceptive method → not sex', () {
         // The [sex] note keeps the day importable in every variant; the
-        // sex observation itself stays unset.
+        // sex observation itself stays unset (mask 0).
         for (final method in [3, 4, 5, 6, 7, 8, 9, 11]) {
           final result = dripCsvToExportJson(
               dripOneRowCsv(
@@ -491,7 +533,7 @@ void main() {
                       '2026-01-01', {2: 'true', method: 'true', 12: 'n'})));
           final doc = jsonDecode(result.json) as Map<String, Object?>;
           final e = (doc['entries']! as List).single as Map<String, Object?>;
-          expect(e['sex'], isFalse,
+          expect(e['sex_timings'], 0,
               reason: 'method index $method is a contraception');
           expect(e['notes'], '[sex] n');
         }
@@ -505,7 +547,7 @@ void main() {
                 {2: 'true', 10: 'true', 3: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
-        expect(e['sex'], isFalse,
+        expect(e['sex_timings'], 0,
             reason: 'a recorded method contradicts the none confirmation');
       });
 
@@ -516,7 +558,7 @@ void main() {
             sexHeader, sexCells('2026-01-01', {2: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
-        expect(e['sex'], isFalse);
+        expect(e['sex_timings'], 0);
         expect(e['notes'], '[sex] n');
       });
 
@@ -526,7 +568,7 @@ void main() {
             sexCells('2026-01-01', {1: 'true', 10: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
-        expect(e['sex'], isFalse, reason: 'solo is not partner sex');
+        expect(e['sex_timings'], 0, reason: 'solo is not partner sex');
         expect(e['notes'], '[sex] n');
       });
 
@@ -748,6 +790,9 @@ void main() {
       // mucus day: value 2 ('f') wins over the 2+1 parts, firmness clamps
       expect(by('2026-07-15')['mucus_sign'], 'f');
       expect(by('2026-07-15')['cervix'], 'medium, soft, medium');
+      expect(by('2026-07-15')['cervix_firmness'], 'soft',
+          reason: 'the specimen firmness index 2 clamps to soft, also '
+              'in the structured field');
       // excluded temperature day
       expect(by('2026-09-13')['exclude_other'], true);
       expect(by('2026-09-13')['bbt_c'], 36.7);
@@ -763,21 +808,21 @@ void main() {
       expect(by('2026-08-20')['desire'], true);
       expect(by('2026-08-20')['mood'], true);
       // Sex observations: only with-partner-without-contraception days map
-      // to sex. The specimen's sex days all fail that rule — 2026-07-17
-      // (partner WITH a condom), 2026-08-16 (partner, but the only
-      // contraceptive info is condom=false/pill=false: no explicit none,
-      // the rest unknown → ambiguous, dropped entirely), 2026-09-12
-      // (solo) — so no day carries sex=true.
+      // to the sex timings mask. The specimen's sex days all fail that
+      // rule — 2026-07-17 (partner WITH a condom), 2026-08-16 (partner,
+      // but the only contraceptive info is condom=false/pill=false: no
+      // explicit none, the rest unknown → ambiguous, dropped entirely),
+      // 2026-09-12 (solo) — so no day carries a set sex_timings mask.
       expect(entries.any((e) => e['date'] == '2026-08-16'), isFalse,
           reason: 'ambiguous partner day without contraception info: '
               'not sex, not data');
       final withCondom = by('2026-07-17');
-      expect(withCondom['sex'], isFalse,
+      expect(withCondom['sex_timings'], 0,
           reason: 'partner sex with a condom is not the mapped variant');
       expect(withCondom['desire'], isTrue);
       expect(withCondom['notes'], '[sex] with condom, quite good');
       final soloDay = by('2026-09-12');
-      expect(soloDay['sex'], isFalse, reason: 'solo is not partner sex');
+      expect(soloDay['sex_timings'], 0, reason: 'solo is not partner sex');
       expect(soloDay['notes'], '[sex] morning');
       // breast-pain (B) + pain-note day (drip pain.tenderBreasts → B)
       expect(by('2026-08-25')['pain_breast'], true);

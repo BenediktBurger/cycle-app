@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/drip_import.dart';
 import 'package:cycle_app/domain/export_import.dart' show formatIsoDay;
@@ -86,11 +87,13 @@ void main() {
 
       // 2026-07-15: mucus day — drip nfp value 2 wins over the 2+1 parts →
       // sign f, no quality (the amended number-level mapping), firmness
-      // index 2 clamps to soft.
+      // index 2 clamps to soft — in the free text AND in the structured
+      // cervixFirmness field.
       final mucusDay = await dayRow('2026-07-15');
       expect(mucusDay.mucusSign, MucusSign.f);
       expect(mucusDay.mucusQuality, isNull);
       expect(mucusDay.cervix, 'medium, soft, medium');
+      expect(mucusDay.cervixFirmness, CervixFirmness.soft);
       expect(mucusDay.bbtC, isNull);
       expect(mucusDay.bleeding, Bleeding.none);
       expect(mucusDay.excludeOther, isFalse);
@@ -127,18 +130,18 @@ void main() {
       expect(breastDay.painMittelschmerz, isFalse);
       expect(breastDay.notes, '[pain] tender in the evening');
 
-      // 2026-07-17: partner sex WITH a condom — the sex observation stays
-      // unset (only partner sex without contraception maps); the [sex]
-      // note and the desire flag still make it a data row.
+      // 2026-07-17: partner sex WITH a condom — the sex timings mask stays
+      // 0 (only partner sex without contraception maps); the [sex] note
+      // and the desire flag still make it a data row.
       final condomDay = await dayRow('2026-07-17');
-      expect(condomDay.sex, isFalse,
+      expect(condomDay.sexTimings, 0,
           reason: 'partner sex with contraception is not the mapped variant');
       expect(condomDay.desire, isTrue);
       expect(condomDay.notes, '[sex] with condom, quite good');
 
-      // 2026-09-12: solo sex with a note — note rides in, sex stays unset.
+      // 2026-09-12: solo sex with a note — note rides in, the mask stays 0.
       final soloDay = await dayRow('2026-09-12');
-      expect(soloDay.sex, isFalse, reason: 'solo is not partner sex');
+      expect(soloDay.sexTimings, 0, reason: 'solo is not partner sex');
       expect(soloDay.notes, '[sex] morning');
     });
 
