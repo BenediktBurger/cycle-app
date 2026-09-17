@@ -106,8 +106,7 @@ final class _ChartDays {
     // group start on or before it — a cycle only ends at the next onset,
     // so untracked gap days keep counting from the last start. The first
     // (leading) group starts at the first recorded day, so every index is
-    // covered. Cycle-group starts also carry the label rule: their column
-    // shows the short month form instead of the plain day number.
+    // covered.
     // TODO(user-review): before the first real onset (a leading group of
     // days that predate the first recorded period) the count starts at the
     // first TRACKED day — the true cycle start is unknowable there.
@@ -120,7 +119,6 @@ final class _ChartDays {
         group++;
       }
       cycleDayByIndex[i] = DateOnly.daysBetween(date, starts[group]) + 1;
-      if (DateOnly.sameDay(date, starts[group])) cycleStartIndexes.add(i);
     }
   }
 
@@ -135,10 +133,6 @@ final class _ChartDays {
   /// Day of cycle (1, 2, 3 …) per day index, counted from the start of the
   /// cycle group the day belongs to (see the mapping note above).
   final Map<int, int> cycleDayByIndex = {};
-
-  /// Day indexes that start a cycle group: their column label shows the
-  /// localized short month form instead of the plain day-of-month.
-  final Set<int> cycleStartIndexes = {};
 
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 }
@@ -577,9 +571,10 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Per-day column labels: day of month on top (cycle
-                    // starts in the short month form), day of cycle
-                    // underneath — windowed, at their global x positions.
+                    // Per-day column labels: day of month on top (the
+                    // first of a month in the short month form), day of
+                    // cycle underneath — windowed, at their global x
+                    // positions.
                     _DayLabelRow(
                       days: _days,
                       cellWidth: colW,
@@ -802,12 +797,24 @@ final class _SymbolCell extends StatelessWidget {
   }
 }
 
+/// The localized short month name for [date]'s calendar month, in the same
+/// abbreviated month form intl's date formats spell (en "Jan" / de "Jan." —
+/// with the German trailing period, like the old DateFormat.MMMd labels).
+/// The plain DateFormat.MMM constant would NOT do: it resolves to the
+/// STANDALONE abbreviated months (de "Jan", no period) via the CLDR
+/// availableFormats table, so the label is read from the locale's month
+/// symbol set directly.
+String _shortMonthLabel(DateTime date, String locale) =>
+    DateFormat('d', locale).dateSymbols.SHORTMONTHS[date.month - 1];
+
 /// Per-day column labels under the chart: every day column shows its day
 /// of month ("14.") on top and its day of cycle (1, 2, 3 …, counted from
-/// the cycle start in _ChartDays) underneath. On a cycle-start day the
-/// day-of-month label is REPLACED by the localized short month form with
-/// the day (DateFormat.MMMd: en "Jan 20" / de "20. Jan.") — the month home
-/// the otherwise bare day numbers need. Mirrors _SymbolRow's windowed
+/// the cycle start in _ChartDays) underneath. On the FIRST day of a
+/// calendar month the day-of-month label is REPLACED by the localized
+/// short month form (de "Jan." / en "Jan") — the month home the otherwise
+/// bare day numbers need. The rule is CALENDAR-based, not cycle-based:
+/// a cycle start mid-month keeps its plain day number (owner decision).
+/// Mirrors _SymbolRow's windowed
 /// layout: only the window's cells are built, and the leading spacer keeps
 /// them at their global x positions.
 final class _DayLabelRow extends StatelessWidget {
@@ -839,15 +846,15 @@ final class _DayLabelRow extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Day of month — only cycle starts carry the month, so the
-                // form is scannable without crowding every narrow column.
-                // FittedBox squeezes "20. Jan." into even the minimum
-                // usable column width.
+                // Day of month — only the FIRST day of a calendar month
+                // carries the month, so the form is scannable without
+                // crowding every narrow column. FittedBox squeezes even
+                // the German "Jan." into the minimum usable column width.
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    days.cycleStartIndexes.contains(i)
-                        ? DateFormat.MMMd(locale).format(days.dayAt(i))
+                    days.dayAt(i).day == 1
+                        ? _shortMonthLabel(days.dayAt(i), locale)
                         : '${days.dayAt(i).day}.',
                     style: const TextStyle(fontSize: 10),
                   ),
