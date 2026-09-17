@@ -14,6 +14,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/export_import.dart';
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/db/cycle_database.dart';
@@ -627,6 +628,136 @@ void main() {
       await db.marksDao.addMark(1, date, 'adhocFutureTool');
       final marks = await db.marksDao.marksForDay(1, date);
       expect(marks.single.markType, 'adhocFutureTool');
+    });
+  });
+
+  group('MarksDao <-> CycleMark round trip (mapper)', () {
+    final day = DateTime(2026, 3, 12);
+
+    test('toggleMark add/remove round-trips through the mapper', () async {
+      final expected = CycleMark(
+        profileId: 1,
+        date: day,
+        type: CycleMarkTypes.mucusPeakDay,
+      );
+      expect(await db.marksDao.toggleMark(1, day, expected.type), isTrue);
+
+      final stored = (await db.marksDao.marksForDay(1, day)).single;
+      expect(cycleMarkFromDrift(stored), expected,
+          reason: 'the stored row maps back to the domain mark the write '
+              'was made from');
+
+      expect(await db.marksDao.toggleMark(1, day, expected.type), isFalse);
+      expect(await db.marksDao.marksForDay(1, day), isEmpty,
+          reason: 'the removal is observable through the mapper too: no row, '
+              'no domain mark');
+    });
+
+    test('the epoch-day converter normalizes any time-of-day into the day',
+        () async {
+      // Written with a time-of-day and in a non-UTC representation (the same
+      // calendar day in a timezone east of UTC): must land on exactly one
+      // row for the calendar day and read back as UTC midnight.
+      final afternoon = DateTime(2026, 3, 12, 17, 30);
+      final stored = await db.marksDao.addMark(
+        1,
+        afternoon,
+        CycleMarkTypes.firstHigherMeasurement,
+      );
+      final mapped = cycleMarkFromDrift(stored);
+
+      expect(DateOnly.sameDay(mapped.date, day), isTrue);
+      expect(mapped.date.isUtc, isTrue, reason: 'domain dates are UTC midnight');
+      expect(mapped.date.hour, 0);
+      expect(mapped.date.minute, 0);
+
+      // Same calendar day from another timezone representation: same row,
+      // no duplicate (uniqueness is on the normalized day).
+      await db.marksDao.addMark(
+        1,
+        afternoon.toUtc().add(const Duration(hours: 2)),
+        CycleMarkTypes.firstHigherMeasurement,
+      );
+      expect(await db.marksDao.marksForDay(1, day), hasLength(1));
+    });
+
+    test('a duplicate (profile, date, type) insert bypassing addMark hits '
+        'the unique index', () async {
+      await db.marksDao.addMark(1, day, CycleMarkTypes.baseline);
+      await expectLater(
+        db.into(db.userMarks).insert(
+              cycleMarkToCompanion(
+                CycleMark(profileId: 1, date: day, type: CycleMarkTypes.baseline),
+              ),
+            ),
+        throwsA(isA<Exception>()), // UNIQUE constraint failed
+      );
+      expect(await db.marksDao.marksForDay(1, day), hasLength(1));
+    });
+
+    test('companion helper writes every domain field and maps back identical',
+        () async {
+      final mark = CycleMark(
+        profileId: 1,
+        date: day,
+        type: 'adhocFutureTool',
+        author: 'assist',
+      );
+      await db.into(db.userMarks).insert(cycleMarkToCompanion(mark));
+
+      final stored = (await db.marksDao.marksForDay(1, day)).single;
+      expect(cycleMarkFromDrift(stored), mark);
+    });
+
+    test('the domain mark vocabulary mirrors the stored tokens', () {
+      // The domain layer must never import lib/db, so the token strings are
+      // duplicated into CycleMarkTypes — this test is the tripwire keeping
+      // the two definitions in sync.
+      expect(CycleMarkTypes.mucusPeakDay, MarkTypes.mucusPeakDay);
+      expect(
+          CycleMarkTypes.firstHigherMeasurement, MarkTypes.firstHigherMeasurement);
+      expect(CycleMarkTypes.baseline, MarkTypes.baseline);
+      expect(CycleMarkTypes.fertileWindow, MarkTypes.fertileWindow);
+      expect(CycleMarkTypes.interruption, MarkTypes.interruption);
+    });
+
+    test('watchAllMarks streams the profile\'s marks as they are toggled',
+        () async {
+      // Buffered events, not emit counting: the initial empty snapshot must
+      // be observed BEFORE the write so its ordering stays meaningful (same
+      // pattern as the watchRange test above).
+      final events = <List<UserMark>>[];
+      final sub = db.marksDao.watchAllMarks(1).listen(events.add);
+      addTearDown(sub.cancel);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(events, [<UserMark>[]],
+          reason: 'initial snapshot of an empty mark table');
+
+      final otherDay = DateTime(2026, 3, 13);
+      await db.profilesDao.addProfile('partner'); // id 2
+      await db.marksDao.addMark(1, otherDay, CycleMarkTypes.baseline);
+      await db.marksDao.addMark(1, day, CycleMarkTypes.mucusPeakDay);
+      await db.marksDao.addMark(2, day, CycleMarkTypes.baseline,
+          author: 'user');
+      await Future<void>.delayed(Duration.zero);
+
+      // Content, not event counting: drift re-emits on ANY write to the
+      // watched table (even other profiles' rows), so the number of events
+      // is not a stable assertion — the latest snapshot is.
+      expect(events.last, hasLength(2),
+          reason: 'only profile 1; the partner profile mark is invisible');
+      expect(
+        [for (final m in events.last) m.markType],
+        [CycleMarkTypes.mucusPeakDay, CycleMarkTypes.baseline],
+        reason: 'ordered by day, then type',
+      );
+      expect(events.last.first.entryDate.isBefore(events.last.last.entryDate),
+          isTrue);
+
+      await db.marksDao.deleteMark(1, otherDay, CycleMarkTypes.baseline);
+      await Future<void>.delayed(Duration.zero);
+      expect(events.last.single.markType, CycleMarkTypes.mucusPeakDay);
     });
   });
 

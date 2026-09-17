@@ -93,6 +93,21 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
         .watch();
   }
 
+  /// Stream of every mark of one profile, ordered by day then type — the
+  /// whole-history companion to EntriesDao.watchAll. [watchMarks] requires
+  /// a [from, to] range and cannot serve a whole-history stream (the cycle
+  /// tab renders evaluation data across cycle boundaries, so it needs every
+  /// mark without knowing the ranges up front).
+  Stream<List<UserMark>> watchAllMarks(int profileId) {
+    return (select(userMarks)
+          ..where((t) => t.profileId.equals(profileId))
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.entryDate),
+            (t) => OrderingTerm.asc(t.markType),
+          ]))
+        .watch();
+  }
+
   /// Every mark of every profile (export support), ordered by profile,
   /// day and type.
   Future<List<UserMark>> allMarksForAllProfiles() {

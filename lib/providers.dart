@@ -14,6 +14,7 @@ import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'domain/date_only.dart';
+import 'domain/marks.dart';
 import 'domain/models.dart';
 
 /// The one open database for the app lifetime. `FutureProvider` (without
@@ -45,6 +46,19 @@ final dailyEntriesProvider =
   yield* db.entriesDao
       .watchAll(defaultProfileId)
       .map((rows) => rows.map(dailyEntryFromDrift).toList());
+});
+
+/// Live stream of the user-placed marks (as pure domain models) for the
+/// default profile — the read side of the evaluation feature (Mode M, the
+/// counterpart to [dailyEntriesProvider]). Re-emits on every mark write
+/// (add/remove); consumers recompute the derived evaluation (baseline,
+/// circled higher measurements, SUZ) from it at render time — never from a
+/// persisted copy, per ADR-0001.
+final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
+  final db = await ref.watch(databaseProvider.future);
+  yield* db.marksDao
+      .watchAllMarks(defaultProfileId)
+      .map((rows) => rows.map(cycleMarkFromDrift).toList());
 });
 
 /// Tab index of the bottom navigation shell. Simple StateProvider: screens

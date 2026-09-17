@@ -5,6 +5,7 @@
 import 'package:drift/drift.dart';
 
 import '../domain/date_only.dart';
+import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
 import 'cycle_database.dart';
@@ -73,3 +74,24 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     notes: Value(d.notes),
   );
 }
+
+/// UserMarks row -> domain model. The mark vocabulary is open TEXT in
+/// storage, so no sanitizing gate applies: an unknown token must survive
+/// the round trip verbatim (future tools write them; the schema is the
+/// vocabulary authority, not the mapper).
+CycleMark cycleMarkFromDrift(UserMark m) => CycleMark(
+      profileId: m.profileId,
+      date: m.entryDate,
+      type: m.markType,
+      author: m.author,
+    );
+
+/// Domain model -> companion. Marks are add/remove events (toggle semantics
+/// in the DAO), never partial patches, so every field is written explicitly
+/// — a companion built from a [CycleMark] is a complete replacement row.
+UserMarksCompanion cycleMarkToCompanion(CycleMark mark) => UserMarksCompanion(
+      profileId: Value(mark.profileId),
+      entryDate: Value(DateOnly.normalize(mark.date)),
+      markType: Value(mark.type),
+      author: Value(mark.author),
+    );
