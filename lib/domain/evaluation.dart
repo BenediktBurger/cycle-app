@@ -87,17 +87,16 @@
 //   excluded days anyway). The peak day itself counts as a low when it
 //   falls into the window — its mucus role does not exempt its temperature.
 //   TODO(user-review): Untracked days (data gaps) and unmeasured days
-//   consume no 1–6 slot. Symmetrically, an excluded day is never a marked
-//   candidate either — a disturbed day cannot prove the rise (the cheat
-//   sheet brackets "Zacken" instead of circling them).
+//   consume no 1–6 slot — do they take one of the six slots?
 //   TODO(user-review): Numbering counts BACKWARDS from the first higher
 //   measurement ("zurücknummerieren"): the low directly before it is 1.
 //   The chronological alternative (1..6 ending right before the rise) is
 //   plausible; only the [NumberedLow.number] field is affected.
-//   TODO(user-review): An EXCLUDED day inside the candidate sequence is
-//   treated like a missing day (it consumes the one-gap allowance of R2).
-//   The owner's rules text only covers "missing or at/below baseline";
-//   excluded-as-missing is this implementation's interpretation.
+//   Settled rule (owner-confirmed 2026-09-17): an unmeasured or EXCLUDED
+//   day inside the candidate sequence counts exactly like a day at/below
+//   the baseline — a gap day consuming the one-gap R2 allowance. The R2
+//   class list ("missing, excluded, or at/below the baseline") names one
+//   and the same gap-day class; no interpretation is deferred here.
 //   TODO(user-review): The SUZ (rules D and E) is declared only from
 //   CIRCLED measurements — the cheat sheet's rule wording speaks of the
 //   "umrandete höhere Messung" (the circled higher measurement), and the
@@ -115,12 +114,15 @@
 //   applied by the chart painter, and the min() clamps (cycle end, next
 //   six-low window) are defensive — under the current cycle grouping they
 //   can never bind. If a future grouping change makes them bind, revisit.
-//   TODO(user-review): The user-marked first higher measurement is taken
+//   Owner-confirmed posture: the user is assumed to follow the rules
+//   (Mode M), so the user-marked first higher measurement is taken
 //   verbatim for the six-low window and the baseline, even when the
 //   marked day itself is not above the baseline. The candidate search
 //   then starts at the next strictly-above measurement from the mark
-//   onward (R3); on noisy data the mark and the candidates can disagree —
-//   the UI shows what the arithmetic says.
+//   onward (R3); above-baseline days before the mark are user error or a
+//   separately-handled disturbance (see R3). The overall Mode-M posture
+//   is still a Hypothesis (ADR-0001) — the owner confirmed this rule
+//   interpretation, not the INER expert review.
 //   No open assumption, settled rule: multiple peak / first-higher marks
 //   inside one cycle are EXPECTED, not a user-data problem (delayed
 //   ovulation; re-marking after a broken Hochlage). The MOST RECENT mark
@@ -448,7 +450,8 @@ _LowWindow _lowWindowFor(
   if (firstHigherDay == null) return _LowWindow.empty;
 
   // Usable measurements: temperature recorded and no exclusion flag (see
-  // the file-header assumptions for the exclusion rule).
+  // the file-header low definition; the settled R8 rule keeps excluded
+  // days out of the candidate sequence as well).
   // cycle.days is sorted ascending by groupIntoCycles.
   final usable = cycle.days
       .where((e) => e.bbtC != null && !e.isExcluded)
@@ -510,8 +513,9 @@ CycleEvaluation _evaluateCycle(
 
   // The marked candidate sequence (R1–R5): walk CALENDAR days from the
   // marked rise onward so that untracked days (data gaps) count as the
-  // missing days they are. Unmeasured and excluded days are gaps too (R8,
-  // see the file-header TODO); a day at or below the baseline is a gap as
+  // missing days they are. Unmeasured and excluded days are gaps too (R8 —
+  // settled rule: they count exactly like days at/below the baseline, see
+  // the file header); a day at or below the baseline is a gap as
   // well. One gap day between two candidates is tolerated; two in a row
   // stop the automatic evaluation (no re-search, no automatic restart).
   // The gap counting spans the WHOLE sequence, including the arrow→circle
