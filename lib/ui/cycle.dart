@@ -12,8 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/date_only.dart';
 import '../domain/models.dart';
+import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'mucus_symbol.dart';
 
 class ZyklusScreen extends ConsumerWidget {
   const ZyklusScreen({super.key});
@@ -212,8 +214,8 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 }
 
 /// One narrow cell per calendar day under the chart, aligned by the same
-/// even day spacing as the chart: bleeding marker on top, the recorded NFP
-/// mucus value (if any) below. Pure recording, no interpretation.
+/// even day spacing as the chart: bleeding marker on top, the recorded
+/// fertility sign (`Sᴱᵂ` style) below. Pure recording, no interpretation.
 final class _SymbolRow extends StatelessWidget {
   const _SymbolRow({required this.days, required this.onDayTap});
 
@@ -271,14 +273,20 @@ final class _SymbolCell extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        // Mucus NFP value (bottom); empty when nothing recorded.
-        Text(
-          entry!.mucusNfp == null ? '' : '${entry!.mucusNfp}',
-          style: TextStyle(
-            fontSize: 9,
-            height: 1.1,
-            color: Theme.of(context).colorScheme.tertiary,
-            fontWeight: FontWeight.w600,
+        // Fertility sign (bottom, superscript quality style); the fixed
+        // slot height keeps all cells aligned even with no sign recorded.
+        SizedBox(
+          height: 12,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: MucusSymbolText(
+              display: mucusDisplay(
+                sign: entry!.mucusSign,
+                quality: entry!.mucusQuality,
+              ),
+              fontSize: 9,
+              color: Theme.of(context).colorScheme.tertiary,
+            ),
           ),
         ),
       ],
@@ -345,13 +353,13 @@ final class _LegendDot extends StatelessWidget {
             border: Border.all(width: 1.5, color: color),
           ),
         ),
-      _LegendShape.text => Text('3',
-          style: TextStyle(
-            fontSize: 10,
-            height: 1.1,
-            color: color,
-            fontWeight: FontWeight.w600,
-          )),
+      _LegendShape.text => MucusSymbolText(
+          // Sample observation: S with the EW quality qualifier, exactly
+          // how a recorded mucus day renders in the symbol row above.
+          display: mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew),
+          fontSize: 10,
+          color: color,
+        ),
     };
     return Row(
       mainAxisSize: MainAxisSize.min,

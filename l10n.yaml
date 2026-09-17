@@ -1,5 +1,10 @@
 arb-dir: lib/l10n
-template-arb-file: app_de.arb
+# app_en.arb is the template on purpose: gen-l10n fills keys that are missing
+# from a locale's ARB with the template's text, so the untranslated-term
+# fallback language is English (never German; see docs/adr/0007-language-policy.md).
+# New keys therefore land in app_en.arb first and are translated from there
+# (currently de is the only other locale).
+template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 nullable-getter: false
 # Generated-code placement: this project generates REAL files into arb-dir

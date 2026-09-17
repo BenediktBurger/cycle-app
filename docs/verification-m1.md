@@ -43,7 +43,8 @@ remains YOUR own gate:
        symbol row; tapping a day switches to Tagebuch with that date loaded
        in the form.
 - [ ] 9. Einstellungen: switch language to **English** → all four tabs and
-       content switch. (Reload resets to German — documented M1 limitation,
+        content switch. (Reload resets to the system default (system language
+        if supported, otherwise English) — documented M1 limitation,
        see CONTRIBUTING §Conventions.)
 
 ## Export / import round trip

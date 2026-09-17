@@ -21,7 +21,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// event-loop turn (Timer.run), and streams cancelled while Riverpod disposes
 /// the ProviderScope during tree teardown can never reach that turn in the
 /// test's fake async zone.
-ProviderScope _appScope() => ProviderScope(
+///
+/// [locale] pins an explicit app language for the duration of the test: the
+/// app's real default is the system language (nullable localeProvider), and
+/// unpinned the test runner exposes an English device — so the German-string
+/// assertions below have to request German explicitly (the system-follow
+/// default itself is covered by locale_default_test.dart).
+ProviderScope _appScope([Locale? locale]) => ProviderScope(
       overrides: [
         // In-memory database: no files, no platform channels, no FFI paths.
         // ref.onDispose closes it together with the test's ProviderScope
@@ -38,6 +44,7 @@ ProviderScope _appScope() => ProviderScope(
             return db;
           },
         ),
+        if (locale != null) localeProvider.overrideWith((ref) => locale),
       ],
       child: const CycleApp(),
     );
@@ -46,9 +53,10 @@ void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (
     WidgetTester tester,
   ) async {
-    // German is the default locale for M1; the language switcher is covered
-    // by its own (manual) verification — see docs/verification-m1.md.
-    await tester.pumpWidget(_appScope());
+    // Explicit German pin so the German labels below hold; how German is
+    // *reached* (system device vs. switcher choice) is tested in
+    // locale_default_test.dart.
+    await tester.pumpWidget(_appScope(const Locale('de')));
     // Let the gated shell resolve the (already-synchronous-ish) database
     // future, then settle screens and any transcription animations.
     await tester.pumpAndSettle();
@@ -76,11 +84,59 @@ void main() {
     }
   });
 
+  testWidgets('mucus form: sign picker with conditional quality picker',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tagebuch').first);
+    await tester.pumpAndSettle();
+
+    // The sign picker offers the unset option plus the four glyphs
+    // t / Ø / f / S (glyphs are the display, per cheat-sheet convention).
+    const signGlyphs = ['—', 't', 'Ø', 'f', 'S'];
+    for (final glyph in signGlyphs) {
+      expect(
+        find.text(glyph),
+        findsWidgets,
+        reason: 'Sign segment "$glyph" should be present',
+      );
+    }
+
+    // The quality picker stays hidden until the sign S is selected.
+    expect(find.text('Qualität'), findsNothing);
+    await tester.ensureVisible(find.text('S'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('S'));
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsOneWidget);
+    const qualityTokens = ['w', 'mi', 'cr', 'kl', 'glb', 'g', 'EW', 'gl', 'fl', 'ns'];
+    for (final token in qualityTokens) {
+      expect(
+        find.text(token),
+        findsOneWidget,
+        reason: 'Quality chip "$token" should be offered on S',
+      );
+    }
+
+    // Selecting a quality keeps the picker; switching to another sign
+    // hides it again (a quality only exists together with S).
+    await tester.ensureVisible(find.text('EW'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EW'));
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsOneWidget);
+    await tester.ensureVisible(find.text('Ø'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ø'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.text('Qualität'), findsNothing);
+  });
+
   testWidgets('PIN lock stub is visible and non-interactive',
       (WidgetTester tester) async {
     // The stub must be visibly NOT interactive (onChanged: null) — flipping
     // it would falsely signal an existing protection (ADR-0005).
-    await tester.pumpWidget(_appScope());
+    await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Einstellungen').first);
     await tester.pumpAndSettle();

@@ -18,6 +18,7 @@ import 'package:drift/native.dart';
 
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/statistics.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/mappers.dart';
@@ -55,15 +56,25 @@ Future<void> main() async {
   var rejected = false;
   try {
     await db.customStatement(
-        'INSERT INTO cycle_entries (profile_id, date, mucus_nfp) '
-        'VALUES (1, 20000, 5)');
+        'INSERT INTO cycle_entries (profile_id, date, mucus_sign) '
+        "VALUES (1, 20000, 'wet')");
   } catch (_) {
     rejected = true;
   }
-  check(rejected, 'mucus_nfp CHECK constraint rejects 5');
+  check(rejected, 'mucus_sign CHECK rejects out-of-vocabulary token');
+  rejected = false;
+  try {
+    await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
+        "mucus_quality) VALUES (1, 20003, 'f', 'w')");
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'mucus_quality CHECK rejects quality without the S sign');
+  // Sanity: in-vocabulary writes go through (S with a quality qualifier).
   await db.customStatement(
-      'INSERT INTO cycle_entries (profile_id, date, mucus_nfp) '
-      'VALUES (1, 20001, 4)');
+      'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
+      "mucus_quality) VALUES (1, 20001, 's', 'ew')");
 
   rejected = false;
   try {
@@ -126,8 +137,8 @@ Future<void> main() async {
     excludeAlcohol: true,
     excludeTravel: true,
     excludeOther: true,
-    mucusFeeling: 'milky, creamy',
-    mucusNfp: 2,
+    mucusSign: MucusSign.s,
+    mucusQuality: MucusQuality.gl,
     cervix: 'closed, low',
     pain: true,
     mood: true,

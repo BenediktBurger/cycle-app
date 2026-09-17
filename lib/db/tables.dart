@@ -1,4 +1,5 @@
-// Drift table definitions for the cycle app (schema version 1).
+// Drift table definitions for the cycle app (schema version 2; the version
+// number lives in cycle_database.dart).
 //
 // SQL-level naming: drift converts camelCase getter names to snake_case
 // column names, matching the naming used in the plan and migration notes.
@@ -51,16 +52,23 @@ class CycleEntries extends Table {
       boolean().withDefault(const Constant(false))();
   BoolColumn get excludeOther => boolean().withDefault(const Constant(false))();
 
-  /// Free-text mucus description entered by the user.
-  TextColumn get mucusFeeling => text().nullable()();
-
-  /// NFP mucus scale value 0..4 (nullable). Constrained at the SQL level so
-  /// broken data (e.g. from a future import path) cannot be written.
+  /// Fertility sign recorded on the day: NULL when no observation, else one
+  /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
+  /// names — TEXT like bleeding, never numbers, never display glyphs).
   /// customConstraint replaces drift's own constraints, which is fine here:
   /// SQLite columns admit NULL unless NOT NULL is written, and the check
-  /// below allows exactly NULL or 0..4.
-  IntColumn get mucusNfp => integer().nullable().customConstraint(
-        'CHECK (mucus_nfp IS NULL OR (mucus_nfp BETWEEN 0 AND 4))',
+  /// below allows exactly NULL or the vocabulary.
+  TextColumn get mucusSign => text().nullable().customConstraint(
+        "CHECK (mucus_sign IS NULL OR mucus_sign IN ('t', 'nothing', 'f', 's'))",
+      )();
+
+  /// Quality qualifier of the mucus sign S; NULL for every sign other than
+  /// 's' and for days without a sign. Enforced at the engine level so broken
+  /// data (e.g. from a future import path) cannot be written.
+  TextColumn get mucusQuality => text().nullable().customConstraint(
+        "CHECK (mucus_quality IS NULL OR (mucus_sign = 's' AND "
+        "mucus_quality IN ('w', 'mi', 'cr', 'kl', 'glb', 'g', 'ew', 'gl', "
+        "'fl', 'ns')))",
       )();
 
   /// Optional cervix observation (free text).

@@ -1,4 +1,4 @@
-// Einstellungen screen: language switcher (de/en), the PIN-lock stub
+// Einstellungen screen: language switcher (System/de/en), the PIN-lock stub
 // (non-functional in M1 by design, ADR-0005), and JSON export/import.
 //
 // Export UX (no new dependencies, see lib/ui/file_transfer.dart): an
@@ -42,8 +42,15 @@ class EinstellungenScreen extends ConsumerWidget {
                   Text(l10n.settingsLanguage,
                       style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
+                  // The provider stores null for "System"; the segment
+                  // model uses a string key ('system'/'de'/'en') so all
+                  // three states fit one SegmentedButton (ADR-0007).
                   SegmentedButton<String>(
                     segments: [
+                      ButtonSegment(
+                        value: 'system',
+                        label: Text(l10n.languageSystem),
+                      ),
                       ButtonSegment(
                         value: 'de',
                         label: Text(l10n.languageGerman),
@@ -53,14 +60,16 @@ class EinstellungenScreen extends ConsumerWidget {
                         label: Text(l10n.languageEnglish),
                       ),
                     ],
-                    selected: {locale.languageCode},
+                    selected: {locale == null ? 'system' : locale.languageCode},
                     onSelectionChanged: (selection) => ref
                         .read(localeProvider.notifier)
-                        .state = Locale(selection.first),
+                        .state = selection.first == 'system'
+                        ? null
+                        : Locale(selection.first),
                   ),
                   const SizedBox(height: 8),
-                  // In-memory ONLY: reset to German after a web reload by
-                  // design for this milestone (documented on
+                  // In-memory ONLY: reset to the system default after a web
+                  // reload by design for this milestone (documented on
                   // localeProvider + docs/roadmap.md).
                   Text(l10n.settingsLanguageNote,
                       style: Theme.of(context).textTheme.bodySmall),

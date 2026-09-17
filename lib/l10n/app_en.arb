@@ -1,6 +1,9 @@
 {
   "@@locale": "en",
   "appTitle": "Cycle App (working title)",
+  "@appTitle": {
+    "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
+  },
   "navTagebuch": "Diary",
   "navZyklus": "Cycle",
   "navStatistik": "Statistics",
@@ -25,17 +28,9 @@
   "excludeTravel": "travel",
   "excludeOther": "other",
   "excludesCaption": "Interrupted days (count as disturbed for evaluation):",
-  "mucusFeeling": "Mucus feeling",
-  "mucusFeelingUnset": "—",
-  "mucusDry": "dry",
-  "mucusSticky": "sticky, tacky",
-  "mucusCreamy": "milky, creamy",
-  "mucusMoist": "moist, smooth",
-  "mucusWet": "wet, slippery",
-  "mucusStretchy": "stretchy, like egg white",
-  "mucusNfpValue": "NFP value (mucus)",
-  "mucusMappingTitle": "Suggested mapping feeling → NFP",
-  "mucusMappingNote": "Preliminary mapping; will be reviewed with the INER experts (ADR-0001).",
+  "mucusSign": "Fertility sign",
+  "mucusSignUnset": "—",
+  "mucusQuality": "Quality",
   "cervix": "Cervix (optional)",
   "pain": "pain",
   "mood": "mood",
@@ -70,7 +65,7 @@
   "cycleTapToEdit": "Tap a day to edit it",
   "zyklusLegendTemperature": "BBT (temperature)",
   "zyklusLegendBleeding": "Bleeding",
-  "zyklusLegendMucus": "NFP mucus value",
+  "zyklusLegendMucus": "Fertility sign (mucus)",
   "zyklusNoData": "The temperature curve appears once days with measurements exist.",
   "zyklusArithmeticNote": "Pure signal recording — no evaluation, no fertility statement. Marks (e.g. baseline/coverline) follow later (Mode M, ADR-0001).",
   "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
@@ -90,7 +85,8 @@
     }
   },
   "settingsLanguage": "Language",
-  "settingsLanguageNote": "In-memory only — reverts to German after reload (persistent storage planned).",
+  "settingsLanguageNote": "In-memory only — reverts to the System setting after reload (persistent storage planned).",
+  "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsPinLock": "PIN lock (placeholder)",
@@ -139,5 +135,30 @@
       }
     }
   },
-  "importEmpty": "Import: nothing to change (document empty or already identical)."
+  "importEmpty": "Import: nothing to change (document empty or already identical).",
+  "dripImportTitle": "Import drip data",
+  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. Imports into the main profile; per-symptom interrupt flags (except temperature) are dropped.",
+  "dripImportApply": "Import CSV",
+  "dripImportHint": "Paste a drip CSV export here …",
+  "dripImportInvalid": "Not a drip CSV export (no \"date\" column in the header row).",
+  "dripImportSummary": "{imported} days imported, {skipped} empty days skipped, {invalid} invalid rows; days new: {newDays}, days overwritten: {overwritten}.",
+  "@dripImportSummary": {
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      }
+    }
+  }
 }

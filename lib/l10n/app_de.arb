@@ -1,9 +1,6 @@
 {
   "@@locale": "de",
   "appTitle": "Zyklus-App (Arbeitstitel)",
-  "@appTitle": {
-    "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
-  },
   "navTagebuch": "Tagebuch",
   "navZyklus": "Zyklus",
   "navStatistik": "Statistik",
@@ -28,17 +25,9 @@
   "excludeTravel": "Reise",
   "excludeOther": "Sonstiges",
   "excludesCaption": "Störungstage (werten bewertungstechnisch wie unterbrochen):",
-  "mucusFeeling": "Schleimgefühl",
-  "mucusFeelingUnset": "—",
-  "mucusDry": "trocken",
-  "mucusSticky": "klebrig, dassig",
-  "mucusCreamy": "milchig, cremeartig",
-  "mucusMoist": "feucht, glatt",
-  "mucusWet": "nass, rutschig",
-  "mucusStretchy": "fädenziehend, wie Eiweiß",
-  "mucusNfpValue": "NFP-Wert (Schleim)",
-  "mucusMappingTitle": "Vorschlagstabelle Gefühl → NFP",
-  "mucusMappingNote": "Vorläufige Zuordnung; wird mit INER-Experten geprüft (ADR-0001).",
+  "mucusSign": "Zeichen der Fruchtbarkeit",
+  "mucusSignUnset": "—",
+  "mucusQuality": "Qualität",
   "cervix": "Muttermund (freiwillig)",
   "pain": "Schmerzen",
   "mood": "Stimmung",
@@ -73,7 +62,7 @@
   "cycleTapToEdit": "Tippen, um den Tag zu bearbeiten",
   "zyklusLegendTemperature": "BBT (Temperatur)",
   "zyklusLegendBleeding": "Blutung",
-  "zyklusLegendMucus": "NFP-Schleimwert",
+  "zyklusLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
   "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
   "zyklusArithmeticNote": "Reine Aufzeichnung der Signale — keine Auswertung, keine Fruchtbarkeitsangabe. Markierungen (z. B. Baseline/Deckblatt) folgen später (Mode M, ADR-0001).",
   "statistikNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
@@ -93,7 +82,8 @@
     }
   },
   "settingsLanguage": "Sprache",
-  "settingsLanguageNote": "Nur im Speicher — nach Neuladen wieder Deutsch (geplant: persistenter Speicher).",
+  "settingsLanguageNote": "Nur im Speicher — nach Neuladen wieder Einstellung „System“ (geplant: persistenter Speicher).",
+  "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
@@ -142,5 +132,30 @@
       }
     }
   },
-  "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch)."
+  "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
+  "dripImportTitle": "Drip-Daten importieren",
+  "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Import läuft in das Hauptprofil; Störungskennzeichen pro Symptom (außer Temperatur) fallen weg.",
+  "dripImportApply": "CSV importieren",
+  "dripImportHint": "Drip-CSV-Export hier einfügen …",
+  "dripImportInvalid": "Das ist kein Drip-CSV-Export (keine „date“-Spalte in der Kopfzeile).",
+  "dripImportSummary": "{imported} Tage importiert, {skipped} leere Tage übersprungen, {invalid} ungültige Zeilen; Tage neu: {newDays}, Tage überschrieben: {overwritten}.",
+  "@dripImportSummary": {
+    "placeholders": {
+      "imported": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      }
+    }
+  }
 }

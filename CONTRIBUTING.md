@@ -131,13 +131,13 @@ report the full analyzer/test output back so issues can be fixed promptly.
 - **Unresolved working assumptions** are marked in code and docs — in
   particular the overall "Mode M" product shape
   ([ADR-001](docs/adr/0001-iner-mode-m-hypothesis.md), status: Hypothesis),
-  the NFP 0–4 mucus mapping table (`lib/domain/mucus.dart`,
-  `// TODO(user-review)`), the cycle-boundary rule
+  the cycle-boundary rule
   (`lib/domain/cycle_grouping.dart`), and the statistics bucket edges
   (`lib/domain/statistics.dart`). Treat marked comments like
   `// TODO(user-review)` as questions to bring to INER experts, not as
   settled behavior.
-- **In-memory-only state for now**: the language selection resets to German
-  on web reload by design (persisting it — e.g. a settings table or
-  localStorage — is future work; see `localeProvider` in
+- **In-memory-only state for now**: the language selection resets to the
+  system-language default on web reload by design (system language when
+  available, otherwise English; persisting an explicit choice — e.g. a
+  settings table or localStorage — is future work; see `localeProvider` in
   `lib/providers.dart`).

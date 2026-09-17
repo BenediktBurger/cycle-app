@@ -41,7 +41,7 @@ environment:
 # Deliberately NOT here: sqlcipher_flutter_libs (ADR-005 — only when encryption
 # is wired, later milestone), pdf/printing (deferred past M1), file pickers
 # (M1 exports/imports are copy-to-clipboard + web download + paste, see
-# lib/ui/einstellungen.dart), and no Android-only plugins (ADR-003). ERROR
+# lib/ui/settings.dart), and no Android-only plugins (ADR-003). ERROR
 # NOTE: if this file ever reverts to "A new Flutter project" defaults, a
 # `flutter create` run has clobbered it — restore from git history.
 
@@ -65,6 +65,9 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
   drift_dev: ^2.35.0
+  # Direct dependency for the migration tests: they bootstrap a real v1-era
+  # database file via the raw SQLite binding before drift's onUpgrade runs.
+  sqlite3: ^3.5.0
 
 flutter:
   uses-material-design: true

@@ -7,8 +7,10 @@
 //     "exported_at": "<ISO 8601 UTC>",
 //     "profiles": [{"id": 1, "name": "main", "ordinal": 0}, ...],
 //     "entries":  [{"profile_id": 1, "date": "2026-03-01", "bbt_c": 36.6,
-//                    "bleeding": "period", "exclude_illness": false, ...,
-//                    "notes": null}, ...],
+//                    "bleeding": "period", "exclude_illness": false,
+//                    "mucus_sign": "s", "mucus_quality": "ew", (both
+//                    nullable; quality only ever together with S)
+//                    "cervix": null, ..., "notes": null}, ...],
 //     "marks":    [{"profile_id": 1, "entry_date": "2026-03-12",
 //                   "mark_type": "baseline", "author": "user"}, ...]
 //   }

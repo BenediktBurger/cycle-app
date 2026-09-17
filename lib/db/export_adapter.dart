@@ -70,8 +70,8 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'exclude_alcohol': e.excludeAlcohol,
           'exclude_travel': e.excludeTravel,
           'exclude_other': e.excludeOther,
-          'mucus_feeling': e.mucusFeeling,
-          'mucus_nfp': e.mucusNfp,
+          'mucus_sign': e.mucusSign,
+          'mucus_quality': e.mucusQuality,
           'cervix': e.cervix,
           'pain': e.pain,
           'mood': e.mood,
@@ -284,9 +284,11 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 
 /// Row map -> [DailyEntry], or null when structurally invalid (bad date,
 /// unknown/missing bleeding value, ...) — the exact gates the merge planner
-/// applies, so a counted row is always written. Out-of-scale values in
-/// coercible fields (bbt, flags, mucus_nfp via clampedMucusNfp) are nulled
-/// by the field parsers below, NOT rejected.
+/// applies, so a counted row is always written. Coercible fields are nulled,
+/// NEVER row killers: out-of-vocabulary / non-string mucus_sign and
+/// mucus_quality tokens collapse to null here, and a quality token without
+/// an S sign keeps the row with its quality nulled (both via the shared
+/// mucus parse helpers + the pair sanitize rule, lib/domain/mucus.dart).
 DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   // parseExportId (shared with the merge planner) accepts numeric-string
   // ids as well — otherwise planner-counted rows would be silently skipped
@@ -302,6 +304,14 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   final bleeding = tryParseBleeding(row['bleeding']);
   if (bleeding == null) return null;
 
+  // The (sign, quality) pair from foreign data through the shared helpers,
+  // then the quality-requires-S rule: the only state this writer can
+  // legally construct.
+  final mucus = sanitizeMucusPair(
+    sign: tryParseMucusSign(row['mucus_sign']),
+    quality: tryParseMucusQuality(row['mucus_quality']),
+  );
+
   final bbt = row['bbt_c'];
   bool flag(Object? key) => row[key] == true;
 
@@ -315,10 +325,8 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       excludeAlcohol: flag('exclude_alcohol'),
       excludeTravel: flag('exclude_travel'),
       excludeOther: flag('exclude_other'),
-      mucusFeeling: row['mucus_feeling'] is String
-          ? row['mucus_feeling'] as String
-          : null,
-      mucusNfp: clampedMucusNfp(row['mucus_nfp']),
+      mucusSign: mucus.sign,
+      mucusQuality: mucus.quality,
       cervix: row['cervix'] is String ? row['cervix'] as String : null,
       pain: flag('pain'),
       mood: flag('mood'),

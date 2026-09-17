@@ -56,3 +56,11 @@ the schema assumes a specific mode), but no S/A functionality is built.
   (e.g. first non-spotting period day starts a cycle; NFP 0–4 mucus mapping)
   inherit review flags from this ADR and are themselves assumptions to
   validate.
+
+  **Update (2026-09-16):** the "NFP 0–4 mucus mapping" assumption listed above
+  has been removed — mucus is no longer stored or shown as a 0–4 number, but
+  is displayed with the fertility-sign vocabulary from the cheat sheet
+  (`t / Ø / f / S`, with quality superscripts — Ø and the superscripts are
+  display glyphs) and stored as stable ASCII enum tokens in TEXT columns.
+  The review flag no longer applies to it; the Mode-M compute-never-interpret
+  posture is unchanged and still applies.

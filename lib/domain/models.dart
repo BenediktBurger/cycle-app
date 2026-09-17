@@ -2,6 +2,7 @@
 // converts between these models and drift rows (see lib/db/mappers.dart).
 
 import 'date_only.dart';
+import 'mucus.dart';
 
 /// Bleeding intensity observed on a single day.
 ///
@@ -36,16 +37,16 @@ final class DailyEntry {
     this.excludeAlcohol = false,
     this.excludeTravel = false,
     this.excludeOther = false,
-    this.mucusFeeling,
-    this.mucusNfp,
+    this.mucusSign,
+    this.mucusQuality,
     this.cervix,
     this.pain = false,
     this.mood = false,
     this.desire = false,
     this.sex = false,
     this.notes,
-  }) : assert(mucusNfp == null || (mucusNfp >= 0 && mucusNfp <= 4),
-            'mucusNfp must be within 0..4 (NFP scale) or null');
+  }) : assert(mucusQuality == null || mucusSign == MucusSign.s,
+            'mucusQuality is only valid together with mucusSign == MucusSign.s');
 
   final int profileId;
   final DateTime date;
@@ -62,12 +63,14 @@ final class DailyEntry {
   final bool excludeTravel;
   final bool excludeOther;
 
-  /// Free-text cervical mucus description as entered by the user.
-  final String? mucusFeeling;
+  /// Fertility sign observed on the day (t / Ø-nichts / f / S), or null when
+  /// no observation was recorded. Stored verbatim — never interpreted (Mode
+  /// M, ADR-0001).
+  final MucusSign? mucusSign;
 
-  /// NFP mucus scale 0..4 (0 = none ... 4 = stretchy/clear, last "peak-like"
-  /// value). Null when the user only gave a free-text feeling.
-  final int? mucusNfp;
+  /// Quality qualifier of the mucus sign; null for every sign other than
+  /// `MucusSign.s` (constructor assert mirrors the SQL CHECK constraint).
+  final MucusQuality? mucusQuality;
 
   /// Optional cervix observation note (e.g. open/closed, position).
   final String? cervix;
@@ -94,8 +97,8 @@ final class DailyEntry {
     bool? excludeAlcohol,
     bool? excludeTravel,
     bool? excludeOther,
-    Object? mucusFeeling = _sentinel,
-    Object? mucusNfp = _sentinel,
+    Object? mucusSign = _sentinel,
+    Object? mucusQuality = _sentinel,
     Object? cervix = _sentinel,
     bool? pain,
     bool? mood,
@@ -112,10 +115,11 @@ final class DailyEntry {
       excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
       excludeTravel: excludeTravel ?? this.excludeTravel,
       excludeOther: excludeOther ?? this.excludeOther,
-      mucusFeeling: mucusFeeling == _sentinel
-          ? this.mucusFeeling
-          : mucusFeeling as String?,
-      mucusNfp: mucusNfp == _sentinel ? this.mucusNfp : mucusNfp as int?,
+      mucusSign:
+          mucusSign == _sentinel ? this.mucusSign : mucusSign as MucusSign?,
+      mucusQuality: mucusQuality == _sentinel
+          ? this.mucusQuality
+          : mucusQuality as MucusQuality?,
       cervix: cervix == _sentinel ? this.cervix : cervix as String?,
       pain: pain ?? this.pain,
       mood: mood ?? this.mood,
@@ -139,8 +143,8 @@ final class DailyEntry {
         excludeAlcohol == other.excludeAlcohol &&
         excludeTravel == other.excludeTravel &&
         excludeOther == other.excludeOther &&
-        mucusFeeling == other.mucusFeeling &&
-        mucusNfp == other.mucusNfp &&
+        mucusSign == other.mucusSign &&
+        mucusQuality == other.mucusQuality &&
         cervix == other.cervix &&
         pain == other.pain &&
         mood == other.mood &&
@@ -159,8 +163,8 @@ final class DailyEntry {
         excludeAlcohol,
         excludeTravel,
         excludeOther,
-        mucusFeeling,
-        mucusNfp,
+        mucusSign,
+        mucusQuality,
         cervix,
         pain,
         mood,
@@ -173,5 +177,6 @@ final class DailyEntry {
   String toString() =>
       'DailyEntry(${DateOnly.normalize(date).toIso8601String()}, '
       'profile:$profileId, bbt:$bbtC, bleeding:$bleeding, '
-      'excluded:$isExcluded, mucusNfp:$mucusNfp)';
+      'excluded:$isExcluded, mucusSign:$mucusSign, '
+      'mucusQuality:$mucusQuality)';
 }

@@ -25,7 +25,7 @@ comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 - [x] **WP2.2 (web)** — wasm + worker assets vendored from the drift 2.35.0
       release; run note updated in [CONTRIBUTING.md](../CONTRIBUTING.md) §3
 - [x] **WP2.2.2** — language switcher (de/en) in settings; in-memory only
-      (resets to German on reload — documented limitation)
+      (resets to the system default on reload — documented limitation)
 - [x] **WP2.2.3** — JSON export/import in settings: copy-text path on all
       platforms, browser download + file input on web, home-directory file
       on desktop; merge policy (profile, date) = overwrite with counts
@@ -63,18 +63,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- [ ] Language default: system language when available, otherwise English;
-      the settings offer switching between "system" and the individual
-      languages (de/en) — see
-      [ADR-0007](adr/0007-language-policy.md).
-- [ ] Rename all German-named code files to English identifiers — at the
-      time of writing: `lib/ui/{einstellungen,zyklus,statistik,tagebuch}.dart`
-      → `{settings,cycle,statistics,diary}.dart`, plus any German-named
-      files that appear meanwhile; mechanical, no behavior change. Policy:
-      [ADR-0007](adr/0007-language-policy.md).
-- [ ] Missing translation term falls back to **English** (non-Germans likely
-      know English, but not German) instead of German.
-- [ ] Use Zeichen der Fruchtbarkeit from Cheat Sheet (maybe even as string)?
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
       higher measurement" adds the baseline automatically, based on the preceding measurements
       User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
@@ -85,9 +73,10 @@ the sections above track planned work, git history keeps the record (see
   clarified: release/packaging vs. remaining placeholder screens).
 - [ ] Time of temperature measurement (can be prefilled with current time)
 - Datenbankschema überarbeiten (manche Dinge pro Zyklus nicht pro Tag speichern? )
+- [ ] allow different levels of bleeding
+- [ ] show excluded temperature measurements in a lighter color (also the connection line, if possible)
 - exclude (Temperatur, Blutung) als negative Zahl?
 - set markings (temperature rising etc.) on the cycle tab
-- Schleim als String, nicht als Zahl speichern?
 - [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
@@ -95,7 +84,7 @@ the sections above track planned work, git history keeps the record (see
 ### Convenience
 
 - [ ] Dark mode, following the device setting.
-- [ ] Password protection for the database — first revisit
+- Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
 - Import from drip
@@ -103,3 +92,4 @@ the sections above track planned work, git history keeps the record (see
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
+- [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
