@@ -142,8 +142,11 @@ final class _ChartDays {
 
 /// fl_chart line chart over all measured days plus a per-day symbol row.
 ///
-/// The x axis is a plain day index over the recorded range: calendar gaps
-/// (days without any measurement) stay honest as distance, not compressed.
+/// The x axis is a plain day index over the recorded range, half a column
+/// SHIFTED (minX −0.5 .. maxX dayCount − 0.5) so day i's dot lands exactly
+/// on its day column's center — the column geometry the label, marks and
+/// symbol rows share: calendar gaps (days without any measurement) stay
+/// honest as distance, not compressed.
 /// Y bounds are rounded to the nearest half degree so the gridlines carry
 /// typical 0.25 °C steps without a "good range" being implied.
 final class _CycleChart extends ConsumerStatefulWidget {
@@ -164,7 +167,9 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
   static const double minDayColumnWidth = 24;
 
   /// The y-axis title strip the chart reserves on its left edge (fl_chart's
-  /// leftTitles reservation, mirrored in the chart config below). The tap
+  /// leftTitles reservation, mirrored in the chart config below). Every
+  /// aligned row (day labels, marks, symbols) leads with a strip of this
+  /// width too, so its day cells line up with the curve's columns; the tap
   /// mapping needs the same figure: the curve's plot area starts right of
   /// this strip.
   static const double leftAxisReservedSize = 44;
@@ -272,7 +277,11 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     final offset =
         _scrollController.hasClients ? _scrollController.offset : 0.0;
     final visible = (viewport / colW).ceil().clamp(1, dayCount);
-    final firstVisible = (offset / colW).floor().clamp(0, dayCount - 1);
+    // The scroll content leads with the y-axis strip: day cell i starts at
+    // leftAxisReservedSize + i * colW, so the strip is subtracted before
+    // flooring the offset onto the column grid.
+    final firstVisible =
+        ((offset - leftAxisReservedSize) / colW).floor().clamp(0, dayCount - 1);
     return (
       math.max(0, firstVisible - 1),
       math.min(dayCount - 1, firstVisible + visible),
@@ -291,14 +300,16 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 
   /// Translates a tap on the chart's plot area into a day index and opens
   /// the day's sheet. The overlay starts at the plot's left edge (right of
-  /// the y-axis strip); day indexes map linearly onto the plot width (0 at
-  /// the left edge, maxX at its right edge — fl_chart's pixel mapping). The
-  /// nearest day column wins, exactly like the row cells underneath.
+  /// the y-axis strip); the chart's x domain is half a column SHIFTED
+  /// (minX −0.5 .. maxX dayCount − 0.5), so the tap's local x maps linearly
+  /// onto a fractional day index d whose integer parts are the columns'
+  /// centers: day i's column spans d in [i − 0.5, i + 0.5). The nearest
+  /// day column wins, exactly like the row cells underneath.
   void _openDayAtLocalX(double localX, double contentWidth) {
     final plotWidth = contentWidth - leftAxisReservedSize;
-    final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
     final t = (localX / plotWidth).clamp(0.0, 1.0);
-    final index = (t * maxX).round().clamp(0, _days.dayCount - 1);
+    final d = -0.5 + t * _days.dayCount;
+    final index = d.round().clamp(0, _days.dayCount - 1);
     _openDaySheet(index);
   }
 
@@ -323,7 +334,10 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     final index = DateOnly.daysBetween(DateOnly.normalize(picked), firstDay)
         .clamp(0, _days.dayCount - 1);
     if (!_scrollController.hasClients) return;
-    final target = (index * colW - (viewport - colW) / 2)
+    // Center the picked day's column: its center sits at
+    // leftAxisReservedSize + (index + 0.5) * colW in the scroll content,
+    // and centering places it at the viewport's middle.
+    final target = (leftAxisReservedSize + (index + 0.5) * colW - viewport / 2)
         .clamp(0.0, _scrollController.position.maxScrollExtent);
     await _scrollController.animateTo(
       target,
@@ -396,11 +410,21 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
         final dayCount = _days.dayCount;
         // Useful day columns: at most as many days as fit the viewport at
         // the minimum usable width; a longer range keeps that width and
-        // scrolls horizontally instead of squeezing.
-        final overflow = dayCount * minDayColumnWidth > viewport;
-        final colW = overflow ? minDayColumnWidth : viewport / dayCount;
+        // scrolls horizontally instead of squeezing. The viewport hosts the
+        // y-axis strip first, then the day columns — a column is "usable"
+        // when the columns plus the strip still fit.
+        final overflow =
+            leftAxisReservedSize + dayCount * minDayColumnWidth > viewport;
+        final colW = overflow
+            ? minDayColumnWidth
+            : (viewport - leftAxisReservedSize) / dayCount;
         _columnWidth = colW;
-        final contentWidth = dayCount * colW;
+        // The scroll content: the strip plus one column per day. In the
+        // fitting case that is exactly the viewport (nothing scrolls); the
+        // explicit viewport keeps the no-scroll case free of floating-point
+        // slack that a recomputed sum could introduce.
+        final contentWidth =
+            overflow ? leftAxisReservedSize + dayCount * colW : viewport;
         final (winStart, winEnd) = _windowFor(dayCount);
         _windowStart = winStart;
         _windowEnd = winEnd;
@@ -431,27 +455,31 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
         // light as well as the dark surface (dark: light overlay).
         final weekendBandColor =
             Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
-        final lastX = (dayCount - 1).toDouble();
+        // The chart's x domain spans one column per day, half a column
+        // SHIFTED so day i's dot lands on its column center: the domain
+        // runs from minX −0.5 to maxX dayCount − 0.5 (day i's column is
+        // [i − 0.5, i + 0.5] in domain units). The ±0.5 offsets below and
+        // in the baseline/SUZ drawing therefore mean exactly "column
+        // bounds"; the range annotations clamp to those bounds, so edge
+        // columns keep their full half-day band.
+        final lastX = (dayCount - 0.5).toDouble();
         final weekendBands = <VerticalRangeAnnotation>[];
         for (var i = winStart; i <= winEnd; i++) {
           if (!DateOnly.isWeekend(_days.dayAt(i))) continue;
           // Half a day left and right of the day's x position, clipped to
-          // the really recorded range (edge days keep a narrower band).
-          var x1 = (i - 0.5).clamp(0, lastX).toDouble();
-          var x2 = (i + 0.5).clamp(0, lastX).toDouble();
-          // Single-day chart: maxX widens to 1.0 while lastX is 0, so the
-          // clamp collapses the band to zero width — extend the right edge
-          // instead so the weekend still shows (left of the day lies
-          // outside minX 0).
-          if (x2 <= x1) x2 = x1 + 0.5;
+          // the plot bounds (a first/last-day weekend keeps its full
+          // column width instead of being cut back to the day index).
+          var x1 = (i - 0.5).clamp(-0.5, lastX).toDouble();
+          var x2 = (i + 0.5).clamp(-0.5, lastX).toDouble();
           weekendBands.add(
             VerticalRangeAnnotation(x1: x1, x2: x2, color: weekendBandColor),
           );
         }
 
-        // fl_chart requires minX < maxX; a single recorded day gets a 1-day
-        // tick window instead of a degenerate zero-width axis.
-        final maxX = dayCount <= 1 ? 1.0 : (dayCount - 1).toDouble();
+        // The domain bounds per the alignment note above: a single
+        // recorded day keeps the −0.5..0.5 one-column window for free
+        // (fl_chart requires minX < maxX, satisfied for every dayCount ≥ 1).
+        final maxX = (dayCount - 0.5).toDouble();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -540,7 +568,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                 // the domain's baselineSpan: from the left
                                 // edge of low #6's day column to half a day
                                 // past the last marked candidate's column,
-                                // clamped to the recorded range (mirror of
+                                // clamped to the plot bounds (mirror of
                                 // the weekend-band clamping). Keeps the
                                 // dashed style and the theme-derived
                                 // secondary color, without spanning the
@@ -551,7 +579,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                     spots: [
                                       FlSpot(
                                           math.max(
-                                              0.0, segment.startIndex - 0.5),
+                                              -0.5, segment.startIndex - 0.5),
                                           segment.value),
                                       FlSpot(
                                           math.min(
@@ -581,12 +609,11 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                     spots: [
                                       // The bar: column START (x − 0.5) for
                                       // suzMorning, column MIDDLE (x) for
-                                      // suzEvening, clamped to the
-                                      // recorded range like the weekend
-                                      // bands (edge days keep a narrower
-                                      // offset).
-                                      FlSpot(suz.barX.clamp(0.0, lastX), yMin),
-                                      FlSpot(suz.barX.clamp(0.0, lastX), yMax),
+                                      // suzEvening, clamped to the plot
+                                      // bounds like the weekend bands (the
+                                      // edge columns keep their full width).
+                                      FlSpot(suz.barX.clamp(-0.5, lastX), yMin),
+                                      FlSpot(suz.barX.clamp(-0.5, lastX), yMax),
                                     ],
                                     isCurved: false,
                                     barWidth: 2,
@@ -602,7 +629,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                   // owner-eyeball rendering detail).
                                   LineChartBarData(
                                     spots: [
-                                      FlSpot(suz.barX.clamp(0.0, lastX),
+                                      FlSpot(suz.barX.clamp(-0.5, lastX),
                                           suz.arrowValueY ?? (yMin + yMax) / 2),
                                     ],
                                     color: Colors.transparent,
@@ -615,7 +642,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                   ),
                                 ],
                               ],
-                              minX: 0,
+                              minX: -0.5,
                               maxX: maxX,
                               minY: yMin,
                               maxY: yMax,
@@ -689,10 +716,14 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                     // columns. Full range: the row renders an empty slot per
                     // day and belongs to the in-progress evaluation-marks
                     // feature (lib/ui/cycle_marks.dart) — kept unwindowed on
-                    // purpose to keep that file untouched; the cells are
-                    // cheap and stay at their global positions.
+                    // purpose to keep that feature's numbering semantics
+                    // untouched; the cells are cheap and stay at their
+                    // global positions (same leading-strip alignment as the
+                    // rows above).
                     EvaluationMarksRow(
                       dayCount: dayCount,
+                      leadingStrip: leftAxisReservedSize,
+                      cellWidth: colW,
                       numbersByIndex: overlay.numbersByIndex,
                       onDayTap: _openDaySheet,
                     ),
@@ -717,15 +748,17 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 }
 
 /// One narrow cell per calendar day under the chart, aligned by the same
-/// even day spacing as the chart: a vertical stack of recorded-fact glyphs
-/// (bleeding marker, mucus peak dot, fertility sign, cervix letter, the
-/// temperature measurement time, sex, the pain letters) — pure recording,
-/// no interpretation.
+/// even day spacing as the chart: a leading strip of the chart's y-axis
+/// reservation puts the cells at the curve's global column positions (cell
+/// i is centered at the strip + (i + 0.5) * cellWidth — exactly where the
+/// chart draws day i's dot), and on top a vertical stack of recorded-fact
+/// glyphs (bleeding marker, mucus peak dot, fertility sign, cervix letter,
+/// the temperature measurement time, sex, the pain letters) — pure
+/// recording, no interpretation.
 ///
 /// Only the window's cells are built: days outside
 /// [windowStart]..[windowEnd] stay unbuilt, and the leading spacer keeps the
-/// window cells at their global positions (cell i is centered at
-/// (i + 0.5) * cellWidth, the same even spacing the full row used before).
+/// window cells at their global positions.
 final class _SymbolRow extends StatelessWidget {
   const _SymbolRow({
     required this.days,
@@ -752,7 +785,11 @@ final class _SymbolRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: windowStart * cellWidth),
+        // The leading strip mirrors the chart's y-axis reservation, so the
+        // cells sit under their curve columns.
+        SizedBox(
+            width: _CycleChartState.leftAxisReservedSize +
+                windowStart * cellWidth),
         // The cell key exposes the whole tappable per day index for the
         // widget tests (same convention as marksCell-$i above the chart).
         for (var i = windowStart; i <= windowEnd; i++)
@@ -1014,8 +1051,10 @@ String _shortMonthLabel(DateTime date, String locale) =>
 /// bare day numbers need. The rule is CALENDAR-based, not cycle-based:
 /// a cycle start mid-month keeps its plain day number (owner decision).
 /// Mirrors _SymbolRow's windowed
-/// layout: only the window's cells are built, and the leading spacer keeps
-/// them at their global x positions.
+/// layout: a leading strip of the chart's y-axis reservation puts the cells
+/// at the curve's global column positions (cell i is centered at the strip
+/// + (i + 0.5) * cellWidth — exactly where the chart draws day i's dot),
+/// and only the window's cells are built.
 final class _DayLabelRow extends StatelessWidget {
   const _DayLabelRow({
     required this.days,
@@ -1035,7 +1074,11 @@ final class _DayLabelRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: windowStart * cellWidth),
+        // The leading strip mirrors the chart's y-axis reservation, so the
+        // labels sit under their curve columns.
+        SizedBox(
+            width: _CycleChartState.leftAxisReservedSize +
+                windowStart * cellWidth),
         // The cell key exposes the whole label column per day index for the
         // widget tests (same convention as symbolCell-$i in _SymbolRow).
         for (var i = windowStart; i <= windowEnd; i++)

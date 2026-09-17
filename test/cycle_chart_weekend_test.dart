@@ -88,8 +88,9 @@ void main() {
   });
 
   // Degenerate case: one recorded day, and it is a weekend day. The chart
-  // widens maxX to 1.0 so the axis stays valid, but the day sits at x = 0 —
-  // the recorded-range clamp must not collapse the band to zero width.
+  // keeps a one-column-wide domain window (−0.5..0.5), so the lone day's
+  // full column (−0.5..0.5) lies inside the plot and the band keeps its
+  // full width — no clamp may collapse it to zero.
   testWidgets('single-day weekend chart still renders one band, positive width',
       (WidgetTester tester) async {
     await tester.pumpWidget(_chartHarness(
@@ -102,7 +103,38 @@ void main() {
     expect(bands, hasLength(1), reason: 'the lone Saturday gets its band');
     // fl_chart requires x1 < x2; zero width would paint nothing.
     expect(bands.single.x2, greaterThan(bands.single.x1));
-    expect(bands.single.x1, closeTo(0.0, 1e-9));
+    expect(bands.single.x1, closeTo(-0.5, 1e-9),
+        reason: 'the lone column spans −0.5..0.5 in the shifted domain');
+    expect(bands.single.x2, closeTo(0.5, 1e-9));
+  });
+
+  // Edge clamps: the band annotation clamps to the shifted plot bounds
+  // (−0.5 .. dayCount − 0.5). A weekend on the FIRST day extends to the
+  // plot's left edge, a weekend on the LAST day to the plot's right edge —
+  // both keep their full column width instead of being cut back to the
+  // day indexes.
+  testWidgets('a weekend on the first day extends to the plot\'s left edge',
+      (WidgetTester tester) async {
+    // Sat (first day) .. Sun (last day): both bands touch a plot edge.
+    await tester.pumpWidget(_chartHarness(
+      entries: [
+        DailyEntry(date: _sat, bbtC: 36.7),
+        DailyEntry(date: _sun, bbtC: 36.7)
+      ],
+      selected: _sat,
+    ));
+    await tester.pumpAndSettle();
+
+    final bands = _weekendBands(tester).toList()
+      ..sort((a, b) => a.x1.compareTo(b.x1));
+    expect(bands, hasLength(2));
+    expect(bands[0].x1, closeTo(-0.5, 1e-9),
+        reason: 'the first day\'s band reaches the plot\'s left edge (−0.5)');
+    expect(bands[0].x2, closeTo(0.5, 1e-9));
+    expect(bands[1].x1, closeTo(0.5, 1e-9),
+        reason: 'the last day\'s band reaches the plot\'s right edge '
+            '(dayCount − 0.5 = 1.5)');
+    expect(bands[1].x2, closeTo(1.5, 1e-9));
   });
 
   testWidgets('band color is a subtle tint that follows the theme', (

@@ -443,7 +443,7 @@ void main() {
     testWidgets(
         'the baseline draws as a SEGMENT: from the left edge of '
         'low #6\'s column to the last marked candidate (+ half a day), '
-        'clamped to the recorded range', (tester) async {
+        'clamped to the plot bounds', (tester) async {
       await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
       await tester.pumpAndSettle();
 
@@ -456,14 +456,15 @@ void main() {
       // START: the left edge of low #6's column — low #6 is 9/8 (idx 2),
       // so the segment begins at x 1.5.
       // END: the last marked candidate (9/16, idx 10 — the rule-D trigger)
-      // plus half a day = x 10.5, but the chart's last recorded day is
-      // also idx 10 (no data to the right), so the clamp holds it at 10.
+      // plus half a day = x 10.5 — the domain extends half a column past
+      // the last day, so the clamp no longer bites here.
       final first = bar.spots.first;
       final last = bar.spots.last;
       expect(first.x, closeTo(1.5, 1e-9),
           reason: 'the segment starts under low #6 (left column edge)');
-      expect(last.x, closeTo(10.0, 1e-9),
-          reason: 'the half-day padding is clamped by the chart edge here');
+      expect(last.x, closeTo(10.5, 1e-9),
+          reason: 'last candidate idx 10 + half a day, inside the domain '
+              '(lastX = dayCount − 0.5 = 10.5)');
       expect(first.y, 36.4);
       expect(last.y, 36.4, reason: 'the segment runs at the baseline value');
     });
@@ -671,6 +672,32 @@ void main() {
       expect(arrow!.$1.x, 8.5, reason: 'the arrow base starts at the bar');
       expect(arrow.$1.y, 36.4,
           reason: 'the arrow anchors at the cycle\'s baseline value');
+    });
+
+    testWidgets(
+        'a suzMorning mark on the FIRST recorded day anchors the bar at '
+        'the plot\'s left edge (x − 0.5 = minX, no cut-back)', (tester) async {
+      // With the half-column-shifted domain the first day's column starts
+      // at −0.5, so its column-START bar sits exactly at the plot's left
+      // edge instead of being clamped onto the day index.
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          ..._marks,
+          CycleMark(profileId: 1, date: _sun6, type: CycleMarkTypes.suzMorning),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final bars = _suzBars(tester);
+      expect(bars, hasLength(1));
+      final bar = bars.single;
+      expect(bar.spots.first.x, -0.5,
+          reason: 'day 0\'s column start is the domain\'s minX (−0.5)');
+      expect(bar.spots.last.x, -0.5);
+      final arrow = _suzArrowSpot(tester);
+      expect(arrow, isNotNull);
+      expect(arrow!.$1.x, -0.5, reason: 'the arrow base starts at the bar');
     });
 
     testWidgets(

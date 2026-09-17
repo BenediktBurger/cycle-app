@@ -412,17 +412,28 @@ final class SuzArrowDotPainter extends FlDotPainter {
 
 /// The 1–6 numbering under the chart: one narrow tappable cell per
 /// calendar day, aligned by the same even day spacing as the chart and
-/// the symbol row (mirrors _SymbolRow in cycle.dart). Days outside the
-/// six-low windows render an empty fixed-height slot.
+/// the symbol row (mirrors _SymbolRow in cycle.dart). The leading strip
+/// matches the chart's y-axis reservation — the curve's columns start
+/// right of it — so day cell i is centered at leadingStrip +
+/// (i + 0.5) * cellWidth, exactly where the chart draws day i's dot. Days
+/// outside the six-low windows render an empty fixed-height slot.
 final class EvaluationMarksRow extends StatelessWidget {
   const EvaluationMarksRow({
     super.key,
     required this.dayCount,
+    required this.leadingStrip,
+    required this.cellWidth,
     required this.numbersByIndex,
     required this.onDayTap,
   });
 
   final int dayCount;
+
+  /// Width of the leading strip (the chart's y-axis title reservation,
+  /// passed in by the chart so both sides share one figure).
+  final double leadingStrip;
+
+  final double cellWidth;
   final Map<int, int> numbersByIndex;
   final void Function(int index) onDayTap;
 
@@ -431,8 +442,10 @@ final class EvaluationMarksRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SizedBox(width: leadingStrip),
         for (var i = 0; i < dayCount; i++)
-          Expanded(
+          SizedBox(
+            width: cellWidth,
             child: InkWell(
               onTap: () => onDayTap(i),
               child: _NumberCell(
