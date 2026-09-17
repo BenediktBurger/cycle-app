@@ -86,6 +86,7 @@
   "zyklusLegendBaseline": "Basislinie",
   "zyklusLegendCervix": "Muttermund-Position",
   "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
+  "zyklusJumpToDate": "Zum Datum springen",
   "zyklusArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
   "cycleSheetSetMucusPeak": "Schleimhöhepunkt setzen",

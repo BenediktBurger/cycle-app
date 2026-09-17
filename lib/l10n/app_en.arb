@@ -89,6 +89,7 @@
   "zyklusLegendBaseline": "Baseline",
   "zyklusLegendCervix": "Cervix position",
   "zyklusNoData": "The temperature curve appears once days with measurements exist.",
+  "zyklusJumpToDate": "Jump to date",
   "zyklusArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
   "cycleSheetSetMucusPeak": "Set mucus peak",

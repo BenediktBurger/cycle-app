@@ -1,17 +1,32 @@
 // Zyklus screen: the recorded temperature curve plus the bleeding/mucus
 // symbol row underneath, plus the COMPUTED evaluation overlay (Mode M,
 // ADR-0001): the user places the mucus-peak and first-higher marks, the app
-// derives the rest for DISPLAY ONLY — peak circle, circled higher
-// measurements, arrow-up for pre-peak rises, the 1–6 low numbering and the
-// baseline (lib/ui/cycle_marks.dart over evaluateCycles). No derived
-// artifact is persisted, and no fertility statement is made (SUZ arithmetic
-// stays domain-only; see lib/domain/evaluation.dart).
+// derives the rest for DISPLAY ONLY — circled higher measurements (up to
+// four, any margin above the baseline), arrow-up glyphs for candidates in
+// cycles without a peak before the rise, the solid peak dot ABOVE the
+// mucus entry in the symbol row (the peak never touches the curve), the
+// 1–6 low numbering and the baseline (lib/ui/cycle_marks.dart over
+// evaluateCycles). No derived artifact is persisted, and no fertility
+// statement is made (SUZ arithmetic stays domain-only; see
+// lib/domain/evaluation.dart).
 //
 // Tapping a chart day or a symbol cell opens the day's mark-entry bottom
 // sheet (lib/ui/cycle_mark_sheet.dart): edit day (jumps to the Tagebuch
 // form with that date pre-selected, via selectedDateProvider +
 // tabIndexProvider), the contextual mark toggles and the computed info
 // line.
+//
+// The chart block renders a VIEWPORT-LIMITED WINDOW of days: day columns
+// keep at least a minimum usable width (see _CycleChartState's
+// minDayColumnWidth), so a long
+// recorded range is not squeezed onto one screen — the whole block (curve,
+// marks row, symbol row) scrolls horizontally as one unit, and a
+// jump-to-date affordance moves the window onto a picked calendar day.
+// Data outside the window is not built: the curve carries only the window's
+// points (at their global x positions, so windows slide seamlessly) and the
+// symbol row builds only the window's cells.
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,12 +126,59 @@ final class _CycleChart extends ConsumerStatefulWidget {
 }
 
 final class _CycleChartState extends ConsumerState<_CycleChart> {
-  late final _ChartDays _days;
+  /// Narrowest day column still considered usable. Below this width the
+  /// day-of-month labels ("28.") and the symbol cells would overlap, so a
+  /// recorded range longer than one screen scrolls instead of shrinking
+  /// further — the day count shown at once derives from the actual layout
+  /// width, never from a hard-coded number.
+  static const double minDayColumnWidth = 24;
+
+  /// The y-axis title strip the chart reserves on its left edge (fl_chart's
+  /// leftTitles reservation, mirrored in the chart config below). The tap
+  /// mapping needs the same figure: the curve's plot area starts right of
+  /// this strip.
+  static const double leftAxisReservedSize = 44;
+
+  static const Duration _scrollDuration = Duration(milliseconds: 300);
+
+  late _ChartDays _days;
+  final ScrollController _scrollController = ScrollController();
+
+  /// Layout snapshot of the last build, for the scroll listener's window
+  /// math and the jump-to-date target computation.
+  double? _viewportWidth;
+  double? _columnWidth;
+
+  /// The day-index window currently built (inclusive bounds). It carries one
+  /// day of margin past each visible edge: as the content slides, data that
+  /// has not scrolled fully into view is already present, so a window
+  /// rebuild never introduces a visual seam at the viewport edge.
+  int _windowStart = 0;
+  int _windowEnd = 0;
 
   @override
   void initState() {
     super.initState();
     _days = _ChartDays(widget.entries);
+    _scrollController.addListener(_onScrolled);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CycleChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A live entry write re-emits the entries stream while this state is
+    // alive: recompute the day mapping so a changed range re-windows
+    // instead of rendering stale data.
+    if (!identical(oldWidget.entries, widget.entries)) {
+      _days = _ChartDays(widget.entries);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScrolled);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _openDaySheet(int index) {
@@ -125,8 +187,78 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     showCycleDaySheet(context, day: _days.dayAt(index));
   }
 
+  /// The day-index window to build for the current scroll offset: every
+  /// column that is at least partially on screen, plus the one-day margin
+  /// of [_windowStart]/[_windowEnd].
+  (int, int) _windowFor(int dayCount) {
+    final viewport = _viewportWidth ?? 0;
+    final colW = _columnWidth ?? minDayColumnWidth;
+    final offset =
+        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final visible = (viewport / colW).ceil().clamp(1, dayCount);
+    final firstVisible = (offset / colW).floor().clamp(0, dayCount - 1);
+    return (
+      math.max(0, firstVisible - 1),
+      math.min(dayCount - 1, firstVisible + visible),
+    );
+  }
+
+  void _onScrolled() {
+    final (start, end) = _windowFor(_days.dayCount);
+    if (start != _windowStart || end != _windowEnd) {
+      setState(() {
+        _windowStart = start;
+        _windowEnd = end;
+      });
+    }
+  }
+
+  /// Translates a tap on the chart's plot area into a day index and opens
+  /// the day's sheet. The overlay starts at the plot's left edge (right of
+  /// the y-axis strip); day indexes map linearly onto the plot width (0 at
+  /// the left edge, maxX at its right edge — fl_chart's pixel mapping). The
+  /// nearest day column wins, exactly like the row cells underneath.
+  void _openDayAtLocalX(double localX, double contentWidth) {
+    final plotWidth = contentWidth - leftAxisReservedSize;
+    final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
+    final t = (localX / plotWidth).clamp(0.0, 1.0);
+    final index = (t * maxX).round().clamp(0, _days.dayCount - 1);
+    _openDaySheet(index);
+  }
+
+  /// The jump-to-date affordance: opens the material date picker bounded to
+  /// the recorded range and scrolls the window so the picked day is centered.
+  Future<void> _jumpToDate(BuildContext context) async {
+    final viewport = _viewportWidth;
+    final colW = _columnWidth;
+    if (viewport == null || colW == null) return;
+    final firstDay = _days.firstDay;
+    final lastDay = _days.dayAt(_days.dayCount - 1);
+    // Initial pick: the leftmost day of the window currently on screen —
+    // the day the user is looking at, not a hidden default.
+    final initial = _days.dayAt(math.min(_windowStart, _days.dayCount - 1));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDay,
+      lastDate: lastDay,
+    );
+    if (picked == null) return;
+    final index = DateOnly.daysBetween(DateOnly.normalize(picked), firstDay)
+        .clamp(0, _days.dayCount - 1);
+    if (!_scrollController.hasClients) return;
+    final target = (index * colW - (viewport - colW) / 2)
+        .clamp(0.0, _scrollController.position.maxScrollExtent);
+    await _scrollController.animateTo(
+      target,
+      duration: _scrollDuration,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // The evaluation artifacts (peak circle, circled higher measurements,
     // arrow-up, 1–6 numbering, baseline) are computed at render time from
     // the entries plus the user-placed marks — never persisted, so a mark
@@ -143,14 +275,15 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     // The curve is split into runs of adjacent measured days (curve helpers,
     // lib/ui/cycle_curve.dart): the line connects two temperatures only when
     // their calendar days are adjacent, so a day without a temperature
-    // (missing entry or entry without bbtC) breaks the line.
+    // (missing entry or entry without bbtC) breaks the line. This global
+    // structure feeds the Y bounds: the scale must cover the whole recorded
+    // range so scrolling never rescales the curve.
     final runs = curveRuns(_days.byIndex);
-    final segments = curveSegments(runs);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
       return Text(
-        AppLocalizations.of(context).zyklusNoData,
+        l10n.zyklusNoData,
         style: Theme.of(context).textTheme.bodyMedium,
       );
     }
@@ -165,174 +298,277 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
       yMax = yMin + 0.5;
     }
 
-    final xInterval = (_days.dayCount / 8).ceil().toDouble().max(1);
     // Interrupted (excluded) TEMPERATURES read lighter: the scheme color at
     // a fraction of the alpha. The dark scheme's primary is a bright color,
     // so the dimmed tint still keeps darkness-readable contrast (asserted
     // by the dark-mode chart tests).
     final temperatureColor = Theme.of(context).colorScheme.primary;
     final interruptedColor = temperatureColor.withValues(alpha: 0.4);
-    final interruptedByIndex = <int, bool>{
-      for (final point in points) point.dayIndex: point.excluded,
-    };
     // The baseline is theme-derived too (secondary: the one scheme color the
     // temperature/bleeding/mucus rendering does not use — see _Legend).
     final baselineColor = Theme.of(context).colorScheme.secondary;
-    // fl_chart requires minX < maxX; a single recorded day gets a 1-day
-    // tick window instead of a degenerate zero-width axis.
-    final maxX = _days.dayCount <= 1 ? 1.0 : (_days.dayCount - 1).toDouble();
 
-    // Weekend highlighting (owner decision: temperature curve only, not the
-    // Tagebuch list). A subtle vertical band behind each weekend day's chart
-    // column (Saturday/Sunday by calendar date via DateOnly.isWeekend, never
-    // by column index). fl_chart's rangeAnnotations paints these regions
-    // behind the grid, line and dots — the lightest-touch approach. The tint
-    // is the theme's on-color at a whisper of opacity, so it works on the
-    // light as well as the dark surface (dark: light overlay).
-    final weekendBandColor =
-        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
-    final lastX = (_days.dayCount - 1).toDouble();
-    final weekendBands = <VerticalRangeAnnotation>[];
-    for (var i = 0; i < _days.dayCount; i++) {
-      if (!DateOnly.isWeekend(_days.dayAt(i))) continue;
-      // Half a day left and right of the day's x position, clipped to the
-      // really recorded range (edge days keep a narrower band).
-      var x1 = (i - 0.5).clamp(0, lastX).toDouble();
-      var x2 = (i + 0.5).clamp(0, lastX).toDouble();
-      // Single-day chart: maxX widens to 1.0 while lastX is 0, so the clamp
-      // collapses the band to zero width — extend the right edge instead so
-      // the weekend still shows (left of the day lies outside minX 0).
-      if (x2 <= x1) x2 = x1 + 0.5;
-      weekendBands.add(
-        VerticalRangeAnnotation(x1: x1, x2: x2, color: weekendBandColor),
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewport = constraints.maxWidth;
+        _viewportWidth = viewport;
+        final dayCount = _days.dayCount;
+        // Useful day columns: at most as many days as fit the viewport at
+        // the minimum usable width; a longer range keeps that width and
+        // scrolls horizontally instead of squeezing.
+        final overflow = dayCount * minDayColumnWidth > viewport;
+        final colW = overflow ? minDayColumnWidth : viewport / dayCount;
+        _columnWidth = colW;
+        final contentWidth = dayCount * colW;
+        final visibleDays = (viewport / colW).ceil().clamp(1, dayCount);
+        final (winStart, winEnd) = _windowFor(dayCount);
+        _windowStart = winStart;
+        _windowEnd = winEnd;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 260,
-          child: LineChart(
-            LineChartData(
-              lineBarsData: [
-                // The line: one two-spot bar per adjacent-day pair, so a
-                // segment touching an interrupted (excluded) day can render
-                // lighter while the others keep the full-strength color.
-                // Dots are painted afterwards by the dot bars below.
-                for (final segment in segments)
-                  LineChartBarData(
-                    spots: [
-                      FlSpot(segment.a.dayIndex.toDouble(), segment.a.bbtC),
-                      FlSpot(segment.b.dayIndex.toDouble(), segment.b.bbtC),
-                    ],
-                    isCurved: false,
-                    barWidth: 1.6,
-                    color:
-                        segment.lighter ? interruptedColor : temperatureColor,
-                    dotData: const FlDotData(show: false),
-                  ),
-                // The dots: invisible-line bars (transparent color) holding
-                // each run's spots, so the per-spot dot painter can render
-                // an interrupted day's dot lighter than the others.
-                for (final run in runs)
-                  LineChartBarData(
-                    spots: [
-                      for (final point in run.points)
-                        FlSpot(point.dayIndex.toDouble(), point.bbtC),
-                    ],
-                    color: Colors.transparent,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, _, bar, __) =>
-                          dotPainterForDay(
-                        dayIndex: spot.x.round(),
-                        dotColor:
-                            interruptedByIndex[spot.x.round()] ?? false
-                                ? interruptedColor
-                                : temperatureColor,
-                        colorScheme: Theme.of(context).colorScheme,
-                        overlay: overlay,
-                      ),
-                    ),
-                  ),
-              ],
-              minX: 0,
-              maxX: maxX,
-              minY: yMin,
-              maxY: yMax,
-              rangeAnnotations: RangeAnnotations(
-                verticalRangeAnnotations: weekendBands,
-              ),
-              // The baseline: one dashed horizontal line per evaluated
-              // cycle, through the highest of its six low measurements
-              // (theme-derived color, dashed so it never reads as a
-              // gridline or as curve data). Spans the full chart width —
-              // see the TODO(user-review) in cycle_marks.dart.
-              extraLinesData: ExtraLinesData(
-                horizontalLines: [
-                  for (final y in overlay.baselineValues)
-                    HorizontalLine(
-                      y: y,
-                      color: baselineColor,
-                      strokeWidth: 1,
-                      dashArray: const [6, 4],
-                    ),
-                ],
-              ),
-              gridData: const FlGridData(drawVerticalLine: false),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(
-                    reservedSize: 44,
-                    showTitles: true,
-                    interval: 0.5,
-                    getTitlesWidget: _yTitle,
-                  ),
-                ),
-                topTitles: const AxisTitles(),
-                rightTitles: const AxisTitles(),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    reservedSize: 22,
-                    showTitles: true,
-                    interval: xInterval,
-                    getTitlesWidget: (value, meta) => _xTitle(
-                      value,
-                      meta,
-                      firstDay: _days.firstDay,
-                    ),
-                  ),
-                ),
-              ),
-              lineTouchData: LineTouchData(
-                enabled: true,
-                handleBuiltInTouches: false,
-                touchCallback: (event, response) {
-                  final tapLike =
-                      event is FlTapUpEvent || event is FlLongPressEnd;
-                  if (!tapLike) return;
-                  final touched = response?.lineBarSpots;
-                  if (touched == null || touched.isEmpty) return;
-                  final index =
-                      touched.first.x.round().clamp(0, _days.dayCount - 1);
-                  _openDaySheet(index);
-                },
+        // The window's data slice, at the curve's GLOBAL x positions: the
+        // axis range (minX..maxX) never changes with the scroll, so a
+        // window rebuild only adds/removes points in place — the content
+        // slides seamlessly instead of jumping.
+        final winByIndex = {
+          for (final entry in _days.byIndex.entries)
+            if (entry.key >= winStart && entry.key <= winEnd)
+              entry.key: entry.value,
+        };
+        final winRuns = curveRuns(winByIndex);
+        final winSegments = curveSegments(winRuns);
+        final interruptedByIndex = <int, bool>{
+          for (final run in winRuns)
+            for (final point in run.points) point.dayIndex: point.excluded,
+        };
+
+        // Weekend highlighting (owner decision: temperature curve only, not
+        // the Tagebuch list). A subtle vertical band behind each weekend
+        // day's chart column (Saturday/Sunday by calendar date via
+        // DateOnly.isWeekend, never by column index), built for the window
+        // only. fl_chart's rangeAnnotations paints these regions behind the
+        // grid, line and dots — the lightest-touch approach. The tint is
+        // the theme's on-color at a whisper of opacity, so it works on the
+        // light as well as the dark surface (dark: light overlay).
+        final weekendBandColor =
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
+        final lastX = (dayCount - 1).toDouble();
+        final weekendBands = <VerticalRangeAnnotation>[];
+        for (var i = winStart; i <= winEnd; i++) {
+          if (!DateOnly.isWeekend(_days.dayAt(i))) continue;
+          // Half a day left and right of the day's x position, clipped to
+          // the really recorded range (edge days keep a narrower band).
+          var x1 = (i - 0.5).clamp(0, lastX).toDouble();
+          var x2 = (i + 0.5).clamp(0, lastX).toDouble();
+          // Single-day chart: maxX widens to 1.0 while lastX is 0, so the
+          // clamp collapses the band to zero width — extend the right edge
+          // instead so the weekend still shows (left of the day lies
+          // outside minX 0).
+          if (x2 <= x1) x2 = x1 + 0.5;
+          weekendBands.add(
+            VerticalRangeAnnotation(x1: x1, x2: x2, color: weekendBandColor),
+          );
+        }
+
+        // fl_chart requires minX < maxX; a single recorded day gets a 1-day
+        // tick window instead of a degenerate zero-width axis.
+        final maxX = dayCount <= 1 ? 1.0 : (dayCount - 1).toDouble();
+
+        // X labels spread across the VISIBLE days (not the whole scrolled
+        // range): one label row per screen, whichever slice is showing.
+        final xInterval = (visibleDays / 8).ceil().toDouble().max(1);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                key: const ValueKey('calendarJumpButton'),
+                icon: const Icon(Icons.date_range),
+                tooltip: l10n.zyklusJumpToDate,
+                onPressed: () => _jumpToDate(context),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // The 1–6 low numbering, directly under the chart day columns.
-        EvaluationMarksRow(
-          dayCount: _days.dayCount,
-          numbersByIndex: overlay.numbersByIndex,
-          onDayTap: _openDaySheet,
-        ),
-        const SizedBox(height: 4),
-        _SymbolRow(days: _days, onDayTap: _openDaySheet),
-      ],
+            SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: contentWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 260,
+                      child: Stack(
+                        children: [
+                          LineChart(
+                            LineChartData(
+                              lineBarsData: [
+                                // The line: one two-spot bar per
+                                // adjacent-day pair, so a segment touching
+                                // an interrupted (excluded) day can render
+                                // lighter while the others keep the
+                                // full-strength color. Dots are painted
+                                // afterwards by the dot bars below. Only
+                                // the window's segments are carried — the
+                                // x positions stay global.
+                                for (final segment in winSegments)
+                                  LineChartBarData(
+                                    spots: [
+                                      FlSpot(segment.a.dayIndex.toDouble(),
+                                          segment.a.bbtC),
+                                      FlSpot(segment.b.dayIndex.toDouble(),
+                                          segment.b.bbtC),
+                                    ],
+                                    isCurved: false,
+                                    barWidth: 1.6,
+                                    color: segment.lighter
+                                        ? interruptedColor
+                                        : temperatureColor,
+                                    dotData: const FlDotData(show: false),
+                                  ),
+                                // The dots: invisible-line bars (transparent
+                                // color) holding each run's spots, so the
+                                // per-spot dot painter can render an
+                                // interrupted day's dot lighter than the
+                                // others.
+                                for (final run in winRuns)
+                                  LineChartBarData(
+                                    spots: [
+                                      for (final point in run.points)
+                                        FlSpot(point.dayIndex.toDouble(),
+                                            point.bbtC),
+                                    ],
+                                    color: Colors.transparent,
+                                    dotData: FlDotData(
+                                      show: true,
+                                      getDotPainter: (spot, _, bar, __) =>
+                                          dotPainterForDay(
+                                        dayIndex: spot.x.round(),
+                                        dotColor:
+                                            interruptedByIndex[
+                                                    spot.x.round()] ??
+                                                false
+                                            ? interruptedColor
+                                            : temperatureColor,
+                                        colorScheme:
+                                            Theme.of(context).colorScheme,
+                                        overlay: overlay,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                              minX: 0,
+                              maxX: maxX,
+                              minY: yMin,
+                              maxY: yMax,
+                              rangeAnnotations: RangeAnnotations(
+                                verticalRangeAnnotations: weekendBands,
+                              ),
+                              // The baseline: one dashed horizontal line per
+                              // evaluated cycle, through the highest of its
+                              // six low measurements (theme-derived color,
+                              // dashed so it never reads as a gridline or as
+                              // curve data). Spans the full chart width —
+                              // see the TODO(user-review) in
+                              // cycle_marks.dart.
+                              extraLinesData: ExtraLinesData(
+                                horizontalLines: [
+                                  for (final y in overlay.baselineValues)
+                                    HorizontalLine(
+                                      y: y,
+                                      color: baselineColor,
+                                      strokeWidth: 1,
+                                      dashArray: const [6, 4],
+                                    ),
+                                ],
+                              ),
+                              gridData:
+                                  const FlGridData(drawVerticalLine: false),
+                              borderData: FlBorderData(show: false),
+                              titlesData: FlTitlesData(
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    reservedSize: leftAxisReservedSize,
+                                    showTitles: true,
+                                    interval: 0.5,
+                                    getTitlesWidget: _yTitle,
+                                  ),
+                                ),
+                                topTitles: const AxisTitles(),
+                                rightTitles: const AxisTitles(),
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    reservedSize: 22,
+                                    showTitles: true,
+                                    interval: xInterval,
+                                    getTitlesWidget: (value, meta) => _xTitle(
+                                      value,
+                                      meta,
+                                      firstDay: _days.firstDay,
+                                      windowStart: winStart,
+                                      windowEnd: winEnd,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Touch handling: the chart itself is
+                              // gesture-transparent (enabled: false) so the
+                              // horizontal scroll owns drags; the overlay
+                              // above it catches tap-like pointers only and
+                              // maps them to day columns (same tap AND
+                              // long-press behavior the built-in touch
+                              // callback used to provide).
+                              lineTouchData: const LineTouchData(
+                                enabled: false,
+                                handleBuiltInTouches: false,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: leftAxisReservedSize,
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTapUp: (details) => _openDayAtLocalX(
+                                  details.localPosition.dx, contentWidth),
+                              onLongPressStart: (details) => _openDayAtLocalX(
+                                  details.localPosition.dx, contentWidth),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // The 1–6 low numbering, directly under the chart day
+                    // columns. Full range: the row renders an empty slot per
+                    // day and belongs to the in-progress evaluation-marks
+                    // feature (lib/ui/cycle_marks.dart) — kept unwindowed on
+                    // purpose to keep that file untouched; the cells are
+                    // cheap and stay at their global positions.
+                    EvaluationMarksRow(
+                      dayCount: dayCount,
+                      numbersByIndex: overlay.numbersByIndex,
+                      onDayTap: _openDaySheet,
+                    ),
+                    const SizedBox(height: 4),
+                    _SymbolRow(
+                      days: _days,
+                      cellWidth: colW,
+                      windowStart: winStart,
+                      windowEnd: winEnd,
+                      peakIndexes: overlay.peakIndexes,
+                      onDayTap: _openDaySheet,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -340,10 +576,30 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
 /// One narrow cell per calendar day under the chart, aligned by the same
 /// even day spacing as the chart: bleeding marker on top, the recorded
 /// fertility sign (`Sᴱᵂ` style) below. Pure recording, no interpretation.
+///
+/// Only the window's cells are built: days outside
+/// [windowStart]..[windowEnd] stay unbuilt, and the leading spacer keeps the
+/// window cells at their global positions (cell i is centered at
+/// (i + 0.5) * cellWidth, the same even spacing the full row used before).
 final class _SymbolRow extends StatelessWidget {
-  const _SymbolRow({required this.days, required this.onDayTap});
+  const _SymbolRow({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+    required this.peakIndexes,
+    required this.onDayTap,
+  });
 
   final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  /// Day indexes carrying the mucus-peak mark (R6): they render the solid
+  /// peak dot above the mucus glyph.
+  final Set<int> peakIndexes;
+
   final void Function(int index) onDayTap;
 
   @override
@@ -351,16 +607,22 @@ final class _SymbolRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SizedBox(width: windowStart * cellWidth),
         // The cell key exposes the whole tappable per day index for the
         // widget tests (same convention as marksCell-$i above the chart).
-        for (var i = 0; i < days.dayCount; i++)
-          Expanded(
+        for (var i = windowStart; i <= windowEnd; i++)
+          SizedBox(
+            width: cellWidth,
             child: InkWell(
               key: ValueKey('symbolCell-$i'),
               onTap: () => onDayTap(i),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
-                child: _SymbolCell(entry: days.byIndex[i]),
+                child: _SymbolCell(
+                  entry: days.byIndex[i],
+                  isPeak: peakIndexes.contains(i),
+                  peakDotKey: ValueKey('peakDot-$i'),
+                ),
               ),
             ),
           ),
@@ -370,9 +632,21 @@ final class _SymbolRow extends StatelessWidget {
 }
 
 final class _SymbolCell extends StatelessWidget {
-  const _SymbolCell({required this.entry});
+  const _SymbolCell({
+    required this.entry,
+    this.isPeak = false,
+    this.peakDotKey,
+  });
 
   final DailyEntry? entry;
+
+  /// Whether this day carries the mucus-peak mark (R6: solid dot above
+  /// the mucus glyph).
+  final bool isPeak;
+
+  /// The test-visible key of the peak dot (null when the day is not the
+  /// peak, so no keyed widget exists there).
+  final Key? peakDotKey;
 
   @override
   Widget build(BuildContext context) {
@@ -411,6 +685,32 @@ final class _SymbolCell extends StatelessWidget {
                   : bleedingColor,
             ),
           ),
+        ),
+        const SizedBox(height: 2),
+        // Mucus-peak slot (R6, classic NER position): a SOLID dot in the
+        // mucus color family directly ABOVE the mucus glyph. The slot is
+        // reserved in every cell (same fixed-slot trick as the fertility
+        // sign below) so the bleeding/mucus/cervix lines stay aligned
+        // across the row regardless of which day is the peak.
+        // TODO(user-review): the peak dot renders only on days WITH a
+        // recorded entry — an entirely untracked day renders an empty
+        // symbol cell (the row shows recorded observations only), so a
+        // peak mark on an untracked day has no dot to render.
+        SizedBox(
+          height: 10,
+          child: isPeak
+              ? Center(
+                  child: Container(
+                    key: peakDotKey,
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.tertiary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                )
+              : null,
         ),
         const SizedBox(height: 2),
         // Fertility sign (bottom, superscript quality style); the fixed
@@ -485,16 +785,18 @@ final class _Legend extends StatelessWidget {
         _LegendDot(
           color: scheme.tertiary,
           label: AppLocalizations.of(context).zyklusLegendMucusPeak,
-          shape: _LegendShape.ring,
+          // R6: the peak renders as a SOLID dot above the mucus glyph in
+          // the symbol row — the old curve-ring glyph is gone.
+          shape: _LegendShape.dot,
         ),
         _LegendDot(
           color: scheme.primary,
-          label: AppLocalizations.of(context).zyklusLegendFirstHigher,
+          label: AppLocalizations.of(context).zyklusLegendCircledHigher,
           shape: _LegendShape.circledDot,
         ),
         _LegendDot(
           color: scheme.primary,
-          label: AppLocalizations.of(context).zyklusLegendRiseBeforePeak,
+          label: AppLocalizations.of(context).zyklusLegendArrowHigher,
           shape: _LegendShape.arrowUp,
         ),
         _LegendDot(
@@ -591,10 +893,14 @@ Widget _yTitle(double value, TitleMeta meta) => Text(
       style: const TextStyle(fontSize: 10),
     );
 
-/// X axis: day-of-month labels ("14.") at the interval ticks.
-Widget _xTitle(double value, TitleMeta meta, {required DateTime firstDay}) {
+/// X axis: day-of-month labels ("14.") at the interval ticks. Ticks outside
+/// the rendered window return an empty slot — the whole scrolled range may
+/// generate ticks, but only the window's days render one.
+Widget _xTitle(double value, TitleMeta meta,
+    {required DateTime firstDay, required int windowStart, required int windowEnd}) {
   final i = value.round();
   if (value != i.toDouble() || i < 0) return const SizedBox.shrink();
+  if (i < windowStart || i > windowEnd) return const SizedBox.shrink();
   final day = DateOnly.addDays(firstDay, i);
   return Padding(
     padding: const EdgeInsets.only(top: 4),

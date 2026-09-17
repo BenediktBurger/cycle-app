@@ -69,7 +69,6 @@ the sections above track planned work, git history keeps the record (see
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
-- [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date
 - [ ] show on cycle tab day of month (and replace the first day with a short form of the month) and day of cycle
 - [ ] drip importer: only sex with partner without contraception is mapped to sex
 - [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
@@ -84,6 +83,7 @@ the sections above track planned work, git history keeps the record (see
       pin down the storage decision; implementation then follows it.
 - [ ] on diary: add buttons for previous/next day
 - [ ] make mode selectable: light mode, dark mode, system setting
+- [ ] add vertical lines to separate days
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)? In the "marks" table – but it is raw data (but not per day).
