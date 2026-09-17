@@ -1,14 +1,15 @@
 // Zyklus screen: the recorded temperature curve plus the bleeding/mucus
 // symbol row underneath, plus the COMPUTED evaluation overlay (Mode M,
 // ADR-0001): the user places the mucus-peak and first-higher marks, the app
-// derives the rest for DISPLAY ONLY — circled higher measurements (up to
-// four, any margin above the baseline), arrow-up glyphs for candidates in
-// cycles without a peak before the rise, the solid peak dot ABOVE the
-// mucus entry in the symbol row (the peak never touches the curve), the
-// 1–6 low numbering and the baseline (lib/ui/cycle_marks.dart over
-// evaluateCycles). No derived artifact is persisted, and no fertility
-// statement is made (SUZ arithmetic stays domain-only; see
-// lib/domain/evaluation.dart).
+// derives the rest for DISPLAY ONLY — circled higher measurements (every
+// candidate strictly after the peak day), arrow-up glyphs for candidates at
+// or before the peak day or with the peak unset (decided PER CANDIDATE by
+// the domain, R4), the solid peak dot ABOVE the mucus entry in the symbol
+// row (the peak never touches the curve), the 1–6 low numbering and the
+// baseline SEGMENT from low #6 to the last marked candidate (R10;
+// lib/ui/cycle_marks.dart over evaluateCycles). No derived artifact is
+// persisted, and no fertility statement is made (SUZ arithmetic stays
+// domain-only; see lib/domain/evaluation.dart).
 //
 // Tapping a chart day or a symbol cell opens the day's mark-entry bottom
 // sheet (lib/ui/cycle_mark_sheet.dart): edit day (jumps to the Tagebuch
@@ -20,18 +21,20 @@
 // keep at least a minimum usable width (see _CycleChartState's
 // minDayColumnWidth), so a long
 // recorded range is not squeezed onto one screen — the whole block (curve,
-// marks row, symbol row) scrolls horizontally as one unit, and a
-// jump-to-date affordance moves the window onto a picked calendar day.
-// Data outside the window is not built: the curve carries only the window's
-// points (at their global x positions, so windows slide seamlessly) and the
-// symbol row builds only the window's cells.
+// per-day column labels, marks row, symbol row) scrolls horizontally as one
+// unit, and a jump-to-date affordance moves the window onto a picked
+// calendar day. Data outside the window is not built: the curve carries
+// only the window's points (at their global x positions, so windows slide
+// seamlessly) and the label/symbol rows build only the window's cells.
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../domain/cervix.dart';
+import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
@@ -97,6 +100,28 @@ final class _ChartDays {
     for (final e in sorted) {
       byIndex[DateOnly.daysBetween(DateOnly.normalize(e.date), firstDay)] = e;
     }
+    // Cycle mapping over the whole index range, from the domain's cycle
+    // grouping (same groups the Tagebuch list and the evaluation use):
+    // every calendar day counts in the cycle whose start is the LATEST
+    // group start on or before it — a cycle only ends at the next onset,
+    // so untracked gap days keep counting from the last start. The first
+    // (leading) group starts at the first recorded day, so every index is
+    // covered. Cycle-group starts also carry the label rule: their column
+    // shows the short month form instead of the plain day number.
+    // TODO(user-review): before the first real onset (a leading group of
+    // days that predate the first recorded period) the count starts at the
+    // first TRACKED day — the true cycle start is unknowable there.
+    final groups = groupIntoCycles(sorted);
+    final starts = [for (final g in groups) DateOnly.normalize(g.startDate)];
+    var group = 0;
+    for (var i = 0; i < dayCount; i++) {
+      final date = dayAt(i);
+      while (group + 1 < starts.length && !starts[group + 1].isAfter(date)) {
+        group++;
+      }
+      cycleDayByIndex[i] = DateOnly.daysBetween(date, starts[group]) + 1;
+      if (DateOnly.sameDay(date, starts[group])) cycleStartIndexes.add(i);
+    }
   }
 
   /// UTC-midnight of the first recorded day (day index 0).
@@ -106,6 +131,14 @@ final class _ChartDays {
   late final int dayCount;
 
   final Map<int, DailyEntry> byIndex = {};
+
+  /// Day of cycle (1, 2, 3 …) per day index, counted from the start of the
+  /// cycle group the day belongs to (see the mapping note above).
+  final Map<int, int> cycleDayByIndex = {};
+
+  /// Day indexes that start a cycle group: their column label shows the
+  /// localized short month form instead of the plain day-of-month.
+  final Set<int> cycleStartIndexes = {};
 
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 }
@@ -305,7 +338,8 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     final temperatureColor = Theme.of(context).colorScheme.primary;
     final interruptedColor = temperatureColor.withValues(alpha: 0.4);
     // The baseline is theme-derived too (secondary: the one scheme color the
-    // temperature/bleeding/mucus rendering does not use — see _Legend).
+    // temperature/bleeding/mucus rendering does not use — see _Legend). It
+    // feeds the dashed R10 segment bars below, not a full-width line.
     final baselineColor = Theme.of(context).colorScheme.secondary;
 
     return LayoutBuilder(
@@ -320,7 +354,6 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
         final colW = overflow ? minDayColumnWidth : viewport / dayCount;
         _columnWidth = colW;
         final contentWidth = dayCount * colW;
-        final visibleDays = (viewport / colW).ceil().clamp(1, dayCount);
         final (winStart, winEnd) = _windowFor(dayCount);
         _windowStart = winStart;
         _windowEnd = winEnd;
@@ -372,10 +405,6 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
         // fl_chart requires minX < maxX; a single recorded day gets a 1-day
         // tick window instead of a degenerate zero-width axis.
         final maxX = dayCount <= 1 ? 1.0 : (dayCount - 1).toDouble();
-
-        // X labels spread across the VISIBLE days (not the whole scrolled
-        // range): one label row per screen, whichever slice is showing.
-        final xInterval = (visibleDays / 8).ceil().toDouble().max(1);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -445,8 +474,7 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                       getDotPainter: (spot, _, bar, __) =>
                                           dotPainterForDay(
                                         dayIndex: spot.x.round(),
-                                        dotColor:
-                                            interruptedByIndex[
+                                        dotColor: interruptedByIndex[
                                                     spot.x.round()] ??
                                                 false
                                             ? interruptedColor
@@ -457,6 +485,38 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                       ),
                                     ),
                                   ),
+                                // The baseline segments (R10): one dashed
+                                // two-spot bar per evaluated cycle, drawn
+                                // LAST so it paints above the curve and the
+                                // dots (the full-width HorizontalLine it
+                                // replaces was drawn on top too). Extent per
+                                // the domain's baselineSpan: from the left
+                                // edge of low #6's day column to half a day
+                                // past the last marked candidate's column,
+                                // clamped to the recorded range (mirror of
+                                // the weekend-band clamping). Keeps the
+                                // dashed style and the theme-derived
+                                // secondary color, without spanning the
+                                // whole plot — no ADR-0004 custom painter
+                                // needed, the segment fits inside fl_chart.
+                                for (final segment in overlay.baselineSegments)
+                                  LineChartBarData(
+                                    spots: [
+                                      FlSpot(
+                                          math.max(
+                                              0.0, segment.startIndex - 0.5),
+                                          segment.value),
+                                      FlSpot(
+                                          math.min(
+                                              lastX, segment.endIndex + 0.5),
+                                          segment.value),
+                                    ],
+                                    isCurved: false,
+                                    barWidth: 1,
+                                    color: baselineColor,
+                                    dashArray: const [6, 4],
+                                    dotData: const FlDotData(show: false),
+                                  ),
                               ],
                               minX: 0,
                               maxX: maxX,
@@ -464,24 +524,6 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                               maxY: yMax,
                               rangeAnnotations: RangeAnnotations(
                                 verticalRangeAnnotations: weekendBands,
-                              ),
-                              // The baseline: one dashed horizontal line per
-                              // evaluated cycle, through the highest of its
-                              // six low measurements (theme-derived color,
-                              // dashed so it never reads as a gridline or as
-                              // curve data). Spans the full chart width —
-                              // see the TODO(user-review) in
-                              // cycle_marks.dart.
-                              extraLinesData: ExtraLinesData(
-                                horizontalLines: [
-                                  for (final y in overlay.baselineValues)
-                                    HorizontalLine(
-                                      y: y,
-                                      color: baselineColor,
-                                      strokeWidth: 1,
-                                      dashArray: const [6, 4],
-                                    ),
-                                ],
                               ),
                               gridData:
                                   const FlGridData(drawVerticalLine: false),
@@ -497,20 +539,13 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                                 ),
                                 topTitles: const AxisTitles(),
                                 rightTitles: const AxisTitles(),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    reservedSize: 22,
-                                    showTitles: true,
-                                    interval: xInterval,
-                                    getTitlesWidget: (value, meta) => _xTitle(
-                                      value,
-                                      meta,
-                                      firstDay: _days.firstDay,
-                                      windowStart: winStart,
-                                      windowEnd: winEnd,
-                                    ),
-                                  ),
-                                ),
+                                // The per-day column labels (day of month +
+                                // day of cycle) render in _DayLabelRow
+                                // UNDER the chart instead of fl_chart's
+                                // bottom axis: every day column gets a
+                                // label, not just the sparse interval
+                                // ticks, and the row builds windowed.
+                                bottomTitles: const AxisTitles(),
                               ),
                               // Touch handling: the chart itself is
                               // gesture-transparent (enabled: false) so the
@@ -540,6 +575,16 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Per-day column labels: day of month on top (cycle
+                    // starts in the short month form), day of cycle
+                    // underneath — windowed, at their global x positions.
+                    _DayLabelRow(
+                      days: _days,
+                      cellWidth: colW,
+                      windowStart: winStart,
+                      windowEnd: winEnd,
                     ),
                     const SizedBox(height: 8),
                     // The 1–6 low numbering, directly under the chart day
@@ -757,6 +802,73 @@ final class _SymbolCell extends StatelessWidget {
   }
 }
 
+/// Per-day column labels under the chart: every day column shows its day
+/// of month ("14.") on top and its day of cycle (1, 2, 3 …, counted from
+/// the cycle start in _ChartDays) underneath. On a cycle-start day the
+/// day-of-month label is REPLACED by the localized short month form with
+/// the day (DateFormat.MMMd: en "Jan 20" / de "20. Jan.") — the month home
+/// the otherwise bare day numbers need. Mirrors _SymbolRow's windowed
+/// layout: only the window's cells are built, and the leading spacer keeps
+/// them at their global x positions.
+final class _DayLabelRow extends StatelessWidget {
+  const _DayLabelRow({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+  });
+
+  final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).toString();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: windowStart * cellWidth),
+        // The cell key exposes the whole label column per day index for the
+        // widget tests (same convention as symbolCell-$i in _SymbolRow).
+        for (var i = windowStart; i <= windowEnd; i++)
+          SizedBox(
+            key: ValueKey('dayLabel-$i'),
+            width: cellWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Day of month — only cycle starts carry the month, so the
+                // form is scannable without crowding every narrow column.
+                // FittedBox squeezes "20. Jan." into even the minimum
+                // usable column width.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    days.cycleStartIndexes.contains(i)
+                        ? DateFormat.MMMd(locale).format(days.dayAt(i))
+                        : '${days.dayAt(i).day}.',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ),
+                // Day of cycle: subtler than the 1–6 numbering (that one
+                // is an evaluation artifact in the primary color).
+                Text(
+                  '${days.cycleDayByIndex[i]}',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 final class _Legend extends StatelessWidget {
   const _Legend();
 
@@ -893,24 +1005,6 @@ Widget _yTitle(double value, TitleMeta meta) => Text(
       style: const TextStyle(fontSize: 10),
     );
 
-/// X axis: day-of-month labels ("14.") at the interval ticks. Ticks outside
-/// the rendered window return an empty slot — the whole scrolled range may
-/// generate ticks, but only the window's days render one.
-Widget _xTitle(double value, TitleMeta meta,
-    {required DateTime firstDay, required int windowStart, required int windowEnd}) {
-  final i = value.round();
-  if (value != i.toDouble() || i < 0) return const SizedBox.shrink();
-  if (i < windowStart || i > windowEnd) return const SizedBox.shrink();
-  final day = DateOnly.addDays(firstDay, i);
-  return Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Text(
-      '${day.day}.',
-      style: const TextStyle(fontSize: 10),
-    ),
-  );
-}
-
 String _formatHalfDegree(double value) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0
@@ -921,7 +1015,3 @@ String _formatHalfDegree(double value) {
 double _floorToHalf(double v) => (v * 2).floorToDouble() / 2;
 
 double _ceilToHalf(double v) => (v * 2).ceilToDouble() / 2;
-
-extension _MaxNum on num {
-  double max(num other) => this > other ? toDouble() : other.toDouble();
-}

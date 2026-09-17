@@ -69,7 +69,6 @@ the sections above track planned work, git history keeps the record (see
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
-- [ ] show on cycle tab day of month (and replace the first day with a short form of the month) and day of cycle
 - [ ] drip importer: only sex with partner without contraception is mapped to sex
 - [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
 - [ ] only store time if temperature is added (not for mucus etc.)
