@@ -66,7 +66,7 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'date': formatIsoDay(e.date),
           'bbt_c': e.bbtC,
           'measured_at_minutes': e.measuredAtMinutes,
-          'bleeding': _legacyBleedingToken(e.bleeding),
+          'bleeding': e.bleeding.level,
           'exclude_illness': e.excludeIllness,
           'exclude_alcohol': e.excludeAlcohol,
           'exclude_travel': e.excludeTravel,
@@ -97,18 +97,6 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 /// clipboard/download and re-import.
 Future<String> exportDatabaseToJson(CycleDatabase db) =>
     exportDatabaseToBlob(db).then(buildExportJson);
-
-/// The bleeding token an export document carries for a stored bleeding
-/// value: the legacy vocabulary (none / period / spotting) for the
-/// menstruation levels, exactly the way the shared parser reads those tokens
-/// back (period -> medium, lib/domain/models.dart). Written this way so a
-/// document cycle-app itself produces can always be re-imported by it; the
-/// per-level numeric field is the successor of this token.
-String _legacyBleedingToken(Bleeding b) => switch (b) {
-      Bleeding.none => 'none',
-      Bleeding.spotting => 'spotting',
-      Bleeding.light || Bleeding.medium || Bleeding.heavy => 'period',
-    };
 
 // --- import (JSON string -> ExportBlob -> plan -> writes) -----------------
 

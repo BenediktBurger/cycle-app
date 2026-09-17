@@ -232,7 +232,7 @@ void main() {
       expect(exportMergePolicy, 'overwrite');
     });
 
-    test('documents of both published schema versions parse', () {
+    test('documents of every published schema version parse', () {
       ExportBlob blobFor(int version) => parseExportJson(jsonEncode(
             <String, Object?>{
               'schema_version': version,
@@ -248,8 +248,11 @@ void main() {
       // says otherwise; anything AFTER the current version stays rejected.
       expect(blobFor(1).exportedAt, DateTime.utc(2026, 9, 15, 12),
           reason: 'documents from before the measured-time field import');
-      expect(blobFor(2).exportedAt, DateTime.utc(2026, 9, 15, 12));
-      expect(() => parseExportJson('{"schema_version": 3, "exported_at": '
+      expect(blobFor(2).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents from the measured-time release');
+      expect(blobFor(3).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents since bleeding became a numeric level');
+      expect(() => parseExportJson('{"schema_version": 4, "exported_at": '
           '"2026-09-15T12:00:00Z"}'), throwsA(isA<FormatException>()));
     });
   });
@@ -440,6 +443,106 @@ void main() {
       });
       expect(entry!.measuredAtMinutes, isNull,
           reason: 'older exports omit the field; that is null, not "now"');
+    });
+  });
+
+  group('bleeding levels in the export version boundary', () {
+    test('the writer emits schema version 3 (numeric bleeding levels)', () {
+      expect(exportSchemaVersion, 3,
+          reason: 'v2 is the measured-time release, whose documents carry '
+              'STRING bleeding tokens — the numeric levels are v3');
+    });
+
+    test('v3 documents with numeric bleeding build, parse and round-trip',
+        () {
+      final json = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: const <Map<String, Object?>>[
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 4},
+          {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 0},
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15, 12),
+      ));
+
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      expect(decoded['schema_version'], 3,
+          reason: 'the writer stamps the current version');
+
+      final doc = parseExportJson(json);
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'numeric levels in range are valid vocabulary');
+      expect(summary.entriesWritten, 2);
+      expect(tryDailyEntryFromExport(doc.entries.first)!.bleeding,
+          Bleeding.heavy);
+      expect(tryDailyEntryFromExport(doc.entries.last)!.bleeding,
+          Bleeding.none);
+    });
+
+    test('a hand-written v3 document parses with its numeric bleeding', () {
+      // Raw JSON on purpose: pins the published document shape itself.
+      const v3Json = '{"schema_version": 3, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"profiles": [], '
+          '"entries": [{"profile_id": 1, "date": "2026-03-01", '
+          '"bleeding": 2}], '
+          '"marks": []}';
+      final doc = parseExportJson(v3Json);
+      expect(tryDailyEntryFromExport(doc.entries.single)!.bleeding,
+          Bleeding.light);
+    });
+
+    test('legacy v1 AND v2 documents carry string tokens that still plan '
+        'and count correctly', () {
+      // v2 documents exported by dev builds between the measured-time
+      // release and the bleeding levels carry STRING bleeding — treating
+      // v2 as numeric would misparse them, so both legacy versions stay
+      // token-shaped.
+      Iterable<Map<String, Object?>> tokenDoc(int version) sync* {
+        yield {
+          'schema_version': version,
+          'exported_at': '2026-09-15T12:00:00Z',
+          'profiles': <Object?>[],
+          'entries': <Object?>[
+            {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+            {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'spotting'},
+            {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
+            {'profile_id': 1, 'date': '2026-03-04', 'bleeding': 'heavy'},
+          ],
+          'marks': <Object?>[],
+        };
+      }
+
+      for (final version in const [1, 2]) {
+        final doc =
+            parseExportJson(jsonEncode(tokenDoc(version).single));
+        final summary = planMerge(
+          doc,
+          existingEntryKeys: {},
+          existingMarkKeys: {},
+          existingProfileIds: const {1},
+        );
+        expect(summary.entriesInvalid, 1,
+            reason: 'v$version: the unknown token counts as invalid');
+        expect(summary.entriesWritten, 3,
+            reason: 'v$version: the three legacy tokens are valid writes');
+
+        final periodDay = tryDailyEntryFromExport(doc.entries[0])!;
+        expect(periodDay.bleeding, Bleeding.medium,
+            reason: 'v$version: period degrades to medium');
+        expect(tryDailyEntryFromExport(doc.entries[1])!.bleeding,
+            Bleeding.spotting, reason: 'v$version: spotting stays spotting');
+        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding,
+            Bleeding.none, reason: 'v$version: none stays none');
+      }
     });
   });
 }

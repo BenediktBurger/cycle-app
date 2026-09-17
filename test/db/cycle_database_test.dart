@@ -824,6 +824,86 @@ void main() {
       });
     });
 
+    group('bleeding levels in the export version boundary', () {
+      test('export carries numeric bleeding levels and schema version 3',
+          () async {
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 2),
+          bleeding: Bleeding.heavy,
+        ));
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 3),
+          bleeding: Bleeding.none,
+        ));
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, contains('"schema_version": 3'));
+        expect(json, contains('"bleeding": 4'),
+            reason: 'heavy is exported as its numeric level');
+        expect(json, contains('"bleeding": 0'),
+            reason: 'none is exported as its numeric level');
+        expect(json, isNot(contains('"bleeding": "')),
+            reason: 'documents no longer carry bleeding string tokens');
+      });
+
+      test('legacy v1 token documents import and read back as mapped levels',
+          () async {
+        // A v1 document (published before heaviness existed) with the legacy
+        // token vocabulary. Raw JSON on purpose: pins the actual file
+        // content of old exports, not a hand-built blob.
+        const oldJson = '{"schema_version": 1, '
+            '"exported_at": "2026-04-01T00:00:00Z", '
+            '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+            '"entries": ['
+            '{"profile_id": 1, "date": "2026-05-01", "bleeding": "period"}, '
+            '{"profile_id": 1, "date": "2026-05-02", "bleeding": "spotting"}], '
+            '"marks": []}';
+        final summary = await importJsonToDatabase(db, oldJson);
+        expect(summary.entriesInvalid, 0);
+        expect(summary.entriesWritten, 2);
+
+        expect((await db.entriesDao.entryFor(1, DateTime(2026, 5, 1)))!.bleeding,
+            Bleeding.medium,
+            reason: 'period (generic menstruation) degrades to medium');
+        expect(
+            (await db.entriesDao.entryFor(1, DateTime(2026, 5, 2)))!.bleeding,
+            Bleeding.spotting);
+      });
+
+      test('export → import round trip preserves all five levels exactly',
+          () async {
+        // One day per level; the heavy/medium days prove there is no
+        // medium-degradation through the document.
+        final levels = Bleeding.values;
+        for (var i = 0; i < levels.length; i++) {
+          await db.entriesDao.upsertDaily(DailyEntry(
+            date: DateTime(2026, 6, 1 + i),
+            bleeding: levels[i],
+          ));
+        }
+
+        final json = await exportDatabaseToJson(db);
+        final target = CycleDatabase(NativeDatabase.memory());
+        addTearDown(target.close);
+        final summary = await importJsonToDatabase(target, json);
+        expect(summary.entriesInvalid, 0);
+        expect(summary.entriesWritten, levels.length);
+
+        final sourceRows = await db.entriesDao.allEntriesForAllProfiles();
+        final targetRows = await target.entriesDao.allEntriesForAllProfiles();
+        expect(targetRows, hasLength(levels.length));
+        for (var i = 0; i < levels.length; i++) {
+          final source = sourceRows
+              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          final imported = targetRows
+              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          expect(imported.bleeding, source.bleeding,
+              reason: '${levels[i].name} must survive the round trip exactly '
+                  '(no degradation to medium)');
+        }
+      });
+    });
+
     test('unexpected errors surface as ImportFailedException', () async {
       // Nothing half-imported survives a mid-transaction/prepare failure:
       // the wrapper turns any engine error into the typed failure the UI

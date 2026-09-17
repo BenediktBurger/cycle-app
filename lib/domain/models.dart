@@ -38,6 +38,10 @@ enum Bleeding {
 ///    of a NEW member name is deliberately invalid — the names are not a
 ///    storage format.
 ///
+/// Both shapes parse regardless of the document's schema version (v1/v2
+/// documents carry tokens, v3 carries numbers — the field parser is
+/// shape-agnostic, see lib/domain/export_import.dart).
+///
 /// TODO(user-review): `period` means "menstruation, heaviness unknown"; it
 /// degrades to `medium` (3), the central menstruation level. INER experts
 /// may prefer a different default.
