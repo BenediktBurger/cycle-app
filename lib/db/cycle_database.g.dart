@@ -329,14 +329,25 @@ class $CycleEntriesTable extends CycleEntries
   late final GeneratedColumn<String> cervix = GeneratedColumn<String>(
       'cervix', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _painMeta = const VerificationMeta('pain');
+  static const VerificationMeta _painBreastMeta =
+      const VerificationMeta('painBreast');
   @override
-  late final GeneratedColumn<bool> pain = GeneratedColumn<bool>(
-      'pain', aliasedName, false,
+  late final GeneratedColumn<bool> painBreast = GeneratedColumn<bool>(
+      'pain_breast', aliasedName, false,
       type: DriftSqlType.bool,
       requiredDuringInsert: false,
       defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("pain" IN (0, 1))'),
+          GeneratedColumn.constraintIsAlways('CHECK ("pain_breast" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _painMittelschmerzMeta =
+      const VerificationMeta('painMittelschmerz');
+  @override
+  late final GeneratedColumn<bool> painMittelschmerz = GeneratedColumn<bool>(
+      'pain_mittelschmerz', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("pain_mittelschmerz" IN (0, 1))'),
       defaultValue: const Constant(false));
   static const VerificationMeta _moodMeta = const VerificationMeta('mood');
   @override
@@ -401,7 +412,8 @@ class $CycleEntriesTable extends CycleEntries
         mucusSign,
         mucusQuality,
         cervix,
-        pain,
+        painBreast,
+        painMittelschmerz,
         mood,
         desire,
         sex,
@@ -474,9 +486,17 @@ class $CycleEntriesTable extends CycleEntries
       context.handle(_cervixMeta,
           cervix.isAcceptableOrUnknown(data['cervix']!, _cervixMeta));
     }
-    if (data.containsKey('pain')) {
+    if (data.containsKey('pain_breast')) {
       context.handle(
-          _painMeta, pain.isAcceptableOrUnknown(data['pain']!, _painMeta));
+          _painBreastMeta,
+          painBreast.isAcceptableOrUnknown(
+              data['pain_breast']!, _painBreastMeta));
+    }
+    if (data.containsKey('pain_mittelschmerz')) {
+      context.handle(
+          _painMittelschmerzMeta,
+          painMittelschmerz.isAcceptableOrUnknown(
+              data['pain_mittelschmerz']!, _painMittelschmerzMeta));
     }
     if (data.containsKey('mood')) {
       context.handle(
@@ -539,8 +559,10 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.string, data['${effectivePrefix}mucus_quality']),
       cervix: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cervix']),
-      pain: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}pain'])!,
+      painBreast: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}pain_breast'])!,
+      painMittelschmerz: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}pain_mittelschmerz'])!,
       mood: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}mood'])!,
       desire: attachedDatabase.typeMapping
@@ -612,7 +634,13 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
 
   /// Optional cervix observation (free text).
   final String? cervix;
-  final bool pain;
+
+  /// Pain options of the day, as two independent flags with the cheat
+  /// sheet's letters: breast tenderness (painBreast, letter B) and
+  /// ovulation pain / Mittelschmerz (painMittelschmerz, letter M). Modeled
+  /// like the exclusion flags: plain booleans, no interval system.
+  final bool painBreast;
+  final bool painMittelschmerz;
   final bool mood;
   final bool desire;
   final bool sex;
@@ -633,7 +661,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       this.mucusSign,
       this.mucusQuality,
       this.cervix,
-      required this.pain,
+      required this.painBreast,
+      required this.painMittelschmerz,
       required this.mood,
       required this.desire,
       required this.sex,
@@ -672,7 +701,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     if (!nullToAbsent || cervix != null) {
       map['cervix'] = Variable<String>(cervix);
     }
-    map['pain'] = Variable<bool>(pain);
+    map['pain_breast'] = Variable<bool>(painBreast);
+    map['pain_mittelschmerz'] = Variable<bool>(painMittelschmerz);
     map['mood'] = Variable<bool>(mood);
     map['desire'] = Variable<bool>(desire);
     map['sex'] = Variable<bool>(sex);
@@ -706,7 +736,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           : Value(mucusQuality),
       cervix:
           cervix == null && nullToAbsent ? const Value.absent() : Value(cervix),
-      pain: Value(pain),
+      painBreast: Value(painBreast),
+      painMittelschmerz: Value(painMittelschmerz),
       mood: Value(mood),
       desire: Value(desire),
       sex: Value(sex),
@@ -734,7 +765,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       mucusSign: serializer.fromJson<String?>(json['mucusSign']),
       mucusQuality: serializer.fromJson<String?>(json['mucusQuality']),
       cervix: serializer.fromJson<String?>(json['cervix']),
-      pain: serializer.fromJson<bool>(json['pain']),
+      painBreast: serializer.fromJson<bool>(json['painBreast']),
+      painMittelschmerz: serializer.fromJson<bool>(json['painMittelschmerz']),
       mood: serializer.fromJson<bool>(json['mood']),
       desire: serializer.fromJson<bool>(json['desire']),
       sex: serializer.fromJson<bool>(json['sex']),
@@ -760,7 +792,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'mucusSign': serializer.toJson<String?>(mucusSign),
       'mucusQuality': serializer.toJson<String?>(mucusQuality),
       'cervix': serializer.toJson<String?>(cervix),
-      'pain': serializer.toJson<bool>(pain),
+      'painBreast': serializer.toJson<bool>(painBreast),
+      'painMittelschmerz': serializer.toJson<bool>(painMittelschmerz),
       'mood': serializer.toJson<bool>(mood),
       'desire': serializer.toJson<bool>(desire),
       'sex': serializer.toJson<bool>(sex),
@@ -784,7 +817,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           Value<String?> mucusSign = const Value.absent(),
           Value<String?> mucusQuality = const Value.absent(),
           Value<String?> cervix = const Value.absent(),
-          bool? pain,
+          bool? painBreast,
+          bool? painMittelschmerz,
           bool? mood,
           bool? desire,
           bool? sex,
@@ -808,7 +842,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         mucusQuality:
             mucusQuality.present ? mucusQuality.value : this.mucusQuality,
         cervix: cervix.present ? cervix.value : this.cervix,
-        pain: pain ?? this.pain,
+        painBreast: painBreast ?? this.painBreast,
+        painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
         mood: mood ?? this.mood,
         desire: desire ?? this.desire,
         sex: sex ?? this.sex,
@@ -843,7 +878,11 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ? data.mucusQuality.value
           : this.mucusQuality,
       cervix: data.cervix.present ? data.cervix.value : this.cervix,
-      pain: data.pain.present ? data.pain.value : this.pain,
+      painBreast:
+          data.painBreast.present ? data.painBreast.value : this.painBreast,
+      painMittelschmerz: data.painMittelschmerz.present
+          ? data.painMittelschmerz.value
+          : this.painMittelschmerz,
       mood: data.mood.present ? data.mood.value : this.mood,
       desire: data.desire.present ? data.desire.value : this.desire,
       sex: data.sex.present ? data.sex.value : this.sex,
@@ -869,7 +908,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
-          ..write('pain: $pain, ')
+          ..write('painBreast: $painBreast, ')
+          ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
           ..write('desire: $desire, ')
           ..write('sex: $sex, ')
@@ -881,27 +921,29 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      profileId,
-      date,
-      bbtC,
-      measuredAtMinutes,
-      bleeding,
-      excludeIllness,
-      excludeAlcohol,
-      excludeTravel,
-      excludeOther,
-      mucusSign,
-      mucusQuality,
-      cervix,
-      pain,
-      mood,
-      desire,
-      sex,
-      notes,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        id,
+        profileId,
+        date,
+        bbtC,
+        measuredAtMinutes,
+        bleeding,
+        excludeIllness,
+        excludeAlcohol,
+        excludeTravel,
+        excludeOther,
+        mucusSign,
+        mucusQuality,
+        cervix,
+        painBreast,
+        painMittelschmerz,
+        mood,
+        desire,
+        sex,
+        notes,
+        createdAt,
+        updatedAt
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -919,7 +961,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.mucusSign == this.mucusSign &&
           other.mucusQuality == this.mucusQuality &&
           other.cervix == this.cervix &&
-          other.pain == this.pain &&
+          other.painBreast == this.painBreast &&
+          other.painMittelschmerz == this.painMittelschmerz &&
           other.mood == this.mood &&
           other.desire == this.desire &&
           other.sex == this.sex &&
@@ -942,7 +985,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<String?> mucusSign;
   final Value<String?> mucusQuality;
   final Value<String?> cervix;
-  final Value<bool> pain;
+  final Value<bool> painBreast;
+  final Value<bool> painMittelschmerz;
   final Value<bool> mood;
   final Value<bool> desire;
   final Value<bool> sex;
@@ -963,7 +1007,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
-    this.pain = const Value.absent(),
+    this.painBreast = const Value.absent(),
+    this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
     this.desire = const Value.absent(),
     this.sex = const Value.absent(),
@@ -985,7 +1030,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
-    this.pain = const Value.absent(),
+    this.painBreast = const Value.absent(),
+    this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
     this.desire = const Value.absent(),
     this.sex = const Value.absent(),
@@ -1007,7 +1053,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<String>? mucusSign,
     Expression<String>? mucusQuality,
     Expression<String>? cervix,
-    Expression<bool>? pain,
+    Expression<bool>? painBreast,
+    Expression<bool>? painMittelschmerz,
     Expression<bool>? mood,
     Expression<bool>? desire,
     Expression<bool>? sex,
@@ -1029,7 +1076,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (mucusSign != null) 'mucus_sign': mucusSign,
       if (mucusQuality != null) 'mucus_quality': mucusQuality,
       if (cervix != null) 'cervix': cervix,
-      if (pain != null) 'pain': pain,
+      if (painBreast != null) 'pain_breast': painBreast,
+      if (painMittelschmerz != null) 'pain_mittelschmerz': painMittelschmerz,
       if (mood != null) 'mood': mood,
       if (desire != null) 'desire': desire,
       if (sex != null) 'sex': sex,
@@ -1053,7 +1101,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<String?>? mucusSign,
       Value<String?>? mucusQuality,
       Value<String?>? cervix,
-      Value<bool>? pain,
+      Value<bool>? painBreast,
+      Value<bool>? painMittelschmerz,
       Value<bool>? mood,
       Value<bool>? desire,
       Value<bool>? sex,
@@ -1074,7 +1123,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       mucusSign: mucusSign ?? this.mucusSign,
       mucusQuality: mucusQuality ?? this.mucusQuality,
       cervix: cervix ?? this.cervix,
-      pain: pain ?? this.pain,
+      painBreast: painBreast ?? this.painBreast,
+      painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
       desire: desire ?? this.desire,
       sex: sex ?? this.sex,
@@ -1128,8 +1178,11 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (cervix.present) {
       map['cervix'] = Variable<String>(cervix.value);
     }
-    if (pain.present) {
-      map['pain'] = Variable<bool>(pain.value);
+    if (painBreast.present) {
+      map['pain_breast'] = Variable<bool>(painBreast.value);
+    }
+    if (painMittelschmerz.present) {
+      map['pain_mittelschmerz'] = Variable<bool>(painMittelschmerz.value);
     }
     if (mood.present) {
       map['mood'] = Variable<bool>(mood.value);
@@ -1168,7 +1221,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
-          ..write('pain: $pain, ')
+          ..write('painBreast: $painBreast, ')
+          ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
           ..write('desire: $desire, ')
           ..write('sex: $sex, ')
@@ -1819,7 +1873,8 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
   Value<String?> cervix,
-  Value<bool> pain,
+  Value<bool> painBreast,
+  Value<bool> painMittelschmerz,
   Value<bool> mood,
   Value<bool> desire,
   Value<bool> sex,
@@ -1842,7 +1897,8 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
   Value<String?> cervix,
-  Value<bool> pain,
+  Value<bool> painBreast,
+  Value<bool> painMittelschmerz,
   Value<bool> mood,
   Value<bool> desire,
   Value<bool> sex,
@@ -1922,8 +1978,12 @@ class $$CycleEntriesTableFilterComposer
   ColumnFilters<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<bool> get pain => $composableBuilder(
-      column: $table.pain, builder: (column) => ColumnFilters(column));
+  ColumnFilters<bool> get painBreast => $composableBuilder(
+      column: $table.painBreast, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get painMittelschmerz => $composableBuilder(
+      column: $table.painMittelschmerz,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get mood => $composableBuilder(
       column: $table.mood, builder: (column) => ColumnFilters(column));
@@ -2015,8 +2075,12 @@ class $$CycleEntriesTableOrderingComposer
   ColumnOrderings<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<bool> get pain => $composableBuilder(
-      column: $table.pain, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<bool> get painBreast => $composableBuilder(
+      column: $table.painBreast, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get painMittelschmerz => $composableBuilder(
+      column: $table.painMittelschmerz,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get mood => $composableBuilder(
       column: $table.mood, builder: (column) => ColumnOrderings(column));
@@ -2102,8 +2166,11 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<String> get cervix =>
       $composableBuilder(column: $table.cervix, builder: (column) => column);
 
-  GeneratedColumn<bool> get pain =>
-      $composableBuilder(column: $table.pain, builder: (column) => column);
+  GeneratedColumn<bool> get painBreast => $composableBuilder(
+      column: $table.painBreast, builder: (column) => column);
+
+  GeneratedColumn<bool> get painMittelschmerz => $composableBuilder(
+      column: $table.painMittelschmerz, builder: (column) => column);
 
   GeneratedColumn<bool> get mood =>
       $composableBuilder(column: $table.mood, builder: (column) => column);
@@ -2180,7 +2247,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
-            Value<bool> pain = const Value.absent(),
+            Value<bool> painBreast = const Value.absent(),
+            Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
             Value<bool> desire = const Value.absent(),
             Value<bool> sex = const Value.absent(),
@@ -2202,7 +2270,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
             cervix: cervix,
-            pain: pain,
+            painBreast: painBreast,
+            painMittelschmerz: painMittelschmerz,
             mood: mood,
             desire: desire,
             sex: sex,
@@ -2224,7 +2293,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
-            Value<bool> pain = const Value.absent(),
+            Value<bool> painBreast = const Value.absent(),
+            Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
             Value<bool> desire = const Value.absent(),
             Value<bool> sex = const Value.absent(),
@@ -2246,7 +2316,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
             cervix: cervix,
-            pain: pain,
+            painBreast: painBreast,
+            painMittelschmerz: painMittelschmerz,
             mood: mood,
             desire: desire,
             sex: sex,

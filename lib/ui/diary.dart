@@ -40,7 +40,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
-  bool _pain = false;
+  bool _painBreast = false;
+  bool _painMittelschmerz = false;
   bool _mood = false;
   bool _desire = false;
   bool _sex = false;
@@ -89,7 +90,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // so the form state can mirror the loaded pair untouched.
     _sign = entry?.mucusSign;
     _quality = entry?.mucusQuality;
-    _pain = entry?.pain ?? false;
+    _painBreast = entry?.painBreast ?? false;
+    _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _mood = entry?.mood ?? false;
     _desire = entry?.desire ?? false;
     _sex = entry?.sex ?? false;
@@ -160,7 +162,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       cervix: _cervixController.text.trim().isEmpty
           ? null
           : _cervixController.text.trim(),
-      pain: _pain,
+      painBreast: _painBreast,
+      painMittelschmerz: _painMittelschmerz,
       mood: _mood,
       desire: _desire,
       sex: _sex,
@@ -413,9 +416,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 spacing: 8,
                 children: [
                   FilterChip(
-                    label: Text(l10n.pain),
-                    selected: _pain,
-                    onSelected: (v) => setState(() => _pain = v),
+                    label: Text(l10n.painBreast),
+                    selected: _painBreast,
+                    onSelected: (v) => setState(() => _painBreast = v),
+                  ),
+                  FilterChip(
+                    label: Text(l10n.painMittelschmerz),
+                    selected: _painMittelschmerz,
+                    onSelected: (v) => setState(() => _painMittelschmerz = v),
                   ),
                   FilterChip(
                     label: Text(l10n.mood),

@@ -252,8 +252,13 @@ void main() {
           reason: 'documents from the measured-time release');
       expect(blobFor(3).exportedAt, DateTime.utc(2026, 9, 15, 12),
           reason: 'documents since bleeding became a numeric level');
-      expect(() => parseExportJson('{"schema_version": 4, "exported_at": '
-          '"2026-09-15T12:00:00Z"}'), throwsA(isA<FormatException>()));
+      expect(blobFor(4).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents since the pain options replaced the '
+              'generic pain flag');
+      expect(
+          () => parseExportJson('{"schema_version": 5, "exported_at": '
+              '"2026-09-15T12:00:00Z"}'),
+          throwsA(isA<FormatException>()));
     });
   });
 
@@ -445,15 +450,91 @@ void main() {
     });
   });
 
-  group('bleeding levels in the export version boundary', () {
-    test('the writer emits schema version 3 (numeric bleeding levels)', () {
-      expect(exportSchemaVersion, 3,
-          reason: 'v2 is the measured-time release, whose documents carry '
-              'STRING bleeding tokens — the numeric levels are v3');
+  group('pain options (breast B, Mittelschmerz M) in the writer', () {
+    test('writer: the letter-coded pain options map to the domain flags', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'pain_breast': true,
+      });
+      expect(entry!.painBreast, isTrue);
+      expect(entry.painMittelschmerz, isFalse);
+
+      final other = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-02',
+        'bleeding': 'none',
+        'pain_mittelschmerz': true,
+      });
+      expect(other!.painBreast, isFalse);
+      expect(other.painMittelschmerz, isTrue);
     });
 
-    test('v3 documents with numeric bleeding build, parse and round-trip',
-        () {
+    test('writer: rows without pain keys parse with both options unset', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'none',
+      });
+      expect(entry!.painBreast, isFalse);
+      expect(entry.painMittelschmerz, isFalse);
+    });
+
+    test('writer: the legacy generic pain flag is tolerated and dropped', () {
+      // ≤v3 documents carry a generic `pain: true` with no B/M identity.
+      // The day row itself stays a valid write (like every coercible
+      // field), only the flag information is not carried over — the
+      // merge policy overwrites such a day with the rest of its fields.
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'none',
+        'pain': true,
+      });
+      expect(entry, isNotNull,
+          reason: 'a legacy pain flag must not invalidate the row');
+      expect(entry!.painBreast, isFalse,
+          reason: 'the generic flag has no breast-pain identity');
+      expect(entry.painMittelschmerz, isFalse,
+          reason: 'the generic flag has no Mittelschmerz identity');
+    });
+
+    test('planner: legacy pain/unknown pain keys never invalidate a row', () {
+      final summary = planMerge(
+        ExportBlob(
+          profiles: const [],
+          entries: const <Map<String, Object?>>[
+            {
+              'profile_id': 1,
+              'date': '2026-03-01',
+              'bleeding': 'none',
+              'pain': true,
+              'pain_breast': true,
+            },
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'boolean pain fields are coercible, never row killers');
+      expect(summary.entriesWritten, 1);
+    });
+  });
+
+  group('bleeding levels in the export version boundary', () {
+    test('the writer emits the schema version with the pain options', () {
+      expect(exportSchemaVersion, 4,
+          reason: 'v3 was the numeric-bleeding release; v4 replaces the '
+              'generic `pain` flag with the pain_breast / pain_mittelschmerz '
+              'options (B/M)');
+    });
+
+    test('documents with numeric bleeding build, parse and round-trip', () {
       final json = buildExportJson(ExportBlob(
         profiles: const [
           {'id': 1, 'name': 'main', 'ordinal': 0},
@@ -467,7 +548,7 @@ void main() {
       ));
 
       final decoded = jsonDecode(json) as Map<String, Object?>;
-      expect(decoded['schema_version'], 3,
+      expect(decoded['schema_version'], exportSchemaVersion,
           reason: 'the writer stamps the current version');
 
       final doc = parseExportJson(json);

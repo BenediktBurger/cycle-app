@@ -100,7 +100,8 @@ final class DailyEntry {
     this.mucusSign,
     this.mucusQuality,
     this.cervix,
-    this.pain = false,
+    this.painBreast = false,
+    this.painMittelschmerz = false,
     this.mood = false,
     this.desire = false,
     this.sex = false,
@@ -142,7 +143,14 @@ final class DailyEntry {
   /// Optional cervix observation note (e.g. open/closed, position).
   final String? cervix;
 
-  final bool pain;
+  /// Pain experiences of the day, as two independent flags — the
+  /// letter-coded pain options of the cheat sheet: breast tenderness
+  /// (`painBreast`, letter B) and ovulation pain (Mittelschmerz,
+  /// `painMittelschmerz`, letter M). Modeled like the exclusion flags:
+  /// plain per-day booleans, no interval system.
+  final bool painBreast;
+  final bool painMittelschmerz;
+
   final bool mood;
   final bool desire;
   final bool sex;
@@ -168,7 +176,8 @@ final class DailyEntry {
     Object? mucusSign = _sentinel,
     Object? mucusQuality = _sentinel,
     Object? cervix = _sentinel,
-    bool? pain,
+    bool? painBreast,
+    bool? painMittelschmerz,
     bool? mood,
     bool? desire,
     bool? sex,
@@ -192,7 +201,8 @@ final class DailyEntry {
           ? this.mucusQuality
           : mucusQuality as MucusQuality?,
       cervix: cervix == _sentinel ? this.cervix : cervix as String?,
-      pain: pain ?? this.pain,
+      painBreast: painBreast ?? this.painBreast,
+      painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
       desire: desire ?? this.desire,
       sex: sex ?? this.sex,
@@ -218,7 +228,8 @@ final class DailyEntry {
         mucusSign == other.mucusSign &&
         mucusQuality == other.mucusQuality &&
         cervix == other.cervix &&
-        pain == other.pain &&
+        painBreast == other.painBreast &&
+        painMittelschmerz == other.painMittelschmerz &&
         mood == other.mood &&
         desire == other.desire &&
         sex == other.sex &&
@@ -239,7 +250,8 @@ final class DailyEntry {
         mucusSign,
         mucusQuality,
         cervix,
-        pain,
+        painBreast,
+        painMittelschmerz,
         mood,
         desire,
         sex,

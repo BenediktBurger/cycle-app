@@ -264,7 +264,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 4,
+      expect(userVersion.data['user_version'], 5,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
@@ -393,7 +393,8 @@ void main() {
         mucusSign: MucusSign.s,
         mucusQuality: MucusQuality.ew,
         cervix: 'closed, low',
-        pain: true,
+        painBreast: true,
+        painMittelschmerz: true,
         mood: true,
         desire: true,
         sex: true,
@@ -407,6 +408,27 @@ void main() {
       expect(stored.date.year, 2026);
       expect(stored.date.month, 6);
       expect(stored.date.day, 15);
+    });
+
+    test('pain options B and M persist as separate boolean columns', () async {
+      // Breast (B) set, Mittelschmerz (M) not: the two options are
+      // independent per-day flags like the exclusion columns, not one
+      // generic flag.
+      final stored = await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        painBreast: true,
+      ));
+      final raw = await db
+          .customSelect(
+              'SELECT pain_breast, pain_mittelschmerz FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['pain_breast'], 1,
+          reason: 'B is stored as its own boolean column');
+      expect(raw.data['pain_mittelschmerz'], 0,
+          reason: 'M stays unset when only B was recorded');
+      final mapped = dailyEntryFromDrift(stored);
+      expect(mapped.painBreast, isTrue);
+      expect(mapped.painMittelschmerz, isFalse);
     });
 
     test('explicit nulls are written on full replace (no stale values left)',
@@ -494,7 +516,8 @@ void main() {
         excludeOther: false,
         mucusSign: 'f',
         mucusQuality: 'w',
-        pain: false,
+        painBreast: false,
+        painMittelschmerz: false,
         mood: false,
         desire: false,
         sex: false,
@@ -956,8 +979,8 @@ void main() {
     });
 
     group('bleeding levels in the export version boundary', () {
-      test('export carries numeric bleeding levels and schema version 3',
-          () async {
+      test('export carries numeric bleeding levels and the current schema'
+          ' version', () async {
         await db.entriesDao.upsertDaily(DailyEntry(
           date: DateTime(2026, 4, 2),
           bleeding: Bleeding.heavy,
@@ -968,7 +991,9 @@ void main() {
         ));
 
         final json = await exportDatabaseToJson(db);
-        expect(json, contains('"schema_version": 3'));
+        expect(json, contains('"schema_version": 4'),
+            reason: 'v4 is the pain-options release; documents always stamp '
+                'their writing shape');
         expect(json, contains('"bleeding": 4'),
             reason: 'heavy is exported as its numeric level');
         expect(json, contains('"bleeding": 0'),

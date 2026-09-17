@@ -256,14 +256,24 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final painNote = cell(dataRow, 'pain.note');
     final sexNote = cell(dataRow, 'sex.note');
     final moodNote = cell(dataRow, 'mood.note');
-    final pain = flagInFamily(dataRow, 'pain') || painNote != null;
+    // drip's pain kinds map onto the letter-coded pain options where a
+    // storage option exists: ovulation pain is exactly the Mittelschmerz
+    // (M) option, tender breasts the breast-pain (B) option.
+    final painBreast = boolCell(dataRow, 'pain.tenderBreasts');
+    final painMittelschmerz = boolCell(dataRow, 'pain.ovulationPain');
+    // Kinds without a cycle-app option (cramps, headache, …) are dropped
+    // like the other dropped columns — NOT data: a row carrying only such
+    // a flag imports nothing (but the pain note below still does).
+    // TODO(user-review): whether the remaining pain kinds deserve options
+    // of their own instead of being dropped.
     final mood = flagInFamily(dataRow, 'mood') || moodNote != null;
 
     // A row is only worth an entry when something mappable was recorded.
     // Dropped columns (bleeding/mucus/cervix excludes, contraceptive flags
-    // without activity, symptom-flag FALSEs) are NOT data — otherwise every
-    // blank drip day would import. A measured time belongs to its
-    // measurement, so a time cell alone never makes a blank day an entry.
+    // without activity, unmappable pain kinds, symptom-flag FALSEs) are
+    // NOT data — otherwise every blank drip day would import. A measured
+    // time belongs to its measurement, so a time cell alone never makes a
+    // blank day an entry.
     final hasData = bbtC != null ||
         excludeOther ||
         bleeding != null ||
@@ -271,7 +281,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
         cervix != null ||
         desire ||
         sex ||
-        pain ||
+        painBreast ||
+        painMittelschmerz ||
+        painNote != null ||
         mood ||
         dayNote != null ||
         tempNote != null ||
@@ -310,7 +322,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'mucus_sign': mucus?.sign?.name,
       'mucus_quality': mucus?.quality?.name,
       'cervix': cervix,
-      'pain': pain,
+      'pain_breast': painBreast,
+      'pain_mittelschmerz': painMittelschmerz,
       'mood': mood,
       'desire': desire,
       'sex': sex,

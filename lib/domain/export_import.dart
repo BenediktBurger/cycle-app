@@ -3,7 +3,7 @@
 // Export document shape (schema version 3):
 //
 //   {
-//     "schema_version": 3,
+//     "schema_version": 4,
 //     "exported_at": "<ISO 8601 UTC>",
 //     "profiles": [{"id": 1, "name": "main", "ordinal": 0}, ...],
 //     "entries":  [{"profile_id": 1, "date": "2026-03-01", "bbt_c": 36.6,
@@ -13,6 +13,8 @@
 //                    below) "exclude_illness": false,
 //                    "mucus_sign": "s", "mucus_quality": "ew", (both
 //                    nullable; quality only ever together with S)
+//                    "pain_breast": false, "pain_mittelschmerz": false,
+//                    (the letter-coded pain options B and M, v4+)
 //                    "cervix": null, ..., "notes": null}, ...],
 //     "marks":    [{"profile_id": 1, "entry_date": "2026-03-12",
 //                   "mark_type": "baseline", "author": "user"}, ...]
@@ -21,11 +23,16 @@
 // Per-version entry fields: v1 omitted `measured_at_minutes` and carried
 // bleeding as one of the legacy string tokens none/period/spotting; v2
 // added `measured_at_minutes` but still carried token bleeding; v3 carries
-// the numeric bleeding level (0=none … 4=heavy). The import side is STRICT
-// per version about which fields exist, and LENIENT within the accepted
-// set: field values are parsed per field by the shared helpers regardless
-// of the version (see tryParseBleeding / tryParseMeasuredAtMinutes), so an
-// old document and the current one flow through the same field parsers.
+// the numeric bleeding level (0=none … 4=heavy); v4 replaces the generic
+// `pain` flag with the letter-coded pain options `pain_breast` (B) and
+// `pain_mittelschmerz` (M). The import side is STRICT per version about
+// which fields exist, and LENIENT within the accepted set: field values
+// are parsed per field by the shared helpers regardless of the version
+// (see tryParseBleeding / tryParseMeasuredAtMinutes), so an old document
+// and the current one flow through the same field parsers. Legacy ≤v3
+// documents may still carry the generic `pain: true` flag: it has no B/M
+// identity, so it is TOLERATED but dropped by the field mapping (the row
+// stays valid, the flag information is not carried over).
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in
@@ -49,7 +56,10 @@ import 'models.dart';
 /// field `bleeding` numeric (0=none … 4=heavy) — v1/v2 documents carry
 /// bleeding as one of the legacy string tokens none/period/spotting, and
 /// the field parser accepts both shapes regardless of the version.
-const int exportSchemaVersion = 3;
+/// Version 4 replaced the generic `pain` entry flag with the letter-coded
+/// pain options `pain_breast` (B) and `pain_mittelschmerz` (M); the legacy
+/// `pain` flag of ≤v3 documents is tolerated and dropped on import.
+const int exportSchemaVersion = 4;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and
 /// documented in CONTRIBUTING; importers MUST behave exactly like this).
@@ -112,8 +122,8 @@ String buildExportJson(ExportBlob blob) {
 /// Throws a [FormatException] when the input is not JSON, not an object,
 /// carries an unsupported schema version, or has a broken exported_at /
 /// table list. The accepted schema-version set is exactly
-/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3}) — kept explicit, no
-/// forward negotiation: old exports exist as real files on user devices,
+/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3, 4}) — kept explicit,
+/// no forward negotiation: old exports exist as real files on user devices,
 /// so every shape ever published stays importable, while anything AFTER
 /// the current version is rejected strictly (no data may be silently
 /// mis-read). Field semantics are strict per version (which fields a

@@ -59,25 +59,20 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
-      higher measurement" adds the baseline automatically, based on the preceding measurements
-      User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
 - Data entry aligned with the NER scheme: time of day for sex
   (morning/midday/evening), … — the exact term list must be specified first.
-  - show sex as an X (and distinguish moring/afternoon)
-  - exclude temperature and a note or keep these different reasons
+  - show sex as an X (and distinguish morning/midday/evening)
+  - generic exclude temperature and a note, or keep these different reasons
   - add "Ausfluss" (A) as an option to mucus
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
-- Datenbankschema überarbeiten (manche Dinge pro Zyklus (erste höhere Messung)/als Event (z.B: Messmethode) nicht pro Tag speichern? )
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
-- [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
+- [ ] Muttermund Beobachtung (Position und Öfnnung) ermöglichen mit verschiedenen Positionen auf Chart anzeigen (low, medium, high, very high, unreachable), opening (geschlossen, mittel, offen)
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
 - [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date
 - [ ] show on cycle tab day of month (and replace the first day with a short form of the month) and day of cycle
 - [ ] drip importer: only sex with partner without contraception is mapped to sex
-- [ ] drip importer: ovulation pain translates to Mittelschmerz (M)
 - [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
 - [ ] only store time if temperature is added (not for mucus etc.)
 - [ ] show temperature measurement time, sex, and pain (M, B) on cycle tab
@@ -88,10 +83,11 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
+- [ ] on diary: add buttons for previous/next day
 - [ ] make mode selectable: light mode, dark mode, system setting
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
-- Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
+- Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)? In the "marks" table – but it is raw data (but not per day).
 - [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
 - add descriptions (texts TBD) and tooltips
 - export as password protected zip

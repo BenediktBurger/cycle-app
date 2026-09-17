@@ -54,6 +54,18 @@ const List<String> dripHeader = [
   'mood.note',
 ];
 
+/// The full drip pain-column family (drip writes every symptom as
+/// `<symptom>.<kind>` booleans plus an (optional) note). Used to pin the
+/// B/M pain-kind mapping separately from the shared minimal header above.
+const List<String> painHeader = [
+  'date',
+  'pain.cramps',
+  'pain.ovulationPain',
+  'pain.tenderBreasts',
+  'pain.headache',
+  'pain.note',
+];
+
 /// Builds a drip CSV: [header] plus one data [row] joined the way drip
 /// writes its files (plain comma join, plain newlines).
 String dripOneRowCsv(List<String> header, List<String> row) =>
@@ -329,6 +341,44 @@ void main() {
       expect(doc['entries'] as List, isEmpty);
     });
 
+    test(
+        'pain options: drip ovulation pain → Mittelschmerz (M), tender '
+        'breasts → breast (B)', () {
+      // drip's ovulation pain kind is exactly the Mittelschmerz (M) day
+      // option; drip's tender breasts kind is the breast-pain (B) option.
+      // The two stay independent day flags — B without M and both at once.
+      // (cells() indices align 0-based with painHeader.)
+      final mDay = entryOf(cells('2026-01-01', {2: 'true'}),
+          header: painHeader);
+      expect(mDay['pain_mittelschmerz'], true);
+      expect(mDay['pain_breast'], false);
+      final bDay = entryOf(cells('2026-01-01', {3: 'true'}),
+          header: painHeader);
+      expect(bDay['pain_breast'], true);
+      expect(bDay['pain_mittelschmerz'], false);
+      final both = entryOf(cells('2026-01-01', {2: 'true', 3: 'true'}),
+          header: painHeader);
+      expect(both['pain_mittelschmerz'], true);
+      expect(both['pain_breast'], true);
+    });
+
+    test(
+        'pain: kinds without a cycle-app option are dropped like other '
+        'dropped columns', () {
+      // cramps/headache/… have no storage option; a row whose ONLY data is
+      // such a flag is skipped entirely (dropped columns are not data),
+      // while the pain NOTE keeps any recorded pain day importable.
+      final crampsOnly = dripCsvToExportJson(
+          dripOneRowCsv(painHeader, cells('2026-01-01', {1: 'true'})));
+      expect(crampsOnly.stats.rowsImported, 0,
+          reason: 'cramps alone are not mappable, the row carries no data');
+      expect(crampsOnly.stats.rowsSkippedEmpty, 1);
+      final noteOnly = dripCsvToExportJson(
+          dripOneRowCsv(painHeader, cells('2026-01-01', {5: 'cramps day'})));
+      expect(noteOnly.stats.rowsImported, 1,
+          reason: 'the pain note is mapped data (the [pain] line)');
+    });
+
     test('desire/sex/pain/mood: flags and note-only days', () {
       expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
       expect(entryOf(cells('2026-01-01', {13: 'true'}))['sex'], true);
@@ -343,10 +393,11 @@ void main() {
       expect(noActivity.stats.rowsImported, 0,
           reason: 'condom alone is dropped, row has no other data');
       expect(noActivity.stats.rowsSkippedEmpty, 1);
-      expect(entryOf(cells('2026-01-01', {17: 'true'}))['pain'], true);
-      // a pain note without a flag still marks the day painful
+      // A pain note without an ovulation/breast flag still marks the day
+      // as a data row; the pain options themselves stay unset.
       final noted = entryOf(cells('2026-01-01', {18: 'cramps day'}));
-      expect(noted['pain'], true);
+      expect(noted['pain_breast'], false);
+      expect(noted['pain_mittelschmerz'], false);
       expect(noted['notes'], '[pain] cramps day');
       expect(entryOf(cells('2026-01-01', {19: 'true'}))['mood'], true);
       final moodNote = entryOf(cells('2026-01-01', {20: 'deadline stress'}));
@@ -523,8 +574,9 @@ void main() {
       expect(by('2026-08-20')['mood'], true);
       // sex day
       expect(by('2026-08-16')['sex'], true);
-      // pain flag + pain-note day
-      expect(by('2026-08-25')['pain'], true);
+      // breast-pain (B) + pain-note day (drip pain.tenderBreasts → B)
+      expect(by('2026-08-25')['pain_breast'], true);
+      expect(by('2026-08-25')['pain_mittelschmerz'], false);
       expect(by('2026-08-25')['notes'], '[pain] tender in the evening');
       // temperature measurement times ride through as measured_at_minutes
       expect(by('2026-07-05')['measured_at_minutes'], 7 * 60 + 15,

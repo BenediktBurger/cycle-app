@@ -87,7 +87,15 @@ class CycleEntries extends Table {
   /// Optional cervix observation (free text).
   TextColumn get cervix => text().nullable()();
 
-  BoolColumn get pain => boolean().withDefault(const Constant(false))();
+  /// Pain options of the day, as two independent flags with the cheat
+  /// sheet's letters: breast tenderness (painBreast, letter B) and
+  /// ovulation pain / Mittelschmerz (painMittelschmerz, letter M). Modeled
+  /// like the exclusion flags: plain booleans, no interval system.
+  BoolColumn get painBreast =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get painMittelschmerz =>
+      boolean().withDefault(const Constant(false))();
+
   BoolColumn get mood => boolean().withDefault(const Constant(false))();
   BoolColumn get desire => boolean().withDefault(const Constant(false))();
   BoolColumn get sex => boolean().withDefault(const Constant(false))();

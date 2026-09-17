@@ -74,7 +74,8 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'mucus_sign': e.mucusSign,
           'mucus_quality': e.mucusQuality,
           'cervix': e.cervix,
-          'pain': e.pain,
+          'pain_breast': e.painBreast,
+          'pain_mittelschmerz': e.painMittelschmerz,
           'mood': e.mood,
           'desire': e.desire,
           'sex': e.sex,
@@ -335,7 +336,11 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       mucusSign: mucus.sign,
       mucusQuality: mucus.quality,
       cervix: row['cervix'] is String ? row['cervix'] as String : null,
-      pain: flag('pain'),
+      // The generic `pain` flag of ≤v3 documents is deliberately NOT read
+      // here: it has no B/M identity, so the flag is dropped while the row
+      // itself stays valid (see export_import.dart's version note).
+      painBreast: flag('pain_breast'),
+      painMittelschmerz: flag('pain_mittelschmerz'),
       mood: flag('mood'),
       desire: flag('desire'),
       sex: flag('sex'),

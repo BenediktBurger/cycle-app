@@ -118,8 +118,14 @@ void main() {
       expect(noteOnlyDay.notes, 'cramps again, expecting menses soon.');
       expect(noteOnlyDay.bbtC, isNull);
       expect(noteOnlyDay.bleeding, Bleeding.none);
-      expect(noteOnlyDay.pain, isFalse,
+      expect(noteOnlyDay.painBreast, isFalse,
           reason: 'note.value is the plain day note, not a pain flag');
+
+      // 2026-08-25: drip's tender-breasts kind → the breast (B) option.
+      final breastDay = await dayRow('2026-08-25');
+      expect(breastDay.painBreast, isTrue);
+      expect(breastDay.painMittelschmerz, isFalse);
+      expect(breastDay.notes, '[pain] tender in the evening');
     });
 
     test('blank calendar days are absent from the database', () async {
