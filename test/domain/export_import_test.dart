@@ -252,10 +252,8 @@ void main() {
           reason: 'documents from the measured-time release');
       expect(blobFor(3).exportedAt, DateTime.utc(2026, 9, 15, 12),
           reason: 'documents since bleeding became a numeric level');
-      expect(
-          () => parseExportJson('{"schema_version": 4, "exported_at": '
-              '"2026-09-15T12:00:00Z"}'),
-          throwsA(isA<FormatException>()));
+      expect(() => parseExportJson('{"schema_version": 4, "exported_at": '
+          '"2026-09-15T12:00:00Z"}'), throwsA(isA<FormatException>()));
     });
   });
 
@@ -454,7 +452,8 @@ void main() {
               'STRING bleeding tokens — the numeric levels are v3');
     });
 
-    test('v3 documents with numeric bleeding build, parse and round-trip', () {
+    test('v3 documents with numeric bleeding build, parse and round-trip',
+        () {
       final json = buildExportJson(ExportBlob(
         profiles: const [
           {'id': 1, 'name': 'main', 'ordinal': 0},
@@ -481,10 +480,10 @@ void main() {
       expect(summary.entriesInvalid, 0,
           reason: 'numeric levels in range are valid vocabulary');
       expect(summary.entriesWritten, 2);
-      expect(
-          tryDailyEntryFromExport(doc.entries.first)!.bleeding, Bleeding.heavy);
-      expect(
-          tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none);
+      expect(tryDailyEntryFromExport(doc.entries.first)!.bleeding,
+          Bleeding.heavy);
+      expect(tryDailyEntryFromExport(doc.entries.last)!.bleeding,
+          Bleeding.none);
     });
 
     test('a hand-written v3 document parses with its numeric bleeding', () {
@@ -500,28 +499,30 @@ void main() {
           Bleeding.light);
     });
 
-    test(
-        'legacy v1 AND v2 documents carry string tokens that still plan '
+    test('legacy v1 AND v2 documents carry string tokens that still plan '
         'and count correctly', () {
       // v2 documents exported by dev builds between the measured-time
       // release and the bleeding levels carry STRING bleeding — treating
       // v2 as numeric would misparse them, so both legacy versions stay
       // token-shaped.
-      Map<String, Object?> tokenDoc(int version) => {
-            'schema_version': version,
-            'exported_at': '2026-09-15T12:00:00Z',
-            'profiles': <Object?>[],
-            'entries': <Object?>[
-              {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
-              {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'spotting'},
-              {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
-              {'profile_id': 1, 'date': '2026-03-04', 'bleeding': 'heavy'},
-            ],
-            'marks': <Object?>[],
-          };
+      Iterable<Map<String, Object?>> tokenDoc(int version) sync* {
+        yield {
+          'schema_version': version,
+          'exported_at': '2026-09-15T12:00:00Z',
+          'profiles': <Object?>[],
+          'entries': <Object?>[
+            {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+            {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'spotting'},
+            {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
+            {'profile_id': 1, 'date': '2026-03-04', 'bleeding': 'heavy'},
+          ],
+          'marks': <Object?>[],
+        };
+      }
 
       for (final version in const [1, 2]) {
-        final doc = parseExportJson(jsonEncode(tokenDoc(version)));
+        final doc =
+            parseExportJson(jsonEncode(tokenDoc(version).single));
         final summary = planMerge(
           doc,
           existingEntryKeys: {},
@@ -537,10 +538,9 @@ void main() {
         expect(periodDay.bleeding, Bleeding.medium,
             reason: 'v$version: period degrades to medium');
         expect(tryDailyEntryFromExport(doc.entries[1])!.bleeding,
-            Bleeding.spotting,
-            reason: 'v$version: spotting stays spotting');
-        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding, Bleeding.none,
-            reason: 'v$version: none stays none');
+            Bleeding.spotting, reason: 'v$version: spotting stays spotting');
+        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding,
+            Bleeding.none, reason: 'v$version: none stays none');
       }
     });
   });

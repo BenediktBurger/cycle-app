@@ -158,7 +158,8 @@ final class DripCsvImport {
   final DripCsvStats stats;
 }
 
-/// Maps a raw drip CSV export into a v1 export document.
+/// Maps a raw drip CSV export into a current-version export document (see
+/// lib/domain/export_import.dart for the document shape).
 ///
 /// Every row lands under profile 1 (drip has no multi-profile concept). A
 /// row maps to an entry only when at least one MAPPED field carries data;
@@ -302,7 +303,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'date': formatIsoDay(day),
       'bbt_c': bbtC,
       'measured_at_minutes': measuredAtMinutes,
-      'bleeding': bleeding?.name ?? Bleeding.none.name,
+      'bleeding': bleeding ?? 0,
       'exclude_illness': false,
       'exclude_alcohol': false,
       'exclude_travel': false,
@@ -369,14 +370,17 @@ int? _parseDripTimeMinutes(String? raw) {
 }
 
 /// Drip's bleeding heaviness scale: 0=spotting, 1=light, 2=medium, 3=heavy.
-/// 1–3 collapse to the day-level `period` value — cycle-app stores no
-/// heaviness yet. Out-of-range indexes mean no observation.
-/// TODO(user-review): the light/medium/heavy collapse (roadmap already
-/// tracks "different bleeding levels" as a future split).
-Bleeding? _parseBleeding(String? raw) {
+/// Maps onto the stored numeric levels shifted by +1 (1=spotting … 4=heavy)
+/// because the export document's scale also stores an explicit none (0);
+/// drip represents "no bleeding" only as an absent CSV cell. Out-of-range
+/// indexes mean no observation (null). The returned values are exactly the
+/// numbers the shared parser accepts (tryParseBleeding, models.dart), so
+/// the writer/planner gates (export_import.dart) can never drop one of
+/// these rows.
+int? _parseBleeding(String? raw) {
   final v = raw == null ? null : int.tryParse(raw);
   if (v == null || v < 0 || v > 3) return null;
-  return v == 0 ? Bleeding.spotting : Bleeding.period;
+  return v + 1; // drip scale → stored level (+1 shift for the explicit none)
 }
 
 /// The mucus observation of a drip row: the stored combined NFP number

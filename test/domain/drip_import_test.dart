@@ -159,17 +159,22 @@ void main() {
       return c;
     }
 
-    test('vocabulary: bleeding maps 0=spotting, 1–3=period, empty=none', () {
-      expect(entryOf(cells('2026-01-01', {4: '0'}))['bleeding'], 'spotting');
-      expect(entryOf(cells('2026-01-01', {4: '1'}))['bleeding'], 'period');
-      expect(entryOf(cells('2026-01-01', {4: '2'}))['bleeding'], 'period');
-      expect(entryOf(cells('2026-01-01', {4: '3'}))['bleeding'], 'period');
+    test('vocabulary: drip scale 0–3 → the +1-shifted numeric levels, '
+        'empty → 0 (none)', () {
+      // drip: 0=spotting, 1=light, 2=medium, 3=heavy; the export document
+      // carries the stored numeric levels (drip scale shifted by +1, so an
+      // explicit none=0 exists).
+      expect(entryOf(cells('2026-01-01', {4: '0'}))['bleeding'], 1);
+      expect(entryOf(cells('2026-01-01', {4: '1'}))['bleeding'], 2);
+      expect(entryOf(cells('2026-01-01', {4: '2'}))['bleeding'], 3);
+      expect(entryOf(cells('2026-01-01', {4: '3'}))['bleeding'], 4);
       // No bleeding observation at all — the day still imports when other
-      // fields carry data (bleeding takes the neutral value).
-      expect(entryOf(cells('2026-01-01', {1: '36.2'}))['bleeding'], 'none');
+      // fields carry data (bleeding takes the neutral level 0 = none).
+      expect(entryOf(cells('2026-01-01', {1: '36.2'}))['bleeding'], 0);
       // Out-of-range index: treated as no observation.
-      expect(entryOf(cells('2026-01-01', {4: '7', 1: '36.2'}))['bleeding'],
-          'none');
+      expect(entryOf(cells('2026-01-01', {4: '7', 1: '36.2'}))['bleeding'], 0);
+      // The entry map carries NUMBERS, never string tokens.
+      expect(entryOf(cells('2026-01-01', {4: '3'}))['bleeding'], isA<int>());
     });
 
     test('temperature: value parses, exclude → exclude_other, note rides', () {
@@ -433,7 +438,8 @@ void main() {
           dripCsvToExportJson(dripOneRowCsv(header, ['2026-01-01', '1']));
       final doc = jsonDecode(result.json) as Map<String, Object?>;
       final e = (doc['entries']! as List).first as Map<String, Object?>;
-      expect(e['bleeding'], 'period');
+      expect(e['bleeding'], 2,
+          reason: 'drip value 1 (light) is the stored level 2');
       expect(e['bbt_c'], isNull);
       expect(e['mucus_sign'], isNull);
     });
@@ -446,7 +452,7 @@ void main() {
       final doc = jsonDecode(result.json) as Map<String, Object?>;
       final e = (doc['entries']! as List).first as Map<String, Object?>;
       expect(e['bbt_c'], 36.2);
-      expect(e['bleeding'], 'period');
+      expect(e['bleeding'], 3);
     });
 
     test('tolerance: short rows are padded with empty cells', () {
@@ -460,7 +466,8 @@ void main() {
       expect(result.stats.rowsSkippedEmpty, 1);
     });
 
-    test('document shape: v1 blob with the main profile and no marks', () {
+    test('document shape: current-version blob with the main profile and '
+        'no marks', () {
       final result = dripCsvToExportJson(dripOneRowCsv(
           dripHeader, cells('2026-01-01', {4: '2', 1: '36.2'})));
       final doc = jsonDecode(result.json) as Map<String, Object?>;
@@ -476,7 +483,8 @@ void main() {
       final e = blob.entries.single;
       expect(e['profile_id'], 1);
       expect(e['date'], '2026-01-01');
-      expect(e['bleeding'], 'period');
+      expect(e['bleeding'], 3,
+          reason: 'drip value 2 (medium) is the stored level 3');
       expect(e['bbt_c'], 36.2);
     });
 
@@ -506,8 +514,8 @@ void main() {
       // note-only day
       expect(
           by('2026-09-15')['notes'], 'cramps again, expecting menses soon.');
-      // bleeding + mood/mood-note day
-      expect(by('2026-08-31')['bleeding'], 'period');
+      // bleeding + mood/mood-note day (drip value 2 = medium → level 3)
+      expect(by('2026-08-31')['bleeding'], 3);
       expect(by('2026-08-31')['mood'], true);
       expect(by('2026-08-31')['notes'], '[mood] first day jitters');
       // desire + mood-flag day

@@ -96,10 +96,11 @@ void main() {
       expect(mucusDay.excludeOther, isFalse);
 
       // 2026-07-09: bleeding value 1 (light) with bleeding.exclude=true →
-      // light collapses to period; the PER-SYMPTOM exclusion is
+      // the level is the +1-shifted stored level (light); the PER-SYMPTOM
+      // exclusion is
       // dropped (no storage), so no day-level exclude flag is set.
       final bleedingDay = await dayRow('2026-07-09');
-      expect(bleedingDay.bleeding, Bleeding.period);
+      expect(bleedingDay.bleeding, Bleeding.light);
       expect(bleedingDay.excludeOther, isFalse,
           reason: 'bleeding.exclude has no storage and is dropped');
       expect(bleedingDay.excludeIllness, isFalse);
@@ -159,6 +160,47 @@ void main() {
       // times survive a second import untouched.
     });
 
+    test('drip bleeding scale reads back from the db as the shifted levels',
+        () async {
+      // Synthetic CSV covering every drip bleeding value; the stored levels
+      // are the drip scale shifted by +1 (an explicit none=0 exists here).
+      // The out-of-range row carries a temperature so the day still imports
+      // (proving out-of-range means "no observation", not "no row").
+      final rows = [
+        'date,temperature.value,bleeding.value',
+        '2026-01-01,,0',
+        '2026-01-02,,1',
+        '2026-01-03,,2',
+        '2026-01-04,,3',
+        '2026-01-05,36.2,7',
+      ].join('\n');
+      final mapping = dripCsvToExportJson(rows);
+      expect(mapping.stats.rowsInvalid, 0);
+      final summary = await importJsonToDatabase(db, mapping.json);
+      expect(summary.entriesWritten, 5);
+      expect(summary.entriesInvalid, 0);
+
+      expect((await dayRow('2026-01-01')).bleeding, Bleeding.spotting);
+      expect((await dayRow('2026-01-02')).bleeding, Bleeding.light);
+      expect((await dayRow('2026-01-03')).bleeding, Bleeding.medium);
+      expect((await dayRow('2026-01-04')).bleeding, Bleeding.heavy);
+      expect((await dayRow('2026-01-05')).bleeding, Bleeding.none,
+          reason: 'out-of-range means no observation → neutral level');
+    });
+
+    test('fixture bleeding days store their shifted levels (light/medium)',
+        () async {
+      final mapping = dripCsvToExportJson(fixtureRaw);
+      await importJsonToDatabase(db, mapping.json);
+
+      // drip value 1 (light) on four days, value 2 (medium) on the rest —
+      // the fixture carries no spotting/heavy, pinned per day below.
+      expect((await dayRow('2026-07-05')).bleeding, Bleeding.medium);
+      expect((await dayRow('2026-07-08')).bleeding, Bleeding.light);
+      expect((await dayRow('2026-08-31')).bleeding, Bleeding.medium);
+      expect((await dayRow('2026-09-01')).bleeding, Bleeding.light);
+    });
+
     test('full-row equality of every stored day across a double import',
         () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
@@ -191,7 +233,7 @@ void main() {
         DailyEntry(
           date: DateTime(2025, 2, 1),
           bbtC: 36.4,
-          bleeding: Bleeding.period,
+          bleeding: Bleeding.medium,
           notes: 'my own diary note',
         ),
       ));
