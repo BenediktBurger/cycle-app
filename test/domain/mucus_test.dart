@@ -1,7 +1,8 @@
 // Tests for the "Zeichen der Fruchtbarkeit" vocabulary (NER cheat sheet):
-// signs t / Ø(nichts) / f / S plus the quality qualifiers that are only valid
-// together with S. Enum NAMES are the stable storage keys (database + export),
-// so the token-set tests below pin them — a rename is a data migration.
+// signs t / Ø(nichts) / f / S / A(Ausfluss) plus the quality qualifiers that
+// are only valid together with S. Enum NAMES are the stable storage keys
+// (database + export), so the token-set tests below pin them — a rename is a
+// data migration.
 
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -12,7 +13,28 @@ void main() {
     test('token set is exactly the cheat-sheet signs', () {
       expect(
         MucusSign.values.map((s) => s.name),
-        unorderedEquals(const ['t', 'nothing', 'f', 's']),
+        unorderedEquals(const ['t', 'nothing', 'f', 's', 'a']),
+      );
+    });
+
+    test("a (Ausfluss) carries no quality — quality stays S-only", () {
+      // 'A' is a discharge observation, not the mucus sign S; like every
+      // non-S sign it must never carry a quality qualifier.
+      expect(
+        sanitizeMucusPair(sign: MucusSign.a, quality: MucusQuality.ew),
+        (sign: MucusSign.a, quality: null),
+      );
+      expect(
+        () => DailyEntry(
+          date: DateTime(2026, 6, 15),
+          mucusSign: MucusSign.a,
+          mucusQuality: MucusQuality.gl,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        mucusDisplay(sign: MucusSign.a, quality: MucusQuality.ew),
+        (symbol: 'A', superscript: null),
       );
     });
 
@@ -182,6 +204,7 @@ void main() {
       expect(mucusSignSymbol(MucusSign.nothing), 'Ø');
       expect(mucusSignSymbol(MucusSign.f), 'f');
       expect(mucusSignSymbol(MucusSign.s), 'S');
+      expect(mucusSignSymbol(MucusSign.a), 'A');
     });
 
     test('quality display tokens are the cheat-sheet tokens', () {

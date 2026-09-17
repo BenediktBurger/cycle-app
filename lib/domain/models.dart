@@ -83,6 +83,27 @@ int? tryParseMeasuredAtMinutes(Object? raw) {
   return (minutes >= 0 && minutes <= 1439) ? minutes : null;
 }
 
+/// One time-of-day of sex on a tracked day, as a single-bit flag. A day
+/// stores the OR of the observed times in [DailyEntry.sexTimings] — multiple
+/// bits mean multiple times on the same day.
+///
+/// Stored as INTEGER (the bitmask itself, not a numbered scale like
+/// Bleeding.level) in the db and the export document; the db mapping MUST go
+/// through `bit`, never the Dart declaration index. Note the deliberate
+/// vocabulary decision: "sex happened, but the time is unknown" is NOT
+/// representable — the observation is either tied to a recorded time or not
+/// recorded.
+enum SexTiming {
+  start(1),
+  middle(2),
+  end(4);
+
+  const SexTiming(this.bit);
+
+  /// The single bit this timing contributes to a day's mask.
+  final int bit;
+}
+
 /// One tracked day of cycle symptoms, decoupled from any storage layer.
 ///
 /// Date semantics: [date] must be a calendar-day-only value (see
@@ -103,11 +124,12 @@ final class DailyEntry {
     this.cervix,
     this.cervixPosition,
     this.cervixOpening,
+    this.cervixFirmness,
     this.painBreast = false,
     this.painMittelschmerz = false,
     this.mood = false,
     this.desire = false,
-    this.sex = false,
+    this.sexTimings = 0,
     this.notes,
   })  : // The measurement time is metadata OF the temperature measurement:
         // without a temperature there is no measurement to time, so the time
@@ -117,7 +139,13 @@ final class DailyEntry {
         // the rule; copyWith re-runs it through this constructor.
         measuredAtMinutes = bbtC == null ? null : measuredAtMinutes,
         assert(mucusQuality == null || mucusSign == MucusSign.s,
-            'mucusQuality is only valid together with mucusSign == MucusSign.s');
+            'mucusQuality is only valid together with mucusSign == MucusSign.s'),
+        // The mask must stay inside the SexTiming vocabulary: exactly the
+        // 3 bits (0..7). Anything else — negative, or a value with unknown
+        // bits — cannot round-trip through storage, so the constructor
+        // rejects it (same assert style as the mucus-quality rule).
+        assert(sexTimings >= 0 && sexTimings <= 7,
+            'sexTimings must be a mask of SexTiming bits (0..7), got $sexTimings');
 
   final int profileId;
   final DateTime date;
@@ -146,9 +174,9 @@ final class DailyEntry {
   final bool excludeTravel;
   final bool excludeOther;
 
-  /// Fertility sign observed on the day (t / Ø-nichts / f / S), or null when
-  /// no observation was recorded. Stored verbatim — never interpreted (Mode
-  /// M, ADR-0001).
+  /// Fertility sign observed on the day (t / Ø-nichts / f / S / A-Ausfluss),
+  /// or null when no observation was recorded. Stored verbatim — never
+  /// interpreted (Mode M, ADR-0001).
   final MucusSign? mucusSign;
 
   /// Quality qualifier of the mucus sign; null for every sign other than
@@ -158,14 +186,16 @@ final class DailyEntry {
   /// Optional cervix observation note (e.g. open/closed, position).
   final String? cervix;
 
-  /// Muttermund (cervix) observation of the day, as two independent
+  /// Muttermund (cervix) observation of the day, as three independent
   /// categorical options: how deep the cervix sat ([CervixPosition],
-  /// tief … unerreichbar) and how far it was open ([CervixOpening],
-  /// geschlossen … offen). Each null when not observed; no rule binds the
-  /// two together. Stored/displayed verbatim — never interpreted
+  /// tief … unerreichbar), how far it was open ([CervixOpening],
+  /// geschlossen … offen), and how firm it felt ([CervixFirmness],
+  /// h / h-w / w). Each null when not observed; no rule binds them
+  /// together. Stored/displayed verbatim — never interpreted
   /// (Mode M, ADR-0001). The display glyphs live in lib/domain/cervix.dart.
   final CervixPosition? cervixPosition;
   final CervixOpening? cervixOpening;
+  final CervixFirmness? cervixFirmness;
 
   /// Pain experiences of the day, as two independent flags — the
   /// letter-coded pain options of the cheat sheet: breast tenderness
@@ -177,7 +207,13 @@ final class DailyEntry {
 
   final bool mood;
   final bool desire;
-  final bool sex;
+
+  /// Times of day sex happened, as a bitmask of [SexTiming.bit] values
+  /// (0 = not recorded; 1 start / 2 middle / 4 end; OR-combined for
+  /// multiple times on one day). "Sex happened, time unknown" is
+  /// deliberately NOT representable — the observation is only recorded
+  /// together with a concrete time slot.
+  final int sexTimings;
 
   final String? notes;
 
@@ -202,11 +238,12 @@ final class DailyEntry {
     Object? cervix = _sentinel,
     Object? cervixPosition = _sentinel,
     Object? cervixOpening = _sentinel,
+    Object? cervixFirmness = _sentinel,
     bool? painBreast,
     bool? painMittelschmerz,
     bool? mood,
     bool? desire,
-    bool? sex,
+    int? sexTimings,
     Object? notes = _sentinel,
   }) {
     return DailyEntry(
@@ -233,11 +270,14 @@ final class DailyEntry {
       cervixOpening: cervixOpening == _sentinel
           ? this.cervixOpening
           : cervixOpening as CervixOpening?,
+      cervixFirmness: cervixFirmness == _sentinel
+          ? this.cervixFirmness
+          : cervixFirmness as CervixFirmness?,
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
       desire: desire ?? this.desire,
-      sex: sex ?? this.sex,
+      sexTimings: sexTimings ?? this.sexTimings,
       notes: notes == _sentinel ? this.notes : notes as String?,
     );
   }
@@ -262,16 +302,19 @@ final class DailyEntry {
         cervix == other.cervix &&
         cervixPosition == other.cervixPosition &&
         cervixOpening == other.cervixOpening &&
+        cervixFirmness == other.cervixFirmness &&
         painBreast == other.painBreast &&
         painMittelschmerz == other.painMittelschmerz &&
         mood == other.mood &&
         desire == other.desire &&
-        sex == other.sex &&
+        sexTimings == other.sexTimings &&
         notes == other.notes;
   }
 
   @override
-  int get hashCode => Object.hash(
+  // Object.hash caps out at 20 arguments; the field list grew past that, so
+  // the hash is built from an ordered list instead (same semantics).
+  int get hashCode => Object.hashAll([
         DateOnly.normalize(date),
         profileId,
         bbtC,
@@ -286,13 +329,14 @@ final class DailyEntry {
         cervix,
         cervixPosition,
         cervixOpening,
+        cervixFirmness,
         painBreast,
         painMittelschmerz,
         mood,
         desire,
-        sex,
+        sexTimings,
         notes,
-      );
+      ]);
 
   @override
   String toString() =>
@@ -301,5 +345,6 @@ final class DailyEntry {
       'bleeding:$bleeding, '
       'excluded:$isExcluded, mucusSign:$mucusSign, '
       'mucusQuality:$mucusQuality, '
-      'cervixPosition:$cervixPosition, cervixOpening:$cervixOpening)';
+      'cervixPosition:$cervixPosition, cervixOpening:$cervixOpening, '
+      'cervixFirmness:$cervixFirmness, sexTimings:$sexTimings)';
 }

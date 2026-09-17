@@ -1,8 +1,10 @@
-// The Muttermund (cervix) observations of a day: POSITION and OPENING.
+// The Muttermund (cervix) observations of a day: POSITION, OPENING, and
+// FIRMNESS.
 //
-// Two independent per-day options with the vocabularies asked for by the
+// Independent per-day options with the vocabularies asked for by the
 // product wishlist — position: tief/mittel/hoch/sehr hoch/unerreichbar,
-// opening: geschlossen/mittel/offen. Neither rules nor conclusions from
+// opening: geschlossen/mittel/offen, firmness (paper shorthand h / h/w / w):
+// hard/halfSoft/soft. Neither rules nor conclusions from
 // them anywhere in this app (Mode M posture, ADR-0001): only the raw
 // observation is recorded and shown.
 //
@@ -34,6 +36,18 @@ enum CervixPosition { low, medium, high, veryHigh, unreachable }
 /// - `open`: offen
 enum CervixOpening { closed, middle, open }
 
+/// How FIRM the cervix felt on the day (paper shorthand: `h` / `h/w` / `w`):
+///
+/// - `hard`: h — fest
+/// - `halfSoft`: h/w — teils fest, teils weich
+/// - `soft`: w — weich
+///
+/// Note the deliberate token distinction (same pattern as position
+/// "medium" vs. opening "middle"): the firmness tokens `hard`/`halfSoft`/
+/// `soft` never collide with a position or opening token, so each column's
+/// SQL CHECK keeps its vocabulary unambiguous.
+enum CervixFirmness { hard, halfSoft, soft }
+
 /// Parses a stored/exported position token back into the enum, or null for
 /// anything else. SHARED by the db mapper and the export/import writer —
 /// like tryParseMucusSign (lib/domain/mucus.dart), the single source of
@@ -58,6 +72,16 @@ CervixOpening? tryParseCervixOpening(Object? raw) {
   return null;
 }
 
+/// Parses a stored/exported firmness token back into the enum, or null for
+/// anything else. Same contract as [tryParseCervixPosition].
+CervixFirmness? tryParseCervixFirmness(Object? raw) {
+  if (raw is! String) return null;
+  for (final firmness in CervixFirmness.values) {
+    if (firmness.name == raw) return firmness;
+  }
+  return null;
+}
+
 /// Chart glyph of a position for the cycle-tab symbol row: the first letter
 /// of the German vocabulary word — `t` tief, `m` mittel, `h` hoch, `sh`
 /// (sehr hoch, two letters to stay distinct from plain `h`), `u`
@@ -74,4 +98,19 @@ String cervixPositionSymbol(CervixPosition position) => switch (position) {
       CervixPosition.high => 'h',
       CervixPosition.veryHigh => 'sh',
       CervixPosition.unreachable => 'u',
+    };
+
+/// Chart glyph of a firmness for the cycle-tab symbol row: the paper
+/// shorthand — `h` hard, `h-w` halfSoft (the paper's h/w rendered with an
+/// ASCII hyphen), `w` soft.
+///
+/// TODO(user-review): like [cervixPositionSymbol], these glyphs are an
+/// ad-hoc display choice — the NER cheat sheet defines no cervix glyphs
+/// (the paper uses h / h/w only as written shorthand). In particular `h`
+/// visually equals the position `high` glyph; INER experts may want
+/// different symbols.
+String cervixFirmnessSymbol(CervixFirmness firmness) => switch (firmness) {
+      CervixFirmness.hard => 'h',
+      CervixFirmness.halfSoft => 'h-w',
+      CervixFirmness.soft => 'w',
     };
