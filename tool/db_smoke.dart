@@ -17,6 +17,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 
 import 'package:cycle_app/domain/cycle_grouping.dart';
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -149,6 +150,39 @@ Future<void> main() async {
   final mappedBack =
       dailyEntryFromDrift(await db.entriesDao.upsertDaily(input));
   check(mappedBack == input, 'domain round trip via drift preserves entry');
+
+  // --- bleeding levels: all five levels round-trip the drift layer --------
+  // The stored number is Bleeding.level (0 none … 4 heavy), mapped through
+  // the converter — never the Dart declaration index.
+  for (var i = 0; i < Bleeding.values.length; i++) {
+    final level = Bleeding.values[i];
+    final row = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
+      DailyEntry(date: DateTime(2026, 7, 1 + i), bleeding: level),
+    ));
+    check(row.bleeding == level,
+        'level ${level.level} round-trips as ${level.name}');
+  }
+  // Raw SQL writes the int directly; the converter must surface exactly the
+  // level it names.
+  final heavyDay = DateOnly.normalize(DateTime(2026, 7, 5))
+      .difference(DateTime.utc(1970))
+      .inDays;
+  final rawHeavy = await db
+      .customSelect('SELECT bleeding FROM cycle_entries WHERE date = ?',
+          variables: [Variable.withInt(heavyDay)])
+      .getSingle();
+  check(rawHeavy.data['bleeding'] == 4,
+      'raw stored bleeding value is the numeric level (4 for heavy)');
+  await db.customStatement(
+    'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+    'VALUES (1, $heavyDay + 1, 3)',
+  );
+  final rawMedium = await db
+      .customSelect('SELECT bleeding FROM cycle_entries WHERE date = ?',
+          variables: [Variable.withInt(heavyDay + 1)])
+      .getSingle();
+  check(rawMedium.data['bleeding'] == 3,
+      'raw int insert (3) is stored verbatim in the int column');
 
   // --- MarksDao ----------------------------------------------------------
   final mark = await db.marksDao

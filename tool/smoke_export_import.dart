@@ -77,6 +77,12 @@ Future<void> main() async {
       mucusQuality: MucusQuality.mi,
     ),
   );
+  await source.entriesDao.upsertDaily(
+    DailyEntry(
+      date: DateTime(2026, 3, 5),
+      bleeding: Bleeding.heavy,
+    ),
+  );
   await source.marksDao.addMark(1, DateTime(2026, 3, 12), 'baseline');
   final partner = await source.profilesDao.addProfile('partner', ordinal: 1);
   await source.entriesDao.upsertDaily(
@@ -87,6 +93,11 @@ Future<void> main() async {
   final json = await exportDatabaseToJson(source);
   check(json.contains('"schema_version": $exportSchemaVersion'),
       'document carries schema version');
+  // The current document shape carries bleeding as NUMERIC levels
+  // (Bleeding.level): heavy(4) from the added day, none(0) from the
+  // partner's day.
+  check(json.contains('"bleeding": 4') && json.contains('"bleeding": 0'),
+      'export carries bleeding as numeric levels');
   check(json.contains('"mucus_sign": "s"') &&
           json.contains('"mucus_quality": "mi"'),
       'export carries the fertility-sign tokens');
@@ -104,7 +115,7 @@ Future<void> main() async {
   // Planning against a fresh target dataset.
   final target = CycleDatabase(NativeDatabase.memory());
   final plan = await planDatabaseImport(target, json);
-  check(plan.entriesNew == 3, 'plan counts all 3 entries as new ($plan)');
+  check(plan.entriesNew == 4, 'plan counts all 4 entries as new ($plan)');
   check(plan.marksNew == 1, 'plan counts the baseline mark as new');
   check(plan.profilesToInsert == 1, 'plan re-creates the partner profile only');
 
@@ -118,25 +129,30 @@ Future<void> main() async {
     ),
   );
   final plan2 = await planDatabaseImport(target, json);
-  check(plan2.entriesOverwritten == 1 && plan2.entriesNew == 2,
+  check(plan2.entriesOverwritten == 1 && plan2.entriesNew == 3,
       'plan flips the pre-existing day to overwrite');
 
   final summary = await importJsonToDatabase(target, json);
   check(
-      summary.entriesNew == 2 &&
+      summary.entriesNew == 3 &&
           summary.entriesOverwritten == 1 &&
           summary.profilesToInsert == 1 &&
           summary.marksNew == 1,
       'executed counts match the plan: $summary');
   final migrated = await target.entriesDao.allEntriesForAllProfiles();
-  check(migrated.length == 3, 'import wrote 3 entry rows total');
+  check(migrated.length == 4, 'import wrote 4 entry rows total');
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
   check(day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
       'import OVERWROTE the existing day with document content');
-  // CycleEntry exposes raw TEXT tokens (the enum mapping happens in the
-  // mapper layer); check that the tokens survived.
+  // CycleEntry exposes bleeding as the mapped enum (int storage, converter
+  // in the db layer) and the mucus signs as raw TEXT tokens (mapping in the
+  // mapper layer); check that both survived the round trip.
   check(day2.mucusSign == 's' && day2.mucusQuality == 'mi',
       'mucus fertility-sign tokens survive the round trip');
+  final heavyRow =
+      migrated.firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 5)));
+  check(heavyRow.bleeding == Bleeding.heavy,
+      'the heavy level survives the export/import round trip');
 
   final targetProfiles = await target.profilesDao.allProfiles();
   check(targetProfiles.where((p) => p.name == 'partner').length == 1,
@@ -150,12 +166,12 @@ Future<void> main() async {
 
   // Re-import of the SAME document: everything is now idempotent/skipped.
   final second = await importJsonToDatabase(target, json);
-  check(second.entriesOverwritten == 3 && second.marksSkipped == 1,
+  check(second.entriesOverwritten == 4 && second.marksSkipped == 1,
       're-import overwrites all days and skips no marks: $second');
   final afterSecond = await target.entriesDao.allEntriesForAllProfiles();
-  check(afterSecond.length == 3, 're-import keeps exactly 3 rows');
+  check(afterSecond.length == 4, 're-import keeps exactly 4 rows');
 
-  check((await source.entriesDao.allEntriesForAllProfiles()).length == 3,
+  check((await source.entriesDao.allEntriesForAllProfiles()).length == 4,
       'source untouched by import');
 
   // --- profile-id remap: document ids that collide differently -------------
@@ -173,11 +189,13 @@ Future<void> main() async {
       {'id': 4, 'name': 'partner-doc', 'ordinal': 1},
     ],
     entries: [
-      {'profile_id': 4, 'date': '2026-04-02', 'bleeding': 'period'},
+      // Hand-written rows carry the CURRENT document shape: bleeding is the
+      // numeric level (0 none … 4 heavy).
+      {'profile_id': 4, 'date': '2026-04-02', 'bleeding': 4},
       {
         'profile_id': 1,
         'date': '2026-04-10',
-        'bleeding': 'period',
+        'bleeding': 2,
         'bbt_c': 36.4,
       },
     ],
@@ -207,12 +225,17 @@ Future<void> main() async {
       allAfter.length == 2 &&
           allAfter.any((e) =>
               e.profileId == partnerActual.id &&
+              e.bleeding == Bleeding.heavy &&
               DateOnly.sameDay(e.date, DateTime(2026, 4, 2))),
-      'document row for profile 4 written under the ACTUAL profile id');
+      'document row for profile 4 written under the ACTUAL profile id '
+      '(numeric level 4 read back as heavy)');
   check(
       allAfter.any((e) =>
-          e.profileId == 1 && DateOnly.sameDay(e.date, DateTime(2026, 4, 10))),
-      'row for a device-known profile id stays on that profile');
+          e.profileId == 1 &&
+          e.bleeding == Bleeding.light &&
+          DateOnly.sameDay(e.date, DateTime(2026, 4, 10))),
+      'row for a device-known profile id stays on that profile '
+      '(numeric level 2 read back as light)');
   final markRows = await mixed.marksDao.allMarksForAllProfiles();
   check(markRows.single.profileId == partnerActual.id,
       'mark remapped to the actual profile id as well');
@@ -232,7 +255,7 @@ Future<void> main() async {
       {'id': '1', 'name': 'main', 'ordinal': 0},
     ],
     entries: [
-      {'profile_id': '1', 'date': '2026-04-02', 'bleeding': 'period'},
+      {'profile_id': '1', 'date': '2026-04-02', 'bleeding': 1},
     ],
     marks: [
       {
@@ -250,8 +273,12 @@ Future<void> main() async {
           stringIdSummary.profilesToInsert == 0,
       'string-id document planned as counted: $stringIdSummary');
   final stringIdRows = await stringIdTarget.entriesDao.allEntriesForAllProfiles();
-  check(stringIdRows.length == 1 && stringIdRows.single.profileId == 1,
-      'string id "1" addresses the known device profile 1');
+  check(
+      stringIdRows.length == 1 &&
+          stringIdRows.single.profileId == 1 &&
+          stringIdRows.single.bleeding == Bleeding.spotting,
+      'string id "1" addresses the known device profile 1 (level 1 '
+      'read back as spotting)');
   check(
       (await stringIdTarget.marksDao.allMarksForAllProfiles()).length == 1,
       'string-id mark landed under profile 1');
@@ -259,16 +286,17 @@ Future<void> main() async {
       'no duplicate profile created for the string id');
 
   // --- invalid bleeding vocabulary: plan counts only writable rows ---------
-  // tryDailyEntryFromExport drops rows whose bleeding value is not in the
-  // enum vocabulary, so the merge planner must count such rows in the
-  // invalid bucket instead of as writes (counted == written).
+  // tryDailyEntryFromExport drops rows whose bleeding value the shared
+  // parser rejects (numeric out of range or unknown token), so the merge
+  // planner must count such rows in the invalid bucket instead of as writes
+  // (counted == written).
   final invalidBleedingTarget = CycleDatabase(NativeDatabase.memory());
   final invalidBleedingDoc = buildExportJson(ExportBlob(
     exportedAt: DateTime(2026, 4, 1),
     profiles: const [],
     entries: [
       {'profile_id': 1, 'date': '2026-04-05', 'bleeding': 'monsoon'},
-      {'profile_id': 1, 'date': '2026-04-06', 'bleeding': 'period'},
+      {'profile_id': 1, 'date': '2026-04-06', 'bleeding': 3},
     ],
     marks: const [],
   ));
@@ -284,11 +312,12 @@ Future<void> main() async {
   check(
       invalidSummary.entriesInvalid == 1 && invalidSummary.entriesNew == 1,
       'invalid-bleeding row reported invalid, not written: $invalidSummary');
-  check(
-      (await invalidBleedingTarget.entriesDao.allEntriesForAllProfiles())
-              .length ==
-          1,
+  final validOnlyRows =
+      await invalidBleedingTarget.entriesDao.allEntriesForAllProfiles();
+  check(validOnlyRows.length == 1,
       'only the valid-bleeding row reached the database');
+  check(validOnlyRows.single.bleeding == Bleeding.medium,
+      'the valid numeric level (3) read back as medium');
   await invalidBleedingTarget.close();
 
   // --- storage-level failure surfaces as ONE typed error -------------------

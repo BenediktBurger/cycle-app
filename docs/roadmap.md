@@ -66,9 +66,11 @@ the sections above track planned work, git history keeps the record (see
 - [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
       higher measurement" adds the baseline automatically, based on the preceding measurements
       User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
-- Data entry aligned with the NER scheme: different bleeding levels, time
-  of day for sex (morning/midday/evening), … — the exact term list must be
-  specified first.
+- Data entry aligned with the NER scheme: time of day for sex
+  (morning/midday/evening), … — the exact term list must be specified first.
+  - show sex as an X (and distinguish moring/afternoon)
+  - exclude temperature and a note or keep these different reasons
+  - add "Ausfluss" (A) as an option to mucus
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - Datenbankschema überarbeiten (manche Dinge pro Zyklus (erste höhere Messung)/als Event (z.B: Messmethode) nicht pro Tag speichern? )
@@ -77,7 +79,13 @@ the sections above track planned work, git history keeps the record (see
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
 - [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date
-- [ ] show on cycle tab also day of month (and replace the first day with a short form of the month)
+- [ ] show on cycle tab day of month (and replace the first day with a short form of the month) and day of cycle
+- [ ] drip importer: only sex with partner without contraception is mapped to sex
+- [ ] drip importer: ovulation pain translates to Mittelschmerz (M)
+- [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
+- [ ] only store time if temperature is added (not for mucus etc.)
+- [ ] show temperature measurement time, sex, and pain (M, B) on cycle tab
+- bleeding should not always start a new cycle. Either choose to ignore bleeding (opt out) or active choice to start a new cycle (maybe suggested at the first bleeding: do you want to start?)
 
 ### Convenience
 
@@ -92,3 +100,6 @@ the sections above track planned work, git history keeps the record (see
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
 - [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
+- add descriptions (texts TBD) and tooltips
+- export as password protected zip
+- improve json export (currently quite verbose), better Csv or similar for the days?
