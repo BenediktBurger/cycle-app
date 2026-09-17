@@ -163,6 +163,17 @@ abstract final class MarkTypes {
   static const mucusPeakDay = 'mucusPeakDay';
   static const fertileWindow = 'fertileWindow';
   static const interruption = 'interruption';
+
+  /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
+  /// MORNING: the SUZ bar renders at the day column's START (x − 0.5).
+  /// The computed SUZ (rules D/E) is suggestion-only — see
+  /// lib/ui/cycle_mark_sheet.dart; manual SUZ marks never alter the
+  /// arithmetic (ADR-0001: user places, app computes).
+  static const suzMorning = 'suzMorning';
+
+  /// The user-placed SUZ start from an EVENING: the SUZ bar renders at the
+  /// day column's MIDDLE (x).
+  static const suzEvening = 'suzEvening';
 }
 
 /// Evaluation profiles on this device (partner mode, v0 schema, UI later).

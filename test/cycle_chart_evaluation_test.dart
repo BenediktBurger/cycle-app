@@ -106,11 +106,36 @@ List<LineChartBarData> _dotBars(WidgetTester tester) =>
 
 /// The baseline segment bars (R10): the dashed two-spot bars drawn in the
 /// baseline color (secondary) — one per evaluated cycle with a marked
-/// candidate.
+/// candidate. Horizontal by construction, so the vertical SUZ bars (same
+/// secondary color) are excluded here.
 List<LineChartBarData> _baselineBars(WidgetTester tester) => _chartData(tester)
     .lineBarsData
-    .where((bar) => bar.color == _scheme(tester).secondary)
+    .where((bar) =>
+        bar.color == _scheme(tester).secondary &&
+        bar.spots.first.y == bar.spots.last.y)
     .toList();
+
+/// The SUZ bars: vertical two-spot bars in the secondary color (one per
+/// user-placed SUZ mark) — the same evaluation-family color as the baseline
+/// segment, distinguished by orientation.
+List<LineChartBarData> _suzBars(WidgetTester tester) => _chartData(tester)
+    .lineBarsData
+    .where((bar) =>
+        bar.color == _scheme(tester).secondary &&
+        bar.spots.first.x == bar.spots.last.x)
+    .toList();
+
+/// The SUZ arrow: the spot + painter of the SUZ arrow glyph, or null when
+/// no user SUZ mark renders an arrow.
+(FlSpot, FlDotPainter)? _suzArrowSpot(WidgetTester tester) {
+  for (final bar in _dotBars(tester)) {
+    for (var i = 0; i < bar.spots.length; i++) {
+      final painter = bar.dotData.getDotPainter(bar.spots[i], 0, bar, i);
+      if (painter is SuzArrowDotPainter) return (bar.spots[i], painter);
+    }
+  }
+  return null;
+}
 
 /// The dot painter the chart would use for the temperature dot of [dayIndex]
 /// (fails when that day has no temperature point on the chart).
@@ -525,6 +550,193 @@ void main() {
       expect(find.text('Baseline'), findsOneWidget);
       // The pre-peak wording is gone (R4 removed the special case).
       expect(find.text('Higher measurement before the peak'), findsNothing);
+    });
+
+    testWidgets('the legend explains the SUZ glyph', (tester) async {
+      await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sicher unfruchtbare Zeit (SUZ)'), findsOneWidget,
+          reason: 'the SUZ bar+arrow glyph has its own legend entry');
+    });
+  });
+
+  group('all mucus peaks render (from the marks stream)', () {
+    testWidgets(
+        'two peak marks in one cycle render two solid dots — even '
+        'when no evaluation exists', (tester) async {
+      // ONLY peak marks: without a first-higher mark no evaluation can
+      // exist, yet every placed peak must render — the dots come from the
+      // MARKS STREAM, not from the single domain-anchored peak.
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          CycleMark(
+              profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(
+              profileId: 1, date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_peakDot(6), findsOneWidget, reason: 'the first peak renders');
+      expect(_peakDot(9), findsOneWidget,
+          reason: 'the second peak renders too, though the evaluation has '
+              'nothing to anchor (no rise marked)');
+      expect(_peakDot(8), findsNothing,
+          reason: 'a day without a peak mark renders no dot');
+    });
+
+    testWidgets('two peaks render alongside a full evaluation', (tester) async {
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          ..._marks,
+          CycleMark(
+              profileId: 1, date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_peakDot(6), findsOneWidget);
+      expect(_peakDot(9), findsOneWidget);
+    });
+  });
+
+  group('SUZ marks render (user-placed only)', () {
+    testWidgets(
+        'a suzEvening mark renders a vertical bar at the column middle '
+        'spanning the plot height, plus a right-pointing arrow whose '
+        'base starts at the bar', (tester) async {
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          ..._marks,
+          CycleMark(
+              profileId: 1, date: _wed16, type: CycleMarkTypes.suzEvening),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final data = _chartData(tester);
+      final bars = _suzBars(tester);
+      expect(bars, hasLength(1), reason: 'one user SUZ mark -> one bar');
+      final bar = bars.single;
+      // suzEvening anchors the bar at the day column's MIDDLE (x = day
+      // index); the bar spans the whole plot height.
+      expect(bar.spots.first.x, 10.0,
+          reason: 'suzEvening anchors at the column middle (9/16, idx 10)');
+      expect(bar.spots.last.x, 10.0);
+      expect(bar.spots.first.y, data.minY,
+          reason: 'the bar spans the plot height');
+      expect(bar.spots.last.y, data.maxY);
+      expect(bar.color, _scheme(tester).secondary,
+          reason: 'the SUZ bar shares the baseline\'s evaluation-family '
+              'color role (secondary)');
+
+      // The right-pointing arrow: base at the bar, vertically anchored at
+      // the cycle's baseline value (geometry flagged for owner review).
+      final arrow = _suzArrowSpot(tester);
+      expect(arrow, isNotNull, reason: 'the SUZ arrow renders with the bar');
+      final (spot, painter) = arrow!;
+      expect(spot.x, 10.0, reason: 'the arrow base starts at the bar');
+      expect(spot.y, 36.4,
+          reason: 'the arrow anchors at the cycle\'s baseline value');
+      expect(painter, isA<SuzArrowDotPainter>());
+      expect((painter as SuzArrowDotPainter).color, _scheme(tester).secondary,
+          reason: 'the SUZ arrow shares the evaluation-family color role');
+    });
+
+    testWidgets(
+        'a suzMorning mark anchors the bar at the column START '
+        '(x − 0.5)', (tester) async {
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          ..._marks,
+          CycleMark(
+              profileId: 1, date: _tue15, type: CycleMarkTypes.suzMorning),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final bars = _suzBars(tester);
+      expect(bars, hasLength(1));
+      final bar = bars.single;
+      expect(bar.spots.first.x, 8.5,
+          reason: 'suzMorning anchors at the column start (9/15, idx 9 − 0.5)');
+      expect(bar.spots.last.x, 8.5);
+      final arrow = _suzArrowSpot(tester);
+      expect(arrow, isNotNull);
+      expect(arrow!.$1.x, 8.5, reason: 'the arrow base starts at the bar');
+      expect(arrow.$1.y, 36.4,
+          reason: 'the arrow anchors at the cycle\'s baseline value');
+    });
+
+    testWidgets(
+        'no SUZ glyph renders without a user mark — the computed '
+        'suzBeginsEvening suggests only, it never renders', (tester) async {
+      // The main scenario's arithmetic fires rule D on 9/16 — but no user
+      // SUZ mark exists, so the chart draws no SUZ bar and no arrow.
+      await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
+      await tester.pumpAndSettle();
+
+      expect(_suzBars(tester), isEmpty,
+          reason: 'the computed SUZ never renders on the chart');
+      expect(_suzArrowSpot(tester), isNull);
+    });
+  });
+
+  group('latest-rise anchor renders in the UI (re-marking supersedes)', () {
+    testWidgets(
+        'two rise marks: the LATER one drives the evaluation; the earlier '
+        'rise day renders no candidate', (tester) async {
+      // Two firstHigher marks: 9/14 and 9/15. The LATER mark (9/15) anchors
+      // the evaluation — and re-derives the six-low window with it (R9):
+      // the lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
+      // 36.9 (the earlier rise mark's day itself becomes a low!). From the
+      // walk start 9/15: 9/15 sits AT the new baseline (gap day, no
+      // candidate), 9/16 (37.0) is circle #1 — no SUZ with a single circle.
+      // Under the old earliest-anchor semantics the circles would be
+      // {8, 9, 10} against the 36.4 baseline; the later mark wins instead.
+      await tester.pumpWidget(_harness(
+        entries: _entries,
+        marks: [
+          CycleMark(
+              profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(
+              profileId: 1,
+              date: _mon14,
+              type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(
+              profileId: 1,
+              date: _tue15,
+              type: CycleMarkTypes.firstHigherMeasurement),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final rings = <int>{};
+      for (final bar in _dotBars(tester)) {
+        for (final spot in bar.spots) {
+          final painter =
+              bar.dotData.getDotPainter(spot, 0, bar, bar.spots.indexOf(spot));
+          if (painter is RingDotPainter) rings.add(spot.x.round());
+        }
+      }
+      expect(rings, {10},
+          reason: 'the LATEST rise mark anchors the evaluation: the '
+              're-derived baseline (36.9 through the earlier rise day, now '
+              'low #1) leaves 9/16 as the only candidate');
+      // The earlier rise mark's day (9/14, idx 8) renders no candidate —
+      // it sits at the new baseline as a low.
+      expect(_dotPainter(tester, 8), isNot(isA<RingDotPainter>()),
+          reason: 'the earlier rise mark renders no candidate');
+      expect(_dotPainter(tester, 8), isNot(isA<ArrowUpDotPainter>()));
+      // And the marked rise day itself (9/15) sits at the re-derived
+      // baseline: no candidate there either.
+      expect(_dotPainter(tester, 9), isNot(isA<RingDotPainter>()));
+      expect(_dotPainter(tester, 9), isNot(isA<ArrowUpDotPainter>()));
     });
   });
 }

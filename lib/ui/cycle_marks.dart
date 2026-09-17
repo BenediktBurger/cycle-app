@@ -1,8 +1,11 @@
 // Computed evaluation marks on the cycle chart (Mode M, ADR-0001).
 //
-// The USER places only the mucus peak and the first higher measurement;
-// everything rendered from this file is DERIVED at render time from
-// evaluateCycles (lib/domain/evaluation.dart) and is never persisted:
+// The USER places the mucus peak, the first higher measurement and the SUZ
+// start (sicher unfruchtbare Zeit, from a morning or from an evening).
+// Everything rendered from this file is DERIVED at render time — the
+// candidate circles/arrows and the 1–6 numbering and the baseline segment
+// from evaluateCycles (lib/domain/evaluation.dart); the solid peak dots and
+// the SUZ bars straight from the MARKS STREAM. Nothing is persisted:
 // the rings around the circled higher measurements (candidates strictly
 // AFTER the mucus peak day), the arrow-up glyph for the arrow-marked
 // candidates (candidate day at or before the peak day, or the peak unset —
@@ -11,12 +14,16 @@
 // column to half a day past the last marked candidate's column, from the
 // domain's baselineSpan; a cycle with no marked candidate draws no segment)
 // and the solid peak dot ABOVE the mucus entry in the symbol row (R6 — the
-// peak no longer touches the temperature curve). Rendered across fl_chart's
-// dot painters + dashed bar segments, with the glyph shapes painted by hand
-// where fl_chart has no facility (ADR-0004 anticipates this custom-paint
-// fallback — used here only for small glyphs; the baseline segment fits
-// inside fl_chart as a dashed two-spot bar, so the chart itself stays
-// fl_chart).
+// peak no longer touches the temperature curve; EVERY placed peak renders,
+// driven from the marks stream so peaks render even when no evaluation
+// exists). The SUZ renders ONLY user-placed marks (a vertical bar spanning
+// the plot height plus a right-pointing arrow from the bar); the computed
+// suzBeginsEvening drives the sheet's suggestion instead — clean
+// compute-only/manual separation. Rendered across fl_chart's dot painters +
+// line bars, with the glyph shapes painted by hand where fl_chart has no
+// facility (ADR-0004 anticipates this custom-paint fallback — used here
+// only for small glyphs; the baseline segment fits inside fl_chart as a
+// dashed two-spot bar, so the chart itself stays fl_chart).
 //
 // Rendering assumptions (validate with an expert reviewer, see
 // docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
@@ -34,12 +41,17 @@
 //   ordinary circle/arrow mark, just without a number — the curve never
 //   paints candidate ordinals; the sheet's circle-numbering line is the
 //   only ordinal surface (circles-only, see cycle_mark_sheet.dart).
+//   TODO(user-review): The SUZ arrow GEOMETRY (head size, shaft length,
+//   and the vertical anchor — the cycle's baseline value when one exists,
+//   else the plot middle) is an owner-eyeball rendering detail, not a
+//   settled rule.
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
+import '../domain/marks.dart';
 
 /// One drawn baseline segment, mapped onto the chart's day-index space
 /// (R10). The chart draws it from the LEFT EDGE of [startIndex]'s day
@@ -65,6 +77,37 @@ final class BaselineSegment {
   final double value;
 }
 
+/// One user-placed SUZ mark, mapped onto the chart's day-index space. The
+/// chart draws a VERTICAL bar spanning the plot height (x = column START
+/// `dayIndex − 0.5` for `suzMorning`, column MIDDLE `dayIndex` for
+/// `suzEvening`) plus a right-pointing arrow whose base starts at the bar.
+final class SuzOverlayMark {
+  const SuzOverlayMark({
+    required this.dayIndex,
+    required this.morning,
+    this.arrowValueY,
+  });
+
+  /// The marked day's chart index (the bar's x anchor derives from it: see
+  /// [morning]).
+  final int dayIndex;
+
+  /// True for `suzMorning` (bar at the column START, x − 0.5), false for
+  /// `suzEvening` (bar at the column MIDDLE, x).
+  final bool morning;
+
+  /// The bar/arrow x anchor in the chart's day-index space: the column
+  /// START (dayIndex − 0.5) for suzMorning, the column MIDDLE (dayIndex)
+  /// for suzEvening. The chart clamps it to the recorded range.
+  double get barX => morning ? dayIndex - 0.5 : dayIndex.toDouble();
+
+  /// The y value the arrow glyph anchors at: the cycle's baseline value
+  /// when one exists, else null (the chart falls back to the plot middle).
+  /// TODO(user-review): the arrow's vertical anchor is an owner-eyeball
+  /// rendering detail.
+  final double? arrowValueY;
+}
+
 /// The per-day evaluation artifacts, mapped onto the chart's day-index
 /// space (day index 0 = the first recorded day, see _ChartDays in
 /// cycle.dart). Anything the arithmetic could not derive for a day is
@@ -77,11 +120,16 @@ final class EvaluationOverlay {
     this.arrowIndexes = const {},
     this.numbersByIndex = const {},
     this.baselineSegments = const [],
+    this.suzMarks = const [],
   });
 
-  /// Day indexes carrying the mucus-peak mark. R6: the peak renders as a
+  /// Day indexes carrying a mucus-peak mark. R6: the peak renders as a
   /// solid dot ABOVE the mucus glyph in the symbol row — the curve never
   /// rings the peak day (the curve's rings wrap only circled candidates).
+  /// Driven from the MARKS STREAM (every placed peak), not from the
+  /// evaluation's single anchored peak, so multiple peaks (delayed
+  /// ovulation) all render — even when no evaluation exists (no rise
+  /// marked).
   final Set<int> peakIndexes;
   final Set<int> circledIndexes;
   final Set<int> arrowIndexes;
@@ -90,13 +138,20 @@ final class EvaluationOverlay {
   /// The baseline segments (R10), one per evaluated cycle with a marked
   /// candidate; a cycle without candidates has none.
   final List<BaselineSegment> baselineSegments;
+
+  /// The user-placed SUZ marks (suzMorning/suzEvening), one overlay entry
+  /// per mark inside an evaluated cycle. ONLY user-placed SUZ marks are
+  /// listed — the computed suzBeginsEvening drives the sheet's suggestion
+  /// and never renders here.
+  final List<SuzOverlayMark> suzMarks;
 }
 
-/// Flattens [evaluations] (one per cycle group) into per-day-index
-/// artifacts for the chart overlay. Dates outside the recorded range
-/// [firstDay, firstDay + dayCount) are skipped defensively.
+/// Flattens [evaluations] (one per cycle group) plus the raw [marks] stream
+/// into per-day-index artifacts for the chart overlay. Dates outside the
+/// recorded range [firstDay, firstDay + dayCount) are skipped defensively.
 EvaluationOverlay buildEvaluationOverlay({
   required List<CycleEvaluation> evaluations,
+  required List<CycleMark> marks,
   required DateTime firstDay,
   required int dayCount,
 }) {
@@ -110,12 +165,44 @@ EvaluationOverlay buildEvaluationOverlay({
   final arrows = <int>{};
   final numbers = <int, int>{};
   final segments = <BaselineSegment>[];
+  final suz = <SuzOverlayMark>[];
 
-  for (final evaluation in evaluations) {
-    if (evaluation.mucusPeakDay != null) {
-      final i = indexFor(evaluation.mucusPeakDay!);
-      if (i != null) peaks.add(i);
+  // The peak dots come straight from the marks stream: EVERY placed
+  // mucus-peak mark renders as a solid dot (multiple peaks arise from
+  // delayed ovulation), independent of any evaluation.
+  for (final mark in marks) {
+    if (mark.type != CycleMarkTypes.mucusPeakDay) continue;
+    final i = indexFor(mark.date);
+    if (i != null) peaks.add(i);
+  }
+
+  for (var e = 0; e < evaluations.length; e++) {
+    final evaluation = evaluations[e];
+    // The SUZ marks belong to the cycle whose [startDate, next cycle
+    // start) window contains them — the same attribution the domain's
+    // evaluateCycles uses for its own mark lookups. The last cycle's
+    // window is open-ended.
+    final windowStart = DateOnly.normalize(evaluation.cycle.startDate);
+    final windowEnd = e + 1 < evaluations.length
+        ? DateOnly.normalize(evaluations[e + 1].cycle.startDate)
+        : null;
+    final arrowValueY = evaluation.baseline?.value;
+    for (final mark in marks) {
+      final isSuz = mark.type == CycleMarkTypes.suzEvening ||
+          mark.type == CycleMarkTypes.suzMorning;
+      if (!isSuz) continue;
+      final day = DateOnly.normalize(mark.date);
+      if (day.isBefore(windowStart)) continue;
+      if (windowEnd != null && !day.isBefore(windowEnd)) continue;
+      final i = indexFor(day);
+      if (i == null) continue;
+      suz.add(SuzOverlayMark(
+        dayIndex: i,
+        morning: mark.type == CycleMarkTypes.suzMorning,
+        arrowValueY: arrowValueY,
+      ));
     }
+
     for (final low in evaluation.numberedLows) {
       final i = indexFor(low.date);
       if (i != null) numbers[i] = low.number;
@@ -161,6 +248,7 @@ EvaluationOverlay buildEvaluationOverlay({
     arrowIndexes: arrows,
     numbersByIndex: numbers,
     baselineSegments: segments,
+    suzMarks: suz,
   );
 }
 
@@ -277,6 +365,55 @@ FlDotPainter dotPainterForDay({
   return FlDotCirclePainter(color: dotColor);
 }
 
+// --- SUZ mark glyph ----------------------------------------------------------
+
+/// Paints a RIGHT-POINTING arrow whose base starts at [base]: a short
+/// horizontal shaft followed by a triangular head, used as the companion
+/// glyph of the SUZ vertical bar (the bar marks the SUZ start's column, the
+/// arrow points toward the fertile-barren boundary it opens).
+/// TODO(user-review): the arrow GEOMETRY (shaft length, head size) is an
+/// owner-eyeball rendering detail, not a settled rule.
+void paintSuzArrowGlyph(Canvas canvas, Offset base, {required Color color}) {
+  final paint = Paint()..color = color;
+  canvas.drawRect(Rect.fromLTWH(base.dx, base.dy - 1, 5, 2), paint);
+  final head = Path()
+    ..moveTo(base.dx + 9, base.dy)
+    ..lineTo(base.dx + 5, base.dy - 3.5)
+    ..lineTo(base.dx + 5, base.dy + 3.5)
+    ..close();
+  canvas.drawPath(head, paint);
+}
+
+/// The SUZ arrow glyph as a fl_chart dot painter: fl_chart's painters paint
+/// at spots, and the SUZ arrow's anchor is exactly one spot — the bar's x
+/// (column start for suzMorning, column middle for suzEvening) at the
+/// arrow's y value (the cycle's baseline value, or the plot middle — see
+/// [SuzOverlayMark.arrowValueY]). Unlike the other dot painters this one
+/// paints NO temperature dot underneath: the SUZ mark is its own artifact,
+/// not a temperature rendering.
+final class SuzArrowDotPainter extends FlDotPainter {
+  const SuzArrowDotPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void draw(Canvas canvas, FlSpot spot, Offset offsetInCanvas) {
+    paintSuzArrowGlyph(canvas, offsetInCanvas, color: color);
+  }
+
+  @override
+  Size getSize(FlSpot spot) => const Size(9, 8);
+
+  @override
+  Color get mainColor => color;
+
+  @override
+  List<Object?> get props => [color];
+
+  @override
+  FlDotPainter lerp(FlDotPainter a, FlDotPainter b, double t) => b;
+}
+
 // --- widget-level pieces ----------------------------------------------------
 
 /// The 1–6 numbering under the chart: one narrow tappable cell per
@@ -370,5 +507,46 @@ class _ArrowUpGlyphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArrowUpGlyphPainter oldDelegate) =>
+      color != oldDelegate.color;
+}
+
+/// The SUZ glyph as a standalone widget for the legend: the same
+/// right-pointing arrow the chart's [SuzArrowDotPainter] paints, plus the
+/// vertical bar it hangs from (the bar spans the plot height on the chart;
+/// here it is drawn to fit the legend's sample box).
+final class SuzArrowGlyph extends StatelessWidget {
+  const SuzArrowGlyph({super.key, required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(14, 16),
+      painter: _SuzArrowGlyphPainter(color: color),
+    );
+  }
+}
+
+class _SuzArrowGlyphPainter extends CustomPainter {
+  const _SuzArrowGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    // The vertical bar: full sample height, at the sample's left edge —
+    // the chart's bar spans the plot height at the SUZ day's column.
+    canvas.drawRect(
+      Rect.fromLTWH(0.5, 0, 2, size.height),
+      paint,
+    );
+    // The arrow, base at the bar (same glyph shape as the chart's painter).
+    paintSuzArrowGlyph(canvas, Offset(2.5, size.height / 2), color: color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SuzArrowGlyphPainter oldDelegate) =>
       color != oldDelegate.color;
 }

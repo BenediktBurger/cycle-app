@@ -26,13 +26,24 @@
 //       INCLUDING the arrow→circle transition — mixed sequences are one
 //       sequence for gap counting.
 //   R3  Candidate region: candidates exist only from the marked rise day
-//       (first higher measurement) onward. Above-baseline values before
-//       the rise are user error or a separately-handled disturbance and
-//       never become candidates.
+//       (first higher measurement) onward. The rise anchor is the MOST
+//       RECENT firstHigherMeasurement mark of the cycle (owner-confirmed:
+//       re-marking supersedes — after a broken Hochlage or a delayed
+//       second peak the user re-marks the rise; the earlier mark stays
+//       stored and, lying before the walk region, renders no candidate).
+//       Above-baseline values before the rise are user error or a
+//       separately-handled disturbance and never become candidates.
 //   R4  Arrow vs circle, PER CANDIDATE: each candidate is an ARROW when the
 //       mucus peak is not set at all, or the candidate day is at or before
 //       the peak day (the peak day's own above-baseline temperature is an
-//       ARROW); every candidate AFTER the peak day is a CIRCLE.
+//       ARROW); every candidate AFTER the peak day is a CIRCLE. The peak
+//       anchor is the MOST RECENT marked peak of the cycle
+//       ("Höhepunkt = letzter Tag mit der besten Qualität"): multiple
+//       peaks arise from delayed ovulation — a peak subsides and a later
+//       one appears — so the last marked peak is the ovulation that
+//       counts here. When a later peak is added, earlier candidates flip
+//       from circles back to arrows automatically (compute-only
+//       re-evaluation, no mark changes).
 //       Chronologically arrows precede circles — no interleaving. The caps
 //       are PER KIND: up to four arrows carry arrow ordinals 1–4, then up
 //       to four circles carry circle ordinals 1–4. Candidates beyond their
@@ -109,8 +120,12 @@
 //   then starts at the next strictly-above measurement from the mark
 //   onward (R3); on noisy data the mark and the candidates can disagree —
 //   the UI shows what the arithmetic says.
-//   TODO(user-review): Several peak / first-higher marks inside one cycle
-//   are a user-data problem; the earliest mark wins.
+//   No open assumption, settled rule: multiple peak / first-higher marks
+//   inside one cycle are EXPECTED, not a user-data problem (delayed
+//   ovulation; re-marking after a broken Hochlage). The MOST RECENT mark
+//   of each type anchors the evaluation (owner-confirmed — see R3/R4);
+//   earlier duplicates stay stored, render no candidate, and are removed
+//   only through the sheet's mark toggles.
 //
 // Input contract: [evaluateCycles] expects entries and marks of ONE profile
 // (pass [evaluateCycles.profileId] to have foreign-profile data filtered
@@ -345,8 +360,16 @@ DateTime? _nextStart(List<Cycle> cycles, int index) =>
         ? DateOnly.normalize(cycles[index + 1].startDate)
         : null;
 
-/// The earliest mark of [type] inside this cycle's date window, if any.
-DateTime? _earliestMarkOf(
+/// The most recent mark of [type] inside this cycle's date window, if any
+/// (owner-confirmed anchor rule: re-marking supersedes). Multiple mucus
+/// peaks arise from delayed ovulation — "Höhepunkt = letzter Tag mit der
+/// besten Qualität", so the LAST marked peak anchors the evaluation — and
+/// the first higher measurement is re-markable too (after a broken
+/// Hochlage or a delayed second peak). Earlier duplicate marks stay
+/// STORED (the domain does not filter them; their removal is the mark
+/// sheet's toggle concern) — they simply stop anchoring and render no
+/// candidate (an earlier rise mark lies before the walk region, R3).
+DateTime? _latestMarkOf(
   Cycle cycle,
   List<CycleMark> marks,
   String type,
@@ -359,7 +382,7 @@ DateTime? _earliestMarkOf(
     final day = DateOnly.normalize(mark.date);
     if (day.isBefore(cycleStart)) continue;
     if (nextCycleStart != null && !day.isBefore(nextCycleStart)) continue;
-    if (found == null || day.isBefore(found)) found = day;
+    if (found == null || day.isAfter(found)) found = day;
   }
   return found;
 }
@@ -402,7 +425,7 @@ _LowWindow _lowWindowFor(
   List<CycleMark> marks,
   DateTime? nextCycleStart,
 ) {
-  final firstHigherDay = _earliestMarkOf(
+  final firstHigherDay = _latestMarkOf(
     cycle,
     marks,
     CycleMarkTypes.firstHigherMeasurement,
@@ -460,7 +483,7 @@ CycleEvaluation _evaluateCycle(
   DateTime? nextCycleStart,
   DateTime? nextWindowStart,
 ) {
-  final peakDay = _earliestMarkOf(
+  final peakDay = _latestMarkOf(
     cycle,
     marks,
     CycleMarkTypes.mucusPeakDay,

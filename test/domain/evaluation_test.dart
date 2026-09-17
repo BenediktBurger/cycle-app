@@ -15,6 +15,13 @@
 // day. Ordinals count WITHIN each kind (arrows 1–4, circles 1–4); the circle
 // ordinal drives the SUZ rules D/E, the arrow ordinal expresses the arrow
 // cap. Candidates beyond their kind's cap stay in the sequence unnumbered.
+//
+// Anchors (owner-confirmed): the MOST RECENT mark of each type inside a
+// cycle drives the evaluation — the latest mucus-peak mark ("Höhepunkt =
+// letzter Tag mit der besten Qualität"; multiple peaks arise from delayed
+// ovulation) and the latest first-higher-measurement mark (re-marking
+// supersedes). Earlier duplicate marks stay stored and render no candidate
+// (see the "multiple marks" group below).
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -698,6 +705,219 @@ void main() {
       );
       expect(e.suzBeginsEvening, isNull);
       expect(e.evaluationStopped, isFalse);
+    });
+  });
+
+  group(
+      'multiple marks in one cycle — the MOST RECENT mark of each type '
+      'anchors the evaluation (owner-confirmed)', () {
+    // NOTE: rendering ALL mucus-peak marks of a cycle is chart/UI scope
+    // (a separate work item — see docs/roadmap.md). The domain only picks
+    // the ANCHORS: the latest mucus-peak mark and the latest
+    // first-higher-measurement mark drive the evaluation; earlier
+    // duplicates stay STORED (their removal is the sheet toggle's concern)
+    // and simply stop anchoring.
+
+    test(
+        'two peaks: candidates up to and including the LAST peak are '
+        'arrows, circles start at 1 after it; rule D fires on the 3rd '
+        'circle under the late peak', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4), // baseline (highest of the six lows)
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2), // peak 1 (early) — also low #1
+        d(2026, 3, 10, t: 36.8), // marked rise (between the peaks) → arrow 1
+        d(2026, 3, 11, t: 36.9), // arrow 2
+        d(2026, 3, 12, t: 37.0), // peak 2 (late) → arrow 3 (peak-day candidate)
+        d(2026, 3, 13, t: 37.0), // circle 1 — first candidate after the LAST peak
+        d(2026, 3, 14, t: 37.0), // circle 2
+        d(2026, 3, 15, t: 36.7), // circle 3, ≥ +0.2 K → rule D fires HERE
+      ];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        peak(2026, 3, 12),
+      ];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      // The MOST RECENT peak (Mar 12) anchors the per-candidate decision —
+      // "Höhepunkt = letzter Tag mit der besten Qualität": multiple peaks
+      // arise from delayed ovulation (a peak subsides and a later one
+      // appears), so the latest peak is the ovulation that counts for R4.
+      expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 12)));
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.arrow, 1),
+          (11, MarkKind.arrow, 2),
+          (12, MarkKind.arrow, 3), // the peak-day candidate is an arrow
+          (13, MarkKind.circle, 1), // circle ordinals start at 1 AFTER the
+          (14, MarkKind.circle, 2), // …last peak
+          (15, MarkKind.circle, 3),
+        ],
+      );
+      // Rules D/E count circles only; under the late peak the 3rd circle
+      // (36.7 ≥ 36.4 + 0.2) triggers rule D on Mar 15 — NOT on Mar 12
+      // (which would be the 3rd circle under an early-peak anchor).
+      expect(e.suzBeginsEvening, DateOnly.normalize(DateTime(2026, 3, 15)));
+      expect(e.suzRule, SuzRule.d);
+      expect(e.evaluationStopped, isFalse);
+    });
+
+    test(
+        'adding a later peak flips earlier circles back to arrows — '
+        'compute-only re-evaluation, no mark changes', () {
+      // The SAME data as the two-peak test above, but at the moment BEFORE
+      // the second peak was placed: only peak 1 (Mar 9) exists, so every
+      // candidate is a circle. The test pins both states to document the
+      // flip: adding the later peak re-evaluates the SAME marks and the
+      // candidates up to and including the new peak day become arrows.
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4), // baseline
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2), // peak 1
+        d(2026, 3, 10, t: 36.8),
+        d(2026, 3, 11, t: 36.9),
+        d(2026, 3, 12, t: 37.0),
+      ];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final before = evalFor(entries, marks, DateTime(2026, 3, 2));
+      expect(
+        before.higherMeasurements
+            .map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.circle, 1),
+          (11, MarkKind.circle, 2),
+          (12, MarkKind.circle, 3),
+        ],
+      );
+
+      final after = evalFor(
+        entries,
+        [...marks, peak(2026, 3, 12)],
+        DateTime(2026, 3, 2),
+      );
+      expect(
+        after.higherMeasurements
+            .map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.arrow, 1),
+          (11, MarkKind.arrow, 2),
+          (12, MarkKind.arrow, 3),
+        ],
+      );
+    });
+
+    test(
+        'a peak marked AFTER all candidates: every candidate stays an '
+        'arrow → no SUZ (rules D/E count circles only)', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4), // baseline
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2), // peak 1 (early, before the rise)
+        d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
+        d(2026, 3, 11, t: 36.9), // arrow 2
+        d(2026, 3, 12, t: 37.0), // arrow 3 — last candidate; data ends here
+      ];
+      // Peak 2 is marked on Mar 14 — AFTER every candidate (Mar 10–12).
+      // Under the most-recent-peak anchor every candidate day is ≤ the
+      // peak → arrows; arrows never trigger rules D/E → no SUZ.
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        peak(2026, 3, 14),
+      ];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 14)));
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.arrow, 1),
+          (11, MarkKind.arrow, 2),
+          (12, MarkKind.arrow, 3),
+        ],
+      );
+      expect(e.suzBeginsEvening, isNull,
+          reason: 'an all-arrow sequence yields no circles, so rules D and '
+              'E cannot fire — even though the 3rd candidate is ≥ +0.2 K');
+      expect(e.suzRule, isNull);
+      expect(e.evaluationStopped, isFalse);
+    });
+
+    test(
+        'two rise marks: the LATER one anchors the six-low window, the '
+        'baseline and the walk; the earlier rise day renders no candidate',
+        () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4),
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2), // peak day
+        d(2026, 3, 10, t: 36.8), // EARLIER rise mark (premature Hochlage)
+        d(2026, 3, 11, t: 36.3), // values fall back — the earlier rise broke
+        d(2026, 3, 12, t: 36.4),
+        d(2026, 3, 13, t: 36.9), // the REAL rise — re-marked here (later mark)
+        d(2026, 3, 14, t: 37.0), // candidate 2
+      ];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        rise(2026, 3, 13),
+      ];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      // The later mark supersedes: re-marking the rise (after a broken
+      // Hochlage or a delayed second peak) moves the whole evaluation.
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 13)));
+      // The six-low window re-anchors to the LATER mark: the six usable
+      // days before Mar 13.
+      expect(
+        e.numberedLows.map((l) => (l.number, l.date.day)),
+        [(1, 12), (2, 11), (3, 10), (4, 9), (5, 8), (6, 7)],
+      );
+      // The earlier rise day's value (36.8 on Mar 10) is the highest of
+      // the re-anchored window — it sets the baseline. (The earlier MARK
+      // itself stops anchoring; its day is just a low of the new window.)
+      expect(e.baseline!.value, 36.8);
+      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 10)));
+      // The earlier rise day renders NO candidate: the walk starts at the
+      // later mark (R3), so Mar 10 lies before the walk region (it is also
+      // AT the new baseline — doubly excluded).
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (13, MarkKind.circle, 1),
+          (14, MarkKind.circle, 2),
+        ],
+      );
+      expect(e.suzBeginsEvening, isNull);
+      expect(e.evaluationStopped, isFalse,
+          reason: 'the re-anchored sequence is simply short — no break');
     });
   });
 

@@ -30,6 +30,16 @@ abstract final class CycleMarkTypes {
 
   /// Interrupted-day / cycle interruption marker.
   static const interruption = 'interruption';
+
+  /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
+  /// MORNING (the SUZ bar renders at the day column's start). The computed
+  /// SUZ (rules D/E in lib/domain/evaluation.dart) is suggestion-only —
+  /// manual SUZ marks never alter the arithmetic (ADR-0001).
+  static const suzMorning = 'suzMorning';
+
+  /// The user-placed SUZ start from an EVENING (the SUZ bar renders at the
+  /// day column's middle).
+  static const suzEvening = 'suzEvening';
 }
 
 /// One mark a user placed onto one calendar day.
