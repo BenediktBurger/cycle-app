@@ -52,6 +52,7 @@ import 'package:flutter/material.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
+import 'cycle_mark_window.dart';
 
 /// One drawn baseline segment, mapped onto the chart's day-index space
 /// (R10). The chart draws it from the LEFT EDGE of [startIndex]'s day
@@ -178,22 +179,15 @@ EvaluationOverlay buildEvaluationOverlay({
 
   for (var e = 0; e < evaluations.length; e++) {
     final evaluation = evaluations[e];
-    // The SUZ marks belong to the cycle whose [startDate, next cycle
-    // start) window contains them — the same attribution the domain's
-    // evaluateCycles uses for its own mark lookups. The last cycle's
-    // window is open-ended.
-    final windowStart = DateOnly.normalize(evaluation.cycle.startDate);
-    final windowEnd = e + 1 < evaluations.length
-        ? DateOnly.normalize(evaluations[e + 1].cycle.startDate)
-        : null;
+    // The SUZ marks belong to the cycle whose attribution window contains
+    // them (isDayInCycleWindow — the shared UI-side helper).
     final arrowValueY = evaluation.baseline?.value;
     for (final mark in marks) {
       final isSuz = mark.type == CycleMarkTypes.suzEvening ||
           mark.type == CycleMarkTypes.suzMorning;
       if (!isSuz) continue;
+      if (!isDayInCycleWindow(evaluations, e, mark.date)) continue;
       final day = DateOnly.normalize(mark.date);
-      if (day.isBefore(windowStart)) continue;
-      if (windowEnd != null && !day.isBefore(windowEnd)) continue;
       final i = indexFor(day);
       if (i == null) continue;
       suz.add(SuzOverlayMark(

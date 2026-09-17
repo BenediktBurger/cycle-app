@@ -34,6 +34,7 @@ import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'cycle_mark_window.dart';
 
 /// Opens the mark-entry sheet for one calendar day of the cycle chart.
 /// [day] must already be a UTC-midnight value (DateOnly convention — the
@@ -128,27 +129,18 @@ final class CycleDaySheet extends ConsumerWidget {
   }
 
   /// Whether a user SUZ mark (either variant) exists inside [evaluation]'s
-  /// cycle window. The cycle's window is [startDate, next cycle start) —
-  /// the same attribution the domain's evaluateCycles uses for its own
-  /// mark lookups; the sheet reconstructs it from the evaluations list
-  /// (the last cycle's window is open-ended).
+  /// cycle window — the shared attribution of isDayInCycleWindow (see
+  /// cycle_mark_window.dart).
   bool _cycleHasSuzMark(
     List<CycleEvaluation> evaluations,
     int index,
     List<CycleMark> marks,
   ) {
-    final windowStart = DateOnly.normalize(evaluations[index].cycle.startDate);
-    final windowEnd = index + 1 < evaluations.length
-        ? DateOnly.normalize(evaluations[index + 1].cycle.startDate)
-        : null;
     return marks.any((m) {
       final isSuz = m.type == CycleMarkTypes.suzEvening ||
           m.type == CycleMarkTypes.suzMorning;
       if (!isSuz) return false;
-      final d = DateOnly.normalize(m.date);
-      if (d.isBefore(windowStart)) return false;
-      if (windowEnd != null && !d.isBefore(windowEnd)) return false;
-      return true;
+      return isDayInCycleWindow(evaluations, index, m.date);
     });
   }
 
@@ -238,7 +230,7 @@ final class CycleDaySheet extends ConsumerWidget {
         ));
       }
       if (evaluation.evaluationStopped &&
-          !day.isBefore(evaluation.cycle.startDate) &&
+          !DateOnly.normalize(evaluation.cycle.startDate).isAfter(day) &&
           !DateOnly.normalize(evaluation.cycle.endDate).isBefore(day)) {
         lines.add((
           l10n.cycleSheetEvaluationStopped,

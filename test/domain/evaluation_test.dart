@@ -712,9 +712,9 @@ void main() {
       'multiple marks in one cycle — the MOST RECENT mark of each type '
       'anchors the evaluation (owner-confirmed)', () {
     // NOTE: rendering ALL mucus-peak marks of a cycle is chart/UI scope
-    // (a separate work item — see docs/roadmap.md). The domain only picks
-    // the ANCHORS: the latest mucus-peak mark and the latest
-    // first-higher-measurement mark drive the evaluation; earlier
+    // (see the all-peaks rendering in lib/ui/cycle_marks.dart). The
+    // domain only picks the ANCHORS: the latest mucus-peak mark and the
+    // latest first-higher-measurement mark drive the evaluation; earlier
     // duplicates stay STORED (their removal is the sheet toggle's concern)
     // and simply stop anchoring.
 
