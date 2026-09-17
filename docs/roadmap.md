@@ -25,11 +25,13 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- Data entry aligned with the NER scheme: time of day for sex
-  (morning/midday/evening), … — the exact term list must be specified first.
-  - show sex as an X (and distinguish morning/midday/evening)
+- Data entry aligned with the NER scheme — the exact term list must be
+  specified first:
   - generic exclude temperature and a note, or keep these different reasons
-  - [ ] add "Ausfluss" (A) as an option to mucus
+  - separate exclude reasons for sp (spät ins Bett) and a (aufstehen) as own
+    temperature-exclusion flags (same exclude question, NER scheme terms)
+- The f/S mucus combination (f before S on the same day) — the source is
+  another app, not authoritative; decide whether/how to represent it.
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
@@ -42,12 +44,14 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- [ ] add vertical lines to separate days
+- [ ] higher measurement before mucus peak arrow should be **below** the temperature measurement
+- [ ] persist language and mode choices
 - exclude unabhängig von krank etc machen
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)? In the "marks" table – but it is raw data (but not per day).
 - add descriptions (texts TBD) and tooltips
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?
+- should we warn the user, if the "temperature rise" is below the baseline (user error, contradicts definition)?
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓) - DOMAIN
