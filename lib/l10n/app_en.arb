@@ -70,8 +70,41 @@
   "zyklusLegendTemperature": "BBT (temperature)",
   "zyklusLegendBleeding": "Bleeding",
   "zyklusLegendMucus": "Fertility sign (mucus)",
+  "zyklusLegendMucusPeak": "Mucus peak",
+  "zyklusLegendFirstHigher": "First higher measurement",
+  "zyklusLegendRiseBeforePeak": "Higher measurement before the peak",
+  "zyklusLegendBaseline": "Baseline",
   "zyklusNoData": "The temperature curve appears once days with measurements exist.",
-  "zyklusArithmeticNote": "Pure signal recording — no evaluation, no fertility statement. Marks (e.g. baseline/coverline) follow later (Mode M, ADR-0001).",
+  "zyklusArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
+  "cycleSheetEditDay": "Edit day",
+  "cycleSheetSetMucusPeak": "Set mucus peak",
+  "cycleSheetRemoveMucusPeak": "Remove mucus peak",
+  "cycleSheetSetFirstHigher": "Set first higher measurement",
+  "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
+  "cycleSheetBaselineInfo": "Baseline: {value}",
+  "@cycleSheetBaselineInfo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleSheetLowInfo": "Low measurement {number}",
+  "@cycleSheetLowInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleSheetCircledInfo": "Circled higher measurement {number}",
+  "@cycleSheetCircledInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
   "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
   "statistikNoData": "Cycle lengths appear once two period onsets are recorded.",
   "statistikCycles": "Cycle lengths",

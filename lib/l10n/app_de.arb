@@ -67,8 +67,41 @@
   "zyklusLegendTemperature": "BBT (Temperatur)",
   "zyklusLegendBleeding": "Blutung",
   "zyklusLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
+  "zyklusLegendMucusPeak": "Schleimhöhepunkt",
+  "zyklusLegendFirstHigher": "erste höhere Messung",
+  "zyklusLegendRiseBeforePeak": "höhere Messung vor dem Höhepunkt",
+  "zyklusLegendBaseline": "Basislinie",
   "zyklusNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
-  "zyklusArithmeticNote": "Reine Aufzeichnung der Signale — keine Auswertung, keine Fruchtbarkeitsangabe. Markierungen (z. B. Baseline/Deckblatt) folgen später (Mode M, ADR-0001).",
+  "zyklusArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
+  "cycleSheetEditDay": "Tag bearbeiten",
+  "cycleSheetSetMucusPeak": "Schleimhöhepunkt setzen",
+  "cycleSheetRemoveMucusPeak": "Schleimhöhepunkt entfernen",
+  "cycleSheetSetFirstHigher": "Erste höhere Messung setzen",
+  "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
+  "cycleSheetBaselineInfo": "Basislinie: {value}",
+  "@cycleSheetBaselineInfo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleSheetLowInfo": "Tiefe Messung {number}",
+  "@cycleSheetLowInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleSheetCircledInfo": "Umrandete höhere Messung {number}",
+  "@cycleSheetCircledInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
   "statistikNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
   "statistikNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
   "statistikCycles": "Zykluslängen",
