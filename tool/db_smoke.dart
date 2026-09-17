@@ -78,6 +78,54 @@ Future<void> main() async {
       'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
       "mucus_quality) VALUES (1, 20001, 's', 'ew')");
 
+  // cervix_firmness: the engine CHECK accepts exactly the CervixFirmness
+  // enum-name tokens (or NULL) — nothing else gets in.
+  rejected = false;
+  try {
+    await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, cervix_firmness) '
+        "VALUES (1, 20004, 'squishy')");
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'cervix_firmness CHECK rejects out-of-vocabulary token');
+
+  // sex_timings: the engine CHECK keeps the mask inside the SexTiming
+  // vocabulary — exactly the 3 bits, so both 8 and any negative fail.
+  rejected = false;
+  try {
+    await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, sex_timings) '
+        'VALUES (1, 20005, 8)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'sex_timings CHECK rejects masks above 7');
+  rejected = false;
+  try {
+    await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, sex_timings) '
+        'VALUES (1, 20006, -1)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'sex_timings CHECK rejects negative masks');
+
+  // Sanity: the Ausfluss sign 'a' is in vocabulary — and carries NO quality
+  // (the quality CHECK rejects any quality on a sign other than S).
+  await db.customStatement(
+      'INSERT INTO cycle_entries (profile_id, date, mucus_sign) '
+      "VALUES (1, 20007, 'a')");
+  rejected = false;
+  try {
+    await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
+        "mucus_quality) VALUES (1, 20008, 'a', 'w')");
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'mucus_quality CHECK rejects a quality on the A sign');
+
   rejected = false;
   try {
     await db.into(db.cycleEntries).insert(
@@ -148,16 +196,18 @@ Future<void> main() async {
     painMittelschmerz: true,
     mood: true,
     desire: true,
-    sex: true,
+    cervixFirmness: CervixFirmness.halfSoft,
+    sexTimings: SexTiming.start.bit | SexTiming.end.bit,
     notes: 'Notiz am Rande.',
   );
   final mappedBack =
       dailyEntryFromDrift(await db.entriesDao.upsertDaily(input));
   check(mappedBack == input, 'domain round trip via drift preserves entry');
-  // The Muttermund options are stored as their TEXT enum-name tokens.
+  // The Muttermund options are stored as their TEXT enum-name tokens (the
+  // sex times as the raw SexTiming bitmask).
   final cervixTokens = await db
-      .customSelect('SELECT cervix_position, cervix_opening '
-          'FROM cycle_entries WHERE date = ?',
+      .customSelect('SELECT cervix_position, cervix_opening, cervix_firmness, '
+              'sex_timings FROM cycle_entries WHERE date = ?',
           variables: [
         Variable.withInt(DateOnly.normalize(DateTime(2026, 6, 15))
             .difference(DateTime.utc(1970))
@@ -167,6 +217,12 @@ Future<void> main() async {
       'raw cervix_position token is the enum name');
   check(cervixTokens.data['cervix_opening'] == 'open',
       'raw cervix_opening token is the enum name');
+  check(cervixTokens.data['cervix_firmness'] == 'halfSoft',
+      'raw cervix_firmness token is the enum name');
+  check(
+      cervixTokens.data['sex_timings'] ==
+          SexTiming.start.bit | SexTiming.end.bit,
+      'raw sex_timings is the SexTiming bitmask');
 
   // --- bleeding levels: all five levels round-trip the drift layer --------
   // The stored number is Bleeding.level (0 none … 4 heavy), mapped through

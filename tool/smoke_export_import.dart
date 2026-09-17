@@ -14,6 +14,7 @@ import 'package:drift/native.dart';
 
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/decimal_input.dart';
 import 'package:cycle_app/domain/export_import.dart';
@@ -37,6 +38,8 @@ Future<void> main() async {
 
   check(tryParseMucusSign('s') == MucusSign.s,
       'fertility sign parses by stable token');
+  check(tryParseMucusSign('a') == MucusSign.a,
+      'the Ausfluss sign parses by its stable token');
   check(tryParseMucusSign('wet') == null, 'out-of-vocabulary sign is null');
   check(tryParseMucusQuality('gl') == MucusQuality.gl &&
       tryParseMucusQuality('glb') == MucusQuality.glb &&
@@ -81,6 +84,12 @@ Future<void> main() async {
     DailyEntry(
       date: DateTime(2026, 3, 5),
       bleeding: Bleeding.heavy,
+      // The fields the redefined v4 shape gained: the Ausfluss sign (no
+      // quality exists for it), the firmness token, and the sex-timings
+      // bitmask (start|end → multiple X on one day).
+      mucusSign: MucusSign.a,
+      cervixFirmness: CervixFirmness.hard,
+      sexTimings: SexTiming.start.bit | SexTiming.end.bit,
     ),
   );
   await source.marksDao.addMark(1, DateTime(2026, 3, 12), 'baseline');
@@ -101,6 +110,13 @@ Future<void> main() async {
   check(json.contains('"mucus_sign": "s"') &&
           json.contains('"mucus_quality": "mi"'),
       'export carries the fertility-sign tokens');
+  check(json.contains('"mucus_sign": "a"'),
+      'export carries the Ausfluss sign token');
+  check(
+      json.contains('"cervix_firmness": "hard"') &&
+          json.contains(
+              '"sex_timings": ${SexTiming.start.bit | SexTiming.end.bit}'),
+      'export carries the redefined-v4 keys (cervix_firmness, sex_timings)');
   check(json.contains('partner'), 'profile list exported');
 
   // Malformed documents must be rejected BEFORE any write.
@@ -153,6 +169,16 @@ Future<void> main() async {
       migrated.firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 5)));
   check(heavyRow.bleeding == Bleeding.heavy,
       'the heavy level survives the export/import round trip');
+  // The new document fields: CycleEntry carries the firmness as the raw TEXT
+  // token and the sex times as the raw INTEGER mask (mapping lives in the
+  // db layer) — check that all of it survived the round trip.
+  check(heavyRow.mucusSign == 'a',
+      'the Ausfluss sign survives the export/import round trip');
+  check(heavyRow.cervixFirmness == 'hard',
+      'the firmness token survives the export/import round trip');
+  check(
+      heavyRow.sexTimings == SexTiming.start.bit | SexTiming.end.bit,
+      'the sex-timings mask survives the export/import round trip');
 
   final targetProfiles = await target.profilesDao.allProfiles();
   check(targetProfiles.where((p) => p.name == 'partner').length == 1,
