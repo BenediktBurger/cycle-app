@@ -42,7 +42,6 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- [ ] on diary: add buttons for previous/next day
 - [ ] make mode selectable: light mode, dark mode, system setting
 - [ ] add vertical lines to separate days
 - exclude unabhängig von krank etc machen

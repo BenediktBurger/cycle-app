@@ -120,6 +120,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(picked);
   }
 
+  /// Moves the entry form to the adjacent calendar day ([delta] = -1/+1).
+  /// The write goes through [selectedDateProvider], so the existing
+  /// `ref.listen` in build reloads the day's entry — exactly the path a
+  /// list-tile tap or a chart jump takes. Unsaved edits are discarded by
+  /// that reload (the form only persists on the explicit save button),
+  /// matching the established semantics of every other day change here.
+  void _moveDay(int delta) {
+    ref.read(selectedDateProvider.notifier).state =
+        DateOnly.addDays(ref.read(selectedDateProvider), delta);
+  }
+
   /// Material time picker dialog. Initial value: the stored (or prefilled)
   /// time, or — for still-unset days — the current time as a starting point.
   Future<void> _pickTime() async {
@@ -232,6 +243,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     String locale,
     DateTime selected,
   ) {
+    // The navigation window matches the date picker's (see _pickDate):
+    // nothing before 2000, nothing beyond tomorrow ("measured just after
+    // midnight") — no unbounded future. "Now" comes from nowProvider so
+    // tests can pin the clock.
+    final now = ref.watch(nowProvider);
+    final previousDay = DateOnly.addDays(selected, -1);
+    final nextDay = DateOnly.addDays(selected, 1);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -242,15 +260,31 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // --- date ---------------------------------------------------
+              // Previous/next flank the date button and step through the
+              // same window the date picker offers (bounds computed above).
               Row(
                 children: [
                   const Icon(Icons.event_outlined),
                   const SizedBox(width: 8),
                   Text(l10n.entryDate),
                   const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: previousDay.isBefore(DateTime.utc(2000))
+                        ? null
+                        : () => _moveDay(-1),
+                    tooltip: l10n.entryPreviousDay,
+                  ),
                   OutlinedButton(
                     onPressed: _pickDate,
                     child: Text(_formatDay(selected, locale)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: nextDay.isAfter(DateOnly.addDays(now, 1))
+                        ? null
+                        : () => _moveDay(1),
+                    tooltip: l10n.entryNextDay,
                   ),
                 ],
               ),

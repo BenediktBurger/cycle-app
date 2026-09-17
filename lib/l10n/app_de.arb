@@ -6,6 +6,8 @@
   "navStatistik": "Statistik",
   "navEinstellungen": "Einstellungen",
   "entryDate": "Datum",
+  "entryPreviousDay": "Voriger Tag",
+  "entryNextDay": "Nächster Tag",
   "temperature": "Temperatur",
   "measuredTime": "Gemessen um",
   "measuredTimeUnset": "nicht erfasst",
