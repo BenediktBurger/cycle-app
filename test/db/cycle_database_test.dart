@@ -472,15 +472,32 @@ void main() {
       expect(unmeasured.measuredAtMinutes, isNull);
     });
 
+    test('a time without a temperature stores null', () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        measuredAtMinutes: 407, // 06:47
+      ));
+
+      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 6, 15)))!;
+      expect(row.bbtC, isNull);
+      expect(row.measuredAtMinutes, isNull,
+          reason: 'the measurement time belongs to the temperature; a '
+              'mucus-only day stores no time');
+    });
+
     test('updating a day without a measured time clears it (full replace)',
         () async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 6, 15),
+        bbtC: 36.4,
         measuredAtMinutes: 407,
       ));
+      // The replacement has no temperature either — the old time must not
+      // survive as a stray value without its measurement.
       await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
 
       final row = (await db.entriesDao.entryFor(1, DateTime(2026, 6, 15)))!;
+      expect(row.bbtC, isNull);
       expect(row.measuredAtMinutes, isNull);
     });
 
@@ -747,6 +764,11 @@ void main() {
       expect(CycleMarkTypes.baseline, MarkTypes.baseline);
       expect(CycleMarkTypes.fertileWindow, MarkTypes.fertileWindow);
       expect(CycleMarkTypes.interruption, MarkTypes.interruption);
+      // The SUZ start markers (sicher unfruchtbare Zeit, placed by the
+      // user from a morning or from an evening) joined the open TEXT
+      // vocabulary — both sides must spell the tokens identically.
+      expect(CycleMarkTypes.suzEvening, MarkTypes.suzEvening);
+      expect(CycleMarkTypes.suzMorning, MarkTypes.suzMorning);
     });
 
     test('watchAllMarks streams the profile\'s marks as they are toggled',
@@ -959,6 +981,31 @@ void main() {
         expect(summary.entriesNew, 1);
         final row = await target.entriesDao.entryFor(1, DateTime(2026, 4, 2));
         expect(row!.measuredAtMinutes, 405);
+      });
+
+      test('export normalizes a stored time without a temperature to null',
+          () async {
+        // A legacy-style row (raw SQL): time stored without a temperature,
+        // e.g. written before the app enforced the pairing. The export
+        // document must not carry the stray time — what it carries is what
+        // a re-import would store.
+        final legacyDay = DateTime(2026, 6, 20);
+        final legacyEpochDay = DateOnly.normalize(legacyDay)
+            .difference(DateTime.utc(1970))
+            .inDays;
+        await db.customStatement(
+          'INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) '
+          'VALUES (1, $legacyEpochDay, 405)',
+        );
+
+        final blob = await exportDatabaseToBlob(db);
+        final legacyRow = blob.entries.singleWhere(
+          (e) => e['date'] == formatIsoDay(legacyDay),
+        );
+        expect(legacyRow['bbt_c'], isNull);
+        expect(legacyRow['measured_at_minutes'], isNull,
+            reason: 'the export document never carries a time without its '
+                'temperature');
       });
 
       test('old export documents without the field import with no time',

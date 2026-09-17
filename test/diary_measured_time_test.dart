@@ -1,9 +1,13 @@
 // Widget tests for the time-of-measurement feature on the Tagebuch screen.
 //
-// Covers the user-visible behaviours: a fresh day prefills the picker
-// control with the current time, a stored time stays when the day is
-// re-opened for editing, clearing the time is possible, and the day tiles
-// show the stored time.
+// The measurement time is metadata OF the temperature: the picker row only
+// appears while a temperature is entered, and a save without a temperature
+// stores no time (the domain model normalizes — see
+// test/domain/daily_entry_test.dart). Covered here: the conditional
+// visibility with the current-time prefill once a temperature is entered, a
+// stored time stays when the day is re-opened for editing, clearing the
+// time is possible, a temperature-less save keeps no time, and the day
+// tiles show the stored time.
 //
 // The clock is pinned through the nowProvider override (the real wall clock
 // would make the prefill assertion race with the minute boundary); the
@@ -67,17 +71,31 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  testWidgets('a fresh day prefills the form with the CURRENT time',
+  /// Types into the temperature field (the first form field) and lets the
+  /// controller listener rebuild the form (the time row's visibility
+  /// follows the temperature).
+  Future<void> enterTemperature(WidgetTester tester, String text) async {
+    await tester.enterText(find.byType(TextFormField).first, text);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the time row appears only once a temperature is entered',
       (WidgetTester tester) async {
     await tester.pumpWidget(_scope());
     await tester.pumpAndSettle();
 
+    expect(find.text('Gemessen um'), findsNothing,
+        reason: 'without a temperature there is no measurement time to '
+            'record — the picker row stays hidden');
+    expect(find.text('14:35'), findsNothing);
+
+    await enterTemperature(tester, '36.5');
+
     expect(find.text('Gemessen um'), findsOneWidget,
-        reason: 'the time-of-measurement row is visible on the form');
+        reason: 'with a temperature the picker row becomes visible');
     expect(find.text('14:35'), findsOneWidget,
-        reason: 'the picker button shows the injected current time');
-    expect(find.text('06:47'), findsNothing,
-        reason: 'no time was stored yet — only the prefill is shown');
+        reason: 'the picker button shows the injected current time as the '
+            'prefill');
   });
 
   testWidgets('a stored time stays on re-open for editing (no re-prefill)',
@@ -85,6 +103,7 @@ void main() {
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: _selectedDay,
+        bbtC: 36.4,
         measuredAtMinutes: 407, // 06:47 — measured in the early morning
       ));
     }));
@@ -101,6 +120,7 @@ void main() {
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: _selectedDay,
+        bbtC: 36.4,
         measuredAtMinutes: 407,
       ));
     }));
@@ -117,8 +137,54 @@ void main() {
     await tester.pumpAndSettle();
 
     final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    expect(stored.bbtC, 36.4, reason: 'the temperature itself is kept');
     expect(stored.measuredAtMinutes, isNull,
         reason: 'a day without time entry is legal; nothing is invented');
+  });
+
+  testWidgets('a temperature-less save stores no time, even after the '
+      'prefill was shown', (WidgetTester tester) async {
+    tallSurface(tester);
+    await tester.pumpWidget(_scope());
+    await tester.pumpAndSettle();
+
+    // The user starts typing a temperature (the time row appears with the
+    // current-time prefill), then removes the temperature again — e.g. the
+    // thermometer showed an unusable value — and saves the mucus-only day.
+    await enterTemperature(tester, '36.5');
+    expect(find.text('Gemessen um'), findsOneWidget);
+    await enterTemperature(tester, '');
+    // Mucus sign S so the day is a real, meaningful entry (not an empty
+    // form save).
+    await tester.tap(find.text('S'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Speichern'));
+    await tester.pumpAndSettle();
+
+    final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    expect(stored.bbtC, isNull);
+    expect(stored.mucusSign, 's');
+    expect(stored.measuredAtMinutes, isNull,
+        reason: 'the time is only stored together with a temperature — '
+            'the prefilled current time must not leak into the row');
+  });
+
+  testWidgets('saving a temperature stores the (prefilled) time with it',
+      (WidgetTester tester) async {
+    tallSurface(tester);
+    await tester.pumpWidget(_scope());
+    await tester.pumpAndSettle();
+
+    await enterTemperature(tester, '36.5');
+    await tester.tap(find.text('Speichern'));
+    await tester.pumpAndSettle();
+
+    final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    expect(stored.bbtC, 36.5);
+    expect(stored.measuredAtMinutes, 14 * 60 + 35, // the injected "now"
+        reason: 'a temperature with the prefilled measurement time stores '
+            'the time');
   });
 
   testWidgets('the day tile shows the stored time',
@@ -129,6 +195,7 @@ void main() {
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 1, 5),
+        bbtC: 36.4,
         measuredAtMinutes: 407,
       ));
     }));

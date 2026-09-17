@@ -788,6 +788,21 @@ void main() {
         expect(absent['measured_at_minutes'], isNull);
       });
 
+      test('a time without a temperature value is not mapped', () {
+        // The measured time belongs to its temperature measurement; a row
+        // carrying only the time (value deleted in drip, say) maps with the
+        // time dropped, never with a stray time that this app would not
+        // store either.
+        final result = dripCsvToExportJson(dripOneRowCsv(
+          timeHeader,
+          const ['2026-01-01', '', '07:15', '2'], // bleeding keeps the row
+        ));
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        final entries = doc['entries']! as List;
+        expect(entries, hasLength(1), reason: 'the row itself stays data');
+        expect((entries.single as Map)['measured_at_minutes'], isNull);
+      });
+
       test('a dropped temperature.time column stays null', () {
         // Header-driven parser: a drip version that never records the time
         // behaves exactly like an empty cell.

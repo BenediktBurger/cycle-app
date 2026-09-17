@@ -421,10 +421,26 @@ void main() {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
         'profile_id': 1,
         'date': '2026-03-01',
+        'bbt_c': 36.4,
         'bleeding': 'period',
         'measured_at_minutes': 405,
       });
       expect(entry!.measuredAtMinutes, 405);
+    });
+
+    test('writer: a time without a temperature is not imported', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'profile_id': 1,
+        'date': '2026-03-01',
+        'bleeding': 'period',
+        'measured_at_minutes': 405,
+      });
+      expect(entry, isNotNull,
+          reason: 'the time is a field, never a row killer');
+      expect(entry!.measuredAtMinutes, isNull,
+          reason: 'the app never stores a measurement time without the '
+              'temperature it belongs to; foreign/legacy documents with a '
+              'stray time normalize on import');
     });
 
     test('writer: out-of-range minutes collapse to null, row is kept', () {

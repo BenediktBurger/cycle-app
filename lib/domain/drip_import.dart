@@ -228,9 +228,13 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final excludeOther = boolCell(dataRow, 'temperature.exclude');
     // drip records the measurement's time of day in temperature.time as
     // plain `HH:MM` (24 h). A time belongs to its measurement — hasData
-    // below deliberately does not count a lone time cell as data.
-    final measuredAtMinutes =
-        _parseDripTimeMinutes(cell(dataRow, 'temperature.time'));
+    // below deliberately does not count a lone time cell as data, and the
+    // time is only mapped when a temperature value exists (the same rule
+    // DailyEntry enforces on storage; the document must not carry a time
+    // this app would never store).
+    final measuredAtMinutes = bbtC == null
+        ? null
+        : _parseDripTimeMinutes(cell(dataRow, 'temperature.time'));
     final bleeding = _parseBleeding(cell(dataRow, 'bleeding.value'));
     final mucus = _mucusObservation(
       nfpNumber: cell(dataRow, 'mucus.value'),

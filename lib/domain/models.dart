@@ -92,7 +92,7 @@ final class DailyEntry {
     required this.date,
     this.profileId = 1,
     this.bbtC,
-    this.measuredAtMinutes,
+    int? measuredAtMinutes,
     this.bleeding = Bleeding.none,
     this.excludeIllness = false,
     this.excludeAlcohol = false,
@@ -109,7 +109,14 @@ final class DailyEntry {
     this.desire = false,
     this.sex = false,
     this.notes,
-  }) : assert(mucusQuality == null || mucusSign == MucusSign.s,
+  })  : // The measurement time is metadata OF the temperature measurement:
+        // without a temperature there is no measurement to time, so the time
+        // is dropped — never stored (and never invented) on mucus-only etc.
+        // days. Enforcing this in the constructor makes every writer (db
+        // mappers, export/import, the drip importer, the entry form) inherit
+        // the rule; copyWith re-runs it through this constructor.
+        measuredAtMinutes = bbtC == null ? null : measuredAtMinutes,
+        assert(mucusQuality == null || mucusSign == MucusSign.s,
             'mucusQuality is only valid together with mucusSign == MucusSign.s');
 
   final int profileId;
@@ -123,6 +130,11 @@ final class DailyEntry {
   /// the entry form prefills the CURRENT time for a fresh day and keeps an
   /// already-stored value when the day is re-opened (UI layer, see
   /// lib/ui/diary.dart; injectable clock there).
+  ///
+  /// Invariant: only ever set together with [bbtC] — the constructor drops
+  /// a time without a temperature (and `copyWith(bbtC: null)` therefore
+  /// drops the time as well). The time is metadata of the temperature
+  /// measurement; it belongs to nothing else and is never stored alone.
   final int? measuredAtMinutes;
 
   final Bleeding bleeding;

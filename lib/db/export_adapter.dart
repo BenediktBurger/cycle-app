@@ -66,7 +66,14 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'profile_id': e.profileId,
           'date': formatIsoDay(e.date),
           'bbt_c': e.bbtC,
-          'measured_at_minutes': e.measuredAtMinutes,
+          // The measurement time is metadata of the temperature (see
+          // DailyEntry.measuredAtMinutes): a document never carries a time
+          // without its temperature. The copy here normalizes on top of the
+          // constructor rule so legacy rows (written before the rule, e.g.
+          // by an older app version) export clean too — the export → import
+          // round trip is idempotent.
+          'measured_at_minutes':
+              e.bbtC == null ? null : e.measuredAtMinutes,
           'bleeding': e.bleeding.level,
           'exclude_illness': e.excludeIllness,
           'exclude_alcohol': e.excludeAlcohol,

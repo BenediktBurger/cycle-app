@@ -152,8 +152,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       date: date,
       profileId: defaultProfileId,
       bbtC: parseDecimalInput(_bbtController.text),
-      // null = the user cleared the time (or never set one); no invented
-      // value is written for days without a recorded time.
+      // The domain model drops a time without a temperature (see
+      // DailyEntry.measuredAtMinutes) — the picker row above is only
+      // reachable while a temperature is entered, and a temperature that
+      // was cleared before saving takes the time with it.
       measuredAtMinutes: _measuredAt == null
           ? null
           : _timeToMinutes(_measuredAt!),
@@ -277,32 +279,49 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- measured time -------------------------------------
-              // Prefilled with the current time when the day has none yet
-              // (see _applyEntry); explicit clearing sets "not recorded".
-              Row(
-                children: [
-                  const Icon(Icons.schedule_outlined),
-                  const SizedBox(width: 8),
-                  Text(l10n.measuredTime),
-                  const Spacer(),
-                  OutlinedButton(
-                    onPressed: _pickTime,
-                    child: Text(
-                      _measuredAt == null
-                          ? l10n.measuredTimeUnset
-                          : MaterialLocalizations.of(context)
-                              .formatTimeOfDay(_measuredAt!),
-                    ),
-                  ),
-                  if (_measuredAt != null)
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => setState(() => _measuredAt = null),
-                      tooltip: l10n.measuredTimeUnset,
-                    ),
-                ],
+              // The measurement time is metadata OF the temperature (the
+              // domain model never stores it without one — see
+              // DailyEntry.measuredAtMinutes), so the row only shows while
+              // a temperature is entered. When it does, a fresh day is
+              // prefilled with the current time (see _applyEntry); explicit
+              // clearing sets "not recorded".
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _bbtController,
+                builder: (context, value, _) =>
+                    parseDecimalInput(value.text) == null
+                        ? const SizedBox.shrink()
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule_outlined),
+                                  const SizedBox(width: 8),
+                                  Text(l10n.measuredTime),
+                                  const Spacer(),
+                                  OutlinedButton(
+                                    onPressed: _pickTime,
+                                    child: Text(
+                                      _measuredAt == null
+                                          ? l10n.measuredTimeUnset
+                                          : MaterialLocalizations.of(
+                                              context,
+                                            ).formatTimeOfDay(_measuredAt!),
+                                    ),
+                                  ),
+                                  if (_measuredAt != null)
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () =>
+                                          setState(() => _measuredAt = null),
+                                      tooltip: l10n.measuredTimeUnset,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
               ),
-              const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
               // All five levels of the numeric scale, none first. Wrap of
               // ChoiceChips like the mucus quality row below: a five-label
