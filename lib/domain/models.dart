@@ -1,6 +1,7 @@
 // Pure-Dart domain models: no drift types, no Flutter imports. The db layer
 // converts between these models and drift rows (see lib/db/mappers.dart).
 
+import 'cervix.dart';
 import 'date_only.dart';
 import 'mucus.dart';
 
@@ -100,6 +101,8 @@ final class DailyEntry {
     this.mucusSign,
     this.mucusQuality,
     this.cervix,
+    this.cervixPosition,
+    this.cervixOpening,
     this.painBreast = false,
     this.painMittelschmerz = false,
     this.mood = false,
@@ -143,6 +146,15 @@ final class DailyEntry {
   /// Optional cervix observation note (e.g. open/closed, position).
   final String? cervix;
 
+  /// Muttermund (cervix) observation of the day, as two independent
+  /// categorical options: how deep the cervix sat ([CervixPosition],
+  /// tief … unerreichbar) and how far it was open ([CervixOpening],
+  /// geschlossen … offen). Each null when not observed; no rule binds the
+  /// two together. Stored/displayed verbatim — never interpreted
+  /// (Mode M, ADR-0001). The display glyphs live in lib/domain/cervix.dart.
+  final CervixPosition? cervixPosition;
+  final CervixOpening? cervixOpening;
+
   /// Pain experiences of the day, as two independent flags — the
   /// letter-coded pain options of the cheat sheet: breast tenderness
   /// (`painBreast`, letter B) and ovulation pain (Mittelschmerz,
@@ -176,6 +188,8 @@ final class DailyEntry {
     Object? mucusSign = _sentinel,
     Object? mucusQuality = _sentinel,
     Object? cervix = _sentinel,
+    Object? cervixPosition = _sentinel,
+    Object? cervixOpening = _sentinel,
     bool? painBreast,
     bool? painMittelschmerz,
     bool? mood,
@@ -201,6 +215,12 @@ final class DailyEntry {
           ? this.mucusQuality
           : mucusQuality as MucusQuality?,
       cervix: cervix == _sentinel ? this.cervix : cervix as String?,
+      cervixPosition: cervixPosition == _sentinel
+          ? this.cervixPosition
+          : cervixPosition as CervixPosition?,
+      cervixOpening: cervixOpening == _sentinel
+          ? this.cervixOpening
+          : cervixOpening as CervixOpening?,
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
@@ -228,6 +248,8 @@ final class DailyEntry {
         mucusSign == other.mucusSign &&
         mucusQuality == other.mucusQuality &&
         cervix == other.cervix &&
+        cervixPosition == other.cervixPosition &&
+        cervixOpening == other.cervixOpening &&
         painBreast == other.painBreast &&
         painMittelschmerz == other.painMittelschmerz &&
         mood == other.mood &&
@@ -250,6 +272,8 @@ final class DailyEntry {
         mucusSign,
         mucusQuality,
         cervix,
+        cervixPosition,
+        cervixOpening,
         painBreast,
         painMittelschmerz,
         mood,
@@ -264,5 +288,6 @@ final class DailyEntry {
       'profile:$profileId, bbt:$bbtC, measuredAt:$measuredAtMinutes, '
       'bleeding:$bleeding, '
       'excluded:$isExcluded, mucusSign:$mucusSign, '
-      'mucusQuality:$mucusQuality)';
+      'mucusQuality:$mucusQuality, '
+      'cervixPosition:$cervixPosition, cervixOpening:$cervixOpening)';
 }

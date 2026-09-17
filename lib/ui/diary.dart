@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../db/mappers.dart';
+import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_input.dart';
@@ -40,6 +41,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
+  CervixPosition? _cervixPosition;
+  CervixOpening? _cervixOpening;
   bool _painBreast = false;
   bool _painMittelschmerz = false;
   bool _mood = false;
@@ -90,6 +93,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // so the form state can mirror the loaded pair untouched.
     _sign = entry?.mucusSign;
     _quality = entry?.mucusQuality;
+    _cervixPosition = entry?.cervixPosition;
+    _cervixOpening = entry?.cervixOpening;
     _painBreast = entry?.painBreast ?? false;
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _mood = entry?.mood ?? false;
@@ -162,6 +167,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       cervix: _cervixController.text.trim().isEmpty
           ? null
           : _cervixController.text.trim(),
+      cervixPosition: _cervixPosition,
+      cervixOpening: _cervixOpening,
       painBreast: _painBreast,
       painMittelschmerz: _painMittelschmerz,
       mood: _mood,
@@ -405,7 +412,71 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              // --- cervix (optional) -----------------------------------
+              // --- Muttermund: position (5 options), opening (3) -------
+              // Both chips are independent pickers; the leading unset chip
+              // ("—") plus the tap-again-deselects rule return to the
+              // no-observation state, like the mucus quality chips.
+              Text(l10n.cervixPosition),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: Text(l10n.cervixPositionUnset),
+                    selected: _cervixPosition == null,
+                    onSelected: (_) => setState(() => _cervixPosition = null),
+                  ),
+                  for (final position in CervixPosition.values)
+                    ChoiceChip(
+                      label: Text(
+                        switch (position) {
+                          CervixPosition.low => l10n.cervixPositionLow,
+                          CervixPosition.medium => l10n.cervixPositionMedium,
+                          CervixPosition.high => l10n.cervixPositionHigh,
+                          CervixPosition.veryHigh =>
+                            l10n.cervixPositionVeryHigh,
+                          CervixPosition.unreachable =>
+                            l10n.cervixPositionUnreachable,
+                        },
+                      ),
+                      selected: _cervixPosition == position,
+                      onSelected: (selected) => setState(() {
+                        _cervixPosition = selected ? position : null;
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.cervixOpening),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: Text(l10n.cervixOpeningUnset),
+                    selected: _cervixOpening == null,
+                    onSelected: (_) => setState(() => _cervixOpening = null),
+                  ),
+                  for (final opening in CervixOpening.values)
+                    ChoiceChip(
+                      label: Text(
+                        switch (opening) {
+                          CervixOpening.closed => l10n.cervixOpeningClosed,
+                          CervixOpening.middle => l10n.cervixOpeningMiddle,
+                          CervixOpening.open => l10n.cervixOpeningOpen,
+                        },
+                      ),
+                      selected: _cervixOpening == opening,
+                      onSelected: (selected) => setState(() {
+                        _cervixOpening = selected ? opening : null;
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // --- cervix note (optional free text next to the chips) ---
               TextFormField(
                 controller: _cervixController,
                 decoration: InputDecoration(labelText: l10n.cervix),

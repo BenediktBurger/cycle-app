@@ -15,7 +15,10 @@
 //                    nullable; quality only ever together with S)
 //                    "pain_breast": false, "pain_mittelschmerz": false,
 //                    (the letter-coded pain options B and M, v4+)
-//                    "cervix": null, ..., "notes": null}, ...],
+//                    "cervix": null, (free-text note) "cervix_position":
+//                    "high", "cervix_opening": "open", (Muttermund
+//                    observation tokens, see the v4 note below)
+//                    ..., "notes": null}, ...],
 //     "marks":    [{"profile_id": 1, "entry_date": "2026-03-12",
 //                   "mark_type": "baseline", "author": "user"}, ...]
 //   }
@@ -33,6 +36,16 @@
 // documents may still carry the generic `pain: true` flag: it has no B/M
 // identity, so it is TOLERATED but dropped by the field mapping (the row
 // stays valid, the flag information is not carried over).
+//
+// Additive fields without a version bump: v4 ALSO carries the two
+// Muttermund (cervix) observation fields `cervix_position` /
+// `cervix_opening` (tokens of the lib/domain/cervix.dart vocabularies) —
+// additively, with NO schema-version change, because the reader ignores
+// unknown/extra keys in BOTH directions: older apps reading a newer
+// document keep every other field (the new keys are ignored, not an
+// error), and newer apps read old documents that simply omit the fields.
+// An unknown/out-of-vocabulary token collapses to null on import without
+// dropping the row (never a row killer, same principle as mucus).
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in
@@ -58,7 +71,10 @@ import 'models.dart';
 /// the field parser accepts both shapes regardless of the version.
 /// Version 4 replaced the generic `pain` entry flag with the letter-coded
 /// pain options `pain_breast` (B) and `pain_mittelschmerz` (M); the legacy
-/// `pain` flag of ≤v3 documents is tolerated and dropped on import.
+/// `pain` flag of ≤v3 documents is tolerated and dropped on import. The
+/// Muttermund observation fields `cervix_position` / `cervix_opening`
+/// extend v4 ADDITIVELY with no version bump — the reader ignores unknown
+/// keys in both directions (see the version note in the header comment).
 const int exportSchemaVersion = 4;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and

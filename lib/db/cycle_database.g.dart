@@ -329,6 +329,24 @@ class $CycleEntriesTable extends CycleEntries
   late final GeneratedColumn<String> cervix = GeneratedColumn<String>(
       'cervix', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cervixPositionMeta =
+      const VerificationMeta('cervixPosition');
+  @override
+  late final GeneratedColumn<String> cervixPosition = GeneratedColumn<String>(
+      'cervix_position', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'CHECK (cervix_position IS NULL OR cervix_position IN (\'low\', \'medium\', \'high\', \'veryHigh\', \'unreachable\'))');
+  static const VerificationMeta _cervixOpeningMeta =
+      const VerificationMeta('cervixOpening');
+  @override
+  late final GeneratedColumn<String> cervixOpening = GeneratedColumn<String>(
+      'cervix_opening', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'CHECK (cervix_opening IS NULL OR cervix_opening IN (\'closed\', \'middle\', \'open\'))');
   static const VerificationMeta _painBreastMeta =
       const VerificationMeta('painBreast');
   @override
@@ -412,6 +430,8 @@ class $CycleEntriesTable extends CycleEntries
         mucusSign,
         mucusQuality,
         cervix,
+        cervixPosition,
+        cervixOpening,
         painBreast,
         painMittelschmerz,
         mood,
@@ -486,6 +506,18 @@ class $CycleEntriesTable extends CycleEntries
       context.handle(_cervixMeta,
           cervix.isAcceptableOrUnknown(data['cervix']!, _cervixMeta));
     }
+    if (data.containsKey('cervix_position')) {
+      context.handle(
+          _cervixPositionMeta,
+          cervixPosition.isAcceptableOrUnknown(
+              data['cervix_position']!, _cervixPositionMeta));
+    }
+    if (data.containsKey('cervix_opening')) {
+      context.handle(
+          _cervixOpeningMeta,
+          cervixOpening.isAcceptableOrUnknown(
+              data['cervix_opening']!, _cervixOpeningMeta));
+    }
     if (data.containsKey('pain_breast')) {
       context.handle(
           _painBreastMeta,
@@ -559,6 +591,10 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.string, data['${effectivePrefix}mucus_quality']),
       cervix: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cervix']),
+      cervixPosition: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cervix_position']),
+      cervixOpening: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cervix_opening']),
       painBreast: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}pain_breast'])!,
       painMittelschmerz: attachedDatabase.typeMapping.read(
@@ -632,8 +668,23 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// data (e.g. from a future import path) cannot be written.
   final String? mucusQuality;
 
-  /// Optional cervix observation (free text).
+  /// Optional cervix observation (free text, e.g. a note next to the two
+  /// categorical Muttermund options below).
   final String? cervix;
+
+  /// Muttermund (cervix) POSITION of the day, as a nullable TEXT token from
+  /// the [CervixPosition] enum-name vocabulary: NULL when not observed,
+  /// else 'low' / 'medium' / 'high' / 'veryHigh' / 'unreachable' (tief …
+  /// unerreichbar). Stored like mucus_sign (TEXT enum-name tokens, engine
+  /// CHECK on the vocabulary; note the deliberate distinction
+  /// position:'medium' — the OPENING column below spells its middle value
+  /// 'middle'). German display labels live in the l10n arbs.
+  final String? cervixPosition;
+
+  /// Muttermund (cervix) OPENING of the day, as above: NULL when not
+  /// observed, else 'closed' / 'middle' / 'open' (geschlossen · mittel ·
+  /// offen). Independent of cervix_position.
+  final String? cervixOpening;
 
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and
@@ -661,6 +712,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       this.mucusSign,
       this.mucusQuality,
       this.cervix,
+      this.cervixPosition,
+      this.cervixOpening,
       required this.painBreast,
       required this.painMittelschmerz,
       required this.mood,
@@ -701,6 +754,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     if (!nullToAbsent || cervix != null) {
       map['cervix'] = Variable<String>(cervix);
     }
+    if (!nullToAbsent || cervixPosition != null) {
+      map['cervix_position'] = Variable<String>(cervixPosition);
+    }
+    if (!nullToAbsent || cervixOpening != null) {
+      map['cervix_opening'] = Variable<String>(cervixOpening);
+    }
     map['pain_breast'] = Variable<bool>(painBreast);
     map['pain_mittelschmerz'] = Variable<bool>(painMittelschmerz);
     map['mood'] = Variable<bool>(mood);
@@ -736,6 +795,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           : Value(mucusQuality),
       cervix:
           cervix == null && nullToAbsent ? const Value.absent() : Value(cervix),
+      cervixPosition: cervixPosition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cervixPosition),
+      cervixOpening: cervixOpening == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cervixOpening),
       painBreast: Value(painBreast),
       painMittelschmerz: Value(painMittelschmerz),
       mood: Value(mood),
@@ -765,6 +830,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       mucusSign: serializer.fromJson<String?>(json['mucusSign']),
       mucusQuality: serializer.fromJson<String?>(json['mucusQuality']),
       cervix: serializer.fromJson<String?>(json['cervix']),
+      cervixPosition: serializer.fromJson<String?>(json['cervixPosition']),
+      cervixOpening: serializer.fromJson<String?>(json['cervixOpening']),
       painBreast: serializer.fromJson<bool>(json['painBreast']),
       painMittelschmerz: serializer.fromJson<bool>(json['painMittelschmerz']),
       mood: serializer.fromJson<bool>(json['mood']),
@@ -792,6 +859,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'mucusSign': serializer.toJson<String?>(mucusSign),
       'mucusQuality': serializer.toJson<String?>(mucusQuality),
       'cervix': serializer.toJson<String?>(cervix),
+      'cervixPosition': serializer.toJson<String?>(cervixPosition),
+      'cervixOpening': serializer.toJson<String?>(cervixOpening),
       'painBreast': serializer.toJson<bool>(painBreast),
       'painMittelschmerz': serializer.toJson<bool>(painMittelschmerz),
       'mood': serializer.toJson<bool>(mood),
@@ -817,6 +886,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           Value<String?> mucusSign = const Value.absent(),
           Value<String?> mucusQuality = const Value.absent(),
           Value<String?> cervix = const Value.absent(),
+          Value<String?> cervixPosition = const Value.absent(),
+          Value<String?> cervixOpening = const Value.absent(),
           bool? painBreast,
           bool? painMittelschmerz,
           bool? mood,
@@ -842,6 +913,10 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         mucusQuality:
             mucusQuality.present ? mucusQuality.value : this.mucusQuality,
         cervix: cervix.present ? cervix.value : this.cervix,
+        cervixPosition:
+            cervixPosition.present ? cervixPosition.value : this.cervixPosition,
+        cervixOpening:
+            cervixOpening.present ? cervixOpening.value : this.cervixOpening,
         painBreast: painBreast ?? this.painBreast,
         painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
         mood: mood ?? this.mood,
@@ -878,6 +953,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ? data.mucusQuality.value
           : this.mucusQuality,
       cervix: data.cervix.present ? data.cervix.value : this.cervix,
+      cervixPosition: data.cervixPosition.present
+          ? data.cervixPosition.value
+          : this.cervixPosition,
+      cervixOpening: data.cervixOpening.present
+          ? data.cervixOpening.value
+          : this.cervixOpening,
       painBreast:
           data.painBreast.present ? data.painBreast.value : this.painBreast,
       painMittelschmerz: data.painMittelschmerz.present
@@ -908,6 +989,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
+          ..write('cervixPosition: $cervixPosition, ')
+          ..write('cervixOpening: $cervixOpening, ')
           ..write('painBreast: $painBreast, ')
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
@@ -935,6 +1018,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         mucusSign,
         mucusQuality,
         cervix,
+        cervixPosition,
+        cervixOpening,
         painBreast,
         painMittelschmerz,
         mood,
@@ -961,6 +1046,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.mucusSign == this.mucusSign &&
           other.mucusQuality == this.mucusQuality &&
           other.cervix == this.cervix &&
+          other.cervixPosition == this.cervixPosition &&
+          other.cervixOpening == this.cervixOpening &&
           other.painBreast == this.painBreast &&
           other.painMittelschmerz == this.painMittelschmerz &&
           other.mood == this.mood &&
@@ -985,6 +1072,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<String?> mucusSign;
   final Value<String?> mucusQuality;
   final Value<String?> cervix;
+  final Value<String?> cervixPosition;
+  final Value<String?> cervixOpening;
   final Value<bool> painBreast;
   final Value<bool> painMittelschmerz;
   final Value<bool> mood;
@@ -1007,6 +1096,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
+    this.cervixPosition = const Value.absent(),
+    this.cervixOpening = const Value.absent(),
     this.painBreast = const Value.absent(),
     this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
@@ -1030,6 +1121,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.mucusSign = const Value.absent(),
     this.mucusQuality = const Value.absent(),
     this.cervix = const Value.absent(),
+    this.cervixPosition = const Value.absent(),
+    this.cervixOpening = const Value.absent(),
     this.painBreast = const Value.absent(),
     this.painMittelschmerz = const Value.absent(),
     this.mood = const Value.absent(),
@@ -1053,6 +1146,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<String>? mucusSign,
     Expression<String>? mucusQuality,
     Expression<String>? cervix,
+    Expression<String>? cervixPosition,
+    Expression<String>? cervixOpening,
     Expression<bool>? painBreast,
     Expression<bool>? painMittelschmerz,
     Expression<bool>? mood,
@@ -1076,6 +1171,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (mucusSign != null) 'mucus_sign': mucusSign,
       if (mucusQuality != null) 'mucus_quality': mucusQuality,
       if (cervix != null) 'cervix': cervix,
+      if (cervixPosition != null) 'cervix_position': cervixPosition,
+      if (cervixOpening != null) 'cervix_opening': cervixOpening,
       if (painBreast != null) 'pain_breast': painBreast,
       if (painMittelschmerz != null) 'pain_mittelschmerz': painMittelschmerz,
       if (mood != null) 'mood': mood,
@@ -1101,6 +1198,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<String?>? mucusSign,
       Value<String?>? mucusQuality,
       Value<String?>? cervix,
+      Value<String?>? cervixPosition,
+      Value<String?>? cervixOpening,
       Value<bool>? painBreast,
       Value<bool>? painMittelschmerz,
       Value<bool>? mood,
@@ -1123,6 +1222,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       mucusSign: mucusSign ?? this.mucusSign,
       mucusQuality: mucusQuality ?? this.mucusQuality,
       cervix: cervix ?? this.cervix,
+      cervixPosition: cervixPosition ?? this.cervixPosition,
+      cervixOpening: cervixOpening ?? this.cervixOpening,
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       mood: mood ?? this.mood,
@@ -1178,6 +1279,12 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (cervix.present) {
       map['cervix'] = Variable<String>(cervix.value);
     }
+    if (cervixPosition.present) {
+      map['cervix_position'] = Variable<String>(cervixPosition.value);
+    }
+    if (cervixOpening.present) {
+      map['cervix_opening'] = Variable<String>(cervixOpening.value);
+    }
     if (painBreast.present) {
       map['pain_breast'] = Variable<bool>(painBreast.value);
     }
@@ -1221,6 +1328,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('mucusSign: $mucusSign, ')
           ..write('mucusQuality: $mucusQuality, ')
           ..write('cervix: $cervix, ')
+          ..write('cervixPosition: $cervixPosition, ')
+          ..write('cervixOpening: $cervixOpening, ')
           ..write('painBreast: $painBreast, ')
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('mood: $mood, ')
@@ -1873,6 +1982,8 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
   Value<String?> cervix,
+  Value<String?> cervixPosition,
+  Value<String?> cervixOpening,
   Value<bool> painBreast,
   Value<bool> painMittelschmerz,
   Value<bool> mood,
@@ -1897,6 +2008,8 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<String?> mucusSign,
   Value<String?> mucusQuality,
   Value<String?> cervix,
+  Value<String?> cervixPosition,
+  Value<String?> cervixOpening,
   Value<bool> painBreast,
   Value<bool> painMittelschmerz,
   Value<bool> mood,
@@ -1977,6 +2090,13 @@ class $$CycleEntriesTableFilterComposer
 
   ColumnFilters<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cervixPosition => $composableBuilder(
+      column: $table.cervixPosition,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cervixOpening => $composableBuilder(
+      column: $table.cervixOpening, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => ColumnFilters(column));
@@ -2075,6 +2195,14 @@ class $$CycleEntriesTableOrderingComposer
   ColumnOrderings<String> get cervix => $composableBuilder(
       column: $table.cervix, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get cervixPosition => $composableBuilder(
+      column: $table.cervixPosition,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cervixOpening => $composableBuilder(
+      column: $table.cervixOpening,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => ColumnOrderings(column));
 
@@ -2166,6 +2294,12 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<String> get cervix =>
       $composableBuilder(column: $table.cervix, builder: (column) => column);
 
+  GeneratedColumn<String> get cervixPosition => $composableBuilder(
+      column: $table.cervixPosition, builder: (column) => column);
+
+  GeneratedColumn<String> get cervixOpening => $composableBuilder(
+      column: $table.cervixOpening, builder: (column) => column);
+
   GeneratedColumn<bool> get painBreast => $composableBuilder(
       column: $table.painBreast, builder: (column) => column);
 
@@ -2247,6 +2381,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
+            Value<String?> cervixPosition = const Value.absent(),
+            Value<String?> cervixOpening = const Value.absent(),
             Value<bool> painBreast = const Value.absent(),
             Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
@@ -2270,6 +2406,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
             cervix: cervix,
+            cervixPosition: cervixPosition,
+            cervixOpening: cervixOpening,
             painBreast: painBreast,
             painMittelschmerz: painMittelschmerz,
             mood: mood,
@@ -2293,6 +2431,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<String?> mucusSign = const Value.absent(),
             Value<String?> mucusQuality = const Value.absent(),
             Value<String?> cervix = const Value.absent(),
+            Value<String?> cervixPosition = const Value.absent(),
+            Value<String?> cervixOpening = const Value.absent(),
             Value<bool> painBreast = const Value.absent(),
             Value<bool> painMittelschmerz = const Value.absent(),
             Value<bool> mood = const Value.absent(),
@@ -2316,6 +2456,8 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             mucusSign: mucusSign,
             mucusQuality: mucusQuality,
             cervix: cervix,
+            cervixPosition: cervixPosition,
+            cervixOpening: cervixOpening,
             painBreast: painBreast,
             painMittelschmerz: painMittelschmerz,
             mood: mood,

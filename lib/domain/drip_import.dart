@@ -21,6 +21,7 @@
 // every assumption an INER expert should re-check carries a
 // TODO(user-review) marker.
 
+import 'cervix.dart';
 import 'export_import.dart';
 import 'mucus.dart';
 
@@ -241,6 +242,16 @@ DripCsvImport dripCsvToExportJson(String raw) {
       firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
+    // drip ALSO carries the cervix vocabulary indexes (0-based), of which
+    // two map naturally onto the structured Muttermund fields: position
+    // low/medium/high and opening closed/medium/open (firmness has no
+    // storage option and stays in the free-text line above). Out-of-range
+    // or non-numeric indexes map to null per field; the free text keeps
+    // its (clamping) behavior.
+    final cervixObservation = _cervixObservation(
+      opening: cell(dataRow, 'cervix.opening'),
+      position: cell(dataRow, 'cervix.position'),
+    );
     // desire.value is drip's 0=low/1=medium/2=high intensity vocabulary —
     // NOT a real boolean (the flag collapses it: intensity is not storable
     // here, see the mapping table). Any present cell means desire; only a
@@ -322,6 +333,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'mucus_sign': mucus?.sign?.name,
       'mucus_quality': mucus?.quality?.name,
       'cervix': cervix,
+      'cervix_position': cervixObservation?.position?.name,
+      'cervix_opening': cervixObservation?.opening?.name,
       'pain_breast': painBreast,
       'pain_mittelschmerz': painMittelschmerz,
       'mood': mood,
@@ -485,4 +498,29 @@ String? _cervixText({
   ].whereType<String>().toList();
   if (parts.isEmpty) return null;
   return parts.join(', ');
+}
+
+/// Structured Muttermund tokens of a drip row, decoded from drip's 0-based
+/// vocabularies (drip: labels.js): position {0: CervixPosition.low,
+/// 1: medium, 2: high} and opening {0: CervixOpening.closed, 1: middle,
+/// 2: open}. drip's "medium" opening token maps onto cycle-app's `middle`
+/// (same value, different storage name — see lib/domain/cervix.dart for
+/// the deliberate token distinction). An index outside the vocabulary
+/// means no stored observation for that dimension (the free-text line
+/// clamps instead — TODO(user-review): whether that clamping asymmetry is
+/// acceptable for the hand-authored specimen rows).
+({CervixPosition? position, CervixOpening? opening})? _cervixObservation({
+  required String? opening,
+  required String? position,
+}) {
+  final p = position == null ? null : int.tryParse(position);
+  final o = opening == null ? null : int.tryParse(opening);
+  final mappedPosition = p == null || p < 0 || p > 2
+      ? null
+      : CervixPosition.values[p]; // 0, 1, 2 = the first three values
+  final mappedOpening = o == null || o < 0 || o > 2
+      ? null
+      : CervixOpening.values[o]; // 0, 1, 2 = all three values
+  if (mappedPosition == null && mappedOpening == null) return null;
+  return (position: mappedPosition, opening: mappedOpening);
 }

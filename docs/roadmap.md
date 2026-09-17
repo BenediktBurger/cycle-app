@@ -67,7 +67,6 @@ the sections above track planned work, git history keeps the record (see
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
-- [ ] Muttermund Beobachtung (Position und Öfnnung) ermöglichen mit verschiedenen Positionen auf Chart anzeigen (low, medium, high, very high, unreachable), opening (geschlossen, mittel, offen)
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
 - pdf export for consultants (one cycle per sheet?)
 - [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date

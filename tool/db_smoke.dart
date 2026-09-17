@@ -16,6 +16,7 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -141,6 +142,8 @@ Future<void> main() async {
     mucusSign: MucusSign.s,
     mucusQuality: MucusQuality.gl,
     cervix: 'closed, low',
+    cervixPosition: CervixPosition.veryHigh,
+    cervixOpening: CervixOpening.open,
     painBreast: true,
     painMittelschmerz: true,
     mood: true,
@@ -151,6 +154,19 @@ Future<void> main() async {
   final mappedBack =
       dailyEntryFromDrift(await db.entriesDao.upsertDaily(input));
   check(mappedBack == input, 'domain round trip via drift preserves entry');
+  // The Muttermund options are stored as their TEXT enum-name tokens.
+  final cervixTokens = await db
+      .customSelect('SELECT cervix_position, cervix_opening '
+          'FROM cycle_entries WHERE date = ?',
+          variables: [
+        Variable.withInt(DateOnly.normalize(DateTime(2026, 6, 15))
+            .difference(DateTime.utc(1970))
+            .inDays)
+      ]).getSingle();
+  check(cervixTokens.data['cervix_position'] == 'veryHigh',
+      'raw cervix_position token is the enum name');
+  check(cervixTokens.data['cervix_opening'] == 'open',
+      'raw cervix_opening token is the enum name');
 
   // --- bleeding levels: all five levels round-trip the drift layer --------
   // The stored number is Bleeding.level (0 none … 4 heavy), mapped through

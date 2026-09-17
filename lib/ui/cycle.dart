@@ -16,6 +16,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/cervix.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
@@ -376,7 +377,7 @@ final class _SymbolCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (entry == null) {
-      return const SizedBox(height: 26);
+      return const SizedBox(height: 38);
     }
     // Bleeding marker (top): none draws nothing; spotting is the hollow
     // ring; light..heavy fill the circle with the error color at the same
@@ -428,6 +429,29 @@ final class _SymbolCell extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 2),
+        // Muttermund position glyph (third line). Raw observation display
+        // only, never a fertility conclusion (ADR-0001); the letters are
+        // the German vocabulary's initial letters — see the
+        // TODO(user-review) in cervix.dart. Neutral on-surface ink: no
+        // scheme hue is claimed, so the glyph cannot be confused with the
+        // temperature/bleeding/mucus/baseline signal colors.
+        if (entry!.cervixPosition != null)
+          SizedBox(
+            height: 10,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                cervixPositionSymbol(entry!.cervixPosition!),
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 10),
       ],
     );
   }
@@ -474,6 +498,11 @@ final class _Legend extends StatelessWidget {
           shape: _LegendShape.arrowUp,
         ),
         _LegendDot(
+          color: scheme.onSurface,
+          label: AppLocalizations.of(context).zyklusLegendCervix,
+          shape: _LegendShape.cervix,
+        ),
+        _LegendDot(
           color: scheme.secondary,
           label: AppLocalizations.of(context).zyklusLegendBaseline,
           shape: _LegendShape.line,
@@ -483,7 +512,7 @@ final class _Legend extends StatelessWidget {
   }
 }
 
-enum _LegendShape { dot, ring, text, circledDot, arrowUp, line }
+enum _LegendShape { dot, ring, text, circledDot, arrowUp, line, cervix }
 
 final class _LegendDot extends StatelessWidget {
   const _LegendDot({
@@ -535,6 +564,12 @@ final class _LegendDot extends StatelessWidget {
           ),
         ),
       _LegendShape.arrowUp => ArrowUpGlyph(color: color),
+      // Sample Muttermund glyph: the "medium" letter, exactly how a
+      // recorded cervix day renders in the symbol row above.
+      _LegendShape.cervix => Text(
+          cervixPositionSymbol(CervixPosition.medium),
+          style: TextStyle(fontSize: 10, color: color),
+        ),
       _LegendShape.line => Container(width: 16, height: 2, color: color),
     };
     return Row(

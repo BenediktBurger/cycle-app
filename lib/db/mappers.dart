@@ -4,6 +4,7 @@
 
 import 'package:drift/drift.dart';
 
+import '../domain/cervix.dart';
 import '../domain/date_only.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
@@ -34,6 +35,8 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     mucusSign: mucus.sign,
     mucusQuality: mucus.quality,
     cervix: e.cervix,
+    cervixPosition: tryParseCervixPosition(e.cervixPosition),
+    cervixOpening: tryParseCervixOpening(e.cervixOpening),
     painBreast: e.painBreast,
     painMittelschmerz: e.painMittelschmerz,
     mood: e.mood,
@@ -68,6 +71,10 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     mucusSign: Value(mucus.sign?.name),
     mucusQuality: Value(mucus.quality?.name),
     cervix: Value(d.cervix),
+    // Stable enum-name TEXT tokens (like mucusSign/mucusQuality); the CHECK
+    // constraints on the columns accept exactly this vocabulary.
+    cervixPosition: Value(d.cervixPosition?.name),
+    cervixOpening: Value(d.cervixOpening?.name),
     painBreast: Value(d.painBreast),
     painMittelschmerz: Value(d.painMittelschmerz),
     mood: Value(d.mood),

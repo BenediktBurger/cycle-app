@@ -1,4 +1,4 @@
-// The app's drift database (schema version 5).
+// The app's drift database (schema version 6).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // profiles_dao.dart) are PARTS of this library. That is the standard drift
@@ -37,7 +37,7 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

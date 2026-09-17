@@ -12,6 +12,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
@@ -32,7 +33,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v4)', () {
+  group('schema & migration (v6)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -264,7 +265,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 5,
+      expect(userVersion.data['user_version'], 6,
           reason: 'drift records the upgrade run');
 
       // Stale rows are gone; the main profile is re-seeded as id 1 so the
@@ -287,6 +288,8 @@ void main() {
       expect(sql, contains('measured_at_minutes'),
           reason: 'the shred-and-recreate upgrade yields the current schema, '
               'including the newest column');
+      expect(sql, contains('cervix_position'),
+          reason: 'the current schema includes the Muttermund columns');
 
       // The unique index came back with the recreated table, foreign keys
       // are enforced again (beforeOpen), and a normal DAO write works.
@@ -393,6 +396,8 @@ void main() {
         mucusSign: MucusSign.s,
         mucusQuality: MucusQuality.ew,
         cervix: 'closed, low',
+        cervixPosition: CervixPosition.veryHigh,
+        cervixOpening: CervixOpening.open,
         painBreast: true,
         painMittelschmerz: true,
         mood: true,

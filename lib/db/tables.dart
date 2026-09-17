@@ -84,8 +84,29 @@ class CycleEntries extends Table {
         "'fl', 'ns')))",
       )();
 
-  /// Optional cervix observation (free text).
+  /// Optional cervix observation (free text, e.g. a note next to the two
+  /// categorical Muttermund options below).
   TextColumn get cervix => text().nullable()();
+
+  /// Muttermund (cervix) POSITION of the day, as a nullable TEXT token from
+  /// the [CervixPosition] enum-name vocabulary: NULL when not observed,
+  /// else 'low' / 'medium' / 'high' / 'veryHigh' / 'unreachable' (tief …
+  /// unerreichbar). Stored like mucus_sign (TEXT enum-name tokens, engine
+  /// CHECK on the vocabulary; note the deliberate distinction
+  /// position:'medium' — the OPENING column below spells its middle value
+  /// 'middle'). German display labels live in the l10n arbs.
+  TextColumn get cervixPosition => text().nullable().customConstraint(
+        "CHECK (cervix_position IS NULL OR cervix_position IN "
+        "('low', 'medium', 'high', 'veryHigh', 'unreachable'))",
+      )();
+
+  /// Muttermund (cervix) OPENING of the day, as above: NULL when not
+  /// observed, else 'closed' / 'middle' / 'open' (geschlossen · mittel ·
+  /// offen). Independent of cervix_position.
+  TextColumn get cervixOpening => text().nullable().customConstraint(
+        "CHECK (cervix_opening IS NULL OR cervix_opening IN "
+        "('closed', 'middle', 'open'))",
+      )();
 
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and

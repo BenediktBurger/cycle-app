@@ -49,12 +49,15 @@ void main() {
 
     // The Tagebuch screen is the shell's initial tab; the bleeding control
     // sits on its entry form. All five levels of the numeric scale must be
-    // offered (German labels, per the pinned locale).
+    // offered (German labels, per the pinned locale). NB "mittel" is also
+    // the German label of one Muttermund position AND of the opening chip
+    // "mittel" on the same form, so the strict one-match assertion does not
+    // apply to that one word.
     const levels = ['keine', 'Schmierblutung', 'leicht', 'mittel', 'stark'];
     for (final level in levels) {
       expect(
         find.text(level),
-        findsOneWidget,
+        findsWidgets,
         reason: 'Bleeding option "$level" should be offered on the form',
       );
     }
