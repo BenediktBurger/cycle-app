@@ -181,6 +181,56 @@
       }
     }
   },
+  "cycleSummaryCycleLength": "Cycle length",
+  "@cycleSummaryCycleLength": {
+    "description": "Row label of the cycle screen's evaluation table: the days between consecutive period onsets."
+  },
+  "cycleSummaryPeriodStart": "Period start",
+  "@cycleSummaryPeriodStart": {
+    "description": "Row label of the cycle screen's evaluation table: the cycle's first menstruation-level bleeding day."
+  },
+  "cycleSummaryPeriodEnd": "Period end",
+  "@cycleSummaryPeriodEnd": {
+    "description": "Row label of the cycle screen's evaluation table: the cycle's last menstruation-level bleeding day."
+  },
+  "cycleSummaryPeak": "Mucus peak",
+  "@cycleSummaryPeak": {
+    "description": "Row label of the cycle screen's evaluation table: the user-placed mucus-peak day."
+  },
+  "cycleSummarySuz": "SUZ start",
+  "@cycleSummarySuz": {
+    "description": "Row label of the cycle screen's evaluation table: the computed start of the sicher unfruchtbare Zeit with its rule (D/E)."
+  },
+  "cycleSummaryStatus": "Evaluation",
+  "@cycleSummaryStatus": {
+    "description": "Row label of the cycle screen's evaluation table's status row: the SUZ day with its rule once determined, the stopped note while the automatic evaluation is broken, or the missing marker."
+  },
+  "cycleSummaryColumn": "Cycle {n}",
+  "@cycleSummaryColumn": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Column header of the evaluation table's per-cycle columns, numbered over the recorded period onsets."
+  },
+  "cycleSummarySuzEvening": "rule D (in the evening)",
+  "@cycleSummarySuzEvening": {
+    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule D begins the SUZ in the evening of the trigger day."
+  },
+  "cycleSummarySuzMorning": "rule E (in the morning)",
+  "@cycleSummarySuzMorning": {
+    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule E begins the SUZ in the morning of the trigger day."
+  },
+  "cycleSummarySuzFrom": "SUZ from {day}",
+  "@cycleSummarySuzFrom": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    },
+    "description": "Status-row text for a determined SUZ: the begin day (pre-formatted) followed by the rule."
+  },
   "statisticsNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
   "statisticsNoData": "Cycle lengths appear once two period onsets are recorded.",
   "statisticsCycles": "Cycle lengths",

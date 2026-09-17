@@ -547,13 +547,31 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Mucus peak'), findsOneWidget,
+      // The evaluation table below the chart card renders its own row
+      // labels behind the sheet (its "Mucus peak" attribute row), so the
+      // sheet's glossary entries are asserted scoped to the sheet.
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text('Mucus peak')),
+          findsOneWidget,
           reason: 'the solid-dot legend entry replaced the old ring entry');
-      expect(find.text('Circled higher measurements'), findsOneWidget);
-      expect(find.text('Higher measurement (arrow)'), findsOneWidget,
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text('Circled higher measurements')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text('Higher measurement (arrow)')),
+          findsOneWidget,
           reason: 'arrows now mean: no peak before the rise (R4)');
-      expect(find.text('Baseline'), findsOneWidget);
-      // The pre-peak wording is gone (R4 removed the special case).
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text('Baseline')),
+          findsOneWidget);      // The pre-peak wording is gone (R4 removed the special case).
       expect(find.text('Higher measurement before the peak'), findsNothing);
     });
 

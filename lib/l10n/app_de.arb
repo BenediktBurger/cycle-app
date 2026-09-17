@@ -166,6 +166,16 @@
       }
     }
   },
+  "cycleSummaryCycleLength": "Zykluslänge",
+  "cycleSummaryPeriodStart": "Mensbeginn",
+  "cycleSummaryPeriodEnd": "Mensende",
+  "cycleSummaryPeak": "Schleimhöhepunkt",
+  "cycleSummarySuz": "SUZ-Beginn",
+  "cycleSummaryStatus": "Auswertung",
+  "cycleSummaryColumn": "Zyklus {n}",
+  "cycleSummarySuzEvening": "Regel D (gegen Abend)",
+  "cycleSummarySuzMorning": "Regel E (am Morgen)",
+  "cycleSummarySuzFrom": "SUZ ab {day}",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
   "statisticsNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",

@@ -51,6 +51,7 @@ import 'cycle_curve.dart';
 import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';
 import 'cycle_marks.dart';
+import 'cycle_summary.dart';
 import 'mucus_symbol.dart';
 
 class ZyklusScreen extends ConsumerWidget {
@@ -87,10 +88,23 @@ class ZyklusScreen extends ConsumerWidget {
               ),
             );
           }
+          // The evaluation table's input, like the chart overlay's: the
+          // entries plus the user-placed marks, evaluated at render time
+          // (ADR-0001). Watching the marks stream here makes a mark change
+          // rebuild the whole screen — the table recomputes, nothing is
+          // persisted.
+          final marks = ref.watch(marksProvider).valueOrNull ??
+              const <CycleMark>[];
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
               _CycleChart(entries: entries),
+              const SizedBox(height: 12),
+              // The paper's bottom summary: the evaluation table, one row
+              // per attribute, one column per cycle group.
+              CycleSummaryTable(
+                evaluations: evaluateCycles(entries, marks),
+              ),
               const SizedBox(height: 12),
               Text(
                 l10n.cycleArithmeticNote,

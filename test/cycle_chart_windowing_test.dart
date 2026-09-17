@@ -64,8 +64,13 @@ Widget _chartHarness({
     );
 
 /// The finder for the horizontal scroll view that carries the chart block.
-Finder _hScrollView() => find.byWidgetPredicate(
-    (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
+/// The evaluation table below the chart block has its own horizontal
+/// scroller (key `cycleSummaryScroll`) — it is not the chart block, so it
+/// is excluded by that key here.
+Finder _hScrollView() => find.byWidgetPredicate((w) =>
+    w is SingleChildScrollView &&
+    w.scrollDirection == Axis.horizontal &&
+    w.key != const ValueKey('cycleSummaryScroll'));
 
 void main() {
   group('long recorded range (60 days)', () {
@@ -96,8 +101,7 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: _longEntries()));
       await tester.pumpAndSettle();
 
-      final scrollView = find.byWidgetPredicate((w) =>
-          w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
+      final scrollView = _hScrollView();
       expect(scrollView, findsOneWidget,
           reason: 'the whole chart block is horizontally scrollable');
       final state = tester.state<ScrollableState>(
@@ -333,8 +337,7 @@ void main() {
             reason: 'a short range fits usefully on one screen');
       }
 
-      final scrollView = find.byWidgetPredicate((w) =>
-          w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
+      final scrollView = _hScrollView();
       expect(scrollView, findsOneWidget,
           reason: 'the chart is still laid out as one scrollable block');
       final state = tester.state<ScrollableState>(

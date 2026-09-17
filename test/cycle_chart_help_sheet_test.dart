@@ -10,6 +10,7 @@ import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
+import 'package:cycle_app/ui/cycle_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,9 +106,12 @@ void main() {
           reason: 'the action carries its localized tooltip');
 
       // The legend is gone from the screen: no glossary text renders
-      // outside the sheet.
+      // outside the sheet. The evaluation table below the chart card
+      // legitimately renders its own localized row labels (its "Mucus
+      // peak" row is a table attribute, not a glossary entry), so the
+      // table's subtree is excluded from this absence check.
       for (final entry in _glossaryEn) {
-        expect(find.text(entry), findsNothing,
+        expect(outsideTable(find.text(entry)), isEmpty,
             reason: '"$entry" no longer sits on the screen');
       }
     });
@@ -127,7 +131,13 @@ void main() {
       expect(find.text('Symbol glossary'), findsOneWidget,
           reason: 'the sheet is titled');
       for (final entry in _glossaryEn) {
-        expect(find.text(entry), findsOneWidget,
+        // Scoped to the sheet: the evaluation table renders its own row
+        // labels behind the sheet (the "Mucus peak" attribute row).
+        expect(
+            find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.text(entry)),
+            findsOneWidget,
             reason: 'the glossary explains "$entry"');
       }
       // The sheet also carries the evaluation-arithmetic note (which stays
@@ -157,7 +167,14 @@ void main() {
 
       expect(find.text('Zeichenerklärung'), findsOneWidget);
       for (final entry in _glossaryDe) {
-        expect(find.text(entry), findsOneWidget, reason: 'de: "$entry"');
+        // Scoped to the sheet: the evaluation table renders its own row
+        // labels behind the sheet (the "Schleimhöhepunkt" attribute row).
+        expect(
+            find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.text(entry)),
+            findsOneWidget,
+            reason: 'de: "$entry"');
       }
       expect(
           find.descendant(
@@ -167,3 +184,17 @@ void main() {
     });
   });
 }
+
+/// The glossary [finder]'s matches that do NOT sit inside the evaluation
+/// table: the table legitimately renders its own localized row labels (its
+/// "Mucus peak" row is a table attribute, not a glossary entry), so the
+/// glossary-absence check filters those matches out.
+Iterable<Element> outsideTable(Finder finder) =>
+    finder.evaluate().where((element) {
+      var insideTable = false;
+      element.visitAncestorElements((ancestor) {
+        if (ancestor.widget is CycleSummaryTable) insideTable = true;
+        return !insideTable;
+      });
+      return !insideTable;
+    });

@@ -37,11 +37,16 @@ Finder _navLabel(String label) =>
     find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
 /// The horizontal scroll view that carries the cycle chart block, scoped to
-/// the Zyklus screen (other tabs have their own scrollables).
+/// the Zyklus screen (other tabs have their own scrollables). The evaluation
+/// table below the chart block has its own horizontal scroller (key
+/// `cycleSummaryScroll`) — it is not the chart block, so it is excluded by
+/// that key here.
 Finder _chartScrollView() => find.descendant(
       of: find.byType(ZyklusScreen),
       matching: find.byWidgetPredicate((w) =>
-          w is SingleChildScrollView && w.scrollDirection == Axis.horizontal),
+          w is SingleChildScrollView &&
+          w.scrollDirection == Axis.horizontal &&
+          w.key != const ValueKey('cycleSummaryScroll')),
     );
 
 Widget _appScope(StreamController<List<DailyEntry>> entries) => ProviderScope(
