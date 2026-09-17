@@ -61,8 +61,9 @@
 //       candidates stay unmarked.
 //   R7  Every marked candidate carries its difference to the baseline
 //       (differenceK) so the UI can render it without arithmetic.
-//   R9  The six-low numbering and the baseline are unchanged (see the
-//       interpretive assumptions below).
+//   R9  Six-low numbering and baseline: the six-low window is the SIX
+//       PREVIOUS CALENDAR DAYS before the marked rise, its numbering is
+//       the calendar offset (settled — see the rules below).
 //   R10 Baseline SEGMENT: the evaluation reports the x-extent the drawn
 //       baseline line covers (baselineSpan). START: the earliest numbered
 //       low day (low #6; see the TODO below for the fewer-than-six case).
@@ -78,32 +79,46 @@
 // Interpretive assumptions (validate with an expert reviewer, see
 // docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
 //
-//   TODO(user-review): A "low" measurement is any usable day (temperature
-//   measured, no exclusion flag) strictly before the user-marked first
-//   higher measurement. The cheat sheet does not define "tief" beyond the
-//   numbering rule; a high pre-rise temperature can therefore legitimately
-//   sit inside the six-low window and set the baseline when the user
-//   marked the first higher late (the textbook "Zacken" are usually
-//   excluded days anyway). The peak day itself counts as a low when it
-//   falls into the window — its mucus role does not exempt its temperature.
-//   TODO(user-review): Untracked days (data gaps) and unmeasured days
-//   consume no 1–6 slot today — should they take one of the six slots?
-//   TODO(user-review): Numbering counts BACKWARDS from the first higher
-//   measurement ("zurücknummerieren"): the low directly before it is 1.
-//   The chronological alternative (1..6 ending right before the rise) is
-//   plausible; only the [NumberedLow.number] field is affected.
+//   Settled rule (owner-confirmed 2026-09-17): the six-low window is the
+//   SIX PREVIOUS CALENDAR DAYS before the user-marked first higher
+//   measurement (rise−1 … rise−6), intersected with the cycle group's
+//   tracked days; the baseline is the MAX of the not-excluded MEASURED
+//   temperatures within those days (the earliest maximum wins on ties).
+//   Any measured, not-excluded temperature in the window counts as a low,
+//   regardless of its mucus role — the peak day itself carries a number
+//   when it falls into the window. (This subsumes the old "peak day
+//   counts as a low" TODO.) An EXCLUDED day occupies its calendar day
+//   but contributes no temperature — no number, no baseline effect. A
+//   window reaching past the group's first tracked day (rise marked
+//   within the first six days of a cycle group) truncates at the group's
+//   tracked days — the edge case is consciously NOT handled further
+//   (owner: "should never happen physically").
+//   Settled rule (owner-confirmed 2026-09-17): numbering belongs to the
+//   CALENDAR POSITIONS, not to a dense index over the measured lows. The
+//   measured, not-excluded day at rise−i carries number i — counting back
+//   from the rise (summary rule 2.2 numbers the six days "6 … 1"; the
+//   cheat sheet says "zurücknummerieren"). An omitted (untracked or
+//   unmeasured) window day gets NO number — numbers skip, e.g.
+//   "6 5 _ 3 _ 1" (day rise−4 and rise−2 unmeasured).
+//   [NumberedLow.number] is therefore the calendar offset. The retired
+//   slot-consumption question (do untracked days consume a 1–6 slot?) is
+//   moot under the calendar window: untracked and unmeasured days are
+//   window days but contribute no temperature.
 //   Settled rule (owner-confirmed 2026-09-17): an unmeasured or EXCLUDED
 //   day inside the candidate sequence counts exactly like a day at/below
 //   the baseline — a gap day consuming the one-gap R2 allowance. The R2
 //   class list ("missing, excluded, or at/below the baseline") names one
 //   and the same gap-day class; no interpretation is deferred here.
-//   TODO(user-review): The SUZ (rules D and E) is declared only from
-//   CIRCLED measurements — the cheat sheet's rule wording speaks of the
-//   "umrandete höhere Messung" (the circled higher measurement), and the
-//   owner confirmed that reading. Circles exist only AFTER the mucus peak
-//   day (R4), so an arrow sequence (peak unset, or all candidates at or
-//   before the peak) never yields an SUZ. The flag stays until expert
-//   review; it is not declared resolved here.
+//   Settled: the SUZ (rules D and E) is declared only from CIRCLED
+//   measurements. Summary rule 2.5 states arrows are "keine höhere
+//   Messung im Sinne dieser Auswertung"; rules 2.7/2.8 and the cheat
+//   sheet's rule wording ("umrandete höhere Messung" — the circled higher
+//   measurement) drive rules D and E, so arrows never start the SUZ.
+//   Circles exist only AFTER the mucus peak day (R4), so an arrow
+//   sequence (peak unset, or all candidates at or before the peak) never
+//   yields an SUZ. Honesty note: the overall Mode-M posture — including
+//   this reading of the rules — is still a Hypothesis (ADR-0001); the
+//   owner confirmed the rule interpretation, not the INER expert review.
 //   TODO(user-review): R10 with fewer than six numbered lows: the segment
 //   START falls on the earliest AVAILABLE low day instead of a low #6 that
 //   does not exist. R10 defines only the six-low case; the fallback is this
@@ -167,8 +182,12 @@ final class NumberedLow {
     required this.value,
   });
 
-  /// The 1–6 number (counting BACK from the first higher measurement, see
-  /// the file-header assumption).
+  /// The 1–6 calendar-offset number: the measured, not-excluded day at
+  /// rise−i carries number i, counting back from the first higher
+  /// measurement. Numbers belong to CALENDAR POSITIONS — an omitted
+  /// (untracked, unmeasured, or excluded) window day gets no number and
+  /// its number is skipped, e.g. "6 5 _ 3 _ 1" (see the settled rule in
+  /// the file header).
   final int number;
 
   final DateTime date;
@@ -422,11 +441,12 @@ final class _LowWindow {
   final List<NumberedLow> numberedLows;
   final BaselinePoint? baseline;
 
-  /// The earliest numbered low day (low #6 when six lows exist, the oldest
-  /// available low otherwise) — the R10 baseline-segment START. Null when
-  /// no usable low measurement exists. Computed as the earliest DATE (not
-  /// "the lowest number") so a future numbering-direction flip does not
-  /// silently move the segment's left edge.
+  /// The earliest numbered low day (low #6 when the window is fully
+  /// measured, the oldest available low otherwise) — the R10
+  /// baseline-segment START. Null when no usable low measurement exists.
+  /// Computed as the earliest DATE (equivalently the lowest number under
+  /// the settled calendar-offset numbering) so the segment's left edge is
+  /// anchored to a position, not to a number.
   DateTime? get startDay {
     DateTime? earliest;
     for (final low in numberedLows) {
@@ -449,41 +469,42 @@ _LowWindow _lowWindowFor(
   );
   if (firstHigherDay == null) return _LowWindow.empty;
 
-  // Usable measurements: temperature recorded and no exclusion flag (see
-  // the file-header low definition; the settled R8 rule keeps excluded
-  // days out of the candidate sequence as well).
-  // cycle.days is sorted ascending by groupIntoCycles.
-  final usable = cycle.days
-      .where((e) => e.bbtC != null && !e.isExcluded)
-      .toList(growable: false);
-
-  // Six low measurements before the first higher, counting BACK (number 1
-  // = the low immediately before the first higher).
-  final prior = usable
-      .where((e) => DateOnly.daysBetween(firstHigherDay, e.date) > 0)
-      .toList();
-  final window = prior.length > 6 ? prior.sublist(prior.length - 6) : prior;
-
+  // The six-low window is the SIX PREVIOUS CALENDAR DAYS before the
+  // user-marked first higher measurement (rise−1 … rise−6 — owner rule,
+  // see the settled low-window rule in the file header), intersected with
+  // the cycle group's tracked days. Numbering belongs to CALENDAR
+  // POSITIONS, not to a dense index over the measured lows: the measured,
+  // not-excluded day at rise−i carries number i; an omitted (untracked or
+  // unmeasured) day and an excluded day get NO number — numbers skip
+  // (the cheat sheet's "zurücknummerieren": 6 … 1). A window reaching
+  // past the group's first tracked day (rise marked within the first six
+  // days of a cycle group) truncates at the group's tracked days — beyond
+  // that it must not reach into the previous cycle group.
+  final byDay = {
+    for (final e in cycle.days) DateOnly.normalize(e.date): e,
+  };
   final lows = <NumberedLow>[];
-  for (var i = window.length - 1, number = 1; i >= 0; i--, number++) {
+  for (var offset = 1; offset <= 6; offset++) {
+    final day = DateOnly.addDays(firstHigherDay, -offset);
+    final entry = byDay[day];
+    // No entry, no temperature, or an exclusion flag: the day occupies its
+    // calendar position but contributes nothing (no number, no baseline).
+    if (entry == null || entry.bbtC == null || entry.isExcluded) continue;
     lows.add(NumberedLow(
-      number: number,
-      date: DateOnly.normalize(window[i].date),
-      value: window[i].bbtC!,
+      number: offset,
+      date: day,
+      value: entry.bbtC!,
     ));
   }
 
   BaselinePoint? baseline;
-  if (window.isNotEmpty) {
-    var best = window.first;
-    for (final e in window) {
+  if (lows.isNotEmpty) {
+    var best = lows.first;
+    for (final low in lows) {
       // Strictly greater keeps the EARLIEST maximum on ties.
-      if (e.bbtC! > best.bbtC!) best = e;
+      if (low.value > best.value) best = low;
     }
-    baseline = BaselinePoint(
-      date: DateOnly.normalize(best.date),
-      value: best.bbtC!,
-    );
+    baseline = BaselinePoint(date: best.date, value: best.value);
   }
 
   return _LowWindow(
@@ -594,7 +615,7 @@ CycleEvaluation _evaluateCycle(
 
       // R5: rules D and E count CIRCLED measurements only — the circle
       // ordinal drives the trigger; arrows never start the SUZ (see the
-      // file-header TODO(user-review) citing the "umrandete" wording).
+      // settled rule in the file header, citing the "umrandete" wording).
       if (markKind == MarkKind.circle && ordinal != null) {
         if (ordinal == 3) {
           if (value >= baseline.value + _suzRuleDAboveBaselineK - _epsilon) {
