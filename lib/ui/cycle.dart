@@ -95,19 +95,24 @@ class ZyklusScreen extends ConsumerWidget {
           // entries plus the user-placed marks, evaluated at render time
           // (ADR-0001). Watching the marks stream here makes a mark change
           // rebuild the whole screen — the table recomputes, nothing is
-          // persisted.
+          // persisted. This is the screen's ONLY marks watch: the
+          // evaluations and the raw marks are computed once and handed to
+          // both the chart overlay and the table below.
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+          final evaluations = evaluateCycles(entries, marks);
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              _CycleChart(entries: entries),
+              _CycleChart(
+                entries: entries,
+                marks: marks,
+                evaluations: evaluations,
+              ),
               const SizedBox(height: 12),
               // The paper's bottom summary: the evaluation table, one row
               // per attribute, one column per cycle group.
-              CycleSummaryTable(
-                evaluations: evaluateCycles(entries, marks),
-              ),
+              CycleSummaryTable(evaluations: evaluations),
               const SizedBox(height: 12),
               Text(
                 l10n.cycleArithmeticNote,
@@ -201,16 +206,28 @@ final class _ChartDays {
 /// honest as distance, not compressed.
 /// Y bounds are rounded to the nearest half degree so the gridlines carry
 /// typical 0.25 °C steps without a "good range" being implied.
-final class _CycleChart extends ConsumerStatefulWidget {
-  const _CycleChart({required this.entries});
+final class _CycleChart extends StatefulWidget {
+  const _CycleChart({
+    required this.entries,
+    required this.marks,
+    required this.evaluations,
+  });
 
   final List<DailyEntry> entries;
 
+  /// The user-placed marks, evaluated with [evaluations] by the screen (at
+  /// render time, ADR-0001) and shared here with the summary table.
+  final List<CycleMark> marks;
+
+  /// The per-cycle evaluations the overlay draws its artifacts from —
+  /// computed once per screen build, never re-derived here.
+  final List<CycleEvaluation> evaluations;
+
   @override
-  ConsumerState<_CycleChart> createState() => _CycleChartState();
+  State<_CycleChart> createState() => _CycleChartState();
 }
 
-final class _CycleChartState extends ConsumerState<_CycleChart> {
+final class _CycleChartState extends State<_CycleChart> {
   /// Narrowest day column still considered usable. Below this width the
   /// day-header labels and the row glyphs would overlap, so a
   /// recorded range longer than one screen scrolls instead of shrinking
@@ -418,12 +435,12 @@ final class _CycleChartState extends ConsumerState<_CycleChart> {
     // arrow-up, 1–6 numbering, baseline) are computed at render time from
     // the entries plus the user-placed marks — never persisted, so a mark
     // change live-updates the whole overlay (ADR-0001). The marks stream is
-    // watched only here: the curve itself never depends on it.
-    final marksAsync = ref.watch(marksProvider);
-    final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
+    // watched once in the screen, which also derives the evaluations the
+    // summary table shows; both arrive as widget fields, so the curve
+    // itself still never depends on a mark change beyond a screen rebuild.
     final overlay = buildEvaluationOverlay(
-      evaluations: evaluateCycles(widget.entries, marks),
-      marks: marks,
+      evaluations: widget.evaluations,
+      marks: widget.marks,
       firstDay: _days.firstDay,
       dayCount: _days.dayCount,
     );
@@ -1246,11 +1263,6 @@ final class _SignalRow extends StatelessWidget {
       ],
     );
   }
-
-  /// The tallest height the peak-dot slot can occupy so a day carries
-  /// its dot above the glyph without shifting the row (mirrors the
-  /// fixed-slot trick used before the per-signal rows).
-  // (kept for reference in the class docs)
 
   /// Cervix: position letter first, firmness shorthand beside it; null
   /// renders an empty cell. The OPENING is deliberately not displayed
