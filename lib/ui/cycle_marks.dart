@@ -427,9 +427,10 @@ BorderSide cycleDayCellBorderSide(BuildContext context,
 
 /// The 1–6 numbering under the chart: one narrow tappable cell per
 /// calendar day, aligned by the same even day spacing as the chart and
-/// the signal rows (mirrors the rows in cycle.dart). The leading strip
-/// matches the chart's y-axis reservation — the curve's columns start
-/// right of it — so day cell i is centered at leadingStrip +
+/// the signal rows (mirrors the rows in cycle.dart). The cells start at
+/// the scroll content's left edge — the chart block's scale and corner
+/// glyphs live in the frozen left rail outside the scroll, so the rows
+/// carry no leading strip — and day cell i is centered at
 /// (i + 0.5) * cellWidth, exactly where the chart draws day i's dot. Days
 /// outside the six-low windows render an empty fixed-height slot. The
 /// cells carry the card's day-cell separators (hairline, thickened on
@@ -439,7 +440,6 @@ final class EvaluationMarksRow extends StatelessWidget {
   const EvaluationMarksRow({
     super.key,
     required this.dayCount,
-    required this.leadingStrip,
     required this.cellWidth,
     required this.numbersByIndex,
     required this.onDayTap,
@@ -448,9 +448,10 @@ final class EvaluationMarksRow extends StatelessWidget {
 
   final int dayCount;
 
-  /// Width of the leading strip (the chart's y-axis title reservation,
-  /// passed in by the chart so both sides share one figure).
-  final double leadingStrip;
+  /// The row's fixed cell height: the frozen left rail (cycle.dart) keeps
+  /// an empty slot of this height so its segments stay vertically in step
+  /// with the scroll content.
+  static const double cellHeight = 14;
 
   final double cellWidth;
   final Map<int, int> numbersByIndex;
@@ -466,7 +467,6 @@ final class EvaluationMarksRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: leadingStrip),
         for (var i = 0; i < dayCount; i++)
           SizedBox(
             width: cellWidth,
@@ -499,9 +499,9 @@ class _NumberCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The fixed slot height keeps all cells aligned with and without a
-    // number (same trick as _SymbolCell's sign slot).
+    // number (same trick as the signal rows' fixed cell heights).
     return SizedBox(
-      height: 14,
+      height: EvaluationMarksRow.cellHeight,
       child: Center(
         child: number == null
             ? null

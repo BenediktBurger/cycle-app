@@ -1,11 +1,12 @@
 // Widget tests of the cycle chart's grid alignment invariant: day i's
 // temperature dot lands exactly at the horizontal CENTER of its day column
-// — the same center the day-label row, the symbol row and the evaluation
-// marks row use. Each of those rows reserves the chart's y-axis strip as a
-// leading spacer, so column i's cell is centered (horizontally) at
-// y-axis strip + (i + 0.5) * cellWidth; the chart's x domain is half a
-// column shifted (minX −0.5 .. maxX dayCount − 0.5) so the curve's dot for
-// day i meets that same center.
+// — the same center the day-label row, the signal rows and the evaluation
+// marks row use. The chart block's scroll content holds ONLY the day
+// columns (the temperature scale and the corner prototypes live in the
+// frozen left rail outside the scroll), so column i's cell is centered at
+// (i + 0.5) * cellWidth from the content's left edge; the chart's x domain
+// is half a column shifted (minX −0.5 .. maxX dayCount − 0.5) so the
+// curve's dot for day i meets that same center.
 //
 // Also pins the degenerate single-day chart: its domain stays a usable
 // non-zero-width window (−0.5..0.5) and taps still map to the one recorded
@@ -47,18 +48,15 @@ Widget _chartHarness({required List<DailyEntry> entries}) => ProviderScope(
       ),
     );
 
-/// The chart's y-axis title strip width (the plot area starts right of it).
-const _leftAxisReservedSize = 44.0;
-
 /// The rendered global x of day [dayIndex]'s chart dot: the chart maps its
-/// x domain linearly onto the plot area, which spans the chart's width
-/// minus the y-axis strip and starts at the strip's right edge.
+/// x domain linearly onto the plot area, which spans the chart widget's
+/// full width — the stripless scroll content starts at the plot's left
+/// edge (the frozen rail sits outside).
 double _dotX(WidgetTester tester, int dayIndex) {
   final rect = tester.getRect(find.byType(LineChart));
   final data = tester.widget<LineChart>(find.byType(LineChart)).data;
-  final plotWidth = rect.width - _leftAxisReservedSize;
   final t = (dayIndex - data.minX) / (data.maxX - data.minX);
-  return rect.left + _leftAxisReservedSize + t * plotWidth;
+  return rect.left + t * rect.width;
 }
 
 double _cellCenterX(WidgetTester tester, String key) =>
@@ -93,7 +91,8 @@ void main() {
 
     // The lone day's dot sits at its column center — the domain is kept at
     // −0.5..0.5 (one full column wide) instead of collapsing.
-    expect(_dotX(tester, 0), closeTo(_cellCenterX(tester, 'bleedingCell-0'), 0.5),
+    expect(
+        _dotX(tester, 0), closeTo(_cellCenterX(tester, 'bleedingCell-0'), 0.5),
         reason: 'the single day\'s column center matches its dot');
 
     // Tapping the plot area opens the one recorded day's sheet.

@@ -169,10 +169,11 @@ void main() {
       expect(_bleedingCell(59), findsNothing,
           reason: 'the view stayed where the user dragged it, not at the end');
       // The dragged-to window still renders: at the dragged offset the
-      // visible window starts around floor((offset − strip) / columnWidth)
-      // — the scroll content leads with the chart's y-axis strip, so the
-      // strip is subtracted before flooring onto the column grid.
-      final firstVisible = ((offsetAfterDrag - 44.0) / _columnWidth).floor();
+      // visible window starts around floor(offset / columnWidth) — the
+      // scroll content leads directly with day column 0 (the y scale lives
+      // in the frozen rail outside the scroll), so the offset maps onto
+      // the column grid without any leading-strip subtraction.
+      final firstVisible = (offsetAfterDrag / _columnWidth).floor();
       expect(_bleedingCell(firstVisible + 2), findsOneWidget,
           reason: 'the dragged-to window cells are still rendered');
     });
@@ -205,7 +206,7 @@ void main() {
 
     testWidgets(
         'after a drag away from the end the rendered window matches the '
-        'leftmost visible day (strip-aware)', (tester) async {
+        'leftmost visible day (stripless content)', (tester) async {
       await tester.pumpWidget(_chartHarness(entries: _longEntries()));
       await tester.pumpAndSettle();
 
@@ -213,7 +214,8 @@ void main() {
       // earliest days. A drag gesture carries no fling momentum, so the
       // settled offset stays put; its exact delta depends on the framework's
       // touch slop, so the test READS the settled offset and pins the
-      // window math against it (the strip-aware floor, not the bare offset).
+      // window math against it (the bare offset maps straight onto the
+      // column grid — the content has no leading strip).
       await tester.drag(_hScrollView(), const Offset(260, 0));
       await tester.pumpAndSettle();
 
@@ -222,9 +224,9 @@ void main() {
       final offset = state.position.pixels;
       expect(offset, lessThan(state.position.maxScrollExtent),
           reason: 'the drag moved the window off the end');
-      // Day cell i starts at 44 + i * 24 in the content, so the leftmost
-      // partially visible day is floor((offset − strip) / columnWidth).
-      final leftmostVisible = ((offset - 44.0) / _columnWidth).floor();
+      // Day cell i starts at i * 24 in the content, so the leftmost
+      // partially visible day is floor(offset / columnWidth).
+      final leftmostVisible = (offset / _columnWidth).floor();
 
       expect(_bleedingCell(leftmostVisible), findsOneWidget,
           reason: 'the leftmost visible day is rendered');
@@ -233,8 +235,9 @@ void main() {
       expect(_bleedingCell(leftmostVisible - 1), findsOneWidget,
           reason: 'the one-day margin before the visible edge renders');
       expect(_bleedingCell(leftmostVisible - 2), findsNothing,
-          reason: 'the window does not reach past the margin — the strip is '
-              'accounted for, the window does not lag behind the scroll');
+          reason: 'the window does not reach past the margin — the window '
+              'math matches the stripless content, it does not lag behind '
+              'the scroll');
     });
 
     testWidgets('jump-to-date: picking a date moves the window onto it',
@@ -273,19 +276,22 @@ void main() {
       await tester.drag(_hScrollView(), const Offset(-1000, 0));
       await tester.pumpAndSettle();
 
-      // Content is the y-axis strip plus 60 day columns; at max scroll the
-      // last day (index 59) sits at the content's right edge. Tap the day
-      // column of index 58 (= 2026-02-28) inside the visible area. The
+      // Content is 60 day columns, no leading strip (the temperature scale
+      // lives in the frozen rail left of the scroll view); at max scroll
+      // the last day (index 59) sits at the content's right edge. Tap the
+      // day column of index 58 (= 2026-02-28) inside the visible area. The
       // chart's x domain is half a column shifted, so day 58's column
-      // center maps to tap x = strip + colW * (58 + 0.5).
-      const leftAxisReservedSize = 44.0; // chart's y-title strip width
+      // center maps to tap x = colW * (58 + 0.5).
+      const railWidth = 44.0; // the frozen rail left of the scroll view
       const testViewportWidth = 800.0;
       const bodyPadding = 12.0;
-      const viewportWidth = testViewportWidth - 2 * bodyPadding; // 776
-      const contentWidth = leftAxisReservedSize + 60 * 24.0; // 1484
-      const maxOffset = contentWidth - viewportWidth; // 708
-      final tapContentX = leftAxisReservedSize + 24.0 * (58 + 0.5);
-      final tapScreenX = bodyPadding + (tapContentX - maxOffset);
+      const scrollViewport =
+          testViewportWidth - 2 * bodyPadding - railWidth; // 732
+      const contentWidth = 60 * 24.0; // 1440
+      const maxOffset = contentWidth - scrollViewport; // 708
+      final tapContentX = 24.0 * (58 + 0.5);
+      final tapScreenX =
+          bodyPadding + railWidth + (tapContentX - maxOffset); // 752
       final chartTop = tester.getRect(find.byType(LineChart)).top;
 
       await tester.tapAt(Offset(tapScreenX, chartTop + 100));
@@ -307,17 +313,17 @@ void main() {
       await tester.pumpAndSettle();
 
       // Same column mapping as the tap above (day 58's column center at
-      // strip + colW * (58 + 0.5), content = strip + 60 columns); the
+      // colW * (58 + 0.5), content = 60 columns without a strip); the
       // long-press behaves identically to the tap.
-      const leftAxisReservedSize = 44.0;
+      const railWidth = 44.0; // the frozen rail left of the scroll view
       const bodyPadding = 12.0;
-      const contentWidth = leftAxisReservedSize + 60 * 24.0;
-      const maxOffset = contentWidth - (800.0 - 2 * bodyPadding);
-      final tapContentX = leftAxisReservedSize + 24.0 * (58 + 0.5);
+      const contentWidth = 60 * 24.0;
+      const maxOffset = contentWidth - (800.0 - 2 * bodyPadding - railWidth);
+      final tapContentX = 24.0 * (58 + 0.5);
       final chartTop = tester.getRect(find.byType(LineChart)).top;
 
-      await tester.longPressAt(
-          Offset(bodyPadding + (tapContentX - maxOffset), chartTop + 100));
+      await tester.longPressAt(Offset(
+          bodyPadding + railWidth + (tapContentX - maxOffset), chartTop + 100));
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsOneWidget);

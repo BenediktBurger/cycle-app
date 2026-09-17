@@ -260,7 +260,8 @@ void main() {
     });
 
     testWidgets(
-        'the header\'s 44 px corner slot shows the two column prototypes '
+        'the header corner (now in the frozen left rail, outside the '
+        'scroll) shows the two column prototypes '
         '(a date sample and a cycle-day sample) with localized tooltips '
         'and semantics labels', (tester) async {
       // 5 days from 2026-01-20: no column label is "14." and no day of
@@ -306,8 +307,8 @@ void main() {
 
     testWidgets('the corner prototypes use the German wording in de',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(
-          entries: _entries(5), locale: const Locale('de')));
+      await tester.pumpWidget(
+          _chartHarness(entries: _entries(5), locale: const Locale('de')));
       await tester.pumpAndSettle();
 
       final corner = find.byKey(const ValueKey('dayHeaderCorner'));

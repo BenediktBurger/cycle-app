@@ -1,8 +1,9 @@
 // Widget tests of the per-signal rows under the cycle chart (the paper's
 // recording rows): one always-rendered row per signal — bleeding, mucus
 // (with the reserved solid peak-dot slot above the glyph), cervix, sex,
-// pain, measurement time — each with its 44 px corner slot carrying a
-// sample glyph plus the localized row name (tooltip + semantics). The
+// pain, measurement time. The rows hold ONLY day cells — their sample
+// glyphs and localized row names live in the frozen left rail (see
+// test/cycle_chart_left_rail_test.dart), keyed `${row}Corner` there. The
 // measurement time renders as localized HH:mm text ONLY when the day
 // column is wide enough; no per-day clock icon exists anywhere in the
 // rows. Tapping a row cell opens the day's mark-entry sheet.
@@ -96,15 +97,16 @@ Widget _chartHarness({
 
 /// The bleeding blob (the circle Container) inside the bleeding cell of
 /// [index].
-Container _bleedingBlob(WidgetTester tester, int index) =>
-    tester.widgetList<Container>(find.descendant(
+Container _bleedingBlob(WidgetTester tester, int index) => tester
+    .widgetList<Container>(find.descendant(
         of: _cell(index, 'bleeding'), matching: find.byType(Container)))
-        .firstWhere((container) =>
-            (container.decoration! as BoxDecoration).shape == BoxShape.circle);
+    .firstWhere((container) =>
+        (container.decoration! as BoxDecoration).shape == BoxShape.circle);
 
 void main() {
   group('per-signal rows', () {
-    testWidgets('every signal row renders for every windowed day, in order '
+    testWidgets(
+        'every signal row renders for every windowed day, in order '
         'bleeding, mucus, cervix, sex, pain, time', (tester) async {
       await tester.pumpWidget(_chartHarness(entries: _entries));
       await tester.pumpAndSettle();
@@ -151,8 +153,8 @@ void main() {
         expect(
           find.descendant(
               of: _corner(key),
-              matching: find.byWidgetPredicate((w) =>
-                  w is Semantics && w.properties.label == value)),
+              matching: find.byWidgetPredicate(
+                  (w) => w is Semantics && w.properties.label == value)),
           findsOneWidget,
           reason: 'row $key\'s corner slot announces the row name to '
               'screen readers',
@@ -161,20 +163,32 @@ void main() {
 
       // The sample glyphs: a bleeding blob, the S mucus glyph, a cervix
       // letter, the X, the B/M pain letters, and the clock icon.
-      expect(find.descendant(of: _corner('bleeding'), matching: find.byType(Container)),
-          findsOneWidget, reason: 'the bleeding corner shows the blob sample');
-      expect(find.descendant(of: _corner('mucus'), matching: find.byType(MucusSymbolText)),
-          findsOneWidget, reason: 'the mucus corner shows the glyph sample');
+      expect(
+          find.descendant(
+              of: _corner('bleeding'), matching: find.byType(Container)),
+          findsOneWidget,
+          reason: 'the bleeding corner shows the blob sample');
+      expect(
+          find.descendant(
+              of: _corner('mucus'), matching: find.byType(MucusSymbolText)),
+          findsOneWidget,
+          reason: 'the mucus corner shows the glyph sample');
       expect(find.descendant(of: _corner('cervix'), matching: find.text('m')),
-          findsOneWidget, reason: 'the cervix corner shows a position letter sample');
+          findsOneWidget,
+          reason: 'the cervix corner shows a position letter sample');
       expect(find.descendant(of: _corner('sex'), matching: find.text('X')),
-          findsOneWidget, reason: 'the sex corner shows the X sample');
+          findsOneWidget,
+          reason: 'the sex corner shows the X sample');
       expect(find.descendant(of: _corner('pain'), matching: find.text('B')),
-          findsOneWidget, reason: 'the pain corner shows the B/M sample');
+          findsOneWidget,
+          reason: 'the pain corner shows the B/M sample');
       expect(find.descendant(of: _corner('pain'), matching: find.text('M')),
           findsOneWidget);
-      expect(find.descendant(of: _corner('time'), matching: find.byIcon(Icons.schedule)),
-          findsOneWidget, reason: 'the time corner keeps the clock icon sample');
+      expect(
+          find.descendant(
+              of: _corner('time'), matching: find.byIcon(Icons.schedule)),
+          findsOneWidget,
+          reason: 'the time corner keeps the clock icon sample');
     });
 
     testWidgets('the row names use the German wording in de', (tester) async {
@@ -208,8 +222,7 @@ void main() {
       // The tooltip overlay shows the localized row name. The bare text
       // can pre-exist elsewhere (the legend's "Bleeding" entry), so pin
       // the OVERLAY as one additional occurrence of the word.
-      final before =
-          tester.widgetList<Text>(find.text('Bleeding')).length;
+      final before = tester.widgetList<Text>(find.text('Bleeding')).length;
       await tester.longPress(find.byKey(const ValueKey('bleedingCorner')));
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.text('Bleeding'), findsNWidgets(before + 1),
@@ -226,10 +239,12 @@ void main() {
       // HH:mm form ("06:30") in both test locales here.
       expect(tester.getRect(_cell(0, 'time')).width, greaterThan(32),
           reason: 'precondition: a comfortable column width');
-      expect(find.descendant(of: _cell(0, 'time'), matching: find.text('06:30')),
+      expect(
+          find.descendant(of: _cell(0, 'time'), matching: find.text('06:30')),
           findsOneWidget,
           reason: 'the localized HH:mm form of 6:30');
-      expect(find.descendant(of: _cell(1, 'time'), matching: find.text('06:30')),
+      expect(
+          find.descendant(of: _cell(1, 'time'), matching: find.text('06:30')),
           findsNothing,
           reason: 'a day without a recorded time shows nothing');
     });
@@ -240,7 +255,8 @@ void main() {
           _chartHarness(entries: _entries, locale: const Locale('de')));
       await tester.pumpAndSettle();
 
-      expect(find.descendant(of: _cell(0, 'time'), matching: find.text('06:30')),
+      expect(
+          find.descendant(of: _cell(0, 'time'), matching: find.text('06:30')),
           findsOneWidget,
           reason: 'the German locale keeps the padded HH:mm form');
     });
@@ -262,9 +278,7 @@ void main() {
 
       expect(timeCellFinder(), findsWidgets,
           reason: 'the initial window renders time cells');
-      expect(
-          find.descendant(
-              of: timeCellFinder(), matching: find.byType(Text)),
+      expect(find.descendant(of: timeCellFinder(), matching: find.byType(Text)),
           findsNothing,
           reason: 'no time text renders at the minimum column width');
       expect(
@@ -282,9 +296,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(timeCellFinder(), findsWidgets);
-      expect(
-          find.descendant(
-              of: timeCellFinder(), matching: find.byType(Text)),
+      expect(find.descendant(of: timeCellFinder(), matching: find.byType(Text)),
           findsNothing,
           reason: 'a ~29 px column is still too narrow for the time text');
     });
@@ -304,7 +316,9 @@ void main() {
             findsNothing,
             reason: 'day $i: no clock icon in the time cell');
       }
-      expect(find.descendant(of: _corner('time'), matching: find.byIcon(Icons.schedule)),
+      expect(
+          find.descendant(
+              of: _corner('time'), matching: find.byIcon(Icons.schedule)),
           findsOneWidget,
           reason: 'only the corner sample keeps a clock icon');
     });
@@ -327,9 +341,8 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: _entries));
       await tester.pumpAndSettle();
 
-      final errorColor = Theme.of(tester.element(_cell(1, 'bleeding')))
-          .colorScheme
-          .error;
+      final errorColor =
+          Theme.of(tester.element(_cell(1, 'bleeding'))).colorScheme.error;
 
       // Day 2 = spotting: the hollow ring (transparent fill, visible border).
       final spotting = _bleedingBlob(tester, 2).decoration! as BoxDecoration;
