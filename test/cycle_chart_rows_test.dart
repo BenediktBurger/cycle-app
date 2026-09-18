@@ -173,6 +173,17 @@ void main() {
               of: _corner('mucus'), matching: find.byType(MucusSymbolText)),
           findsOneWidget,
           reason: 'the mucus corner shows the glyph sample');
+      // Plain S, no quality qualifier: the superscript renders as a
+      // Text('EW') WidgetSpan child when one is set — it must be absent.
+      final mucusSample =
+          tester.widget<MucusSymbolText>(find.descendant(
+              of: _corner('mucus'), matching: find.byType(MucusSymbolText)));
+      expect(mucusSample.display.superscript, isNull,
+          reason: 'the mucus corner sample is the plain S glyph');
+      expect(
+          find.descendant(of: _corner('mucus'), matching: find.text('EW')),
+          findsNothing,
+          reason: 'the mucus corner sample carries no EW superscript');
       expect(find.descendant(of: _corner('cervix'), matching: find.text('m')),
           findsOneWidget,
           reason: 'the cervix corner shows a position letter sample');

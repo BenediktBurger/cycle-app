@@ -174,9 +174,9 @@ final class _HelpEntry extends StatelessWidget {
           ),
         ),
       _HelpEntryShape.text => MucusSymbolText(
-          // Sample observation: S with the EW quality qualifier, exactly
-          // how a recorded mucus day renders in the mucus row.
-          display: mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew),
+          // Sample glyph: plain S, matching the chart legend — no quality
+          // qualifier shown.
+          display: mucusDisplay(sign: MucusSign.s),
           fontSize: 10,
           color: color,
         ),

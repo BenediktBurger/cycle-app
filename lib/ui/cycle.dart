@@ -1054,11 +1054,8 @@ String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
       _SignalKind.time => l10n.cycleRowMeasurementTime,
     };
 
-/// A signal row's sample glyph — rendered in the frozen left rail at the
-/// row's vertical slot (the per-row corner slots are gone).
-// TODO(user-review): the sample glyphs (blob, S, position letter, X, B/M,
-// clock) are ad-hoc column samples mirroring the row's glyphs; the
-// NER cheat sheet defines samples only for some of them.
+/// A signal row's sample glyph, rendered in the frozen left rail at the
+/// row's vertical slot.
 Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
   final scheme = Theme.of(context).colorScheme;
   return switch (kind) {
@@ -1071,10 +1068,10 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
           border: Border.all(width: 1.5, color: scheme.error),
         ),
       ),
-    // Sample observation: S with the EW quality qualifier, exactly how a
-    // recorded mucus day renders in the row's cells.
+    // Sample glyph: plain S, matching the sign glyph a recorded mucus day
+    // renders (no quality qualifier).
     _SignalKind.mucus => MucusSymbolText(
-        display: mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew),
+        display: mucusDisplay(sign: MucusSign.s),
         fontSize: 10,
         color: scheme.tertiary,
       ),

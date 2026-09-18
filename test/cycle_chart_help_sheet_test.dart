@@ -147,6 +147,13 @@ void main() {
               of: find.byKey(const ValueKey('cycleHelpSheet')),
               matching: find.text(_arithmeticNoteEn)),
           findsOneWidget);
+      // The mucus glossary sample is the plain S glyph (no EW superscript).
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.text('EW')),
+          findsNothing,
+          reason: 'the mucus glossary sample carries no EW superscript');
     });
 
     testWidgets('the glossary uses the German wording in de',
