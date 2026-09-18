@@ -23,24 +23,10 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-- JSON import: the merge planner counts the FIRST occurrence of a duplicate
-  (profile, date) entry key in the document, but the write loop upserts
-  every valid row — storage ends on the LAST occurrence, while the in-code
-  comment in `lib/db/export_adapter.dart` claims first-wins. Needs
-  discussion: whether the writer should skip duplicates like the planner
-  counts them (unreachable from real drip exports, so low priority).
 - [ ] time of measurement is not visible on the cycle chart (not enough space?) -> if space constraint is there, write vertically
 
 ### Necessary
 
-- [ ] Data entry aligned with the NER scheme — the exact term list must be
-  specified first:
-  - [ ] temperature exclusion to raw_data (observation) and mark:
-    raw data: replace all exclusionReasons with a single intflag field for these temperature disturbances / interruptions with the following entries: sp (spät ins Bett) and a (häufig aufstehen in der Nacht), alk (Alkohol), kr (krank) – no more Reise
-      This raw data should be represented on the cycle chart
-    mark: add a new mark (in the list of marks between mucus peak and higher temp) whether to exclude a day from analysis or not (toggleable on the journal, autotoggled if any exclusion is selected) (drip excluded temp has to be translated to a mark, not an observation anymore)
-  - [ ] Remove stimmung und Lust from diary
-  - [ ] add "f/S - f vor S an einem Tag" as additional mucus sign (not combinable with quality)
 - Building the actual app (as captured: "building an app" — scope to be
   clarified: release/packaging vs. remaining placeholder screens).
 - [ ] Make the cycle chart more like the paper: first bleeding, then mucus, then temperature. ideas if possible to render entries inside temperature chart, see the image in .opencode/plans, to get closer to paper:
@@ -54,12 +40,6 @@ the sections above track planned work, git history keeps the record (see
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - pdf export for consultants (similar to paper form)
 - [ ] with many cycles, scrolling the cycle chart becomes sloppy
-- clean up database schema
-  - remove unused features
-    - profiles at all
-    - exclude reasons
-    - [ ] remove entries: Stimmung, Lust
-    - [ ] remove unused marks: fertilityWindow, baseline, interruption
 
 ### Convenience
 
@@ -90,7 +70,3 @@ the sections above track planned work, git history keeps the record (see
   already carries the cycle start mark (harmless — addMark is idempotent):
   needs discussion whether to suppress the prompt when the mark is already
   present on the saved day.
-- Multi-profile future note: `List.sort` in `groupIntoCycles` is not stable,
-  so same-date entries of two profiles could interleave
-  nondeterministically; resolve when multi-profile work lands (the
-  mark-driven grouping is per profile, see ADR-0008).

@@ -3,6 +3,25 @@
 - **Date:** 2026-09-18
 - **Status:** Accepted
 
+> **Author's note (2026-09-18, post-schema-v9):** the record below was
+> written against the multi-profile database (ADR-0008's single-user
+> posture had not yet been revisited). The schema v9 work removed the
+> profiles machinery completely — there is one tracked-day table with no
+> profile dimension, marks are unique per (entry_date, mark_type), and
+> grouping is day-keyed. Wherever this record says "for that profile" /
+> "per profile", read it as history: the current code has no profile
+> argument anywhere. The DECISION itself (cycle start is a user-owned
+> mark; bleeding only suggests; the suggestion predicate gates prompts
+> and derivations but never creates boundaries) is unchanged and stays
+> accepted. Two mechanics also moved with v9: the analysis exclusion is
+> the `excludedFromAnalysis` MARK (the old exclude_* raw flags are gone —
+> the raw disturbance mask is rendering input only, see
+> lib/domain/models.dart), so open question (a)'s "exclusion flags never
+> block it" now reads "the exclusion mark never blocks it" (unchanged
+> behavior); and `isSuggestedCycleStart` takes the excluded-state as an
+> explicit parameter (the entries stay raw-data-only), which is what
+> (b)'s "non-excluded day" means today.
+
 ## Context
 
 Until now, cycle boundaries were decided by an automatic rule in the domain
@@ -25,11 +44,13 @@ bleeding only suggests it.**
 
 - The boundary rule is **mark-driven**: a new cycle group opens at the first
   tracked day on/after a `cycleStart` mark for that profile. Marks of other
-  types never create boundaries. A mark no later than the current group's
-  start is a no-op. A mark placed on an untracked gap day opens the group
-  at the next tracked entry. The leading group — entries predating the
-  first mark — keeps `startsAtMenstruation == false` (its begin is unknown;
-  the app shows only its end).
+  types never create boundaries. *(Author's note, schema v9: profile-free —
+  a cycleStart mark keys to a day; no profile argument exists.)* A mark no
+  later than the current group's start is a no-op. A mark placed on an
+  untracked gap day opens the group at the next tracked entry. The leading
+  group — entries predating the first mark — keeps
+  `startsAtMenstruation == false` (its begin is unknown; the app shows only
+  its end).
 - The mark is **authoritative wherever placed**: it binds on days without
   bleeding and on excluded/interrupted days alike (owner decision — see the
   open questions below).
