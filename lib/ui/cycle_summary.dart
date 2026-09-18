@@ -135,7 +135,7 @@ final class CycleSummaryTable extends StatelessWidget {
 
   /// One column's derived values. The bleeding attributes follow the
   /// grouping (lib/domain/cycle_grouping.dart): the leading group (it
-  /// predates the first recorded onset, `startsAtMenstruation == false`)
+  /// predates the first cycleStart mark, `startsAtMenstruation == false`)
   /// shows the dash for period start, period end and cycle length —
   /// consistent with the cycle-counting TODO(user-review) on the chart's
   /// day header. The evaluation attributes (peak, SUZ, status) come from
@@ -154,12 +154,12 @@ final class CycleSummaryTable extends StatelessWidget {
         ? _missing
         : DateFormat.yMd(locale).format(DateOnly.normalize(date).toLocal());
 
-    // The group's own onset (the leading group has none).
+    // The group's own marked start (the leading group has none).
     final onset =
         isOnsetGroup ? DateOnly.normalize(cycle.startDate) : null;
-    // The next onset: only a following onset group counts (the leading
-    // group is always the first group, so any successor of an onset group
-    // is an onset group itself).
+    // The next marked start: only a following marked group counts (the
+    // leading group is always the first group, so any successor of a
+    // marked group is a marked group itself).
     final nextOnset =
         index + 1 < evaluations.length && evaluations[index + 1].cycle.startsAtMenstruation
             ? DateOnly.normalize(evaluations[index + 1].cycle.startDate)
@@ -187,8 +187,8 @@ final class CycleSummaryTable extends StatelessWidget {
           ? // TODO(user-review): the "Zyklus n" label is a first draft — the
             // experts may want a different caption (or numbering direction).
             l10n.cycleSummaryColumn(_onsetNumber(evaluations, index))
-          // The leading group predates the first recorded onset: it is not
-          // a numbered cycle, so it keeps the Tagebuch's leading-group
+          // The leading group predates the first cycleStart mark: it is
+          // not a numbered cycle, so it keeps the Tagebuch's leading-group
           // label with its (knowable) end day.
           : l10n.cycleGroupLeading(dayLabel(cycle.endDate)),
       length: onset == null || nextOnset == null

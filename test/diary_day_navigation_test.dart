@@ -52,7 +52,7 @@ ProviderScope _scope({required DateTime selectedDay}) {
         await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
         return db;
       }),
-      nowProvider.overrideWith((ref) => _fixedNow),
+      nowProvider.overrideWith((ref) => () => _fixedNow),
       selectedDateProvider.overrideWith((ref) => selectedDay),
       localeProvider.overrideWith((ref) => const Locale('de')),
     ],

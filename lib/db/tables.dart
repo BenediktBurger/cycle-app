@@ -192,6 +192,11 @@ abstract final class MarkTypes {
   /// The user-placed SUZ start from an EVENING: the SUZ bar renders at the
   /// day column's MIDDLE (x).
   static const suzEvening = 'suzEvening';
+
+  /// The user-placed start of a menstrual cycle: the authoritative cycle
+  /// boundary of the mark-driven grouping (bleeding only suggests a cycle
+  /// start — see lib/domain/cycle_grouping.dart).
+  static const cycleStart = 'cycleStart';
 }
 
 /// Evaluation profiles on this device (partner mode, v0 schema, UI later).

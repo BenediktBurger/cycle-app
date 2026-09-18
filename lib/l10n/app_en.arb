@@ -257,7 +257,7 @@
     },
     "description": "Status-row text for a determined SUZ: the begin day (pre-formatted) followed by the rule."
   },
-  "statisticsNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
+  "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
   "statisticsNoData": "Cycle lengths appear once two period onsets are recorded.",
   "statisticsCycles": "Cycle lengths",
   "statisticsOnsets": "Period onsets",

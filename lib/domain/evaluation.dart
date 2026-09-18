@@ -366,8 +366,10 @@ const int _marksPerKindCap = 4;
 /// without the tolerance.
 const double _epsilon = 1e-9;
 
-/// Computes the evaluation artifacts for every cycle group (see
-/// groupIntoCycles for the boundary rule).
+/// Computes the evaluation artifacts for every cycle group.
+///
+/// The cycle windows are MARK-driven (see groupIntoCycles): a group opens
+/// at the first tracked day on/after a user-placed cycleStart mark.
 ///
 /// Marks are attached to a cycle by date: a mark belongs to the cycle whose
 /// [Cycle.startDate, next cycle start) window contains it (the last cycle's
@@ -384,7 +386,7 @@ List<CycleEvaluation> evaluateCycles(
       ? marks
       : marks.where((m) => m.profileId == profileId).toList();
 
-  final cycles = groupIntoCycles(profileEntries);
+  final cycles = groupIntoCycles(profileEntries, profileMarks);
 
   // Pre-pass: the six-low window per cycle. The R10 segment-end clamps need
   // the NEXT cycle's window start, so the windows are computed before the

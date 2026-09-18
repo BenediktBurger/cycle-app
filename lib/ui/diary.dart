@@ -2,9 +2,10 @@
 //
 // The form writes one day at a time through EntriesDao.upsertDaily (full
 // replacement of the day; nulls included). The list underneath groups the
-// live entry stream into cycles using the boundary rule from
-// lib/domain/cycle_grouping.dart (assumption pending expert review) and
-// pre-loads the tapped day back into the form for editing.
+// live entry stream into cycles using the mark-driven boundary rule from
+// lib/domain/cycle_grouping.dart (a cycle starts at a user-placed
+// cycleStart mark; bleeding only suggests) and pre-loads the tapped day
+// back into the form for editing.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +15,7 @@ import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_input.dart';
+import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
@@ -225,6 +227,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
     final entriesAsync = ref.watch(dailyEntriesProvider);
     final selected = ref.watch(selectedDateProvider);
+    final marks = ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navDiary)),
@@ -233,7 +236,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         children: [
           _buildForm(l10n, locale, selected),
           const SizedBox(height: 16),
-          ..._buildCycleList(l10n, entriesAsync),
+          ..._buildCycleList(l10n, entriesAsync, marks),
         ],
       ),
     );
@@ -282,7 +285,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
-                    onPressed: nextDay.isAfter(DateOnly.addDays(now, 1))
+                    onPressed: nextDay.isAfter(DateOnly.addDays(now(), 1))
                         ? null
                         : () => _moveDay(1),
                     tooltip: l10n.entryNextDay,
@@ -396,7 +399,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // --- exclusion flags (compact) ---------------------------
               // Always visible: interruptions (illness, alcohol, travel,
               // other) apply to temperature interruptions regardless of
-              // bleeding. Excluded (interrupted) days never start a cycle.
+              // bleeding; exclusion flags never block a cycleStart mark.
               Text(l10n.excludesCaption,
                   style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 4),
@@ -648,6 +651,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   List<Widget> _buildCycleList(
     AppLocalizations l10n,
     AsyncValue<List<DailyEntry>> entriesAsync,
+    List<CycleMark> marks,
   ) {
     return entriesAsync.when(
       loading: () => <Widget>[const SizedBox.shrink()],
@@ -662,7 +666,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             ),
           ];
         }
-        final cycles = groupIntoCycles(entries);
+        final cycles = groupIntoCycles(entries, marks);
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
             _cycleTile(l10n, cycles[i]),
@@ -677,7 +681,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final endLabel = _formatDay(cycle.endDate, locale);
     final title = cycle.startsAtMenstruation
         ? l10n.cycleGroupOnset(startLabel)
-        // Leading group predates the first known period onset: title shows
+        // Leading group predates the first cycleStart mark: title shows
         // the range END, since the begin is unknown.
         : l10n.cycleGroupLeading(endLabel);
     final dayCount = DateOnly.daysBetween(cycle.endDate, cycle.startDate) + 1;

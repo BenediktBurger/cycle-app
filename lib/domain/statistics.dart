@@ -10,13 +10,18 @@
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';
+import 'marks.dart';
 import 'models.dart';
 
-/// Cycle lengths in days: differences between consecutive menstruation
-/// onsets (see lib/domain/cycle_grouping.dart for the boundary rule).
-/// A trailing onset with no known follow-up contributes no length.
-List<int> cycleLengthsInDays(List<DailyEntry> entries) {
-  final onsets = menstruationOnsetDates(entries);
+/// Cycle lengths in days: differences between consecutive mark-driven
+/// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
+/// group at every user-placed cycleStart mark). A trailing cycle start with
+/// no known follow-up contributes no length.
+List<int> cycleLengthsInDays(
+  List<DailyEntry> entries,
+  List<CycleMark> marks,
+) {
+  final onsets = menstruationOnsetDates(entries, marks);
   final lengths = <int>[];
   for (var i = 0; i + 1 < onsets.length; i++) {
     // Day-component arithmetic (not DateTime.difference): difference()

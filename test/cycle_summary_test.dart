@@ -2,7 +2,8 @@
 // bottom summary): one ROW per attribute — cycle length, period start,
 // period end, mucus peak, SUZ start, evaluation status — and one COLUMN per
 // cycle group, computed purely at render time from evaluateCycles +
-// groupIntoCycles. Nothing is persisted (ADR-0001): a marks re-emit
+// groupIntoCycles (mark-driven boundaries: the scenarios' cycleStart marks
+// open the groups). Nothing is persisted (ADR-0001): a marks re-emit
 // live-updates the table without any database write. Missing values render
 // as the "—" dash. More cycles than fit the viewport scroll horizontally so
 // the attribute rows stay readable.
@@ -35,12 +36,12 @@ String yMd(DateTime date, String locale) =>
     DateFormat.yMd(locale).format(DateOnly.normalize(date).toLocal());
 
 // ---------------------------------------------------------------------------
-// Scenario A: three cycle groups — two finished cycles (onsets 2026-03-01
-// and 2026-03-28) plus one open third (onset 2026-04-20), with a rules-D
+// Scenario A: three cycle groups — two finished cycles (starts 2026-03-01
+// and 2026-03-28) plus one open third (start 2026-04-20), with a rules-D
 // evaluation marked in cycle 1.
 // ---------------------------------------------------------------------------
 
-/// Cycle 1: onset 2026-03-01, bleeding Mar 1-3 (heavy -> medium -> light),
+/// Cycle 1: starts 2026-03-01, bleeding Mar 1-3 (heavy -> medium -> light),
 /// spotting Mar 4 (level 1 — does NOT extend the period end), the six-low
 /// window Mar 9-14 at 36.4 (baseline 36.4), the rise Mar 15-17 at 36.7.
 final _twoCycleEntries = <DailyEntry>[
@@ -63,21 +64,26 @@ final _twoCycleEntries = <DailyEntry>[
   DailyEntry(date: d(3, 17), bbtC: 36.7),
   DailyEntry(date: d(3, 18), bbtC: 36.7),
   DailyEntry(date: d(3, 27), bbtC: 36.7),
-  // Cycle 2: onset 2026-03-28, bleeding Mar 28-30, then a gap of untracked
-  // days until cycle 3's onset (the gap keeps the length arithmetic
-  // calendar-honest — the length spans it).
+  // Cycle 2: starts 2026-03-28, bleeding Mar 28-30, then a gap of
+  // untracked days until cycle 3's start mark (the gap keeps the length
+  // arithmetic calendar-honest — the length spans it).
   DailyEntry(date: d(3, 28), bleeding: Bleeding.heavy),
   DailyEntry(date: d(3, 29), bleeding: Bleeding.medium),
   DailyEntry(date: d(3, 30), bleeding: Bleeding.light),
   DailyEntry(date: d(3, 31)),
-  // Cycle 3: onset 2026-04-20, open (no further onset recorded).
+  // Cycle 3: starts 2026-04-20, open (no further start mark recorded).
   DailyEntry(date: d(4, 20), bleeding: Bleeding.heavy),
 ];
 
 /// The marks of the rules-D scenario: the peak on Mar 14 and the first
 /// higher measurement on Mar 15 (so Mar 15-17 are CIRCLES — all after the
 /// peak — and the 3rd circle clears the 0.2 K margin → SUZ on Mar 17).
+/// The cycleStart marks open the three cycle groups (at the days that used
+/// to be the bleeding onsets — the mark is the authoritative boundary).
 final _ruleDMarks = <CycleMark>[
+  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(profileId: 1, date: d(3, 28), type: CycleMarkTypes.cycleStart),
+  CycleMark(profileId: 1, date: d(4, 20), type: CycleMarkTypes.cycleStart),
   CycleMark(profileId: 1, date: d(3, 14), type: CycleMarkTypes.mucusPeakDay),
   CycleMark(
       profileId: 1,
@@ -90,7 +96,7 @@ List<CycleEvaluation> _evaluations(List<DailyEntry> entries,
     evaluateCycles(entries, marks);
 
 // ---------------------------------------------------------------------------
-// Scenario B: a leading group predates the first onset (Feb 25-28, spotting
+// Scenario B: a leading group predates the first cycleStart mark (Feb 25-28, spotting
 // on Feb 26) before scenario A's cycles.
 // ---------------------------------------------------------------------------
 
@@ -102,6 +108,15 @@ final _leadingEntries = <DailyEntry>[
   DailyEntry(date: d(3, 1), bleeding: Bleeding.heavy),
   DailyEntry(date: d(3, 28), bleeding: Bleeding.heavy),
   DailyEntry(date: d(4, 20), bleeding: Bleeding.heavy),
+];
+
+/// The leading group (Feb 25-28) predates the first cycleStart mark — it
+/// keeps `startsAtMenstruation == false` while the marked days open the
+/// three cycle groups.
+final _leadingMarks = <CycleMark>[
+  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(profileId: 1, date: d(3, 28), type: CycleMarkTypes.cycleStart),
+  CycleMark(profileId: 1, date: d(4, 20), type: CycleMarkTypes.cycleStart),
 ];
 
 // ---------------------------------------------------------------------------
@@ -126,6 +141,7 @@ final _stoppedEntries = <DailyEntry>[
 ];
 
 final _stoppedMarks = <CycleMark>[
+  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(
       profileId: 1,
       date: d(3, 10),
@@ -133,7 +149,7 @@ final _stoppedMarks = <CycleMark>[
 ];
 
 // ---------------------------------------------------------------------------
-// Scenario D: several plain onsets for the scroll-behavior tests.
+// Scenario D: several plain cycle starts for the scroll-behavior tests.
 // ---------------------------------------------------------------------------
 
 List<DailyEntry> _onsetEntries(int count) => [
@@ -143,6 +159,16 @@ List<DailyEntry> _onsetEntries(int count) => [
             date: d(3, 1).add(Duration(days: 25 * i + 1)),
             bleeding: Bleeding.light),
       ],
+    ];
+
+/// The cycle starts matching [_onsetEntries]: one cycleStart mark per
+/// 25-day period on the first of its two bleeding days.
+List<CycleMark> _onsetMarks(int count) => [
+      for (var i = 0; i < count; i++)
+        CycleMark(
+            profileId: 1,
+            date: d(3, 1).add(Duration(days: 25 * i)),
+            type: CycleMarkTypes.cycleStart),
     ];
 
 // ---------------------------------------------------------------------------
@@ -232,7 +258,7 @@ void main() {
             reason: 'the attribute row "$label" renders with its label');
       }
 
-      // One column per cycle group: three onsets, numbered.
+      // One column per cycle group: three marked starts, numbered.
       expect(_header(0), findsOneWidget);
       expect(_header(1), findsOneWidget);
       expect(_header(2), findsOneWidget);
@@ -273,7 +299,8 @@ void main() {
           evaluations: _evaluations(_twoCycleEntries, _ruleDMarks)));
       await tester.pumpAndSettle();
 
-      // Cycle length: days between consecutive onsets (Mar 1 -> Mar 28 = 27
+      // Cycle length: days between consecutive marked starts (Mar 1 ->
+      // Mar 28 = 27
       // days, Mar 28 -> Apr 20 = 23); the open last cycle shows the dash.
       expect(find.descendant(of: _cell('length', 0), matching: find.text('27 days')),
           findsOneWidget);
@@ -282,7 +309,7 @@ void main() {
       expect(find.descendant(of: _cell('length', 2), matching: find.text('—')),
           findsOneWidget);
 
-      // Period start: each onset group's own onset date.
+      // Period start: each marked group's own bleeding onset date.
       expect(find.descendant(of: _cell('start', 0), matching: find.text(yMd(d(3, 1), 'en'))),
           findsOneWidget);
       expect(find.descendant(of: _cell('start', 1), matching: find.text(yMd(d(3, 28), 'en'))),
@@ -292,9 +319,9 @@ void main() {
 
       // Period end: the LAST menstruation-level (>= 2) bleeding day of the
       // group — the spotting continuation on Mar 4 does not extend cycle 1.
-      // The open cycle 3 has its onset day itself bleeding, so its period
-      // end is the onset day (only its LENGTH stays undetermined — no next
-      // onset exists yet).
+      // The open cycle 3 has its first day itself bleeding, so its period
+      // end is the marked start day (only its LENGTH stays undetermined —
+      // no next start exists yet).
       expect(find.descendant(of: _cell('end', 0), matching: find.text(yMd(d(3, 3), 'en'))),
           findsOneWidget);
       expect(find.descendant(of: _cell('end', 1), matching: find.text(yMd(d(3, 30), 'en'))),
@@ -343,10 +370,10 @@ void main() {
         'the leading group shows the dash for the bleeding attributes and '
         'its own header', (tester) async {
       await tester.pumpWidget(
-          _tableHarness(evaluations: _evaluations(_leadingEntries)));
+          _tableHarness(evaluations: _evaluations(_leadingEntries, _leadingMarks)));
       await tester.pumpAndSettle();
 
-      // Four columns: the leading group plus three onset groups.
+      // Four columns: the leading group plus three marked groups.
       expect(find.byWidgetPredicate((w) =>
               w.key is ValueKey<String> &&
               (w.key as ValueKey<String>).value.startsWith('cycleSummaryHeader-')),
@@ -356,10 +383,10 @@ void main() {
       // label, ending at the group's last day (the begin is unknown).
       expect(find.text('Without period onset (until 2/28/2026)'), findsOneWidget);
       expect(find.text('Cycle 1'), findsOneWidget,
-          reason: 'the onset groups keep their numbering');
+          reason: 'the marked groups keep their numbering');
 
       // The bleeding attributes show the dash in the leading group — it
-      // predates the first recorded onset, so the bleeding begin/end and
+      // predates the first cycleStart mark, so the bleeding begin/end and
       // the cycle length are unknowable there (the spotting on Feb 26
       // counts neither as a period start nor as a period end).
       expect(find.descendant(of: _cell('length', 0), matching: find.text('—')),
@@ -370,8 +397,8 @@ void main() {
           findsOneWidget);
       expect(find.descendant(of: _cell('length', 1), matching: find.text('27 days')),
           findsOneWidget,
-          reason: 'the following onset group is unaffected: the length is '
-              'counted between its own onset (Mar 1) and the next onset '
+          reason: 'the following marked group is unaffected: the length is '
+              'counted between its own start (Mar 1) and the next start '
               '(Mar 28), never via the leading group');
       expect(find.descendant(of: _cell('start', 1), matching: find.text(yMd(d(3, 1), 'en'))),
           findsOneWidget);
@@ -405,7 +432,7 @@ void main() {
   group('scroll behavior', () {
     testWidgets('more than ~3 cycles scroll horizontally', (tester) async {
       await tester.pumpWidget(_tableHarness(
-        evaluations: _evaluations(_onsetEntries(4)),
+        evaluations: _evaluations(_onsetEntries(4), _onsetMarks(4)),
         width: 500,
       ));
       await tester.pumpAndSettle();
@@ -417,7 +444,7 @@ void main() {
 
     testWidgets('~3 cycles fit the viewport without scrolling', (tester) async {
       await tester.pumpWidget(_tableHarness(
-        evaluations: _evaluations(_onsetEntries(3)),
+        evaluations: _evaluations(_onsetEntries(3), _onsetMarks(3)),
         width: 500,
       ));
       await tester.pumpAndSettle();

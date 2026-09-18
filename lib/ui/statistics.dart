@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/marks.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
@@ -29,10 +30,12 @@ class StatistikScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text(l10n.loadFailed)),
         data: (entries) {
-          final lengths = cycleLengthsInDays(entries);
+          final marks =
+              ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+          final lengths = cycleLengthsInDays(entries, marks);
           final summary = summarizeCycleLengths(lengths);
           final buckets = cycleLengthDistribution(lengths);
-          final onsets = menstruationOnsetDates(entries);
+          final onsets = menstruationOnsetDates(entries, marks);
           String day(DateTime d) =>
               DateFormat.yMd(locale).format(DateOnly.normalize(d).toLocal());
 
@@ -95,8 +98,9 @@ class StatistikScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // The raw onset dates keep the length list auditable against
-                // the (assumed) boundary rule without adding any evaluation.
+                // The raw cycle-start dates keep the length list auditable
+                // against the mark-driven boundaries without adding any
+                // evaluation.
                 _StatCard(
                   title: l10n.statisticsOnsets,
                   child: Column(

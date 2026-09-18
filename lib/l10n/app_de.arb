@@ -180,7 +180,7 @@
   "cycleSummarySuzEvening": "Regel D (gegen Abend)",
   "cycleSummarySuzMorning": "Regel E (am Morgen)",
   "cycleSummarySuzFrom": "SUZ ab {day}",
-  "statisticsNote": "Nur Rechenwerte (Zykluslängen aus der angenommenen Regelbeginn-Definition), keine Bewertung oder Aussagen über Fruchtbarkeit. Störungstage beginnen keinen Zyklus — Annahme; wird mit den Fachleuten geprüft (ADR-0001).",
+  "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen) — keine Bewertung oder Aussagen über Fruchtbarkeit. Eine gesetzte Zyklusbeginn-Markierung gilt unabhängig vom Bleedingsmuster; Störungen verschieben sie nicht.",
   "statisticsNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",
   "statisticsOnsets": "Regelbeginne",

@@ -810,6 +810,9 @@ void main() {
       // vocabulary — both sides must spell the tokens identically.
       expect(CycleMarkTypes.suzEvening, MarkTypes.suzEvening);
       expect(CycleMarkTypes.suzMorning, MarkTypes.suzMorning);
+      // The cycleStart mark (the user-placed cycle start; bleeding only
+      // suggests) is part of the open TEXT vocabulary too.
+      expect(CycleMarkTypes.cycleStart, MarkTypes.cycleStart);
     });
 
     test('watchAllMarks streams the profile\'s marks as they are toggled',

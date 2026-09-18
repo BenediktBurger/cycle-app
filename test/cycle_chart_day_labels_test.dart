@@ -52,12 +52,13 @@ Finder _label(int index, String text) => find.descendant(
 
 Widget _chartHarness({
   required List<DailyEntry> entries,
+  List<CycleMark> marks = const [],
   Locale locale = const Locale('en'),
 }) =>
     ProviderScope(
       overrides: [
         dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
+        marksProvider.overrideWith((ref) => Stream.value(marks)),
         selectedDateProvider.overrideWith((ref) => entries.first.date),
       ],
       child: MaterialApp(
@@ -166,18 +167,17 @@ void main() {
     });
 
     testWidgets(
-        'a new cycle onsets mid-month with a plain day number and '
+        'a new cycle starts mid-month with a plain day number and '
         'restarts the day-of-cycle count', (tester) async {
-      // 40 days (2026-01-20 .. 2026-02-28); menstruation-level bleeding on
-      // the first day and again on day index 35 (2026-02-24) after a
-      // bleeding-free day 34, so a second cycle starts there — mid-month,
-      // hence a plain day number despite the cycle start.
-      final bleeding = {
-        0: Bleeding.heavy,
-        35: Bleeding.heavy,
-      };
-      await tester
-          .pumpWidget(_chartHarness(entries: _entries(40, bleeding: bleeding)));
+      // 40 days (2026-01-20 .. 2026-02-28); a cycleStart mark on day index
+      // 35 (2026-02-24) opens the second cycle there — mid-month, hence a
+      // plain day number despite the cycle start.
+      final marks = [
+        CycleMark(
+            profileId: 1, date: _day(35), type: CycleMarkTypes.cycleStart),
+      ];
+      await tester.pumpWidget(
+          _chartHarness(entries: _entries(40), marks: marks));
       await tester.pumpAndSettle();
 
       // The initial auto-scroll puts the window at the newest days: the 40

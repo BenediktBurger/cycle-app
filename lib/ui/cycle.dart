@@ -128,7 +128,7 @@ class ZyklusScreen extends ConsumerWidget {
 
 /// The chart data view model for one recorded range: day index -> signal.
 final class _ChartDays {
-  _ChartDays(List<DailyEntry> entries) {
+  _ChartDays(List<DailyEntry> entries, List<CycleMark> marks) {
     final sorted = [...entries]
       ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
     firstDay = DateOnly.normalize(sorted.first.date);
@@ -148,7 +148,7 @@ final class _ChartDays {
     // TODO(user-review): before the first real onset (a leading group of
     // days that predate the first recorded period) the count starts at the
     // first TRACKED day — the true cycle start is unknowable there.
-    final groups = groupIntoCycles(sorted);
+    final groups = groupIntoCycles(sorted, marks);
     final starts = [for (final g in groups) DateOnly.normalize(g.startDate)];
     cycleStartDates = {
       // Only groups that START at a menstruation onset are cycle
@@ -309,7 +309,7 @@ final class _CycleChartState extends State<_CycleChart> {
   @override
   void initState() {
     super.initState();
-    _days = _ChartDays(widget.entries);
+    _days = _ChartDays(widget.entries, widget.marks);
     _scrollController.addListener(_onScrolled);
     // Data may already be present at mount time: schedule the one-time
     // initial auto-scroll for the end of this frame.
@@ -319,11 +319,12 @@ final class _CycleChartState extends State<_CycleChart> {
   @override
   void didUpdateWidget(covariant _CycleChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // A live entry write re-emits the entries stream while this state is
-    // alive: recompute the day mapping so a changed range re-windows
-    // instead of rendering stale data.
-    if (!identical(oldWidget.entries, widget.entries)) {
-      _days = _ChartDays(widget.entries);
+    // A live entry or mark write re-emits the respective stream while this
+    // state is alive: recompute the day mapping so a changed range (or a
+    // changed boundary mark) re-windows instead of rendering stale data.
+    if (!identical(oldWidget.entries, widget.entries) ||
+        !identical(oldWidget.marks, widget.marks)) {
+      _days = _ChartDays(widget.entries, widget.marks);
       // Only the FIRST data frame (an initial auto-scroll still pending)
       // may trigger the jump here; once it ran, a later re-emit never
       // re-jumps and the user's position survives.

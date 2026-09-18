@@ -67,6 +67,15 @@ CycleMark rise(int year, int month, int day) => CycleMark(
       type: CycleMarkTypes.firstHigherMeasurement,
     );
 
+/// A user-placed cycleStart mark on (year, month, day) — the authoritative
+/// cycle boundary (see lib/domain/cycle_grouping.dart: grouping is
+/// mark-driven; bleeding only suggests).
+CycleMark start(int year, int month, int day) => CycleMark(
+      profileId: 1,
+      date: DateTime(year, month, day),
+      type: CycleMarkTypes.cycleStart,
+    );
+
 /// The evaluation of the cycle group whose first tracked day is [start].
 CycleEvaluation evalFor(
   List<DailyEntry> entries,
@@ -1266,7 +1275,7 @@ void main() {
         d(2026, 3, 11, t: 36.5), // circle 2
         d(2026, 3, 12, t: 36.5), // circle 3 — below the margin
         d(2026, 3, 13, t: 36.5), // circle 4 — rule E fires here
-        // …and cycle B starts the very next day.
+        // …and cycle B starts the very next day (cycleStart mark).
         d(2026, 3, 14, bleeding: Bleeding.medium),
         d(2026, 3, 15, t: 36.2),
         d(2026, 3, 16, t: 36.1),
@@ -1279,8 +1288,10 @@ void main() {
         d(2026, 3, 23, t: 37.0), // circle 3, ≥ +0.2 K → rule D
       ];
       final marks = [
+        start(2026, 3, 2),
         peak(2026, 3, 9),
         rise(2026, 3, 10),
+        start(2026, 3, 14),
         peak(2026, 3, 20),
         rise(2026, 3, 21),
       ];
@@ -1306,7 +1317,7 @@ void main() {
 
     test('multi-cycle evaluations carry independent baseline segments', () {
       final entries = [
-        // Cycle A: onset Mar 2
+        // Cycle A: starts at the Mar 2 cycleStart mark
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
         d(2026, 3, 4, t: 36.3),
@@ -1319,7 +1330,7 @@ void main() {
         d(2026, 3, 11, t: 36.8), // first higher A
         d(2026, 3, 12, t: 36.9),
         d(2026, 3, 13, t: 37.0),
-        // Cycle B: onset Apr 6 (after a data gap)
+        // Cycle B: starts at the Apr 6 cycleStart mark (after a data gap)
         d(2026, 4, 6, bleeding: Bleeding.medium),
         d(2026, 4, 7, t: 36.2),
         d(2026, 4, 8, t: 36.1),
@@ -1333,8 +1344,10 @@ void main() {
         d(2026, 4, 16, t: 37.0),
       ];
       final marks = [
+        start(2026, 3, 2),
         peak(2026, 3, 10),
         rise(2026, 3, 11),
+        start(2026, 4, 6),
         peak(2026, 4, 13),
         rise(2026, 4, 14),
       ];
@@ -1764,7 +1777,7 @@ void main() {
         'multiple cycles are evaluated independently; marks do not leak '
         'across cycle boundaries', () {
       final entries = [
-        // Cycle A: onset Mar 2
+        // Cycle A: starts at the Mar 2 cycleStart mark
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
         d(2026, 3, 4, t: 36.3),
@@ -1777,7 +1790,7 @@ void main() {
         d(2026, 3, 11, t: 36.8), // first higher A
         d(2026, 3, 12, t: 36.9),
         d(2026, 3, 13, t: 37.0),
-        // Cycle B: onset Apr 6 (after a data gap)
+        // Cycle B: starts at the Apr 6 cycleStart mark (after a data gap)
         d(2026, 4, 6, bleeding: Bleeding.medium),
         d(2026, 4, 7, t: 36.2),
         d(2026, 4, 8, t: 36.1),
@@ -1791,8 +1804,10 @@ void main() {
         d(2026, 4, 16, t: 37.0),
       ];
       final marks = [
+        start(2026, 3, 2),
         peak(2026, 3, 10),
         rise(2026, 3, 11),
+        start(2026, 4, 6),
         peak(2026, 4, 13),
         rise(2026, 4, 14),
       ];
@@ -1854,6 +1869,94 @@ void main() {
 
     test('empty input yields no evaluations', () {
       expect(evaluateCycles(const [], const []), isEmpty);
+    });
+  });
+
+  group('mark-driven cycle windows flow into the evaluation', () {
+    test(
+        'a cycleStart mark splits the tracked days into independent '
+        'evaluation windows — the peak/rise anchors bind per window', () {
+      final entries = [
+        d(2026, 3, 1),
+        d(2026, 3, 2, t: 36.2),
+        d(2026, 3, 3, t: 36.1),
+        d(2026, 3, 4, t: 36.3),
+        d(2026, 3, 5, t: 36.4), // highest of window 1's six lows → baseline
+        d(2026, 3, 6, t: 36.2),
+        d(2026, 3, 7, t: 36.3),
+        d(2026, 3, 8, t: 36.8), // marked rise of window 1
+        d(2026, 3, 9, t: 36.2),
+        d(2026, 3, 10), // the cycleStart-mark day (unmeasured — irrelevant)
+        d(2026, 3, 11, t: 36.2),
+        d(2026, 3, 12, t: 36.1),
+        d(2026, 3, 13, t: 36.3),
+        d(2026, 3, 14, t: 36.4), // highest of window 2's six lows → baseline
+        d(2026, 3, 15, t: 36.2),
+        d(2026, 3, 16, t: 36.3),
+        d(2026, 3, 17, t: 36.8), // marked rise of window 2
+        d(2026, 3, 18, t: 36.9),
+      ];
+      final marks = [
+        peak(2026, 3, 5),
+        rise(2026, 3, 8),
+        start(2026, 3, 10),
+        peak(2026, 3, 15),
+        rise(2026, 3, 17),
+      ];
+
+      final a = evalFor(entries, marks, DateTime(2026, 3, 1));
+      expect(a.cycle.startsAtMenstruation, isFalse,
+          reason: 'the leading group predates the first cycleStart mark');
+      expect(a.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 8)));
+      expect(a.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(a.baseline!.value, 36.4);
+      expect(a.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 5)));
+
+      final b = evalFor(entries, marks, DateTime(2026, 3, 10));
+      expect(b.cycle.startsAtMenstruation, isTrue,
+          reason: 'the mark-driven group opens at the marked day');
+      expect(b.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 17)),
+          reason: 'the window 1 rise (Mar 8) lies before window 2 and does '
+              'not anchor it');
+      expect(b.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 15)));
+      expect(b.baseline!.value, 36.4);
+      expect(b.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 14)));
+    });
+
+    test('without a cycleStart mark the same data is ONE window — the '
+        'latest rise anchors the whole run', () {
+      final entries = [
+        d(2026, 3, 1),
+        d(2026, 3, 2, t: 36.2),
+        d(2026, 3, 3, t: 36.1),
+        d(2026, 3, 4, t: 36.3),
+        d(2026, 3, 5, t: 36.4),
+        d(2026, 3, 6, t: 36.2),
+        d(2026, 3, 7, t: 36.3),
+        d(2026, 3, 8, t: 36.8), // marked rise of window 1
+        d(2026, 3, 9, t: 36.2),
+        d(2026, 3, 10),
+        d(2026, 3, 11, t: 36.2),
+        d(2026, 3, 12, t: 36.1),
+        d(2026, 3, 13, t: 36.3),
+        d(2026, 3, 14, t: 36.4),
+        d(2026, 3, 15, t: 36.2),
+        d(2026, 3, 16, t: 36.3),
+        d(2026, 3, 17, t: 36.8), // marked rise of window 2 — the LATEST
+        d(2026, 3, 18, t: 36.9),
+      ];
+      final marks = [
+        peak(2026, 3, 5),
+        rise(2026, 3, 8),
+        peak(2026, 3, 15),
+        rise(2026, 3, 17),
+      ];
+
+      final evaluations = evaluateCycles(entries, marks, profileId: 1);
+      expect(evaluations, hasLength(1));
+      expect(evaluations.single.firstHigherDay,
+          DateOnly.normalize(DateTime(2026, 3, 17)),
+          reason: 'the most-recent rise mark anchors the single group');
     });
   });
 }

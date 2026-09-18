@@ -3,6 +3,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/statistics.dart';
 
@@ -15,7 +16,15 @@ DailyEntry d(
   return DailyEntry(date: DateTime(year, month, day), bleeding: bleeding);
 }
 
-/// Three clean cycles: onsets Mar 2 / Mar 30 / Apr 27 / May 25.
+/// A user-placed cycleStart mark on (year, month, day) — the cycle-length
+/// anchor (see lib/domain/cycle_grouping.dart: grouping is mark-driven).
+CycleMark start(int year, int month, int day) => CycleMark(
+      profileId: 1,
+      date: DateTime(year, month, day),
+      type: CycleMarkTypes.cycleStart,
+    );
+
+/// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
 /// Consecutive lengths: 28, 28, 28.
 List<DailyEntry> threeCycleData() => [
       d(2026, 3, 2, bleeding: Bleeding.medium),
@@ -30,39 +39,70 @@ List<DailyEntry> threeCycleData() => [
       d(2026, 5, 26, bleeding: Bleeding.medium),
     ];
 
+List<CycleMark> threeCycleStarts() => [
+      start(2026, 3, 2),
+      start(2026, 3, 30),
+      start(2026, 4, 27),
+      start(2026, 5, 25),
+    ];
+
 void main() {
   group('cycleLengthsInDays', () {
-    test('counts days between consecutive menstruation onsets', () {
-      expect(cycleLengthsInDays(threeCycleData()), [28, 28, 28]);
+    test('counts days between consecutive marked cycle starts', () {
+      expect(cycleLengthsInDays(threeCycleData(), threeCycleStarts()),
+          [28, 28, 28]);
     });
 
-    test('excludes interrupted (excluded) bleeding days as boundaries', () {
+    test('lengths are mark-driven, not bleeding-driven', () {
+      // The old rule split at menstruation-level bleeding onsets; now only
+      // the user-placed cycleStart marks anchor the lengths — the bleeding
+      // pattern below would have produced different boundaries.
       final entries = [
         d(2026, 4, 1, bleeding: Bleeding.medium),
-        // interrupted period day shortly before the real next onset:
         DailyEntry(
           date: DateTime(2026, 4, 28),
           bleeding: Bleeding.medium,
           excludeIllness: true,
         ),
-        d(2026, 4, 29, bleeding: Bleeding.medium), // true onset
+        d(2026, 4, 29, bleeding: Bleeding.medium),
       ];
-      // Apr 29 is the only later onset -> single length from Apr 1 to Apr 29.
-      expect(cycleLengthsInDays(entries), [28]);
+      // Marks on Apr 1 and Apr 29: a single length from Apr 1 to Apr 29.
+      expect(cycleLengthsInDays(entries, [start(2026, 4, 1), start(2026, 4, 29)]),
+          [28]);
+      // Without marks there are no boundaries and no lengths at all.
+      expect(cycleLengthsInDays(entries, const []), isEmpty);
+    });
+
+    test('a mark on an excluded day anchors a length too', () {
+      final entries = [
+        d(2026, 4, 1, bleeding: Bleeding.medium),
+        DailyEntry(
+          date: DateTime(2026, 4, 28),
+          bleeding: Bleeding.medium,
+          excludeIllness: true,
+        ),
+        d(2026, 4, 29, bleeding: Bleeding.medium),
+      ];
+      // The Apr 28 mark sits on an excluded day — the mark binds wherever
+      // placed (no exclusion-flag interplay), so it anchors a length.
+      final lengths = cycleLengthsInDays(
+          entries, [start(2026, 4, 1), start(2026, 4, 28), start(2026, 4, 29)]);
+      expect(lengths, [27, 1]);
     });
 
     test('incomplete trailing cycle contributes no length', () {
       final entries = [
         d(2026, 1, 5, bleeding: Bleeding.medium),
         d(2026, 2, 2, bleeding: Bleeding.medium),
-        // no known next onset: cycle 2 is open-ended
+        // no known next start: cycle 2 is open-ended
       ];
-      expect(cycleLengthsInDays(entries), [28]);
+      expect(cycleLengthsInDays(entries, [start(2026, 1, 5), start(2026, 2, 2)]),
+          [28]);
     });
 
-    test('no onsets -> no lengths', () {
-      expect(cycleLengthsInDays([d(2026, 1, 1)]), isEmpty);
-      expect(cycleLengthsInDays(const []), isEmpty);
+    test('no marks -> no lengths', () {
+      expect(cycleLengthsInDays([d(2026, 1, 1)], const []), isEmpty);
+      expect(cycleLengthsInDays(const [], const []), isEmpty);
     });
   });
 
@@ -84,7 +124,7 @@ void main() {
     });
 
     test('integrated with grouping: three clean cycles', () {
-      final lengths = cycleLengthsInDays(threeCycleData());
+      final lengths = cycleLengthsInDays(threeCycleData(), threeCycleStarts());
       final summary = summarizeCycleLengths(lengths);
       expect(summary.lengths, [28, 28, 28]);
       expect(summary.average, closeTo(28, 0.0001));

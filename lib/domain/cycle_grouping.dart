@@ -1,31 +1,22 @@
 // Cycle grouping: split a stream of tracked days into cycles.
 //
-// Boundary assumption (THE rule to review with experts):
+// Boundary rule (decided — the cycle start is a user mark):
 //
-//   TODO(user-review): A new menstrual cycle is assumed to start on the
-//   FIRST day with menstruation-level bleeding (`Bleeding.level >= 2`:
-//   light, medium or heavy) that follows any earlier day without such
-//   bleeding (or a data gap). This is the classical NFP/Rötzer "cycle
-//   day 1 = first bleeding day" posture, recorded here as an ASSUMPTION
-//   pending expert review — see ADR-0001 draft note,
-//   docs/adr/0001-iner-mode-m-hypothesis.md (status: Hypothesis). Details
-//   of this rule that need validation:
-//     - Spotting (level 1) and bleeding-free days never start a cycle
-//       (spotting is not menstruation).
-//     - Interrupted days (any exclude flag set) never start a cycle; they
-//       are treated as opaque.
-//     - A menstruation-level day directly following an interrupted
-//       menstruation-level day IS treated as a new menstruation onset
-//       (the interrupted day may hide the true start of the bleeding
-//       phase).
-//     - A data gap (day without any entry) allows the next menstruation-
-//       level day to be an onset (an absent previous day cannot be proven
-//       non-menstruating).
+//   A new cycle group opens at the first tracked day on/after a user-placed
+//   `cycleStart` mark (CycleMarkTypes.cycleStart) for that profile. The mark
+//   is AUTHORITATIVE and binds wherever it sits — including on days without
+//   menstruation bleeding, on excluded (interrupted) days, and on untracked
+//   gap days (the group then opens at the next tracked entry). Bleeding
+//   never creates a boundary by itself; it only SUGGESTS a cycle start via
+//   [isSuggestedCycleStart] (prompts / derived marks). A leading group of
+//   entries that predate the first mark keeps
+//   `startsAtMenstruation == false`.
 
 import 'date_only.dart';
+import 'marks.dart';
 import 'models.dart';
 
-/// One cycle = all tracked days between two consecutive menstruation onsets.
+/// One cycle = all tracked days between two consecutive cycle starts.
 final class Cycle {
   const Cycle({required this.days, required this.startsAtMenstruation});
 
@@ -33,9 +24,10 @@ final class Cycle {
   /// the grouping algorithm.
   final List<DailyEntry> days;
 
-  /// True when the group's first tracked day is a menstruation onset
-  /// (a cycle boundary). False only for the leading group formed from
-  /// entries that predate the first known period onset.
+  /// True when the group opened at a user-placed cycleStart mark (the
+  /// group's first tracked day is the first tracked day on/after that
+  /// mark). False only for the leading group formed from entries that
+  /// predate the first cycleStart mark.
   final bool startsAtMenstruation;
 
   /// First tracked day of the group.
@@ -45,12 +37,16 @@ final class Cycle {
   DateTime get endDate => days.last.date;
 }
 
-/// Dates on which (per the assumption above) a new cycle starts — the
-/// anchors for cycle-length statistics. Sorted ascending, normalized to
-/// UTC-midnight (see DateOnly.normalize) so calendar-day arithmetic is
-/// immune to DST shifts.
-List<DateTime> menstruationOnsetDates(List<DailyEntry> entries) =>
-    groupIntoCycles(entries)
+/// Dates of the mark-driven cycle starts — the anchors for cycle-length
+/// statistics (all groups with `startsAtMenstruation == true`, i.e. every
+/// user-placed cycle start that has at least one tracked day on/after it).
+/// Sorted ascending, normalized to UTC-midnight (see DateOnly.normalize) so
+/// calendar-day arithmetic is immune to DST shifts.
+List<DateTime> menstruationOnsetDates(
+  List<DailyEntry> entries,
+  List<CycleMark> marks,
+) =>
+    groupIntoCycles(entries, marks)
         .where((c) => c.startsAtMenstruation)
         .map((c) => DateOnly.normalize(c.startDate))
         .toList();
@@ -58,10 +54,33 @@ List<DateTime> menstruationOnsetDates(List<DailyEntry> entries) =>
 /// Groups the given (possibly unsorted) entries into cycles.
 ///
 /// Entries are sorted by date; entry timing (date-only) decides grouping.
-/// A group starts at every menstruation onset; entries before the first
-/// onset form one leading group with `startsAtMenstruation == false`.
-List<Cycle> groupIntoCycles(List<DailyEntry> entries) {
+/// A group starts at the first tracked day on/after a cycleStart mark for
+/// that entry's profile; leading entries (before the first mark) form one
+/// leading group with `startsAtMenstruation == false`.
+List<Cycle> groupIntoCycles(
+  List<DailyEntry> entries,
+  List<CycleMark> marks,
+) {
   if (entries.isEmpty) return const [];
+
+  // The cycleStart mark dates per profile (marks of other types never
+  // create boundaries). Normalized so calendar-day comparisons are exact.
+  final markDates = <int, List<DateTime>>{};
+  for (final mark in marks) {
+    if (mark.type != CycleMarkTypes.cycleStart) continue;
+    markDates
+        .putIfAbsent(mark.profileId, () => <DateTime>[])
+        .add(DateOnly.normalize(mark.date));
+  }
+  for (final dates in markDates.values) {
+    dates.sort();
+  }
+
+  // Per profile: index of the next NOT-yet-consumed mark. A mark is
+  // consumed when the group it opens has started (all marks on/before that
+  // day together — they cannot open a second group for the same day, and
+  // anything on/before the group's start is a no-op anyway).
+  final cursor = <int, int>{};
 
   final sorted = [...entries]
     ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
@@ -69,7 +88,7 @@ List<Cycle> groupIntoCycles(List<DailyEntry> entries) {
   final cycles = <Cycle>[];
   var currentDays = <DailyEntry>[];
   var currentStartsAtMenstruation = false;
-  DailyEntry? previous;
+  DateTime? currentStart;
 
   void flush() {
     if (currentDays.isEmpty) return;
@@ -80,28 +99,63 @@ List<Cycle> groupIntoCycles(List<DailyEntry> entries) {
     currentDays = <DailyEntry>[];
   }
 
+  /// True when the next unconsumed cycleStart mark for [profileId] opens a
+  /// group at [entryDate]:
+  /// - the very first tracked group opens when a mark sits on or before
+  ///   [entryDate] (no leading group forms before that mark);
+  /// - an already-open group is left when the next mark lies after the
+  ///   group's start and no later than [entryDate] — a mark no later than
+  ///   the current group's start is a no-op.
+  /// On success all marks on or before [entryDate] are consumed (they
+  /// cannot open a second group for the same day).
+  bool markOpensGroup(int profileId, DateTime entryDate, bool haveGroup) {
+    final dates = markDates[profileId];
+    if (dates == null) return false;
+    final index = cursor[profileId] ?? 0;
+    if (index >= dates.length) return false;
+    final nextMark = dates[index];
+    final day = DateOnly.normalize(entryDate);
+    if (haveGroup) {
+      final lower = DateOnly.normalize(currentStart!);
+      if (nextMark.compareTo(lower) <= 0 || nextMark.compareTo(day) > 0) {
+        return false;
+      }
+    } else if (nextMark.compareTo(day) > 0) {
+      return false;
+    }
+    var consumed = index;
+    while (consumed < dates.length && dates[consumed].compareTo(day) <= 0) {
+      consumed++;
+    }
+    cursor[profileId] = consumed;
+    return true;
+  }
+
   for (final entry in sorted) {
-    final isOnset = _isMenstruationOnset(entry, previous);
-    if (isOnset || currentDays.isEmpty) {
+    final isGroupOpen = currentStart != null;
+    final opens = markOpensGroup(entry.profileId, entry.date, isGroupOpen);
+    if (opens || !isGroupOpen) {
       // A new boundary always opens a group; the very first group opens
-      // regardless (leading, non-boundary group starts at false).
+      // regardless (leading, non-boundary group starts at false — unless a
+      // mark on/before the first tracked day opens the cycle right there).
       flush();
-      currentStartsAtMenstruation = isOnset;
+      currentStartsAtMenstruation = opens;
+      currentStart = entry.date;
     }
     currentDays.add(entry);
-    previous = entry;
   }
   flush();
 
   return cycles;
 }
 
-/// The boundary rule (see the TODO(user-review) comment at the top):
-/// a non-excluded day with menstruation-level bleeding (`level >= 2`) starts
-/// a new cycle unless the immediately preceding calendar day is also a
-/// non-excluded menstruation-level day (i.e. we are in the middle of one
-/// continuous menstruation).
-bool _isMenstruationOnset(DailyEntry entry, DailyEntry? previous) {
+/// The bleeding SUGGESTION predicate (the demoted former boundary rule):
+/// a non-excluded day with menstruation-level bleeding (`level >= 2`)
+/// suggests starting a new cycle unless the immediately preceding calendar
+/// day is also a non-excluded menstruation-level day (i.e. we are in the
+/// middle of one continuous menstruation). This gates prompts and derived
+/// marks — it NEVER creates a cycle boundary by itself.
+bool isSuggestedCycleStart(DailyEntry entry, DailyEntry? previous) {
   if (entry.bleeding.level < 2) return false;
   if (entry.isExcluded) return false;
 

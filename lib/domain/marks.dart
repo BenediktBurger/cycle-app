@@ -40,6 +40,13 @@ abstract final class CycleMarkTypes {
   /// The user-placed SUZ start from an EVENING (the SUZ bar renders at the
   /// day column's middle).
   static const suzEvening = 'suzEvening';
+
+  /// The user-placed start of a menstrual cycle. The AUTHORITATIVE cycle
+  /// boundary: cycle grouping (lib/domain/cycle_grouping.dart) opens a new
+  /// cycle group at this mark, wherever it sits — bleeding only SUGGESTS a
+  /// cycle start via isSuggestedCycleStart, it never creates boundaries by
+  /// itself.
+  static const cycleStart = 'cycleStart';
 }
 
 /// One mark a user placed onto one calendar day.

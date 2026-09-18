@@ -19,6 +19,7 @@ import 'package:drift/native.dart';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -281,6 +282,16 @@ Future<void> main() async {
     );
   }
 
+  // Cycle grouping is MARK-driven: a cycleStart mark opens a group wherever
+  // it sits; bleeding alone (spotting included) never creates a boundary.
+  List<CycleMark> starts(List<(int, int, int)> days) => [
+        for (final (y, m, dd) in days)
+          CycleMark(
+              profileId: 1,
+              date: DateTime(y, m, dd),
+              type: MarkTypes.cycleStart),
+      ];
+
   final entries = [
     d(2026, 3, 2, bleeding: Bleeding.medium),
     d(2026, 3, 3, bleeding: Bleeding.medium),
@@ -290,31 +301,57 @@ Future<void> main() async {
     d(2026, 4, 27, bleeding: Bleeding.medium),
     d(2026, 4, 28),
   ];
-  final cycles = groupIntoCycles(entries);
-  check(cycles.length == 3, 'three cycles grouped');
-  check(cycles.every((c) => c.startsAtMenstruation), 'all cycles bounded');
+
+  final marks = starts([(2026, 3, 2), (2026, 3, 30), (2026, 4, 27)]);
+  final cycles = groupIntoCycles(entries, marks);
+  check(cycles.length == 3, 'three cycles grouped at the cycleStart marks');
+  check(cycles.every((c) => c.startsAtMenstruation),
+      'all cycles opened by marks');
   check(
-    eq(menstruationOnsetDates(entries).map((e) => e.day).toList(), [2, 30, 27]),
-    'onsets: spotting day is NOT a boundary (${menstruationOnsetDates(entries)})',
+    eq(menstruationOnsetDates(entries, marks).map((e) => e.day).toList(),
+        [2, 30, 27]),
+    'onsets: the cycleStart marks anchor the starts',
   );
 
-  // interrupted period day does not start a cycle
-  final interrupted = [
+  // Without marks the bleeding sequence is ONE leading group.
+  check(
+    groupIntoCycles(entries, const []).length == 1,
+    'bleeding alone never opens a group (one group without marks)',
+  );
+
+  // A mark on an untracked gap day opens the group at the next tracked day.
+  final gapEntries = [d(2026, 3, 1), d(2026, 3, 5)];
+  final gapCycles =
+      groupIntoCycles(gapEntries, starts([(2026, 3, 3)]));
+  check(
+    gapCycles.length == 2 &&
+        gapCycles[1].startDate.day == 5 &&
+        gapCycles[1].startsAtMenstruation,
+    'a mark in an untracked gap opens at the next tracked day',
+  );
+
+  // A mark on an excluded (interrupted) day binds regardless (no
+  // exclusion-flag interplay).
+  final excluded = [
     d(2026, 4, 1, bleeding: Bleeding.medium),
     d(2026, 4, 29, bleeding: Bleeding.medium, interrupted: true),
     d(2026, 4, 30, bleeding: Bleeding.medium),
   ];
   check(
-    menstruationOnsetDates(interrupted).length == 2 &&
-        menstruationOnsetDates(interrupted)[1].day == 30,
-    'excluded bleeding day does not start a cycle',
+    menstruationOnsetDates(excluded, starts([(2026, 4, 1), (2026, 4, 29)]))
+            .length ==
+        2,
+    'a mark on an excluded day still opens a cycle',
   );
 
   // --- statistics ---------------------------------------------------------
-  // 28-day entries have 3 onsets -> 2 interval lengths; add a 4th onset to
-  // exercise the third interval (mirrors threeCycleData in the test suite).
+  // The marked starts (3 onsets within the entry range) -> 2 lengths; add a
+  // 4th mark to exercise the third interval (mirrors threeCycleData in the
+  // test suite).
   final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.medium)];
-  final lengths = cycleLengthsInDays(statsEntries);
+  final statsMarks = starts(
+      [(2026, 3, 2), (2026, 3, 30), (2026, 4, 27), (2026, 5, 25)]);
+  final lengths = cycleLengthsInDays(statsEntries, statsMarks);
   check(eq(lengths, [28, 28, 28]), 'cycle lengths 28/28/28 ($lengths)');
   final summary = summarizeCycleLengths(lengths);
   check(

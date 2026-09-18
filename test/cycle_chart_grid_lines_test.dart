@@ -4,8 +4,8 @@
 // draws a THICK solid line through the whole card — as the chart's extra
 // line at x = nextCycleStart − 0.5 and as a thick right border on the cell
 // before the new cycle's first day in every row. The boundary predicate is
-// derived once from the domain's cycle grouping (lib/domain/
-// cycle_grouping.dart): no line before the first recorded onset (the
+// derived once from the domain's mark-driven cycle grouping (lib/domain/
+// cycle_grouping.dart): no line before the first cycleStart mark (the
 // leading group), and a boundary is drawn even across untracked gap days.
 //
 // Same harness pattern as test/cycle_chart_rows_test.dart.
@@ -24,9 +24,10 @@ final _seedColor = const Color(0xFF6750A4);
 // 2026-09-07 is a Monday: a 12-day run Mon .. Fri (next week).
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
-/// One cycle group per bleeding onset: onsets at day indexes 5 and 9
-/// (each preceded by a bleeding-free day), none before the first — the
-/// leading group (indexes 0..4) predates the first recorded onset.
+/// One cycle group per cycleStart mark: marks at day indexes 5 and 9,
+/// none before the first — the leading group (indexes 0..4) predates the
+/// first mark. The bleeding values keep the PAPER row populated; the
+/// boundaries themselves come from the marks.
 final _twoCycleEntries = <DailyEntry>[
   for (var i = 0; i < 12; i++)
     DailyEntry(
@@ -35,19 +36,40 @@ final _twoCycleEntries = <DailyEntry>[
         bleeding: i == 5 || i == 9 ? Bleeding.heavy : Bleeding.none),
 ];
 
-/// A gap scenario: day 0 (onset), days 1..4 untracked, day 5 the next
-/// onset — the boundary is drawn across the untracked gap days.
+/// The cycleStart marks of the two-cycle scenario (at the marked days 5
+/// and 9 — the same days that used to be bleeding onsets).
+final _twoCycleMarks = <CycleMark>[
+  CycleMark(
+      profileId: 1,
+      date: _day(5),
+      type: CycleMarkTypes.cycleStart),
+  CycleMark(
+      profileId: 1,
+      date: _day(9),
+      type: CycleMarkTypes.cycleStart),
+];
+
+/// A gap scenario: day 0 tracked, days 1..4 untracked, a cycleStart mark
+/// on an untracked gap day (say day 3) — the next tracked day 5 opens the
+/// new cycle, and the boundary is drawn across the untracked gap days.
 final _gapEntries = <DailyEntry>[
   DailyEntry(date: _day(0), bbtC: 36.5, bleeding: Bleeding.heavy),
   DailyEntry(date: _day(5), bbtC: 36.5, bleeding: Bleeding.heavy),
 ];
 
+final _gapMarks = <CycleMark>[
+  CycleMark(profileId: 1, date: _day(3), type: CycleMarkTypes.cycleStart),
+];
+
 Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
 
-Widget _chartHarness({required List<DailyEntry> entries}) => ProviderScope(
+Widget _chartHarness(
+        {required List<DailyEntry> entries,
+        List<CycleMark> marks = const []}) =>
+    ProviderScope(
       overrides: [
         dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
+        marksProvider.overrideWith((ref) => Stream.value(marks)),
         selectedDateProvider.overrideWith((ref) => entries.first.date),
       ],
       child: MaterialApp(
@@ -88,7 +110,7 @@ void main() {
     testWidgets(
         'the chart draws hairline vertical grid lines with interval 1 '
         'aligned to the shifted domain\'s column boundaries', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries));
+      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final grid = _chartData(tester).gridData;
@@ -112,7 +134,7 @@ void main() {
     testWidgets(
         'every signal row\'s day cells carry a matching hairline right '
         'border, and the header row does too', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries));
+      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final onSurface = _scheme(tester).onSurface;
@@ -151,15 +173,15 @@ void main() {
         'cycle starts draw thick solid lines: the chart\'s extra line at '
         'nextCycleStart − 0.5 and the thick right border on the cell '
         'before the new cycle in every row', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries));
+      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final onSurface = _scheme(tester).onSurface;
       final verticalLines = _chartData(tester).extraLinesData.verticalLines;
       final boundaryXs = verticalLines.map((l) => l.x).toSet();
       expect(boundaryXs, {4.5, 8.5},
-          reason: 'the onsets at indexes 5 and 9 draw their separator at '
-              'x = onset − 0.5');
+          reason: 'the marked days at indexes 5 and 9 draw their separator '
+              'at x = start − 0.5');
       for (final line in verticalLines) {
         expect(line.strokeWidth, closeTo(2, 0.01),
             reason: 'cycle-start lines are thick');
@@ -195,9 +217,9 @@ void main() {
     });
 
     testWidgets(
-        'no cycle-start line before the first recorded onset (the leading '
-        'group)', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries));
+        'no cycle-start line before the first cycleStart mark (the '
+        'leading group)', (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final verticalLines = _chartData(tester).extraLinesData.verticalLines;
@@ -217,13 +239,13 @@ void main() {
 
     testWidgets('a boundary across untracked gap days is still drawn',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _gapEntries));
+      await tester.pumpWidget(_chartHarness(entries: _gapEntries, marks: _gapMarks));
       await tester.pumpAndSettle();
 
       final verticalLines = _chartData(tester).extraLinesData.verticalLines;
       expect(verticalLines.map((l) => l.x), contains(4.5),
-          reason: 'the onset after the untracked gap days draws its '
-              'separator across the gap');
+          reason: 'the group opened across the untracked gap days draws '
+              'its separator across the gap');
     });
   });
 }
