@@ -157,9 +157,9 @@ report the full analyzer/test output back so issues can be fixed promptly.
 - **Unresolved working assumptions** are marked in code and docs — in
   particular the overall "Mode M" product shape
   ([ADR-001](docs/adr/0001-iner-mode-m-hypothesis.md), status: Hypothesis),
-  the cycle-boundary rule
-  (`lib/domain/cycle_grouping.dart`), and the statistics bucket edges
-  (`lib/domain/statistics.dart`). Treat marked comments like
+  the open questions (`TODO(user-review)`) in
+  [ADR-0008](docs/adr/0008-cycle-start-as-mark.md), and the statistics
+  bucket edges (`lib/domain/statistics.dart`). Treat marked comments like
   `// TODO(user-review)` as questions to bring to INER experts, not as
   settled behavior.
 - **In-memory-only state for now**: the language selection resets to the

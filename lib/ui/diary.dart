@@ -208,7 +208,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // level >= 2 on a not-interrupted day that does not continue the
     // previous calendar day's menstruation-level bleeding — one gate is
     // enough. A mark of this type already on the day is harmless: addMark
-    // is idempotent.
+    // is idempotent. The cheap bleeding-level/exclusion pre-check runs
+    // BEFORE the previous-day lookup, so the common (non-suggesting) save
+    // path skips the indexed DB fetch entirely.
+    if (entry.bleeding.level < 2 || entry.isExcluded) return;
     final previousRow = await db.entriesDao
         .entryFor(defaultProfileId, DateOnly.addDays(date, -1));
     final previous =

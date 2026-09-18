@@ -23,6 +23,13 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
+- JSON import: the merge planner counts the FIRST occurrence of a duplicate
+  (profile, date) entry key in the document, but the write loop upserts
+  every valid row — storage ends on the LAST occurrence, while the in-code
+  comment in `lib/db/export_adapter.dart` claims first-wins. Needs
+  discussion: whether the writer should skip duplicates like the planner
+  counts them (unreachable from real drip exports, so low priority).
+
 ### Necessary
 
 - Data entry aligned with the NER scheme — the exact term list must be
@@ -68,3 +75,15 @@ the sections above track planned work, git history keeps the record (see
 - drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓) - DOMAIN
+- The cycle-summary table's "period start" row label still says period
+  start, while the marked cycle start may sit on a bleeding-free day —
+  wording follow-up; the new label wording should be settled first with the
+  ADR-0008 open question (c) expert review (needs expert wording).
+- The diary cycle-start prompt re-fires when re-saving a suggested day that
+  already carries the cycle start mark (harmless — addMark is idempotent):
+  needs discussion whether to suppress the prompt when the mark is already
+  present on the saved day.
+- Multi-profile future note: `List.sort` in `groupIntoCycles` is not stable,
+  so same-date entries of two profiles could interleave
+  nondeterministically; resolve when multi-profile work lands (the
+  mark-driven grouping is per profile, see ADR-0008).

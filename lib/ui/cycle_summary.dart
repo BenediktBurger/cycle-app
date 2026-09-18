@@ -1,12 +1,12 @@
 // The cycle screen's evaluation table (the paper's bottom summary): one ROW
-// per attribute — Zykluslänge (days between consecutive period onsets),
-// Mensbeginn, Mensende, mucus-peak day, SUZ begin + rule (D/E) and the
-// evaluation status — and one COLUMN per cycle group. Everything is computed
-// purely at render time from the CycleEvaluation list the screen derives
-// with evaluateCycles (ADR-0001: nothing here is persisted — the derived
-// artifacts live only in the widget tree). Missing values render as the "—"
-// dash, the same unset marker the diary's observation cells use. Columns
-// beyond the viewport scroll horizontally so the attribute rows stay
+// per attribute — Zykluslänge (days between consecutive marked cycle
+// starts), Mensbeginn, Mensende, mucus-peak day, SUZ begin + rule (D/E) and
+// the evaluation status — and one COLUMN per cycle group. Everything is
+// computed purely at render time from the CycleEvaluation list the screen
+// derives with evaluateCycles (ADR-0001: nothing here is persisted — the
+// derived artifacts live only in the widget tree). Missing values render as
+// the "—" dash, the same unset marker the diary's observation cells use.
+// Columns beyond the viewport scroll horizontally so the attribute rows stay
 // readable instead of being squeezed.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';

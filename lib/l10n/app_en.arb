@@ -71,7 +71,7 @@
         "type": "String"
       }
     },
-    "description": "Tagebuch/evaluation-table title for the LEADING cycle group: entries that predate the first user-placed cycleStart mark, so the group's begin is unknown and only the end is shown."
+    "description": "Diary/evaluation-table title for the LEADING cycle group: entries that predate the first user-placed cycleStart mark, so the group's begin is unknown and only the end is shown."
   },
   "cycleGroupOnset": "Cycle from {day}",
   "@cycleGroupOnset": {
@@ -222,7 +222,7 @@
   },
   "cycleSummaryCycleLength": "Cycle length",
   "@cycleSummaryCycleLength": {
-    "description": "Row label of the cycle screen's evaluation table: the days between consecutive period onsets."
+    "description": "Row label of the cycle screen's evaluation table: the days between consecutive cycle starts (the user-placed cycleStart marks that open a cycle group)."
   },
   "cycleSummaryPeriodStart": "Period start",
   "@cycleSummaryPeriodStart": {
@@ -251,7 +251,7 @@
         "type": "int"
       }
     },
-    "description": "Column header of the evaluation table's per-cycle columns, numbered over the recorded period onsets."
+    "description": "Column header of the evaluation table's per-cycle columns, numbered over the recorded cycle starts (the user-placed cycleStart marks that open a cycle group)."
   },
   "cycleSummarySuzEvening": "rule D (in the evening)",
   "@cycleSummarySuzEvening": {

@@ -1,14 +1,13 @@
 // The mark-entry bottom sheet of the cycle tab (Mode M, ADR-0001): tapping
 // a chart day opens this sheet instead of jumping straight to the entry
 // form. It offers the preserved "edit day" jump (the old tap behavior) and
-// the contextual set/remove toggles for the user-placed marks — the mucus
-// peak, the first higher measurement (both may live on one day, two
-// independent toggles), the SUZ start (from a morning or from an evening;
-// the two variants are mutually exclusive per day: placing one removes the
-// other) and the cycle start (the authoritative cycle boundary of the
-// mark-driven grouping; bleeding only suggests it — see lib/domain/
-// cycle_grouping.dart and ADR-0008) — plus the computed info lines for the
-// day.
+// the contextual set/remove toggles for the user-placed marks — the cycle
+// start (the authoritative cycle boundary of the mark-driven grouping;
+// bleeding only suggests it — see lib/domain/cycle_grouping.dart and
+// ADR-0008), the mucus peak and the first higher measurement (both may live
+// on one day, two independent toggles) and the SUZ start (from a morning or
+// from an evening; the two variants are mutually exclusive per day: placing
+// one removes the other) — plus the computed info lines for the day.
 //
 // The SUZ suggestion follows the locked decision (the app SUGGESTS, the
 // user PLACES): on the computed suzBegins day the sheet shows a suggestion
@@ -414,9 +413,9 @@ final class CycleDaySheet extends ConsumerWidget {
     }
 
     return SafeArea(
-      // Scrollable: the sheet's actions grew (peak, first higher, two SUZ
-      // variants) — on short viewports the column would otherwise overflow
-      // the modal sheet's maximum height.
+      // Scrollable: the sheet's actions grew (cycle start, peak, first
+      // higher, two SUZ variants) — on short viewports the column would
+      // otherwise overflow the modal sheet's maximum height.
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -454,6 +453,21 @@ final class CycleDaySheet extends ConsumerWidget {
               icon: Icons.edit_outlined,
               label: l10n.cycleSheetEditDay,
               onTap: () => _editDay(context, ref),
+            ),
+            _SheetAction(
+              // The cycle start comes FIRST among the toggle rows: it is the
+              // authoritative cycle-boundary mark of the mark-driven
+              // grouping (bleeding only SUGGESTS it — the diary asks on a
+              // suggested menstruation day). Settable and removable on ANY
+              // day, wherever the user judges the new cycle to begin; the
+              // chart draws the boundary line where the grouping opens the
+              // group.
+              icon: Icons.flag_outlined,
+              label: hasCycleStart
+                  ? l10n.cycleSheetRemoveCycleStart
+                  : l10n.cycleSheetSetCycleStart,
+              onTap: () => _writeMark(ref,
+                  type: CycleMarkTypes.cycleStart, remove: hasCycleStart),
             ),
             _SheetAction(
               // The action icons are affordances for the two user-placed
@@ -498,20 +512,6 @@ final class CycleDaySheet extends ConsumerWidget {
                   type: CycleMarkTypes.suzMorning,
                   otherType: CycleMarkTypes.suzEvening,
                   remove: hasSuzMorning),
-            ),
-            // The cycle start: the authoritative cycle-boundary mark of the
-            // mark-driven grouping (bleeding only SUGGESTS it — the diary
-            // asks on a suggested menstruation day). Settable and removable
-            // on ANY day, wherever the user judges the new cycle to begin;
-            // the chart draws the boundary line where the grouping opens
-            // the group.
-            _SheetAction(
-              icon: Icons.flag_outlined,
-              label: hasCycleStart
-                  ? l10n.cycleSheetRemoveCycleStart
-                  : l10n.cycleSheetSetCycleStart,
-              onTap: () => _writeMark(ref,
-                  type: CycleMarkTypes.cycleStart, remove: hasCycleStart),
             ),
             const SizedBox(height: 8),
           ],

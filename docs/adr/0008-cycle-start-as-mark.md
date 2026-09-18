@@ -59,10 +59,12 @@ bleeding only suggests it.**
   own exports already carry the marks, so a round-trip never re-derives:
   derivation applies only to foreign imports.
 - The old automatic onset rule is **superseded**: no automatic boundary
-  rule remains. `menstruationOnsetDates` now returns the dates of all
-  user-placed cycle starts (the groups with `startsAtMenstruation == true`),
-  which includes marks placed on days without menstruation bleeding and
-  marks whose previous-day subtleties the old rule would have suppressed.
+  rule remains. `menstruationOnsetDates` now returns the dates of the
+  user-placed cycle starts that open a group (the groups with
+  `startsAtMenstruation == true` — a mark yields a group only when at least
+  one tracked day falls on/after it), which includes marks placed on days
+  without menstruation bleeding and marks whose previous-day subtleties the
+  old rule would have suppressed.
 
 This continues [ADR-0001](0001-iner-mode-m-hypothesis.md)'s Mode-M posture:
 the prompt is a suggestion the user confirms, the mark is user-authored —
