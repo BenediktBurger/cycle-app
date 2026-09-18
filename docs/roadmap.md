@@ -61,7 +61,6 @@ the sections above track planned work, git history keeps the record (see
   - add temperature disturbance reasons here (bottom part of the chart)
   - time of measurement below, can be its own row (not part of the chart)
 - [ ] cycle chart: show an indicator if there is a note for a day
-- [ ] SUZ mark should have a larger arrow
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - [ ] with many cycles, scrolling the cycle chart becomes sloppy
 - [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
@@ -82,10 +81,7 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- [ ] the arrow sign for a higher measurement before mucus peak should be **below** the temperature measurement, not above. Its legend should state "vorzeitiger Temperaturanstieg"
 - [ ] persist language and mode choices
-- [ ] cycle tab, selection: set mucus peak should show a filled circle
-- [ ] cycle tab: date selector wastes space (it sits in its own row) should probably be next to info
 - [ ] diary tab: reorder entries: everything of temperature (value, time, exclude) together, all mucus together, all cervix together, sex, pain, extra data
 - [ ] cycle tab: limit temperature to a range selectable in the settings, default is 36-38 °C
 - [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)

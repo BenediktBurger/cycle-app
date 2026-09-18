@@ -555,9 +555,10 @@ void main() {
       expect(
           find.descendant(
               of: find.byKey(const ValueKey('cycleHelpSheet')),
-              matching: find.text('Higher measurement (arrow)')),
+              matching: find.text('Premature temperature rise')),
           findsOneWidget,
-          reason: 'arrows now mean: no peak before the rise (R4)');
+          reason: 'arrows now mean: no peak before the rise (R4), worded '
+              'after the paper sheet\'s term');
       expect(
           find.descendant(
               of: find.byKey(const ValueKey('cycleHelpSheet')),

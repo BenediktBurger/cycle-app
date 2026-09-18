@@ -240,6 +240,28 @@ void main() {
               'the scroll');
     });
 
+    testWidgets(
+        'the jump-to-date affordance sits in the AppBar actions, next to '
+        'the info action', (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpAndSettle();
+
+      final jump = find.byKey(const ValueKey('calendarJumpButton'));
+      final info = find.byKey(const ValueKey('cycleHelpAction'));
+      expect(find.ancestor(of: jump, matching: find.byType(AppBar)),
+          findsOneWidget,
+          reason: 'the jump affordance moved into the AppBar actions');
+      expect(find.ancestor(of: info, matching: find.byType(AppBar)),
+          findsOneWidget,
+          reason: 'the info action stays in the AppBar beside it');
+      expect(tester.getCenter(jump).dx, lessThan(tester.getCenter(info).dx),
+          reason: 'the jump affordance renders before the info action');
+      expect(find.ancestor(of: jump, matching: find.byType(ListView)),
+          findsNothing,
+          reason: 'the wasted standalone row above the chart block is gone — '
+              'the affordance no longer renders inside the screen body');
+    });
+
     testWidgets('jump-to-date: picking a date moves the window onto it',
         (tester) async {
       await tester.pumpWidget(_chartHarness(entries: _longEntries()));

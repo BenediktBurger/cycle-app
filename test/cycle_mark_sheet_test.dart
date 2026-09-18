@@ -282,6 +282,34 @@ void main() {
         reason: 'the peak day keeps a plain dot on the curve (R6)');
   });
 
+  testWidgets(
+      'the set-mucus-peak action shows a filled circle icon; the remove '
+      'action keeps the outline circle', (tester) async {
+    await _pump(tester, entries: _entries); // no marks yet
+
+    await _tapDay(tester, 4); // 9/10, an arbitrary day
+
+    final setTile = tester.widget<ListTile>(find.ancestor(
+        of: find.text('Set mucus peak'), matching: find.byType(ListTile)));
+    expect(
+        setTile.leading,
+        isA<Icon>()
+            .having((icon) => icon.icon, 'icon', Icons.circle),
+        reason: 'the set action shows the filled circle — the solid dot the '
+            'chart renders for a placed peak');
+
+    await tester.tap(find.text('Set mucus peak'));
+    await tester.pumpAndSettle();
+
+    final removeTile = tester.widget<ListTile>(find.ancestor(
+        of: find.text('Remove mucus peak'), matching: find.byType(ListTile)));
+    expect(
+        removeTile.leading,
+        isA<Icon>()
+            .having((icon) => icon.icon, 'icon', Icons.radio_button_unchecked),
+        reason: 'the remove action keeps the outline circle');
+  });
+
   testWidgets('tapping the same action again removes the mark', (tester) async {
     await _pump(tester, entries: _entries, seedMarks: [_peakMark]);
 

@@ -41,10 +41,12 @@
 //   ordinary circle/arrow mark, just without a number — the curve never
 //   paints candidate ordinals; the sheet's circle-numbering line is the
 //   only ordinal surface (circles-only, see cycle_mark_sheet.dart).
-//   TODO(user-review): The SUZ arrow GEOMETRY (head size, shaft length,
-//   and the vertical anchor — the cycle's baseline value when one exists,
-//   else the plot middle) is an owner-eyeball rendering detail, not a
-//   settled rule.
+//   TODO(user-review): The SUZ arrow's vertical anchor — the cycle's
+//   baseline value when one exists, else the plot middle — is an
+//   owner-eyeball rendering detail, not a settled rule. (The glyph's SIZE
+//   is chosen: shaft 8 px, head 7 x 11 px — see paintSuzArrowGlyph; the
+//   original 5 px shaft / 4 px head / Size(9, 8) footprint rendered too
+//   small next to the day columns.)
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -291,12 +293,18 @@ final class RingDotPainter extends FlDotCirclePainter {
       ];
 }
 
-/// Paints the temperature dot plus an ARROW-UP glyph above it: a marked
+/// Paints the temperature dot plus an ARROW-UP glyph BELOW it: a marked
 /// candidate whose day is at or before the mucus peak day, or one of a
 /// cycle with the peak unset (R4, decided per candidate by the domain) —
 /// higher, but explicitly NOT circled per the rule that only candidates
 /// after the peak get circled. Beyond the arrow kind's four-cap the
 /// candidate stays arrowed too, just unnumbered.
+///
+/// The glyph paints below the dot on purpose: the paper sheet writes the
+/// upward arrow UNDER the column's dot. This is a position change, not an
+/// orientation change — the arrow keeps pointing UP at the dot it marks
+/// (see [arrowUpTipFor], the pure placement seam). [getSize] reserves the
+/// glyph's extent on both sides of the dot for hit-testing either way.
 final class ArrowUpDotPainter extends FlDotCirclePainter {
   ArrowUpDotPainter({
     required super.color,
@@ -312,7 +320,7 @@ final class ArrowUpDotPainter extends FlDotCirclePainter {
     super.draw(canvas, spot, offsetInCanvas);
     paintArrowUpGlyph(
       canvas,
-      Offset(offsetInCanvas.dx, offsetInCanvas.dy - radius - arrowHeight),
+      arrowUpTipFor(offsetInCanvas, radius: radius),
       color: arrowColor,
     );
   }
@@ -323,6 +331,18 @@ final class ArrowUpDotPainter extends FlDotCirclePainter {
   @override
   List<Object?> get props => [...super.props, arrowColor];
 }
+
+/// The tip position of the arrow-up glyph for a temperature dot painted at
+/// [dotCenter] with [radius]: the glyph hangs BELOW the dot, flush at its
+/// bottom edge — the paper sheet writes the upward arrow under the column's
+/// dot. The head keeps pointing UP at the dot it marks: a position-below
+/// placement, not an orientation change. (The glyph's own extent
+/// — the height [ArrowUpDotPainter.arrowHeight] reserves — hangs downward
+/// from the tip and only feeds the painters' size math; the tip itself
+/// always sits on the dot's edge, exactly the way the glyph used to hang
+/// flush from the dot's TOP edge.)
+Offset arrowUpTipFor(Offset dotCenter, {required double radius}) =>
+    Offset(dotCenter.dx, dotCenter.dy + radius);
 
 /// Paints an upward arrow (triangle head + short stem) with the 8px
 /// total height used by [ArrowUpDotPainter]; [tip] is the apex. Shared
@@ -361,19 +381,22 @@ FlDotPainter dotPainterForDay({
 
 // --- SUZ mark glyph ----------------------------------------------------------
 
-/// Paints a RIGHT-POINTING arrow whose base starts at [base]: a short
-/// horizontal shaft followed by a triangular head, used as the companion
-/// glyph of the SUZ vertical bar (the bar marks the SUZ start's column, the
-/// arrow points toward the fertile-barren boundary it opens).
-/// TODO(user-review): the arrow GEOMETRY (shaft length, head size) is an
-/// owner-eyeball rendering detail, not a settled rule.
+/// Paints a RIGHT-POINTING arrow whose base starts at [base]: an 8 px
+/// horizontal shaft followed by a triangular head (7 px long, 11 px high),
+/// used as the companion glyph of the SUZ vertical bar (the bar marks the
+/// SUZ start's column, the arrow points toward the fertile-barren boundary
+/// it opens). The size matches the paper sheet's clearly readable SUZ
+/// arrow — enlarged from the original 5 px shaft / 4 px head, which
+/// rendered too small next to the day columns.
+/// TODO(user-review): the exact geometry (shaft length, head size) stays
+/// an owner-eyeball rendering detail, not a settled rule.
 void paintSuzArrowGlyph(Canvas canvas, Offset base, {required Color color}) {
   final paint = Paint()..color = color;
-  canvas.drawRect(Rect.fromLTWH(base.dx, base.dy - 1, 5, 2), paint);
+  canvas.drawRect(Rect.fromLTWH(base.dx, base.dy - 1, 8, 2), paint);
   final head = Path()
-    ..moveTo(base.dx + 9, base.dy)
-    ..lineTo(base.dx + 5, base.dy - 3.5)
-    ..lineTo(base.dx + 5, base.dy + 3.5)
+    ..moveTo(base.dx + 15, base.dy)
+    ..lineTo(base.dx + 8, base.dy - 5.5)
+    ..lineTo(base.dx + 8, base.dy + 5.5)
     ..close();
   canvas.drawPath(head, paint);
 }
@@ -396,7 +419,7 @@ final class SuzArrowDotPainter extends FlDotPainter {
   }
 
   @override
-  Size getSize(FlSpot spot) => const Size(9, 8);
+  Size getSize(FlSpot spot) => const Size(15, 11);
 
   @override
   Color get mainColor => color;
@@ -560,8 +583,11 @@ final class SuzArrowGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The sample box carries the enlarged chart glyph (paintSuzArrowGlyph:
+    // 15 px wide — 8 px shaft + 7 px head — and 11 px high) next to its
+    // bar.
     return CustomPaint(
-      size: const Size(14, 16),
+      size: const Size(18, 16),
       painter: _SuzArrowGlyphPainter(color: color),
     );
   }
@@ -581,7 +607,8 @@ class _SuzArrowGlyphPainter extends CustomPainter {
       Rect.fromLTWH(0.5, 0, 2, size.height),
       paint,
     );
-    // The arrow, base at the bar (same glyph shape as the chart's painter).
+    // The arrow, base at the bar (same enlarged glyph shape as the chart's
+    // painter — scaled together with it).
     paintSuzArrowGlyph(canvas, Offset(2.5, size.height / 2), color: color);
   }
 

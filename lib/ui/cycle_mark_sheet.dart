@@ -472,10 +472,14 @@ final class CycleDaySheet extends ConsumerWidget {
             ),
             _SheetAction(
               // The action icons are affordances for the two user-placed
-              // marks: the circle outline for the mucus peak (which renders
-              // as a solid dot in the symbol row, R6) and the circled dot
-              // for the first higher measurement.
-              icon: Icons.radio_button_unchecked,
+              // marks: the mucus peak shows the FILLED circle while its
+              // mark is unset (the set action places the glyph the chart
+              // renders for it — the solid dot in the symbol row, R6) and
+              // keeps the outline circle for the removal; the circled dot
+              // stands for the first higher measurement.
+              icon: hasPeak
+                  ? Icons.radio_button_unchecked
+                  : Icons.circle,
               label: hasPeak
                   ? l10n.cycleSheetRemoveMucusPeak
                   : l10n.cycleSheetSetMucusPeak,

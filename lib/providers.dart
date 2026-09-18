@@ -98,3 +98,14 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 /// it changes. Normalized to UTC midnight on read/write (DateOnly).
 final selectedDateProvider =
     StateProvider<DateTime>((ref) => DateOnly.normalize(DateTime.now()));
+
+/// The cycle chart's jump-to-date affordance. The button lives in the Zyklus
+/// AppBar's actions (next to the info action — a row of its own above the
+/// chart wasted vertical space), but the jump logic needs the chart's scroll
+/// state (the viewport/column geometry, the day mapping and the scroll
+/// controller all live on the chart state), so the chart state registers its
+/// action here while mounted and clears it again on dispose. Null while no
+/// chart is on screen (entries still loading, no data) — the AppBar hides
+/// the button then, exactly like the old in-chart row never rendered there.
+final cycleChartJumpProvider =
+    StateProvider<void Function(BuildContext context)?>((ref) => null);

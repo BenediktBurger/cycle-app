@@ -64,11 +64,23 @@ class ZyklusScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final entriesAsync = ref.watch(dailyEntriesProvider);
+    // The jump-to-date affordance sits in the AppBar actions, next to the
+    // info action (a standalone row above the chart wasted vertical
+    // space). Its callback is registered by the chart state while the
+    // chart block is mounted — see cycleChartJumpProvider.
+    final jumpToDate = ref.watch(cycleChartJumpProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.navCycle),
         actions: [
+          if (jumpToDate != null)
+            IconButton(
+              key: const ValueKey('calendarJumpButton'),
+              icon: const Icon(Icons.date_range),
+              tooltip: l10n.cycleJumpToDate,
+              onPressed: () => jumpToDate(context),
+            ),
           // The symbol glossary: the on-screen legend moved into this
           // bottom sheet, opened from the AppBar's info action.
           IconButton(
@@ -295,6 +307,40 @@ final class _CycleChartState extends State<_CycleChart> {
   /// yet — unsets this again, so the next data frame can retry.
   bool _initialAutoScrollScheduled = false;
 
+  /// The jump-to-date affordance lives up in the AppBar actions; the
+  /// AppBar sits ABOVE this state in the tree while the jump logic needs
+  /// this state's scroll hooks, so this state registers its action in
+  /// [cycleChartJumpProvider] while mounted (cleared again on dispose).
+  /// Riverpod forbids provider writes inside the widget life-cycle methods,
+  /// so both the registration and the unregister run post-frame.
+  StateController<void Function(BuildContext context)?>? _jumpRegistration;
+
+  /// Registers [_jumpToDate] as the AppBar's jump affordance (see
+  /// [_jumpRegistration]). Post-frame so the provider write happens after
+  /// the build sweep; the AppBar picks the callback up on its next rebuild.
+  void _registerJumpAffordance() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final registration = ProviderScope.containerOf(context, listen: false)
+          .read(cycleChartJumpProvider.notifier);
+      registration.state = _jumpToDate;
+      _jumpRegistration = registration;
+    });
+  }
+
+  /// Clears the AppBar registration (see [_jumpRegistration]).
+  /// Post-frame so the provider write happens outside the teardown sweep;
+  /// skipped when the container is gone already (test scope disposal).
+  void _unregisterJumpAffordance() {
+    final registration = _jumpRegistration;
+    _jumpRegistration = null;
+    if (registration == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!registration.mounted) return;
+      registration.state = null;
+    });
+  }
+
   /// Schedules the one-time initial auto-scroll (see
   /// [_didInitialAutoScroll]). Runs post-frame so the scroll view is laid
   /// out (hasClients, maxScrollExtent) when the jump happens; the jump goes
@@ -325,6 +371,8 @@ final class _CycleChartState extends State<_CycleChart> {
     super.initState();
     _days = _ChartDays(widget.entries, widget.marks);
     _scrollController.addListener(_onScrolled);
+    // Register the AppBar's jump affordance (see [_jumpRegistration]).
+    _registerJumpAffordance();
     // Data may already be present at mount time: schedule the one-time
     // initial auto-scroll for the end of this frame.
     _scheduleInitialAutoScroll();
@@ -348,6 +396,9 @@ final class _CycleChartState extends State<_CycleChart> {
 
   @override
   void dispose() {
+    // The chart is going away — the AppBar must not keep an affordance
+    // whose scroll hooks are being disposed.
+    _unregisterJumpAffordance();
     _scrollController.removeListener(_onScrolled);
     _scrollController.dispose();
     super.dispose();
@@ -410,9 +461,11 @@ final class _CycleChartState extends State<_CycleChart> {
     _openDaySheet(index);
   }
 
-  /// The jump-to-date affordance: opens the material date picker bounded to
+  /// The jump-to-date affordance (the AppBar's date-range button, see
+  /// [cycleChartJumpProvider]): opens the material date picker bounded to
   /// the recorded range and scrolls the window so the picked day is centered.
   Future<void> _jumpToDate(BuildContext context) async {
+    if (!mounted) return;
     final viewport = _viewportWidth;
     final colW = _columnWidth;
     if (viewport == null || colW == null) return;
@@ -605,15 +658,6 @@ final class _CycleChartState extends State<_CycleChart> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                key: const ValueKey('calendarJumpButton'),
-                icon: const Icon(Icons.date_range),
-                tooltip: l10n.cycleJumpToDate,
-                onPressed: () => _jumpToDate(context),
-              ),
-            ),
             // The paper sheet's layout: the fixed left margin (the frozen
             // rail) next to the sliding day columns. The rail carries the
             // header prototypes, the temperature scale and the rows' name
