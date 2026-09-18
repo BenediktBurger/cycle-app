@@ -762,4 +762,73 @@ void main() {
       }
     });
   });
+
+  group('cycleStart marks ride the document verbatim (round-trip pin)', () {
+    test('both author values survive build → parse → plan idempotently', () {
+      // The cycleStart token carries the user-placed cycle boundary (and,
+      // for foreign drip imports, the derived one with author 'import').
+      // The document shape accepts it like any other mark row — the planner
+      // accepts any non-empty mark_type (the storage vocabulary is open
+      // TEXT) — and the merge is idempotent for both author values.
+      const markRows = <Map<String, Object?>>[
+        {
+          'profile_id': 1,
+          'entry_date': '2026-01-01',
+          'mark_type': 'cycleStart',
+          'author': 'import',
+        },
+        {
+          'profile_id': 1,
+          'entry_date': '2026-02-01',
+          'mark_type': 'cycleStart',
+          'author': 'user',
+        },
+      ];
+      final json = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: const <Map<String, Object?>>[
+          {'profile_id': 1, 'date': '2026-01-01', 'bleeding': 3},
+          {'profile_id': 1, 'date': '2026-02-01', 'bleeding': 3},
+        ],
+        marks: markRows,
+        exportedAt: DateTime.utc(2026, 9, 18, 12),
+      ));
+
+      // Build → parse keeps the rows verbatim (author column included).
+      final doc = parseExportJson(json);
+      expect(doc.marks, markRows);
+
+      // First import: both rows count as new writes.
+      final first = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingProfileIds: const {1},
+      );
+      expect(first.marksNew, 2);
+      expect(first.marksSkipped, 0);
+
+      // Re-import of the same document (or of a cycle-app export that
+      // contains these rows): the marks are already present and are skipped
+      // idempotently — never duplicated, author preserved on the device.
+      final existingMarkKeys = {
+        for (final row in doc.marks)
+          importMarkKey(
+            1,
+            row['entry_date'] as String,
+            row['mark_type'] as String,
+          ),
+      };
+      final second = planMerge(
+        doc,
+        existingEntryKeys: const {'1|2026-01-01', '1|2026-02-01'},
+        existingMarkKeys: existingMarkKeys,
+        existingProfileIds: const {1},
+      );
+      expect(second.marksNew, 0);
+      expect(second.marksSkipped, 2);
+    });
+  });
 }

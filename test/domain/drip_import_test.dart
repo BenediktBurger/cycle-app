@@ -767,7 +767,7 @@ void main() {
     });
 
     test('document shape: current-version blob with the main profile and '
-        'no marks', () {
+        'the derived cycleStart mark', () {
       final result = dripCsvToExportJson(dripOneRowCsv(
           dripHeader, cells('2026-01-01', {4: '2', 1: '36.2'})));
       final doc = jsonDecode(result.json) as Map<String, Object?>;
@@ -775,7 +775,17 @@ void main() {
       expect(doc['profiles'], [
         {'id': 1, 'name': 'main', 'ordinal': 0},
       ]);
-      expect(doc['marks'] as List, isEmpty);
+      // A menstruation-level day that is the episode's first day derives a
+      // cycleStart mark with author 'import' (bleeding only SUGGESTS a
+      // cycle start; the mark is what the boundaries consume).
+      expect(doc['marks'], [
+        {
+          'profile_id': 1,
+          'entry_date': '2026-01-01',
+          'mark_type': 'cycleStart',
+          'author': 'import',
+        },
+      ]);
       expect(doc['exported_at'], isA<String>());
       // The produced document passes the shared validator untouched.
       final blob = parseExportJson(result.json);
@@ -964,6 +974,134 @@ void main() {
         expect(result.stats.rowsImported, 0,
             reason: 'a lone time without its measurement is meaningless');
         expect(result.stats.rowsSkippedEmpty, 1);
+      });
+    });
+
+    group('cycleStart mark derivation (foreign drip imports)', () {
+      /// The marks rows of the produced document, in document order.
+      List<Map<String, Object?>> marksOf(DripCsvImport result) =>
+          ((jsonDecode(result.json) as Map<String, Object?>)['marks']! as List)
+              .cast<Map<String, Object?>>();
+
+      /// The one derived mark shape of this feature: profile 1 (drip has no
+      /// multi-profile concept), type cycleStart, author 'import'.
+      Map<String, Object?> derivedMark(String iso) => {
+            'profile_id': 1,
+            'entry_date': iso,
+            'mark_type': 'cycleStart',
+            'author': 'import',
+          };
+
+      test('the first menstruation-level day of an episode derives one '
+          'cycleStart mark (author import)', () {
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {1: '36.2'}), // tracked, no bleeding
+          cells('2026-01-02', {4: '2'}), // medium onset
+          cells('2026-01-03', {4: '2'}), // continues the flow
+        ]));
+        expect(marksOf(result), [derivedMark('2026-01-02')]);
+      });
+
+      test('mid-flow continuation derives nothing (light still continues '
+          'the flow)', () {
+        // drip 2 → stored level 3 (medium); drip 1 → stored level 2
+        // (light). Both are menstruation-level (>= 2), so only the episode's
+        // FIRST day suggests a cycle start; the continuations derive nothing.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {4: '2'}),
+          cells('2026-01-02', {4: '2'}),
+          cells('2026-01-03', {4: '1'}),
+          cells('2026-01-04', {4: '1'}),
+        ]));
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
+      });
+
+      test('spotting does not continue the flow: the next menstruation '
+          'level day is an onset again', () {
+        // drip 0 → stored level 1 (spotting): below the suggestion level,
+        // so it neither derives a mark itself nor suppresses the following
+        // menstruation-level day.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {4: '2'}),
+          cells('2026-01-02', {4: '0'}),
+          cells('2026-01-03', {4: '2'}),
+        ]));
+        expect(marksOf(result), [
+          derivedMark('2026-01-01'),
+          derivedMark('2026-01-03'),
+        ]);
+      });
+
+      test('the hand-authored specimen derives exactly one mark per '
+          'bleeding episode (three in total)', () {
+        // The specimen's bleeding sequences: 2026-07-05..09, 2026-08-02..05
+        // and 2026-08-30..09-02 — each episode's first day is an onset (the
+        // day before it carries no menstruation-level entry), every other
+        // bleeding day continues the previous day's flow. NOT one mark for
+        // the whole file: one per episode.
+        final result = dripCsvToExportJson(dripExportSampleCsv);
+        expect(marksOf(result), [
+          derivedMark('2026-07-05'),
+          derivedMark('2026-08-02'),
+          derivedMark('2026-08-30'),
+        ]);
+      });
+
+      test('CSV row order never changes the derived marks (day-ordered '
+          'replay)', () {
+        // The suppression check runs over the DAY order, not the CSV row
+        // order: 2026-01-03's menstruation-level row appears BEFORE its
+        // prior day's row here, and must still be suppressed by it.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-03', {4: '2'}),
+          cells('2026-01-01', {1: '36.2'}),
+          cells('2026-01-02', {4: '2'}),
+        ]));
+        expect(marksOf(result), [derivedMark('2026-01-02')]);
+      });
+
+      test('duplicated dates follow the merge plan: the first occurrence '
+          'wins', () {
+        // The merge plan counts duplicate (profile, date) keys once, first
+        // occurrence winning; the derivation replay applies the same rule,
+        // so the stored (first) shape of the day decides suppression.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {1: '36.2'}), // first occurrence: no bleeding
+          cells('2026-01-01', {4: '2'}), // duplicate: not a counted write
+          cells('2026-01-02', {4: '2'}),
+        ]));
+        expect(marksOf(result), [derivedMark('2026-01-02')]);
+      });
+
+      test('an interrupted (excluded) day neither derives a mark nor '
+          "suppresses the next day's onset", () {
+        // drip temperature.exclude maps onto the day-level excludeOther, so
+        // the day is an interrupted day for the suggestion predicate — it
+        // never suggests a cycle start itself, and a following
+        // menstruation-level day is not read as a continuation of it.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {4: '2', 2: 'true'}),
+          cells('2026-01-02', {4: '2'}),
+        ]));
+        expect(marksOf(result), [derivedMark('2026-01-02')]);
+      });
+
+      test('a single menstruation-level day with no other tracked days '
+          'derives a mark', () {
+        final result = dripCsvToExportJson(
+            dripOneRowCsv(dripHeader, cells('2026-01-01', {4: '2'})));
+        expect(result.stats.rowsImported, 1);
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
+      });
+
+      test('out-of-range or spotting-only bleeding derives no mark', () {
+        // Out-of-range means no observation (stored level 0); spotting is
+        // stored level 1 — both below the menstruation suggestion level.
+        final result = dripCsvToExportJson(dripCsv(dripHeader, [
+          cells('2026-01-01', {4: '7', 1: '36.2'}),
+          cells('2026-01-02', {4: '0'}),
+        ]));
+        expect(marksOf(result), isEmpty);
       });
     });
   });

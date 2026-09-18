@@ -18,7 +18,8 @@ import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/drip_import.dart';
-import 'package:cycle_app/domain/export_import.dart' show formatIsoDay;
+import 'package:cycle_app/domain/export_import.dart'
+    show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
 
@@ -64,7 +65,9 @@ void main() {
       expect(summary.entriesNew, 28);
       expect(summary.entriesOverwritten, 0);
       expect(summary.entriesWritten, 28);
-      expect(summary.marksNew, 0);
+      expect(summary.marksNew, 3,
+          reason: 'the fixture carries three bleeding episodes, each '
+              'deriving one cycleStart mark (author import)');
       expect(summary.profilesToInsert, 0,
           reason: 'document profile 1 is the seeded main profile');
 
@@ -281,6 +284,102 @@ void main() {
       final kept = storedList
           .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2025, 2, 1)));
       expect(kept, resident, reason: 'the pre-existing day is untouched');
+    });
+  });
+
+  group('derived cycleStart marks (foreign imports round-trip)', () {
+    /// The stored cycleStart marks, ordered by day.
+    Future<List<UserMark>> storedCycleStarts(CycleDatabase target) async {
+      final marks = await target.marksDao.allMarksForAllProfiles();
+      final starts = marks
+          .where((m) => m.markType == 'cycleStart')
+          .toList()
+            ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
+      return starts;
+    }
+
+    test('the fixture import derives one cycleStart mark per bleeding '
+        'episode (author import)', () async {
+      final mapping = dripCsvToExportJson(fixtureRaw);
+      final summary = await importJsonToDatabase(db, mapping.json);
+      expect(summary.marksNew, 3);
+      expect(summary.marksInvalid, 0);
+
+      final starts = await storedCycleStarts(db);
+      expect(starts.map((m) => formatIsoDay(m.entryDate)).toList(),
+          ['2026-07-05', '2026-08-02', '2026-08-30'],
+          reason: 'one mark per bleeding episode (07-05..09, 08-02..05, '
+              '08-30..09-02), each on the episode\'s first day');
+      expect(
+          starts.every((m) => m.profileId == 1 && m.author == 'import'),
+          isTrue,
+          reason: 'drip has no multi-profile concept and the derived marks '
+              'carry the import authorship');
+    });
+
+    test('re-importing the same drip CSV derives nothing new (idempotent '
+        'marks)', () async {
+      await importJsonToDatabase(db, dripCsvToExportJson(fixtureRaw).json);
+
+      final second =
+          await importJsonToDatabase(db, dripCsvToExportJson(fixtureRaw).json);
+      expect(second.marksNew, 0,
+          reason: 'the mapping is deterministic: the same rows derive the '
+              'same marks, which the idempotent addMark skips');
+      expect(second.marksSkipped, 3);
+      expect(await storedCycleStarts(db), hasLength(3));
+    });
+
+    test('cycleStart marks survive the cycle-app export → import round trip '
+        'with their author column (nothing re-derives)', () async {
+      // Hand-authored document: one cycleStart mark with author 'import'
+      // (as a foreign drip import writes it) and one with author 'user'
+      // (as the diary prompt writes it), each on its own tracked day.
+      final doc = buildExportJson(ExportBlob(
+        profiles: const [
+          {'id': 1, 'name': 'main', 'ordinal': 0},
+        ],
+        entries: const [
+          {'profile_id': 1, 'date': '2026-01-01', 'bleeding': 3},
+          {'profile_id': 1, 'date': '2026-02-01', 'bleeding': 3},
+        ],
+        marks: const [
+          {
+            'profile_id': 1,
+            'entry_date': '2026-01-01',
+            'mark_type': 'cycleStart',
+            'author': 'import',
+          },
+          {
+            'profile_id': 1,
+            'entry_date': '2026-02-01',
+            'mark_type': 'cycleStart',
+            'author': 'user',
+          },
+        ],
+        exportedAt: DateTime.utc(2026, 9, 18, 12),
+      ));
+      final first = await importJsonToDatabase(db, doc);
+      expect(first.marksNew, 2);
+
+      // Export THIS database and re-import into a fresh one: the cycleStart
+      // rows travel as document rows verbatim (author column kept) and the
+      // bleeding days do NOT derive new marks — the derivation lives only
+      // in the drip CSV mapping, never on cycle-app's own round trip.
+      final exported = await exportDatabaseToJson(db);
+      final fresh = CycleDatabase(NativeDatabase.memory());
+      addTearDown(fresh.close);
+      final second = await importJsonToDatabase(fresh, exported);
+      expect(second.marksNew, 2,
+          reason: 'the two marks travel as document rows, not derivations');
+      expect(second.marksSkipped, 0);
+
+      final starts = await storedCycleStarts(fresh);
+      expect(starts, hasLength(2));
+      expect(formatIsoDay(starts[0].entryDate), '2026-01-01');
+      expect(starts[0].author, 'import');
+      expect(formatIsoDay(starts[1].entryDate), '2026-02-01');
+      expect(starts[1].author, 'user');
     });
   });
 }

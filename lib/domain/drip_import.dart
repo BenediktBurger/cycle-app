@@ -16,13 +16,23 @@
 // Output is a standard export document of the CURRENT schema version (see
 // lib/domain/export_import.dart) that the write phase feeds through the
 // EXISTING importJsonToDatabase — no second db writer for this feature.
+// On top of the mapped entries the mapper DERIVES cycleStart marks (author
+// 'import') from the bleeding sequence via the shared suggestion predicate
+// (isSuggestedCycleStart, lib/domain/cycle_grouping.dart) — bleeding only
+// SUGGESTS a cycle start; the derived mark is what the mark-driven cycle
+// grouping consumes (see lib/domain/marks.dart). Cycle-app's own export
+// already carries its marks verbatim, so re-importing an app export never
+// re-derives anything: the derivation lives only in this CSV mapping.
 //
 // Mapping decisions live in the tables below and in the plan document;
 // every assumption an INER expert should re-check carries a
 // TODO(user-review) marker.
 
 import 'cervix.dart';
+import 'cycle_grouping.dart';
+import 'date_only.dart';
 import 'export_import.dart';
+import 'marks.dart';
 import 'mucus.dart';
 import 'models.dart';
 
@@ -153,7 +163,9 @@ final class DripCsvImport {
 
   /// A current-version export document (see lib/domain/export_import.dart)
   /// with the seeded main profile `[{id: 1, name: 'main', ordinal: 0}]`,
-  /// entries only, and an empty marks list — drip has no mark analogue.
+  /// the mapped entries, and the DERIVED cycleStart marks (author 'import')
+  /// — drip has no mark analogue of its own, so foreign imports get their
+  /// cycle-start boundaries derived from the imported bleeding sequence.
   final String json;
 
   final DripCsvStats stats;
@@ -170,7 +182,9 @@ final class DripCsvImport {
 /// columns are ignored, known-but-missing columns carry no data. The row
 /// shape mirrors lib/db/export_adapter.dart's export rows exactly, so the
 /// existing writer/planner gates (bleeding vocabulary, quality-requires-S)
-/// never drop one of these rows.
+/// never drop one of these rows — and the derived cycleStart marks ride
+/// the same merge plan (any non-empty mark_type is accepted; the marks
+/// writer adds idempotently).
 ///
 /// Throws a [FormatException] when [raw] is not a drip CSV at all (no
 /// header row / no `date` column) — see [parseDripCsv].
@@ -386,7 +400,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       {'id': 1, 'name': 'main', 'ordinal': 0},
     ],
     entries: entries,
-    marks: const <Map<String, Object?>>[],
+    marks: _deriveCycleStartMarks(entries),
     exportedAt: DateTime.now(),
   );
 
@@ -402,6 +416,64 @@ DripCsvImport dripCsvToExportJson(String raw) {
 }
 
 // --- vocabulary tables (drip: components/helpers/labels.js, 0-based) -------
+
+/// Derives the foreign-import cycleStart marks from the mapped entry rows
+/// (drip has no mark analogue of its own, so the cycle-start boundaries are
+/// derived from the imported bleeding sequence; the derivation replays the
+/// exact rows that the export document carries, and the idempotent marks
+/// writer makes a repeated import of the same CSV a no-op).
+///
+/// The rows are replayed through the SHARED suggestion predicate
+/// [isSuggestedCycleStart] — no derivation-local bleeding rule: a
+/// menstruation-level day (light or heavier) that does not continue the
+/// previous calendar day's menstruation-level flow suggests a cycle start,
+/// and every suggested day becomes a `cycleStart` row with author
+/// 'import', profile 1 (drip has no multi-profile concept).
+///
+/// Replay details (kept in step with the import merge plan):
+/// - the rows are judged in DAY order, not CSV row order (drip exports one
+///   row per calendar day, but the previous-day check of the predicate
+///   must always see the prior day, wherever it sat in the file);
+/// - duplicated (profile, date) keys keep their FIRST occurrence, like the
+///   merge plan counts them.
+List<Map<String, Object?>> _deriveCycleStartMarks(
+    List<Map<String, Object?>> entries) {
+  // Row map -> the [DailyEntry] fields the suggestion predicate reads:
+  // the bleeding level through the shared vocabulary helper
+  // tryParseBleeding, the interruption flags as stored (drip maps
+  // temperature.exclude onto exclude_other). The remaining entry fields
+  // stay neutral — the predicate never reads them (shared helpers
+  // guarantee the used fields parse, so the replay always succeeds).
+  final seenDates = <String>{};
+  final replayed = <DailyEntry>[];
+  for (final row in entries) {
+    final iso = row['date'] as String?;
+    if (iso == null || !seenDates.add(iso)) continue;
+    final day = tryParseIsoDay(iso);
+    if (day == null) continue;
+    replayed.add(DailyEntry(
+      date: day,
+      profileId: 1,
+      bleeding: tryParseBleeding(row['bleeding']) ?? Bleeding.none,
+      excludeOther: row['exclude_other'] == true,
+    ));
+  }
+  replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
+
+  final marks = <Map<String, Object?>>[];
+  for (var i = 0; i < replayed.length; i++) {
+    final previous = i == 0 ? null : replayed[i - 1];
+    if (isSuggestedCycleStart(replayed[i], previous)) {
+      marks.add(<String, Object?>{
+        'profile_id': 1,
+        'entry_date': formatIsoDay(replayed[i].date),
+        'mark_type': CycleMarkTypes.cycleStart,
+        'author': 'import',
+      });
+    }
+  }
+  return marks;
+}
 
 /// Parses a drip temperature cell (`36.2`); any non-number means no
 /// measurement (dot decimals only, as drip writes them).
