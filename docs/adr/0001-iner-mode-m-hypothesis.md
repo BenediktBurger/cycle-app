@@ -64,3 +64,12 @@ the schema assumes a specific mode), but no S/A functionality is built.
   display glyphs) and stored as stable ASCII enum tokens in TEXT columns.
   The review flag no longer applies to it; the Mode-M compute-never-interpret
   posture is unchanged and still applies.
+
+  **Update (2026-09-18):** the "first non-spotting period day starts a
+  cycle" consequence is superseded by
+  [ADR-0008](0008-cycle-start-as-mark.md) — the cycle start is now a
+  user-owned `cycleStart` mark; bleeding only suggests it (the diary prompt
+  is a suggestion the user confirms) and never creates a boundary by itself.
+  The Mode-M posture is unchanged: the mark is user-authored, and the
+  app still computes only (foreign drip imports derive marks with author
+  `import`, recording derivation rather than placement).

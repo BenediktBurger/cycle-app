@@ -27,7 +27,6 @@ the sections above track planned work, git history keeps the record (see
 
 - Data entry aligned with the NER scheme — the exact term list must be
   specified first:
-  - [ ] bleeding does not start a new cycle, only specific mark (store as evaluation). Where to enter: on the page with bleedings (dilluted as it is analysis and not raw data, but practical) or on cycle chart (where marks are typically added)
   - generic exclude temperature and a note, or keep these different reasons
   - separate exclude reasons for sp (spät ins Bett) and a (aufstehen) as own
     temperature-exclusion flags (same exclude question, NER scheme terms), remove "Reise"
@@ -39,7 +38,6 @@ the sections above track planned work, git history keeps the record (see
 - mark "exclude" (Temperatur, Blutung) als negative Zahl?
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - pdf export for consultants (one cycle per sheet?)
-- bleeding should not always start a new cycle. Either choose to ignore bleeding (opt out) or active choice to start a new cycle (maybe suggested at the first bleeding: do you want to start?)
 - [ ] with many cycles, scrolling the cycle chart becomes sloppy
 - clean up database schema
   - remove unused features
@@ -67,5 +65,6 @@ the sections above track planned work, git history keeps the record (see
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?
 - review test suite and clean it up
+- drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓) - DOMAIN

@@ -17,3 +17,16 @@ A record is in exactly one of these states:
 
 A status is never "silently downgraded": when a Hypothesis is validated (or
 rejected), a new ADR is written that supersedes the old one and references it.
+
+## Index
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [0001](0001-iner-mode-m-hypothesis.md) | INER-compatible "Mode M" product shape | Hypothesis |
+| [0002](0002-package-name-cycle-app-placeholder.md) | Package name `cycle_app` is a placeholder | Accepted |
+| [0003](0003-target-platforms-web-iteration.md) | Web/Chrome as iteration target; Android + iOS as product targets | Accepted |
+| [0004](0004-riverpod-flchart-flutter.md) | Riverpod for state management; fl_chart for the temperature curve | Accepted |
+| [0005](0005-storage-and-encryption.md) | Storage drift/SQLite; encryption split native-SQLCipher vs. web-none | Accepted |
+| [0006](0006-ci.md) | Automated verification — local testing AND GitHub Actions CI (analyze + test + build web) | Accepted |
+| [0007](0007-language-policy.md) | Language policy — English code, multilingual app | Accepted |
+| [0008](0008-cycle-start-as-mark.md) | Cycle start is a user-owned mark; bleeding only suggests | Accepted |
