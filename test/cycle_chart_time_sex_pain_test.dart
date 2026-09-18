@@ -1,19 +1,23 @@
 // Widget tests of the cycle tab's recorded-fact glyphs in the per-signal
 // rows under the temperature curve: the measurement time renders as
-// localized HH:mm text in its own row when the column is wide enough (the
-// old per-day clock glyph is gone — the clock lives only in the row
-// corner), the sex time slots (one X glyph per SET SexTiming bit, drawn at
+// localized HH:mm text in its OWN row BELOW the chart block — rotated
+// vertically when the day column is narrower than the text (never dropped,
+// the old space-constraint bug), horizontal in wide columns (the old
+// per-day clock glyph is gone — the clock lives only in the row corner),
+// the sex time slots (one X glyph per SET SexTiming bit, drawn at
 // that slot's third of the day column — multiple bits render multiple X
-// marks), and the letter-coded pain flags B (breast) and M
-// (Mittelschmerz). Days without the respective fact render nothing. Same
-// harness pattern as test/cycle_chart_cervix_test.dart (localized en, plus
-// a de wording check).
+// marks), and the letter-coded pain flags B (breast, in the pain row) and
+// M (Mittelschmerz, in its own row beneath the mucus row). Days without
+// the respective fact render nothing. Same harness pattern as
+// test/cycle_chart_cervix_test.dart (localized en, plus a de wording
+// check).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,6 +87,114 @@ Widget _chartHarness({
     );
 
 void main() {
+  group('measurement time — its own row below the chart block', () {
+    testWidgets(
+        'the time row renders BELOW the chart block, below the '
+        'below-curve rows, for every day with a recorded measurement time',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries()));
+      await tester.pumpAndSettle();
+
+      final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
+      // Own row below the block: the time row starts after the chart, and
+      // after the below-curve rows (cervix, pain, disturbance).
+      expect(tester.getRect(_cell(0, 'time')).top, greaterThan(chartBottom),
+          reason: 'the time row is not part of the chart block');
+      for (final row in ['cervix', 'pain']) {
+        expect(tester.getRect(_cell(0, 'time')).top,
+            greaterThan(tester.getRect(_cell(0, row)).bottom),
+            reason: 'the time row renders below the $row row');
+      }
+      // Every day with a recorded time renders its HH:mm (the fixture's
+      // only recorded time is day 0).
+      expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget);
+    });
+
+    testWidgets(
+        'at minimum column width the time STILL renders — rotated '
+        'vertically in its cell (regression: the time used to be dropped '
+        'entirely at the space constraint)', (tester) async {
+      // 60 days overflow the viewport: columns render at the minimum
+      // usable width (24 px), far below the horizontal text threshold.
+      // Give EVERY day a recorded measurement time so the narrow check
+      // exercises the row everywhere.
+      final entries = [
+        for (var i = 0; i < 60; i++)
+          DailyEntry(
+            date: _day(i),
+            bbtC: 36.5,
+            measuredAtMinutes: 6 * 60 + 30,
+          ),
+      ];
+      await tester.pumpWidget(_chartHarness(entries: entries));
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_cell(59, 'time')).width, closeTo(24, 0.5),
+          reason: 'precondition: columns at the minimum usable width');
+
+      Finder timeCells() => find.byWidgetPredicate((w) =>
+          w.key is ValueKey<String> &&
+          (w.key as ValueKey<String>).value.startsWith('timeCell-'));
+
+      // The time text survives the space constraint: every rendered time
+      // cell carries the rotated HH:mm text (RotatedBox), never empty.
+      final rotated = find.descendant(
+          of: find.byWidgetPredicate((w) =>
+              w is RotatedBox && w.quarterTurns != 0),
+          matching: find.text('06:30'));
+      expect(rotated, findsWidgets,
+          reason: 'at the minimum column width the time renders vertically '
+              '— it is NEVER dropped');
+      expect(
+          find.descendant(of: timeCells(), matching: find.byType(RotatedBox)),
+          findsWidgets,
+          reason: 'the narrow cells rotate the time text');
+    });
+
+    testWidgets(
+        'between the minimum and the threshold the time renders vertically '
+        'too', (tester) async {
+      // 25 days fit the viewport but leave only ~29 px per column — below
+      // the threshold, so still vertical.
+      final entries = [
+        for (var i = 0; i < 25; i++)
+          DailyEntry(
+            date: _day(i),
+            bbtC: 36.5,
+            measuredAtMinutes: 6 * 60 + 30,
+          ),
+      ];
+      await tester.pumpWidget(_chartHarness(entries: entries));
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_cell(24, 'time')).width, closeTo(29, 1.5),
+          reason: 'precondition: narrow, non-minimum column width');
+      expect(
+          find.descendant(
+              of: _cell(24, 'time'),
+              matching: find.descendant(
+                  of: find.byWidgetPredicate(
+                      (w) => w is RotatedBox && w.quarterTurns != 0),
+                  matching: find.text('06:30'))),
+          findsOneWidget,
+          reason: 'a ~29 px column also renders the time vertically');
+    });
+
+    testWidgets('wide columns render the time horizontally, unrotated',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries()));
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_cell(0, 'time')).width, greaterThan(32),
+          reason: 'precondition: a wide column');
+      expect(
+          find.descendant(
+              of: _cell(0, 'time'), matching: find.byType(RotatedBox)),
+          findsNothing,
+          reason: 'a wide column keeps the horizontal HH:mm text');
+      expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget);
+    });
+  });
   testWidgets('the measurement time renders localized HH:mm text on days '
       'with a recorded measurement time — and nothing elsewhere',
       (tester) async {
@@ -157,37 +269,45 @@ void main() {
         reason: 'the second X belongs to the end slot (right third)');
   });
 
-  testWidgets('pain renders B and M independently, both on a combined day',
-      (tester) async {
+  testWidgets('pain renders B in its row; Mittelschmerz renders M in its '
+      'own row beneath the mucus row', (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
     expect(_inCell(3, 'pain', find.text('B')), findsOneWidget,
-        reason: 'breast pain shows the B letter');
+        reason: 'breast pain shows the B letter in the pain row');
     expect(_inCell(3, 'pain', find.text('M')), findsNothing,
-        reason: 'no Mittelschmerz letter without the flag');
-    expect(_inCell(4, 'pain', find.text('M')), findsOneWidget,
-        reason: 'Mittelschmerz shows the M letter');
+        reason: 'no Mittelschmerz letter without the flag — and the M '
+            'letter home is its own row anyway');
+    expect(_inCell(4, 'mittelschmerz', find.text('M')), findsOneWidget,
+        reason: 'Mittelschmerz shows the M letter in its own row beneath '
+            'the mucus row (flagged TODO(user-review) in the chart code)');
+    expect(_inCell(4, 'pain', find.text('M')), findsNothing,
+        reason: 'the M letter no longer renders in the below-curve pain '
+            'row');
     expect(_inCell(4, 'pain', find.text('B')), findsNothing,
         reason: 'no breast letter without the flag');
     expect(_inCell(5, 'pain', find.text('B')), findsOneWidget);
-    expect(_inCell(5, 'pain', find.text('M')), findsOneWidget);
+    expect(_inCell(5, 'mittelschmerz', find.text('M')), findsOneWidget);
     expect(_inCell(6, 'pain', find.text('B')), findsNothing,
-        reason: 'a plain day shows neither pain letter');
-    expect(_inCell(6, 'pain', find.text('M')), findsNothing);
+        reason: 'a plain day shows no pain letter');
+    expect(_inCell(6, 'mittelschmerz', find.text('M')), findsNothing);
   });
 
   testWidgets('a combined day carries the sex X marks alongside both pain '
-      'letters', (tester) async {
+      'letters (B in the pain row, M beneath the mucus row)',
+      (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
     expect(_inCell(5, 'sex', find.text('X')), findsNWidgets(2),
         reason: 'the sex X marks render in their own row');
     expect(_inCell(5, 'pain', find.text('B')), findsOneWidget,
-        reason: 'the pain letters render in their own row beside the sex '
+        reason: 'the pain letter renders in its own row beside the sex '
             'row');
-    expect(_inCell(5, 'pain', find.text('M')), findsOneWidget);
+    expect(_inCell(5, 'mittelschmerz', find.text('M')), findsOneWidget,
+        reason: 'the Mittelschmerz letter renders in its own row beneath '
+            'the mucus row');
   });
 
   testWidgets('a firmness-only day renders its glyph with no position '
@@ -206,7 +326,7 @@ void main() {
   });
 
   testWidgets('the help sheet names the measurement time, sex, firmness, '
-      'and pain symbols', (tester) async {
+      'and the pain letters', (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
@@ -221,8 +341,12 @@ void main() {
     expect(find.text('Cervix firmness'), findsOneWidget,
         reason: 'the firmness glyph needs a legend entry, parallel to the '
             'position entry');
-    expect(find.text('Pain (B breast, M Mittelschmerz)'), findsOneWidget,
-        reason: 'the B/M letters need a legend entry');
+    expect(find.text('Breast pain (B)'), findsOneWidget,
+        reason: 'the B letter keeps its legend entry (the M letter has '
+            'its own row and its own entry)');
+    expect(find.text('Mittelschmerz (M)'), findsOneWidget,
+        reason: 'the M letter has its own legend entry — it renders in '
+            'its own row beneath the mucus row');
   });
 
   testWidgets('the German help sheet uses the German wording',
@@ -237,6 +361,7 @@ void main() {
     expect(find.text('Sex (X je Zeitpunkt)'), findsOneWidget,
         reason: 'the diary already uses "Sex" in the German vocabulary');
     expect(find.text('Muttermund-Festigkeit'), findsOneWidget);
-    expect(find.text('Schmerz (B Brust, M Mittelschmerz)'), findsOneWidget);
+    expect(find.text('Brustschmerz (B)'), findsOneWidget);
+    expect(find.text('Mittelschmerz (M)'), findsOneWidget);
   });
 }

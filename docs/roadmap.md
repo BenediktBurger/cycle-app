@@ -23,8 +23,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-- [ ] time of measurement is not visible on the cycle chart (not enough space?) -> if space constraint is there, write vertically
-
 ### Necessary
 
 #### Building the app
@@ -54,13 +52,14 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
-- [ ] Make the cycle chart more like the paper: first bleeding, then mucus, then temperature. ideas if possible to render entries inside temperature chart, see the image in .opencode/plans, to get closer to paper:
-  - render bleeding and mucus inside the temperature chart (at the top of the chart)
-  - M below mucus
-  - also sex
-  - add temperature disturbance reasons here (bottom part of the chart)
-  - time of measurement below, can be its own row (not part of the chart)
-- [ ] cycle chart: show an indicator if there is a note for a day
+- Cycle-length statistics during a very long mark-driven cycle: during
+  pregnancy a cycle runs arbitrarily long (day-of-cycle > 100 on the
+  chart) and skews cycle-length statistics — `cycleLengthsInDays`
+  (`lib/domain/statistics.dart`) computes lengths as gaps between
+  consecutive cycle-start marks, so the next mark after a pregnancy
+  yields one length spanning the whole pregnancy. Needs discussion how to
+  treat such spans (cap, exclusion, pregnancy marker) — an expert/ADR
+  question.
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - [ ] with many cycles, scrolling the cycle chart becomes sloppy
 - [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)

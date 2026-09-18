@@ -11,9 +11,13 @@
 //     value→pixel mapping as the plot (shared from the chart's min/max and
 //     plot height — one source of truth), with the 0.5 °C interval and the
 //     two-scale numbering (plain integers, halves with one decimal),
-//  3. the six per-signal-row corner sample glyphs (bleeding blob, S,
-//     cervix letter, X, B/M, clock), each vertically aligned with its
-//     signal row's fixed-height slot.
+//  3. the per-signal-row corner sample glyphs (bleeding blob, S,
+//     Mittelschmerz M, X, cervix letter, B, clock), each vertically
+//     aligned with its signal row's fixed-height slot; the rows' segments
+//     mirror the scroll content: the top-of-block rows (bleeding, mucus,
+//     M, sex) stack between the header prototypes and the temperature
+//     scale, the below-curve rows (cervix, pain) below the marks slot,
+//     and the below-block rows (time) at the rail's tail.
 // Same harness pattern as test/cycle_chart_rows_test.dart (long-range
 // frozen-content test mirrors test/cycle_chart_windowing_test.dart).
 import 'package:cycle_app/domain/cervix.dart';
@@ -224,10 +228,13 @@ void main() {
       const rows = [
         'bleeding',
         'mucus',
-        'cervix',
+        'mittelschmerz',
         'sex',
+        'cervix',
         'pain',
+        'disturbance',
         'time',
+        'note',
       ];
       for (final row in rows) {
         final corner = find.byKey(ValueKey('${row}Corner'));

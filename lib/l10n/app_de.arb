@@ -87,8 +87,11 @@
   "cycleRowMucus": "Fruchtbarkeitszeichen (Schleim)",
   "cycleRowCervix": "Muttermund",
   "cycleRowSex": "Sex",
+  "cycleRowMittelschmerz": "Mittelschmerz",
   "cycleRowPain": "Schmerz",
+  "cycleRowDisturbance": "Messstörung",
   "cycleRowMeasurementTime": "Messzeitpunkt",
+  "cycleRowNote": "Notiz",
   "cycleHelpShow": "Zeichenerklärung anzeigen",
   "cycleHelpTitle": "Zeichenerklärung",
   "cycleLegendBleeding": "Blutung",
@@ -161,7 +164,10 @@
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh (Regel E)",
   "cycleLegendMeasuredAt": "Messzeitpunkt",
   "cycleLegendSex": "Sex (X je Zeitpunkt)",
-  "cycleLegendPain": "Schmerz (B Brust, M Mittelschmerz)",
+  "cycleLegendPain": "Brustschmerz (B)",
+  "cycleLegendMittelschmerz": "Mittelschmerz (M)",
+  "cycleLegendDisturbance": "Gestörte Messung (kr krank, alk Alkohol, R Reise, a anderes)",
+  "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "cycleSheetMeasuredAt": "Messzeitpunkt: {time}",
   "@cycleSheetMeasuredAt": {
     "placeholders": {

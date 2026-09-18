@@ -99,8 +99,20 @@
   "cycleRowMucus": "Fertility sign (mucus)",
   "cycleRowCervix": "Cervix",
   "cycleRowSex": "Sex",
+  "cycleRowMittelschmerz": "Mittelschmerz",
+  "@cycleRowMittelschmerz": {
+    "description": "Row name (corner tooltip/semantics) of the Mittelschmerz row on the cycle chart, rendered directly beneath the mucus row inside the top of the temperature block."
+  },
   "cycleRowPain": "Pain",
+  "cycleRowDisturbance": "Disturbed measurement",
+  "@cycleRowDisturbance": {
+    "description": "Row name (corner tooltip/semantics) of the disturbance row at the bottom of the cycle chart block: the letter codes of the day's temperature-disturbance (exclusion) flags."
+  },
   "cycleRowMeasurementTime": "Measurement time",
+  "cycleRowNote": "Note",
+  "@cycleRowNote": {
+    "description": "Row name (corner tooltip/semantics) of the note-indicator row at the very bottom of the cycle chart block: a small glyph marks the days whose entry carries a non-empty notes text."
+  },
   "cycleHelpShow": "Show symbol glossary",
   "@cycleHelpShow": {
     "description": "AppBar action tooltip opening the cycle chart's symbol glossary bottom sheet."
@@ -204,7 +216,19 @@
   "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
   "cycleLegendMeasuredAt": "Measurement time",
   "cycleLegendSex": "Sex (X per time of day)",
-  "cycleLegendPain": "Pain (B breast, M Mittelschmerz)",
+  "cycleLegendPain": "Breast pain (B)",
+  "@cycleLegendPain": {
+    "description": "The breast pain letter B; the Mittelschmerz letter M has its own legend entry (it renders beneath the mucus row on the chart)."
+  },
+  "cycleLegendMittelschmerz": "Mittelschmerz (M)",
+  "cycleLegendDisturbance": "Interrupted days (kr illness, alk alcohol, R travel, a other)",
+  "@cycleLegendDisturbance": {
+    "description": "Glossary entry for the disturbance row's stacked letter codes. The vocabulary (kr/alk/R/a) mirrors today's exclusion flags — the pending NER-scheme data-entry item may re-vocabulary these letters."
+  },
+  "cycleLegendNote": "Note (this day carries a note in the Tagebuch)",
+  "@cycleLegendNote": {
+    "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
+  },
   "cycleSheetMeasuredAt": "Measurement time: {time}",
   "@cycleSheetMeasuredAt": {
     "placeholders": {

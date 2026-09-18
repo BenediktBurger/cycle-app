@@ -74,6 +74,15 @@ void main() {
       expect(dotX, closeTo(_cellCenterX(tester, 'bleedingCell-$i'), 0.5),
           reason: 'day $i: the chart dot must sit at the bleeding row\'s '
               'cell horizontal center');
+      expect(dotX, closeTo(_cellCenterX(tester, 'mucusCell-$i'), 0.5),
+          reason: 'day $i: the top-of-block mucus row keeps the shared '
+              'column center');
+      expect(dotX, closeTo(_cellCenterX(tester, 'mittelschmerzCell-$i'), 0.5),
+          reason: 'day $i: the Mittelschmerz row under the mucus row keeps '
+              'the shared column center');
+      expect(dotX, closeTo(_cellCenterX(tester, 'sexCell-$i'), 0.5),
+          reason: 'day $i: the top-of-block sex row keeps the shared '
+              'column center');
       expect(dotX, closeTo(_cellCenterX(tester, 'dayLabel-$i'), 0.5),
           reason: 'day $i: the chart dot must sit at the day label cell\'s '
               'horizontal center');

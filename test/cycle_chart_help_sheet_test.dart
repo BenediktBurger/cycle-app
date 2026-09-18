@@ -62,7 +62,10 @@ const _glossaryEn = [
   'Cervix firmness',
   'Measurement time',
   'Sex (X per time of day)',
-  'Pain (B breast, M Mittelschmerz)',
+  'Mittelschmerz (M)',
+  'Breast pain (B)',
+  'Interrupted days (kr illness, alk alcohol, R travel, a other)',
+  'Note (this day carries a note in the Tagebuch)',
 ];
 
 const _glossaryDe = [
@@ -79,7 +82,10 @@ const _glossaryDe = [
   'Muttermund-Festigkeit',
   'Messzeitpunkt',
   'Sex (X je Zeitpunkt)',
-  'Schmerz (B Brust, M Mittelschmerz)',
+  'Mittelschmerz (M)',
+  'Brustschmerz (B)',
+  'Gestörte Messung (kr krank, alk Alkohol, R Reise, a anderes)',
+  'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
 ];
 
 const _arithmeticNoteEn =

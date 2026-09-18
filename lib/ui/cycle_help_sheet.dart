@@ -4,10 +4,11 @@
 // peak, circled higher, arrow higher, baseline, SUZ, cervix position,
 // cervix firmness, measurement time, sex, pain) plus the ignored-
 // temperature entry (the lighter temperature rendering of the
-// ignoreTemperature-marked days — see the entry note) and the evaluation-
-// arithmetic note. The glyph samples reuse the same shapes the chart and
-// its rows render, so the glossary always shows what the screen draws.
-// Pure display — no persistence (ADR-0001).
+// ignoreTemperature-marked days — see the entry note), the breast-pain
+// and Mittelschmerz letters, the disturbance letters, the note indicator
+// and the evaluation-arithmetic note. The glyph samples reuse the same
+// shapes the chart and its rows render, so the glossary always shows
+// what the screen draws. Pure display — no persistence (ADR-0001).
 
 import 'package:flutter/material.dart';
 
@@ -116,10 +117,34 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
+              label: l10n.cycleLegendDisturbance,
+              // Sample disturbance glyph: the stacked letter codes the
+              // disturbance row renders per set exclusion flag (here the
+              // two most common codes; more codes stack further and
+              // shrink to fit the row).
+              shape: _HelpEntryShape.disturbance,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.cycleLegendNote,
+              // Sample note glyph: the sticky-note icon a noted day
+              // renders at the very bottom of the chart block.
+              shape: _HelpEntryShape.note,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.cycleLegendMittelschmerz,
+              // Sample Mittelschmerz glyph: the M letter, exactly how a
+              // recorded Mittelschmerz day renders in its own row beneath
+              // the mucus row.
+              shape: _HelpEntryShape.mittelschmerz,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
               label: l10n.cycleLegendMeasuredAt,
               // The measured-at entry keeps the clock icon here (in the
-              // help sheet only — the per-day clock glyph on the chart is
-              // gone; wide columns spell the time as text instead).
+              // help sheet only — the chart's day cells spell the time as
+              // text, vertically in narrow columns).
               shape: _HelpEntryShape.clock,
             ),
             _HelpEntry(
@@ -157,6 +182,9 @@ enum _HelpEntryShape {
   clock,
   sex,
   pain,
+  mittelschmerz,
+  disturbance,
+  note,
 }
 
 final class _HelpEntry extends StatelessWidget {
@@ -235,15 +263,35 @@ final class _HelpEntry extends StatelessWidget {
           'X',
           style: TextStyle(fontSize: 10, color: color),
         ),
-      // Pain glyphs: B and M, the letter-coded pain options the
-      // pain row renders per flag (sample).
-      _HelpEntryShape.pain => Row(
+      // Sample pain glyph: the B letter, the breast-pain option the below-
+      // curve pain row renders per flag (the M letter has its own entry).
+      _HelpEntryShape.pain => Text(
+          'B',
+          style: TextStyle(fontSize: 10, color: color),
+        ),
+      // Sample Mittelschmerz glyph: the M letter, exactly how a recorded
+      // Mittelschmerz day renders in its own row beneath the mucus row.
+      _HelpEntryShape.mittelschmerz => Text(
+          'M',
+          style: TextStyle(fontSize: 10, color: color),
+        ),
+      // Sample disturbance glyphs: the stacked letter codes of today's
+      // exclusion vocabulary (disturbanceLetters in cycle.dart — the
+      // NER-scheme data-entry item may re-vocabulary these).
+      _HelpEntryShape.disturbance => Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('B', style: TextStyle(fontSize: 10, color: color)),
-            const SizedBox(width: 1),
-            Text('M', style: TextStyle(fontSize: 10, color: color)),
+            Text('kr', style: TextStyle(fontSize: 9, color: color)),
+            Text('alk', style: TextStyle(fontSize: 9, color: color)),
           ],
+        ),
+      // Sample note glyph: the same sticky-note icon a noted day renders
+      // in its cell at the very bottom of the chart block.
+      _HelpEntryShape.note => Icon(
+          Icons.sticky_note_2_outlined,
+          size: 12,
+          color: color,
         ),
     };
     return Padding(
@@ -253,10 +301,12 @@ final class _HelpEntry extends StatelessWidget {
         children: [
           symbol,
           const SizedBox(width: 6),
-          // Flexible: a long label wraps instead of overflowing its row
-          // (the exclusion entry's wording is deliberately descriptive).
+          // Flexible: the longer entries (the disturbance codes' legend,
+          // the arithmetic wording) wrap within the sheet width instead of
+          // overflowing the row.
           Flexible(
-              child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+            child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+          ),
         ],
       ),
     );

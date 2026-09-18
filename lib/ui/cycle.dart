@@ -1,8 +1,20 @@
-// Zyklus screen: the recorded temperature curve plus, paper-style, the
-// day/cycle header line ABOVE it and one recording row per signal BELOW it
-// (bleeding, mucus, cervix, sex, pain, measurement time — pure recording,
-// no interpretation), plus the COMPUTED evaluation overlay (Mode M,
-// ADR-0001): the user places the mucus-peak and first-higher marks, the app
+// Zyklus screen: the recorded temperature curve, paper-style: the
+// day/cycle header line ABOVE it, and INSIDE the top of the temperature
+// block the per-day recording rows bleeding, mucus (with the reserved
+// solid peak-dot slot above the glyph), the Mittelschmerz letter M on its
+// own row directly beneath the mucus row (TODO(user-review): the exact
+// home of the M letter is an owner-eyeball choice — the paper sheet writes
+// it under the mucus letters; clinicians may want it twice, with the
+// below-block pain row) and sex — pure recording, no interpretation; the
+// curve runs through the main body BELOW those rows. UNDER the curve come
+// the 1–6 numbering, the rows not on the paper sheet's grid (cervix,
+// remaining pain) and — at the very bottom of the block — the
+// disturbance-letter row for the day's temperature-disturbance (exclusion)
+// flags; below the block come the measurement-time row (vertical text in
+// narrow columns) and — at the very bottom, the paper sheet's remarks
+// home — the day-note indicator row. The COMPUTED evaluation overlay
+// (Mode M, ADR-0001): the user places the mucus-peak
+// and first-higher marks, the app
 // derives the rest for DISPLAY ONLY — circled higher measurements (every
 // candidate strictly after the peak day), arrow-up glyphs for candidates at
 // or before the peak day or with the peak unset (decided PER CANDIDATE by
@@ -688,6 +700,26 @@ final class _CycleChartState extends State<_CycleChart> {
                             windowEnd: winEnd,
                           ),
                           const SizedBox(height: 4),
+                          // INSIDE the top of the temperature block (the
+                          // paper sheet's grid rows above the temperature
+                          // body): bleeding, mucus (with the reserved solid
+                          // peak-dot slot above the glyph), the
+                          // Mittelschmerz letter M on its own row directly
+                          // beneath the mucus row, and sex. No gap between
+                          // the rows and the plot: the paper's rows ARE
+                          // part of the temperature grid, so the rows and
+                          // the curve read as one block (the rows carry the
+                          // same day-cell separators as the chart's vertical
+                          // grid lines).
+                          _SignalRows(
+                            kinds: _topSignalKinds,
+                            days: _days,
+                            cellWidth: colW,
+                            windowStart: winStart,
+                            windowEnd: winEnd,
+                            peakIndexes: overlay.peakIndexes,
+                            onDayTap: _openDaySheet,
+                          ),
                           SizedBox(
                             height: chartHeight,
                             child: Stack(
@@ -964,10 +996,27 @@ final class _CycleChartState extends State<_CycleChart> {
                             isCycleBoundary: _days.isCycleBoundary,
                           ),
                           const SizedBox(height: 4),
-                          // One recording row per signal: bleeding, mucus,
-                          // cervix, sex, pain, measurement time — with the
-                          // solid peak-dot slot reserved in the mucus row.
+                          // BELOW the curve, outside the paper sheet's grid:
+                          // the rows the sheet does not carry (cervix and
+                          // the breast pain letter B; the Mittelschmerz
+                          // letter M moved into the top block above —
+                          // TODO(user-review): the experts may want M
+                          // rendered here as well).
                           _SignalRows(
+                            kinds: _belowCurveKinds,
+                            days: _days,
+                            cellWidth: colW,
+                            windowStart: winStart,
+                            windowEnd: winEnd,
+                            peakIndexes: overlay.peakIndexes,
+                            onDayTap: _openDaySheet,
+                          ),
+                          const SizedBox(height: 4),
+                          // The measurement-time row, its own row BELOW the
+                          // chart block (the paper's strip under the grid;
+                          // narrow columns write the time vertically).
+                          _SignalRows(
+                            kinds: _belowChartKinds,
                             days: _days,
                             cellWidth: colW,
                             windowStart: winStart,
@@ -989,21 +1038,50 @@ final class _CycleChartState extends State<_CycleChart> {
   }
 }
 
-/// One recording row per signal BELOW the chart (the paper's rows):
-/// bleeding, mucus (with the reserved solid peak-dot slot above the glyph,
-/// R6), cervix, sex, pain and measurement time — pure recording, no
-/// interpretation. Every row renders for every day (auto-hide of unused
-/// rows is deferred), aligned by the same even day spacing as the chart:
-/// the rows hold ONLY day cells (their name glyphs and the localized row
-/// names live in the frozen left rail, positioned over each row's vertical
-/// slot via the shared height constants below), and the windowed day cells
-/// sit at the curve's global column positions (cell i is centered at
+/// The paper layout's row segments: INSIDE the top of the temperature
+/// block the sheet's grid rows — bleeding, mucus (with the reserved solid
+/// peak-dot slot above the glyph), the Mittelschmerz letter M directly
+/// beneath the mucus row, and sex (the same order the rows render in).
+/// TODO(user-review): the M letter's home (own row beneath the mucus row)
+/// is an owner-eyeball choice; the paper writes it under the mucus letters
+/// and clinicians may prefer it in the below-block pain row too.
+const _topSignalKinds = <_SignalKind>[
+  _SignalKind.bleeding,
+  _SignalKind.mucus,
+  _SignalKind.mittelschmerz,
+  _SignalKind.sex,
+];
+
+/// Below the curve, outside the paper grid: the rows the sheet does not
+/// carry — cervix and the breast pain letter B — and at the very bottom
+/// of the chart block the disturbance row (the paper writes its
+/// disturbance codes low inside the temperature block).
+const _belowCurveKinds = <_SignalKind>[
+  _SignalKind.cervix,
+  _SignalKind.pain,
+  _SignalKind.disturbance,
+];
+
+/// BELOW the chart block entirely (the paper's strip under the grid):
+/// the measurement time, and — at the very bottom, the paper sheet's
+/// remarks ("Bemerkungen") home — the day-note indicator.
+/// TODO(user-review): the note indicator's home (own row below the time
+/// row, mirroring the paper sheet's bottom remarks block) is an
+/// owner-eyeball choice; the experts may prefer it elsewhere (e.g. in the
+/// day-header column).
+const _belowChartKinds = <_SignalKind>[_SignalKind.time, _SignalKind.note];
+
+/// One recording row per segment signal, top-down in segment order. Every
+/// row renders for every day (auto-hide of unused rows is deferred),
+/// aligned by the same even day spacing as the chart: the rows hold ONLY
+/// day cells (their name glyphs and the localized row names live in the
+/// frozen left rail, positioned over each row's vertical slot via the
+/// shared height constants below), and the windowed day cells sit at the
+/// curve's global column positions (cell i is centered at
 /// (i + 0.5) * cellWidth — exactly where the chart draws day i's dot).
-/// Tapping a cell opens the day's mark-entry sheet and the cell keys expose
-/// the row/cell pairs for the widget tests (bleedingCell-$i, mucusCell-$i,
-/// …).
 final class _SignalRows extends StatelessWidget {
   const _SignalRows({
+    required this.kinds,
     required this.days,
     required this.cellWidth,
     required this.windowStart,
@@ -1011,6 +1089,9 @@ final class _SignalRows extends StatelessWidget {
     required this.peakIndexes,
     required this.onDayTap,
   });
+
+  /// The segment's rows, top-down (paper sheet order within the segment).
+  final List<_SignalKind> kinds;
 
   final _ChartDays days;
   final double cellWidth;
@@ -1026,10 +1107,10 @@ final class _SignalRows extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = [
-      for (final kind in _SignalKind.values)
+      for (final kind in kinds)
         Padding(
           padding: EdgeInsets.only(
-              top: kind == _SignalKind.values.first ? 0 : _signalRowGap),
+              top: kind == kinds.first ? 0 : _signalRowGap),
           child: _SignalRow(
             kind: kind,
             days: days,
@@ -1055,40 +1136,62 @@ final class _SignalRows extends StatelessWidget {
 const double _signalRowGap = 2;
 
 /// The fixed height a signal row's day cells occupy (mucus reserves the
-/// solid peak-dot slot above the glyph, R6: dot slot 10 + gap 2 + glyph 12).
-double _signalRowHeight(_SignalKind kind) =>
-    kind == _SignalKind.mucus ? 24 : 12;
+/// solid peak-dot slot above the glyph, R6: dot slot 10 + gap 2 + glyph 12;
+/// the disturbance row reserves two letter slots so a two-code day renders
+/// unscaled — more codes shrink to fit, see _disturbanceContent; the time
+/// row reserves the height of a VERTICALLY written HH:mm text — its width
+/// becomes the cell height when the column is narrow, see _timeContent).
+double _signalRowHeight(_SignalKind kind) => switch (kind) {
+      _SignalKind.mucus || _SignalKind.disturbance => 24,
+      _SignalKind.time => 30,
+      _ => 12,
+    };
 
-/// The vertical offset of a signal row's top inside the rows block: the
-/// rows stack top-down with the shared gap between them (mirrors
-/// _SignalRows' inter-row padding).
-double _signalRowTop(_SignalKind kind) {
+/// The vertical offset of a row's top inside its segment: the rows stack
+/// top-down with the shared gap between them (mirrors _SignalRows'
+/// inter-row padding).
+double _signalRowTop(_SignalKind kind, List<_SignalKind> kinds) {
   var top = 0.0;
-  for (final k in _SignalKind.values) {
+  for (final k in kinds) {
     if (k == kind) break;
     top += _signalRowHeight(k) + _signalRowGap;
   }
   return top;
 }
 
-/// The rows block's total height — the rail's glyph segment must match it.
-double get _signalRowsTotalHeight =>
-    _signalRowTop(_SignalKind.values.last) +
-    _signalRowHeight(_SignalKind.values.last);
+/// A segment's total height — the rail's glyph segment must match it.
+double _signalSegmentHeight(List<_SignalKind> kinds) => kinds.fold(
+    0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
+    (kinds.isEmpty ? 0 : _signalRowGap);
 
-/// The six recording signals, in the order the rows render (paper order:
-/// bleeding/top .. measurement time/bottom).
-enum _SignalKind { bleeding, mucus, cervix, sex, pain, time }
+/// The recording signals, with the row ORDER grouped by segment (paper
+/// order within each segment: the top block bleeding → mucus → M → sex;
+/// below the curve cervix → pain; below the chart block the measurement
+/// time). The enum's declaration order matches the full render order.
+enum _SignalKind {
+  bleeding,
+  mucus,
+  mittelschmerz,
+  sex,
+  cervix,
+  pain,
+  disturbance,
+  time,
+  note,
+}
 
 /// Test-visible key prefix of a row's day cells: `bleedingCell-3`,
 /// `mucusCell-3`, …
 String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
       _SignalKind.bleeding => 'bleedingCell',
       _SignalKind.mucus => 'mucusCell',
-      _SignalKind.cervix => 'cervixCell',
+      _SignalKind.mittelschmerz => 'mittelschmerzCell',
       _SignalKind.sex => 'sexCell',
+      _SignalKind.cervix => 'cervixCell',
       _SignalKind.pain => 'painCell',
+      _SignalKind.disturbance => 'disturbanceCell',
       _SignalKind.time => 'timeCell',
+      _SignalKind.note => 'noteCell',
     };
 
 /// Test-visible key prefix of a row's 44 px corner slot: `bleedingCorner`,
@@ -1096,10 +1199,13 @@ String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
 String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
       _SignalKind.bleeding => 'bleedingCorner',
       _SignalKind.mucus => 'mucusCorner',
-      _SignalKind.cervix => 'cervixCorner',
+      _SignalKind.mittelschmerz => 'mittelschmerzCorner',
       _SignalKind.sex => 'sexCorner',
+      _SignalKind.cervix => 'cervixCorner',
       _SignalKind.pain => 'painCorner',
+      _SignalKind.disturbance => 'disturbanceCorner',
       _SignalKind.time => 'timeCorner',
+      _SignalKind.note => 'noteCorner',
     };
 
 /// The localized row name for a signal (the corner tooltip/semantics
@@ -1110,10 +1216,13 @@ String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
     switch (kind) {
       _SignalKind.bleeding => l10n.cycleRowBleeding,
       _SignalKind.mucus => l10n.cycleRowMucus,
-      _SignalKind.cervix => l10n.cycleRowCervix,
+      _SignalKind.mittelschmerz => l10n.cycleRowMittelschmerz,
       _SignalKind.sex => l10n.cycleRowSex,
+      _SignalKind.cervix => l10n.cycleRowCervix,
       _SignalKind.pain => l10n.cycleRowPain,
+      _SignalKind.disturbance => l10n.cycleRowDisturbance,
       _SignalKind.time => l10n.cycleRowMeasurementTime,
+      _SignalKind.note => l10n.cycleRowNote,
     };
 
 /// A signal row's sample glyph, rendered in the frozen left rail at the
@@ -1143,30 +1252,68 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
         cervixPositionSymbol(CervixPosition.medium),
         style: TextStyle(fontSize: 10, color: scheme.onSurface),
       ),
+    _SignalKind.mittelschmerz => Text(
+        'M',
+        style: TextStyle(fontSize: 10, color: scheme.onSurface),
+      ),
     _SignalKind.sex => Text(
         'X',
         style: TextStyle(fontSize: 10, color: scheme.onSurface),
       ),
-    _SignalKind.pain => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('B', style: TextStyle(fontSize: 10, color: scheme.onSurface)),
-          const SizedBox(width: 1),
-          Text('M', style: TextStyle(fontSize: 10, color: scheme.onSurface)),
-        ],
+    _SignalKind.pain => Text(
+        'B',
+        style: TextStyle(fontSize: 10, color: scheme.onSurface),
+      ),
+    // Sample disturbance glyph: the first letter code of today's
+    // vocabulary (disturbanceLetters below) — the per-day cells stack one
+    // code per set exclusion flag.
+    _SignalKind.disturbance => Text(
+        'kr',
+        style: TextStyle(fontSize: 10, color: scheme.onSurface),
       ),
     // The rail keeps a clock icon sample; the per-day cells show the
-    // recorded time as text (wide columns) or nothing (narrow ones).
+    // recorded time as text (wide columns) or vertically (narrow ones).
     _SignalKind.time => Icon(Icons.schedule, size: 12, color: scheme.onSurface),
+    // Sample note glyph: the same sticky-note icon a noted day renders in
+    // its cell.
+    _SignalKind.note => Icon(
+        Icons.sticky_note_2_outlined,
+        size: 12,
+        color: scheme.onSurface,
+      ),
   };
 }
 
-/// The narrowest day column that still carries the measurement-time TEXT
-/// ("06:30"). Below it (at the 24 px minimum the cells are empty) the
-/// recorded time stays in the day sheet — no data/model change.
+/// The day-column width boundary between the measurement-time row's
+/// HORIZONTAL and VERTICAL rendering: below it the HH:mm text renders
+/// rotated (RotatedBox), so the recorded time stays visible even at the
+/// minimum usable column width (24 px) — the old behavior dropped the
+/// text entirely there (the space-constraint bug; see _timeContent).
 // TODO(user-review): the threshold is a tuned display heuristic, not a
 // rule from the cheat sheet.
 const double _timeCellMinColumnWidth = 32;
+
+/// The temperature-disturbance letter codes of a day, one per set
+/// exclusion flag, in the render order the disturbance row stacks them:
+/// TODAY'S vocabulary — illness → "kr", alcohol → "alk", travel → "R"
+/// (the paper sheet writes "Reise" in full, narrow columns shorten it to
+/// R), other → "a".
+///
+/// THE single seam for the letter vocabulary: the pending NER-scheme
+/// data-entry item re-models the exclusion flags (sp/a/alk/kr, Reise
+/// dropped, intflag field) — it retargets THIS function (and the glossary
+/// entry), nothing else on the chart. Nothing on the chart interprets the
+/// letters; they are raw-observation display only (ADR-0001).
+/// TODO(user-review): the letter vocabulary mirrors the paper sheet's
+/// disturbance codes; the experts may want different ones.
+List<String> disturbanceLetters(DailyEntry? day) => day == null
+    ? const []
+    : [
+        if (day.excludeIllness) 'kr',
+        if (day.excludeAlcohol) 'alk',
+        if (day.excludeTravel) 'R',
+        if (day.excludeOther) 'a',
+      ];
 
 /// One signal's recording row: the window's day cells only — the row's
 /// name glyph lives in the frozen left rail (see _LeftRail), at this row's
@@ -1242,10 +1389,13 @@ final class _SignalRow extends StatelessWidget {
         child: switch (kind) {
           _SignalKind.bleeding => _bleedingContent(context, day),
           _SignalKind.mucus => _mucusContent(context, index, day),
-          _SignalKind.cervix => _cervixContent(context, day),
+          _SignalKind.mittelschmerz => _mittelschmerzContent(context, day),
           _SignalKind.sex => _sexContent(context, day),
+          _SignalKind.cervix => _cervixContent(context, day),
           _SignalKind.pain => _painContent(context, day),
+          _SignalKind.disturbance => _disturbanceContent(context, day),
           _SignalKind.time => _timeContent(context, day),
+          _SignalKind.note => _noteContent(context, day),
         },
       ),
     );
@@ -1369,8 +1519,10 @@ final class _SignalRow extends StatelessWidget {
   /// multiple slots render multiple X marks side by side. The mask itself
   /// encodes whether sex happened (no bits = no X; "sex happened, time
   /// unknown" is deliberately not representable, DailyEntry.sexTimings).
-  /// No collision with an exclusion marker: interrupted days render as
-  /// LIGHTER CURVE POINTS, there is no exclusion letter on the chart.
+  /// No collision with the disturbance codes: interrupted days render as
+  /// LIGHTER CURVE POINTS in the plot, and their letter codes live in the
+  /// disturbance row at the bottom of the chart block — never in this
+  /// cell.
   /// TODO(user-review): the X is the provisional glyph from the product
   /// wishlist, and the third-of-column placement is an ad-hoc geometry
   /// choice — experts may want a different mark/placement.
@@ -1397,68 +1549,125 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 
-  /// Pain: the letter-coded pain options of the cheat sheet — B (Brust,
-  /// breast tenderness) and M (Mittelschmerz) — each flag its own letter
-  /// so a single flag stays legible alone. The UPPERCASE letters keep
-  /// them distinguishable from the lowercase cervix letters in the row
-  /// above; both rows share the same neutral on-surface ink (no scheme
-  /// hue claimed).
-  /// TODO(user-review): the letters mirror the vocabulary of the entry
-  /// form ("Brustschmerzen (B)" / "Mittelschmerz (M)") — the same ad-hoc
-  /// glyph caveat as the cervix letters applies.
+  /// Pain: the breast pain letter B — the letter-coded pain option of the
+  /// cheat sheet that still renders in this below-curve row. The
+  /// Mittelschmerz letter M renders in its OWN row directly beneath the
+  /// mucus row, inside the top of the temperature block (the paper sheet
+  /// writes M under the mucus letters; TODO(user-review): the M's home is
+  /// an owner-eyeball choice, the below-block row here could carry it too
+  /// if the experts want it twice). The UPPERCASE letter keeps it
+  /// distinguishable from the lowercase cervix letters in the cervix row
+  /// below; the row shares the same neutral on-surface ink (no scheme hue
+  /// claimed).
+  /// TODO(user-review): the letter mirrors the vocabulary of the entry
+  /// form ("Brustschmerzen (B)") — the same ad-hoc glyph caveat as the
+  /// cervix letters applies.
   static Widget _painContent(BuildContext context, DailyEntry? day) {
-    if (day == null || !(day.painBreast || day.painMittelschmerz)) {
-      return const SizedBox.shrink();
-    }
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    if (day == null || !day.painBreast) return const SizedBox.shrink();
+    return Text(
+      'B',
+      style: TextStyle(
+        fontSize: 9,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+    );
+  }
+
+  /// Mittelschmerz: the letter M of the cheat sheet, rendered in its own
+  /// row directly beneath the mucus row inside the top of the temperature
+  /// block (the paper sheet writes M under the mucus letters — this home
+  /// is flagged TODO(user-review) on the segment constants above).
+  static Widget _mittelschmerzContent(BuildContext context, DailyEntry? day) {
+    if (day == null || !day.painMittelschmerz) return const SizedBox.shrink();
+    return Text(
+      'M',
+      style: TextStyle(
+        fontSize: 9,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+    );
+  }
+
+/// Disturbance: the stacked letter codes of the day's exclusion flags
+/// ([disturbanceLetters]) — the paper sheet writes disturbance codes one
+/// under the other. Neutral on-surface ink. The row's fixed height fits
+/// two codes unscaled; more codes shrink to fit (FittedBox) rather than
+/// overflow or drop. The excluded temperatures themselves keep rendering
+/// as LIGHTER curve dots in the plot (unchanged curve behavior; these
+/// letters only NAME the reason).
+static Widget _disturbanceContent(BuildContext context, DailyEntry? day) {
+  final letters = disturbanceLetters(day);
+  if (letters.isEmpty) return const SizedBox.shrink();
+  return FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (day.painBreast)
+        for (final letter in letters)
           Text(
-            'B',
-            style: TextStyle(
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        if (day.painBreast && day.painMittelschmerz) const SizedBox(width: 1),
-        if (day.painMittelschmerz)
-          Text(
-            'M',
+            letter,
             style: TextStyle(
               fontSize: 9,
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   /// Measurement time: the localized HH:mm text of a recorded
-  /// temperature-measurement time — rendered only when the day column is
-  /// wide enough ([_timeCellMinColumnWidth]; at the 24 px minimum the
-  /// column stays empty). measuredAtMinutes is normalized to exist only
-  /// together with bbtC (the DailyEntry constructor drops a time without
-  /// a temperature), so the text never claims a time for a
+  /// temperature-measurement time, rendered in the time row BELOW the
+  /// chart block. Narrow day columns (below [_timeCellMinColumnWidth],
+  /// including the 24 px minimum) write the time VERTICALLY (RotatedBox,
+  /// reading bottom-to-top like the paper's vertical strip handwriting)
+  /// so the time is never dropped at the space constraint; wide columns
+  /// keep the horizontal text. measuredAtMinutes is normalized to exist
+  /// only together with bbtC (the DailyEntry constructor drops a time
+  /// without a temperature), so the text never claims a time for a
   /// temperature-free day. The per-day clock icon is gone — the icon
   /// lives only in the row's corner sample.
   Widget _timeContent(BuildContext context, DailyEntry? day) {
     if (day == null) return const SizedBox.shrink();
     final minutes = day.measuredAtMinutes;
     if (minutes == null) return const SizedBox.shrink();
-    if (cellWidth < _timeCellMinColumnWidth) return const SizedBox.shrink();
     final locale = Localizations.localeOf(context).toString();
     final time = DateTime.utc(2000).add(Duration(minutes: minutes));
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        DateFormat.Hm(locale).format(time),
-        style: TextStyle(
-          fontSize: 9,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
+    final text = Text(
+      DateFormat.Hm(locale).format(time),
+      style: TextStyle(
+        fontSize: 9,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
+    );
+    if (cellWidth < _timeCellMinColumnWidth) {
+      // Vertical: the rotated text needs roughly the text's WIDTH as its
+      // cell height, so the row height constant reserves that space
+      // (_signalRowHeight for the time kind); FittedBox keeps any
+      // unexpectedly long text inside the cell.
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: RotatedBox(quarterTurns: 3, child: text),
+      );
+    }
+    return FittedBox(fit: BoxFit.scaleDown, child: text);
+  }
+
+  /// Note indicator: a small sticky-note glyph for a day whose entry
+  /// carries a NON-EMPTY notes text (empty/absent render nothing). The
+  /// row sits below the measurement-time row — the paper sheet's remarks
+  /// (Bemerkungen) block is the very bottom (TODO(user-review): flagged
+  /// on _belowChartKinds). Tapping the cell opens the day's mark-entry
+  /// sheet like every other cell; the note text itself is edited in the
+  /// Tagebuch form (the sheet's "edit day" jump).
+  static Widget _noteContent(BuildContext context, DailyEntry? day) {
+    if (day == null || day.notes == null || day.notes!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Icon(
+      Icons.sticky_note_2_outlined,
+      size: 10,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
   }
 }
@@ -1701,13 +1910,19 @@ final class _LeftRail extends StatelessWidget {
                 ],
               ),
             ),
-            // The gap between the header segment and the plot, mirroring
-            // the content column's spacer.
+            // The gap between the header segment and the rows inside the
+            // top of the temperature block, mirroring the content column's
+            // spacer.
             const SizedBox(height: 4),
+            // The name glyphs of the rows INSIDE the top of the temperature
+            // block (bleeding, mucus, M, sex — paper sheet order), above
+            // the temperature scale, mirroring the content column.
+            _railSignalSegment(context, l10n, _topSignalKinds),
             // The temperature scale: one label per half degree, positioned
             // at its value's plot pixel y (the shared mapping) — the
             // owner-reported defect this rail fixes: the scale no longer
-            // scrolls away with the day columns.
+            // scrolls away with the day columns. The scale starts exactly
+            // where the plot bar starts (right after the top rows).
             SizedBox(
               key: const ValueKey('railScale'),
               height: scale.plotHeight,
@@ -1738,40 +1953,55 @@ final class _LeftRail extends StatelessWidget {
             ),
             // The marks-row slot: empty in the rail (the 1–6 numbering is
             // per-day content), but kept so the glyph segment below starts
-            // exactly where the signal rows start.
+            // exactly where the rows below the curve start.
             const SizedBox(height: 4),
             SizedBox(height: EvaluationMarksRow.cellHeight),
             const SizedBox(height: 4),
-            // The signal rows' name glyphs, one per row, vertically
-            // centered on the row's slot (shared row heights).
-            SizedBox(
-              height: _signalRowsTotalHeight,
-              child: Stack(
-                children: [
-                  for (final kind in _SignalKind.values)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: _signalRowTop(kind),
-                      height: _signalRowHeight(kind),
-                      child: SizedBox(
-                        key: ValueKey(_signalCornerKeyPrefix(kind)),
-                        child: Semantics(
-                          label: _signalRowName(kind, l10n),
-                          child: Tooltip(
-                            message: _signalRowName(kind, l10n),
-                            child: Center(
-                              child: _signalCornerSample(context, kind),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            // The name glyphs of the rows BELOW the curve (cervix, pain —
+            // the rows the paper sheet does not carry in its grid),
+            // mirroring the content column's below-curve segment.
+            _railSignalSegment(context, l10n, _belowCurveKinds),
+            const SizedBox(height: 4),
+            // The name glyphs of the rows BELOW the chart block (the
+            // measurement time and, at the very bottom, the day-note
+            // indicator — the paper's strip under the grid and its remarks
+            // block).
+            _railSignalSegment(context, l10n, _belowChartKinds),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The rail glyph stack for one row segment: the segment's name glyphs,
+  /// each vertically centered on the row's slot (shared row heights, same
+  /// offsets the scrolling rows stack with).
+  Widget _railSignalSegment(
+      BuildContext context, AppLocalizations l10n, List<_SignalKind> kinds) {
+    return SizedBox(
+      height: _signalSegmentHeight(kinds),
+      child: Stack(
+        children: [
+          for (final kind in kinds)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: _signalRowTop(kind, kinds),
+              height: _signalRowHeight(kind),
+              child: SizedBox(
+                key: ValueKey(_signalCornerKeyPrefix(kind)),
+                child: Semantics(
+                  label: _signalRowName(kind, l10n),
+                  child: Tooltip(
+                    message: _signalRowName(kind, l10n),
+                    child: Center(
+                      child: _signalCornerSample(context, kind),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

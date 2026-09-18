@@ -18,6 +18,7 @@ import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:cycle_app/ui/mucus_symbol.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,7 +32,7 @@ DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 //  1: bleeding light
 //  2: bleeding spotting
 //  3: bleeding heavy
-//  4: mucus S with EW quality
+//  4: mucus S with EW quality, Mittelschmerz
 //  5: cervix position low + firmness soft
 //  6: sex at the START slot
 //  7: breast pain
@@ -46,6 +47,7 @@ final _entries = <DailyEntry>[
     bbtC: 36.5,
     mucusSign: MucusSign.s,
     mucusQuality: MucusQuality.ew,
+    painMittelschmerz: true,
   ),
   DailyEntry(
     date: _day(5),
@@ -60,18 +62,30 @@ final _entries = <DailyEntry>[
 
 const _dayCount = 9;
 
+// The chart block's recording rows, top-down in render order: the top
+// block inside the temperature grid (bleeding, mucus, Mittelschmerz M,
+// sex), then below the curve: cervix, pain, disturbance (the disturbance
+// letters sit at the bottom of the chart block), then below the chart
+// block: time, note (the note indicator at the very bottom — the paper
+// sheet's remarks home).
 const _signalRows = [
   'bleeding',
   'mucus',
-  'cervix',
+  'mittelschmerz',
   'sex',
+  'cervix',
   'pain',
+  'disturbance',
   'time',
+  'note',
 ];
 
 Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
 
 Finder _corner(String row) => find.byKey(ValueKey('${row}Corner'));
+
+Finder _inCell(int i, String row, Finder inner) =>
+    find.descendant(of: _cell(i, row), matching: inner);
 
 Widget _chartHarness({
   required List<DailyEntry> entries,
@@ -104,10 +118,94 @@ Container _bleedingBlob(WidgetTester tester, int index) => tester
         (container.decoration! as BoxDecoration).shape == BoxShape.circle);
 
 void main() {
+  group('paper layout: bleeding, mucus, M and sex at the top of the '
+      'temperature block', () {
+    testWidgets(
+        'the top signal rows render INSIDE the chart block above the '
+        'curve; cervix, pain and time stay below it', (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries));
+      await tester.pumpAndSettle();
+
+      final chartTop = tester.getRect(find.byType(LineChart)).top;
+      final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
+      for (final row in ['bleeding', 'mucus', 'mittelschmerz', 'sex']) {
+        expect(tester.getRect(_cell(0, row)).top, lessThan(chartTop),
+            reason: 'the $row row renders in the TOP of the temperature '
+                'block, above the curve (paper sheet)');
+      }
+      for (final row in ['cervix', 'pain', 'time']) {
+        expect(tester.getRect(_cell(0, row)).top, greaterThan(chartBottom),
+            reason: 'the $row row stays below the temperature block');
+      }
+    });
+
+    testWidgets(
+        'the rows render in the paper order — bleeding, mucus, M '
+        '(Mittelschmerz directly beneath the mucus row), sex — and the '
+        'below-block rows follow the curve segment', (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries));
+      await tester.pumpAndSettle();
+
+      double top(String row) => tester.getRect(_corner(row)).top;
+      expect(
+        ['bleeding', 'mucus', 'mittelschmerz', 'sex']
+            .map(top)
+            .toList(),
+        [...['bleeding', 'mucus', 'mittelschmerz', 'sex'].map(top)]..sort(),
+        reason: 'M sits directly beneath the mucus row (paper sheet), '
+            'sex after it, bleeding on top');
+      // The below-block rows keep their relative order (cervix before
+      // pain before time) with a clear gap across the curve between the
+      // segments.
+      expect(top('cervix'), greaterThan(tester.getRect(_corner('sex')).bottom),
+          reason: 'the below-block segment starts after the top segment '
+              'and the curve');
+      expect(top('pain'), greaterThan(top('cervix')));
+      expect(top('time'), greaterThan(top('pain')));
+    });
+
+    testWidgets(
+        'the Mittelschmerz letter M renders in its own row beneath the '
+        'mucus row; the below-block pain row carries only B',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries));
+      await tester.pumpAndSettle();
+
+      // Day 4 = the fixture's Mittelschmerz day (beside its mucus S): the
+      // M letter renders in the mittelschmerz cell, directly beneath the
+      // day's mucus glyph.
+      expect(_inCell(4, 'mittelschmerz', find.text('M')), findsOneWidget,
+          reason: 'Mittelschmerz renders its M letter in its own row, '
+              'directly beneath the mucus row (paper sheet)');
+      expect(_inCell(4, 'pain', find.text('M')), findsNothing,
+          reason: 'the M letter moved out of the below-block pain row — '
+              'flagged with TODO(user-review) in the chart code');
+      expect(_inCell(7, 'pain', find.text('B')), findsOneWidget,
+          reason: 'breast pain B stays in the below-block pain row');
+      expect(_inCell(7, 'mittelschmerz', find.text('M')), findsNothing,
+          reason: 'no M without the Mittelschmerz flag');
+    });
+
+    testWidgets('tapping a top-block cell opens the day sheet',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries));
+      await tester.pumpAndSettle();
+
+      await tester.tap(_cell(4, 'mucus'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(sheet.day, _day(4),
+          reason: 'the moved top-block mucus cell keeps its tap behavior');
+    });
+  });
+
   group('per-signal rows', () {
     testWidgets(
         'every signal row renders for every windowed day, in order '
-        'bleeding, mucus, cervix, sex, pain, time', (tester) async {
+        'bleeding, mucus, mittelschmerz, sex, cervix, pain, time',
+        (tester) async {
       await tester.pumpWidget(_chartHarness(entries: _entries));
       await tester.pumpAndSettle();
 
@@ -119,7 +217,9 @@ void main() {
         }
       }
 
-      // Row ORDER: the corner slots appear top-down bleeding .. time.
+      // Row ORDER: the corner slots appear top-down bleeding .. time
+      // (paper layout: the first four inside the top of the temperature
+      // block, the rest below).
       final corners = _signalRows.map((row) => tester.getRect(_corner(row)));
       final tops = corners.map((r) => r.top).toList();
       expect(tops, equals([...tops]..sort()),
@@ -136,10 +236,13 @@ void main() {
       final rowNames = {
         'bleeding': 'Bleeding',
         'mucus': 'Fertility sign (mucus)',
+        'mittelschmerz': 'Mittelschmerz',
         'cervix': 'Cervix',
         'sex': 'Sex',
         'pain': 'Pain',
+        'disturbance': 'Disturbed measurement',
         'time': 'Measurement time',
+        'note': 'Note',
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
         expect(find.byKey(ValueKey('${key}Corner')), findsOneWidget);
@@ -161,8 +264,9 @@ void main() {
         );
       }
 
-      // The sample glyphs: a bleeding blob, the S mucus glyph, a cervix
-      // letter, the X, the B/M pain letters, and the clock icon.
+      // The sample glyphs: a bleeding blob, the S mucus glyph, the
+      // Mittelschmerz M, a cervix letter, the X, the B pain letter, and
+      // the clock icon.
       expect(
           find.descendant(
               of: _corner('bleeding'), matching: find.byType(Container)),
@@ -184,6 +288,11 @@ void main() {
           find.descendant(of: _corner('mucus'), matching: find.text('EW')),
           findsNothing,
           reason: 'the mucus corner sample carries no EW superscript');
+      expect(
+          find.descendant(
+              of: _corner('mittelschmerz'), matching: find.text('M')),
+          findsOneWidget,
+          reason: 'the mittelschmerz corner shows the M sample');
       expect(find.descendant(of: _corner('cervix'), matching: find.text('m')),
           findsOneWidget,
           reason: 'the cervix corner shows a position letter sample');
@@ -192,9 +301,10 @@ void main() {
           reason: 'the sex corner shows the X sample');
       expect(find.descendant(of: _corner('pain'), matching: find.text('B')),
           findsOneWidget,
-          reason: 'the pain corner shows the B/M sample');
+          reason: 'the pain corner shows the B sample '
+              '(the Mittelschmerz M has its own row/corner)');
       expect(find.descendant(of: _corner('pain'), matching: find.text('M')),
-          findsOneWidget);
+          findsNothing);
       expect(
           find.descendant(
               of: _corner('time'), matching: find.byIcon(Icons.schedule)),
@@ -210,10 +320,13 @@ void main() {
       final rowNames = {
         'bleeding': 'Blutung',
         'mucus': 'Fruchtbarkeitszeichen (Schleim)',
+        'mittelschmerz': 'Mittelschmerz',
         'cervix': 'Muttermund',
         'sex': 'Sex',
         'pain': 'Schmerz',
+        'disturbance': 'Messstörung',
         'time': 'Messzeitpunkt',
+        'note': 'Notiz',
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
         final tooltips = tester
@@ -273,43 +386,37 @@ void main() {
     });
 
     testWidgets(
-        'at minimum column width the time cell stays empty — and between '
-        'the minimum and the threshold too', (tester) async {
+        'at minimum column width the time renders vertically — never '
+        'dropped (wide columns keep the horizontal text, see the wide '
+        'HH:mm test above and cycle_chart_time_sex_pain_test.dart)',
+        (tester) async {
       Finder timeCellFinder() => find.byWidgetPredicate((w) =>
           w.key is ValueKey<String> &&
           (w.key as ValueKey<String>).value.startsWith('timeCell-'));
 
       // 60 days overflow the viewport: columns render at the minimum
-      // usable width (24 px), below the time-text threshold. The initial
+      // usable width (24 px), below the horizontal threshold. The initial
       // auto-scroll puts the newest days' cells on screen.
       await tester.pumpWidget(_chartHarness(entries: [
-        for (var i = 0; i < 60; i++) DailyEntry(date: _day(i % 9), bbtC: 36.5),
+        for (var i = 0; i < 60; i++)
+          DailyEntry(
+            date: _day(i),
+            bbtC: 36.5,
+            measuredAtMinutes: 6 * 60 + 30,
+          ),
       ]));
       await tester.pumpAndSettle();
 
       expect(timeCellFinder(), findsWidgets,
           reason: 'the initial window renders time cells');
-      expect(find.descendant(of: timeCellFinder(), matching: find.byType(Text)),
-          findsNothing,
-          reason: 'no time text renders at the minimum column width');
       expect(
-          find.descendant(
-              of: timeCellFinder(), matching: find.byIcon(Icons.schedule)),
-          findsNothing,
-          reason: 'no per-day clock icon anywhere at min column width');
-
-      // Between minimum and threshold: 25 days fit the viewport but leave
-      // only ~29 px per column — still below the threshold, so the cell
-      // stays empty.
-      await tester.pumpWidget(_chartHarness(entries: [
-        for (var i = 0; i < 25; i++) DailyEntry(date: _day(i % 9), bbtC: 36.5),
-      ]));
-      await tester.pumpAndSettle();
-
-      expect(timeCellFinder(), findsWidgets);
-      expect(find.descendant(of: timeCellFinder(), matching: find.byType(Text)),
-          findsNothing,
-          reason: 'a ~29 px column is still too narrow for the time text');
+          find.descendant(of: timeCellFinder(), matching: find.text('06:30')),
+          findsWidgets,
+          reason: 'the recorded time renders at the minimum column width — '
+              'vertically (the old behavior dropped it)');
+      expect(
+          find.descendant(of: timeCellFinder(), matching: find.byType(Text)),
+          findsWidgets);
     });
 
     testWidgets('no per-day clock icon exists anywhere in the signal rows',
