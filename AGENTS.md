@@ -49,6 +49,9 @@ single durable mapping of those IDs. Therefore:
 
 ## Running tests
 
+In a fresh checkout or git worktree, run `flutter pub get` before any
+`flutter`/`dart` command (`.dart_tool/` is not version-controlled).
+
 Run tests with `flutter test`; the default `compact` reporter redraws one
 line with carriage returns, so captured agent logs end up mangled and
 failures only surface in a summary at the end. Instead:
