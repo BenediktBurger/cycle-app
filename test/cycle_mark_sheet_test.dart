@@ -468,7 +468,7 @@ void main() {
     });
   });
 
-  group('excludedFromAnalysis toggle (the analysis-exclusion mark)', () {
+  group('ignoreTemperature toggle (the temperature-ignore mark)', () {
     /// The y-position of a sheet row label (visual order probe).
     double rowYOf(WidgetTester tester, String label) => tester
         .getTopLeft(find.descendant(
@@ -483,8 +483,8 @@ void main() {
       await _pump(tester, entries: _entries); // no marks yet
       await _tapDay(tester, 4); // 9/10, an arbitrary day
 
-      expect(find.text('Exclude from analysis'), findsOneWidget,
-          reason: 'the day carries no exclusion mark -> the set wording');
+      expect(find.text('Ignore temperature'), findsOneWidget,
+          reason: 'the day carries no ignore mark -> the set wording');
 
       // Visual order, not mere presence: each row label must render ABOVE
       // the next one inside the sheet.
@@ -492,7 +492,7 @@ void main() {
         'Edit day',
         'Set cycle start',
         'Set mucus peak',
-        'Exclude from analysis',
+        'Ignore temperature',
         'Set first higher measurement',
         'SUZ from this evening',
         'SUZ from this morning',
@@ -503,64 +503,64 @@ void main() {
       for (var i = 0; i < order.length - 1; i++) {
         expect(ys[order[i]]! < ys[order[i + 1]]!, isTrue,
             reason: '"${order[i]}" sits above "${order[i + 1]}" — the '
-                'exclusion toggle belongs between the mucus-peak and the '
-                'first-higher rows');
+                'temperature-ignore toggle belongs between the mucus-peak '
+                'and the first-higher rows');
       }
     });
 
     testWidgets(
-        'tapping the toggle persists an excludedFromAnalysis mark through '
+        'tapping the toggle persists an ignoreTemperature mark through '
         'the MarksDao and flips to the include wording; tapping again '
         'removes it', (tester) async {
       await _pump(tester, entries: _entries); // no marks yet
 
       await _tapDay(tester, 4); // 9/10, an arbitrary day
-      await tester.tap(find.text('Exclude from analysis'));
+      await tester.tap(find.text('Ignore temperature'));
       await tester.pumpAndSettle();
 
       final stored = await _db!.marksDao.marksForDay(_d(10));
       expect(stored.map((m) => m.markType),
-          contains(CycleMarkTypes.excludedFromAnalysis),
+          contains(CycleMarkTypes.ignoreTemperature),
           reason: 'the toggle writes the mark through marksDao '
               '(day/type-keyed addMark)');
-      final mark = stored.singleWhere(
-          (m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
+      final mark = stored
+          .singleWhere((m) => m.markType == CycleMarkTypes.ignoreTemperature);
       expect(mark.author, 'user',
           reason: 'the sheet placement is user-authored');
-      expect(find.text('Include in analysis again'), findsOneWidget,
+      expect(find.text('Temperature evaluated again'), findsOneWidget,
           reason: 'the sheet re-renders contextually after the write');
-      expect(find.text('Exclude from analysis'), findsNothing);
+      expect(find.text('Ignore temperature'), findsNothing);
       expect(stored, hasLength(1), reason: 'exactly one mark was written');
 
-      await tester.tap(find.text('Include in analysis again'));
+      await tester.tap(find.text('Temperature evaluated again'));
       await tester.pumpAndSettle();
 
       expect(await _storedTypes(_d(10)), isEmpty,
           reason: 'the reverse toggle deletes the mark');
-      expect(find.text('Exclude from analysis'), findsOneWidget,
-          reason: 'the action flips back to the exclude wording');
-      expect(find.text('Include in analysis again'), findsNothing);
+      expect(find.text('Ignore temperature'), findsOneWidget,
+          reason: 'the action flips back to the ignore wording');
+      expect(find.text('Temperature evaluated again'), findsNothing);
     });
 
     testWidgets(
         'a present exclusion mark shows the include wording and the '
         'include action deletes it', (tester) async {
       await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(date: _d(10), type: CycleMarkTypes.excludedFromAnalysis),
+        CycleMark(date: _d(10), type: CycleMarkTypes.ignoreTemperature),
       ]);
 
       await _tapDay(tester, 4); // 9/10: the marked day
-      expect(find.text('Include in analysis again'), findsOneWidget,
+      expect(find.text('Temperature evaluated again'), findsOneWidget,
           reason: 'the day already carries the mark -> the include action');
 
-      await tester.tap(find.text('Include in analysis again'));
+      await tester.tap(find.text('Temperature evaluated again'));
       await tester.pumpAndSettle();
 
       expect(await _storedTypes(_d(10)), isEmpty,
           reason: 'the mark is removed from storage through the deleteMark '
               'path');
-      expect(find.text('Exclude from analysis'), findsOneWidget,
-          reason: 'the action flips back to the exclude wording');
+      expect(find.text('Ignore temperature'), findsOneWidget,
+          reason: 'the action flips back to the ignore wording');
     });
 
     testWidgets(
@@ -568,12 +568,12 @@ void main() {
         'first higher on a mark-EXCLUDED (but measured) day warns with the '
         'no-usable-temperature wording', (tester) async {
       // 9/14 is measured (36.90, ABOVE the baseline 36.40) — with the
-      // analysis-exclusion mark on the day the temperature is still not
+      // temperature-ignore mark on the day the temperature is still not
       // usable, so the placement warns with the "unmeasured or
       // interrupted" wording (the mark-excluded branch of the dialog
       // body choice).
       await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(date: _d(14), type: CycleMarkTypes.excludedFromAnalysis),
+        CycleMark(date: _d(14), type: CycleMarkTypes.ignoreTemperature),
       ]);
 
       await _tapDay(tester, 8); // 9/14: measured above the baseline
@@ -581,7 +581,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget,
-          reason: 'the excluded temperature is not usable for the check — '
+          reason: 'the ignored temperature is not usable for the check — '
               'the placement warns even though the VALUE is above the '
               'baseline');
       expect(

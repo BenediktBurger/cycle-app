@@ -109,7 +109,7 @@ Future<void> main() async {
     ),
   );
   await source.marksDao
-      .addMark(DateTime(2026, 3, 12), CycleMarkTypes.excludedFromAnalysis);
+      .addMark(DateTime(2026, 3, 12), CycleMarkTypes.ignoreTemperature);
   await source.entriesDao.upsertDaily(
     DailyEntry(date: DateTime(2026, 3, 4), bleeding: Bleeding.none),
   );
@@ -215,7 +215,7 @@ Future<void> main() async {
   // --- old-document translation (v1–4) -------------------------------------
   // Old documents carry profile keys (accepted and IGNORED) and the legacy
   // exclude_* booleans: illness → the kr bit, alcohol → the alk bit, and
-  // ANY of the four true derives an excludedFromAnalysis mark (author
+  // ANY of the four true derives an ignoreTemperature mark (author
   // 'import') inside the import transaction — the interrupted-day analysis
   // semantics survive the shape change.
   final oldDocTarget = CycleDatabase(NativeDatabase.memory());
@@ -247,7 +247,7 @@ Future<void> main() async {
   check(travelDay.tempDisturbances == 0,
       'exclude_travel leaves no mask bit (travel has no flag any more)');
   final exclusionMarks = (await oldDocTarget.marksDao.allMarks())
-      .where((m) => m.markType == CycleMarkTypes.excludedFromAnalysis)
+      .where((m) => m.markType == CycleMarkTypes.ignoreTemperature)
       .toList()
     ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
   check(
@@ -255,7 +255,7 @@ Future<void> main() async {
           exclusionMarks.every((m) => m.author == 'import') &&
           DateOnly.sameDay(
               exclusionMarks.first.entryDate, DateTime(2026, 4, 2)),
-      'every old excluded day derives an excludedFromAnalysis mark '
+      'every old excluded day derives an ignoreTemperature mark '
       "(author 'import') — the analysis semantics survive");
   // Re-import: the derived marks are idempotent (no duplicates).
   final oldSecond = await importJsonToDatabase(oldDocTarget, oldDocJson);
@@ -311,7 +311,7 @@ Future<void> main() async {
 
   // --- DAO facade additions work on the real schema ------------------------
   final marks = await source.marksDao.allMarks();
-  check(marks.length == 1 && marks.single.markType == 'excludedFromAnalysis',
+  check(marks.length == 1 && marks.single.markType == 'ignoreTemperature',
       'allMarks facade');
 
   await source.close();

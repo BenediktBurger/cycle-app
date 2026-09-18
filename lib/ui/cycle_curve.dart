@@ -8,7 +8,7 @@ import '../domain/models.dart';
 /// One drawable point of the temperature curve: a measured temperature on
 /// its chart x position (day index), flagged when the day is interrupted
 /// (a non-zero raw disturbance mask — the rendering is keyed to the raw
-/// `tempDisturbances` mask, NOT to the excludedFromAnalysis mark) and thus
+/// `tempDisturbances` mask, NOT to the ignoreTemperature mark) and thus
 /// renders lighter.
 final class CurvePoint {
   const CurvePoint({
@@ -54,8 +54,8 @@ final class CurveSegment {
 /// _ChartDays). Days WITHOUT a temperature — no entry at all, or an entry
 /// that carries no bbtC — break the line; a day with a temperature counts
 /// as measured even when its raw disturbance mask marks it interrupted
-/// (the mask is rendering input only — the excludedFromAnalysis mark is
-/// deliberately NOT consulted here: a manually-excluded day without flags
+/// (the mask is rendering input only — the ignoreTemperature mark is
+/// deliberately NOT consulted here: a manually-ignored day without flags
 /// renders normally).
 List<CurveRun> curveRuns(Map<int, DailyEntry> entriesByDayIndex) {
   final measured = <CurvePoint>[

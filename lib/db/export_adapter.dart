@@ -12,7 +12,7 @@
 //    day / (day, mark_type), never by profile. Their exclude_* keys
 //    translate into the temp_disturbances mask bits (illness → kr, alcohol
 //    → alk; travel/other have no flag any more) AND any of the four true
-//    derives an excludedFromAnalysis mark (author 'import') for that day,
+//    derives an ignoreTemperature mark (author 'import') for that day,
 //    preserving the old interrupted-day analysis semantics. The derived
 //    marks are written inside the import transaction (idempotently, like
 //    the document's own marks); they are not part of the planner's counts.
@@ -157,11 +157,11 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
       }
 
       // 2) Marks idempotently (addMark skips existing ones silently). The
-      //    document's own excludedFromAnalysis rows suppress the derived
+      //    document's own ignoreTemperature rows suppress the derived
       //    ones for the same day (no duplicates, no double marks).
       final documentExcludedDays = {
         for (final row in doc.marks)
-          if (row['mark_type'] == CycleMarkTypes.excludedFromAnalysis &&
+          if (row['mark_type'] == CycleMarkTypes.ignoreTemperature &&
               row['entry_date'] is String)
             row['entry_date']! as String,
       };
@@ -169,7 +169,7 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         if (documentExcludedDays.contains(day)) continue;
         await db.marksDao.addMark(
           tryParseIsoDay(day)!,
-          CycleMarkTypes.excludedFromAnalysis,
+          CycleMarkTypes.ignoreTemperature,
           author: 'import',
         );
       }
@@ -202,7 +202,7 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
 }
 
 /// Whether the (old-document) row carries any of the four legacy exclusion
-/// keys as `true` — the trigger for the derived excludedFromAnalysis mark.
+/// keys as `true` — the trigger for the derived ignoreTemperature mark.
 bool _oldDocExcluded(Map<String, Object?> row) =>
     row['exclude_illness'] == true ||
     row['exclude_alcohol'] == true ||

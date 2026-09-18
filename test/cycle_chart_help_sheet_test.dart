@@ -45,7 +45,7 @@ Widget _chartHarness({
     );
 
 /// The glossary entries (en wording); each is asserted inside the help
-/// sheet. The "Excluded from analysis" entry covers the day-sheet toggle
+/// sheet. The "Ignore temperature" entry covers the day-sheet toggle
 /// (a user mark without a chart glyph — explained under its own switch
 /// icon).
 const _glossaryEn = [
@@ -53,7 +53,7 @@ const _glossaryEn = [
   'Bleeding',
   'Fertility sign (mucus)',
   'Mucus peak',
-  'Excluded from analysis (day-sheet toggle)',
+  'Ignore temperature (day-sheet toggle)',
   'Circled higher measurements',
   'Higher measurement (arrow)',
   'Baseline',
@@ -70,7 +70,7 @@ const _glossaryDe = [
   'Blutung',
   'Zeichen der Fruchtbarkeit (Schleim)',
   'Schleimhöhepunkt',
-  'Vom Auswerten ausgeschlossen (Schalter im Tagesblatt)',
+  'Temperatur ignorieren (Schalter im Tagesblatt)',
   'Umrandete höhere Messungen',
   'höhere Messung (Pfeil)',
   'Basislinie',

@@ -930,10 +930,9 @@ void main() {
       expect(CycleMarkTypes.mucusPeakDay, MarkTypes.mucusPeakDay);
       expect(CycleMarkTypes.firstHigherMeasurement,
           MarkTypes.firstHigherMeasurement);
-      // The analysis-exclusion mark (the NER-aligned replacement of the
+      // The temperature-ignore mark (the NER-aligned replacement of the
       // old exclude_* raw flags) is part of the shared vocabulary too.
-      expect(
-          CycleMarkTypes.excludedFromAnalysis, MarkTypes.excludedFromAnalysis);
+      expect(CycleMarkTypes.ignoreTemperature, MarkTypes.ignoreTemperature);
       // The SUZ start markers (sicher unfruchtbare Zeit, placed by the
       // user from a morning or from an evening) joined the open TEXT
       // vocabulary — both sides must spell the tokens identically.
@@ -1069,6 +1068,39 @@ void main() {
       expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 4, 2)), isTrue,
           reason: 'the day merge key holds regardless of profile_id');
       expect(await db.marksDao.allMarks(), hasLength(1));
+    });
+
+    test(
+        'old-document exclude_* keys derive an ignoreTemperature mark '
+        "(author 'import')", () async {
+      // The old-document translation (inside the import transaction):
+      // any of the four true exclude_* keys derives the analysis mark for
+      // that day — and since Phase 3 the mark token is ignoreTemperature
+      // (temperature-evaluation-scoped only — the mark does not affect
+      // cycle-start suggestions any more). The derived token is pinned
+      // here (a rename of the
+      // stored vocabulary is a data-visible change, even with no schema
+      // bump).
+      const oldJson = '{"schema_version": 3, '
+          '"exported_at": "2026-04-01T00:00:00Z", '
+          '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+          '"entries": [{"profile_id": 1, "date": "2026-04-02", '
+          '"bleeding": 3, "exclude_travel": true}], '
+          '"marks": []}';
+      final summary = await importJsonToDatabase(db, oldJson);
+      expect(summary.entriesNew, 1);
+      expect(summary.marksNew, 0,
+          reason: 'the derived marks ride inside the transaction without '
+              'being counted (document rows only)');
+
+      final marks = await db.marksDao.allMarks();
+      expect(marks, hasLength(1),
+          reason: 'exclude_travel=true derives the temperature-ignore mark');
+      expect(marks.single.markType, CycleMarkTypes.ignoreTemperature,
+          reason: 'the derived mark token is the RENAMED one — the old '
+              'name is gone from the production vocabulary (an escape '
+              'hatch of the open-TEXT column would fail this pin)');
+      expect(marks.single.author, 'import');
     });
 
     test(

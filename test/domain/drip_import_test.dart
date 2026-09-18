@@ -228,7 +228,7 @@ void main() {
       final e = (doc['entries']! as List).single as Map<String, Object?>;
       expect(e['bbt_c'], 36.2);
       // drip's "not usable for fertility detection" maps to the
-      // excludedFromAnalysis MARK (author 'import') — NOT to raw entry
+      // ignoreTemperature MARK (author 'import') — NOT to raw entry
       // data: the day carries temp_disturbances 0 (drip has no reason
       // column, so no mask bits come from drip).
       expect(e['temp_disturbances'], 0);
@@ -240,7 +240,7 @@ void main() {
       expect(doc['marks'], [
         {
           'entry_date': '2026-01-01',
-          'mark_type': 'excludedFromAnalysis',
+          'mark_type': 'ignoreTemperature',
           'author': 'import',
         },
       ]);
@@ -844,15 +844,15 @@ void main() {
       // Deep matcher on the filtered list: json-decoded maps carry no
       // structural ==, so the shape is compared element shape by shape.
       expect(
-          marks.where((m) => m['mark_type'] == 'excludedFromAnalysis'),
+          marks.where((m) => m['mark_type'] == 'ignoreTemperature'),
           [
             {
               'entry_date': '2026-09-13',
-              'mark_type': 'excludedFromAnalysis',
+              'mark_type': 'ignoreTemperature',
               'author': 'import',
             },
           ],
-          reason: 'temperature.exclude derives the exclusion mark');
+          reason: 'temperature.exclude derives the ignore-temperature mark');
       // note-only day
       expect(by('2026-09-15')['notes'], 'cramps again, expecting menses soon.');
       // bleeding + mood-note day (drip value 2 = medium → level 3); the
@@ -1015,11 +1015,11 @@ void main() {
             'author': 'import',
           };
 
-      /// The derived analysis-exclusion mark (drip temperature.exclude →
-      /// the excludedFromAnalysis mark; author 'import').
+      /// The derived temperature-ignore mark (drip temperature.exclude →
+      /// the ignoreTemperature mark; author 'import').
       Map<String, Object?> exclusionMark(String iso) => {
             'entry_date': iso,
-            'mark_type': 'excludedFromAnalysis',
+            'mark_type': 'ignoreTemperature',
             'author': 'import',
           };
 
@@ -1079,7 +1079,7 @@ void main() {
         // day before it carries no menstruation-level entry), every other
         // bleeding day continues the previous day's flow. NOT one mark for
         // the whole file: one per episode. Additionally the temperature-
-        // excluded day (2026-09-13) derives its excludedFromAnalysis mark.
+        // excluded day (2026-09-13) derives its ignoreTemperature mark.
         final result = dripCsvToExportJson(dripExportSampleCsv);
         expect(cycleStartsOf(result), [
           derivedMark('2026-07-05'),
@@ -1087,8 +1087,7 @@ void main() {
           derivedMark('2026-08-30'),
         ]);
         expect(
-          marksOf(result)
-              .where((m) => m['mark_type'] == 'excludedFromAnalysis'),
+          marksOf(result).where((m) => m['mark_type'] == 'ignoreTemperature'),
           [exclusionMark('2026-09-13')],
         );
       });
@@ -1122,22 +1121,26 @@ void main() {
       });
 
       test(
-          'an interrupted (excluded) day derives the exclusion mark and '
-          "neither derives a cycleStart mark nor suppresses the next "
-          "day's onset", () {
-        // drip temperature.exclude maps onto the excludedFromAnalysis MARK
-        // (author 'import', no raw exclude key, mask 0) — the day is an
-        // interrupted day for the suggestion predicate: it never suggests
-        // a cycle start itself, and a following menstruation-level day is
-        // not read as a continuation of it.
+          'an ignored (temperature-excluded) day derives the mark AND its '
+          "own cycleStart suggestion; the next day stays suppressed by "
+          "bleeding continuity", () {
+        // drip temperature.exclude maps onto the ignoreTemperature MARK
+        // (author 'import', no raw exclude key, mask 0). The mark is
+        // temperature-evaluation-scoped: it does NOT suppress the
+        // suggestion any more — 2026-01-01 (bleeding level 2, no previous
+        // bleeding day) SUGGESTS and derives its own cycleStart mark,
+        // while 2026-01-02 stays mid-flow (previous calendar day also
+        // bleeding level >= 2) and derives nothing.
         final result = dripCsvToExportJson(dripCsv(dripHeader, [
           cells('2026-01-01', {4: '2', 2: 'true'}),
           cells('2026-01-02', {4: '2'}),
         ]));
         expect(
             marksOf(result),
-            unorderedEquals(
-                [exclusionMark('2026-01-01'), derivedMark('2026-01-02')]));
+            unorderedEquals([
+              derivedMark('2026-01-01'),
+              exclusionMark('2026-01-01'),
+            ]));
       });
 
       test(

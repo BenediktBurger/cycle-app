@@ -22,15 +22,19 @@ abstract final class CycleMarkTypes {
   /// First higher measurement after the peak ("erste höhere Messung").
   static const firstHigherMeasurement = 'firstHigherMeasurement';
 
-  /// The analysis-exclusion mark ("vom Auswerten ausschließen"): a marked
-  /// day is an interrupted day for evaluation — a gap day, never a cycle
-  /// start — regardless of the raw disturbance flags (which are rendering
-  /// input only). The diary save auto-SETs this mark (idempotently) when
-  /// any tempDisturbances flag is selected; a mark is NEVER auto-removed
-  /// when the flags clear. Foreign imports (drip CSV temperature.exclude,
-  /// old export documents with exclude_* keys) derive it with author
+  /// The temperature-ignore mark ("Temperatur ignorieren"): a marked
+  /// day's temperature is EXCLUDED FROM THE TEMPERATURE EVALUATION — the
+  /// evaluation arithmetic (lib/domain/evaluation.dart) treats the day
+  /// like an unmeasured one. The mark does NOT affect cycle-start
+  /// suggestions (bleeding continuity only, see
+  /// lib/domain/cycle_grouping.dart) and does NOT drive the interrupted-
+  /// temperature chart rendering (the raw tempDisturbances mask does).
+  /// The diary save auto-SETs this mark (idempotently) when any
+  /// tempDisturbances flag is selected; a mark is NEVER auto-removed when
+  /// the flags clear. Foreign imports (drip CSV temperature.exclude, old
+  /// export documents with exclude_* keys) derive it with author
   /// 'import'.
-  static const excludedFromAnalysis = 'excludedFromAnalysis';
+  static const ignoreTemperature = 'ignoreTemperature';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
   /// MORNING (the SUZ bar renders at the day column's start). The computed

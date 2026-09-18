@@ -114,9 +114,11 @@ enum SexTiming {
 /// the db mapping MUST go through `bit`, never the Dart declaration index.
 /// NOTE the vocabulary decision: Reise (travel) is NOT representable — the
 /// old exclusion-reason booleans are gone, and this mask is RAW data for
-/// the interrupted-temperature rendering. The analysis exclusion is the
-/// separate excludedFromAnalysis MARK (see lib/domain/cycle_grouping.dart),
-/// which the diary save auto-sets (idempotently) whenever a flag is selected.
+/// the interrupted-temperature rendering. The temperature evaluation uses
+/// the separate ignoreTemperature MARK (see lib/domain/evaluation.dart),
+/// which the diary save auto-sets (idempotently) whenever a flag is
+/// selected; cycle-start suggestions are untouched by both (bleeding
+/// continuity only).
 enum TempDisturbance {
   /// Late to bed ("spät ins Bett").
   sp(1),
@@ -223,9 +225,9 @@ final class DailyEntry {
   /// Raw disturbance flags of the day, as a bitmask of [TempDisturbance.bit]
   /// values (0 = no disturbance; 1 sp / 2 a / 4 alk / 8 kr; OR-combined for
   /// multiple disturbances on one day). RAW data: it drives the
-  /// interrupted-temperature chart rendering, but NEVER the analysis
-  /// exclusion — that is the excludedFromAnalysis mark (see
-  /// lib/domain/cycle_grouping.dart).
+  /// interrupted-temperature chart rendering, but NEVER the temperature
+  /// evaluation — that is the ignoreTemperature mark (see
+  /// lib/domain/evaluation.dart).
   final int tempDisturbances;
 
   /// Fertility sign observed on the day (t / Ø-nichts / f / S / f/S
@@ -268,9 +270,9 @@ final class DailyEntry {
 
   /// True when the day carries at least one raw disturbance flag, i.e. the
   /// temperature is interrupted (rendering input — the chart draws the
-  /// touching segments and the dot lighter). The ANALYSIS exclusion is the
-  /// separate excludedFromAnalysis mark; this getter must not be used for
-  /// it (see lib/domain/cycle_grouping.dart).
+  /// touching segments and the dot lighter). The temperature EVALUATION
+  /// uses the separate ignoreTemperature mark; this getter must not be
+  /// used for it (see lib/domain/evaluation.dart).
   bool get isInterrupted => tempDisturbances != 0;
 
   DailyEntry copyWith({

@@ -27,7 +27,7 @@ CycleMark start(int year, int month, int day) => CycleMark(
 /// signal the data model knows (raw disturbance flags never exclude).
 CycleMark excludedDay(int year, int month, int day) => CycleMark(
       date: DateTime(year, month, day),
-      type: CycleMarkTypes.excludedFromAnalysis,
+      type: CycleMarkTypes.ignoreTemperature,
     );
 
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
@@ -85,7 +85,7 @@ void main() {
         d(2026, 4, 29, bleeding: Bleeding.medium),
       ];
       // The Apr 28 mark sits on an EXCLUDED day (the analysis exclusion is
-      // the excludedFromAnalysis mark — raw flags do not exclude); the
+      // the ignoreTemperature mark — raw flags do not exclude); the
       // cycle-start mark binds wherever placed (no exclusion interplay),
       // so it anchors a length.
       final lengths = cycleLengthsInDays(entries, [

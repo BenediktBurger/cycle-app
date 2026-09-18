@@ -1,6 +1,6 @@
 // Widget tests for the analysis-exclusion AUTO-SET on the Tagebuch screen:
 // saving a day with ANY disturbance flag selected (sp/a/alk/kr) auto-SETs
-// the excludedFromAnalysis mark (idempotent); saving a flag-less day never
+// the ignoreTemperature mark (idempotent); saving a flag-less day never
 // creates the mark. The REVERSE direction — a mark is never auto-REMOVED
 // when the flags clear — is pinned in test/diary_cycle_start_prompt_test.dart
 // (the mark-suppresses-prompt test asserts the mark survives the save).
@@ -79,7 +79,7 @@ void main() {
 
   testWidgets(
       'saving a day with a disturbance flag selected auto-sets the '
-      'excludedFromAnalysis mark (user-authored, once)', (tester) async {
+      'ignoreTemperature mark (user-authored, once)', (tester) async {
     tallSurface(tester);
     await tester.pumpWidget(_scope());
     await tester.pumpAndSettle();
@@ -92,12 +92,12 @@ void main() {
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
     expect(marks.map((m) => m.markType),
-        contains(CycleMarkTypes.excludedFromAnalysis),
+        contains(CycleMarkTypes.ignoreTemperature),
         reason: 'any selected disturbance flag auto-SETs the '
             'analysis-exclusion mark on save (the raw mask alone is '
             'rendering input, the analysis is mark-driven)');
     final mark = marks
-        .singleWhere((m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
+        .singleWhere((m) => m.markType == CycleMarkTypes.ignoreTemperature);
     expect(mark.author, 'user',
         reason: 'the diary save is user-placed data — the mark is '
             'user-authored like every sheet toggle');
@@ -126,7 +126,7 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(marks.map((m) => m.markType), [CycleMarkTypes.excludedFromAnalysis],
+    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
         reason: 'still exactly ONE exclusion mark (addMark is idempotent)');
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
     expect(entry!.tempDisturbances, TempDisturbance.kr.bit,

@@ -94,7 +94,6 @@
   "cycleLegendBleeding": "Blutung",
   "cycleLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
   "cycleLegendMucusPeak": "Schleimhöhepunkt",
-  "cycleLegendExcludedFromAnalysis": "Vom Auswerten ausgeschlossen (Schalter im Tagesblatt)",
   "cycleLegendCircledHigher": "Umrandete höhere Messungen",
   "cycleLegendArrowHigher": "höhere Messung (Pfeil)",
   "cycleLegendBaseline": "Basislinie",
@@ -108,8 +107,6 @@
   "cycleSheetRemoveMucusPeak": "Schleimhöhepunkt entfernen",
   "cycleSheetSetFirstHigher": "Erste höhere Messung setzen",
   "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
-  "cycleSheetSetExcludeFromAnalysis": "Aus den Auswertungen ausschließen",
-  "cycleSheetRemoveExcludeFromAnalysis": "Wieder auswerten",
   "cycleSheetBaselineInfo": "Basislinie: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {
@@ -261,5 +258,8 @@
   "disturbanceLateToBed": "Spät ins Bett (sp)",
   "disturbanceNightAwakening": "Nachts öfter aufstehen (a)",
   "disturbanceAlcohol": "Alkohol (alk)",
-  "disturbanceIllness": "Krank (kr)"
+  "disturbanceIllness": "Krank (kr)",
+  "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
+  "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
+  "cycleLegendIgnoreTemperature": "Temperatur ignorieren (Schalter im Tagesblatt)"
 }

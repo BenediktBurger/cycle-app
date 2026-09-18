@@ -5,7 +5,7 @@
 // sex-time bitmask, the cervix firmness fields, and the
 // temp_disturbances mask (the NER-aligned raw-data disturbance flags
 // sp/a/alk/kr — an int mask 0..15; the ANALYSIS exclusion is no longer
-// driven by entry flags but by the excludedFromAnalysis mark, see
+// driven by entry flags but by the ignoreTemperature mark, see
 // lib/domain/cycle_grouping.dart). DB mappers, the export/import writers
 // and any future writer all build DailyEntries, so they cannot store a
 // stray time or an out-of-range mask either.
@@ -260,7 +260,7 @@ void main() {
             reason: 'mask $mask carries a disturbance flag');
       }
       // The mask is RAW data: it does not drive analysis exclusion (see
-      // cycle_grouping/evaluation — the excludedFromAnalysis mark does).
+      // cycle_grouping/evaluation — the ignoreTemperature mark does).
     });
 
     test('copyWith keeps the mask unless given', () {

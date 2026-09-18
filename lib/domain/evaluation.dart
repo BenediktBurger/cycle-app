@@ -146,12 +146,14 @@
 //   only through the sheet's mark toggles.
 //
 // Profile-free: marks key to days only; the (entry_date, mark_type)
-// uniqueness is the whole key. The ANALYSIS EXCLUSION lives in the
-// excludedFromAnalysis MARKS (not in entry raw data — the raw disturbance
-// flags are rendering input only, see lib/domain/models.dart):
-// [evaluateCycles] builds the excluded-day set once from the marks and
+// uniqueness is the whole key. The TEMPERATURE-IGNORE marks
+// (ignoreTemperature — the mark token, not the raw disturbance mask; see
+// lib/domain/models.dart) are the only analysis input:
+// [evaluateCycles] builds the ignored-day set once from the marks and
 // treats those days like unmeasured ones (no number, no baseline
-// contribution, a gap day in the candidate sequence, no usable rise value).
+// contribution, a gap day in the candidate sequence, no usable rise
+// value). The mark does NOT affect cycle-start suggestions (bleeding
+// continuity only, see lib/domain/cycle_grouping.dart).
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';
@@ -382,13 +384,14 @@ List<CycleEvaluation> evaluateCycles(
   List<DailyEntry> entries,
   List<CycleMark> marks,
 ) {
-  // The excluded-day set, built ONCE from the exclusion marks: a marked
-  // day behaves like an unmeasured day in every rule below (R2/R8 gap,
-  // no low number, no baseline contribution, no usable rise value). Raw
-  // disturbance flags never contribute here.
+  // The ignored-day set, built ONCE from the temperature-ignore marks: a
+  // marked day behaves like an unmeasured day in every rule below (R2/R8
+  // gap, no low number, no baseline contribution, no usable rise value).
+  // Raw disturbance flags never contribute here, and cycle-start
+  // suggestions are untouched by these marks.
   final excludedDays = <DateTime>{
     for (final mark in marks)
-      if (mark.type == CycleMarkTypes.excludedFromAnalysis)
+      if (mark.type == CycleMarkTypes.ignoreTemperature)
         DateOnly.normalize(mark.date),
   };
 
@@ -517,7 +520,7 @@ _LowWindow _lowWindowFor(
   for (var offset = 1; offset <= 6; offset++) {
     final day = DateOnly.addDays(firstHigherDay, -offset);
     final entry = byDay[day];
-    // No entry, no temperature, or an excludedFromAnalysis MARK: the day
+    // No entry, no temperature, or an ignoreTemperature MARK: the day
     // occupies its calendar position but contributes nothing (no number,
     // no baseline). Raw disturbance flags do NOT do this.
     if (entry == null || entry.bbtC == null || excludedDays.contains(day)) {

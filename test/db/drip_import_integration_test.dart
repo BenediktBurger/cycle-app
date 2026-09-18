@@ -69,7 +69,7 @@ void main() {
       expect(summary.marksNew, 4,
           reason: 'three bleeding episodes derive one cycleStart mark each '
               '(author import) and the temperature.exclude day derives one '
-              'excludedFromAnalysis mark (author import)');
+              'ignoreTemperature mark (author import)');
 
       final rows = await db.entriesDao.allEntries();
       expect(rows, hasLength(27),
@@ -111,9 +111,9 @@ void main() {
       expect(tempDay.bleeding, Bleeding.none);
       final exclusionMarks =
           (await db.marksDao.marksForDay(DateTime(2026, 9, 13)))
-              .where((m) => m.markType == 'excludedFromAnalysis');
+              .where((m) => m.markType == 'ignoreTemperature');
       expect(exclusionMarks, hasLength(1),
-          reason: 'temperature.exclude derives the excludedFromAnalysis '
+          reason: 'temperature.exclude derives the ignoreTemperature '
               'mark (author import) — not a raw entry flag');
       expect(exclusionMarks.single.author, 'import');
 
@@ -316,7 +316,7 @@ void main() {
       final mapping = dripCsvToExportJson(fixtureRaw);
       final summary = await importJsonToDatabase(db, mapping.json);
       expect(summary.marksNew, 4,
-          reason: '3 cycleStart marks + the derived excludedFromAnalysis '
+          reason: '3 cycleStart marks + the derived ignoreTemperature '
               'mark carry the import authorship (the merge plan counts every '
               'document mark row)');
       expect(summary.marksInvalid, 0);
@@ -343,7 +343,7 @@ void main() {
           reason: 'the mapping is deterministic: the same rows derive the '
               'same marks, which the idempotent addMark skips');
       expect(second.marksSkipped, 4,
-          reason: '3 cycleStart marks + the derived excludedFromAnalysis '
+          reason: '3 cycleStart marks + the derived ignoreTemperature '
               'mark are all skip-idempotent on re-import');
       expect(await storedCycleStarts(db), hasLength(3));
     });

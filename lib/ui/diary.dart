@@ -184,7 +184,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // repeated saves are no-ops. AUTO-SET ONLY: a mask back to 0 NEVER
     // removes the mark — a manually-placed mark stays in place.
     if (entry.tempDisturbances != 0) {
-      await db.marksDao.addMark(date, CycleMarkTypes.excludedFromAnalysis);
+      await db.marksDao.addMark(date, CycleMarkTypes.ignoreTemperature);
     }
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.
@@ -195,25 +195,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // authoritative cycleStart one): after saving a menstruation-level day
     // that the shared suggestion predicate flags, the app ASKS before
     // placing the mark. `isSuggestedCycleStart` requires bleeding level >= 2
-    // on a day that the excludedFromAnalysis MARK does not exclude and that
-    // does not continue the previous calendar day's menstruation-level
-    // bleeding. The excluded-state comes from the MARKS (the analysis
-    // exclusion is the mark; raw flags never suppress a suggestion).
+    // on a day that does not continue the previous calendar day's
+    // menstruation-level bleeding — the suppression is keyed PURELY to
+    // bleeding continuity: the ignoreTemperature mark does NOT suppress
+    // the prompt (owner decision 2026-09-18 — the mark is
+    // temperature-evaluation-scoped), so no mark lookups happen here.
     if (entry.bleeding.level < 2) return;
-    final dayMarks = await db.marksDao.marksForDay(date);
-    final entryExcluded =
-        dayMarks.any((m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
-    final previousDay = DateOnly.addDays(date, -1);
-    final previousRow = await db.entriesDao.entryFor(previousDay);
+    final previousRow =
+        await db.entriesDao.entryFor(DateOnly.addDays(date, -1));
     final previous =
         previousRow == null ? null : dailyEntryFromDrift(previousRow);
-    final previousMarks = await db.marksDao.marksForDay(previousDay);
-    final previousExcluded = previousMarks
-        .any((m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
-    if (!isSuggestedCycleStart(entry, previous,
-        entryExcluded: entryExcluded, previousExcluded: previousExcluded)) {
-      return;
-    }
+    if (!isSuggestedCycleStart(entry, previous)) return;
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,

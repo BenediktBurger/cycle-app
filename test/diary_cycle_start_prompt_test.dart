@@ -11,9 +11,10 @@
 // (level >= 2), confirming persists the user-authored mark, dismissing
 // persists nothing, a level-1 day (spotting) prompts nothing, a
 // menstruation-level day that continues the previous day's bleeding
-// (mid-flow) prompts nothing, and the prompt is SUPPRESSED by the
-// excludedFromAnalysis mark (the analysis exclusion is the mark, no longer
-// an entry flag).
+// (mid-flow) prompts nothing, and the prompt is keyed PURELY to bleeding
+// continuity: the ignoreTemperature mark does NOT suppress it any more
+// (owner decision 2026-09-18 — the mark is temperature-evaluation-scoped;
+// a marked bleeding day still prompts and still places the cycleStart).
 //
 // The database is an in-memory override, same pattern as
 // test/diary_measured_time_test.dart; the German locale is pinned so the
@@ -174,16 +175,17 @@ void main() {
   });
 
   testWidgets(
-      'an excludedFromAnalysis mark on the day suppresses the prompt '
-      '(exclusion is the mark — no entry flag required)', (tester) async {
+      'an ignoreTemperature mark on the day does NOT suppress the prompt '
+      '(a marked bleeding day still suggests)', (tester) async {
     tallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
-      // The day already carries the analysis-exclusion mark: a
-      // menstruation-level bleeding day with that mark is interrupted —
-      // it must not suggest a cycle start.
+      // The day already carries the temperature-ignore mark: that mark is
+      // scoped to the temperature evaluation and must not swallow the
+      // cycle-start suggestion — the suppression is keyed purely to
+      // bleeding continuity.
       await db.marksDao.addMark(
         _day,
-        CycleMarkTypes.excludedFromAnalysis,
+        CycleMarkTypes.ignoreTemperature,
         author: 'user',
       );
     }));
@@ -191,11 +193,28 @@ void main() {
 
     await saveWithBleeding(tester, 'leicht');
 
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'the excludedFromAnalysis mark suppresses the suggestion — '
-            'the raw entry data never drives the prompt');
-    expect(await storedMarkTypes(_day), [CycleMarkTypes.excludedFromAnalysis],
-        reason: 'the mark stays untouched (auto-set only, never '
+    expect(find.byType(AlertDialog), findsOneWidget,
+        reason: 'the ignoreTemperature mark no longer suppresses the '
+            'suggestion — the marked bleeding day still asks');
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Zyklusbeginn setzen')));
+    await tester.pumpAndSettle();
+
+    final marks = await _db!.marksDao.marksForDay(_day);
+    expect(
+        marks.map((m) => m.markType),
+        unorderedEquals([
+          CycleMarkTypes.ignoreTemperature,
+          CycleMarkTypes.cycleStart,
+        ]),
+        reason: 'confirming places the cycleStart mark; the pre-existing '
+            'ignoreTemperature mark stays untouched (auto-set only, never '
             'auto-removed)');
+    final start =
+        marks.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
+    expect(start.author, 'user',
+        reason: 'the confirmed placement is user-authored even on a '
+            'marked day');
   });
 }

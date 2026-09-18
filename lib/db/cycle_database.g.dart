@@ -327,8 +327,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// sp(1) late to bed, a(2) frequent night awakening, alk(4) alcohol,
   /// kr(8) illness. 0 = no disturbance. Reise (travel) is deliberately NOT
   /// representable. This is RAW data for the interrupted-temperature
-  /// rendering; the analysis exclusion is the separate
-  /// excludedFromAnalysis MARK (user_marks), never this mask.
+  /// rendering; the temperature evaluation uses the separate
+  /// ignoreTemperature MARK (user_marks), never this mask.
   /// customConstraint replaces drift's own constraints, so NOT NULL, the
   /// default 0 and the 0..15 range check are written out explicitly inside
   /// the constraint string (a bare CHECK would silently drop both). The

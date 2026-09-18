@@ -38,7 +38,7 @@ import 'package:cycle_app/domain/models.dart';
 ///
 /// NOTE on exclusion: raw disturbance flags (tempDisturbances) do NOT
 /// exclude a day from the analysis any more — the exclusion is the
-/// excludedFromAnalysis MARK (see [excludedDay]), supplied alongside the
+/// ignoreTemperature MARK (see [excludedDay]), supplied alongside the
 /// entries in the marks list.
 DailyEntry d(
   int year,
@@ -78,7 +78,7 @@ CycleMark start(int year, int month, int day) => CycleMark(
 /// signal the evaluation consumes. Raw disturbance flags never exclude.
 CycleMark excludedDay(int year, int month, int day) => CycleMark(
       date: DateTime(year, month, day),
-      type: CycleMarkTypes.excludedFromAnalysis,
+      type: CycleMarkTypes.ignoreTemperature,
     );
 
 /// The evaluation of the cycle group whose first tracked day is [start].
@@ -1145,7 +1145,7 @@ void main() {
       'rule R8 — excluded days in the candidate sequence (excluded like '
       'missing)', () {
     test(
-        'an excludedFromAnalysis MARK without any raw flags excludes: ONE '
+        'an ignoreTemperature MARK without any raw flags excludes: ONE '
         'marked day between candidates consumes the tolerated gap; its '
         'above-baseline value is never a candidate', () {
       final entries = [
@@ -1655,7 +1655,7 @@ void main() {
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 6, t: 36.4), // rise−6 → #6 — highest inside the window
         d(2026, 3, 7, t: 37.5), // rise−5: the day EXISTS and is measured,
-        // but the excludedFromAnalysis MARK makes its 37.5 get no number
+        // but the ignoreTemperature MARK makes its 37.5 get no number
         // and raise no baseline (the entry carries no raw flags)
         d(2026, 3, 8, t: 36.3), // rise−4 → #4
         d(2026, 3, 9, t: 36.1), // rise−3 → #3
@@ -1739,7 +1739,7 @@ void main() {
     });
 
     test(
-        'false when the marked day is excluded (excludedFromAnalysis mark, '
+        'false when the marked day is excluded (ignoreTemperature mark, '
         'no raw flags needed)', () {
       final entries = [
         ...baseEntries.take(7),

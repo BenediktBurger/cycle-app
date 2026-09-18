@@ -13,7 +13,7 @@
 //                    "bleeding": 3, (numeric level; see the version note
 //                    below) "temp_disturbances": 5, (raw disturbance mask
 //                    0..15, v5; the analysis exclusion is NOT entry raw
-//                    data — it rides as an excludedFromAnalysis mark row)
+//                    data — it rides as an ignoreTemperature mark row)
 //                    "mucus_sign": "s", "mucus_quality": "ew", (both
 //                    nullable; quality only ever together with S)
 //                    "pain_breast": false, "pain_mittelschmerz": false,
@@ -23,7 +23,7 @@
 //                    "sex_timings": 2,
 //                    ..., "notes": null}, ...],
 //     "marks":    [{"entry_date": "2026-03-12",
-//                   "mark_type": "excludedFromAnalysis",
+//                   "mark_type": "ignoreTemperature",
 //                   "author": "user"}, ...]
 //   }
 //
@@ -44,11 +44,11 @@
 // NER scheme: entries drop the exclude_* booleans and the mood/desire
 // flags and gain `temp_disturbances` (the raw disturbance mask 0..15,
 // sp/a/alk/kr; see models.dart); the analysis exclusion rides as the
-// excludedFromAnalysis MARK row. Old-document translation (inside the
+// ignoreTemperature MARK row. Old-document translation (inside the
 // import transaction, lib/db/export_adapter.dart): `exclude_illness` →
 // the kr bit (8), `exclude_alcohol` → the alk bit (4), `exclude_travel` /
 // `exclude_other` dropped as raw data (no equivalent flag exists) — and
-// ANY of the four true derives an excludedFromAnalysis mark (author
+// ANY of the four true derives an ignoreTemperature mark (author
 // 'import') for that day, preserving the old interrupted-day analysis
 // semantics; `mood` / `desire` are dropped (the row stays valid, notes
 // untouched).
@@ -112,7 +112,7 @@ import 'models.dart';
 /// author only); the document has no `profiles` list at all. Old
 /// (v1–4) documents keep importing: their `profile_id`/`profiles` keys are
 /// accepted and ignored, their exclude_* keys translate into the mask bits
-/// plus derived excludedFromAnalysis marks (see the header comment and
+/// plus derived ignoreTemperature marks (see the header comment and
 /// lib/db/export_adapter.dart).
 const int exportSchemaVersion = 5;
 
@@ -231,7 +231,7 @@ List<Map<String, Object?>> _listOfMaps(Object? raw, String field) {
 }
 
 /// Counted import plan. The db adapter executes exactly these writes
-/// (plus the derived excludedFromAnalysis marks that OLD documents'
+/// (plus the derived ignoreTemperature marks that OLD documents'
 /// exclude_* keys translate into — see lib/db/export_adapter.dart; the
 /// planner counts the document's own rows only).
 final class ImportSummary {

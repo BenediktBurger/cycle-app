@@ -21,7 +21,7 @@
 // shared suggestion predicate (isSuggestedCycleStart,
 // lib/domain/cycle_grouping.dart) — bleeding only SUGGESTS a cycle start;
 // the derived mark is what the mark-driven cycle grouping consumes (see
-// lib/domain/marks.dart) — and excludedFromAnalysis marks from
+// lib/domain/marks.dart) — and ignoreTemperature marks from
 // temperature.exclude (drip's "not usable for fertility detection": the
 // roadmap's "drip excluded temp → a mark, not an observation"). Cycle-app's
 // own export already carries its marks verbatim, so re-importing an app
@@ -169,7 +169,7 @@ final class DripCsvImport {
   /// — profile-free: the document root is exactly schema_version /
   /// exported_at / entries / marks — with the mapped entries and the
   /// DERIVED marks (author 'import'): cycleStart marks for the suggested
-  /// cycle-start days and excludedFromAnalysis marks for the
+  /// cycle-start days and ignoreTemperature marks for the
   /// temperature.exclude days (drip has no mark analogue of its own, so
   /// foreign imports get their cycle boundaries and analysis exclusions
   /// derived from the imported data).
@@ -233,7 +233,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
     final bbtC = _parseBbtC(cell(dataRow, 'temperature.value'));
     // drip's "not usable for fertility detection" (temperature.exclude)
-    // maps to the derived excludedFromAnalysis MARK (author 'import') —
+    // maps to the derived ignoreTemperature MARK (author 'import') —
     // NOT to an entry flag and NOT to mask bits (drip has no reason
     // column). The day still counts as a data row (the exclusion is
     // meaningful data, and the mark needs its day), but the entry itself
@@ -416,10 +416,11 @@ DripCsvImport dripCsvToExportJson(String raw) {
 ///   [isSuggestedCycleStart] — no derivation-local bleeding rule: a
 ///   menstruation-level day (light or heavier) that does not continue the
 ///   previous calendar day's menstruation-level flow suggests a cycle
-///   start. The excluded-state comes from [excludedDays] (the
-///   temperature.exclude days): an excluded day never suggests, and an
-///   excluded previous day does not suppress the next day's suggestion.
-/// - `excludedFromAnalysis`: one per temperature.exclude day — the roadmap's
+///   start. The suppression is keyed PURELY to bleeding continuity
+///   (temperature-only semantics): [excludedDays] (the temperature.exclude
+///   days) does NOT feed the predicate — an ignored bleeding day derives
+///   its own cycleStart mark like any other menstruation-level day.
+/// - `ignoreTemperature`: one per temperature.exclude day — the roadmap's
 ///   "drip excluded temp → a mark, not an observation". Drip has no reason
 ///   column, so no mask bits come from drip.
 ///
@@ -454,16 +455,16 @@ List<Map<String, Object?>> _deriveMarks(
     if (excludedDays.contains(iso)) {
       marks.add(<String, Object?>{
         'entry_date': iso,
-        'mark_type': CycleMarkTypes.excludedFromAnalysis,
+        'mark_type': CycleMarkTypes.ignoreTemperature,
         'author': 'import',
       });
     }
+    // The ignored-day set feeds ONLY the ignoreTemperature mark
+    // derivation above — the suggestion predicate reads bleeding
+    // continuity alone (temperature-only semantics, owner decision
+    // 2026-09-18).
     final previous = i == 0 ? null : replayed[i - 1];
-    if (isSuggestedCycleStart(entry, previous,
-        entryExcluded: excludedDays.contains(iso),
-        previousExcluded: previous == null
-            ? false
-            : excludedDays.contains(formatIsoDay(previous.date)))) {
+    if (isSuggestedCycleStart(entry, previous)) {
       marks.add(<String, Object?>{
         'entry_date': iso,
         'mark_type': CycleMarkTypes.cycleStart,

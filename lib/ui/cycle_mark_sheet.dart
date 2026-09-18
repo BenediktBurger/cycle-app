@@ -173,9 +173,9 @@ final class CycleDaySheet extends ConsumerWidget {
 
       // The marked day's entry (from the evaluation's own cycle days)
       // decides the dialog body: the value-vs-baseline arithmetic, or the
-      // no-usable-temperature fact. The excluded-state comes from the
-      // excludedFromAnalysis MARK (the analysis exclusion is the mark —
-      // raw flags never make a day unusable here).
+      // no-usable-temperature fact. The ignored-state comes from the
+      // ignoreTemperature MARK (the temperature evaluation ignores the
+      // day — raw flags never make a day unusable here).
       DailyEntry? markedEntry;
       for (final entry in evaluation.cycle.days) {
         if (DateOnly.sameDay(entry.date, day)) {
@@ -184,7 +184,7 @@ final class CycleDaySheet extends ConsumerWidget {
         }
       }
       final dayExcluded = marks.any((m) =>
-          m.type == CycleMarkTypes.excludedFromAnalysis &&
+          m.type == CycleMarkTypes.ignoreTemperature &&
           DateOnly.sameDay(m.date, day));
       String body;
       if (markedEntry == null || markedEntry.bbtC == null || dayExcluded) {
@@ -393,7 +393,7 @@ final class CycleDaySheet extends ConsumerWidget {
         ref.watch(dailyEntriesProvider).valueOrNull ?? const <DailyEntry>[];
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
-    final hasExcluded = _hasMark(marks, CycleMarkTypes.excludedFromAnalysis);
+    final hasExcluded = _hasMark(marks, CycleMarkTypes.ignoreTemperature);
     final hasFirstHigher =
         _hasMark(marks, CycleMarkTypes.firstHigherMeasurement);
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
@@ -483,21 +483,22 @@ final class CycleDaySheet extends ConsumerWidget {
                   type: CycleMarkTypes.mucusPeakDay, remove: hasPeak),
             ),
             _SheetAction(
-              // The analysis-exclusion toggle ("vom Auswerten
-              // ausschließen"): a marked day is interrupted for the
-              // evaluation — a gap day, never a cycle start — regardless of
-              // the raw disturbance flags (which are the interrupted
-              // TEMPERATURE rendering, not analysis input). It is the same
-              // mark the diary save auto-SETs when a disturbance flag is
-              // selected (auto-set only, never auto-removed); this row is
-              // the manual correction affordance.
+              // The temperature-ignore toggle ("Temperatur ignorieren"):
+              // a marked day's temperature is excluded from the evaluation
+              // arithmetic (the day behaves like an unmeasured one — see
+              // lib/domain/evaluation.dart). The mark does NOT affect
+              // cycle-start suggestions (bleeding continuity only) and
+              // does NOT drive the interrupted-temperature rendering (the
+              // raw disturbance mask does). It is the same mark the diary
+              // save auto-SETs when a disturbance flag is selected
+              // (auto-set only, never auto-removed); this row is the
+              // manual correction affordance.
               icon: Icons.visibility_off_outlined,
               label: hasExcluded
-                  ? l10n.cycleSheetRemoveExcludeFromAnalysis
-                  : l10n.cycleSheetSetExcludeFromAnalysis,
+                  ? l10n.cycleSheetRemoveIgnoreTemperature
+                  : l10n.cycleSheetSetIgnoreTemperature,
               onTap: () => _writeMark(ref,
-                  type: CycleMarkTypes.excludedFromAnalysis,
-                  remove: hasExcluded),
+                  type: CycleMarkTypes.ignoreTemperature, remove: hasExcluded),
             ),
             _SheetAction(
               icon: Icons.adjust,

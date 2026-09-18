@@ -274,12 +274,12 @@ Future<void> main() async {
   check(mark.id == again.id, 'addMark is idempotent per (date, type)');
   check(
     await db.marksDao
-        .toggleMark(DateTime(2026, 4, 9), MarkTypes.excludedFromAnalysis),
+        .toggleMark(DateTime(2026, 4, 9), MarkTypes.ignoreTemperature),
     'toggleMark adds',
   );
   check(
     !await db.marksDao
-        .toggleMark(DateTime(2026, 4, 9), MarkTypes.excludedFromAnalysis),
+        .toggleMark(DateTime(2026, 4, 9), MarkTypes.ignoreTemperature),
     'toggleMark removes',
   );
 
@@ -337,21 +337,19 @@ Future<void> main() async {
     'a mark in an untracked gap opens at the next tracked day',
   );
 
-  // A mark on an excluded day binds regardless (no exclusion interplay).
-  // RAW disturbance flags do NOT suppress a suggestion — only the mark does.
+  // Suggestion suppression is keyed PURELY to bleeding continuity
+  // (temperature-only semantics): raw disturbance flags and the
+  // ignoreTemperature mark are both invisible to the predicate.
   check(
     isSuggestedCycleStart(
       d(2026, 4, 1, bleeding: Bleeding.medium, tempDisturbances: 15),
       null,
-      entryExcluded: false,
-      previousExcluded: false,
     ),
-    'raw disturbance flags alone do NOT exclude a suggested cycle start',
+    'raw disturbance flags never reach the suggestion predicate',
   );
   check(
-    !isSuggestedCycleStart(d(2026, 4, 1, bleeding: Bleeding.medium), null,
-        entryExcluded: true, previousExcluded: false),
-    'an excludedFromAnalysis-marked day never suggests a cycle start',
+    isSuggestedCycleStart(d(2026, 4, 1, bleeding: Bleeding.medium), null),
+    'an ignoreTemperature-marked day still suggests a cycle start',
   );
 
   // --- statistics ---------------------------------------------------------

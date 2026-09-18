@@ -148,30 +148,27 @@ List<Cycle> groupIntoCycles(
 }
 
 /// The bleeding SUGGESTION predicate (the demoted former boundary rule):
-/// a non-excluded day with menstruation-level bleeding (`level >= 2`)
-/// suggests starting a new cycle unless the immediately preceding calendar
-/// day is also a non-excluded menstruation-level day (i.e. we are in the
-/// middle of one continuous menstruation). This gates prompts and derived
-/// marks — it NEVER creates a cycle boundary by itself.
+/// a day with menstruation-level bleeding (`level >= 2`) suggests starting
+/// a new cycle unless the immediately preceding CALENDAR day is also a
+/// menstruation-level day (i.e. we are in the middle of one continuous
+/// menstruation). This gates prompts and derived marks — it NEVER creates
+/// a cycle boundary by itself.
 ///
-/// The excluded-state comes as EXPLICIT parameters, decided by the CALLER
-/// from the excludedFromAnalysis marks (see lib/domain/evaluation.dart for
-/// how the excluded-day set is built from marks): entries stay raw-data-only
-/// — raw disturbance flags ([DailyEntry.tempDisturbances]) do NOT exclude a
-/// day from the suggestion, a mark does.
+/// Temperature-only semantics (owner decision 2026-09-18): the suppression
+/// is keyed PURELY on bleeding continuity. The ignoreTemperature mark does
+/// NOT affect suggestions (a marked bleeding day suggests, a marked
+/// previous bleeding day suppresses like any other bleeding day), and the
+/// raw disturbance flags ([DailyEntry.tempDisturbances]) are equally
+/// invisible — the predicate reads bleeding levels only.
 bool isSuggestedCycleStart(
   DailyEntry entry,
-  DailyEntry? previous, {
-  required bool entryExcluded,
-  required bool previousExcluded,
-}) {
+  DailyEntry? previous,
+) {
   if (entry.bleeding.level < 2) return false;
-  if (entryExcluded) return false;
 
   if (previous != null &&
       DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date)) &&
-      previous.bleeding.level >= 2 &&
-      !previousExcluded) {
+      previous.bleeding.level >= 2) {
     return false;
   }
   return true;

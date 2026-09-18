@@ -2,7 +2,7 @@
 // rendering: the line connects two temperatures ONLY when their calendar
 // days are adjacent; interrupted temperatures (a NON-ZERO raw disturbance
 // mask on the entry — the rendering is keyed to the raw mask, NOT to the
-// excludedFromAnalysis mark) count as measured days, keep the line
+// ignoreTemperature mark) count as measured days, keep the line
 // continuous, but render lighter (dot AND touching segments). Same harness
 // pattern as test/cycle_chart_weekend_test.dart.
 import 'package:cycle_app/domain/models.dart';

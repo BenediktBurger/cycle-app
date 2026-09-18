@@ -39,8 +39,8 @@ class CycleEntries extends Table {
   /// sp(1) late to bed, a(2) frequent night awakening, alk(4) alcohol,
   /// kr(8) illness. 0 = no disturbance. Reise (travel) is deliberately NOT
   /// representable. This is RAW data for the interrupted-temperature
-  /// rendering; the analysis exclusion is the separate
-  /// excludedFromAnalysis MARK (user_marks), never this mask.
+  /// rendering; the temperature evaluation uses the separate
+  /// ignoreTemperature MARK (user_marks), never this mask.
   /// customConstraint replaces drift's own constraints, so NOT NULL, the
   /// default 0 and the 0..15 range check are written out explicitly inside
   /// the constraint string (a bare CHECK would silently drop both). The
@@ -183,12 +183,16 @@ abstract final class MarkTypes {
   static const firstHigherMeasurement = 'firstHigherMeasurement';
   static const mucusPeakDay = 'mucusPeakDay';
 
-  /// The analysis-exclusion mark ("vom Auswerten ausschließen"): a marked
-  /// day is interrupted for evaluation — a gap day, never a cycle start —
-  /// regardless of the raw disturbance flags (which are rendering input
-  /// only). Auto-SET (idempotently) by the diary save when any disturbance
-  /// flag is selected; never auto-REMOVED when the flags clear.
-  static const excludedFromAnalysis = 'excludedFromAnalysis';
+  /// The temperature-ignore mark ("Temperatur ignorieren"): a marked day's
+  /// temperature is EXCLUDED FROM THE TEMPERATURE EVALUATION — the day
+  /// behaves like an unmeasured day in the evaluation arithmetic (no low
+  /// number, no baseline contribution, a gap in the candidate sequence),
+  /// see lib/domain/evaluation.dart. The mark never touches cycle-start
+  /// suggestions (the suggestion is keyed purely to bleeding continuity —
+  /// see lib/domain/cycle_grouping.dart). Auto-SET (idempotently) by the
+  /// diary save when any disturbance flag is selected; never auto-REMOVED
+  /// when the flags clear.
+  static const ignoreTemperature = 'ignoreTemperature';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
   /// MORNING: the SUZ bar renders at the day column's START (x − 0.5).

@@ -622,7 +622,7 @@ void main() {
               'entry with the NER scheme: the entry gains the '
               '`temp_disturbances` raw mask, drops the exclude_* booleans '
               'and the mood/desire flags, and the analysis exclusion rides '
-              'as the excludedFromAnalysis mark');
+              'as the ignoreTemperature mark');
     });
 
     test('documents with numeric bleeding build, parse and round-trip', () {
@@ -788,7 +788,7 @@ void main() {
         marks: const <Map<String, Object?>>[
           {
             'entry_date': '2026-03-02',
-            'mark_type': 'excludedFromAnalysis',
+            'mark_type': 'ignoreTemperature',
             'author': 'user',
           },
         ],
@@ -814,7 +814,7 @@ void main() {
       final entry = tryDailyEntryFromExport(doc.entries.single)!;
       expect(entry.tempDisturbances, 15);
       expect(entry.isInterrupted, isTrue);
-      expect(doc.marks.single['mark_type'], 'excludedFromAnalysis');
+      expect(doc.marks.single['mark_type'], 'ignoreTemperature');
       expect(doc.marks.single['author'], 'user');
       // THE profile keys are gone everywhere: entries/marks carry no
       // profile_id and the document has no profiles list at all.
@@ -870,7 +870,7 @@ void main() {
       // The old exclusion reasons lose their reason identity (Reise and
       // 'other' have no disturbance flag), but illness/alcohol keep it via
       // the raw mask — and EVERY previously-excluded day keeps its analysis
-      // semantics through the derived excludedFromAnalysis mark (db-level
+      // semantics through the derived ignoreTemperature mark (db-level
       // adapter concern, tested against the database).
       final entry = tryDailyEntryFromExport(const <String, Object?>{
         'date': '2026-03-01',
@@ -966,9 +966,9 @@ void main() {
     test('merge keys are day-based: entries ISO day, marks (day, mark_type)',
         () {
       expect(importEntryKey('2026-03-05'), '2026-03-05');
-      expect(importMarkKey('2026-03-05', 'excludedFromAnalysis'),
-          '2026-03-05|excludedFromAnalysis');
-      expect(importMarkKey('2026-03-05', 'excludedFromAnalysis'),
+      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
+          '2026-03-05|ignoreTemperature');
+      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
           isNot(importMarkKey('2026-03-05', 'mucusPeakDay')));
     });
   });

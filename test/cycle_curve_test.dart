@@ -3,7 +3,7 @@
 // temperatures — the rule set the temperature chart draws by. The
 // interruption flag comes from the RAW disturbance mask on the entry
 // (isInterrupted): the lighter rendering is keyed to the mask, never to the
-// excludedFromAnalysis mark (a manually-excluded day without flags renders
+// ignoreTemperature mark (a manually-excluded day without flags renders
 // normally — the flags are the representable raw data).
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/ui/cycle_curve.dart';

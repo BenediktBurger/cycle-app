@@ -73,8 +73,8 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendExcludedFromAnalysis,
-              // The analysis-exclusion mark draws NO chart glyph (the
+              label: l10n.cycleLegendIgnoreTemperature,
+              // The temperature-ignore mark draws NO chart glyph (the
               // interrupted-lookup is the raw Temperature mask, and the
               // mark is deliberately not doubled onto the curve): the
               // glossary entry therefore carries the day-sheet TOGGLE
@@ -227,9 +227,9 @@ final class _HelpEntry extends StatelessWidget {
       // Sample measurement-time glyph: the clock icon (help sheet only —
       // the chart's day cells show the recorded time as text instead).
       _HelpEntryShape.clock => Icon(Icons.schedule, size: 12, color: color),
-      // The analysis-exclusion entry: no chart glyph exists (see the entry
-      // note), so the sample is the day sheet's own toggle icon — the
-      // affordance IS the explanation.
+      // The temperature-ignore entry: no chart glyph exists (see the
+      // entry note), so the sample is the day sheet's own toggle icon —
+      // the affordance IS the explanation.
       _HelpEntryShape.eyeOff =>
         Icon(Icons.visibility_off_outlined, size: 12, color: color),
       // Sample sex glyph: the X, exactly how a recorded sex day renders in
