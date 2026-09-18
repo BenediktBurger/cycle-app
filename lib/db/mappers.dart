@@ -24,6 +24,7 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     date: e.date,
     profileId: e.profileId,
     bbtC: e.bbtC,
+    measuredAtMinutes: e.measuredAtMinutes,
     bleeding: e.bleeding,
     excludeIllness: e.excludeIllness,
     excludeAlcohol: e.excludeAlcohol,
@@ -53,13 +54,15 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     profileId: Value(d.profileId),
     date: Value(DateOnly.normalize(d.date)),
     bbtC: Value(d.bbtC),
+    measuredAtMinutes: Value(d.measuredAtMinutes),
     bleeding: Value(d.bleeding),
     excludeIllness: Value(d.excludeIllness),
     excludeAlcohol: Value(d.excludeAlcohol),
     excludeTravel: Value(d.excludeTravel),
     excludeOther: Value(d.excludeOther),
-    // Stable enum-name TEXT tokens (like bleeding), written post-sanitize so
-    // the pair can never violate the SQL CHECK.
+    // Stable enum-name TEXT tokens (bleeding itself is the numeric level
+    // column), written post-sanitize so the pair can never violate the SQL
+    // CHECK.
     mucusSign: Value(mucus.sign?.name),
     mucusQuality: Value(mucus.quality?.name),
     cervix: Value(d.cervix),

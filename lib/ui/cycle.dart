@@ -252,23 +252,36 @@ final class _SymbolCell extends StatelessWidget {
     if (entry == null) {
       return const SizedBox(height: 26);
     }
+    // Bleeding marker (top): none draws nothing; spotting is the hollow
+    // ring; light..heavy fill the circle with the error color at the same
+    // graded opacity as the diary day tiles (light 0.6 / medium 0.8 /
+    // heavy 1.0), so the heaviness reads the same in both views.
+    final bleedingColor = Theme.of(context).colorScheme.error;
+    final bleeding = entry!.bleeding;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Bleeding marker (top): filled = period, hollow = spotting.
         Container(
           width: 10,
           height: 10,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: entry!.bleeding == Bleeding.period
-                ? Theme.of(context).colorScheme.error
+            color: bleeding.level >= 2
+                ? bleedingColor.withValues(
+                    alpha: switch (bleeding) {
+                      // none/spotting are guarded by level >= 2 above.
+                      Bleeding.none || Bleeding.spotting => 1.0,
+                      Bleeding.light => 0.6,
+                      Bleeding.medium => 0.8,
+                      Bleeding.heavy => 1.0,
+                    },
+                  )
                 : Colors.transparent,
             border: Border.all(
               width: 1.5,
-              color: entry!.bleeding == Bleeding.none
+              color: bleeding == Bleeding.none
                   ? Colors.transparent
-                  : Theme.of(context).colorScheme.error,
+                  : bleedingColor,
             ),
           ),
         ),

@@ -17,8 +17,8 @@ DailyEntry d(
   return DailyEntry(
     date: DateTime(year, month, day),
     bleeding: bleeding,
-    excludeIllness: interrupted && bleeding == Bleeding.period,
-    excludeTravel: interrupted && bleeding != Bleeding.period,
+    excludeIllness: interrupted && bleeding == Bleeding.medium,
+    excludeTravel: interrupted && bleeding != Bleeding.medium,
   );
 }
 
@@ -27,15 +27,15 @@ void main() {
     test('splits three menstrual cycles at their period onsets', () {
       final entries = <DailyEntry>[
         // cycle 1: onset Mar 2, bleeding 3 days, then a few tracked days
-        d(2026, 3, 2, bleeding: Bleeding.period),
-        d(2026, 3, 3, bleeding: Bleeding.period),
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, bleeding: Bleeding.medium),
         d(2026, 3, 4),
         // cycle 2: onset Mar 30 (28-day cycle); tracked only partially,
         // plus one spotting-only day mid-cycle that must NOT be a boundary
-        d(2026, 3, 30, bleeding: Bleeding.period),
+        d(2026, 3, 30, bleeding: Bleeding.medium),
         d(2026, 4, 10, bleeding: Bleeding.spotting),
         // cycle 3: onset Apr 27
-        d(2026, 4, 27, bleeding: Bleeding.period),
+        d(2026, 4, 27, bleeding: Bleeding.medium),
         d(2026, 4, 28),
       ];
 
@@ -55,7 +55,7 @@ void main() {
       );
       expect(
         cycles[1].days.map((e) => (e.bleeding, e.date.day)).toList(),
-        const [(Bleeding.period, 30), (Bleeding.spotting, 10)],
+        const [(Bleeding.medium, 30), (Bleeding.spotting, 10)],
       );
       expect(cycles[2].days, hasLength(2));
 
@@ -76,7 +76,7 @@ void main() {
       final entries = [
         d(2026, 2, 20), // mid-cycle data, no known period yet
         d(2026, 2, 21),
-        d(2026, 3, 2, bleeding: Bleeding.period), // first known onset
+        d(2026, 3, 2, bleeding: Bleeding.medium), // first known onset
         d(2026, 3, 3),
       ];
       final cycles = groupIntoCycles(entries);
@@ -89,12 +89,12 @@ void main() {
 
     test('interrupted (excluded) bleeding days do NOT start cycles', () {
       final entries = [
-        d(2026, 4, 1, bleeding: Bleeding.period), // onset of cycle
+        d(2026, 4, 1, bleeding: Bleeding.medium), // onset of cycle
         d(2026, 4, 2),
         // A period day flagged as interrupted (illness) is not a boundary —
         // the next NORMAL period day becomes the true onset:
-        d(2026, 4, 29, bleeding: Bleeding.period, interrupted: true),
-        d(2026, 4, 30, bleeding: Bleeding.period),
+        d(2026, 4, 29, bleeding: Bleeding.medium, interrupted: true),
+        d(2026, 4, 30, bleeding: Bleeding.medium),
         d(2026, 5, 1),
       ];
       final cycles = groupIntoCycles(entries);
@@ -111,9 +111,9 @@ void main() {
 
     test('consecutive period days are ONE menstruation, not many cycles', () {
       final entries = [
-        d(2026, 6, 1, bleeding: Bleeding.period),
-        d(2026, 6, 2, bleeding: Bleeding.period),
-        d(2026, 6, 3, bleeding: Bleeding.period),
+        d(2026, 6, 1, bleeding: Bleeding.medium),
+        d(2026, 6, 2, bleeding: Bleeding.medium),
+        d(2026, 6, 3, bleeding: Bleeding.medium),
       ];
       final cycles = groupIntoCycles(entries);
       expect(cycles, hasLength(1));
@@ -129,12 +129,53 @@ void main() {
 
     test('unsorted input is sorted internally', () {
       final entries = [
-        d(2026, 4, 27, bleeding: Bleeding.period),
-        d(2026, 3, 2, bleeding: Bleeding.period),
+        d(2026, 4, 27, bleeding: Bleeding.medium),
+        d(2026, 3, 2, bleeding: Bleeding.medium),
       ];
       final cycles = groupIntoCycles(entries);
       expect(cycles[0].startDate, DateTime(2026, 3, 2));
       expect(cycles[1].startDate, DateTime(2026, 4, 27));
+    });
+  });
+
+  group('bleeding levels at cycle boundaries', () {
+    test('a light day after a gap starts a new cycle', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium), // onset of the first cycle
+        d(2026, 3, 3),
+        d(2026, 4, 2, bleeding: Bleeding.light), // a month later, light only
+        d(2026, 4, 3),
+      ];
+      final cycles = groupIntoCycles(entries);
+      expect(cycles.map((c) => c.startsAtMenstruation), [true, true]);
+      expect(cycles[1].startDate, DateTime(2026, 4, 2),
+          reason: 'light (level 2) counts as menstruation at a boundary');
+      expect(
+        menstruationOnsetDates(entries),
+        [
+          DateOnly.normalize(DateTime(2026, 3, 2)),
+          DateOnly.normalize(DateTime(2026, 4, 2)),
+        ],
+      );
+    });
+
+    test('a spotting day never starts a cycle, even after a gap', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium), // onset of the first cycle
+        d(2026, 3, 3),
+        d(2026, 4, 2, bleeding: Bleeding.spotting), // a month later: mid-cycle
+        d(2026, 4, 15), // gap, then tracked non-bleeding days
+      ];
+      final cycles = groupIntoCycles(entries);
+      // The spotting day extends the current cycle — a gap alone never
+      // splits a cycle, and spotting (level 1) must not become a boundary.
+      expect(cycles, hasLength(1));
+      expect(cycles.single.startsAtMenstruation, isTrue);
+      expect(cycles.single.days.map((e) => e.date.day), [2, 3, 2, 15]);
+      expect(
+        menstruationOnsetDates(entries),
+        [DateOnly.normalize(DateTime(2026, 3, 2))],
+      );
     });
   });
 }

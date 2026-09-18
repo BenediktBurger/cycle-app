@@ -65,7 +65,8 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'profile_id': e.profileId,
           'date': formatIsoDay(e.date),
           'bbt_c': e.bbtC,
-          'bleeding': e.bleeding.name,
+          'measured_at_minutes': e.measuredAtMinutes,
+          'bleeding': e.bleeding.level,
           'exclude_illness': e.excludeIllness,
           'exclude_alcohol': e.excludeAlcohol,
           'exclude_travel': e.excludeTravel,
@@ -315,11 +316,17 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   final bbt = row['bbt_c'];
   bool flag(Object? key) => row[key] == true;
 
+  // Coercible field: broken or absent time tokens collapse to null (v1
+  // documents omit the field entirely).
+  final measuredAtMinutes =
+      tryParseMeasuredAtMinutes(row['measured_at_minutes']);
+
   try {
     return DailyEntry(
       date: day,
       profileId: profileId,
       bbtC: bbt is num ? bbt.toDouble() : null,
+      measuredAtMinutes: measuredAtMinutes,
       bleeding: bleeding,
       excludeIllness: flag('exclude_illness'),
       excludeAlcohol: flag('exclude_alcohol'),

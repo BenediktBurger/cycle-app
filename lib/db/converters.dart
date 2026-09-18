@@ -10,6 +10,7 @@
 import 'package:drift/drift.dart';
 
 import '../domain/date_only.dart';
+import '../domain/models.dart';
 
 /// Stores a calendar day as INTEGER (days since the Unix epoch).
 class EpochDayConverter extends TypeConverter<DateTime, int> {
@@ -22,4 +23,34 @@ class EpochDayConverter extends TypeConverter<DateTime, int> {
   @override
   int toSql(DateTime value) =>
       DateOnly.normalize(value).difference(DateTime.utc(1970)).inDays;
+}
+
+/// Maps the [Bleeding] domain enum to the stored INTEGER bleeding level: the
+/// number is exactly [Bleeding.level] (0 none … 4 heavy), kept in sync with
+/// that field — never the Dart declaration index. An unknown stored number is
+/// data corruption (e.g. foreign data bypassing the engine): reading throws
+/// so drift surfaces the corrupt row instead of silently mapping it.
+class BleedingLevelConverter extends TypeConverter<Bleeding, int> {
+  const BleedingLevelConverter();
+
+  /// Stored level → enum member, derived from [Bleeding.values] so it can
+  /// never drift from the `level` fields. (`static final`, not `const`:
+  /// a const map literal would have to repeat the level numbers as literals
+  /// and reintroduce exactly the drift this lookup exists to avoid.)
+  static final Map<int, Bleeding> _byLevel = {
+    for (final b in Bleeding.values) b.level: b,
+  };
+
+  @override
+  Bleeding fromSql(int argFromDb) {
+    final b = _byLevel[argFromDb];
+    if (b == null) {
+      throw ArgumentError.value(
+          argFromDb, 'bleeding', 'unknown stored bleeding level');
+    }
+    return b;
+  }
+
+  @override
+  int toSql(Bleeding value) => value.level;
 }

@@ -31,7 +31,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  group('schema & migration (v2)', () {
+  group('schema & migration (v4)', () {
     test('seeds exactly one profile named main', () async {
       final profiles = await db.profilesDao.allProfiles();
       expect(profiles, hasLength(1));
@@ -91,14 +91,68 @@ void main() {
       );
     });
 
-    test('bleeding is stored and read as the drift enum vocabulary', () async {
+    test('bleeding round-trips as each of the five levels', () async {
+      for (final (index, level) in Bleeding.values.indexed) {
+        final day = DateTime(2026, 6).add(Duration(days: index));
+        await db.entriesDao
+            .upsertDaily(DailyEntry(date: day, bleeding: level));
+        final row = await db.entriesDao.entryFor(1, day);
+        expect(row!.bleeding, level,
+            reason: '${level.name} (level ${level.level}) must survive the '
+                'db round trip by its stored number');
+      }
+    });
+
+    test('bleeding is stored as the numeric level, never a string token',
+        () async {
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2026, 6, 15), bleeding: Bleeding.heavy),
+      );
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['bleeding'], Bleeding.heavy.level,
+          reason: 'the decided storage representation is the integer level '
+              '(4), not a vocabulary name');
+    });
+
+    test('bleeding defaults to 0: a row written without it reads none',
+        () async {
+      await db.into(db.cycleEntries).insert(
+            CycleEntriesCompanion.insert(date: DateTime(2026, 6, 20)),
+          );
+      final row = await db.entriesDao.entryFor(1, DateTime(2026, 6, 20));
+      expect(row!.bleeding, Bleeding.none);
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['bleeding'], 0, reason: 'the column default is 0');
+    });
+
+    test('raw SQL INSERT stores an integer level that reads back heavy',
+        () async {
+      // Hand-written SQL (e.g. a future import path) stores the int directly:
+      // 4 must read back as Bleeding.heavy (by LEVEL, not by declaration
+      // index).
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, bleeding) "
-        "VALUES (1, 20000, 'period')",
+        'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+        'VALUES (1, 20000, 4)',
       );
       final row =
           await db.entriesDao.entryFor(1, DateTime(2024, 10, 4)); // day 20000
-      expect(row!.bleeding, Bleeding.period);
+      expect(row!.bleeding, Bleeding.heavy);
+    });
+
+    test('an unknown stored level is surfaced as an error, not silently '
+        'mapped', () async {
+      await db.customStatement(
+        'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+        'VALUES (1, 20001, 7)',
+      );
+      await expectLater(
+        db.entriesDao.entryFor(1, DateTime(2024, 10, 5)), // day 20001
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('cycle entries reference existing profiles (foreign keys on)',
@@ -125,265 +179,124 @@ void main() {
       expect(row.date.month, 3);
       expect(row.date.day, 4);
     });
+
+    test('measured time-of-day is rejected outside the minute range',
+        () async {
+      // Engine-level CHECK, like the mucus constraint: 0–1439 or NULL.
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+          "VALUES (1, 20000, 1440)",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+          "VALUES (1, 20000, -1)",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      // Sanity: an in-range value goes through.
+      await db.customStatement(
+        "INSERT INTO cycle_entries (profile_id, date, measured_at_minutes) "
+        "VALUES (1, 20001, 405)",
+      );
+    });
   });
 
-  group('migration v1 -> v2 (mucus column rebuild)', () {
+  group('destructive upgrade from an older schemaVersion', () {
     late Directory tempDir;
     late File dbFile;
-    CycleDatabase? migrated;
+    CycleDatabase? upgraded;
 
     setUp(() {
-      tempDir = Directory.systemTemp.createTempSync('cycle_migration_fixt_');
+      tempDir = Directory.systemTemp.createTempSync('cycle_upgrade_fixt_');
       addTearDown(() => tempDir.deleteSync(recursive: true));
-      dbFile = File('${tempDir.path}/v1.db');
+      dbFile = File('${tempDir.path}/old.db');
       addTearDown(() async {
-        await migrated?.close();
-        migrated = null;
+        await upgraded?.close();
+        upgraded = null;
       });
-      // The group-level `db` (fresh in-memory instance every test, see the
-      // outer setUp) is unused here — the fixture opens its own file-backed
-      // databases. Closing the unused one first avoids drift's
-      // multiple-databases warning (idempotent: the outer tearDown is a
-      // no-op afterwards).
+      // The outer `db` (fresh in-memory instance, see the outer setUp) is
+      // unused here — this group works on its own file-backed database.
+      // Closing the unused one first avoids drift's multiple-databases
+      // warning (idempotent: the outer tearDown is a no-op afterwards).
       db.close();
     });
 
-    /// Builds the REAL v1-era database on disk: the schema as drift generated
-    /// it before the fertility-sign rework, with seeded rows and the file's
-    /// drift user_version pinned to 1 — so opening it through CycleDatabase
-    /// (schema version 2) runs the table-rebuild onUpgrade.
-    Future<void> buildV1Database() async {
-      createV1Schema(Database raw) {
-        raw.execute(
-          'CREATE TABLE "profiles" ("id" INTEGER PRIMARY KEY AUTOINCREMENT '
-          'NOT NULL, "name" TEXT NOT NULL, "ordinal" INTEGER NOT NULL '
-          'DEFAULT 0);',
-        );
-        raw.execute(
-          'CREATE TABLE "user_marks" ("id" INTEGER PRIMARY KEY AUTOINCREMENT '
-          'NOT NULL, "profile_id" INTEGER NOT NULL DEFAULT 1 '
-          'REFERENCES profiles (id), "entry_date" INTEGER NOT NULL, '
-          '"mark_type" TEXT NOT NULL, "author" TEXT NOT NULL DEFAULT \'user\');',
-        );
-        raw.execute(
-          'CREATE TABLE "cycle_entries" ("id" INTEGER PRIMARY KEY '
-          'AUTOINCREMENT NOT NULL, "profile_id" INTEGER NOT NULL DEFAULT 1 '
-          'REFERENCES profiles (id), "date" INTEGER NOT NULL, '
-          '"bbt_c" REAL NULL, "bleeding" TEXT NOT NULL DEFAULT \'none\', '
-          '"exclude_illness" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_illness" IN (0, 1)), '
-          '"exclude_alcohol" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_alcohol" IN (0, 1)), '
-          '"exclude_travel" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_travel" IN (0, 1)), '
-          '"exclude_other" INTEGER NOT NULL DEFAULT 0 '
-          'CHECK ("exclude_other" IN (0, 1)), '
-          '"mucus_feeling" TEXT NULL, '
-          // Historical constraint, written inline by drift (customConstraint):
-          '"mucus_nfp" INTEGER NULL '
-          'CHECK (mucus_nfp IS NULL OR (mucus_nfp BETWEEN 0 AND 4)), '
-          '"cervix" TEXT NULL, '
-          '"pain" INTEGER NOT NULL DEFAULT 0 CHECK ("pain" IN (0, 1)), '
-          '"mood" INTEGER NOT NULL DEFAULT 0 CHECK ("mood" IN (0, 1)), '
-          '"desire" INTEGER NOT NULL DEFAULT 0 CHECK ("desire" IN (0, 1)), '
-          '"sex" INTEGER NOT NULL DEFAULT 0 CHECK ("sex" IN (0, 1)), '
-          '"notes" TEXT NULL, '
-          '"created_at" INTEGER NOT NULL '
-          'DEFAULT (strftime(\'%s\', CURRENT_TIMESTAMP)), '
-          '"updated_at" INTEGER NOT NULL '
-          'DEFAULT (strftime(\'%s\', CURRENT_TIMESTAMP)));',
-        );
-        raw.execute(
-          'CREATE UNIQUE INDEX cycle_entries_profile_date_unique '
-          'ON cycle_entries (profile_id, date);',
-        );
-        raw.execute(
-          'CREATE UNIQUE INDEX user_marks_profile_date_type_unique '
-          'ON user_marks (profile_id, entry_date, mark_type);',
-        );
-      }
-
+    /// Builds a file whose drift user_version is stale (1) and whose
+    /// cycle_entries has an outdated shape with legacy columns and a junk
+    /// row. Not a faithful reconstruction of any historical release schema —
+    /// the pre-release upgrade policy discards everything anyway; the point
+    /// is that opening through CycleDatabase recreates from the CURRENT
+    /// schema instead of migrating.
+    Future<CycleDatabase> openThroughAppSchema() async {
       final raw = sqlite3.open(dbFile.path);
       try {
-        createV1Schema(raw);
         raw.execute(
-          'INSERT INTO profiles (id, name, ordinal) '
-          "VALUES (1, 'main', 0), (2, 'zweit', 3);",
+          'CREATE TABLE profiles (id INTEGER PRIMARY KEY, '
+          'name TEXT NOT NULL, ordinal INTEGER NOT NULL);',
         );
         raw.execute(
-          'INSERT INTO cycle_entries '
-          '(id, profile_id, date, bbt_c, bleeding, exclude_travel, '
-          'mucus_feeling, mucus_nfp, pain, notes, created_at, updated_at) '
-          'VALUES (101, 2, 20000, 36.55, \'period\', 1, \'milky\', 2, 1, '
-          "'v1 note', 1700000000, 1700000001), "
-          '(102, 1, 20001, NULL, \'none\', 0, NULL, NULL, 0, NULL, '
-          '1700000002, 1700000002);',
+          'CREATE TABLE cycle_entries (id INTEGER PRIMARY KEY, '
+          'profile_id INTEGER NOT NULL, date INTEGER NOT NULL, '
+          'mucus_feeling TEXT NULL);',
         );
-        raw.execute(
-          'INSERT INTO user_marks (id, profile_id, entry_date, mark_type, '
-          "author) VALUES (201, 1, 20001, 'baseline', 'user');",
-        );
+        raw.execute("INSERT INTO profiles VALUES (1, 'stale', 0);");
+        raw.execute("INSERT INTO cycle_entries VALUES (101, 1, 20000, 'x');");
         raw.execute('PRAGMA user_version = 1;');
       } finally {
         raw.close();
       }
-    }
-
-    Future<CycleDatabase> openThroughAppSchema() async {
       final db = CycleDatabase(NativeDatabase(dbFile));
-      migrated = db;
+      upgraded = db;
       // Opening a query forces the executor to open, which runs the
-      // v1 -> v2 upgrade before the first statement completes.
+      // destructive upgrade before the first statement completes.
       await db.profilesDao.allProfiles();
       return db;
     }
 
-    test('rebuild preserves rows and non-mucus fields; new columns enter '
-        'as NULL', () async {
-      await buildV1Database();
+    test('opening a lower-version file recreates the schema, discarding old '
+        'data', () async {
       final db = await openThroughAppSchema();
 
+      final userVersion =
+          await db.customSelect('PRAGMA user_version').getSingle();
+      expect(userVersion.data['user_version'], 4,
+          reason: 'drift records the upgrade run');
+
+      // Stale rows are gone; the main profile is re-seeded as id 1 so the
+      // profile_id defaults reference a valid row from the first open.
       final profiles = await db.profilesDao.allProfiles();
-      expect(profiles.map((p) => p.name), ['main', 'zweit']);
-      expect(profiles.singleWhere((p) => p.id == 2).ordinal, 3);
+      expect(profiles, hasLength(1));
+      expect(profiles.single.id, 1);
+      expect(profiles.single.name, 'main');
 
-      final entries = await db.entriesDao.allEntriesForAllProfiles();
-      expect(entries, hasLength(2), reason: 'both v1 rows survive');
-
-      final oldDay = entries.singleWhere((e) => e.id == 101);
-      expect(oldDay.profileId, 2);
-      expect(oldDay.date.day, 4, reason: 'day 20000 = 2024-10-04');
-      expect(oldDay.bbtC, 36.55);
-      expect(oldDay.bleeding, Bleeding.period);
-      expect(oldDay.excludeTravel, isTrue);
-      expect(oldDay.pain, isTrue);
-      expect(oldDay.notes, 'v1 note');
-      expect(oldDay.mucusSign, isNull,
-          reason: 'v1 mucus values are dropped without data migration');
-      expect(oldDay.mucusQuality, isNull);
-
-      final emptyDay = entries.singleWhere((e) => e.id == 102);
-      expect(emptyDay.bleeding, Bleeding.none);
-      expect(emptyDay.mucusSign, isNull);
-
-      final marks = await db.marksDao.allMarksForAllProfiles();
-      expect(marks, hasLength(1));
-      expect(marks.single.id, 201);
-    });
-
-    test('schema is physically rebuilt: new columns + CHECKs present, old '
-        'columns gone', () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      final userVersion = await db.customSelect('PRAGMA user_version')
-          .getSingle();
-      expect(userVersion.data['user_version'], 2,
-          reason: 'drift records the run upgrade');
-
+      // The rebuilt table has the CURRENT shape: new columns with their
+      // engine-level CHECKs, legacy columns gone.
       final ddl = await db
           .customSelect(
               "SELECT sql FROM sqlite_master WHERE type = 'table' AND "
               "name = 'cycle_entries'")
           .getSingle();
       final sql = ddl.data['sql']! as String;
-      expect(sql, contains('mucus_sign'), reason: 'new column exists');
-      expect(sql, contains('mucus_quality'));
-      expect(sql, isNot(contains('mucus_feeling')),
-          reason: 'retired columns are removed from the DDL');
-      expect(sql, isNot(contains('mucus_nfp')));
-      expect(sql, contains("mucus_sign IS NULL OR mucus_sign IN"),
-          reason: 'the engine-level vocabulary CHECK is present post-migration');
+      expect(sql, contains('mucus_sign IS NULL OR mucus_sign IN'));
+      expect(sql, isNot(contains('mucus_feeling')));
+      expect(sql, contains('measured_at_minutes'),
+          reason: 'the shred-and-recreate upgrade yields the current schema, '
+              'including the newest column');
 
-      // The unique index was lost with the old table and must exist again:
-      final indexCount = await db.customSelect(
-              "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = "
-              "'index' AND name = 'cycle_entries_profile_date_unique'")
-          .getSingle();
-      expect(indexCount.data['count'], 1);
-    });
-
-    test('upsert and the recreated unique index work on the migrated rows',
-        () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      // EntriesDao (stream/upsert flows) works on the rebuilt table.
-      await db.entriesDao.upsertDaily(
-        DailyEntry(
-          date: DateTime(2026, 6, 15),
-          mucusSign: MucusSign.s,
-          mucusQuality: MucusQuality.ew,
-        ),
-      );
-      final row = (await db.entriesDao.allEntriesForAllProfiles())
-          .singleWhere((e) => e.date.month == 6);
-      // CycleEntry exposes the raw TEXT tokens (enum mapping happens in the
-      // mapper layer, tested above).
-      expect(row.mucusSign, 's');
-      expect(row.mucusQuality, 'ew');
-
-      // A duplicate (profile, date) insert still hits the unique index.
-      await expectLater(
-        db.into(db.cycleEntries).insert(
-              CycleEntriesCompanion.insert(date: DateTime(2026, 6, 15)),
-            ),
-        throwsA(isA<Exception>()),
-      );
-    });
-
-    test('foreign keys stay enabled across the migration and a fresh reopen',
-        () async {
-      await buildV1Database();
-      Future<Object?> foreignKeyState(CycleDatabase d) async => (await d
-              .customSelect('PRAGMA foreign_keys')
-              .getSingle())
-          .data['foreign_keys'];
-
-      final db = await openThroughAppSchema();
-      expect(await foreignKeyState(db), 1);
-
-      // The app schema's FK is intact: an unknown profile is rejected.
-      await expectLater(
-        db.into(db.cycleEntries).insert(
-              CycleEntriesCompanion.insert(
-                date: DateTime(2026, 7, 1),
-                profileId: const Value(99),
-              ),
-            ),
-        throwsA(isA<Exception>()),
-      );
-
-      // Reopen the settled v2 file with a fresh connection: the pragma is
-      // re-enabled by the app's beforeOpen hook, and the rebuild must NOT
-      // rerun (drift sees user_version == 2).
-      await db.close();
-      migrated = null;
-      final reopened = CycleDatabase(NativeDatabase(dbFile));
-      migrated = reopened;
-      await reopened.profilesDao.allProfiles();
-      expect(await foreignKeyState(reopened), 1);
-      expect(await reopened.entriesDao.allEntriesForAllProfiles(), hasLength(2),
-          reason: 'the rebuild ran exactly once');
-    });
-
-    test('the engine enforces the new CHECKs on a migrated database',
-        () async {
-      await buildV1Database();
-      final db = await openThroughAppSchema();
-
-      await expectLater(
-        db.customStatement(
-            "INSERT INTO cycle_entries (profile_id, date, mucus_sign) "
-            "VALUES (1, 30000, 'wet')"),
-        throwsA(isA<Exception>()),
-      );
-      await expectLater(
-        db.customStatement(
-            "INSERT INTO cycle_entries (profile_id, date, mucus_sign, "
-            "mucus_quality) VALUES (1, 30001, 'f', 'w')"),
-        throwsA(isA<Exception>()),
-      );
+      // The unique index came back with the recreated table, foreign keys
+      // are enforced again (beforeOpen), and a normal DAO write works.
+      final foreignKeys =
+          await db.customSelect('PRAGMA foreign_keys').getSingle();
+      expect(foreignKeys.data['foreign_keys'], 1);
+      await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
+      final row = await db.entriesDao.entryFor(1, DateTime(2026, 6, 15));
+      expect(row, isNotNull);
+      expect(row!.profileId, 1,
+          reason: 'FK default resolves to the re-seeded profile');
     });
   });
 
@@ -391,12 +304,12 @@ void main() {
     test('inserts one row on the first write of a day', () async {
       await db.entriesDao.upsertByDate(
         CycleEntriesCompanion.insert(date: DateTime(2026, 3, 1)).copyWith(
-          bleeding: const Value(Bleeding.period),
+          bleeding: const Value(Bleeding.medium),
         ),
       );
       final rows = await db.entriesDao.allEntries(1);
       expect(rows, hasLength(1));
-      expect(rows.single.bleeding, Bleeding.period);
+      expect(rows.single.bleeding, Bleeding.medium);
     });
 
     test(
@@ -405,7 +318,7 @@ void main() {
       final first = await db.entriesDao.upsertByDate(
         dailyEntryToCompanion(DailyEntry(
           date: DateTime(2026, 3, 1),
-          bleeding: Bleeding.period,
+          bleeding: Bleeding.medium,
           bbtC: 36.1,
         )),
       );
@@ -511,6 +424,36 @@ void main() {
       expect(row.mucusQuality, isNull);
       expect(row.mucusSign, isNull);
       expect(row.notes, isNull);
+    });
+
+    test('measured time round-trips as minutes since midnight (or stays null)',
+        () async {
+      final measured = await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        bbtC: 36.4,
+        measuredAtMinutes: 407, // 06:47
+      ));
+      expect(measured.measuredAtMinutes, 407);
+      final mapped = dailyEntryFromDrift(measured);
+      expect(mapped.measuredAtMinutes, 407);
+
+      final unmeasured = await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 16),
+        bbtC: 36.0,
+      ));
+      expect(unmeasured.measuredAtMinutes, isNull);
+    });
+
+    test('updating a day without a measured time clears it (full replace)',
+        () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 6, 15),
+        measuredAtMinutes: 407,
+      ));
+      await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
+
+      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 6, 15)))!;
+      expect(row.measuredAtMinutes, isNull);
     });
 
     test('S with quality round-trips through the stored tokens and the mapper',
@@ -837,6 +780,128 @@ void main() {
       expect(DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)), isTrue);
       // The mark row was untouched by the entry gate.
       expect(await db.marksDao.allMarksForAllProfiles(), hasLength(1));
+    });
+
+    group('measured time-of-day in the EXPORT version boundary', () {
+      test('export carries the stored minutes; fresh db keeps it on import',
+          () async {
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 2),
+          bbtC: 36.4,
+          measuredAtMinutes: 405, // 06:45
+        ));
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, contains('"measured_at_minutes": 405'));
+
+        final target = CycleDatabase(NativeDatabase.memory());
+        addTearDown(target.close);
+        final summary = await importJsonToDatabase(target, json);
+        expect(summary.entriesNew, 1);
+        final row = await target.entriesDao.entryFor(1, DateTime(2026, 4, 2));
+        expect(row!.measuredAtMinutes, 405);
+      });
+
+      test('old export documents without the field import with no time',
+          () async {
+        // A v1 document (shape published before the field existed). Raw JSON
+        // on purpose: this pins the backward compatibility of the actual
+        // file content, not of a hand-built blob.
+        const oldJson = '{"schema_version": 1, '
+            '"exported_at": "2026-04-01T00:00:00Z", '
+            '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+            '"entries": [{"profile_id": 1, "date": "2026-05-01", '
+            '"bbt_c": 36.4, "bleeding": "none"}], '
+            '"marks": []}';
+        final summary = await importJsonToDatabase(db, oldJson);
+        expect(summary.entriesNew, 1);
+
+        final row = await db.entriesDao.entryFor(1, DateTime(2026, 5, 1));
+        expect(row!.bbtC, 36.4);
+        expect(row.measuredAtMinutes, isNull,
+            reason: 'pre-field exports carry no time; that must not fail '
+                'and must not fabricate one either');
+      });
+    });
+
+    group('bleeding levels in the export version boundary', () {
+      test('export carries numeric bleeding levels and schema version 3',
+          () async {
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 2),
+          bleeding: Bleeding.heavy,
+        ));
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 3),
+          bleeding: Bleeding.none,
+        ));
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, contains('"schema_version": 3'));
+        expect(json, contains('"bleeding": 4'),
+            reason: 'heavy is exported as its numeric level');
+        expect(json, contains('"bleeding": 0'),
+            reason: 'none is exported as its numeric level');
+        expect(json, isNot(contains('"bleeding": "')),
+            reason: 'documents no longer carry bleeding string tokens');
+      });
+
+      test('legacy v1 token documents import and read back as mapped levels',
+          () async {
+        // A v1 document (published before heaviness existed) with the legacy
+        // token vocabulary. Raw JSON on purpose: pins the actual file
+        // content of old exports, not a hand-built blob.
+        const oldJson = '{"schema_version": 1, '
+            '"exported_at": "2026-04-01T00:00:00Z", '
+            '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+            '"entries": ['
+            '{"profile_id": 1, "date": "2026-05-01", "bleeding": "period"}, '
+            '{"profile_id": 1, "date": "2026-05-02", "bleeding": "spotting"}], '
+            '"marks": []}';
+        final summary = await importJsonToDatabase(db, oldJson);
+        expect(summary.entriesInvalid, 0);
+        expect(summary.entriesWritten, 2);
+
+        expect((await db.entriesDao.entryFor(1, DateTime(2026, 5, 1)))!.bleeding,
+            Bleeding.medium,
+            reason: 'period (generic menstruation) degrades to medium');
+        expect(
+            (await db.entriesDao.entryFor(1, DateTime(2026, 5, 2)))!.bleeding,
+            Bleeding.spotting);
+      });
+
+      test('export → import round trip preserves all five levels exactly',
+          () async {
+        // One day per level; the heavy/medium days prove there is no
+        // medium-degradation through the document.
+        final levels = Bleeding.values;
+        for (var i = 0; i < levels.length; i++) {
+          await db.entriesDao.upsertDaily(DailyEntry(
+            date: DateTime(2026, 6, 1 + i),
+            bleeding: levels[i],
+          ));
+        }
+
+        final json = await exportDatabaseToJson(db);
+        final target = CycleDatabase(NativeDatabase.memory());
+        addTearDown(target.close);
+        final summary = await importJsonToDatabase(target, json);
+        expect(summary.entriesInvalid, 0);
+        expect(summary.entriesWritten, levels.length);
+
+        final sourceRows = await db.entriesDao.allEntriesForAllProfiles();
+        final targetRows = await target.entriesDao.allEntriesForAllProfiles();
+        expect(targetRows, hasLength(levels.length));
+        for (var i = 0; i < levels.length; i++) {
+          final source = sourceRows
+              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          final imported = targetRows
+              .singleWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)));
+          expect(imported.bleeding, source.bleeding,
+              reason: '${levels[i].name} must survive the round trip exactly '
+                  '(no degradation to medium)');
+        }
+      });
     });
 
     test('unexpected errors surface as ImportFailedException', () async {

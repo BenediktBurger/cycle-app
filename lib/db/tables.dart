@@ -1,5 +1,5 @@
-// Drift table definitions for the cycle app (schema version 2; the version
-// number lives in cycle_database.dart).
+// Drift table definitions for the cycle app (the schema version number
+// lives in cycle_database.dart).
 //
 // SQL-level naming: drift converts camelCase getter names to snake_case
 // column names, matching the naming used in the plan and migration notes.
@@ -37,11 +37,24 @@ class CycleEntries extends Table {
   /// Basal body temperature in degrees Celsius, when measured.
   RealColumn get bbtC => real().nullable()();
 
-  /// Bleeding level: none / period / spotting (enum name as TEXT).
-  /// Note: textEnum's Dart-level builder type is String, so the default is
-  /// the SQL-level enum name.
-  TextColumn get bleeding =>
-      textEnum<Bleeding>().withDefault(const Constant('none'))();
+  /// Time-of-day of the temperature measurement, minutes since midnight
+  /// (0–1439), NULL when not recorded. Engine-level CHECK mirrors the
+  /// shared parse helper (lib/domain/models.dart) so foreign data (e.g. a
+  /// future import path) cannot write an impossible time.
+  IntColumn get measuredAtMinutes => integer().nullable().customConstraint(
+        'CHECK (measured_at_minutes IS NULL OR '
+        '(measured_at_minutes BETWEEN 0 AND 1439))',
+      )();
+
+  /// Bleeding intensity on the shared 5-step numeric scale, stored as the
+  /// INTEGER [Bleeding.level]: none(0) / spotting(1) / light(2) / medium(3) /
+  /// heavy(4). The converter derives every mapping from [Bleeding.level],
+  /// never from the declaration index; an unknown stored number throws so
+  /// corrupt data is surfaced instead of silently mapped. The default 0
+  /// stores an explicit `none` (a day with no observation still has a value).
+  IntColumn get bleeding => integer()
+      .map(const BleedingLevelConverter())
+      .withDefault(const Constant(0))();
 
   // Disturbance/exclusion flags for interrupted days (NFP "Störungen").
   BoolColumn get excludeIllness =>
@@ -54,7 +67,7 @@ class CycleEntries extends Table {
 
   /// Fertility sign recorded on the day: NULL when no observation, else one
   /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
-  /// names — TEXT like bleeding, never numbers, never display glyphs).
+  /// names — TEXT, unlike bleeding's numeric column; never display glyphs).
   /// customConstraint replaces drift's own constraints, which is fine here:
   /// SQLite columns admit NULL unless NOT NULL is written, and the check
   /// below allows exactly NULL or the vocabulary.

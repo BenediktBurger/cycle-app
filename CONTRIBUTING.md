@@ -109,7 +109,7 @@ core assertions without the test runner (useful when hunting failures):
   (profile, day) with **overwrite** of conflicting days; known marks are
   skipped (idempotent); unknown profiles are re-created. A summary counts
   new/overwritten/skipped rows.
-- The JSON document format is schema-versioned (`schema_version: 1`); the
+- The JSON document format is schema-versioned (`schema_version`); the
   codec and merge planner are pure logic under `lib/domain/export_import.dart`
   (unit-tested in `test/domain/`), the database adapter lives in
   `lib/db/export_adapter.dart`.

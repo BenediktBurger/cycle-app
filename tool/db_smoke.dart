@@ -17,6 +17,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 
 import 'package:cycle_app/domain/cycle_grouping.dart';
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -93,7 +94,7 @@ Future<void> main() async {
   final first = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
     DailyEntry(
       date: DateTime(2026, 3, 1),
-      bleeding: Bleeding.period,
+      bleeding: Bleeding.medium,
       bbtC: 36.1,
     ),
   ));
@@ -150,6 +151,38 @@ Future<void> main() async {
       dailyEntryFromDrift(await db.entriesDao.upsertDaily(input));
   check(mappedBack == input, 'domain round trip via drift preserves entry');
 
+  // --- bleeding levels: all five levels round-trip the drift layer --------
+  // The stored number is Bleeding.level (0 none … 4 heavy), mapped through
+  // the converter — never the Dart declaration index.
+  for (var i = 0; i < Bleeding.values.length; i++) {
+    final level = Bleeding.values[i];
+    final row = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
+      DailyEntry(date: DateTime(2026, 7, 1 + i), bleeding: level),
+    ));
+    check(row.bleeding == level,
+        'level ${level.level} round-trips as ${level.name}');
+  }
+  // Raw SQL writes the int directly; the converter must surface exactly the
+  // level it names.
+  final heavyDay = DateOnly.normalize(DateTime(2026, 7, 5))
+      .difference(DateTime.utc(1970))
+      .inDays;
+  final rawHeavy = await db.customSelect(
+      'SELECT bleeding FROM cycle_entries WHERE date = ?',
+      variables: [Variable.withInt(heavyDay)]).getSingle();
+  check(rawHeavy.data['bleeding'] == 4,
+      'raw stored bleeding value is the numeric level (4 for heavy)');
+  await db.customStatement(
+    'INSERT INTO cycle_entries (profile_id, date, bleeding) '
+    'VALUES (?, ?, ?)',
+    [1, heavyDay + 1, 3],
+  );
+  final rawMedium = await db.customSelect(
+      'SELECT bleeding FROM cycle_entries WHERE date = ?',
+      variables: [Variable.withInt(heavyDay + 1)]).getSingle();
+  check(rawMedium.data['bleeding'] == 3,
+      'raw int insert (3) is stored verbatim in the int column');
+
   // --- MarksDao ----------------------------------------------------------
   final mark = await db.marksDao
       .addMark(1, DateTime(2026, 3, 12), MarkTypes.mucusPeakDay);
@@ -171,18 +204,18 @@ Future<void> main() async {
     return DailyEntry(
       date: DateTime(y, m, day),
       bleeding: bleeding,
-      excludeIllness: interrupted && bleeding == Bleeding.period,
-      excludeTravel: interrupted && bleeding != Bleeding.period,
+      excludeIllness: interrupted && bleeding == Bleeding.medium,
+      excludeTravel: interrupted && bleeding != Bleeding.medium,
     );
   }
 
   final entries = [
-    d(2026, 3, 2, bleeding: Bleeding.period),
-    d(2026, 3, 3, bleeding: Bleeding.period),
+    d(2026, 3, 2, bleeding: Bleeding.medium),
+    d(2026, 3, 3, bleeding: Bleeding.medium),
     d(2026, 3, 4),
-    d(2026, 3, 30, bleeding: Bleeding.period),
+    d(2026, 3, 30, bleeding: Bleeding.medium),
     d(2026, 4, 10, bleeding: Bleeding.spotting),
-    d(2026, 4, 27, bleeding: Bleeding.period),
+    d(2026, 4, 27, bleeding: Bleeding.medium),
     d(2026, 4, 28),
   ];
   final cycles = groupIntoCycles(entries);
@@ -195,9 +228,9 @@ Future<void> main() async {
 
   // interrupted period day does not start a cycle
   final interrupted = [
-    d(2026, 4, 1, bleeding: Bleeding.period),
-    d(2026, 4, 29, bleeding: Bleeding.period, interrupted: true),
-    d(2026, 4, 30, bleeding: Bleeding.period),
+    d(2026, 4, 1, bleeding: Bleeding.medium),
+    d(2026, 4, 29, bleeding: Bleeding.medium, interrupted: true),
+    d(2026, 4, 30, bleeding: Bleeding.medium),
   ];
   check(
     menstruationOnsetDates(interrupted).length == 2 &&
@@ -208,7 +241,7 @@ Future<void> main() async {
   // --- statistics ---------------------------------------------------------
   // 28-day entries have 3 onsets -> 2 interval lengths; add a 4th onset to
   // exercise the third interval (mirrors threeCycleData in the test suite).
-  final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.period)];
+  final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.medium)];
   final lengths = cycleLengthsInDays(statsEntries);
   check(eq(lengths, [28, 28, 28]), 'cycle lengths 28/28/28 ($lengths)');
   final summary = summarizeCycleLengths(lengths);

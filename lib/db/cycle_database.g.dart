@@ -250,12 +250,21 @@ class $CycleEntriesTable extends CycleEntries
   late final GeneratedColumn<double> bbtC = GeneratedColumn<double>(
       'bbt_c', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _measuredAtMinutesMeta =
+      const VerificationMeta('measuredAtMinutes');
   @override
-  late final GeneratedColumnWithTypeConverter<Bleeding, String> bleeding =
-      GeneratedColumn<String>('bleeding', aliasedName, false,
-              type: DriftSqlType.string,
+  late final GeneratedColumn<int> measuredAtMinutes = GeneratedColumn<int>(
+      'measured_at_minutes', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'CHECK (measured_at_minutes IS NULL OR (measured_at_minutes BETWEEN 0 AND 1439))');
+  @override
+  late final GeneratedColumnWithTypeConverter<Bleeding, int> bleeding =
+      GeneratedColumn<int>('bleeding', aliasedName, false,
+              type: DriftSqlType.int,
               requiredDuringInsert: false,
-              defaultValue: const Constant('none'))
+              defaultValue: const Constant(0))
           .withConverter<Bleeding>($CycleEntriesTable.$converterbleeding);
   static const VerificationMeta _excludeIllnessMeta =
       const VerificationMeta('excludeIllness');
@@ -383,6 +392,7 @@ class $CycleEntriesTable extends CycleEntries
         profileId,
         date,
         bbtC,
+        measuredAtMinutes,
         bleeding,
         excludeIllness,
         excludeAlcohol,
@@ -419,6 +429,12 @@ class $CycleEntriesTable extends CycleEntries
     if (data.containsKey('bbt_c')) {
       context.handle(
           _bbtCMeta, bbtC.isAcceptableOrUnknown(data['bbt_c']!, _bbtCMeta));
+    }
+    if (data.containsKey('measured_at_minutes')) {
+      context.handle(
+          _measuredAtMinutesMeta,
+          measuredAtMinutes.isAcceptableOrUnknown(
+              data['measured_at_minutes']!, _measuredAtMinutesMeta));
     }
     if (data.containsKey('exclude_illness')) {
       context.handle(
@@ -504,9 +520,11 @@ class $CycleEntriesTable extends CycleEntries
           .read(DriftSqlType.int, data['${effectivePrefix}date'])!),
       bbtC: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}bbt_c']),
+      measuredAtMinutes: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}measured_at_minutes']),
       bleeding: $CycleEntriesTable.$converterbleeding.fromSql(attachedDatabase
           .typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}bleeding'])!),
+          .read(DriftSqlType.int, data['${effectivePrefix}bleeding'])!),
       excludeIllness: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}exclude_illness'])!,
       excludeAlcohol: attachedDatabase.typeMapping
@@ -545,8 +563,8 @@ class $CycleEntriesTable extends CycleEntries
 
   static TypeConverter<DateTime, int> $converterdate =
       const EpochDayConverter();
-  static JsonTypeConverter2<Bleeding, String, String> $converterbleeding =
-      const EnumNameConverter<Bleeding>(Bleeding.values);
+  static TypeConverter<Bleeding, int> $converterbleeding =
+      const BleedingLevelConverter();
 }
 
 class CycleEntry extends DataClass implements Insertable<CycleEntry> {
@@ -561,9 +579,18 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// Basal body temperature in degrees Celsius, when measured.
   final double? bbtC;
 
-  /// Bleeding level: none / period / spotting (enum name as TEXT).
-  /// Note: textEnum's Dart-level builder type is String, so the default is
-  /// the SQL-level enum name.
+  /// Time-of-day of the temperature measurement, minutes since midnight
+  /// (0–1439), NULL when not recorded. Engine-level CHECK mirrors the
+  /// shared parse helper (lib/domain/models.dart) so foreign data (e.g. a
+  /// future import path) cannot write an impossible time.
+  final int? measuredAtMinutes;
+
+  /// Bleeding intensity on the shared 5-step numeric scale, stored as the
+  /// INTEGER [Bleeding.level]: none(0) / spotting(1) / light(2) / medium(3) /
+  /// heavy(4). The converter derives every mapping from [Bleeding.level],
+  /// never from the declaration index; an unknown stored number throws so
+  /// corrupt data is surfaced instead of silently mapped. The default 0
+  /// stores an explicit `none` (a day with no observation still has a value).
   final Bleeding bleeding;
   final bool excludeIllness;
   final bool excludeAlcohol;
@@ -572,7 +599,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
 
   /// Fertility sign recorded on the day: NULL when no observation, else one
   /// of the stable tokens 't' / 'nothing' / 'f' / 's' (the MucusSign enum
-  /// names — TEXT like bleeding, never numbers, never display glyphs).
+  /// names — TEXT, unlike bleeding's numeric column; never display glyphs).
   /// customConstraint replaces drift's own constraints, which is fine here:
   /// SQLite columns admit NULL unless NOT NULL is written, and the check
   /// below allows exactly NULL or the vocabulary.
@@ -597,6 +624,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       required this.profileId,
       required this.date,
       this.bbtC,
+      this.measuredAtMinutes,
       required this.bleeding,
       required this.excludeIllness,
       required this.excludeAlcohol,
@@ -624,9 +652,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     if (!nullToAbsent || bbtC != null) {
       map['bbt_c'] = Variable<double>(bbtC);
     }
+    if (!nullToAbsent || measuredAtMinutes != null) {
+      map['measured_at_minutes'] = Variable<int>(measuredAtMinutes);
+    }
     {
-      map['bleeding'] = Variable<String>(
-          $CycleEntriesTable.$converterbleeding.toSql(bleeding));
+      map['bleeding'] =
+          Variable<int>($CycleEntriesTable.$converterbleeding.toSql(bleeding));
     }
     map['exclude_illness'] = Variable<bool>(excludeIllness);
     map['exclude_alcohol'] = Variable<bool>(excludeAlcohol);
@@ -659,6 +690,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       profileId: Value(profileId),
       date: Value(date),
       bbtC: bbtC == null && nullToAbsent ? const Value.absent() : Value(bbtC),
+      measuredAtMinutes: measuredAtMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(measuredAtMinutes),
       bleeding: Value(bleeding),
       excludeIllness: Value(excludeIllness),
       excludeAlcohol: Value(excludeAlcohol),
@@ -691,8 +725,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       profileId: serializer.fromJson<int>(json['profileId']),
       date: serializer.fromJson<DateTime>(json['date']),
       bbtC: serializer.fromJson<double?>(json['bbtC']),
-      bleeding: $CycleEntriesTable.$converterbleeding
-          .fromJson(serializer.fromJson<String>(json['bleeding'])),
+      measuredAtMinutes: serializer.fromJson<int?>(json['measuredAtMinutes']),
+      bleeding: serializer.fromJson<Bleeding>(json['bleeding']),
       excludeIllness: serializer.fromJson<bool>(json['excludeIllness']),
       excludeAlcohol: serializer.fromJson<bool>(json['excludeAlcohol']),
       excludeTravel: serializer.fromJson<bool>(json['excludeTravel']),
@@ -717,8 +751,8 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'profileId': serializer.toJson<int>(profileId),
       'date': serializer.toJson<DateTime>(date),
       'bbtC': serializer.toJson<double?>(bbtC),
-      'bleeding': serializer.toJson<String>(
-          $CycleEntriesTable.$converterbleeding.toJson(bleeding)),
+      'measuredAtMinutes': serializer.toJson<int?>(measuredAtMinutes),
+      'bleeding': serializer.toJson<Bleeding>(bleeding),
       'excludeIllness': serializer.toJson<bool>(excludeIllness),
       'excludeAlcohol': serializer.toJson<bool>(excludeAlcohol),
       'excludeTravel': serializer.toJson<bool>(excludeTravel),
@@ -741,6 +775,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           int? profileId,
           DateTime? date,
           Value<double?> bbtC = const Value.absent(),
+          Value<int?> measuredAtMinutes = const Value.absent(),
           Bleeding? bleeding,
           bool? excludeIllness,
           bool? excludeAlcohol,
@@ -761,6 +796,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
         profileId: profileId ?? this.profileId,
         date: date ?? this.date,
         bbtC: bbtC.present ? bbtC.value : this.bbtC,
+        measuredAtMinutes: measuredAtMinutes.present
+            ? measuredAtMinutes.value
+            : this.measuredAtMinutes,
         bleeding: bleeding ?? this.bleeding,
         excludeIllness: excludeIllness ?? this.excludeIllness,
         excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
@@ -784,6 +822,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       profileId: data.profileId.present ? data.profileId.value : this.profileId,
       date: data.date.present ? data.date.value : this.date,
       bbtC: data.bbtC.present ? data.bbtC.value : this.bbtC,
+      measuredAtMinutes: data.measuredAtMinutes.present
+          ? data.measuredAtMinutes.value
+          : this.measuredAtMinutes,
       bleeding: data.bleeding.present ? data.bleeding.value : this.bleeding,
       excludeIllness: data.excludeIllness.present
           ? data.excludeIllness.value
@@ -819,6 +860,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('profileId: $profileId, ')
           ..write('date: $date, ')
           ..write('bbtC: $bbtC, ')
+          ..write('measuredAtMinutes: $measuredAtMinutes, ')
           ..write('bleeding: $bleeding, ')
           ..write('excludeIllness: $excludeIllness, ')
           ..write('excludeAlcohol: $excludeAlcohol, ')
@@ -844,6 +886,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       profileId,
       date,
       bbtC,
+      measuredAtMinutes,
       bleeding,
       excludeIllness,
       excludeAlcohol,
@@ -867,6 +910,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.profileId == this.profileId &&
           other.date == this.date &&
           other.bbtC == this.bbtC &&
+          other.measuredAtMinutes == this.measuredAtMinutes &&
           other.bleeding == this.bleeding &&
           other.excludeIllness == this.excludeIllness &&
           other.excludeAlcohol == this.excludeAlcohol &&
@@ -889,6 +933,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<int> profileId;
   final Value<DateTime> date;
   final Value<double?> bbtC;
+  final Value<int?> measuredAtMinutes;
   final Value<Bleeding> bleeding;
   final Value<bool> excludeIllness;
   final Value<bool> excludeAlcohol;
@@ -909,6 +954,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.profileId = const Value.absent(),
     this.date = const Value.absent(),
     this.bbtC = const Value.absent(),
+    this.measuredAtMinutes = const Value.absent(),
     this.bleeding = const Value.absent(),
     this.excludeIllness = const Value.absent(),
     this.excludeAlcohol = const Value.absent(),
@@ -930,6 +976,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.profileId = const Value.absent(),
     required DateTime date,
     this.bbtC = const Value.absent(),
+    this.measuredAtMinutes = const Value.absent(),
     this.bleeding = const Value.absent(),
     this.excludeIllness = const Value.absent(),
     this.excludeAlcohol = const Value.absent(),
@@ -951,7 +998,8 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<int>? profileId,
     Expression<int>? date,
     Expression<double>? bbtC,
-    Expression<String>? bleeding,
+    Expression<int>? measuredAtMinutes,
+    Expression<int>? bleeding,
     Expression<bool>? excludeIllness,
     Expression<bool>? excludeAlcohol,
     Expression<bool>? excludeTravel,
@@ -972,6 +1020,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (profileId != null) 'profile_id': profileId,
       if (date != null) 'date': date,
       if (bbtC != null) 'bbt_c': bbtC,
+      if (measuredAtMinutes != null) 'measured_at_minutes': measuredAtMinutes,
       if (bleeding != null) 'bleeding': bleeding,
       if (excludeIllness != null) 'exclude_illness': excludeIllness,
       if (excludeAlcohol != null) 'exclude_alcohol': excludeAlcohol,
@@ -995,6 +1044,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       Value<int>? profileId,
       Value<DateTime>? date,
       Value<double?>? bbtC,
+      Value<int?>? measuredAtMinutes,
       Value<Bleeding>? bleeding,
       Value<bool>? excludeIllness,
       Value<bool>? excludeAlcohol,
@@ -1015,6 +1065,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       profileId: profileId ?? this.profileId,
       date: date ?? this.date,
       bbtC: bbtC ?? this.bbtC,
+      measuredAtMinutes: measuredAtMinutes ?? this.measuredAtMinutes,
       bleeding: bleeding ?? this.bleeding,
       excludeIllness: excludeIllness ?? this.excludeIllness,
       excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
@@ -1049,8 +1100,11 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (bbtC.present) {
       map['bbt_c'] = Variable<double>(bbtC.value);
     }
+    if (measuredAtMinutes.present) {
+      map['measured_at_minutes'] = Variable<int>(measuredAtMinutes.value);
+    }
     if (bleeding.present) {
-      map['bleeding'] = Variable<String>(
+      map['bleeding'] = Variable<int>(
           $CycleEntriesTable.$converterbleeding.toSql(bleeding.value));
     }
     if (excludeIllness.present) {
@@ -1105,6 +1159,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('profileId: $profileId, ')
           ..write('date: $date, ')
           ..write('bbtC: $bbtC, ')
+          ..write('measuredAtMinutes: $measuredAtMinutes, ')
           ..write('bleeding: $bleeding, ')
           ..write('excludeIllness: $excludeIllness, ')
           ..write('excludeAlcohol: $excludeAlcohol, ')
@@ -1755,6 +1810,7 @@ typedef $$CycleEntriesTableCreateCompanionBuilder = CycleEntriesCompanion
   Value<int> profileId,
   required DateTime date,
   Value<double?> bbtC,
+  Value<int?> measuredAtMinutes,
   Value<Bleeding> bleeding,
   Value<bool> excludeIllness,
   Value<bool> excludeAlcohol,
@@ -1777,6 +1833,7 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder = CycleEntriesCompanion
   Value<int> profileId,
   Value<DateTime> date,
   Value<double?> bbtC,
+  Value<int?> measuredAtMinutes,
   Value<Bleeding> bleeding,
   Value<bool> excludeIllness,
   Value<bool> excludeAlcohol,
@@ -1833,7 +1890,11 @@ class $$CycleEntriesTableFilterComposer
   ColumnFilters<double> get bbtC => $composableBuilder(
       column: $table.bbtC, builder: (column) => ColumnFilters(column));
 
-  ColumnWithTypeConverterFilters<Bleeding, Bleeding, String> get bleeding =>
+  ColumnFilters<int> get measuredAtMinutes => $composableBuilder(
+      column: $table.measuredAtMinutes,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<Bleeding, Bleeding, int> get bleeding =>
       $composableBuilder(
           column: $table.bleeding,
           builder: (column) => ColumnWithTypeConverterFilters(column));
@@ -1921,7 +1982,11 @@ class $$CycleEntriesTableOrderingComposer
   ColumnOrderings<double> get bbtC => $composableBuilder(
       column: $table.bbtC, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get bleeding => $composableBuilder(
+  ColumnOrderings<int> get measuredAtMinutes => $composableBuilder(
+      column: $table.measuredAtMinutes,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get bleeding => $composableBuilder(
       column: $table.bleeding, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get excludeIllness => $composableBuilder(
@@ -2010,7 +2075,10 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<double> get bbtC =>
       $composableBuilder(column: $table.bbtC, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<Bleeding, String> get bleeding =>
+  GeneratedColumn<int> get measuredAtMinutes => $composableBuilder(
+      column: $table.measuredAtMinutes, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Bleeding, int> get bleeding =>
       $composableBuilder(column: $table.bleeding, builder: (column) => column);
 
   GeneratedColumn<bool> get excludeIllness => $composableBuilder(
@@ -2103,6 +2171,7 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<int> profileId = const Value.absent(),
             Value<DateTime> date = const Value.absent(),
             Value<double?> bbtC = const Value.absent(),
+            Value<int?> measuredAtMinutes = const Value.absent(),
             Value<Bleeding> bleeding = const Value.absent(),
             Value<bool> excludeIllness = const Value.absent(),
             Value<bool> excludeAlcohol = const Value.absent(),
@@ -2124,6 +2193,7 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             profileId: profileId,
             date: date,
             bbtC: bbtC,
+            measuredAtMinutes: measuredAtMinutes,
             bleeding: bleeding,
             excludeIllness: excludeIllness,
             excludeAlcohol: excludeAlcohol,
@@ -2145,6 +2215,7 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             Value<int> profileId = const Value.absent(),
             required DateTime date,
             Value<double?> bbtC = const Value.absent(),
+            Value<int?> measuredAtMinutes = const Value.absent(),
             Value<Bleeding> bleeding = const Value.absent(),
             Value<bool> excludeIllness = const Value.absent(),
             Value<bool> excludeAlcohol = const Value.absent(),
@@ -2166,6 +2237,7 @@ class $$CycleEntriesTableTableManager extends RootTableManager<
             profileId: profileId,
             date: date,
             bbtC: bbtC,
+            measuredAtMinutes: measuredAtMinutes,
             bleeding: bleeding,
             excludeIllness: excludeIllness,
             excludeAlcohol: excludeAlcohol,

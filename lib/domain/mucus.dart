@@ -7,10 +7,11 @@
 // from the cheat sheet evaluation is encoded here or anywhere in the code.
 //
 // Storage rule: the enum NAMES are the TEXT tokens stored in the database and
-// in the export document, exactly like the Bleeding enum. A rename of any
-// value is therefore a data migration — the tests pin every token; treat a
-// rename as a schema change, not a refactor. Display glyphs (Ø, EW, …) are
-// derived helpers, never stored.
+// in the export document (unlike bleeding, which stores the numeric
+// Bleeding.level — see models.dart). A rename of any value is therefore a
+// data migration — the tests pin every token; treat a rename as a schema
+// change, not a refactor. Display glyphs (Ø, EW, …) are derived helpers,
+// never stored.
 
 /// A fertility sign observed on a day:
 ///

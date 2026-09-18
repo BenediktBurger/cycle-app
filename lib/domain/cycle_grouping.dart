@@ -3,19 +3,24 @@
 // Boundary assumption (THE rule to review with experts):
 //
 //   TODO(user-review): A new menstrual cycle is assumed to start on the
-//   FIRST day with `period` bleeding that follows any non-period day (or a
-//   data gap). This is the classical NFP/Rötzer "cycle day 1 = first
-//   bleeding day" posture, recorded here as an ASSUMPTION pending expert
-//   review — see ADR-0001 draft note, docs/adr/0001-iner-mode-m-hypothesis.md
-//   (status: Hypothesis). Details of this rule that need validation:
-//     - Spotting days never start a cycle (spotting is not menstruation).
+//   FIRST day with menstruation-level bleeding (`Bleeding.level >= 2`:
+//   light, medium or heavy) that follows any earlier day without such
+//   bleeding (or a data gap). This is the classical NFP/Rötzer "cycle
+//   day 1 = first bleeding day" posture, recorded here as an ASSUMPTION
+//   pending expert review — see ADR-0001 draft note,
+//   docs/adr/0001-iner-mode-m-hypothesis.md (status: Hypothesis). Details
+//   of this rule that need validation:
+//     - Spotting (level 1) and bleeding-free days never start a cycle
+//       (spotting is not menstruation).
 //     - Interrupted days (any exclude flag set) never start a cycle; they
 //       are treated as opaque.
-//     - A period day directly following an interrupted period day IS
-//       treated as a new menstruation onset (the interrupted day may hide
-//       the true start of the bleeding phase).
-//     - A data gap (day without any entry) allows the next period day to
-//       be an onset (an absent previous day cannot be proven non-period).
+//     - A menstruation-level day directly following an interrupted
+//       menstruation-level day IS treated as a new menstruation onset
+//       (the interrupted day may hide the true start of the bleeding
+//       phase).
+//     - A data gap (day without any entry) allows the next menstruation-
+//       level day to be an onset (an absent previous day cannot be proven
+//       non-menstruating).
 
 import 'date_only.dart';
 import 'models.dart';
@@ -92,16 +97,17 @@ List<Cycle> groupIntoCycles(List<DailyEntry> entries) {
 }
 
 /// The boundary rule (see the TODO(user-review) comment at the top):
-/// a non-excluded period day starts a new cycle unless the immediately
-/// preceding calendar day is also a non-excluded period day (i.e. we are in
-/// the middle of one continuous menstruation).
+/// a non-excluded day with menstruation-level bleeding (`level >= 2`) starts
+/// a new cycle unless the immediately preceding calendar day is also a
+/// non-excluded menstruation-level day (i.e. we are in the middle of one
+/// continuous menstruation).
 bool _isMenstruationOnset(DailyEntry entry, DailyEntry? previous) {
-  if (entry.bleeding != Bleeding.period) return false;
+  if (entry.bleeding.level < 2) return false;
   if (entry.isExcluded) return false;
 
   if (previous != null &&
       DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date)) &&
-      previous.bleeding == Bleeding.period &&
+      previous.bleeding.level >= 2 &&
       !previous.isExcluded) {
     return false;
   }
