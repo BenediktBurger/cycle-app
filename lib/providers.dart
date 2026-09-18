@@ -28,9 +28,9 @@ final databaseProvider = FutureProvider<CycleDatabase>((ref) {
 
 /// The current wall-clock time, injectable: the Tagebuch entry form prefills
 /// the time-of-measurement with this value for a fresh day. Widget tests
-/// override it with a fixed DateTime so "the form shows the current time" is
-/// deterministic (no race against the real minute boundary).
-final nowProvider = Provider<DateTime>((ref) => DateTime.now());
+/// override it with a fixed clock (`() => fixedNow`) so "the form shows the
+/// current time" is deterministic (no race against the real minute boundary).
+final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
 /// The profile all M1 UI reads/writes. Multi-profile (partner mode) is in
 /// the schema, but deliberately not exposed in the M1 UI.

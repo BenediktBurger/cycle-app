@@ -108,10 +108,10 @@
   "exportNativeHint": "On Android/iOS: copy the text above (a share sheet will follow).",
   "exportNothing": "Database is empty — nothing to export.",
   "importTitle": "Paste JSON",
-  "importHint": "Paste an export document (schema_version 1 or 2) here …",
+  "importHint": "Paste an export document (schema_version 1, 2, or 3) here …",
   "importPickFile": "Pick file (web only)",
   "importApply": "Apply import",
-  "importInvalid": "Invalid document (not an export / schema_version 1).",
+  "importInvalid": "Invalid document (not an export / schema_version 1, 2, or 3).",
   "importFailed": "Import failed — the data was not changed.",
   "importSummary": "New profiles: {profiles}, days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
   "@importSummary": {

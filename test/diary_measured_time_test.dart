@@ -48,7 +48,7 @@ ProviderScope _scope({Future<void> Function(CycleDatabase db)? seed}) {
         await seed?.call(db);
         return db;
       }),
-      nowProvider.overrideWith((ref) => _fixedNow),
+      nowProvider.overrideWith((ref) => () => _fixedNow),
       selectedDateProvider.overrideWith((ref) => _selectedDay),
       localeProvider.overrideWith((ref) => const Locale('de')),
     ],

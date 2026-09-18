@@ -83,7 +83,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // — including deliberately cleared days (stored null), which never
     // re-prefill.
     _measuredAt = entry == null
-        ? TimeOfDay.fromDateTime(ref.read(nowProvider))
+        ? TimeOfDay.fromDateTime(ref.read(nowProvider)())
         : _minutesToTime(entry.measuredAtMinutes);
     // DailyEntry already enforces quality-only-with-S (constructor assert),
     // so the form state can mirror the loaded pair untouched.
@@ -119,9 +119,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _measuredAt ??
-          TimeOfDay.fromDateTime(ref.read(nowProvider)),
+          TimeOfDay.fromDateTime(ref.read(nowProvider)()),
     );
-    if (picked == null) return;
+    if (!mounted || picked == null) return;
     setState(() => _measuredAt = picked);
   }
 
