@@ -84,10 +84,10 @@
 //   measurement (rise−1 … rise−6), intersected with the cycle group's
 //   tracked days; the baseline is the MAX of the not-marked-excluded MEASURED
 //   temperatures within those days (the earliest maximum wins on ties).
-//   Any measured, not-marked-excluded temperature in the window counts as a low,
-//   regardless of its mucus role — the peak day itself carries a number
-//   when it falls into the window. (This subsumes the old "peak day
-//   counts as a low" TODO.) An EXCLUDED day occupies its calendar day
+//   Any measured, not-marked-excluded temperature in the window counts as
+//   a low, regardless of its mucus role — the peak day itself carries a
+//   number when it falls into the window. (This subsumes the old "peak
+//   day counts as a low" TODO.) An EXCLUDED day occupies its calendar day
 //   but contributes no temperature — no number, no baseline effect. A
 //   window reaching past the group's first tracked day (rise marked
 //   within the first six days of a cycle group) truncates at the group's
@@ -326,12 +326,12 @@ final class CycleEvaluation {
   final SuzRule? suzRule;
 
   /// Whether the user-placed first higher measurement sits on a day whose
-  /// measured, not-marked-excluded temperature lies STRICTLY ABOVE the baseline
-  /// (owner decision 2026-09-17: when it does not, the app warns — the
-  /// user may have chosen a wrong day; any warning wording states the
-  /// arithmetic fact only, never a verdict). Because the baseline derives
-  /// ONLY from the six calendar days before the mark, the check is
-  /// well-defined once the mark exists.
+  /// measured, not-marked-excluded temperature lies STRICTLY ABOVE the
+  /// baseline (owner decision 2026-09-17: when it does not, the app warns
+  /// — the user may have chosen a wrong day; any warning wording states
+  /// the arithmetic fact only, never a verdict). Because the baseline
+  /// derives ONLY from the six calendar days before the mark, the check
+  /// is well-defined once the mark exists.
   ///
   /// - null when no first-higher mark exists or no baseline could be
   ///   derived (no usable low measurement in the mark's window) — the
@@ -505,12 +505,11 @@ _LowWindow _lowWindowFor(
   // the cycle group's tracked days. Numbering belongs to CALENDAR
   // POSITIONS, not to a dense index over the measured lows: the measured,
   // not-marked-excluded day at rise−i carries number i; an omitted
-  // (untracked or
-  // unmeasured) day and a mark-excluded day get NO number — numbers skip
-  // (the cheat sheet's "zurücknummerieren": 6 … 1). A window reaching
-  // past the group's first tracked day (rise marked within the first six
-  // days of a cycle group) truncates at the group's tracked days — beyond
-  // that it must not reach into the previous cycle group.
+  // (untracked or unmeasured) day and a mark-excluded day get NO number —
+  // numbers skip (the cheat sheet's "zurücknummerieren": 6 … 1). A window
+  // reaching past the group's first tracked day (rise marked within the
+  // first six days of a cycle group) truncates at the group's tracked days
+  // — beyond that it must not reach into the previous cycle group.
   final byDay = {
     for (final e in cycle.days) DateOnly.normalize(e.date): e,
   };
@@ -585,13 +584,13 @@ CycleEvaluation _evaluateCycle(
 
   // The rise-mark consistency check (owner decision 2026-09-17): the
   // marked day must carry a measured, not-marked-excluded temperature
-  // STRICTLY
-  // above the baseline — otherwise the UI warns (the user may have chosen
-  // a wrong day). The baseline derives ONLY from the six calendar days
-  // before the mark, so the check is well-defined once mark and baseline
-  // exist; without either it stays undefined (null). The check needs the
-  // marked day's entry from the tracked days — the day may carry NO entry
-  // at all (an untracked mark day), which counts as inconsistent.
+  // STRICTLY above the baseline — otherwise the UI warns (the user may
+  // have chosen a wrong day). The baseline derives ONLY from the six
+  // calendar days before the mark, so the check is well-defined once mark
+  // and baseline exist; without either it stays undefined (null). The
+  // check needs the marked day's entry from the tracked days — the day
+  // may carry NO entry at all (an untracked mark day), which counts as
+  // inconsistent.
   final byDay = {
     for (final e in cycle.days) DateOnly.normalize(e.date): e,
   };
