@@ -298,10 +298,13 @@ final class _CycleChartState extends State<_CycleChart> {
   double? _viewportWidth;
   double? _columnWidth;
 
-  /// The day-index window currently built (inclusive bounds). It carries one
-  /// day of margin past each visible edge: as the content slides, data that
-  /// has not scrolled fully into view is already present, so a window
-  /// rebuild never introduces a visual seam at the viewport edge.
+  /// The day-index window currently built (inclusive bounds). The window
+  /// PARKS with an extra screen-width of margin past each visible edge
+  /// (the drawn margin rides on the one-day seam margin) and stays put
+  /// while the content slides — the scroll-window check below only
+  /// rebuilds when the visible edge would run into the margin, so a fling
+  /// travels a whole extra screen-width between two window rebuilds
+  /// instead of one day column.
   int _windowStart = 0;
   int _windowEnd = 0;
 
@@ -423,18 +426,37 @@ final class _CycleChartState extends State<_CycleChart> {
     showCycleDaySheet(context, day: _days.dayAt(index));
   }
 
-  /// The day-index window to build for the current scroll offset: every
-  /// column that is at least partially on screen, plus the one-day margin
-  /// of [_windowStart]/[_windowEnd]. The scroll content leads directly with
-  /// day column 0 (the temperature scale and the corner glyphs live in the
-  /// frozen rail outside the scroll), so the offset maps straight onto the
-  /// column grid: day cell i spans [i * colW, (i + 1) * colW).
+  /// The leftmost day with any pixel on screen (no margin): day cell i
+  /// spans [i * colW, (i + 1) * colW) in the stripless scroll content, so
+  /// the offset maps straight onto the column grid.
+  int _firstVisibleDay(int dayCount) {
+    final colW = _columnWidth ?? minDayColumnWidth;
+    final offset =
+        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    return (offset / colW).floor().clamp(0, dayCount - 1);
+  }
+
+  /// The day-index window to build for the current scroll offset. The
+  /// scroll content leads directly with day column 0 (the temperature
+  /// scale and the corner glyphs live in the frozen rail outside the
+  /// scroll), so the offset maps straight onto the column grid: day cell
+  /// i spans [i * colW, (i + 1) * colW).
+  ///
+  /// Returns the PARKED window ([_windowStart.._windowEnd]) while it still
+  /// covers the visible range with the one-day seam margin to spare —
+  /// keeping a sufficient window avoids a rebuild for nothing. Otherwise
+  /// (fresh state, first scroll, or the visible edge reached the parked
+  /// window's margin) it re-parks around the current position: every
+  /// column at least partially on screen plus [windowMarginDays] of
+  /// margin on each side. A rebuild therefore happens at most once per
+  /// extra screen-width of travel, and never leaves the viewport edge
+  /// without a built column (the seam guarantee).
   (int, int) _windowFor(int dayCount) {
     final viewport = _viewportWidth ?? 0;
     final colW = _columnWidth ?? minDayColumnWidth;
     final offset =
         _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final firstVisible = (offset / colW).floor().clamp(0, dayCount - 1);
+    final firstVisible = _firstVisibleDay(dayCount);
     // The last column with any pixel on screen: day i's column START is
     // left of the viewport's right edge — i.e. i < (offset + viewport) /
     // colW, so the largest such i is one below that quotient's ceil (a
@@ -442,11 +464,39 @@ final class _CycleChartState extends State<_CycleChart> {
     // exactly at the right edge — nothing of it is visible).
     final lastVisible = (((offset + viewport) / colW).ceil() - 1)
         .clamp(firstVisible, dayCount - 1);
+    final parkedStart = math.min(_windowStart, dayCount - 1);
+    final parkedEnd = math.min(_windowEnd, dayCount - 1);
+    // Still sufficient? The parked window must cover the visible range
+    // plus the one-day seam margin on each side — where such a column
+    // exists at all (at the range's edges there is nothing beyond the
+    // first/last day to cover, so the check clamps there too).
+    final leftNeeded = math.max(0, firstVisible - 1);
+    final rightNeeded = math.min(dayCount - 1, lastVisible + 1);
+    if (parkedStart < parkedEnd &&
+        leftNeeded >= parkedStart &&
+        rightNeeded <= parkedEnd) {
+      return (parkedStart, parkedEnd);
+    }
+    // Re-park around the current position.
+    final margin = windowMarginDays(viewport, colW);
     return (
-      math.max(0, firstVisible - 1),
-      math.min(dayCount - 1, lastVisible + 1),
+      math.max(0, firstVisible - 1 - margin),
+      math.min(dayCount - 1, lastVisible + 1 + margin),
     );
   }
+
+  /// The window margin in day columns: one extra screen-width (what the
+  /// viewport shows) rounded UP to whole columns, so the parked window is
+  /// re-built only after the content travels a full extra screen — during
+  /// a fling that means a handful of rebuilds instead of one per column.
+  /// A fresh park always carries the margin past the visible edge; the
+  /// one-day seam margin rides on top, so a rebuild also never introduces
+  /// a seam at the viewport edge. Derived from the LIVE viewport and
+  /// column width rather than a fixed constant: a phone and a wide
+  /// desktop window then both carry the same one-screen lead, and no
+  /// constant guess at a maximum viewport width wastes cells.
+  static int windowMarginDays(double viewport, double columnWidth) =>
+      columnWidth <= 0 ? 0 : (viewport / columnWidth).ceil();
 
   void _onScrolled() {
     final (start, end) = _windowFor(_days.dayCount);
@@ -483,9 +533,12 @@ final class _CycleChartState extends State<_CycleChart> {
     if (viewport == null || colW == null) return;
     final firstDay = _days.firstDay;
     final lastDay = _days.dayAt(_days.dayCount - 1);
-    // Initial pick: the leftmost day of the window currently on screen —
-    // the day the user is looking at, not a hidden default.
-    final initial = _days.dayAt(math.min(_windowStart, _days.dayCount - 1));
+    // Initial pick: the leftmost VISIBLE day, not the marined window's
+    // start — the window carries an extra screen-width of margin past the
+    // visible edge, and the picker should open on the day the user is
+    // looking at (see [_firstVisibleDay]).
+    final initial = _days.dayAt(
+        math.min(_firstVisibleDay(_days.dayCount), _days.dayCount - 1));
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -980,20 +1033,21 @@ final class _CycleChartState extends State<_CycleChart> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // The 1–6 low numbering, directly under the chart day
-                          // columns. Full range: the row renders an empty slot per
-                          // day and belongs to the in-progress evaluation-marks
-                          // feature (lib/ui/cycle_marks.dart) — kept unwindowed on
-                          // purpose to keep that feature's numbering semantics
-                          // untouched; the cells are cheap and stay at their
-                          // global positions (cells start at the content's left
-                          // edge — the rail carries no marks-row slot content).
+                          // The 1–6 low numbering, directly under the chart
+                          // day columns. Like the signal rows it renders only
+                          // the scroll window's cells — the window spacer
+                          // keeps them at the global column positions, so a
+                          // window rebuild only adds/removes cells in place;
+                          // the numbering semantics are untouched
+                          // (lib/ui/cycle_marks.dart builds the row).
                           EvaluationMarksRow(
                             dayCount: dayCount,
                             cellWidth: colW,
                             numbersByIndex: overlay.numbersByIndex,
                             onDayTap: _openDaySheet,
                             isCycleBoundary: _days.isCycleBoundary,
+                            windowStart: winStart,
+                            windowEnd: winEnd,
                           ),
                           const SizedBox(height: 4),
                           // BELOW the curve, outside the paper sheet's grid:

@@ -1,6 +1,8 @@
 // Widget tests of the cycle tab's viewport-limited day window: for long
-// recorded ranges only the days that fit usefully on screen are rendered,
-// the whole chart block scrolls horizontally (curve + signal
+// recorded ranges only the days that fit usefully on screen are rendered
+// (the window PARKS with an extra screen-width of margin past the visible
+// edges and is only rebuilt when the visible edge runs into that margin),
+// the whole chart block scrolls horizontally (curve + signal + numbering
 // rows together), the FIRST data frame auto-scrolls so the MOST RECENT days
 // fill the viewport, a later entries re-emit never re-jumps (the user's
 // scrolled position survives), and a jump-to-date affordance moves the
@@ -29,11 +31,29 @@ List<DailyEntry> _longEntries() => [
         DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
     ];
 
+// A many-day range: 2026-01-01 .. 2026-05-30 (150 days, indexes 0..149) —
+// long enough that the scroll window and its margin sit strictly inside
+// the recorded range, so windowing and margin semantics stay distinguishable.
+// The accompanying cycle-start marks (one every 25 days) keep the header's
+// day-of-cycle labels in the two-digit range a real recording stays in (the
+// day-of-cycle counter restarts at every cycle boundary).
+List<DailyEntry> _manyEntries() => [
+      for (var i = 0; i < 150; i++)
+        DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
+    ];
+
+List<CycleMark> _manyCycleStartMarks() => [
+      for (var i = 24; i <= 149; i += 25)
+        CycleMark(
+            profileId: 1, date: _day(i), type: CycleMarkTypes.cycleStart),
+    ];
+
 List<DailyEntry> _shortEntries() => [
       for (var i = 0; i < 5; i++) DailyEntry(date: _day(i), bbtC: 36.5),
     ];
 
 Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
+Finder _marksCell(int index) => find.byKey(ValueKey('marksCell-$index'));
 
 // The chart's day-column geometry at the test viewport (800 wide, 12 body
 // padding on each side): a 60-day range overflows, so columns render at the
@@ -43,12 +63,13 @@ const _columnWidth = 24.0;
 Widget _chartHarness({
   required List<DailyEntry> entries,
   Stream<List<DailyEntry>>? entriesStream,
+  List<CycleMark> marks = const <CycleMark>[],
 }) =>
     ProviderScope(
       overrides: [
         dailyEntriesProvider
             .overrideWith((ref) => entriesStream ?? Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
+        marksProvider.overrideWith((ref) => Stream.value(marks)),
         selectedDateProvider.overrideWith((ref) => entries.first.date),
       ],
       child: MaterialApp(
@@ -73,16 +94,16 @@ Finder _hScrollView() => find.byWidgetPredicate((w) =>
     w.key != const ValueKey('cycleSummaryScroll'));
 
 void main() {
-  group('long recorded range (60 days)', () {
+  group('long recorded range', () {
     testWidgets('the first data frame auto-scrolls to the newest days',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The newest days sit at the content's right edge, so the initial
       // auto-scroll jumped the viewport to the maximum scroll extent: the
       // last day column fills the window, the earliest days are off-screen.
-      expect(_bleedingCell(59), findsOneWidget,
+      expect(_bleedingCell(149), findsOneWidget,
           reason: 'the newest days fill the viewport after the first frame');
       expect(_bleedingCell(0), findsNothing,
           reason: 'the earliest days are outside the initial window');
@@ -92,7 +113,7 @@ void main() {
       final state = tester.state<ScrollableState>(find.descendant(
           of: _hScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.maxScrollExtent, greaterThan(0),
-          reason: '60 day columns need more width than the viewport provides');
+          reason: '150 day columns need more width than the viewport provides');
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the initial auto-scroll jumps straight to the newest days');
     });
@@ -112,15 +133,17 @@ void main() {
 
     testWidgets('dragging scrolls the window; y bounds stay global',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The initial window sits at the newest days; drag BACK toward the
-      // earliest days and assert the window follows the scroll.
-      await tester.drag(_hScrollView(), const Offset(1000, 0));
+      // earliest days and assert the window follows the scroll. The drag
+      // exceeds the maximum scroll extent, so it settles at the content's
+      // start (the earliest days).
+      await tester.drag(_hScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
 
-      expect(_bleedingCell(59), findsNothing,
+      expect(_bleedingCell(149), findsNothing,
           reason: 'the newest days scrolled out of the window');
       expect(_bleedingCell(0), findsOneWidget,
           reason: 'the earliest days appear once scrolled to');
@@ -130,7 +153,7 @@ void main() {
       // absolute heights while scrolling.
       final chartMinY =
           tester.widget<LineChart>(find.byType(LineChart)).data.minY;
-      final recordedValues = _longEntries().map((e) => e.bbtC!).toList();
+      final recordedValues = _manyEntries().map((e) => e.bbtC!).toList();
       expect(chartMinY,
           lessThanOrEqualTo(recordedValues.reduce((a, b) => a < b ? a : b)),
           reason: 'the y scale still covers the coldest recorded day');
@@ -141,8 +164,10 @@ void main() {
       final controller = StreamController<List<DailyEntry>>();
       addTearDown(controller.close);
       await tester.pumpWidget(_chartHarness(
-          entries: _longEntries(), entriesStream: controller.stream));
-      controller.add(_longEntries());
+          entries: _manyEntries(),
+          marks: _manyCycleStartMarks(),
+          entriesStream: controller.stream));
+      controller.add(_manyEntries());
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
@@ -150,9 +175,11 @@ void main() {
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the first data frame jumped to the newest days');
 
-      // Drag away from the end toward earlier days. A timed drag has no
-      // fling momentum, so the settled offset is deterministic.
-      await tester.timedDrag(_hScrollView(), const Offset(300, 0),
+      // Drag away from the end toward earlier days (deep enough that the
+      // wide window margin no longer reaches the range's end). A timed
+      // drag has no fling momentum, so the settled offset is
+      // deterministic.
+      await tester.timedDrag(_hScrollView(), const Offset(900, 0),
           const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
       final offsetAfterDrag = state.position.pixels;
@@ -160,13 +187,13 @@ void main() {
 
       // Emit a NEW list instance (one extra day at the end): the user's
       // scrolled position must survive — no re-jump back to the end.
-      controller
-          .add([..._longEntries(), DailyEntry(date: _day(60), bbtC: 36.5)]);
+      controller.add(
+          [..._manyEntries(), DailyEntry(date: _day(150), bbtC: 36.5)]);
       await tester.pumpAndSettle();
 
       expect(state.position.pixels, offsetAfterDrag,
           reason: 'a later re-emit must not re-run the initial auto-scroll');
-      expect(_bleedingCell(59), findsNothing,
+      expect(_bleedingCell(149), findsNothing,
           reason: 'the view stayed where the user dragged it, not at the end');
       // The dragged-to window still renders: at the dragged offset the
       // visible window starts around floor(offset / columnWidth) — the
@@ -184,7 +211,9 @@ void main() {
       final controller = StreamController<List<DailyEntry>>();
       addTearDown(controller.close);
       await tester.pumpWidget(_chartHarness(
-          entries: _longEntries(), entriesStream: controller.stream));
+          entries: _manyEntries(),
+          marks: _manyCycleStartMarks(),
+          entriesStream: controller.stream));
       controller.add(const <DailyEntry>[]);
       await tester.pumpAndSettle();
 
@@ -192,7 +221,7 @@ void main() {
       // to jump (the screen shows its no-data state instead).
       expect(_hScrollView(), findsNothing);
 
-      controller.add(_longEntries());
+      controller.add(_manyEntries());
       await tester.pumpAndSettle();
 
       // The first NON-EMPTY data frame mounts the chart and auto-scrolls
@@ -201,43 +230,93 @@ void main() {
           of: _hScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the first non-empty data frame jumps to the newest days');
-      expect(_bleedingCell(59), findsOneWidget);
+      expect(_bleedingCell(149), findsOneWidget);
     });
 
     testWidgets(
-        'after a drag away from the end the rendered window matches the '
-        'leftmost visible day (stripless content)', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
-      await tester.pumpAndSettle();
-
-      // Drag from the newest-days end (max scroll extent) back toward the
-      // earliest days. A drag gesture carries no fling momentum, so the
-      // settled offset stays put; its exact delta depends on the framework's
-      // touch slop, so the test READS the settled offset and pins the
-      // window math against it (the bare offset maps straight onto the
-      // column grid — the content has no leading strip).
-      await tester.drag(_hScrollView(), const Offset(260, 0));
+        'a freshly parked window carries one extra screen-width of margin '
+        'past the visible edges, not further', (tester) async {
+      await tester.pumpWidget(
+          _chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
           of: _hScrollView(), matching: find.byType(Scrollable)));
-      final offset = state.position.pixels;
-      expect(offset, lessThan(state.position.maxScrollExtent),
-          reason: 'the drag moved the window off the end');
-      // Day cell i starts at i * 24 in the content, so the leftmost
-      // partially visible day is floor(offset / columnWidth).
-      final leftmostVisible = (offset / _columnWidth).floor();
+      // The scroll viewport: block width (800 test viewport, 12 body
+      // padding on each side) minus the frozen rail left of the scroll.
+      const scrollViewport = 800.0 - 2 * 12 - 44; // 732
+      final marginDays = (scrollViewport / _columnWidth).ceil(); // 31
 
-      expect(_bleedingCell(leftmostVisible), findsOneWidget,
-          reason: 'the leftmost visible day is rendered');
-      // The window carries one day of margin before the visible edge, but
-      // no further: the day BEFORE the margin must not render.
-      expect(_bleedingCell(leftmostVisible - 1), findsOneWidget,
-          reason: 'the one-day margin before the visible edge renders');
-      expect(_bleedingCell(leftmostVisible - 2), findsNothing,
-          reason: 'the window does not reach past the margin — the window '
-              'math matches the stripless content, it does not lag behind '
-              'the scroll');
+      // Fresh park 1: the initial auto-scroll landed at the newest days;
+      // the left margin is unclamped and ends exactly one extra
+      // screen-width before the leftmost visible edge.
+      final maxExtent = state.position.maxScrollExtent;
+      final freshVisible = (maxExtent / _columnWidth).floor();
+      expect(_bleedingCell(freshVisible - 1 - marginDays), findsOneWidget,
+          reason: 'a full extra screen-width of margin renders before the '
+              'visible edge of a freshly parked window');
+      expect(_bleedingCell(freshVisible - 2 - marginDays), findsNothing,
+          reason: 'the fresh park is bounded: the window does not extend '
+              'past one extra screen-width');
+
+      // Fresh park 2: a long jump (the jump-to-date landing does the same)
+      // re-parks the window around the landed position: both margins
+      // extend exactly one extra screen-width past the visible edges.
+      // Day cell i spans [i * 24, (i + 1) * 24).
+      state.position.jumpTo(1000.0);
+      await tester.pumpAndSettle();
+      expect(state.position.pixels, 1000.0,
+          reason: 'precondition: the jump landed at the exact offset');
+      final firstVisible = (1000.0 / _columnWidth).floor();
+      final lastVisible =
+          ((1000.0 + scrollViewport) / _columnWidth).ceil() - 1;
+      expect(_bleedingCell(firstVisible - 1 - marginDays), findsOneWidget,
+          reason: 'the re-parked window carries the screen-width margin '
+              'before the visible edge');
+      expect(_bleedingCell(firstVisible - 2 - marginDays), findsNothing,
+          reason: 'the re-parked window stays bounded at the margin');
+      expect(_bleedingCell(lastVisible + 1 + marginDays), findsOneWidget,
+          reason: 'the re-parked window carries the screen-width margin '
+              'past the visible right edge');
+      expect(_bleedingCell(lastVisible + 2 + marginDays), findsNothing,
+          reason: 'the re-parked window stays bounded at the margin');
+    });
+
+    testWidgets(
+        'a small scroll stays inside the parked window — the window is '
+        'not rebuilt for travel the margin absorbs', (tester) async {
+      await tester.pumpWidget(
+          _chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpAndSettle();
+
+      final state = tester.state<ScrollableState>(find.descendant(
+          of: _hScrollView(), matching: find.byType(Scrollable)));
+      const scrollViewport = 800.0 - 2 * 12 - 44; // 732
+      final marginDays = (scrollViewport / _columnWidth).ceil();
+      final maxExtent = state.position.maxScrollExtent;
+      final freshVisible = (maxExtent / _columnWidth).floor();
+      final parkedStart = freshVisible - 1 - marginDays;
+      expect(parkedStart, greaterThan(0),
+          reason: 'precondition: the parked margin is unclamped here');
+
+      // Travel 240 px (ten columns) — well within one extra screen-width
+      // of margin: the visible edge moves, but the parked window around it
+      // still covers the viewport with seam margin to spare.
+      state.position.jumpTo(maxExtent - 240.0);
+      await tester.pumpAndSettle();
+
+      // The parked window keeps sitting at the SAME boundary — it was not
+      // re-parked around the new position (that is what keeps the rebuild
+      // rare during a fling).
+      expect(_bleedingCell(parkedStart), findsOneWidget);
+      expect(_bleedingCell(parkedStart - 1), findsNothing,
+          reason: 'the parked window did not follow the small scroll — '
+              'the margin absorbs the travel');
+
+      // The seam guarantee still holds at the new position: the leftmost
+      // visible day and the day before it render.
+      final visible = (state.position.pixels / _columnWidth).floor();
+      expect(_bleedingCell(visible), findsOneWidget);
     });
 
     testWidgets(
@@ -264,7 +343,15 @@ void main() {
 
     testWidgets('jump-to-date: picking a date moves the window onto it',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpAndSettle();
+
+      // Drag to the content's start first: the picker opens on the
+      // leftmost day of the window (the day the user is looking at), so
+      // with the window parked at the earliest days it opens on January —
+      // independent of how wide the window margin sits behind the visible
+      // edge.
+      await tester.drag(_hScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('calendarJumpButton')));
@@ -272,11 +359,8 @@ void main() {
 
       expect(find.byType(DatePickerDialog), findsOneWidget,
           reason: 'the affordance opens the material date picker');
-      // With the initial auto-scroll the window sits at the newest days
-      // (offset = max extent -> leftmost visible day index 26 = 2026-01-27,
-      // the picker's initial date), so it still opens on January. Day index
-      // of 2026-01-20 = 19. The material picker confirms a day selection
-      // through its OK button.
+      // Day index of 2026-01-20 = 19. The material picker confirms a day
+      // selection through its OK button.
       await tester.tap(find.text('20').last, warnIfMissed: false);
       await tester.pumpAndSettle();
       await tester.tap(find.text('OK'), warnIfMissed: false);
@@ -284,8 +368,8 @@ void main() {
 
       expect(_bleedingCell(19), findsOneWidget,
           reason: 'the picked day is now inside the rendered window');
-      expect(_bleedingCell(0), findsNothing,
-          reason: 'the window jumped away from the first day');
+      expect(_bleedingCell(149), findsNothing,
+          reason: 'the window jumped away from where it was');
     });
 
     testWidgets('tapping the curve in the scrolled window opens the day sheet',
@@ -351,6 +435,57 @@ void main() {
       expect(find.byType(BottomSheet), findsOneWidget);
       final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
       expect(sheet.day, DateTime.utc(2026, 2, 28));
+    });
+  });
+
+  group('the 1–6 numbering row is windowed like the signal rows', () {
+    testWidgets('only the scroll window\'s numbering cells render',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpAndSettle();
+
+      // The initial auto-scroll parks the window at the newest days: only
+      // the window's numbering cells are built — a 150-day range must not
+      // keep one cell per calendar day alive off-screen.
+      expect(_marksCell(149), findsOneWidget,
+          reason: 'the newest days fill the window after the first frame');
+      expect(_marksCell(0), findsNothing,
+          reason: 'the earliest days are outside the initial window');
+
+      // Drag back to the earliest days: the numbering window follows the
+      // scroll, like the signal rows it mirrors.
+      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.pumpAndSettle();
+      expect(_marksCell(0), findsOneWidget,
+          reason: 'the numbering cells appear once their days scroll in');
+      expect(_marksCell(149), findsNothing,
+          reason: 'the newest days are outside the window after the drag');
+    });
+
+    testWidgets(
+        'the windowed numbering cells keep their global column positions',
+        (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpAndSettle();
+
+      // The window spacer (the signal rows' pattern) keeps cell i at its
+      // global column position: wherever the window starts, the numbering
+      // cell of a day sits exactly at the same column as that day's
+      // signal-row cell.
+      void expectSharedColumn(int index) {
+        final marksX = tester.getTopLeft(_marksCell(index)).dx;
+        final bleedingX = tester.getTopLeft(_bleedingCell(index)).dx;
+        expect(marksX, closeTo(bleedingX, 0.5),
+            reason: 'numbering cell $index keeps its global column position '
+                '(window spacer, like the signal rows)');
+      }
+
+      // The initial window sits at the newest days ...
+      expectSharedColumn(130);
+      // ... and the dragged-to window at the earliest days.
+      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.pumpAndSettle();
+      expectSharedColumn(10);
     });
   });
 

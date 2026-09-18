@@ -48,6 +48,8 @@
 //   original 5 px shaft / 4 px head / Size(9, 8) footprint rendered too
 //   small next to the day columns.)
 
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -450,15 +452,16 @@ BorderSide cycleDayCellBorderSide(BuildContext context,
 
 /// The 1–6 numbering under the chart: one narrow tappable cell per
 /// calendar day, aligned by the same even day spacing as the chart and
-/// the signal rows (mirrors the rows in cycle.dart). The cells start at
-/// the scroll content's left edge — the chart block's scale and corner
-/// glyphs live in the frozen left rail outside the scroll, so the rows
-/// carry no leading strip — and day cell i is centered at
-/// (i + 0.5) * cellWidth, exactly where the chart draws day i's dot. Days
-/// outside the six-low windows render an empty fixed-height slot. The
-/// cells carry the card's day-cell separators (hairline, thickened on
-/// cycle boundaries) so the vertical lines run through the whole card;
-/// the numbering semantics themselves stay untouched.
+/// the signal rows (mirrors the rows in cycle.dart). LIKE those rows, only
+/// the scroll window's cells are built (windowStart..windowEnd, inclusive;
+/// a leading spacer keeps them at their global column positions) — day cell
+/// i is centered at (i + 0.5) * cellWidth, exactly where the chart draws
+/// day i's dot. Days outside the six-low windows render an empty
+/// fixed-height slot. The cells carry the card's day-cell separators
+/// (hairline, thickened on cycle boundaries) so the vertical lines run
+/// through the whole card; the numbering semantics themselves stay
+/// untouched (the windowing only decides WHICH cells are built, never which
+/// number a cell carries).
 final class EvaluationMarksRow extends StatelessWidget {
   const EvaluationMarksRow({
     super.key,
@@ -466,6 +469,8 @@ final class EvaluationMarksRow extends StatelessWidget {
     required this.cellWidth,
     required this.numbersByIndex,
     required this.onDayTap,
+    required this.windowStart,
+    required this.windowEnd,
     this.isCycleBoundary,
   });
 
@@ -480,6 +485,14 @@ final class EvaluationMarksRow extends StatelessWidget {
   final Map<int, int> numbersByIndex;
   final void Function(int index) onDayTap;
 
+  /// The built window's inclusive day-index bounds ([windowStart..windowEnd] —
+  /// the caller's scroll window; clamped to the recorded range here). The
+  /// leading window spacer keeps the built cells at their global column
+  /// positions (mirrors the header row's and the signal rows' spacers), so
+  /// a window rebuild only adds/removes cells in place.
+  final int windowStart;
+  final int windowEnd;
+
   /// The shared cycle-boundary predicate (see _ChartDays.isCycleBoundary
   /// in cycle.dart): when given, cell i's right border thickens on the
   /// cell before a cycle start (day i + 1 opens a cycle).
@@ -490,7 +503,13 @@ final class EvaluationMarksRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < dayCount; i++)
+        // The window spacer keeps the cells at their global column
+        // positions (mirrors the header row's and the signal rows'
+        // spacers).
+        if (windowStart > 0) SizedBox(width: windowStart * cellWidth),
+        for (var i = math.max(windowStart, 0);
+            i <= math.min(windowEnd, dayCount - 1);
+            i++)
           SizedBox(
             width: cellWidth,
             child: InkWell(

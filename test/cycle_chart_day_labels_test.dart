@@ -220,25 +220,34 @@ void main() {
 
     testWidgets('the labels build windowed at their global x positions',
         (tester) async {
-      // 60 recorded days (2026-01-20 .. 2026-03-20): far more than one
-      // screen, so only the on-screen window renders labels — and the
+      // 100 recorded days (2026-01-20 .. 2026-04-29): far more than one
+      // screen, so only the parked window renders labels — and the
       // initial auto-scroll starts that window at the newest days, where
       // the later labels carry the content of THEIR day, not of a
-      // re-indexed window.
-      await tester.pumpWidget(_chartHarness(entries: _entries(60)));
+      // re-indexed window. The parked window carries an extra screen-width
+      // of margin past the visible edges (31 columns at this viewport), so
+      // the earliest days (index 0..36) stay outside it. One trailing
+      // cycle-start mark keeps the day-of-cycle labels two-digit (a real
+      // recording restarts its cycle count).
+      final marks = [
+        CycleMark(
+            profileId: 1, date: _day(96), type: CycleMarkTypes.cycleStart),
+      ];
+      await tester.pumpWidget(_chartHarness(
+          entries: _entries(100), marks: marks));
       await tester.pumpAndSettle();
 
       expect(_dayLabel(0), findsNothing,
           reason: 'the earliest days are outside the initial (newest-days) '
-              'window');
-      expect(_dayLabel(59), findsOneWidget,
+              'parked window');
+      expect(_dayLabel(99), findsOneWidget,
           reason: 'the newest day fills the initial window');
 
       // Day index 40 = 2026-03-01 (20 + 40 days): a month FIRST, so its
       // label is the short month form instead of "1." — and the day-of-
       // cycle line is its own (41, counting from 2026-01-20). The initial
-      // window covers the range's tail, so index 40 renders without any
-      // scrolling.
+      // parked window covers the range's tail, so index 40 renders without
+      // any scrolling.
       expect(_label(40, 'Mar'), findsOneWidget,
           reason: 'March 1st shows the short month form even mid-window');
       expect(_label(40, '1.'), findsNothing);
