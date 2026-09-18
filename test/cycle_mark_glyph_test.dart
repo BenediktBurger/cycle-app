@@ -55,12 +55,21 @@ void main() {
 
       final sample = tester.widget<CustomPaint>(find.descendant(
           of: find.byType(SuzArrowGlyph), matching: find.byType(CustomPaint)));
-      expect(sample.size.width, greaterThanOrEqualTo(16),
-          reason: 'the legend sample grew with the chart glyph '
-              '(old sample box: 14 px wide)');
-      expect(sample.size.height, greaterThanOrEqualTo(14),
-          reason: 'the legend sample grew with the chart glyph '
-              '(old sample box: 16 px high)');
+      // The sample box must carry the chart glyph's ENLARGED footprint —
+      // the very Size the chart painter reports — next to its companion
+      // bar: the 2 px bar sits at the 0.5 px left inset (see
+      // _SuzArrowGlyphPainter), so the box is at least bar + inset + glyph
+      // wide, and at least the glyph tall. Stated as proportions of the
+      // chart glyph's size, not as bare absolutes.
+      final glyphSize =
+          SuzArrowDotPainter(color: const Color(0xFF000000))
+              .getSize(const FlSpot(0, 0));
+      expect(sample.size.width, greaterThanOrEqualTo(glyphSize.width + 2.5),
+          reason: 'the bar (2 px) plus its 0.5 px inset precede the glyph — '
+              'the sample grew with the enlarged chart glyph');
+      expect(sample.size.height, greaterThanOrEqualTo(glyphSize.height),
+          reason: 'the sample is at least as tall as the enlarged glyph '
+              '(the bar spans the box\'s full height)');
     });
   });
 }

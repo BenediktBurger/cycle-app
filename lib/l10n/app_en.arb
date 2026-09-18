@@ -225,7 +225,7 @@
   "@cycleLegendDisturbance": {
     "description": "Glossary entry for the disturbance row's stacked letter codes. The vocabulary (kr/alk/R/a) mirrors today's exclusion flags — the pending NER-scheme data-entry item may re-vocabulary these letters."
   },
-  "cycleLegendNote": "Note (this day carries a note in the Tagebuch)",
+  "cycleLegendNote": "Note (this day carries a note in the Diary)",
   "@cycleLegendNote": {
     "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
   },

@@ -66,8 +66,7 @@ Widget _chartHarness({
 void main() {
   testWidgets(
       'a day with a non-empty note renders the indicator glyph in its '
-      'day column, at the very bottom of the chart block',
-      (tester) async {
+      'day column, below the chart block', (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
@@ -79,7 +78,7 @@ void main() {
         reason: 'the note-indicator row sits below the chart block');
     expect(tester.getRect(_cell(1, 'time')).top, lessThan(noteRect.top),
         reason: 'the note indicator renders below the measurement-time '
-            'row — the paper sheet\'s remarks block is the very bottom');
+            'row, below the chart block');
     final cell = tester.getRect(_cell(1, 'bleeding'));
     expect(noteRect.left, closeTo(cell.left, 0.5),
         reason: 'the note cell shares the day column geometry');
@@ -124,8 +123,8 @@ void main() {
 
     expect(_corner('note'), findsOneWidget);
     final tooltips = tester
-        .widgetList<Tooltip>(
-            find.descendant(of: _corner('note'), matching: find.byType(Tooltip)))
+        .widgetList<Tooltip>(find.descendant(
+            of: _corner('note'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(tooltips, ['Note'],
@@ -140,8 +139,8 @@ void main() {
         _chartHarness(entries: _entries, locale: const Locale('de')));
     await tester.pumpAndSettle();
     final deTooltips = tester
-        .widgetList<Tooltip>(
-            find.descendant(of: _corner('note'), matching: find.byType(Tooltip)))
+        .widgetList<Tooltip>(find.descendant(
+            of: _corner('note'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(deTooltips, ['Notiz'], reason: 'de: the note row is "Notiz"');
@@ -158,7 +157,7 @@ void main() {
         find.descendant(
             of: find.byKey(const ValueKey('cycleHelpSheet')),
             matching: find.text(
-                'Note (this day carries a note in the Tagebuch)')),
+                'Note (this day carries a note in the Diary)')),
         findsOneWidget,
         reason: 'the indicator glyph needs a glossary entry');
   });

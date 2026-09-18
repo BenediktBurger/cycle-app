@@ -65,7 +65,7 @@ const _glossaryEn = [
   'Mittelschmerz (M)',
   'Breast pain (B)',
   'Interrupted days (kr illness, alk alcohol, R travel, a other)',
-  'Note (this day carries a note in the Tagebuch)',
+  'Note (this day carries a note in the Diary)',
 ];
 
 const _glossaryDe = [

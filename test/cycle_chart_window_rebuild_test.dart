@@ -76,10 +76,7 @@ void main() {
     // Travel 2000 px in 10 px steps (one pump per step): with a parked
     // window carrying an extra screen-width of margin (31 columns at this
     // viewport), the window needs re-parking only every extra screen-width
-    // of travel — once per active edge — not once per day column. A
-    // without-margin implementation re-windows ~5× more often than it
-    // pumps here; the generous bound below leaves room for the parked
-    // window's two edges and the range's clamped edges.
+    // of travel — once per active edge — not once per day column.
     var reWindows = 0;
     var built = _builtCells(tester);
     const steps = 200;
@@ -97,10 +94,10 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    // One screen-width of travel = 31 columns = 744 px: 2000 px of travel
-    // needs 2–3 re-parks per active edge; a generous bound of 6 stays far
-    // below a per-column re-windowing (which would approach 80+ transitions
-    // for both edges).
+    // Measured improvement trail: without windowing/margin this 2000 px
+    // scroll caused 200 window rebuilds; with the parked screen-width
+    // margin ≤2 were observed — the bound of 6 is headroom for the parked
+    // window's two edges and the range's clamped edges.
     expect(reWindows, lessThanOrEqualTo(6),
         reason: 'a 2000 px scroll must re-window only a handful of times '
             '(the parked margin absorbs the travel); observed $reWindows');

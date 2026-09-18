@@ -97,7 +97,8 @@ void main() {
   group('long recorded range', () {
     testWidgets('the first data frame auto-scrolls to the newest days',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpWidget(_chartHarness(
+          entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The newest days sit at the content's right edge, so the initial
@@ -133,7 +134,8 @@ void main() {
 
     testWidgets('dragging scrolls the window; y bounds stay global',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpWidget(_chartHarness(
+          entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The initial window sits at the newest days; drag BACK toward the
@@ -237,7 +239,8 @@ void main() {
         'a freshly parked window carries one extra screen-width of margin '
         'past the visible edges, not further', (tester) async {
       await tester.pumpWidget(
-          _chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          _chartHarness(
+              entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
@@ -286,7 +289,8 @@ void main() {
         'a small scroll stays inside the parked window — the window is '
         'not rebuilt for travel the margin absorbs', (tester) async {
       await tester.pumpWidget(
-          _chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          _chartHarness(
+              entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
@@ -343,7 +347,8 @@ void main() {
 
     testWidgets('jump-to-date: picking a date moves the window onto it',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpWidget(_chartHarness(
+          entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // Drag to the content's start first: the picker opens on the
@@ -441,7 +446,8 @@ void main() {
   group('the 1–6 numbering row is windowed like the signal rows', () {
     testWidgets('only the scroll window\'s numbering cells render',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpWidget(_chartHarness(
+          entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The initial auto-scroll parks the window at the newest days: only
@@ -465,7 +471,8 @@ void main() {
     testWidgets(
         'the windowed numbering cells keep their global column positions',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _manyEntries(), marks: _manyCycleStartMarks()));
+      await tester.pumpWidget(_chartHarness(
+          entries: _manyEntries(), marks: _manyCycleStartMarks()));
       await tester.pumpAndSettle();
 
       // The window spacer (the signal rows' pattern) keeps cell i at its

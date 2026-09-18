@@ -346,13 +346,19 @@ final class _CycleChartState extends State<_CycleChart> {
   /// Clears the AppBar registration (see [_jumpRegistration]).
   /// Post-frame so the provider write happens outside the teardown sweep;
   /// skipped when the container is gone already (test scope disposal).
+  ///
+  /// The clear is STAMPED: a disposing chart instance only nulls the
+  /// registration while it still holds its OWN callback — a later chart
+  /// (re-registered between this dispose's post-frame callback and its
+  /// run) keeps its affordance instead of losing it to the stale clear.
   void _unregisterJumpAffordance() {
     final registration = _jumpRegistration;
     _jumpRegistration = null;
     if (registration == null) return;
+    final myCallback = _jumpToDate; // tear-off equal to the registered one
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!registration.mounted) return;
-      registration.state = null;
+      if (registration.state == myCallback) registration.state = null;
     });
   }
 
@@ -537,8 +543,7 @@ final class _CycleChartState extends State<_CycleChart> {
     // start — the window carries an extra screen-width of margin past the
     // visible edge, and the picker should open on the day the user is
     // looking at (see [_firstVisibleDay]).
-    final initial = _days.dayAt(
-        math.min(_firstVisibleDay(_days.dayCount), _days.dayCount - 1));
+    final initial = _days.dayAt(_firstVisibleDay(_days.dayCount));
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -1642,33 +1647,33 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 
-/// Disturbance: the stacked letter codes of the day's exclusion flags
-/// ([disturbanceLetters]) — the paper sheet writes disturbance codes one
-/// under the other. Neutral on-surface ink. The row's fixed height fits
-/// two codes unscaled; more codes shrink to fit (FittedBox) rather than
-/// overflow or drop. The excluded temperatures themselves keep rendering
-/// as LIGHTER curve dots in the plot (unchanged curve behavior; these
-/// letters only NAME the reason).
-static Widget _disturbanceContent(BuildContext context, DailyEntry? day) {
-  final letters = disturbanceLetters(day);
-  if (letters.isEmpty) return const SizedBox.shrink();
-  return FittedBox(
-    fit: BoxFit.scaleDown,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final letter in letters)
-          Text(
-            letter,
-            style: TextStyle(
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.onSurface,
+  /// Disturbance: the stacked letter codes of the day's exclusion flags
+  /// ([disturbanceLetters]) — the paper sheet writes disturbance codes one
+  /// under the other. Neutral on-surface ink. The row's fixed height fits
+  /// two codes unscaled; more codes shrink to fit (FittedBox) rather than
+  /// overflow or drop. The excluded temperatures themselves keep rendering
+  /// as LIGHTER curve dots in the plot (unchanged curve behavior; these
+  /// letters only NAME the reason).
+  static Widget _disturbanceContent(BuildContext context, DailyEntry? day) {
+    final letters = disturbanceLetters(day);
+    if (letters.isEmpty) return const SizedBox.shrink();
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final letter in letters)
+            Text(
+              letter,
+              style: TextStyle(
+                fontSize: 9,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
-          ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   /// Measurement time: the localized HH:mm text of a recorded
   /// temperature-measurement time, rendered in the time row BELOW the
@@ -1713,7 +1718,7 @@ static Widget _disturbanceContent(BuildContext context, DailyEntry? day) {
   /// (Bemerkungen) block is the very bottom (TODO(user-review): flagged
   /// on _belowChartKinds). Tapping the cell opens the day's mark-entry
   /// sheet like every other cell; the note text itself is edited in the
-  /// Tagebuch form (the sheet's "edit day" jump).
+  /// Diary form (the sheet's "edit day" jump).
   static Widget _noteContent(BuildContext context, DailyEntry? day) {
     if (day == null || day.notes == null || day.notes!.isEmpty) {
       return const SizedBox.shrink();

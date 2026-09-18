@@ -17,7 +17,7 @@
 //     mirror the scroll content: the top-of-block rows (bleeding, mucus,
 //     M, sex) stack between the header prototypes and the temperature
 //     scale, the below-curve rows (cervix, pain) below the marks slot,
-//     and the below-block rows (time) at the rail's tail.
+//     and the below-block rows (time, note) at the rail's tail.
 // Same harness pattern as test/cycle_chart_rows_test.dart (long-range
 // frozen-content test mirrors test/cycle_chart_windowing_test.dart).
 import 'package:cycle_app/domain/cervix.dart';
