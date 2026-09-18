@@ -251,13 +251,13 @@ final class ImportSummary {
   /// Entries present on this device (to overwrite, per the merge policy).
   final int entriesOverwritten;
 
-  /// Rows rejected because they are structurally invalid (bad/missing date
-  /// or profile id, bleeding outside the stored vocabulary — exactly the
+  /// Rows rejected because they are structurally invalid (a broken or
+  /// missing ISO day, bleeding outside the stored vocabulary — exactly the
   /// rows the db writer drops, see the shared helpers used by both sides).
   final int entriesInvalid;
 
-  /// Rows whose (profile, date) key appears twice IN the document itself;
-  /// the first occurrence wins.
+  /// Rows whose same-day key appears twice IN the document itself; the
+  /// first occurrence wins.
   final int duplicateEntryRows;
 
   /// Marks absent on this device (to add).

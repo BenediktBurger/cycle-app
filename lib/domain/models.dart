@@ -26,10 +26,10 @@ enum Bleeding {
 
 /// Parses an export/storage bleeding field into the enum ([Bleeding.values]
 /// vocabulary), null for anything else. SHARED by the import planner and the
-/// db writer — the single source of truth for this field's validation, like
-/// parseExportId for ids, so a row a writer would drop is never counted as a
-/// write (and never vice versa). Accepts `Object?` (see tryParseBleeding's
-/// callers: export rows arrive JSON-decoded as the loosest possible shape).
+/// db writer — the single source of truth for this field's validation, so a
+/// row a writer would drop is never counted as a write (and never vice
+/// versa). Accepts `Object?` (see tryParseBleeding's callers: export rows
+/// arrive JSON-decoded as the loosest possible shape).
 ///
 /// Two accepted shapes:
 ///  - `int` 0–4 → the enum member carrying that [Bleeding.level] (mapped by
@@ -68,9 +68,9 @@ Bleeding? tryParseBleeding(Object? raw) {
 /// (0–1439), the vocabulary of [DailyEntry.measuredAtMinutes].
 ///
 /// An `int` is taken verbatim (inside the valid range); a numeric string is
-/// tolerated like `parseExportId` (lib/domain/export_import.dart) tolerates
-/// ids: lossy tools serialize integers as strings. Everything else —
-/// including NULL-as-"not recorded" and out-of-range values — yields null.
+/// tolerated because lossy tools serialize integers as strings. Everything
+/// else — including NULL-as-"not recorded" and out-of-range values — yields
+/// null.
 /// Never drops a row: callers treat null as "field not recorded", mirroring
 /// the SQL CHECK on the column.
 int? tryParseMeasuredAtMinutes(Object? raw) {

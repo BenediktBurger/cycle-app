@@ -393,6 +393,7 @@ final class CycleDaySheet extends ConsumerWidget {
         ref.watch(dailyEntriesProvider).valueOrNull ?? const <DailyEntry>[];
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
+    final hasExcluded = _hasMark(marks, CycleMarkTypes.excludedFromAnalysis);
     final hasFirstHigher =
         _hasMark(marks, CycleMarkTypes.firstHigherMeasurement);
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
@@ -480,6 +481,23 @@ final class CycleDaySheet extends ConsumerWidget {
                   : l10n.cycleSheetSetMucusPeak,
               onTap: () => _writeMark(ref,
                   type: CycleMarkTypes.mucusPeakDay, remove: hasPeak),
+            ),
+            _SheetAction(
+              // The analysis-exclusion toggle ("vom Auswerten
+              // ausschließen"): a marked day is interrupted for the
+              // evaluation — a gap day, never a cycle start — regardless of
+              // the raw disturbance flags (which are the interrupted
+              // TEMPERATURE rendering, not analysis input). It is the same
+              // mark the diary save auto-SETs when a disturbance flag is
+              // selected (auto-set only, never auto-removed); this row is
+              // the manual correction affordance.
+              icon: Icons.visibility_off_outlined,
+              label: hasExcluded
+                  ? l10n.cycleSheetRemoveExcludeFromAnalysis
+                  : l10n.cycleSheetSetExcludeFromAnalysis,
+              onTap: () => _writeMark(ref,
+                  type: CycleMarkTypes.excludedFromAnalysis,
+                  remove: hasExcluded),
             ),
             _SheetAction(
               icon: Icons.adjust,

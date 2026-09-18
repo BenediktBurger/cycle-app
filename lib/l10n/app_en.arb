@@ -109,6 +109,7 @@
   "cycleLegendBleeding": "Bleeding",
   "cycleLegendMucus": "Fertility sign (mucus)",
   "cycleLegendMucusPeak": "Mucus peak",
+  "cycleLegendExcludedFromAnalysis": "Excluded from analysis (day-sheet toggle)",
   "cycleLegendCircledHigher": "Circled higher measurements",
   "cycleLegendArrowHigher": "Higher measurement (arrow)",
   "cycleLegendBaseline": "Baseline",
@@ -122,6 +123,8 @@
   "cycleSheetRemoveMucusPeak": "Remove mucus peak",
   "cycleSheetSetFirstHigher": "Set first higher measurement",
   "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
+  "cycleSheetSetExcludeFromAnalysis": "Exclude from analysis",
+  "cycleSheetRemoveExcludeFromAnalysis": "Include in analysis again",
   "cycleSheetBaselineInfo": "Baseline: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {

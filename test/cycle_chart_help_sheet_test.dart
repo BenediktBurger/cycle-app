@@ -44,13 +44,16 @@ Widget _chartHarness({
       ),
     );
 
-/// The glossary entries the on-screen legend carried (en wording); each is
-/// asserted inside the help sheet.
+/// The glossary entries (en wording); each is asserted inside the help
+/// sheet. The "Excluded from analysis" entry covers the day-sheet toggle
+/// (a user mark without a chart glyph — explained under its own switch
+/// icon).
 const _glossaryEn = [
   'BBT (temperature)',
   'Bleeding',
   'Fertility sign (mucus)',
   'Mucus peak',
+  'Excluded from analysis (day-sheet toggle)',
   'Circled higher measurements',
   'Higher measurement (arrow)',
   'Baseline',
@@ -67,6 +70,7 @@ const _glossaryDe = [
   'Blutung',
   'Zeichen der Fruchtbarkeit (Schleim)',
   'Schleimhöhepunkt',
+  'Vom Auswerten ausgeschlossen (Schalter im Tagesblatt)',
   'Umrandete höhere Messungen',
   'höhere Messung (Pfeil)',
   'Basislinie',
@@ -97,10 +101,10 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: _entries(5)));
       await tester.pumpAndSettle();
 
-      final action =
-          tester.widget<IconButton>(find.byKey(const ValueKey('cycleHelpAction')));
-      expect(action.icon, isA<Icon>().having(
-          (i) => i.icon, 'icon', Icons.info_outline),
+      final action = tester
+          .widget<IconButton>(find.byKey(const ValueKey('cycleHelpAction')));
+      expect(action.icon,
+          isA<Icon>().having((i) => i.icon, 'icon', Icons.info_outline),
           reason: 'the affordance is the info_outline icon');
       expect(action.tooltip, 'Show symbol glossary',
           reason: 'the action carries its localized tooltip');
@@ -156,17 +160,15 @@ void main() {
           reason: 'the mucus glossary sample carries no EW superscript');
     });
 
-    testWidgets('the glossary uses the German wording in de',
-        (tester) async {
-      await tester.pumpWidget(_chartHarness(
-          entries: _entries(5), locale: const Locale('de')));
+    testWidgets('the glossary uses the German wording in de', (tester) async {
+      await tester.pumpWidget(
+          _chartHarness(entries: _entries(5), locale: const Locale('de')));
       await tester.pumpAndSettle();
 
       expect(
           tester
-                  .widget<IconButton>(
-                      find.byKey(const ValueKey('cycleHelpAction')))
-                  .tooltip,
+              .widget<IconButton>(find.byKey(const ValueKey('cycleHelpAction')))
+              .tooltip,
           'Zeichenerklärung anzeigen');
 
       await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));

@@ -119,6 +119,16 @@ Future<void> _tapDay(WidgetTester tester, int index) async {
   await tester.pumpAndSettle();
 }
 
+/// Brings a sheet row into view: the toggle rows live in a scrollable
+/// column, and the bottom rows (the SUZ variants) can sit below the
+/// modal sheet's visible area once the row list grows.
+Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 50,
+      scrollable: find.descendant(
+          of: find.byType(BottomSheet), matching: find.byType(Scrollable)));
+  await tester.pumpAndSettle();
+}
+
 /// The stored mark types for one calendar day, from the REAL database.
 Future<List<String>> _storedTypes(DateTime day) async =>
     (await _db!.marksDao.marksForDay(day)).map((m) => m.markType).toList();
@@ -458,6 +468,132 @@ void main() {
     });
   });
 
+  group('excludedFromAnalysis toggle (the analysis-exclusion mark)', () {
+    /// The y-position of a sheet row label (visual order probe).
+    double rowYOf(WidgetTester tester, String label) => tester
+        .getTopLeft(find.descendant(
+            of: find.byType(BottomSheet), matching: find.text(label)))
+        .dy;
+
+    testWidgets(
+        'the toggle row sits BETWEEN the mucus-peak row and the '
+        'first-higher row: edit day → cycle start → mucus peak → exclude '
+        'from analysis → first higher → SUZ evening → SUZ morning',
+        (tester) async {
+      await _pump(tester, entries: _entries); // no marks yet
+      await _tapDay(tester, 4); // 9/10, an arbitrary day
+
+      expect(find.text('Exclude from analysis'), findsOneWidget,
+          reason: 'the day carries no exclusion mark -> the set wording');
+
+      // Visual order, not mere presence: each row label must render ABOVE
+      // the next one inside the sheet.
+      const order = [
+        'Edit day',
+        'Set cycle start',
+        'Set mucus peak',
+        'Exclude from analysis',
+        'Set first higher measurement',
+        'SUZ from this evening',
+        'SUZ from this morning',
+      ];
+      final ys = <String, double>{
+        for (final label in order) label: rowYOf(tester, label),
+      };
+      for (var i = 0; i < order.length - 1; i++) {
+        expect(ys[order[i]]! < ys[order[i + 1]]!, isTrue,
+            reason: '"${order[i]}" sits above "${order[i + 1]}" — the '
+                'exclusion toggle belongs between the mucus-peak and the '
+                'first-higher rows');
+      }
+    });
+
+    testWidgets(
+        'tapping the toggle persists an excludedFromAnalysis mark through '
+        'the MarksDao and flips to the include wording; tapping again '
+        'removes it', (tester) async {
+      await _pump(tester, entries: _entries); // no marks yet
+
+      await _tapDay(tester, 4); // 9/10, an arbitrary day
+      await tester.tap(find.text('Exclude from analysis'));
+      await tester.pumpAndSettle();
+
+      final stored = await _db!.marksDao.marksForDay(_d(10));
+      expect(stored.map((m) => m.markType),
+          contains(CycleMarkTypes.excludedFromAnalysis),
+          reason: 'the toggle writes the mark through marksDao '
+              '(day/type-keyed addMark)');
+      final mark = stored.singleWhere(
+          (m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
+      expect(mark.author, 'user',
+          reason: 'the sheet placement is user-authored');
+      expect(find.text('Include in analysis again'), findsOneWidget,
+          reason: 'the sheet re-renders contextually after the write');
+      expect(find.text('Exclude from analysis'), findsNothing);
+      expect(stored, hasLength(1), reason: 'exactly one mark was written');
+
+      await tester.tap(find.text('Include in analysis again'));
+      await tester.pumpAndSettle();
+
+      expect(await _storedTypes(_d(10)), isEmpty,
+          reason: 'the reverse toggle deletes the mark');
+      expect(find.text('Exclude from analysis'), findsOneWidget,
+          reason: 'the action flips back to the exclude wording');
+      expect(find.text('Include in analysis again'), findsNothing);
+    });
+
+    testWidgets(
+        'a present exclusion mark shows the include wording and the '
+        'include action deletes it', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [
+        CycleMark(date: _d(10), type: CycleMarkTypes.excludedFromAnalysis),
+      ]);
+
+      await _tapDay(tester, 4); // 9/10: the marked day
+      expect(find.text('Include in analysis again'), findsOneWidget,
+          reason: 'the day already carries the mark -> the include action');
+
+      await tester.tap(find.text('Include in analysis again'));
+      await tester.pumpAndSettle();
+
+      expect(await _storedTypes(_d(10)), isEmpty,
+          reason: 'the mark is removed from storage through the deleteMark '
+              'path');
+      expect(find.text('Exclude from analysis'), findsOneWidget,
+          reason: 'the action flips back to the exclude wording');
+    });
+
+    testWidgets(
+        'the consistency dialog covers the mark-excluded branch: placing a '
+        'first higher on a mark-EXCLUDED (but measured) day warns with the '
+        'no-usable-temperature wording', (tester) async {
+      // 9/14 is measured (36.90, ABOVE the baseline 36.40) — with the
+      // analysis-exclusion mark on the day the temperature is still not
+      // usable, so the placement warns with the "unmeasured or
+      // interrupted" wording (the mark-excluded branch of the dialog
+      // body choice).
+      await _pump(tester, entries: _entries, seedMarks: [
+        CycleMark(date: _d(14), type: CycleMarkTypes.excludedFromAnalysis),
+      ]);
+
+      await _tapDay(tester, 8); // 9/14: measured above the baseline
+      await tester.tap(find.text('Set first higher measurement'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget,
+          reason: 'the excluded temperature is not usable for the check — '
+              'the placement warns even though the VALUE is above the '
+              'baseline');
+      expect(
+          find.text(
+              'The marked day carries no usable temperature (unmeasured or '
+              'interrupted).'),
+          findsOneWidget,
+          reason: 'the mark-excluded branch shows the fact wording, not a '
+              'value comparison');
+    });
+  });
+
   group('SUZ mark + suggestion (the app suggests, the user places)', () {
     testWidgets(
         'the computed SUZ day suggests the start with the EVENING phrasing, '
@@ -553,7 +689,10 @@ void main() {
       expect(find.text('Remove SUZ from this evening'), findsOneWidget,
           reason: 'the removal label when the variant is present');
 
-      // Variant switch: placing the other variant removes the one present.
+      // Variant switch: placing the other variant removes the one present
+      // (scroll it into view first — the bottom rows can sit below the
+      // sheet fold).
+      await scrollSheetTo(tester, find.text('SUZ from this morning'));
       await tester.tap(find.text('SUZ from this morning'));
       await tester.pumpAndSettle();
       expect(await _storedTypes(_d(10)),
@@ -563,6 +702,7 @@ void main() {
       expect(find.text('SUZ from this evening'), findsOneWidget,
           reason: 'the evening action flips back to its set label');
 
+      await scrollSheetTo(tester, find.text('Remove SUZ from this morning'));
       await tester.tap(find.text('Remove SUZ from this morning'));
       await tester.pumpAndSettle();
       expect(await _storedTypes(_d(10)), isEmpty,
