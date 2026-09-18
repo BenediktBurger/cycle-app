@@ -3,7 +3,8 @@
 // the ignoreTemperature mark (idempotent); saving a flag-less day never
 // creates the mark. The REVERSE direction — a mark is never auto-REMOVED
 // when the flags clear — is pinned in test/diary_cycle_start_prompt_test.dart
-// (the mark-suppresses-prompt test asserts the mark survives the save).
+// (the prompt test asserts the mark does NOT suppress the cycle-start
+// prompt while the pre-existing mark survives the save).
 //
 // The database is an in-memory override and the German locale is pinned,
 // same harness pattern as test/diary_measured_time_test.dart.

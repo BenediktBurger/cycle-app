@@ -1075,7 +1075,7 @@ void main() {
         "(author 'import')", () async {
       // The old-document translation (inside the import transaction):
       // any of the four true exclude_* keys derives the analysis mark for
-      // that day — and since Phase 3 the mark token is ignoreTemperature
+      // that day — and the current mark token is ignoreTemperature
       // (temperature-evaluation-scoped only — the mark does not affect
       // cycle-start suggestions any more). The derived token is pinned
       // here (a rename of the

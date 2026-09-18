@@ -117,7 +117,7 @@ the app never decides a boundary on its own.
 ### Open questions for INER experts (`TODO(user-review)`)
 
 (a) **Mark-on-temperature-ignored-day interplay:** should a `cycleStart`
-mark on a `ignoreTemperature`-marked (temperature-evaluation-ignored) day
+mark on an `ignoreTemperature`-marked (temperature-evaluation-ignored) day
 ever be rejected or reworded? Current behavior: no — the mark is
 authoritative wherever placed (owner decision); the temperature-ignore
 mark never blocks it (unchanged behavior; the old exclude_* flags are
