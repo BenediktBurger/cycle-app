@@ -201,6 +201,41 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(l10n.saved)));
+    // Bleeding only SUGGESTS a cycle start (the user places the mark, the
+    // authoritative cycleStart one): after saving a menstruation-level day
+    // that the shared suggestion predicate flags, the app ASKS before
+    // placing the mark. `isSuggestedCycleStart` already requires bleeding
+    // level >= 2 on a not-interrupted day that does not continue the
+    // previous calendar day's menstruation-level bleeding — one gate is
+    // enough. A mark of this type already on the day is harmless: addMark
+    // is idempotent.
+    final previousRow = await db.entriesDao
+        .entryFor(defaultProfileId, DateOnly.addDays(date, -1));
+    final previous =
+        previousRow == null ? null : dailyEntryFromDrift(previousRow);
+    if (!isSuggestedCycleStart(entry, previous)) return;
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.diaryCycleStartPromptTitle),
+        content: Text(l10n.diaryCycleStartPromptBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.diaryCycleStartPromptDismiss),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.diaryCycleStartPromptConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await db.marksDao
+          .addMark(defaultProfileId, date, CycleMarkTypes.cycleStart);
+    }
   }
 
   String _formatDay(DateTime d, String locale) =>

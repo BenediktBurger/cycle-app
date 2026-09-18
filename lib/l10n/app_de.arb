@@ -61,13 +61,14 @@
   "sexTimingEnd": "Ende",
   "errorTemperature": "Nur eine Temperatur mit Komma oder Punkt, zwei Dezimalstellen",
   "errorTemperatureRange": "Plausibilität: Temperaturen zwischen 25 und 45 °C",
-  "cycleGroupLeading": "Ohne Periodenbeginn (bis {day})",
+  "cycleGroupLeading": "Vor dem ersten Zyklusbeginn (bis {day})",
   "@cycleGroupLeading": {
     "placeholders": {
       "day": {
         "type": "String"
       }
-    }
+    },
+    "description": "Tagebuch-/Auswertungstabellen-Titel für die führende Zyklusgruppe: Einträge vor der ersten gesetzten Zyklusbeginn-Markierung — der Gruppenbeginn ist dort unbekannt, nur das Ende wird gezeigt."
   },
   "cycleGroupOnset": "Zyklus ab {day}",
   "@cycleGroupOnset": {
@@ -157,6 +158,12 @@
   "cycleSheetRemoveSuzEvening": "SUZ ab heute Abend entfernen",
   "cycleSheetSetSuzMorning": "SUZ ab heute Morgen",
   "cycleSheetRemoveSuzMorning": "SUZ ab heute Morgen entfernen",
+  "cycleSheetSetCycleStart": "Zyklusbeginn setzen",
+  "cycleSheetRemoveCycleStart": "Zyklusbeginn entfernen",
+  "diaryCycleStartPromptTitle": "Neuen Zyklus beginnen?",
+  "diaryCycleStartPromptBody": "Die Blutung an diesem Tag deutet darauf hin, dass hier ein neuer Zyklus beginnt. Soll an diesem Tag eine Zyklusbeginn-Markierung gesetzt werden?",
+  "diaryCycleStartPromptConfirm": "Zyklusbeginn setzen",
+  "diaryCycleStartPromptDismiss": "Nicht jetzt",
   "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend (Regel D)",
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh (Regel E)",
   "cycleLegendMeasuredAt": "Messzeitpunkt",
@@ -181,9 +188,9 @@
   "cycleSummarySuzMorning": "Regel E (am Morgen)",
   "cycleSummarySuzFrom": "SUZ ab {day}",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen) — keine Bewertung oder Aussagen über Fruchtbarkeit. Eine gesetzte Zyklusbeginn-Markierung gilt unabhängig vom Bleedingsmuster; Störungen verschieben sie nicht.",
-  "statisticsNoData": "Sobald zwei Periodenbeginne erfasst sind, erscheinen Zykluslängen.",
+  "statisticsNoData": "Sobald zwei Zyklusbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",
-  "statisticsOnsets": "Regelbeginne",
+  "statisticsOnsets": "Zyklusbeginne",
   "statisticsAverage": "Durchschnitt",
   "statisticsShortest": "Kürzester",
   "statisticsLongest": "Längster",

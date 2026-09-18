@@ -64,13 +64,14 @@
   "sexTimingEnd": "end",
   "errorTemperature": "One temperature using comma or dot, two decimals max",
   "errorTemperatureRange": "Plausibility: temperatures between 25 and 45 °C",
-  "cycleGroupLeading": "Without period onset (until {day})",
+  "cycleGroupLeading": "Before the first cycle start (until {day})",
   "@cycleGroupLeading": {
     "placeholders": {
       "day": {
         "type": "String"
       }
-    }
+    },
+    "description": "Tagebuch/evaluation-table title for the LEADING cycle group: entries that predate the first user-placed cycleStart mark, so the group's begin is unknown and only the end is shown."
   },
   "cycleGroupOnset": "Cycle from {day}",
   "@cycleGroupOnset": {
@@ -194,6 +195,18 @@
   "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",
   "cycleSheetSetSuzMorning": "SUZ from this morning",
   "cycleSheetRemoveSuzMorning": "Remove SUZ from this morning",
+  "cycleSheetSetCycleStart": "Set cycle start",
+  "@cycleSheetSetCycleStart": {
+    "description": "Mark-sheet action placing the cycleStart mark — the authoritative cycle boundary; bleeding only suggests it, bleeding never creates a boundary by itself."
+  },
+  "cycleSheetRemoveCycleStart": "Remove cycle start",
+  "diaryCycleStartPromptTitle": "Start new cycle?",
+  "@diaryCycleStartPromptTitle": {
+    "description": "Confirmation prompt after the diary saves a day whose menstruation-level bleeding SUGGESTS a new cycle start (not a continuation of the previous day's bleeding)."
+  },
+  "diaryCycleStartPromptBody": "The bleeding on this day suggests that a new cycle begins here. Set a cycle start mark on this day?",
+  "diaryCycleStartPromptConfirm": "Set cycle start",
+  "diaryCycleStartPromptDismiss": "Not now",
   "cycleSheetSuzSuggestionEvening": "Suggested: sicher unfruchtbare Zeit begins this evening (rule D)",
   "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
   "cycleLegendMeasuredAt": "Measurement time",
@@ -258,9 +271,12 @@
     "description": "Status-row text for a determined SUZ: the begin day (pre-formatted) followed by the rule."
   },
   "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
-  "statisticsNoData": "Cycle lengths appear once two period onsets are recorded.",
+  "statisticsNoData": "Cycle lengths appear once two cycle starts are recorded.",
   "statisticsCycles": "Cycle lengths",
-  "statisticsOnsets": "Period onsets",
+  "statisticsOnsets": "Cycle starts",
+  "@statisticsOnsets": {
+    "description": "Card title of the statistics screen's list of the mark-driven cycle starts (the recorded dates of the user-placed cycleStart marks that opened a cycle group). The key mirrors the domain function menstruationOnsetDates on purpose, to keep one name across the boundary."
+  },
   "statisticsAverage": "Average",
   "statisticsShortest": "Shortest",
   "statisticsLongest": "Longest",

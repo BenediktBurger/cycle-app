@@ -3,9 +3,12 @@
 // form. It offers the preserved "edit day" jump (the old tap behavior) and
 // the contextual set/remove toggles for the user-placed marks — the mucus
 // peak, the first higher measurement (both may live on one day, two
-// independent toggles) and the SUZ start (from a morning or from an
-// evening; the two variants are mutually exclusive per day: placing one
-// removes the other) — plus the computed info lines for the day.
+// independent toggles), the SUZ start (from a morning or from an evening;
+// the two variants are mutually exclusive per day: placing one removes the
+// other) and the cycle start (the authoritative cycle boundary of the
+// mark-driven grouping; bleeding only suggests it — see lib/domain/
+// cycle_grouping.dart and ADR-0008) — plus the computed info lines for the
+// day.
 //
 // The SUZ suggestion follows the locked decision (the app SUGGESTS, the
 // user PLACES): on the computed suzBegins day the sheet shows a suggestion
@@ -395,6 +398,7 @@ final class CycleDaySheet extends ConsumerWidget {
         _hasMark(marks, CycleMarkTypes.firstHigherMeasurement);
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
     final hasSuzMorning = _hasMark(marks, CycleMarkTypes.suzMorning);
+    final hasCycleStart = _hasMark(marks, CycleMarkTypes.cycleStart);
     final infoLines = _infoLines(context, l10n, entries, marks);
 
     // The recorded fact the chart glyph cannot carry: the temperature
@@ -494,6 +498,20 @@ final class CycleDaySheet extends ConsumerWidget {
                   type: CycleMarkTypes.suzMorning,
                   otherType: CycleMarkTypes.suzEvening,
                   remove: hasSuzMorning),
+            ),
+            // The cycle start: the authoritative cycle-boundary mark of the
+            // mark-driven grouping (bleeding only SUGGESTS it — the diary
+            // asks on a suggested menstruation day). Settable and removable
+            // on ANY day, wherever the user judges the new cycle to begin;
+            // the chart draws the boundary line where the grouping opens
+            // the group.
+            _SheetAction(
+              icon: Icons.flag_outlined,
+              label: hasCycleStart
+                  ? l10n.cycleSheetRemoveCycleStart
+                  : l10n.cycleSheetSetCycleStart,
+              onTap: () => _writeMark(ref,
+                  type: CycleMarkTypes.cycleStart, remove: hasCycleStart),
             ),
             const SizedBox(height: 8),
           ],

@@ -381,7 +381,8 @@ void main() {
 
       // The leading group's header mirrors the Tagebuch's leading-group
       // label, ending at the group's last day (the begin is unknown).
-      expect(find.text('Without period onset (until 2/28/2026)'), findsOneWidget);
+      expect(find.text('Before the first cycle start (until 2/28/2026)'),
+          findsOneWidget);
       expect(find.text('Cycle 1'), findsOneWidget,
           reason: 'the marked groups keep their numbering');
 

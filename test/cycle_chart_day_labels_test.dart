@@ -149,16 +149,18 @@ void main() {
     testWidgets(
         'a month first that is also a cycle start shows the short '
         'month form, not the day number', (tester) async {
-      // Bleeding onset on 2026-02-01: the cycle start coincides with the
-      // first of the month, so the month form wins over the plain "1.".
+      // The recorded range BEGINS on 2026-02-01 (the leading group's
+      // start, no cycleStart mark involved): the first of the month shows
+      // the month form, and the leading group's day-of-cycle count also
+      // starts at 1 there.
       await tester.pumpWidget(_chartHarness(
           entries: _entriesFrom(DateTime.utc(2026, 2, 1), 3,
               bleeding: {0: Bleeding.heavy})));
       await tester.pumpAndSettle();
 
       expect(_label(0, 'Feb'), findsOneWidget,
-          reason: 'February 1st is a month first AND the cycle start — the '
-              'month form shows');
+          reason: 'February 1st is a month first AND the range\'s first '
+              'day — the month form shows');
       expect(_label(0, '1.'), findsNothing);
       expect(_label(0, '1'), findsOneWidget,
           reason: 'day of cycle 1 on the cycle start');

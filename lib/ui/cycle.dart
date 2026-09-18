@@ -141,19 +141,18 @@ final class _ChartDays {
     // Cycle mapping over the whole index range, from the domain's cycle
     // grouping (same groups the Tagebuch list and the evaluation use):
     // every calendar day counts in the cycle whose start is the LATEST
-    // group start on or before it — a cycle only ends at the next onset,
-    // so untracked gap days keep counting from the last start. The first
-    // (leading) group starts at the first recorded day, so every index is
-    // covered.
-    // TODO(user-review): before the first real onset (a leading group of
-    // days that predate the first recorded period) the count starts at the
-    // first TRACKED day — the true cycle start is unknowable there.
+    // group start on or before it — a cycle only ends at the next cycle
+    // start, so untracked gap days keep counting from the last start. A
+    // group opens at the first tracked day on/after a user-placed
+    // cycleStart mark; a mark on an untracked gap day opens the group at
+    // the next tracked day (the boundary line still drawn across the gap).
+    // The first (leading) group starts at the first recorded day before
+    // the first mark, so every index is covered.
     final groups = groupIntoCycles(sorted, marks);
     final starts = [for (final g in groups) DateOnly.normalize(g.startDate)];
     cycleStartDates = {
-      // Only groups that START at a menstruation onset are cycle
-      // boundaries; the leading group (predating the first recorded
-      // onset) is not.
+      // Only mark-opened groups are cycle boundaries; the leading group
+      // (predating the first cycleStart mark) is not.
       for (final g in groups)
         if (g.startsAtMenstruation) DateOnly.normalize(g.startDate),
     };
@@ -179,20 +178,22 @@ final class _ChartDays {
   /// cycle group the day belongs to (see the mapping note above).
   final Map<int, int> cycleDayByIndex = {};
 
-  /// The recorded dates on which a cycle group starts at a menstruation
-  /// onset (startsAtMenstruation) — the cycle separators. Never contains
-  /// the leading group's start (it predates the first recorded onset).
+  /// The recorded dates at which an individual cycle group opens at a
+  /// user-placed cycleStart mark (startsAtMenstruation) — the cycle
+  /// separators. Never contains the leading group's start (it predates the
+  /// first mark).
   late final Set<DateTime> cycleStartDates;
 
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 
-  /// Whether day [index] opens a new cycle (a menstruation-level bleeding
-  /// onset starts its group there — the shared "is cycle boundary"
-  /// predicate driving the card's thick separator lines). The very first
-  /// recorded day is never a boundary: there is no line at the recorded
-  /// range's left edge (a leading pre-onset group is not an onset group
-  /// either). Untracked gap days before an onset do not hide the boundary:
-  /// the predicate matches the ONSET's calendar date wherever it falls.
+  /// Whether day [index] opens a new cycle (a user-placed cycleStart mark
+  /// opens its group there — the shared "is cycle boundary" predicate
+  /// driving the card's thick separator lines). The very first recorded
+  /// day is never a boundary: there is no line at the recorded range's
+  /// left edge (a leading pre-mark group is not a mark-opened group
+  /// either). Untracked gap days before a marked day do not hide the
+  /// boundary: the grouping opens the group at the next tracked day, and
+  /// the predicate matches that day's calendar date wherever it falls.
   bool isCycleBoundary(int index) =>
       index > 0 && cycleStartDates.contains(dayAt(index));
 }
@@ -807,10 +808,11 @@ final class _CycleChartState extends State<_CycleChart> {
                                     // boundary inside the window, derived from
                                     // the shared cycle-boundary predicate (the
                                     // same one the row cells' thick borders
-                                    // use). No line before the first recorded
-                                    // onset (the leading group is not a
-                                    // boundary), and a boundary after untracked
-                                    // gap days is drawn across the gap.
+                                    // use). No line before the first
+                                    // cycleStart mark (the leading group is
+                                    // not a boundary), and a boundary opened
+                                    // after untracked gap days is drawn
+                                    // across the gap.
                                     extraLinesData: ExtraLinesData(
                                       verticalLines: [
                                         for (var i = winStart; i <= winEnd; i++)

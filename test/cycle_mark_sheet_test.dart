@@ -1,9 +1,11 @@
 // Widget tests of the mark-entry bottom sheet on the cycle tab (Mode M,
 // ADR-0001): tapping a chart day opens a modal sheet with the "edit day"
-// action, the contextual set/remove actions for the mucus peak and the
-// first higher measurement, and the computed info lines (derived artifacts
-// such as the baseline value, the 1-6 low numbering, the difference to the
-// baseline for marked candidates and the stopped-evaluation notice).
+// action, the contextual set/remove actions for the mucus peak, the first
+// higher measurement, the SUZ start and the cycle start (the authoritative
+// cycle boundary — bleeding only suggests it), and the computed info lines
+// (derived artifacts such as the baseline value, the 1-6 low numbering, the
+// difference to the baseline for marked candidates and the
+// stopped-evaluation notice).
 //
 // Unlike test/cycle_chart_evaluation_test.dart (fixed marks streams), these
 // tests write through the REAL MarksDao against an in-memory database —
@@ -424,6 +426,55 @@ void main() {
     expect(
         find.byKey(const ValueKey('cycleSheetEvaluationStopped')), findsNothing,
         reason: 'the evaluation did not stop — no notice');
+  });
+
+  group('cycleStart toggle (the authoritative cycle-boundary mark)', () {
+    testWidgets(
+        'setting the cycle start persists a user-authored cycleStart mark '
+        'and flips the action to the remove wording', (tester) async {
+      await _pump(tester, entries: _entries); // no marks yet
+
+      await _tapDay(tester, 4); // 9/10, an arbitrary day
+      await tester.tap(find.text('Set cycle start'));
+      await tester.pumpAndSettle();
+
+      final stored = await _db!.marksDao.marksForDay(defaultProfileId, _d(10));
+      expect(stored.map((m) => m.markType),
+          contains(CycleMarkTypes.cycleStart),
+          reason: 'the cycle start is persisted through the MarksDao '
+              '(the user places the mark — bleeding only suggests)');
+      final mark =
+          stored.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
+      expect(mark.author, 'user',
+          reason: 'the sheet placement is user-authored');
+      expect(mark.profileId, defaultProfileId,
+          reason: 'the mark binds to the sheet\'s profile');
+      expect(find.text('Remove cycle start'), findsOneWidget,
+          reason: 'the sheet re-renders contextually after the write');
+      expect(find.text('Set cycle start'), findsNothing);
+    });
+
+    testWidgets('a present cycle start shows the removal wording and '
+        'the remove action deletes it', (tester) async {
+      await _pump(tester, entries: _entries, seedMarks: [
+        CycleMark(
+            profileId: defaultProfileId,
+            date: _d(10),
+            type: CycleMarkTypes.cycleStart),
+      ]);
+
+      await _tapDay(tester, 4); // 9/10: the marked day
+      expect(find.text('Remove cycle start'), findsOneWidget,
+          reason: 'the day already carries the mark -> the remove action');
+
+      await tester.tap(find.text('Remove cycle start'));
+      await tester.pumpAndSettle();
+
+      expect(await _storedTypes(_d(10)), isEmpty,
+          reason: 'the cycle start is removed from storage');
+      expect(find.text('Set cycle start'), findsOneWidget,
+          reason: 'the action flips back to the set wording');
+    });
   });
 
   group('SUZ mark + suggestion (the app suggests, the user places)', () {
