@@ -111,6 +111,16 @@ Map<String, Object?> entryOf(
   return entries.single as Map<String, Object?>;
 }
 
+/// Same as [entryOf] but returns the WHOLE document map (for asserting the
+/// derived mark rows that ride alongside the entry).
+Map<String, Object?> docOf(
+  List<String> cells, {
+  List<String> header = dripHeader,
+}) =>
+    jsonDecode(
+      dripCsvToExportJson(dripOneRowCsv(header, cells)).json,
+    ) as Map<String, Object?>;
+
 void main() {
   group('csv parsing', () {
     test('plain rows split on commas, header preserved', () {
@@ -169,10 +179,8 @@ void main() {
       expect(rows[1][1], '36.2');
       // Real quoted cells survive: the fixture's [sex]-note line contains a
       // comma and a period, so drip wrapped it in quotes.
-      final quoted = rows
-          .where((r) => r.first == '2026-07-17')
-          .map((r) => r[28])
-          .single;
+      final quoted =
+          rows.where((r) => r.first == '2026-07-17').map((r) => r[28]).single;
       expect(quoted, 'with condom, quite good');
     });
 
@@ -193,7 +201,8 @@ void main() {
       return c;
     }
 
-    test('vocabulary: drip scale 0–3 → the +1-shifted numeric levels, '
+    test(
+        'vocabulary: drip scale 0–3 → the +1-shifted numeric levels, '
         'empty → 0 (none)', () {
       // drip: 0=spotting, 1=light, 2=medium, 3=heavy; the export document
       // carries the stored numeric levels (drip scale shifted by +1, so an
@@ -211,19 +220,41 @@ void main() {
       expect(entryOf(cells('2026-01-01', {4: '3'}))['bleeding'], isA<int>());
     });
 
-    test('temperature: value parses, exclude → exclude_other, note rides', () {
-      final e = entryOf(
+    test(
+        'temperature: value parses, note rides; exclude becomes the '
+        'derived exclusion mark (no raw exclude key)', () {
+      final doc = docOf(
           cells('2026-01-01', {1: '36.2', 2: 'true', 3: 'measured late'}));
+      final e = (doc['entries']! as List).single as Map<String, Object?>;
       expect(e['bbt_c'], 36.2);
-      expect(e['exclude_other'], true);
+      // drip's "not usable for fertility detection" maps to the
+      // excludedFromAnalysis MARK (author 'import') — NOT to raw entry
+      // data: the day carries temp_disturbances 0 (drip has no reason
+      // column, so no mask bits come from drip).
+      expect(e['temp_disturbances'], 0);
+      expect(e.containsKey('exclude_illness'), isFalse,
+          reason: 'the v5 shape carries no exclude_* keys');
+      expect(e.containsKey('exclude_other'), isFalse,
+          reason: 'the v5 shape carries no exclude_* keys');
       expect(e['notes'], '[temp] measured late');
+      expect(doc['marks'], [
+        {
+          'entry_date': '2026-01-01',
+          'mark_type': 'excludedFromAnalysis',
+          'author': 'import',
+        },
+      ]);
     });
 
-    test('temperature.exclude=false (or empty) is not an exclusion', () {
+    test('temperature.exclude=false (or empty) derives no exclusion mark', () {
       expect(
-          entryOf(cells('2026-01-01', {1: '36.5', 2: 'false'}))['exclude_other'],
-          false);
-      expect(entryOf(cells('2026-01-01', {1: '36.5'}))['exclude_other'], false);
+        (docOf(cells('2026-01-01', {1: '36.5', 2: 'false'}))['marks']! as List),
+        isEmpty,
+      );
+      expect(
+        (docOf(cells('2026-01-01', {1: '36.5'}))['marks']! as List),
+        isEmpty,
+      );
     });
 
     test('mucus: drip nfp number 0..4 decodes onto sign/quality tokens', () {
@@ -258,8 +289,7 @@ void main() {
       expect(e['mucus_quality'], isNull);
     });
 
-    test('mucus: feeling+texture composite ports drip getNfpMucus exactly',
-        () {
+    test('mucus: feeling+texture composite ports drip getNfpMucus exactly', () {
       // Transcribed from drip's test/nfp-mucus.spec.js:
       // (feeling, texture) → nfp number via max(mapping); the number then
       // decodes exactly like the mucus.value row.
@@ -294,12 +324,10 @@ void main() {
 
     test('mucus: a composite needs BOTH parts (null when either missing)', () {
       expect(
-          entryOf(cells('2026-01-01', {5: '2', 4: '2'}))['mucus_sign'],
-          isNull,
+          entryOf(cells('2026-01-01', {5: '2', 4: '2'}))['mucus_sign'], isNull,
           reason: 'a feeling without a texture carries no mucus');
       expect(
-          entryOf(cells('2026-01-01', {6: '2', 4: '2'}))['mucus_sign'],
-          isNull,
+          entryOf(cells('2026-01-01', {6: '2', 4: '2'}))['mucus_sign'], isNull,
           reason: 'a texture without a feeling carries no mucus');
     });
 
@@ -322,9 +350,7 @@ void main() {
       // indexes map ONLY into the structured fields (pinned in the
       // structured and firmness tests below), never into a `cervix`
       // string — whatever cells the row carries.
-      expect(
-          entryOf(
-              cells('2026-01-01', {8: '1', 9: '1', 10: '1'}))['cervix'],
+      expect(entryOf(cells('2026-01-01', {8: '1', 9: '1', 10: '1'}))['cervix'],
           isNull);
       // partial observations map only structurally, too
       expect(entryOf(cells('2026-01-01', {8: '0'}))['cervix'], isNull);
@@ -362,21 +388,29 @@ void main() {
       // dimension (and the clamping free-text line) keep their values. The
       // bleeding cell keeps the row a data row in the non-numeric case.
       expect(entryOf(cells('2026-01-01', {10: '3', 8: '1'}))['cervix_position'],
-          isNull, reason: 'position index 3 is outside 0..2');
+          isNull,
+          reason: 'position index 3 is outside 0..2');
       expect(entryOf(cells('2026-01-01', {10: '3', 8: '1'}))['cervix_opening'],
           'middle');
       expect(entryOf(cells('2026-01-01', {8: '7', 10: '1'}))['cervix_opening'],
-          isNull, reason: 'opening index 7 is outside 0..2');
+          isNull,
+          reason: 'opening index 7 is outside 0..2');
       expect(entryOf(cells('2026-01-01', {8: '7', 10: '1'}))['cervix_position'],
           'medium');
-      expect(entryOf(cells('2026-01-01', {10: '-1', 8: '0'}))['cervix_position'],
-          isNull, reason: 'a negative index is out of range');
+      expect(
+          entryOf(cells('2026-01-01', {10: '-1', 8: '0'}))['cervix_position'],
+          isNull,
+          reason: 'a negative index is out of range');
       // Non-numeric cells never map structurally (they also stay out of
       // the clamping free text), so the row needs another data anchor.
-      expect(entryOf(cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))
-          ['cervix_opening'], isNull);
-      expect(entryOf(cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))
-          ['cervix_position'], isNull);
+      expect(
+          entryOf(
+              cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))['cervix_opening'],
+          isNull);
+      expect(
+          entryOf(cells('2026-01-01', {8: 'x', 10: 'y', 4: '2'}))[
+              'cervix_position'],
+          isNull);
       // Absent columns behave like empty cells (no structured tokens).
       final absent =
           entryOf(['2026-01-01', '2'], header: ['date', 'bleeding.value']);
@@ -390,30 +424,24 @@ void main() {
       // drip's firmness vocabulary is hard/soft (0-based, length 2). The
       // structured field is set IN ADDITION to the (clamping) free-text
       // line. Header index: 9 = cervix.firmness.
-      expect(entryOf(cells('2026-01-01', {9: '0', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: '0', 4: '2'}))['cervix_firmness'],
           'hard');
-      expect(entryOf(cells('2026-01-01', {9: '1', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: '1', 4: '2'}))['cervix_firmness'],
           'soft');
       // The shipped hand-authored specimen carries firmness=2, out of
       // drip's vocabulary: it clamps to soft, exactly like the free-text
       // word (and unlike position/opening, which map out-of-range to null).
-      expect(entryOf(cells('2026-01-01', {9: '2', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: '2', 4: '2'}))['cervix_firmness'],
           'soft',
           reason: 'the out-of-range specimen index clamps to soft');
-      expect(entryOf(cells('2026-01-01', {9: '-1', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: '-1', 4: '2'}))['cervix_firmness'],
           'hard',
           reason: 'a negative index clamps to the nearest valid one');
-      expect(entryOf(cells('2026-01-01', {9: '7', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: '7', 4: '2'}))['cervix_firmness'],
           'soft',
           reason: 'a far-out index clamps to the nearest valid one');
       // Non-numeric cells stay unstructured (and out of the free text too).
-      expect(entryOf(cells('2026-01-01', {9: 'x', 4: '2'}))
-              ['cervix_firmness'],
+      expect(entryOf(cells('2026-01-01', {9: 'x', 4: '2'}))['cervix_firmness'],
           isNull);
       // Absent column behaves like an empty cell.
       final absent =
@@ -421,30 +449,30 @@ void main() {
       expect(absent['cervix_firmness'], isNull);
     });
 
-    test('desire: intensity values 0/1/2 count, literal false does not', () {
-      // drip's desire vocabulary is 0=low/1=medium/2=high — not a boolean;
-      // any present value means "desire happened", intensity is lost.
-      expect(entryOf(cells('2026-01-01', {12: '0'}))['desire'], true);
-      expect(entryOf(cells('2026-01-01', {12: '1'}))['desire'], true);
-      expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
-      // A hypothetically rendered literal `false` is NOT data and NOT
-      // desire — same treatment as an empty cell. Trimmed, since drip
-      // lowercases but a spreadsheet round-trip may add padding.
-      expect(entryOf(cells('2026-01-01', {12: 'false', 4: '2'}))['desire'],
-          isFalse, reason: 'false is ignored for the flag');
+    test('desire: values are dropped entirely — not data, no key, no flag', () {
+      // drip's desire vocabulary is 0=low/1=medium/2=high — the intensity
+      // is not storable here AND the dropped flag is no longer data at all
+      // (Lust is removed everywhere). Any desire-only row imports nothing.
       expect(
-          entryOf(cells('2026-01-01', {12: ' false ', 1: '36.2'}))['desire'],
+          entryOf(cells('2026-01-01', {12: '0', 4: '2'})).containsKey('desire'),
           isFalse,
-          reason: 'false is ignored even with padding');
-      // A false-only row carries no data at all → skipped empty, exactly
-      // like the mapping table's data rule.
-      final result = dripCsvToExportJson(dripOneRowCsv(dripHeader,
-          cells('2026-01-01', {12: 'false'})));
-      expect(result.stats.rowsImported, 0,
-          reason: 'a desire=false row is not a data row');
-      expect(result.stats.rowsSkippedEmpty, 1);
-      final doc = jsonDecode(result.json) as Map<String, Object?>;
-      expect(doc['entries'] as List, isEmpty);
+          reason: 'the v5 shape carries no `desire` key');
+      expect(
+          entryOf(cells('2026-01-01', {12: 'false', 4: '2'}))
+              .containsKey('desire'),
+          isFalse);
+      // A desire-only row (any value, including a literal `false`) carries
+      // no data at all → skipped empty, exactly like the mapping table's
+      // data rule.
+      for (final desireValue in ['0', '1', '2', 'false', ' false ']) {
+        final result = dripCsvToExportJson(
+            dripOneRowCsv(dripHeader, cells('2026-01-01', {12: desireValue})));
+        expect(result.stats.rowsImported, 0,
+            reason: 'a desire-only row ($desireValue) is not a data row');
+        expect(result.stats.rowsSkippedEmpty, 1);
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        expect(doc['entries'] as List, isEmpty);
+      }
     });
 
     test(
@@ -454,12 +482,12 @@ void main() {
       // option; drip's tender breasts kind is the breast-pain (B) option.
       // The two stay independent day flags — B without M and both at once.
       // (cells() indices align 0-based with painHeader.)
-      final mDay = entryOf(cells('2026-01-01', {2: 'true'}),
-          header: painHeader);
+      final mDay =
+          entryOf(cells('2026-01-01', {2: 'true'}), header: painHeader);
       expect(mDay['pain_mittelschmerz'], true);
       expect(mDay['pain_breast'], false);
-      final bDay = entryOf(cells('2026-01-01', {3: 'true'}),
-          header: painHeader);
+      final bDay =
+          entryOf(cells('2026-01-01', {3: 'true'}), header: painHeader);
       expect(bDay['pain_breast'], true);
       expect(bDay['pain_mittelschmerz'], false);
       final both = entryOf(cells('2026-01-01', {2: 'true', 3: 'true'}),
@@ -522,11 +550,8 @@ void main() {
         // The [sex] note keeps the day importable in every variant; the
         // sex observation itself stays unset (mask 0).
         for (final method in [3, 4, 5, 6, 7, 8, 9, 11]) {
-          final result = dripCsvToExportJson(
-              dripOneRowCsv(
-                  sexHeader,
-                  sexCells(
-                      '2026-01-01', {2: 'true', method: 'true', 12: 'n'})));
+          final result = dripCsvToExportJson(dripOneRowCsv(sexHeader,
+              sexCells('2026-01-01', {2: 'true', method: 'true', 12: 'n'})));
           final doc = jsonDecode(result.json) as Map<String, Object?>;
           final e = (doc['entries']! as List).single as Map<String, Object?>;
           expect(e['sex_timings'], 0,
@@ -535,19 +560,19 @@ void main() {
         }
       });
 
-      test('partner + none + a method together → not sex (contradictory)',
-          () {
+      test('partner + none + a method together → not sex (contradictory)', () {
         final result = dripCsvToExportJson(dripOneRowCsv(
             sexHeader,
-            sexCells('2026-01-01',
-                {2: 'true', 10: 'true', 3: 'true', 12: 'n'})));
+            sexCells(
+                '2026-01-01', {2: 'true', 10: 'true', 3: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
         expect(e['sex_timings'], 0,
             reason: 'a recorded method contradicts the none confirmation');
       });
 
-      test('partner with no contraceptive info at all → the sex observation '
+      test(
+          'partner with no contraceptive info at all → the sex observation '
           '(absence of methods counts as none)', () {
         // There is no explicit none=true requirement any more (owner
         // decision, 2026-09-17): partner sex with no contraceptive method
@@ -565,8 +590,7 @@ void main() {
       });
 
       test('solo never maps to the sex observation, even with none', () {
-        final result = dripCsvToExportJson(dripOneRowCsv(
-            sexHeader,
+        final result = dripCsvToExportJson(dripOneRowCsv(sexHeader,
             sexCells('2026-01-01', {1: 'true', 10: 'true', 12: 'n'})));
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
@@ -613,44 +637,23 @@ void main() {
       });
     });
 
-    test('desire/sex/pain/mood: flags and note-only days', () {
-      expect(entryOf(cells('2026-01-01', {12: '2'}))['desire'], true);
-      // Solo sex maps to nothing (the detailed sex variants are pinned in
-      // the dedicated sex group below).
-      final soloOnly =
-          dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
-            13: 'true',
+    test('mood: flags are dropped; the [mood] note stays data', () {
+      // Mood (Stimmung) is removed everywhere — the flags are NOT data:
+      // a mood-flag-only row imports nothing. The mood NOTE is a raw note
+      // (still data) and keeps such a day importable, with the '[mood]'
+      // line preserved; the entry carries no `mood` key either way.
+      final flagOnly = dripCsvToExportJson(dripOneRowCsv(
+          dripHeader,
+          cells('2026-01-01', {
+            19: 'true',
           })));
-      expect(soloOnly.stats.rowsImported, 0,
-          reason: 'solo sex maps to nothing, the row has no other data');
-      expect(soloOnly.stats.rowsSkippedEmpty, 1);
-      final partnerOnly =
-          dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
-            14: 'true',
-          })));
-      expect(partnerOnly.stats.rowsImported, 1,
-          reason: 'partner sex without a method flag is mapped data '
-              '(no explicit none needed)');
-      expect(partnerOnly.stats.rowsSkippedEmpty, 0);
-      // contraceptive columns are ignored (no model for them) — a row with
-      // no activity beyond them is data-less and skipped entirely (its
-      // stats are pinned separately below)
-      final noActivity =
-          dripCsvToExportJson(dripOneRowCsv(dripHeader, cells('2026-01-01', {
-            15: 'true',
-          })));
-      expect(noActivity.stats.rowsImported, 0,
-          reason: 'condom alone is dropped, row has no other data');
-      expect(noActivity.stats.rowsSkippedEmpty, 1);
-      // A pain note without an ovulation/breast flag still marks the day
-      // as a data row; the pain options themselves stay unset.
-      final noted = entryOf(cells('2026-01-01', {18: 'cramps day'}));
-      expect(noted['pain_breast'], false);
-      expect(noted['pain_mittelschmerz'], false);
-      expect(noted['notes'], '[pain] cramps day');
-      expect(entryOf(cells('2026-01-01', {19: 'true'}))['mood'], true);
+      expect(flagOnly.stats.rowsImported, 0,
+          reason: 'a mood flag alone is not mappable data');
+      expect(flagOnly.stats.rowsSkippedEmpty, 1);
+
       final moodNote = entryOf(cells('2026-01-01', {20: 'deadline stress'}));
-      expect(moodNote['mood'], true);
+      expect(moodNote.containsKey('mood'), isFalse,
+          reason: 'the v5 shape carries no `mood` key');
       expect(moodNote['notes'], '[mood] deadline stress');
     });
 
@@ -724,12 +727,18 @@ void main() {
 
     test('tolerance: unknown columns are ignored', () {
       final header = [...dripHeader, 'future.symptom', 'other.thing'];
-      final row = [...cells('2026-01-01', {7: '2'}), 'zzz', 'iq 90'];
+      final row = [
+        ...cells('2026-01-01', {7: '2'}),
+        'zzz',
+        'iq 90'
+      ];
       final result = dripCsvToExportJson(dripOneRowCsv(header, row));
       final doc = jsonDecode(result.json) as Map<String, Object?>;
       final e = (doc['entries']! as List).first as Map<String, Object?>;
       expect(e['mucus_sign'], 'f');
-      expect(e['desire'], false, reason: 'unknown columns carry no data');
+      expect(e.containsKey('desire'), isFalse,
+          reason: 'unknown columns carry no data, and the dropped flag '
+              'exists nowhere in the v5 shape');
     });
 
     test('tolerance: missing known columns simply carry no data', () {
@@ -766,21 +775,22 @@ void main() {
       expect(result.stats.rowsSkippedEmpty, 1);
     });
 
-    test('document shape: current-version blob with the main profile and '
-        'the derived cycleStart mark', () {
-      final result = dripCsvToExportJson(dripOneRowCsv(
-          dripHeader, cells('2026-01-01', {4: '2', 1: '36.2'})));
+    test(
+        'document shape: current-version profile-free blob with the '
+        'derived cycleStart mark', () {
+      final result = dripCsvToExportJson(
+          dripOneRowCsv(dripHeader, cells('2026-01-01', {4: '2', 1: '36.2'})));
       final doc = jsonDecode(result.json) as Map<String, Object?>;
       expect(doc['schema_version'], exportSchemaVersion);
-      expect(doc['profiles'], [
-        {'id': 1, 'name': 'main', 'ordinal': 0},
-      ]);
+      // No profile keys anywhere in the document — drip used to write into
+      // profile 1; now the document root is exactly version / exported_at /
+      // entries / marks.
+      expect(doc.containsKey('profiles'), isFalse);
       // A menstruation-level day that is the episode's first day derives a
       // cycleStart mark with author 'import' (bleeding only SUGGESTS a
       // cycle start; the mark is what the boundaries consume).
       expect(doc['marks'], [
         {
-          'profile_id': 1,
           'entry_date': '2026-01-01',
           'mark_type': 'cycleStart',
           'author': 'import',
@@ -791,7 +801,8 @@ void main() {
       final blob = parseExportJson(result.json);
       expect(blob.entries, hasLength(1));
       final e = blob.entries.single;
-      expect(e['profile_id'], 1);
+      expect(e.containsKey('profile_id'), isFalse,
+          reason: 'no profile dimension exists any more');
       expect(e['date'], '2026-01-01');
       expect(e['bleeding'], 3,
           reason: 'drip value 2 (medium) is the stored level 3');
@@ -802,18 +813,20 @@ void main() {
       final result = dripCsvToExportJson(dripExportSampleCsv);
       expect(result.stats.rowsTotal, 73);
       expect(result.stats.rowsInvalid, 0);
+      expect(result.stats.rowsImported, 27,
+          reason: '2026-08-20 (desire + mood flags only) imports nothing: '
+              'mood/desire are no longer data');
+      expect(result.stats.rowsSkippedEmpty, 46,
+          reason: '45 blank calendar days + the desire/mood-only day');
       expect(
         result.stats.rowsImported + result.stats.rowsSkippedEmpty,
         result.stats.rowsTotal,
       );
-      expect(result.stats.rowsImported, greaterThan(15),
-          reason: 'the specimen carries ~25 titled days');
 
-      final entries = ((jsonDecode(result.json)
-              as Map<String, Object?>)['entries'] as List)
-          .cast<Map<dynamic, dynamic>>();
-      Map by(String date) =>
-          entries.where((e) => e['date'] == date).single;
+      final doc = jsonDecode(result.json) as Map<String, Object?>;
+      final entries = (doc['entries'] as List).cast<Map<dynamic, dynamic>>();
+      final marks = (doc['marks'] as List).cast<Map<dynamic, dynamic>>();
+      Map by(String date) => entries.where((e) => e['date'] == date).single;
       // mucus day: value 2 ('f') wins over the 2+1 parts, firmness clamps
       expect(by('2026-07-15')['mucus_sign'], 'f');
       expect(by('2026-07-15')['cervix'], isNull,
@@ -822,20 +835,34 @@ void main() {
       expect(by('2026-07-15')['cervix_firmness'], 'soft',
           reason: 'the specimen firmness index 2 clamps to soft, also '
               'in the structured field');
-      // excluded temperature day
-      expect(by('2026-09-13')['exclude_other'], true);
+      // excluded temperature day: the day carries NO raw exclude key and a
+      // neutral mask; the exclusion rides as the derived mark instead.
+      expect(by('2026-09-13')['temp_disturbances'], 0);
+      expect(by('2026-09-13').containsKey('exclude_other'), isFalse);
       expect(by('2026-09-13')['bbt_c'], 36.7);
       expect(by('2026-09-13')['notes'], '[temp] measured late');
-      // note-only day
+      // Deep matcher on the filtered list: json-decoded maps carry no
+      // structural ==, so the shape is compared element shape by shape.
       expect(
-          by('2026-09-15')['notes'], 'cramps again, expecting menses soon.');
-      // bleeding + mood/mood-note day (drip value 2 = medium → level 3)
+          marks.where((m) => m['mark_type'] == 'excludedFromAnalysis'),
+          [
+            {
+              'entry_date': '2026-09-13',
+              'mark_type': 'excludedFromAnalysis',
+              'author': 'import',
+            },
+          ],
+          reason: 'temperature.exclude derives the exclusion mark');
+      // note-only day
+      expect(by('2026-09-15')['notes'], 'cramps again, expecting menses soon.');
+      // bleeding + mood-note day (drip value 2 = medium → level 3); the
+      // mood FLAG is dropped, the [mood] note stays.
       expect(by('2026-08-31')['bleeding'], 3);
-      expect(by('2026-08-31')['mood'], true);
+      expect(by('2026-08-31').containsKey('mood'), isFalse);
       expect(by('2026-08-31')['notes'], '[mood] first day jitters');
-      // desire + mood-flag day
-      expect(by('2026-08-20')['desire'], true);
-      expect(by('2026-08-20')['mood'], true);
+      // the desire + mood-flag-only day (2026-08-20) is gone entirely
+      expect(entries.where((e) => e['date'] == '2026-08-20'), isEmpty,
+          reason: 'a desire/mood-only row is skipped-empty now');
       // Sex observations: partner days without a contraceptive method map
       // to the sex timings mask (an unfilled method column counts as "no
       // method" — owner rule of 2026-09-17). Of the specimen's sex days
@@ -849,7 +876,8 @@ void main() {
       final withCondom = by('2026-07-17');
       expect(withCondom['sex_timings'], 0,
           reason: 'partner sex with a condom is not the mapped variant');
-      expect(withCondom['desire'], isTrue);
+      expect(withCondom.containsKey('desire'), isFalse,
+          reason: 'desire is dropped entirely');
       expect(withCondom['notes'], '[sex] with condom, quite good');
       final soloDay = by('2026-09-12');
       expect(soloDay['sex_timings'], 0, reason: 'solo is not partner sex');
@@ -866,8 +894,6 @@ void main() {
       // a temperature without a recorded time stays null, never fabricated
       expect(by('2026-09-13')['measured_at_minutes'], isNull,
           reason: '2026-09-13 has a temperature but no time cell');
-      expect(by('2026-08-20')['measured_at_minutes'], isNull,
-          reason: 'no temperature at all on 2026-08-20');
     });
 
     group('temperature.time → measured_at_minutes', () {
@@ -936,8 +962,7 @@ void main() {
         expect(e['measured_at_minutes'], isNull);
       });
 
-      test('malformed or out-of-range times degrade to null, row survives',
-          () {
+      test('malformed or out-of-range times degrade to null, row survives', () {
         for (final bad in [
           '25:00', // hour out of range
           '07:60', // minute out of range
@@ -955,8 +980,7 @@ void main() {
           );
           final doc = jsonDecode(result.json) as Map<String, Object?>;
           final entries = doc['entries']! as List;
-          expect(entries, hasLength(1),
-              reason: '"$bad" must not drop the row');
+          expect(entries, hasLength(1), reason: '"$bad" must not drop the row');
           expect(
             (entries.single as Map)['measured_at_minutes'],
             isNull,
@@ -983,16 +1007,28 @@ void main() {
           ((jsonDecode(result.json) as Map<String, Object?>)['marks']! as List)
               .cast<Map<String, Object?>>();
 
-      /// The one derived mark shape of this feature: profile 1 (drip has no
-      /// multi-profile concept), type cycleStart, author 'import'.
+      /// The one derived mark shape of this feature: type cycleStart,
+      /// author 'import'; the rows carry no profile id (there is none).
       Map<String, Object?> derivedMark(String iso) => {
-            'profile_id': 1,
             'entry_date': iso,
             'mark_type': 'cycleStart',
             'author': 'import',
           };
 
-      test('the first menstruation-level day of an episode derives one '
+      /// The derived analysis-exclusion mark (drip temperature.exclude →
+      /// the excludedFromAnalysis mark; author 'import').
+      Map<String, Object?> exclusionMark(String iso) => {
+            'entry_date': iso,
+            'mark_type': 'excludedFromAnalysis',
+            'author': 'import',
+          };
+
+      /// The cycleStart marks of the produced document.
+      List<Map<String, Object?>> cycleStartsOf(DripCsvImport result) =>
+          marksOf(result).where((m) => m['mark_type'] == 'cycleStart').toList();
+
+      test(
+          'the first menstruation-level day of an episode derives one '
           'cycleStart mark (author import)', () {
         final result = dripCsvToExportJson(dripCsv(dripHeader, [
           cells('2026-01-01', {1: '36.2'}), // tracked, no bleeding
@@ -1002,7 +1038,8 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-02')]);
       });
 
-      test('mid-flow continuation derives nothing (light still continues '
+      test(
+          'mid-flow continuation derives nothing (light still continues '
           'the flow)', () {
         // drip 2 → stored level 3 (medium); drip 1 → stored level 2
         // (light). Both are menstruation-level (>= 2), so only the episode's
@@ -1016,7 +1053,8 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-01')]);
       });
 
-      test('spotting does not continue the flow: the next menstruation '
+      test(
+          'spotting does not continue the flow: the next menstruation '
           'level day is an onset again', () {
         // drip 0 → stored level 1 (spotting): below the suggestion level,
         // so it neither derives a mark itself nor suppresses the following
@@ -1032,22 +1070,31 @@ void main() {
         ]);
       });
 
-      test('the hand-authored specimen derives exactly one mark per '
-          'bleeding episode (three in total)', () {
+      test(
+          'the hand-authored specimen derives exactly one cycleStart mark '
+          'per bleeding episode (three in total) plus the exclusion mark '
+          'for the temperature.exclude day', () {
         // The specimen's bleeding sequences: 2026-07-05..09, 2026-08-02..05
         // and 2026-08-30..09-02 — each episode's first day is an onset (the
         // day before it carries no menstruation-level entry), every other
         // bleeding day continues the previous day's flow. NOT one mark for
-        // the whole file: one per episode.
+        // the whole file: one per episode. Additionally the temperature-
+        // excluded day (2026-09-13) derives its excludedFromAnalysis mark.
         final result = dripCsvToExportJson(dripExportSampleCsv);
-        expect(marksOf(result), [
+        expect(cycleStartsOf(result), [
           derivedMark('2026-07-05'),
           derivedMark('2026-08-02'),
           derivedMark('2026-08-30'),
         ]);
+        expect(
+          marksOf(result)
+              .where((m) => m['mark_type'] == 'excludedFromAnalysis'),
+          [exclusionMark('2026-09-13')],
+        );
       });
 
-      test('CSV row order never changes the derived marks (day-ordered '
+      test(
+          'CSV row order never changes the derived marks (day-ordered '
           'replay)', () {
         // The suppression check runs over the DAY order, not the CSV row
         // order: 2026-01-03's menstruation-level row appears BEFORE its
@@ -1060,9 +1107,10 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-02')]);
       });
 
-      test('duplicated dates follow the merge plan: the first occurrence '
+      test(
+          'duplicated dates follow the merge plan: the first occurrence '
           'wins', () {
-        // The merge plan counts duplicate (profile, date) keys once, first
+        // The merge plan counts duplicate same-day keys once, first
         // occurrence winning; the derivation replay applies the same rule,
         // so the stored (first) shape of the day decides suppression.
         final result = dripCsvToExportJson(dripCsv(dripHeader, [
@@ -1073,20 +1121,27 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-02')]);
       });
 
-      test('an interrupted (excluded) day neither derives a mark nor '
-          "suppresses the next day's onset", () {
-        // drip temperature.exclude maps onto the day-level excludeOther, so
-        // the day is an interrupted day for the suggestion predicate — it
-        // never suggests a cycle start itself, and a following
-        // menstruation-level day is not read as a continuation of it.
+      test(
+          'an interrupted (excluded) day derives the exclusion mark and '
+          "neither derives a cycleStart mark nor suppresses the next "
+          "day's onset", () {
+        // drip temperature.exclude maps onto the excludedFromAnalysis MARK
+        // (author 'import', no raw exclude key, mask 0) — the day is an
+        // interrupted day for the suggestion predicate: it never suggests
+        // a cycle start itself, and a following menstruation-level day is
+        // not read as a continuation of it.
         final result = dripCsvToExportJson(dripCsv(dripHeader, [
           cells('2026-01-01', {4: '2', 2: 'true'}),
           cells('2026-01-02', {4: '2'}),
         ]));
-        expect(marksOf(result), [derivedMark('2026-01-02')]);
+        expect(
+            marksOf(result),
+            unorderedEquals(
+                [exclusionMark('2026-01-01'), derivedMark('2026-01-02')]));
       });
 
-      test('a single menstruation-level day with no other tracked days '
+      test(
+          'a single menstruation-level day with no other tracked days '
           'derives a mark', () {
         final result = dripCsvToExportJson(
             dripOneRowCsv(dripHeader, cells('2026-01-01', {4: '2'})));

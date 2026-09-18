@@ -69,9 +69,8 @@ final _entries = <DailyEntry>[
 /// The mucus-peak mark lies BEFORE the first higher measurement (9/12 <
 /// 9/14), so the candidates render CIRCLED (R4).
 final _marks = <CycleMark>[
-  CycleMark(profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(
-      profileId: 1, date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+  CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
 ];
 
 Widget _harness(
@@ -319,10 +318,7 @@ void main() {
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 36.5));
       final marks = [
-        CycleMark(
-            profileId: 1,
-            date: _mon14,
-            type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
       ];
       await tester.pumpWidget(_harness(entries: entries, marks: marks));
       await tester.pumpAndSettle();
@@ -381,12 +377,8 @@ void main() {
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 37.0));
       final marks = [
-        CycleMark(
-            profileId: 1, date: _tue15, type: CycleMarkTypes.mucusPeakDay),
-        CycleMark(
-            profileId: 1,
-            date: _mon14,
-            type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
       ];
       await tester.pumpWidget(_harness(entries: entries, marks: marks));
       await tester.pumpAndSettle();
@@ -491,8 +483,7 @@ void main() {
       await tester.pumpWidget(_harness(
         entries: _entries,
         marks: [
-          CycleMark(
-              profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
         ],
       ));
       await tester.pumpAndSettle();
@@ -571,7 +562,7 @@ void main() {
           find.descendant(
               of: find.byKey(const ValueKey('cycleHelpSheet')),
               matching: find.text('Baseline')),
-          findsOneWidget);      // The pre-peak wording is gone (R4 removed the special case).
+          findsOneWidget); // The pre-peak wording is gone (R4 removed the special case).
       expect(find.text('Higher measurement before the peak'), findsNothing);
     });
 
@@ -596,10 +587,8 @@ void main() {
       await tester.pumpWidget(_harness(
         entries: _entries,
         marks: [
-          CycleMark(
-              profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-          CycleMark(
-              profileId: 1, date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
         ],
       ));
       await tester.pumpAndSettle();
@@ -617,8 +606,7 @@ void main() {
         entries: _entries,
         marks: [
           ..._marks,
-          CycleMark(
-              profileId: 1, date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
         ],
       ));
       await tester.pumpAndSettle();
@@ -637,8 +625,7 @@ void main() {
         entries: _entries,
         marks: [
           ..._marks,
-          CycleMark(
-              profileId: 1, date: _wed16, type: CycleMarkTypes.suzEvening),
+          CycleMark(date: _wed16, type: CycleMarkTypes.suzEvening),
         ],
       ));
       await tester.pumpAndSettle();
@@ -679,8 +666,7 @@ void main() {
         entries: _entries,
         marks: [
           ..._marks,
-          CycleMark(
-              profileId: 1, date: _tue15, type: CycleMarkTypes.suzMorning),
+          CycleMark(date: _tue15, type: CycleMarkTypes.suzMorning),
         ],
       ));
       await tester.pumpAndSettle();
@@ -708,7 +694,7 @@ void main() {
         entries: _entries,
         marks: [
           ..._marks,
-          CycleMark(profileId: 1, date: _sun6, type: CycleMarkTypes.suzMorning),
+          CycleMark(date: _sun6, type: CycleMarkTypes.suzMorning),
         ],
       ));
       await tester.pumpAndSettle();
@@ -753,16 +739,9 @@ void main() {
       await tester.pumpWidget(_harness(
         entries: _entries,
         marks: [
-          CycleMark(
-              profileId: 1, date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-          CycleMark(
-              profileId: 1,
-              date: _mon14,
-              type: CycleMarkTypes.firstHigherMeasurement),
-          CycleMark(
-              profileId: 1,
-              date: _tue15,
-              type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: _tue15, type: CycleMarkTypes.firstHigherMeasurement),
         ],
       ));
       await tester.pumpAndSettle();

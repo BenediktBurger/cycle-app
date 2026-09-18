@@ -65,11 +65,11 @@ class EinstellungenScreen extends ConsumerWidget {
                       ),
                     ],
                     selected: {locale == null ? 'system' : locale.languageCode},
-                    onSelectionChanged: (selection) => ref
-                        .read(localeProvider.notifier)
-                        .state = selection.first == 'system'
-                        ? null
-                        : Locale(selection.first),
+                    onSelectionChanged: (selection) =>
+                        ref.read(localeProvider.notifier).state =
+                            selection.first == 'system'
+                                ? null
+                                : Locale(selection.first),
                   ),
                   const SizedBox(height: 8),
                   // In-memory ONLY: reset to the system default after a web
@@ -222,7 +222,7 @@ class EinstellungenScreen extends ConsumerWidget {
     // An export without any content is not useful as a file; communicate
     // instead of producing an empty document in the user's Downloads.
     final doc = parseExportJson(json);
-    if (doc.profiles.isEmpty && doc.entries.isEmpty && doc.marks.isEmpty) {
+    if (doc.entries.isEmpty && doc.marks.isEmpty) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
@@ -333,7 +333,6 @@ class EinstellungenScreen extends ConsumerWidget {
             summary.entriesWritten == 0 && summary.marksNew == 0
                 ? l10n.importEmpty
                 : l10n.importSummary(
-                    summary.profilesToInsert,
                     summary.entriesNew,
                     summary.entriesOverwritten,
                     summary.duplicateEntryRows,
@@ -387,8 +386,7 @@ class EinstellungenScreen extends ConsumerWidget {
                 if (canPickFile) ...[
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final text =
-                          await pickFileText(accept: '.csv,text/csv');
+                      final text = await pickFileText(accept: '.csv,text/csv');
                       if (text != null) {
                         controller.text = text;
                       }

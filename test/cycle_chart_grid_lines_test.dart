@@ -39,14 +39,8 @@ final _twoCycleEntries = <DailyEntry>[
 /// The cycleStart marks of the two-cycle scenario (at the marked days 5
 /// and 9 — the same days that used to be bleeding onsets).
 final _twoCycleMarks = <CycleMark>[
-  CycleMark(
-      profileId: 1,
-      date: _day(5),
-      type: CycleMarkTypes.cycleStart),
-  CycleMark(
-      profileId: 1,
-      date: _day(9),
-      type: CycleMarkTypes.cycleStart),
+  CycleMark(date: _day(5), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: _day(9), type: CycleMarkTypes.cycleStart),
 ];
 
 /// A gap scenario: day 0 tracked, days 1..4 untracked, a cycleStart mark
@@ -58,7 +52,7 @@ final _gapEntries = <DailyEntry>[
 ];
 
 final _gapMarks = <CycleMark>[
-  CycleMark(profileId: 1, date: _day(3), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: _day(3), type: CycleMarkTypes.cycleStart),
 ];
 
 Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
@@ -94,8 +88,8 @@ ColorScheme _scheme(WidgetTester tester) =>
 /// cell's decoration border is a non-uniform Border (right side only),
 /// unlike every glyph's own decoration (uniform Border.all or none).
 Border _cellRightBorder(WidgetTester tester, int index, String row) {
-  final containers = tester.widgetList<Container>(find.descendant(
-      of: _cell(index, row), matching: find.byType(Container)));
+  final containers = tester.widgetList<Container>(
+      find.descendant(of: _cell(index, row), matching: find.byType(Container)));
   return containers
       .map((c) => c.decoration)
       .whereType<BoxDecoration>()
@@ -110,14 +104,14 @@ void main() {
     testWidgets(
         'the chart draws hairline vertical grid lines with interval 1 '
         'aligned to the shifted domain\'s column boundaries', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpWidget(
+          _chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final grid = _chartData(tester).gridData;
       expect(grid.drawVerticalLine, isTrue,
           reason: 'the day columns are separated by vertical lines');
-      expect(grid.verticalInterval, 1,
-          reason: 'one line per day column');
+      expect(grid.verticalInterval, 1, reason: 'one line per day column');
       // The domain is half a column shifted (minX −0.5); with the baseline
       // at minX the interval-1 lines land on the interior column
       // boundaries 0.5, 1.5, … dayCount − 1.5.
@@ -134,7 +128,8 @@ void main() {
     testWidgets(
         'every signal row\'s day cells carry a matching hairline right '
         'border, and the header row does too', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpWidget(
+          _chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final onSurface = _scheme(tester).onSurface;
@@ -164,8 +159,9 @@ void main() {
           .whereType<BoxDecoration>()
           .map((d) => d.border)
           .whereType<Border>()
-          .firstWhere((b) => !b.isUniform, orElse: () => fail('no header '
-              'cell border found'));
+          .firstWhere((b) => !b.isUniform,
+              orElse: () => fail('no header '
+                  'cell border found'));
       expect(headerBorder.right.width, closeTo(0.5, 0.01));
     });
 
@@ -173,7 +169,8 @@ void main() {
         'cycle starts draw thick solid lines: the chart\'s extra line at '
         'nextCycleStart − 0.5 and the thick right border on the cell '
         'before the new cycle in every row', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpWidget(
+          _chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final onSurface = _scheme(tester).onSurface;
@@ -219,7 +216,8 @@ void main() {
     testWidgets(
         'no cycle-start line before the first cycleStart mark (the '
         'leading group)', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpWidget(
+          _chartHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
       await tester.pumpAndSettle();
 
       final verticalLines = _chartData(tester).extraLinesData.verticalLines;
@@ -239,7 +237,8 @@ void main() {
 
     testWidgets('a boundary across untracked gap days is still drawn',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _gapEntries, marks: _gapMarks));
+      await tester
+          .pumpWidget(_chartHarness(entries: _gapEntries, marks: _gapMarks));
       await tester.pumpAndSettle();
 
       final verticalLines = _chartData(tester).extraLinesData.verticalLines;

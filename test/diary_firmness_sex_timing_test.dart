@@ -93,7 +93,7 @@ void main() {
     // Read the saved day back through the database provider — the same
     // instance the form writes through, not a second connection.
     final (:db, :date) = await _savedDayOf(tester);
-    final row = await db.entriesDao.entryFor(defaultProfileId, date);
+    final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.cervixFirmness, 'soft',
         reason: 'the selected firmness (weich) must persist as its token');
@@ -118,13 +118,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final (:db, :date) = await _savedDayOf(tester);
-    final row = await db.entriesDao.entryFor(defaultProfileId, date);
+    final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.cervixFirmness, isNull,
         reason: 'a deselected firmness must persist as no observation');
   });
 
-  testWidgets('sex time slots are a multi-select: several chips persist as '
+  testWidgets(
+      'sex time slots are a multi-select: several chips persist as '
       'the OR of their bits', (WidgetTester tester) async {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
@@ -151,7 +152,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final (:db, :date) = await _savedDayOf(tester);
-    final row = await db.entriesDao.entryFor(defaultProfileId, date);
+    final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.sexTimings, 1 | 4,
         reason: 'Anfang (bit 1) + Ende (bit 4) must persist as mask 5');
@@ -177,7 +178,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final (:db, :date) = await _savedDayOf(tester);
-    final row = await db.entriesDao.entryFor(defaultProfileId, date);
+    final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.sexTimings, 4,
         reason: 'the re-tapped middle slot must be cleared; Ende (bit 4) '

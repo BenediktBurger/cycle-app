@@ -29,11 +29,6 @@
   "bleedingLight": "light",
   "bleedingMedium": "medium",
   "bleedingHeavy": "heavy",
-  "excludeIllness": "illness",
-  "excludeAlcohol": "alcohol",
-  "excludeTravel": "travel",
-  "excludeOther": "other",
-  "excludesCaption": "Interrupted days (count as disturbed for evaluation):",
   "mucusSign": "Fertility sign",
   "mucusSignUnset": "—",
   "mucusQuality": "Quality",
@@ -56,8 +51,6 @@
   "cervixFirmnessSoft": "soft",
   "painBreast": "Breast pain (B)",
   "painMittelschmerz": "Mittelschmerz (M)",
-  "mood": "mood",
-  "desire": "desire",
   "sex": "sex",
   "sexTimingStart": "start",
   "sexTimingMiddle": "middle",
@@ -302,7 +295,7 @@
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: encryption/lock is planned in ADR-0005 (native later via SQLCipher, web via PIN).",
   "settingsExport": "JSON export",
-  "settingsExportNote": "All profiles, entries and marks as one JSON document.",
+  "settingsExportNote": "All entries and marks as one JSON document.",
   "settingsImport": "JSON import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
   "exportTitle": "JSON preview",
@@ -319,36 +312,11 @@
   "importApply": "Apply import",
   "importInvalid": "Invalid document (not a valid cycle-app export).",
   "importFailed": "Import failed — the data was not changed.",
-  "importSummary": "New profiles: {profiles}, days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
-  "@importSummary": {
-    "placeholders": {
-      "profiles": {
-        "type": "int"
-      },
-      "newDays": {
-        "type": "int"
-      },
-      "overwritten": {
-        "type": "int"
-      },
-      "duplicates": {
-        "type": "int"
-      },
-      "invalid": {
-        "type": "int"
-      },
-      "newMarks": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
+  "importSummary": "Days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
   "importEmpty": "Import: nothing to change (document empty or already identical).",
   "dripImportTitle": "Import drip data",
   "dripImportButton": "Import CSV",
-  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. Imports into the main profile; per-symptom interrupt flags (except temperature) are dropped.",
+  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. An excluded temperature derives an \"exclude from analysis\" mark; mood and desire flags are dropped (their notes are kept).",
   "dripImportApply": "Import CSV",
   "dripImportHint": "Paste a drip CSV export here …",
   "dripImportInvalid": "Not a drip CSV export (no \"date\" column in the header row).",
@@ -368,6 +336,33 @@
         "type": "int"
       },
       "overwritten": {
+        "type": "int"
+      }
+    }
+  },
+  "disturbancesCaption": "Disturbed temperature days (flag the measurement, the exclusion is the mark on the day sheet):",
+  "disturbanceLateToBed": "Late to bed (sp)",
+  "disturbanceNightAwakening": "Frequent night awakening (a)",
+  "disturbanceAlcohol": "Alcohol (alk)",
+  "disturbanceIllness": "Illness (kr)",
+  "@importSummary": {
+    "placeholders": {
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newMarks": {
+        "type": "int"
+      },
+      "skipped": {
         "type": "int"
       }
     }

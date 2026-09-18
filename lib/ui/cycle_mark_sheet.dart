@@ -97,9 +97,9 @@ final class CycleDaySheet extends ConsumerWidget {
   }) async {
     final db = await ref.read(databaseProvider.future);
     if (remove) {
-      await db.marksDao.deleteMark(defaultProfileId, day, type);
+      await db.marksDao.deleteMark(day, type);
     } else {
-      await db.marksDao.toggleMark(defaultProfileId, day, type);
+      await db.marksDao.toggleMark(day, type);
     }
   }
 
@@ -115,12 +115,12 @@ final class CycleDaySheet extends ConsumerWidget {
   }) async {
     final db = await ref.read(databaseProvider.future);
     if (remove) {
-      await db.marksDao.deleteMark(defaultProfileId, day, type);
+      await db.marksDao.deleteMark(day, type);
       return;
     }
     // Variant switch first, then the add — never two variants on one day.
-    await db.marksDao.deleteMark(defaultProfileId, day, otherType);
-    await db.marksDao.addMark(defaultProfileId, day, type);
+    await db.marksDao.deleteMark(day, otherType);
+    await db.marksDao.addMark(day, type);
   }
 
   /// The first-higher mark-writing action with the owner consistency
@@ -156,13 +156,11 @@ final class CycleDaySheet extends ConsumerWidget {
     final placed = [
       ...marks,
       CycleMark(
-        profileId: defaultProfileId,
         date: day,
         type: CycleMarkTypes.firstHigherMeasurement,
       ),
     ];
-    final evaluations =
-        evaluateCycles(entries, placed, profileId: defaultProfileId);
+    final evaluations = evaluateCycles(entries, placed);
     for (var i = 0; i < evaluations.length; i++) {
       final evaluation = evaluations[i];
       if (!isDayInCycleWindow(evaluations, i, day)) continue;
@@ -175,7 +173,9 @@ final class CycleDaySheet extends ConsumerWidget {
 
       // The marked day's entry (from the evaluation's own cycle days)
       // decides the dialog body: the value-vs-baseline arithmetic, or the
-      // no-usable-temperature fact.
+      // no-usable-temperature fact. The excluded-state comes from the
+      // excludedFromAnalysis MARK (the analysis exclusion is the mark —
+      // raw flags never make a day unusable here).
       DailyEntry? markedEntry;
       for (final entry in evaluation.cycle.days) {
         if (DateOnly.sameDay(entry.date, day)) {
@@ -183,10 +183,11 @@ final class CycleDaySheet extends ConsumerWidget {
           break;
         }
       }
+      final dayExcluded = marks.any((m) =>
+          m.type == CycleMarkTypes.excludedFromAnalysis &&
+          DateOnly.sameDay(m.date, day));
       String body;
-      if (markedEntry == null ||
-          markedEntry.bbtC == null ||
-          markedEntry.isExcluded) {
+      if (markedEntry == null || markedEntry.bbtC == null || dayExcluded) {
         body = l10n.cycleSheetRiseConsistencyNoValue;
       } else {
         body = l10n.cycleSheetRiseConsistencyBelow(
@@ -295,8 +296,7 @@ final class CycleDaySheet extends ConsumerWidget {
     final locale = Localizations.localeOf(context).toString();
 
     final lines = <(String, Key?)>[];
-    final evaluations =
-        evaluateCycles(entries, marks, profileId: defaultProfileId);
+    final evaluations = evaluateCycles(entries, marks);
     for (var e = 0; e < evaluations.length; e++) {
       final evaluation = evaluations[e];
       for (final low in evaluation.numberedLows) {

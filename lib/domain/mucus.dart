@@ -20,9 +20,13 @@
 /// - `nothing`: nichts gesehen/gespürt — displays as `Ø`
 /// - `f`: feucht, reine Empfindung (moist feeling, no mucus)
 /// - `s`: S = Schleim aus den Krypten des Gebärmutterhalses (mucus)
+/// - `fs`: f/S — "f vor S an einem Tag" (the moist feeling before the
+///   mucus, observed on ONE day); displays as `f/S`. A sign of its own:
+///   NOT combinable with a quality qualifier (the quality qualifiers stay
+///   exclusive to S — the general quality-requires-S rule covers it).
 /// - `a`: Ausfluss (discharge) — displays as `A`; no quality exists for it,
 ///   the quality qualifiers stay exclusive to S.
-enum MucusSign { t, nothing, f, s, a }
+enum MucusSign { t, nothing, f, s, fs, a }
 
 /// A quality qualifier of the mucus sign S (bare S without a qualifier is
 /// equally valid). ONE vocabulary from the cheat sheet, split only by the
@@ -83,12 +87,13 @@ MucusPair sanitizeMucusPair({
     );
 
 /// Display glyph of a sign (cheat sheet): `t`, `Ø` for `nothing`, `f`, `S`,
-/// `A` for `a` (Ausfluss).
+/// `f/S` for `fs` ("f vor S an einem Tag"), `A` for `a` (Ausfluss).
 String mucusSignSymbol(MucusSign sign) => switch (sign) {
       MucusSign.t => 't',
       MucusSign.nothing => 'Ø',
       MucusSign.f => 'f',
       MucusSign.s => 'S',
+      MucusSign.fs => 'f/S',
       MucusSign.a => 'A',
     };
 

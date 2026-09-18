@@ -104,6 +104,58 @@ enum SexTiming {
   final int bit;
 }
 
+/// One temperature-disturbance flag of a tracked day (the NER "Störungen"
+/// vocabulary), as a single-bit flag. A day stores the OR of the observed
+/// flags in [DailyEntry.tempDisturbances] — multiple bits mean multiple
+/// disturbances on the same day.
+///
+/// Stored as an INTEGER (the mask itself) in the db column
+/// `temp_disturbances` and in the export document key `temp_disturbances`;
+/// the db mapping MUST go through `bit`, never the Dart declaration index.
+/// NOTE the vocabulary decision: Reise (travel) is NOT representable — the
+/// old exclusion-reason booleans are gone, and this mask is RAW data for
+/// the interrupted-temperature rendering. The analysis exclusion is the
+/// separate excludedFromAnalysis MARK (see lib/domain/cycle_grouping.dart),
+/// which the diary save auto-sets (idempotently) whenever a flag is selected.
+enum TempDisturbance {
+  /// Late to bed ("spät ins Bett").
+  sp(1),
+
+  /// Frequent night awakening ("häufig aufstehen").
+  a(2),
+
+  /// Alcohol.
+  alk(4),
+
+  /// Illness ("krank").
+  kr(8);
+
+  const TempDisturbance(this.bit);
+
+  /// The single bit this disturbance contributes to a day's mask.
+  final int bit;
+
+  /// The stable token of the flag: the enum name itself (display letters
+  /// come from the tokens — sp/a/alk/kr; a rename is therefore a storage
+  /// change, not a refactor).
+  String get token => name;
+}
+
+/// Parses a stored/exported `temp_disturbances` value into the 0..15 mask
+/// (the vocabulary of [DailyEntry.tempDisturbances]).
+///
+/// An `int` inside 0..15 is taken verbatim. Everything else — a missing
+/// key, a non-int, an out-of-range or negative value — collapses to 0 ("no
+/// disturbance"), NEVER a row killer: same lenient-coercion principle as
+/// the other coercible fields (mucus tokens, sex_timings), so foreign/legacy
+/// data cannot invalidate a row through this field. SHARED by the db layer
+/// and the export/import writer — the single source of truth for this
+/// field's validation.
+int tryParseTempDisturbances(Object? raw) {
+  if (raw is! int) return 0;
+  return (raw >= 0 && raw <= 15) ? raw : 0;
+}
+
 /// One tracked day of cycle symptoms, decoupled from any storage layer.
 ///
 /// Date semantics: [date] must be a calendar-day-only value (see
@@ -111,14 +163,10 @@ enum SexTiming {
 final class DailyEntry {
   const DailyEntry({
     required this.date,
-    this.profileId = 1,
     this.bbtC,
     int? measuredAtMinutes,
     this.bleeding = Bleeding.none,
-    this.excludeIllness = false,
-    this.excludeAlcohol = false,
-    this.excludeTravel = false,
-    this.excludeOther = false,
+    this.tempDisturbances = 0,
     this.mucusSign,
     this.mucusQuality,
     this.cervixPosition,
@@ -126,8 +174,6 @@ final class DailyEntry {
     this.cervixFirmness,
     this.painBreast = false,
     this.painMittelschmerz = false,
-    this.mood = false,
-    this.desire = false,
     this.sexTimings = 0,
     this.notes,
   })  : // The measurement time is metadata OF the temperature measurement:
@@ -139,6 +185,15 @@ final class DailyEntry {
         measuredAtMinutes = bbtC == null ? null : measuredAtMinutes,
         assert(mucusQuality == null || mucusSign == MucusSign.s,
             'mucusQuality is only valid together with mucusSign == MucusSign.s'),
+        // The mask must stay inside the TempDisturbance vocabulary: exactly
+        // the 4 bits (0..15). Anything else — negative, or a value with
+        // unknown bits — cannot round-trip through storage, so the
+        // constructor rejects it (same assert style as the mucus-quality
+        // rule).
+        assert(
+            tempDisturbances >= 0 && tempDisturbances <= 15,
+            'tempDisturbances must be a mask of TempDisturbance bits '
+            '(0..15), got $tempDisturbances'),
         // The mask must stay inside the SexTiming vocabulary: exactly the
         // 3 bits (0..7). Anything else — negative, or a value with unknown
         // bits — cannot round-trip through storage, so the constructor
@@ -146,7 +201,6 @@ final class DailyEntry {
         assert(sexTimings >= 0 && sexTimings <= 7,
             'sexTimings must be a mask of SexTiming bits (0..7), got $sexTimings');
 
-  final int profileId;
   final DateTime date;
 
   /// Basal body temperature in degrees Celsius, if measured.
@@ -166,20 +220,22 @@ final class DailyEntry {
 
   final Bleeding bleeding;
 
-  // Disturbance/exclusion flags: a day with any flag set is an interrupted
-  // day for evaluation purposes (illness, alcohol, travel, other events).
-  final bool excludeIllness;
-  final bool excludeAlcohol;
-  final bool excludeTravel;
-  final bool excludeOther;
+  /// Raw disturbance flags of the day, as a bitmask of [TempDisturbance.bit]
+  /// values (0 = no disturbance; 1 sp / 2 a / 4 alk / 8 kr; OR-combined for
+  /// multiple disturbances on one day). RAW data: it drives the
+  /// interrupted-temperature chart rendering, but NEVER the analysis
+  /// exclusion — that is the excludedFromAnalysis mark (see
+  /// lib/domain/cycle_grouping.dart).
+  final int tempDisturbances;
 
-  /// Fertility sign observed on the day (t / Ø-nichts / f / S / A-Ausfluss),
-  /// or null when no observation was recorded. Stored verbatim — never
-  /// interpreted (Mode M, ADR-0001).
+  /// Fertility sign observed on the day (t / Ø-nichts / f / S / f/S
+  /// ("f vor S an einem Tag") / A-Ausfluss), or null when no observation
+  /// was recorded. Stored verbatim — never interpreted (Mode M, ADR-0001).
   final MucusSign? mucusSign;
 
   /// Quality qualifier of the mucus sign; null for every sign other than
-  /// `MucusSign.s` (constructor assert mirrors the SQL CHECK constraint).
+  /// `MucusSign.s` (constructor assert mirrors the SQL CHECK constraint;
+  /// the 'fs' sign carries no quality either).
   final MucusQuality? mucusQuality;
 
   /// Muttermund (cervix) observation of the day, as three independent
@@ -196,13 +252,10 @@ final class DailyEntry {
   /// Pain experiences of the day, as two independent flags — the
   /// letter-coded pain options of the cheat sheet: breast tenderness
   /// (`painBreast`, letter B) and ovulation pain (Mittelschmerz,
-  /// `painMittelschmerz`, letter M). Modeled like the exclusion flags:
+  /// `painMittelschmerz`, letter M). Modeled like the disturbance flags:
   /// plain per-day booleans, no interval system.
   final bool painBreast;
   final bool painMittelschmerz;
-
-  final bool mood;
-  final bool desire;
 
   /// Times of day sex happened, as a bitmask of [SexTiming.bit] values
   /// (0 = not recorded; 1 start / 2 middle / 4 end; OR-combined for
@@ -213,22 +266,19 @@ final class DailyEntry {
 
   final String? notes;
 
-  /// True when the day carries at least one exclusion flag, i.e. it is an
-  /// interrupted day. Interrupted days never start cycles
-  /// (see lib/domain/cycle_grouping.dart).
-  bool get isExcluded =>
-      excludeIllness || excludeAlcohol || excludeTravel || excludeOther;
+  /// True when the day carries at least one raw disturbance flag, i.e. the
+  /// temperature is interrupted (rendering input — the chart draws the
+  /// touching segments and the dot lighter). The ANALYSIS exclusion is the
+  /// separate excludedFromAnalysis mark; this getter must not be used for
+  /// it (see lib/domain/cycle_grouping.dart).
+  bool get isInterrupted => tempDisturbances != 0;
 
   DailyEntry copyWith({
     DateTime? date,
-    int? profileId,
     Object? bbtC = _sentinel,
     Object? measuredAtMinutes = _sentinel,
     Bleeding? bleeding,
-    bool? excludeIllness,
-    bool? excludeAlcohol,
-    bool? excludeTravel,
-    bool? excludeOther,
+    int? tempDisturbances,
     Object? mucusSign = _sentinel,
     Object? mucusQuality = _sentinel,
     Object? cervixPosition = _sentinel,
@@ -236,23 +286,17 @@ final class DailyEntry {
     Object? cervixFirmness = _sentinel,
     bool? painBreast,
     bool? painMittelschmerz,
-    bool? mood,
-    bool? desire,
     int? sexTimings,
     Object? notes = _sentinel,
   }) {
     return DailyEntry(
       date: date ?? this.date,
-      profileId: profileId ?? this.profileId,
       bbtC: bbtC == _sentinel ? this.bbtC : bbtC as double?,
       measuredAtMinutes: measuredAtMinutes == _sentinel
           ? this.measuredAtMinutes
           : measuredAtMinutes as int?,
       bleeding: bleeding ?? this.bleeding,
-      excludeIllness: excludeIllness ?? this.excludeIllness,
-      excludeAlcohol: excludeAlcohol ?? this.excludeAlcohol,
-      excludeTravel: excludeTravel ?? this.excludeTravel,
-      excludeOther: excludeOther ?? this.excludeOther,
+      tempDisturbances: tempDisturbances ?? this.tempDisturbances,
       mucusSign:
           mucusSign == _sentinel ? this.mucusSign : mucusSign as MucusSign?,
       mucusQuality: mucusQuality == _sentinel
@@ -269,8 +313,6 @@ final class DailyEntry {
           : cervixFirmness as CervixFirmness?,
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
-      mood: mood ?? this.mood,
-      desire: desire ?? this.desire,
       sexTimings: sexTimings ?? this.sexTimings,
       notes: notes == _sentinel ? this.notes : notes as String?,
     );
@@ -283,14 +325,10 @@ final class DailyEntry {
     if (identical(this, other)) return true;
     return other is DailyEntry &&
         DateOnly.sameDay(date, other.date) &&
-        profileId == other.profileId &&
         bbtC == other.bbtC &&
         measuredAtMinutes == other.measuredAtMinutes &&
         bleeding == other.bleeding &&
-        excludeIllness == other.excludeIllness &&
-        excludeAlcohol == other.excludeAlcohol &&
-        excludeTravel == other.excludeTravel &&
-        excludeOther == other.excludeOther &&
+        tempDisturbances == other.tempDisturbances &&
         mucusSign == other.mucusSign &&
         mucusQuality == other.mucusQuality &&
         cervixPosition == other.cervixPosition &&
@@ -298,25 +336,17 @@ final class DailyEntry {
         cervixFirmness == other.cervixFirmness &&
         painBreast == other.painBreast &&
         painMittelschmerz == other.painMittelschmerz &&
-        mood == other.mood &&
-        desire == other.desire &&
         sexTimings == other.sexTimings &&
         notes == other.notes;
   }
 
   @override
-  // Object.hash caps out at 20 arguments; the field list grew past that, so
-  // the hash is built from an ordered list instead (same semantics).
-  int get hashCode => Object.hashAll([
+  int get hashCode => Object.hash(
         DateOnly.normalize(date),
-        profileId,
         bbtC,
         measuredAtMinutes,
         bleeding,
-        excludeIllness,
-        excludeAlcohol,
-        excludeTravel,
-        excludeOther,
+        tempDisturbances,
         mucusSign,
         mucusQuality,
         cervixPosition,
@@ -324,18 +354,16 @@ final class DailyEntry {
         cervixFirmness,
         painBreast,
         painMittelschmerz,
-        mood,
-        desire,
         sexTimings,
         notes,
-      ]);
+      );
 
   @override
   String toString() =>
       'DailyEntry(${DateOnly.normalize(date).toIso8601String()}, '
-      'profile:$profileId, bbt:$bbtC, measuredAt:$measuredAtMinutes, '
-      'bleeding:$bleeding, '
-      'excluded:$isExcluded, mucusSign:$mucusSign, '
+      'bbt:$bbtC, measuredAt:$measuredAtMinutes, '
+      'bleeding:$bleeding, tempDisturbances:$tempDisturbances, '
+      'mucusSign:$mucusSign, '
       'mucusQuality:$mucusQuality, '
       'cervixPosition:$cervixPosition, cervixOpening:$cervixOpening, '
       'cervixFirmness:$cervixFirmness, sexTimings:$sexTimings)';

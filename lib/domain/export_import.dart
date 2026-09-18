@@ -1,80 +1,98 @@
 // JSON export/import for the whole local database — PURE domain layer.
 //
-// Export document shape (schema version 4):
+// Export document shape (schema version 5, profile-free):
 //
 //   {
-//     "schema_version": 4,
+//     "schema_version": 5,
 //     "exported_at": "<ISO 8601 UTC>",
-//     "profiles": [{"id": 1, "name": "main", "ordinal": 0}, ...],
-//     "entries":  [{"profile_id": 1, "date": "2026-03-01", "bbt_c": 36.6,
-//                    "measured_at_minutes": 405, (nullable, v2+; minutes
+//     "entries":  [{"date": "2026-03-01", "bbt_c": 36.6,
+//                    "measured_at_minutes": 405, (nullable; minutes
 //                    since midnight, when the temperature was measured —
 //                    only ever set together with bbt_c; the import side
 //                    drops a stray time, never the row)
-//                    "bleeding": 3, (numeric level, v3; see the version note
-//                    below) "exclude_illness": false,
+//                    "bleeding": 3, (numeric level; see the version note
+//                    below) "temp_disturbances": 5, (raw disturbance mask
+//                    0..15, v5; the analysis exclusion is NOT entry raw
+//                    data — it rides as an excludedFromAnalysis mark row)
 //                    "mucus_sign": "s", "mucus_quality": "ew", (both
 //                    nullable; quality only ever together with S)
 //                    "pain_breast": false, "pain_mittelschmerz": false,
-//                    (the letter-coded pain options B and M, v4+)
 //                    "cervix_position": "high",
-//                    "cervix_opening": "open", (Muttermund
-//                    observation tokens, see the v4 note below)
-//                    "cervix_firmness": "hard", (Muttermund firmness token,
-//                    v4, see the version note below)
-//                    "sex_timings": 2, (SexTiming bitmask 0..7, v4, see the
-//                    version note below)
+//                    "cervix_opening": "open",
+//                    "cervix_firmness": "hard",
+//                    "sex_timings": 2,
 //                    ..., "notes": null}, ...],
-//     "marks":    [{"profile_id": 1, "entry_date": "2026-03-12",
-//                   "mark_type": "baseline", "author": "user"}, ...]
+//     "marks":    [{"entry_date": "2026-03-12",
+//                   "mark_type": "excludedFromAnalysis",
+//                   "author": "user"}, ...]
 //   }
+//
+// The document root is exactly schema_version / exported_at / entries /
+// marks — there are NO profile keys anywhere (the Profiles table, the
+// profile_id columns and the per-profile machinery are gone from the
+// schema; see the version note below). Old (v1–4) documents DO carry
+// `profile_id` on every row and a root `profiles` list: those keys are
+// ACCEPTED and IGNORED on import — rows merge by day / (day, mark_type),
+// never by profile.
 //
 // Per-version entry fields: v1 omitted `measured_at_minutes` and carried
 // bleeding as one of the legacy string tokens none/period/spotting; v2
 // added `measured_at_minutes` but still carried token bleeding; v3 carries
-// the numeric bleeding level (0=none … 4=heavy); v4 replaces the generic
+// the numeric bleeding level (0=none … 4=heavy); v4 replaced the generic
 // `pain` flag with the letter-coded pain options `pain_breast` (B) and
-// `pain_mittelschmerz` (M). The import side is STRICT per version about
-// which fields exist, and LENIENT within the accepted set: field values
+// `pain_mittelschmerz` (M). v5 (current) aligns the data entry with the
+// NER scheme: entries drop the exclude_* booleans and the mood/desire
+// flags and gain `temp_disturbances` (the raw disturbance mask 0..15,
+// sp/a/alk/kr; see models.dart); the analysis exclusion rides as the
+// excludedFromAnalysis MARK row. Old-document translation (inside the
+// import transaction, lib/db/export_adapter.dart): `exclude_illness` →
+// the kr bit (8), `exclude_alcohol` → the alk bit (4), `exclude_travel` /
+// `exclude_other` dropped as raw data (no equivalent flag exists) — and
+// ANY of the four true derives an excludedFromAnalysis mark (author
+// 'import') for that day, preserving the old interrupted-day analysis
+// semantics; `mood` / `desire` are dropped (the row stays valid, notes
+// untouched).
+//
+// The import side is LENIENT within the accepted version set: field values
 // are parsed per field by the shared helpers regardless of the version
-// (see tryParseBleeding / tryParseMeasuredAtMinutes), so an old document
-// and the current one flow through the same field parsers. Legacy ≤v3
-// documents may still carry the generic `pain: true` flag: it has no B/M
-// identity, so it is TOLERATED but dropped by the field mapping (the row
-// stays valid, the flag information is not carried over).
+// (see tryParseBleeding / tryParseMeasuredAtMinutes /
+// tryParseTempDisturbances), so an old document and the current one flow
+// through the same field parsers. Legacy ≤v3 documents may still carry the
+// generic `pain: true` flag: it has no B/M identity, so it is TOLERATED but
+// dropped by the field mapping (the row stays valid, the flag information
+// is not carried over).
 //
 // Version note on the v4 REDEFINITION (pre-release): v4 was never published
 // before the sex/cervix vocabulary landed, so its shape was redefined in
-// place instead of growing a v5 — the old v4 `sex` boolean is REPLACED by
+// place instead of growing a version — the old `sex` boolean is REPLACED by
 // the `sex_timings` bitmask (0..7, the SexTiming bits; see models.dart) and
-// `cervix_firmness` (the lib/domain/cervix.dart firmness token) extends v4
-// ADDITIVELY. The free-text `cervix` note key was later dropped from v4 the
-// same way (owner decision: the three Muttermund vocabularies carry the
-// observation; prose belongs in `notes`). No legacy tolerance shims exist
-// for any of these keys: there are no v4 documents in the wild with an old
-// shape, and a stray `sex` or `cervix` key is simply ignored (unknown keys
-// never error — see below).
+// `cervix_firmness` extends it ADDITIVELY. The free-text `cervix` note key
+// was later dropped the same way (owner decision: the three Muttermund
+// vocabularies carry the observation; prose belongs in `notes`). No legacy
+// tolerance shims exist for any of these keys: there are no such documents
+// in the wild with an old shape, and a stray `sex` or `cervix` key is
+// simply ignored (unknown keys never error — see below).
 //
-// Additive fields without a version bump: v4 ALSO carries the two
-// Muttermund (cervix) observation fields `cervix_position` /
-// `cervix_opening` (tokens of the lib/domain/cervix.dart vocabularies) —
-// additively, with NO schema-version change, because the reader ignores
-// unknown/extra keys in BOTH directions: older apps reading a newer
-// document keep every other field (the new keys are ignored, not an
+// Additive fields without a version bump: the Muttermund observation
+// fields `cervix_position` / `cervix_opening` (tokens of the
+// lib/domain/cervix.dart vocabularies) ride ADDITIVELY, because the reader
+// ignores unknown/extra keys in BOTH directions: older apps reading a
+// newer document keep every other field (the new keys are ignored, not an
 // error), and newer apps read old documents that simply omit the fields.
 // An unknown/out-of-vocabulary token collapses to null on import without
 // dropping the row (never a row killer, same principle as mucus); an
-// out-of-range `sex_timings` mask likewise collapses to 0.
+// out-of-range `sex_timings` mask or `temp_disturbances` mask likewise
+// collapses to 0.
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in
 // lib/db/export_adapter.dart. Only the JSON shape/semantics live here.
 //
 // Import merge policy (resolved decision, see exportMergePolicy): entries
-// merge by (profile, date) with an OVERWRITE of the stored day; marks are
-// idempotent (existing marks are skipped, never duplicated); unknown
-// profiles are re-created. The planner only COUNTS what will happen — the
-// actual writes are performed by the db adapter against the same plan.
+// merge by DAY with an OVERWRITE of the stored day; marks are idempotent
+// (existing marks are skipped, never duplicated). The planner only COUNTS
+// what will happen — the actual writes are performed by the db adapter
+// against the same plan.
 
 import 'dart:convert';
 
@@ -83,36 +101,35 @@ import 'models.dart';
 
 /// Bump when the document shape changes; importers accept older/newer
 /// documents per the rules in [parseExportJson]. Version 2 added the
-/// `measured_at_minutes` entry field (records when the temperature was
-/// measured); a v1 entry simply omits the field. Version 3 made the entry
-/// field `bleeding` numeric (0=none … 4=heavy) — v1/v2 documents carry
-/// bleeding as one of the legacy string tokens none/period/spotting, and
-/// the field parser accepts both shapes regardless of the version.
-/// Version 4 replaced the generic `pain` entry flag with the letter-coded
-/// pain options `pain_breast` (B) and `pain_mittelschmerz` (M); the legacy
-/// `pain` flag of ≤v3 documents is tolerated and dropped on import. v4 was
-/// also (pre-release) REDEFINED IN PLACE: the boolean `sex` entry flag is
-/// replaced by the `sex_timings` bitmask (0..7), and the Muttermund fields
-/// `cervix_position` / `cervix_opening` / `cervix_firmness` extend v4
-/// ADDITIVELY with no version bump — the reader ignores unknown keys in
-/// both directions (see the version note in the header comment).
-const int exportSchemaVersion = 4;
+/// `measured_at_minutes` entry field; version 3 made `bleeding` numeric;
+/// version 4 replaced the generic `pain` flag with the letter-coded pain
+/// options and (pre-release, redefined in place) the `sex` flag with the
+/// `sex_timings` mask plus the additive Muttermund fields. Version 5
+/// aligns the data entry with the NER scheme AND removes the profile
+/// dimension completely: entries drop `profile_id`, the four `exclude_*`
+/// booleans, `mood` and `desire` and gain `temp_disturbances` (raw mask
+/// 0..15); marks drop `profile_id` (rows are entry_date / mark_type /
+/// author only); the document has no `profiles` list at all. Old
+/// (v1–4) documents keep importing: their `profile_id`/`profiles` keys are
+/// accepted and ignored, their exclude_* keys translate into the mask bits
+/// plus derived excludedFromAnalysis marks (see the header comment and
+/// lib/db/export_adapter.dart).
+const int exportSchemaVersion = 5;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and
 /// documented in CONTRIBUTING; importers MUST behave exactly like this).
 const String exportMergePolicy = 'overwrite';
 
-/// Row maps of the three exported tables. Values are plain JSON-decodable
-/// scalars (String / num / bool / null / nested lists/maps).
+/// Row maps of the two exported tables. Values are plain JSON-decodable
+/// scalars (String / num / bool / null / nested lists/maps). There is no
+/// profiles list: the v5 document is profile-free.
 final class ExportBlob {
   const ExportBlob({
-    required this.profiles,
     required this.entries,
     required this.marks,
     required this.exportedAt,
   });
 
-  final List<Map<String, Object?>> profiles;
   final List<Map<String, Object?>> entries;
   final List<Map<String, Object?>> marks;
 
@@ -147,7 +164,6 @@ String buildExportJson(ExportBlob blob) {
   return const JsonEncoder.withIndent('  ').convert(<String, Object?>{
     'schema_version': exportSchemaVersion,
     'exported_at': blob.exportedAt.toUtc().toIso8601String(),
-    'profiles': blob.profiles,
     'entries': blob.entries,
     'marks': blob.marks,
   });
@@ -159,15 +175,16 @@ String buildExportJson(ExportBlob blob) {
 /// Throws a [FormatException] when the input is not JSON, not an object,
 /// carries an unsupported schema version, or has a broken exported_at /
 /// table list. The accepted schema-version set is exactly
-/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3, 4}) — kept explicit,
-/// no forward negotiation: old exports exist as real files on user devices,
-/// so every shape ever published stays importable, while anything AFTER
-/// the current version is rejected strictly (no data may be silently
-/// mis-read). Field semantics are strict per version (which fields a
-/// version carries — see the header comment); within the accepted set the
-/// per-field parsers are version-agnostic (numeric and legacy token
-/// bleeding both parse, via tryParseBleeding). Unknown/extra keys are
-/// ignored (forward compatibility).
+/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3, 4, 5}) — kept
+/// explicit, no forward negotiation: old exports exist as real files on
+/// user devices, so every shape ever published stays importable, while
+/// anything AFTER the current version is rejected strictly (no data may be
+/// silently mis-read). The `profiles` list is NOT required (v5 documents
+/// have none; old documents' lists are tolerated and ignored — unknown
+/// keys never error). Field semantics are lenient within the accepted
+/// set: the per-field parsers are version-agnostic (numeric and legacy
+/// token bleeding both parse, via tryParseBleeding). Unknown/extra keys
+/// are ignored (forward compatibility).
 ExportBlob parseExportJson(String raw) {
   final Object? decoded;
   try {
@@ -192,7 +209,6 @@ ExportBlob parseExportJson(String raw) {
 
   return ExportBlob(
     exportedAt: exported,
-    profiles: _listOfMaps(decoded['profiles'], 'profiles'),
     entries: _listOfMaps(decoded['entries'], 'entries'),
     marks: _listOfMaps(decoded['marks'], 'marks'),
   );
@@ -214,10 +230,12 @@ List<Map<String, Object?>> _listOfMaps(Object? raw, String field) {
   return result;
 }
 
-/// Counted import plan. The db adapter executes exactly these writes.
+/// Counted import plan. The db adapter executes exactly these writes
+/// (plus the derived excludedFromAnalysis marks that OLD documents'
+/// exclude_* keys translate into — see lib/db/export_adapter.dart; the
+/// planner counts the document's own rows only).
 final class ImportSummary {
   const ImportSummary({
-    this.profilesToInsert = 0,
     this.entriesNew = 0,
     this.entriesOverwritten = 0,
     this.entriesInvalid = 0,
@@ -226,9 +244,6 @@ final class ImportSummary {
     this.marksSkipped = 0,
     this.marksInvalid = 0,
   });
-
-  /// Unknown profile ids that must be re-created on import.
-  final int profilesToInsert;
 
   /// Entries absent on this device (to insert).
   final int entriesNew;
@@ -257,28 +272,29 @@ final class ImportSummary {
   int get entriesWritten => entriesNew + entriesOverwritten;
 }
 
-/// Stable key of an entry row for the (profile, date) uniqueness; also part
-/// of the adapter contract (the db layer looks up existing rows by exactly
-/// this key).
-String importEntryKey(int profileId, String isoDay) => '$profileId|$isoDay';
+/// Stable key of an entry row for the day uniqueness (the ISO day itself);
+/// also part of the adapter contract (the db layer looks up existing rows
+/// by exactly this key).
+String importEntryKey(String isoDay) => isoDay;
 
-/// Stable key of a mark row for its (profile, date, type) uniqueness.
-String importMarkKey(int profileId, String isoDay, String markType) =>
-    '$profileId|$isoDay|$markType';
+/// Stable key of a mark row for its (day, type) uniqueness.
+String importMarkKey(String isoDay, String markType) => '$isoDay|$markType';
 
 /// Plans the import of [doc] into an existing dataset.
 ///
 /// [existingEntryKeys] / [existingMarkKeys] contain the keys of all rows
-/// already on the device (built with [importEntryKey]/[importMarkKey]);
-/// [existingProfileIds] lists known profile ids. Only counts are produced —
-/// no writes happen here, keeping this function pure and testable.
+/// already on the device (built with [importEntryKey]/[importMarkKey]).
+/// The `profile_id` / `profiles` keys of old documents are NOT read here
+/// (accepted and ignored — rows merge by day / (day, mark_type), and two
+/// rows that differ only by profile on the same day collapse onto one
+/// key: first occurrence wins, extras count as duplicates). Only counts
+/// are produced — no writes happen here, keeping this function pure and
+/// testable.
 ImportSummary planMerge(
   ExportBlob doc, {
   required Set<String> existingEntryKeys,
   required Set<String> existingMarkKeys,
-  required Set<int> existingProfileIds,
 }) {
-  var profilesToInsert = 0;
   var entriesNew = 0;
   var entriesOverwritten = 0;
   var entriesInvalid = 0;
@@ -287,34 +303,24 @@ ImportSummary planMerge(
   var marksSkipped = 0;
   var marksInvalid = 0;
 
-  // Profiles in the document that the device does not know yet must be
-  // re-created with their DOCUMENTED OWN data (name/ordinal).
-  for (final row in doc.profiles) {
-    final id = parseExportId(row['id']);
-    if (id != null && !existingProfileIds.contains(id)) {
-      profilesToInsert++;
-    }
-  }
-
   final seenEntryKeys = <String>{};
 
   for (final row in doc.entries) {
     // Same field-level gates as the db writer (tryDailyEntryFromExport):
-    // profile id and day through the shared helpers, and bleeding through
-    // the SHARED vocabulary helper tryParseBleeding (models.dart) instead of
-    // a planner-local rule — the writer rejecting a field must never happen
+    // the day through the shared helper, and bleeding through the SHARED
+    // vocabulary helper tryParseBleeding (models.dart) instead of a
+    // planner-local rule — the writer rejecting a field must never happen
     // after the planner counted the row as a write. The writer's remaining
-    // field handling (bbt/flags defaults, mucus/entries coercion to null)
+    // field handling (bbt/flags defaults, mucus/mask coercion to 0/null)
     // never drops a row, so no further planner gate exists.
-    final profileId = parseExportId(row['profile_id']);
     final day =
         row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
     final bleeding = tryParseBleeding(row['bleeding']);
-    if (profileId == null || day == null || bleeding == null) {
+    if (day == null || bleeding == null) {
       entriesInvalid++;
       continue;
     }
-    final key = importEntryKey(profileId, formatIsoDay(day));
+    final key = importEntryKey(formatIsoDay(day));
     if (seenEntryKeys.contains(key)) {
       duplicateEntryRows++;
       continue;
@@ -328,16 +334,15 @@ ImportSummary planMerge(
   }
 
   for (final row in doc.marks) {
-    final profileId = parseExportId(row['profile_id']);
     final day = row['entry_date'] is String
         ? tryParseIsoDay(row['entry_date'] as String)
         : null;
     final type = row['mark_type'];
-    if (profileId == null || day == null || type is! String || type.isEmpty) {
+    if (day == null || type is! String || type.isEmpty) {
       marksInvalid++;
       continue;
     }
-    final key = importMarkKey(profileId, formatIsoDay(day), type);
+    final key = importMarkKey(formatIsoDay(day), type);
     if (existingMarkKeys.contains(key)) {
       marksSkipped++;
     } else {
@@ -346,7 +351,6 @@ ImportSummary planMerge(
   }
 
   return ImportSummary(
-    profilesToInsert: profilesToInsert,
     entriesNew: entriesNew,
     entriesOverwritten: entriesOverwritten,
     entriesInvalid: entriesInvalid,
@@ -355,14 +359,4 @@ ImportSummary planMerge(
     marksSkipped: marksSkipped,
     marksInvalid: marksInvalid,
   );
-}
-
-/// Parses a numeric export id that may arrive as `int`, or as a numeric
-/// string (boxed from lossy systems — some tools serialize ids as strings);
-/// anything else is invalid. Plan counting and every row writer MUST use
-/// this same helper so a counted row is always a written row.
-int? parseExportId(Object? raw) {
-  if (raw is int) return raw;
-  if (raw is String) return int.tryParse(raw);
-  return null;
 }

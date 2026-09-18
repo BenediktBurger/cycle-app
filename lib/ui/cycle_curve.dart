@@ -7,7 +7,9 @@ import '../domain/models.dart';
 
 /// One drawable point of the temperature curve: a measured temperature on
 /// its chart x position (day index), flagged when the day is interrupted
-/// (exclusion flags such as illness) and thus renders lighter.
+/// (a non-zero raw disturbance mask — the rendering is keyed to the raw
+/// `tempDisturbances` mask, NOT to the excludedFromAnalysis mark) and thus
+/// renders lighter.
 final class CurvePoint {
   const CurvePoint({
     required this.dayIndex,
@@ -21,7 +23,8 @@ final class CurvePoint {
   /// Measured temperature in °C.
   final double bbtC;
 
-  /// True when the day carries an exclusion flag: measured, but lighter.
+  /// True when the day carries at least one raw disturbance flag
+  /// (tempDisturbances != 0): measured, but lighter.
   final bool excluded;
 }
 
@@ -50,7 +53,10 @@ final class CurveSegment {
 /// [entriesByDayIndex] maps day index -> entry over the chart range (see
 /// _ChartDays). Days WITHOUT a temperature — no entry at all, or an entry
 /// that carries no bbtC — break the line; a day with a temperature counts
-/// as measured even when exclusion flags mark it as interrupted.
+/// as measured even when its raw disturbance mask marks it interrupted
+/// (the mask is rendering input only — the excludedFromAnalysis mark is
+/// deliberately NOT consulted here: a manually-excluded day without flags
+/// renders normally).
 List<CurveRun> curveRuns(Map<int, DailyEntry> entriesByDayIndex) {
   final measured = <CurvePoint>[
     for (final MapEntry(:key, value: entry) in entriesByDayIndex.entries)
@@ -58,7 +64,7 @@ List<CurveRun> curveRuns(Map<int, DailyEntry> entriesByDayIndex) {
         CurvePoint(
           dayIndex: key,
           bbtC: entry.bbtC!,
-          excluded: entry.isExcluded,
+          excluded: entry.isInterrupted,
         ),
   ]..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));
 

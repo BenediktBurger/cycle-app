@@ -82,9 +82,9 @@
 //   Settled rule (owner-confirmed 2026-09-17): the six-low window is the
 //   SIX PREVIOUS CALENDAR DAYS before the user-marked first higher
 //   measurement (rise−1 … rise−6), intersected with the cycle group's
-//   tracked days; the baseline is the MAX of the not-excluded MEASURED
+//   tracked days; the baseline is the MAX of the not-marked-excluded MEASURED
 //   temperatures within those days (the earliest maximum wins on ties).
-//   Any measured, not-excluded temperature in the window counts as a low,
+//   Any measured, not-marked-excluded temperature in the window counts as a low,
 //   regardless of its mucus role — the peak day itself carries a number
 //   when it falls into the window. (This subsumes the old "peak day
 //   counts as a low" TODO.) An EXCLUDED day occupies its calendar day
@@ -107,7 +107,7 @@
 //   Settled rule (owner-confirmed 2026-09-17): an unmeasured or EXCLUDED
 //   day inside the candidate sequence counts exactly like a day at/below
 //   the baseline — a gap day consuming the one-gap R2 allowance. The R2
-//   class list ("missing, excluded, or at/below the baseline") names one
+//   class list ("missing, marked excluded, or at/below the baseline") names one
 //   and the same gap-day class; no interpretation is deferred here.
 //   Settled: the SUZ (rules D and E) is declared only from CIRCLED
 //   measurements. Summary rule 2.5 states arrows are "keine höhere
@@ -145,9 +145,13 @@
 //   earlier duplicates stay stored, render no candidate, and are removed
 //   only through the sheet's mark toggles.
 //
-// Input contract: [evaluateCycles] expects entries and marks of ONE profile
-// (pass [evaluateCycles.profileId] to have foreign-profile data filtered
-// out defensively; the UI providers already deliver per-profile data).
+// Profile-free: marks key to days only; the (entry_date, mark_type)
+// uniqueness is the whole key. The ANALYSIS EXCLUSION lives in the
+// excludedFromAnalysis MARKS (not in entry raw data — the raw disturbance
+// flags are rendering input only, see lib/domain/models.dart):
+// [evaluateCycles] builds the excluded-day set once from the marks and
+// treats those days like unmeasured ones (no number, no baseline
+// contribution, a gap day in the candidate sequence, no usable rise value).
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';
@@ -185,7 +189,7 @@ final class NumberedLow {
   /// The 1–6 calendar-offset number: the measured, not-excluded day at
   /// rise−i carries number i, counting back from the first higher
   /// measurement. Numbers belong to CALENDAR POSITIONS — an omitted
-  /// (untracked, unmeasured, or excluded) window day gets no number and
+  /// (untracked, unmeasured, or marked-excluded) window day gets no number and
   /// its number is skipped, e.g. "6 5 _ 3 _ 1" (see the settled rule in
   /// the file header).
   final int number;
@@ -322,7 +326,7 @@ final class CycleEvaluation {
   final SuzRule? suzRule;
 
   /// Whether the user-placed first higher measurement sits on a day whose
-  /// measured, not-excluded temperature lies STRICTLY ABOVE the baseline
+  /// measured, not-marked-excluded temperature lies STRICTLY ABOVE the baseline
   /// (owner decision 2026-09-17: when it does not, the app warns — the
   /// user may have chosen a wrong day; any warning wording states the
   /// arithmetic fact only, never a verdict). Because the baseline derives
@@ -333,7 +337,7 @@ final class CycleEvaluation {
   ///   derived (no usable low measurement in the mark's window) — the
   ///   check is undefined there;
   /// - false when the marked day has no usable temperature (no entry,
-  ///   unmeasured, or excluded) or its value is not strictly above the
+  ///   unmeasured, or marked excluded) or its value is not strictly above the
   ///   baseline;
   /// - true otherwise.
   ///
@@ -376,24 +380,27 @@ const double _epsilon = 1e-9;
 /// window is open-ended); marks before the first group are ignored.
 List<CycleEvaluation> evaluateCycles(
   List<DailyEntry> entries,
-  List<CycleMark> marks, {
-  int? profileId,
-}) {
-  final profileEntries = profileId == null
-      ? entries
-      : entries.where((e) => e.profileId == profileId).toList();
-  final profileMarks = profileId == null
-      ? marks
-      : marks.where((m) => m.profileId == profileId).toList();
+  List<CycleMark> marks,
+) {
+  // The excluded-day set, built ONCE from the exclusion marks: a marked
+  // day behaves like an unmeasured day in every rule below (R2/R8 gap,
+  // no low number, no baseline contribution, no usable rise value). Raw
+  // disturbance flags never contribute here.
+  final excludedDays = <DateTime>{
+    for (final mark in marks)
+      if (mark.type == CycleMarkTypes.excludedFromAnalysis)
+        DateOnly.normalize(mark.date),
+  };
 
-  final cycles = groupIntoCycles(profileEntries, profileMarks);
+  final cycles = groupIntoCycles(entries, marks);
 
   // Pre-pass: the six-low window per cycle. The R10 segment-end clamps need
   // the NEXT cycle's window start, so the windows are computed before the
   // per-cycle evaluations.
   final windows = <_LowWindow>[];
   for (var i = 0; i < cycles.length; i++) {
-    windows.add(_lowWindowFor(cycles[i], profileMarks, _nextStart(cycles, i)));
+    windows.add(
+        _lowWindowFor(cycles[i], marks, excludedDays, _nextStart(cycles, i)));
   }
 
   final evaluations = <CycleEvaluation>[];
@@ -402,7 +409,8 @@ List<CycleEvaluation> evaluateCycles(
         i + 1 < cycles.length ? windows[i + 1].startDay : null;
     evaluations.add(_evaluateCycle(
       cycles[i],
-      profileMarks,
+      marks,
+      excludedDays,
       windows[i],
       _nextStart(cycles, i),
       nextWindowStart,
@@ -412,10 +420,9 @@ List<CycleEvaluation> evaluateCycles(
 }
 
 /// The start of the NEXT cycle's date window, or null for the last cycle.
-DateTime? _nextStart(List<Cycle> cycles, int index) =>
-    index + 1 < cycles.length
-        ? DateOnly.normalize(cycles[index + 1].startDate)
-        : null;
+DateTime? _nextStart(List<Cycle> cycles, int index) => index + 1 < cycles.length
+    ? DateOnly.normalize(cycles[index + 1].startDate)
+    : null;
 
 /// The most recent mark of [type] inside this cycle's date window, if any
 /// (owner-confirmed anchor rule: re-marking supersedes). Multiple mucus
@@ -481,6 +488,7 @@ final class _LowWindow {
 _LowWindow _lowWindowFor(
   Cycle cycle,
   List<CycleMark> marks,
+  Set<DateTime> excludedDays,
   DateTime? nextCycleStart,
 ) {
   final firstHigherDay = _latestMarkOf(
@@ -496,8 +504,9 @@ _LowWindow _lowWindowFor(
   // see the settled low-window rule in the file header), intersected with
   // the cycle group's tracked days. Numbering belongs to CALENDAR
   // POSITIONS, not to a dense index over the measured lows: the measured,
-  // not-excluded day at rise−i carries number i; an omitted (untracked or
-  // unmeasured) day and an excluded day get NO number — numbers skip
+  // not-marked-excluded day at rise−i carries number i; an omitted
+  // (untracked or
+  // unmeasured) day and a mark-excluded day get NO number — numbers skip
   // (the cheat sheet's "zurücknummerieren": 6 … 1). A window reaching
   // past the group's first tracked day (rise marked within the first six
   // days of a cycle group) truncates at the group's tracked days — beyond
@@ -509,9 +518,12 @@ _LowWindow _lowWindowFor(
   for (var offset = 1; offset <= 6; offset++) {
     final day = DateOnly.addDays(firstHigherDay, -offset);
     final entry = byDay[day];
-    // No entry, no temperature, or an exclusion flag: the day occupies its
-    // calendar position but contributes nothing (no number, no baseline).
-    if (entry == null || entry.bbtC == null || entry.isExcluded) continue;
+    // No entry, no temperature, or an excludedFromAnalysis MARK: the day
+    // occupies its calendar position but contributes nothing (no number,
+    // no baseline). Raw disturbance flags do NOT do this.
+    if (entry == null || entry.bbtC == null || excludedDays.contains(day)) {
+      continue;
+    }
     lows.add(NumberedLow(
       number: offset,
       date: day,
@@ -539,6 +551,7 @@ _LowWindow _lowWindowFor(
 CycleEvaluation _evaluateCycle(
   Cycle cycle,
   List<CycleMark> marks,
+  Set<DateTime> excludedDays,
   _LowWindow lowWindow,
   DateTime? nextCycleStart,
   DateTime? nextWindowStart,
@@ -556,7 +569,8 @@ CycleEvaluation _evaluateCycle(
 
   // The marked candidate sequence (R1–R5): walk CALENDAR days from the
   // marked rise onward so that untracked days (data gaps) count as the
-  // missing days they are. Unmeasured and excluded days are gaps too (R8 —
+  // missing days they are. Unmeasured and mark-excluded days are gaps
+  // too (R8 —
   // settled rule: they count exactly like days at/below the baseline, see
   // the file header); a day at or below the baseline is a gap as
   // well. One gap day between two candidates is tolerated; two in a row
@@ -570,7 +584,8 @@ CycleEvaluation _evaluateCycle(
   BaselineSpan? baselineSpan;
 
   // The rise-mark consistency check (owner decision 2026-09-17): the
-  // marked day must carry a measured, not-excluded temperature STRICTLY
+  // marked day must carry a measured, not-marked-excluded temperature
+  // STRICTLY
   // above the baseline — otherwise the UI warns (the user may have chosen
   // a wrong day). The baseline derives ONLY from the six calendar days
   // before the mark, so the check is well-defined once mark and baseline
@@ -585,7 +600,7 @@ CycleEvaluation _evaluateCycle(
     final markedEntry = byDay[firstHigherDay];
     riseMarkConsistent = markedEntry == null ||
             markedEntry.bbtC == null ||
-            markedEntry.isExcluded
+            excludedDays.contains(firstHigherDay)
         ? false
         : markedEntry.bbtC! > baseline.value;
   }
@@ -605,11 +620,11 @@ CycleEvaluation _evaluateCycle(
 
       if (entry == null ||
           entry.bbtC == null ||
-          entry.isExcluded ||
+          excludedDays.contains(day) ||
           entry.bbtC! <= baseline.value) {
-        // Missing, excluded, or at/below the baseline: a gap day (R2/R8).
-        // Gap days before the first candidate do not count — the sequence
-        // has nothing to be connected to yet.
+        // Missing, marked excluded, or at/below the baseline: a gap day
+        // (R2/R8). Gap days before the first candidate do not count — the
+        // sequence has nothing to be connected to yet.
         if (sequenceStarted) gapRun++;
         continue;
       }

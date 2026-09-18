@@ -78,7 +78,7 @@ void main() {
     final container = ProviderScope.containerOf(context);
     final db = await container.read(databaseProvider.future);
     final date = container.read(selectedDateProvider);
-    final row = await db.entriesDao.entryFor(defaultProfileId, date);
+    final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(
       row!.bleeding,

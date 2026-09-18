@@ -1,8 +1,8 @@
 // Tests for the "Zeichen der Fruchtbarkeit" vocabulary (NER cheat sheet):
-// signs t / Ø(nichts) / f / S / A(Ausfluss) plus the quality qualifiers that
-// are only valid together with S. Enum NAMES are the stable storage keys
-// (database + export), so the token-set tests below pin them — a rename is a
-// data migration.
+// signs t / Ø(nichts) / f / S / f/S ("f vor S an einem Tag") / A(Ausfluss)
+// plus the quality qualifiers that are only valid together with S. Enum
+// NAMES are the stable storage keys (database + export), so the token-set
+// tests below pin them — a rename is a data migration.
 
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -13,7 +13,41 @@ void main() {
     test('token set is exactly the cheat-sheet signs', () {
       expect(
         MucusSign.values.map((s) => s.name),
-        unorderedEquals(const ['t', 'nothing', 'f', 's', 'a']),
+        unorderedEquals(const ['t', 'nothing', 'f', 's', 'fs', 'a']),
+      );
+    });
+
+    test('fs (f vor S an einem Tag) keeps its exact storage token', () {
+      expect(MucusSign.fs.name, 'fs',
+          reason: 'the token is pinned by the storage format — a rename is '
+              'a data migration, never a refactor');
+      expect(tryParseMucusSign('fs'), MucusSign.fs);
+      expect(MucusSign.fs.name, isNot(contains('/')),
+          reason: 'the storage token is the enum name, not the glyph');
+    });
+
+    test('fs displays as f/S and carries no quality', () {
+      // 'f/S' ("f vor S an einem Tag") is a single observation with NO
+      // quality qualifier of its own — like every non-S sign the quality
+      // must never survive alongside it.
+      expect(mucusSignSymbol(MucusSign.fs), 'f/S');
+      expect(
+        sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew),
+        (sign: MucusSign.fs, quality: null),
+        reason: 'the quality collapses — fs is not the S sign',
+      );
+      expect(
+        () => DailyEntry(
+          date: DateTime(2026, 6, 15),
+          mucusSign: MucusSign.fs,
+          mucusQuality: MucusQuality.gl,
+        ),
+        throwsA(isA<AssertionError>()),
+        reason: 'the constructor mirrors the sanitize rule',
+      );
+      expect(
+        mucusDisplay(sign: MucusSign.fs, quality: MucusQuality.ew),
+        (symbol: 'f/S', superscript: null),
       );
     });
 
@@ -204,6 +238,8 @@ void main() {
       expect(mucusSignSymbol(MucusSign.nothing), 'Ø');
       expect(mucusSignSymbol(MucusSign.f), 'f');
       expect(mucusSignSymbol(MucusSign.s), 'S');
+      expect(mucusSignSymbol(MucusSign.fs), 'f/S',
+          reason: '"f vor S an einem Tag" renders as the composite glyph');
       expect(mucusSignSymbol(MucusSign.a), 'A');
     });
 

@@ -27,8 +27,7 @@ void main() {
         () async {
       for (var i = 0; i < CervixPosition.values.length; i++) {
         final position = CervixPosition.values[i];
-        final opening = CervixOpening.values[
-            i % CervixOpening.values.length];
+        final opening = CervixOpening.values[i % CervixOpening.values.length];
         final day = DateTime(2026, 8, 1 + i);
         final stored = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
           DailyEntry(
@@ -65,15 +64,15 @@ void main() {
       // cervix_position must reject it.
       await expectLater(
         db.customStatement(
-          "INSERT INTO cycle_entries (profile_id, date, cervix_position) "
-          "VALUES (1, 20000, 'middle')",
+          "INSERT INTO cycle_entries (date, cervix_position) "
+          "VALUES (20000, 'middle')",
         ),
         throwsA(isA<Exception>()),
       );
       // Sanity: an in-vocabulary token goes through.
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, cervix_position) "
-        "VALUES (1, 20001, 'veryHigh')",
+        "INSERT INTO cycle_entries (date, cervix_position) "
+        "VALUES (20001, 'veryHigh')",
       );
     });
 
@@ -81,15 +80,15 @@ void main() {
       // 'medium' is the POSITION token; cervix_opening says 'middle'.
       await expectLater(
         db.customStatement(
-          "INSERT INTO cycle_entries (profile_id, date, cervix_opening) "
-          "VALUES (1, 20002, 'medium')",
+          "INSERT INTO cycle_entries (date, cervix_opening) "
+          "VALUES (20002, 'medium')",
         ),
         throwsA(isA<Exception>()),
       );
       // Sanity: an in-vocabulary token goes through.
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, cervix_opening) "
-        "VALUES (1, 20003, 'middle')",
+        "INSERT INTO cycle_entries (date, cervix_opening) "
+        "VALUES (20003, 'middle')",
       );
     });
 
@@ -103,7 +102,7 @@ void main() {
       await db.entriesDao.upsertDaily(
         DailyEntry(date: DateTime(2026, 8, 15)),
       );
-      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 8, 15)))!;
+      final row = (await db.entriesDao.entryFor(DateTime(2026, 8, 15)))!;
       expect(row.cervixPosition, isNull);
       expect(row.cervixOpening, isNull);
     });
@@ -122,8 +121,9 @@ void main() {
       );
 
       final json = await exportDatabaseToJson(db);
-      expect(json, contains('"schema_version": 4'),
-          reason: 'the additive fields extend the existing format; no bump');
+      expect(json, contains('"schema_version": 5'),
+          reason: "v5 is the NER-alignment/profile-free release; the "
+              "additive Muttermund fields still ride the entries");
       expect(json, contains('"cervix_position": "veryHigh"'));
       expect(json, contains('"cervix_opening": "open"'));
       expect(json, contains('"cervix_position": null'),
@@ -135,17 +135,16 @@ void main() {
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesWritten, 2);
       expect(
-        (await target.entriesDao.entryFor(1, DateTime(2026, 4, 2)))!
+        (await target.entriesDao.entryFor(DateTime(2026, 4, 2)))!
             .cervixPosition,
         'veryHigh',
       );
       expect(
-        (await target.entriesDao.entryFor(1, DateTime(2026, 4, 2)))!
-            .cervixOpening,
+        (await target.entriesDao.entryFor(DateTime(2026, 4, 2)))!.cervixOpening,
         'open',
       );
       expect(
-        (await target.entriesDao.entryFor(1, DateTime(2026, 4, 3)))!
+        (await target.entriesDao.entryFor(DateTime(2026, 4, 3)))!
             .cervixPosition,
         isNull,
       );
@@ -168,11 +167,11 @@ void main() {
       expect(summary.entriesInvalid, 0, reason: 'no row may be dropped here');
       expect(summary.entriesWritten, 2);
 
-      final first = (await db.entriesDao.entryFor(1, DateTime(2026, 5, 1)))!;
+      final first = (await db.entriesDao.entryFor(DateTime(2026, 5, 1)))!;
       expect(first.cervixPosition, isNull);
       expect(first.cervixOpening, isNull,
           reason: 'non-string/opening tokens are not data');
-      final second = (await db.entriesDao.entryFor(1, DateTime(2026, 5, 2)))!;
+      final second = (await db.entriesDao.entryFor(DateTime(2026, 5, 2)))!;
       expect(second.cervixPosition, 'low');
       expect(second.cervixOpening, isNull);
     });

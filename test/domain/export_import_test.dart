@@ -1,9 +1,14 @@
 // Tests for the JSON export/import domain logic (export document assembly,
-// parsing/validation, and the (profile, date) overwrite merge plan).
+// parsing/validation, and the day-keyed overwrite merge plan).
 // Pure Dart — no DB instances, runs on the host VM / CI. The writer-parity
 // group additionally pins the row converter of lib/db/export_adapter.dart,
 // which is a pure row-map function exercising the domain vocabulary helpers
 // (still no database needed).
+//
+// v5 document shape (profiles REMOVED): the document root is exactly
+// schema_version / exported_at / entries / marks — no `profiles` list, no
+// `profile_id` keys on any row. Old-document `profile_id`/`profiles` keys
+// are accepted and IGNORED (verified in the old-document group below).
 
 import 'dart:convert';
 
@@ -18,11 +23,8 @@ void main() {
   group('export/import JSON codec', () {
     test('buildExportJson assembles the schema-version document', () {
       final json = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: const [
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
+          {'date': '2026-03-01', 'bleeding': 'period'},
         ],
         marks: const [],
         exportedAt: DateTime.utc(2026, 9, 15, 12),
@@ -32,22 +34,20 @@ void main() {
       expect(decoded['schema_version'], exportSchemaVersion);
       expect(
           (decoded['exported_at'] as String).startsWith('2026-09-15'), isTrue);
-      expect((decoded['profiles'] as List).length, 1);
       expect((decoded['entries'] as List).length, 1);
       expect(decoded['marks'] as List, isEmpty);
+      // The document root is exactly the four keys: no profile keys anywhere.
+      expect(decoded.keys.toSet(),
+          {'schema_version', 'exported_at', 'entries', 'marks'});
     });
 
     test('parseExportJson round-trips a document it built', () {
       final json = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 2, 'name': 'partner', 'ordinal': 1},
-        ],
         entries: const [
-          {'profile_id': 2, 'date': '2026-04-10', 'bleeding': 'spotting'},
+          {'date': '2026-04-10', 'bleeding': 'spotting'},
         ],
         marks: const [
           {
-            'profile_id': 2,
             'entry_date': '2026-04-10',
             'mark_type': 'baseline',
             'author': 'user',
@@ -57,7 +57,6 @@ void main() {
       ));
 
       final doc = parseExportJson(json);
-      expect(doc.profiles.single['name'], 'partner');
       expect(doc.entries.single['date'], '2026-04-10');
       expect(doc.marks.single['mark_type'], 'baseline');
     });
@@ -67,7 +66,6 @@ void main() {
           () => parseExportJson(jsonEncode(<String, Object?>{
                 'schema_version': exportSchemaVersion,
                 // exported_at is missing entirely
-                'profiles': <Object?>[],
                 'entries': <Object?>[],
                 'marks': <Object?>[],
               })),
@@ -83,7 +81,6 @@ void main() {
           () => parseExportJson(jsonEncode(<String, Object?>{
                 'schema_version': 99,
                 'exported_at': '2026-09-15T00:00:00Z',
-                'profiles': <Object?>[],
                 'entries': <Object?>[],
                 'marks': <Object?>[],
               })),
@@ -92,24 +89,19 @@ void main() {
 
     test('planMerge counts new entries, overwrites and marks correctly', () {
       final doc = ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: const <Map<String, Object?>>[
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
-          {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'none'},
+          {'date': '2026-03-01', 'bleeding': 'period'},
+          {'date': '2026-03-02', 'bleeding': 'none'},
           // overwrites the existing day (merge policy: overwrite)
-          {'profile_id': 1, 'date': '2026-03-05', 'bleeding': 'spotting'},
+          {'date': '2026-03-05', 'bleeding': 'spotting'},
         ],
         marks: const <Map<String, Object?>>[
           {
-            'profile_id': 1,
             'entry_date': '2026-03-03',
             'mark_type': 'baseline',
             'author': 'user',
           },
           {
-            'profile_id': 1,
             'entry_date': '2026-03-04',
             'mark_type': 'baseline',
             'author': 'user',
@@ -120,12 +112,10 @@ void main() {
 
       final summary = planMerge(
         doc,
-        existingEntryKeys: {importEntryKey(1, '2026-03-05')},
-        existingMarkKeys: {importMarkKey(1, '2026-03-03', 'baseline')},
-        existingProfileIds: const {1},
+        existingEntryKeys: {'2026-03-05'},
+        existingMarkKeys: {'2026-03-03|baseline'},
       );
 
-      expect(summary.profilesToInsert, 0, reason: 'profile 1 does exist');
       expect(summary.duplicateEntryRows, 0, reason: 'no date repeated in doc');
       expect(summary.entriesNew, 2, reason: '03-01, 03-02');
       expect(summary.entriesOverwritten, 1, reason: '03-05 exists');
@@ -135,13 +125,12 @@ void main() {
 
     test('unparsable bleeding values are counted invalid, never as writes', () {
       final doc = ExportBlob(
-        profiles: const [],
         entries: const <Map<String, Object?>>[
           // Unknown vocabulary — the db writer drops this row.
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'heavy'},
+          {'date': '2026-03-01', 'bleeding': 'heavy'},
           // Missing entirely — the writer cannot produce an enum either.
-          {'profile_id': 1, 'date': '2026-03-02'},
-          {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
+          {'date': '2026-03-02'},
+          {'date': '2026-03-03', 'bleeding': 'none'},
         ],
         marks: const [],
         exportedAt: DateTime.utc(2026, 9, 15),
@@ -151,7 +140,6 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
 
       // The plan counts EXACTLY what the writer will write: the two
@@ -163,12 +151,11 @@ void main() {
       expect(summary.entriesWritten, 1);
     });
 
-    test('repeated (profile, date) rows inside one document are reported', () {
+    test('repeated same-day rows inside one document are reported', () {
       final doc = ExportBlob(
-        profiles: const [],
         entries: const <Map<String, Object?>>[
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'none'},
+          {'date': '2026-03-01', 'bleeding': 'period'},
+          {'date': '2026-03-01', 'bleeding': 'none'},
         ],
         marks: const [],
         exportedAt: DateTime.utc(2026, 9, 15),
@@ -178,26 +165,24 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.duplicateEntryRows, 1);
       // The first occurrence wins; the later one is the counted duplicate.
       expect(summary.entriesNew, 1);
     });
 
-    test('numeric-string profile ids plan the same as int ids', () {
+    test('old multi-profile rows collapse onto the day key (first wins)', () {
+      // Consequence of full profiles removal: the split was once
+      // (profile, date); now two rows differing only by profile_id share
+      // one merge key — the first occurrence wins, the later one counts as
+      // a duplicate (the writer ignores the profile_id key entirely).
       final doc = ExportBlob(
-        profiles: const [
-          {'id': '5', 'name': 'from-another-tool', 'ordinal': 0},
-        ],
         entries: const <Map<String, Object?>>[
-          {'profile_id': '5', 'date': '2026-03-01', 'bleeding': 'period'},
-          // Same id, boxed differently: must count as a duplicate key.
+          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
           {'profile_id': 5, 'date': '2026-03-01', 'bleeding': 'none'},
         ],
         marks: const <Map<String, Object?>>[
           {
-            'profile_id': '5',
             'entry_date': '2026-03-02',
             'mark_type': 'baseline',
             'author': 'user',
@@ -210,23 +195,19 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {},
       );
 
-      // The writer re-creates the profile for these rows, so the plan must
-      // count it, and one written row must exist per counted row.
-      expect(summary.profilesToInsert, 1);
       expect(summary.entriesNew, 1, reason: 'the second row is a duplicate');
       expect(summary.duplicateEntryRows, 1);
       expect(summary.marksNew, 1);
     });
 
-    test('entry/mark key helpers are stable and unambiguous', () {
-      expect(importEntryKey(1, '2026-03-05'), contains('|2026-03-05'));
-      expect(importEntryKey(12, '2026-03-05'),
-          isNot(importEntryKey(1, '2026-03-05'.padLeft(10, '1'))));
-      expect(importMarkKey(1, '2026-03-05', 'baseline'),
-          isNot(importMarkKey(1, '2026-03-05', 'mucusPeakDay')));
+    test('entry/mark key helpers are day(/type)-based (no profile prefix)', () {
+      expect(importEntryKey('2026-03-05'), '2026-03-05');
+      expect(importMarkKey('2026-03-05', 'baseline'), '2026-03-05|baseline');
+      expect(importMarkKey('2026-03-05', 'baseline'),
+          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')),
+          reason: 'the mark key distinguishes types, nothing else');
     });
 
     test('merge policy constant documents the overwrite behaviour', () {
@@ -238,7 +219,6 @@ void main() {
             <String, Object?>{
               'schema_version': version,
               'exported_at': '2026-09-15T12:00:00Z',
-              'profiles': <Object?>[],
               'entries': <Object?>[],
               'marks': <Object?>[],
             },
@@ -256,8 +236,11 @@ void main() {
       expect(blobFor(4).exportedAt, DateTime.utc(2026, 9, 15, 12),
           reason: 'documents since the pain options replaced the '
               'generic pain flag');
+      expect(blobFor(5).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents since the NER alignment (temp_disturbances, '
+              'exclusion as a mark, no mood/desire/exclude_* keys)');
       expect(
-          () => parseExportJson('{"schema_version": 5, "exported_at": '
+          () => parseExportJson('{"schema_version": 6, "exported_at": '
               '"2026-09-15T12:00:00Z"}'),
           throwsA(isA<FormatException>()));
     });
@@ -308,10 +291,8 @@ void main() {
 
   group('mucus tokens ride along as coercible fields', () {
     ExportBlob docWithMucus(Map<String, Object?> mucusFields) => ExportBlob(
-          profiles: const [],
           entries: [
             {
-              'profile_id': 1,
               'date': '2026-03-01',
               'bleeding': 'period',
               ...mucusFields,
@@ -326,7 +307,6 @@ void main() {
         docWithMucus(const {'mucus_sign': 'zzz', 'mucus_quality': 'qqq'}),
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.entriesInvalid, 0,
           reason: 'mucus content is coerced, not gated');
@@ -336,7 +316,6 @@ void main() {
 
     test('writer: out-of-vocabulary mucus tokens are nulled, row is kept', () {
       final entry = tryDailyEntryFromExport(<String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'mucus_sign': 'zzz',
@@ -351,7 +330,6 @@ void main() {
     test('writer: quality without an S sign is kept as a row, quality null',
         () {
       final entry = tryDailyEntryFromExport(<String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'mucus_sign': 'f',
@@ -365,7 +343,6 @@ void main() {
 
     test('writer: an S sign with a quality token survives verbatim', () {
       final entry = tryDailyEntryFromExport(<String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'mucus_sign': 's',
@@ -397,10 +374,8 @@ void main() {
         () {
       final summary = planMerge(
         ExportBlob(
-          profiles: const [],
           entries: const <Map<String, Object?>>[
             {
-              'profile_id': 1,
               'date': '2026-03-01',
               'bleeding': 'period',
               'measured_at_minutes': 9999,
@@ -411,7 +386,6 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.entriesInvalid, 0,
           reason: 'a broken time is coerced, not gated');
@@ -420,7 +394,6 @@ void main() {
 
     test('writer: a measured document carries the stored minutes over', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bbt_c': 36.4,
         'bleeding': 'period',
@@ -431,7 +404,6 @@ void main() {
 
     test('writer: a time without a temperature is not imported', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'measured_at_minutes': 405,
@@ -446,7 +418,6 @@ void main() {
 
     test('writer: out-of-range minutes collapse to null, row is kept', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'measured_at_minutes': 9999,
@@ -458,7 +429,6 @@ void main() {
 
     test('writer: document rows without the field import with no time', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
       });
@@ -470,7 +440,6 @@ void main() {
   group('pain options (breast B, Mittelschmerz M) in the writer', () {
     test('writer: the letter-coded pain options map to the domain flags', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'period',
         'pain_breast': true,
@@ -479,7 +448,6 @@ void main() {
       expect(entry.painMittelschmerz, isFalse);
 
       final other = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-02',
         'bleeding': 'none',
         'pain_mittelschmerz': true,
@@ -490,7 +458,6 @@ void main() {
 
     test('writer: rows without pain keys parse with both options unset', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'none',
       });
@@ -504,7 +471,6 @@ void main() {
       // field), only the flag information is not carried over — the
       // merge policy overwrites such a day with the rest of its fields.
       final entry = tryDailyEntryFromExport(const <String, Object?>{
-        'profile_id': 1,
         'date': '2026-03-01',
         'bleeding': 'none',
         'pain': true,
@@ -520,10 +486,8 @@ void main() {
     test('planner: legacy pain/unknown pain keys never invalidate a row', () {
       final summary = planMerge(
         ExportBlob(
-          profiles: const [],
           entries: const <Map<String, Object?>>[
             {
-              'profile_id': 1,
               'date': '2026-03-01',
               'bleeding': 'none',
               'pain': true,
@@ -535,7 +499,6 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.entriesInvalid, 0,
           reason: 'boolean pain fields are coercible, never row killers');
@@ -547,14 +510,12 @@ void main() {
       () {
     Map<String, Object?> rowWith(Map<String, Object?> fields) =>
         <String, Object?>{
-          'profile_id': 1,
           'date': '2026-03-01',
           'bleeding': 'none',
           ...fields,
         };
 
-    test('reader: the sex_timings mask carries over verbatim within 0..7',
-        () {
+    test('reader: the sex_timings mask carries over verbatim within 0..7', () {
       for (final mask in [0, 1, 2, 4, 5, 7]) {
         final entry = tryDailyEntryFromExport(rowWith({'sex_timings': mask}));
         expect(entry, isNotNull, reason: 'mask $mask must never kill the row');
@@ -582,8 +543,7 @@ void main() {
           reason: 'the legacy flag has no mask identity');
     });
 
-    test('reader: cervix_firmness tokens parse into the structured field',
-        () {
+    test('reader: cervix_firmness tokens parse into the structured field', () {
       final cases = <String, CervixFirmness>{
         'hard': CervixFirmness.hard,
         'halfSoft': CervixFirmness.halfSoft,
@@ -612,7 +572,6 @@ void main() {
     test('planner: sex_timings / cervix_firmness never invalidate a row', () {
       final summary = planMerge(
         ExportBlob(
-          profiles: const [],
           entries: [
             rowWith({'sex_timings': 8, 'cervix_firmness': 'zzz'}),
           ],
@@ -621,7 +580,6 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.entriesInvalid, 0,
           reason: 'both fields are coercible, never gated');
@@ -636,12 +594,8 @@ void main() {
 
     test('round trip: a full document keeps the new fields', () {
       final json = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: [
           {
-            'profile_id': 1,
             'date': '2026-03-01',
             'bleeding': 'none',
             'sex_timings': 3,
@@ -662,23 +616,20 @@ void main() {
   });
 
   group('bleeding levels in the export version boundary', () {
-    test('the writer emits the schema version with the pain options', () {
-      expect(exportSchemaVersion, 4,
-          reason: 'v3 was the numeric-bleeding release; v4 replaces the '
-              'generic `pain` flag with the pain_breast / pain_mittelschmerz '
-              'options (B/M) and — redefined in place pre-release — the '
-              'boolean `sex` flag with the `sex_timings` mask plus the '
-              'additive `cervix_firmness` field');
+    test('the writer emits the schema version with the NER alignment', () {
+      expect(exportSchemaVersion, 5,
+          reason: 'v4 was the pain-options release; v5 aligns the data '
+              'entry with the NER scheme: the entry gains the '
+              '`temp_disturbances` raw mask, drops the exclude_* booleans '
+              'and the mood/desire flags, and the analysis exclusion rides '
+              'as the excludedFromAnalysis mark');
     });
 
     test('documents with numeric bleeding build, parse and round-trip', () {
       final json = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: const <Map<String, Object?>>[
-          {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 4},
-          {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 0},
+          {'date': '2026-03-01', 'bleeding': 4},
+          {'date': '2026-03-02', 'bleeding': 0},
         ],
         marks: const [],
         exportedAt: DateTime.utc(2026, 9, 15, 12),
@@ -693,15 +644,14 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(summary.entriesInvalid, 0,
           reason: 'numeric levels in range are valid vocabulary');
       expect(summary.entriesWritten, 2);
-      expect(tryDailyEntryFromExport(doc.entries.first)!.bleeding,
-          Bleeding.heavy);
-      expect(tryDailyEntryFromExport(doc.entries.last)!.bleeding,
-          Bleeding.none);
+      expect(
+          tryDailyEntryFromExport(doc.entries.first)!.bleeding, Bleeding.heavy);
+      expect(
+          tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none);
     });
 
     test('a hand-written v3 document parses with its numeric bleeding', () {
@@ -717,7 +667,8 @@ void main() {
           Bleeding.light);
     });
 
-    test('legacy v1 AND v2 documents carry string tokens that still plan '
+    test(
+        'legacy v1 AND v2 documents carry string tokens that still plan '
         'and count correctly', () {
       // v2 documents exported by dev builds between the measured-time
       // release and the bleeding levels carry STRING bleeding — treating
@@ -727,25 +678,22 @@ void main() {
         yield {
           'schema_version': version,
           'exported_at': '2026-09-15T12:00:00Z',
-          'profiles': <Object?>[],
           'entries': <Object?>[
-            {'profile_id': 1, 'date': '2026-03-01', 'bleeding': 'period'},
-            {'profile_id': 1, 'date': '2026-03-02', 'bleeding': 'spotting'},
-            {'profile_id': 1, 'date': '2026-03-03', 'bleeding': 'none'},
-            {'profile_id': 1, 'date': '2026-03-04', 'bleeding': 'heavy'},
+            {'date': '2026-03-01', 'bleeding': 'period'},
+            {'date': '2026-03-02', 'bleeding': 'spotting'},
+            {'date': '2026-03-03', 'bleeding': 'none'},
+            {'date': '2026-03-04', 'bleeding': 'heavy'},
           ],
           'marks': <Object?>[],
         };
       }
 
       for (final version in const [1, 2]) {
-        final doc =
-            parseExportJson(jsonEncode(tokenDoc(version).single));
+        final doc = parseExportJson(jsonEncode(tokenDoc(version).single));
         final summary = planMerge(
           doc,
           existingEntryKeys: {},
           existingMarkKeys: {},
-          existingProfileIds: const {1},
         );
         expect(summary.entriesInvalid, 1,
             reason: 'v$version: the unknown token counts as invalid');
@@ -756,9 +704,10 @@ void main() {
         expect(periodDay.bleeding, Bleeding.medium,
             reason: 'v$version: period degrades to medium');
         expect(tryDailyEntryFromExport(doc.entries[1])!.bleeding,
-            Bleeding.spotting, reason: 'v$version: spotting stays spotting');
-        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding,
-            Bleeding.none, reason: 'v$version: none stays none');
+            Bleeding.spotting,
+            reason: 'v$version: spotting stays spotting');
+        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding, Bleeding.none,
+            reason: 'v$version: none stays none');
       }
     });
   });
@@ -772,25 +721,20 @@ void main() {
       // TEXT) — and the merge is idempotent for both author values.
       const markRows = <Map<String, Object?>>[
         {
-          'profile_id': 1,
           'entry_date': '2026-01-01',
           'mark_type': 'cycleStart',
           'author': 'import',
         },
         {
-          'profile_id': 1,
           'entry_date': '2026-02-01',
           'mark_type': 'cycleStart',
           'author': 'user',
         },
       ];
       final json = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: const <Map<String, Object?>>[
-          {'profile_id': 1, 'date': '2026-01-01', 'bleeding': 3},
-          {'profile_id': 1, 'date': '2026-02-01', 'bleeding': 3},
+          {'date': '2026-01-01', 'bleeding': 3},
+          {'date': '2026-02-01', 'bleeding': 3},
         ],
         marks: markRows,
         exportedAt: DateTime.utc(2026, 9, 18, 12),
@@ -805,7 +749,6 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
-        existingProfileIds: const {1},
       );
       expect(first.marksNew, 2);
       expect(first.marksSkipped, 0);
@@ -816,19 +759,217 @@ void main() {
       final existingMarkKeys = {
         for (final row in doc.marks)
           importMarkKey(
-            1,
             row['entry_date'] as String,
             row['mark_type'] as String,
           ),
       };
       final second = planMerge(
         doc,
-        existingEntryKeys: const {'1|2026-01-01', '1|2026-02-01'},
+        existingEntryKeys: const {'2026-01-01', '2026-02-01'},
         existingMarkKeys: existingMarkKeys,
-        existingProfileIds: const {1},
       );
       expect(second.marksNew, 0);
       expect(second.marksSkipped, 2);
+    });
+  });
+
+  group('v5 document shape: temp_disturbances + exclusion as a mark', () {
+    test('round trip: the mask and the exclusion mark survive verbatim', () {
+      final json = buildExportJson(ExportBlob(
+        entries: const <Map<String, Object?>>[
+          {
+            'date': '2026-03-01',
+            'bleeding': 3,
+            'temp_disturbances': 15, // sp | a | alk | kr
+            'pain_breast': true,
+            'sex_timings': 1,
+          },
+        ],
+        marks: const <Map<String, Object?>>[
+          {
+            'entry_date': '2026-03-02',
+            'mark_type': 'excludedFromAnalysis',
+            'author': 'user',
+          },
+        ],
+        exportedAt: DateTime.utc(2026, 9, 18, 12),
+      ));
+
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      final entryRow = (decoded['entries']! as List).first as Map;
+      expect(entryRow['temp_disturbances'], 15);
+      // The dropped v4 keys are gone from the WRITER output:
+      expect(entryRow.containsKey('exclude_illness'), isFalse,
+          reason: 'the exclusion is a mark, not entry raw data');
+      expect(entryRow.containsKey('exclude_alcohol'), isFalse);
+      expect(entryRow.containsKey('exclude_travel'), isFalse);
+      expect(entryRow.containsKey('exclude_other'), isFalse);
+      expect(entryRow.containsKey('mood'), isFalse,
+          reason: 'Stimmung/Lust are removed everywhere');
+      expect(entryRow.containsKey('desire'), isFalse);
+
+      // … and the reader consumes the mask into the domain model while the
+      // mark rides the document verbatim like any other mark row.
+      final doc = parseExportJson(json);
+      final entry = tryDailyEntryFromExport(doc.entries.single)!;
+      expect(entry.tempDisturbances, 15);
+      expect(entry.isInterrupted, isTrue);
+      expect(doc.marks.single['mark_type'], 'excludedFromAnalysis');
+      expect(doc.marks.single['author'], 'user');
+      // THE profile keys are gone everywhere: entries/marks carry no
+      // profile_id and the document has no profiles list at all.
+      expect(entryRow.containsKey('profile_id'), isFalse,
+          reason: 'full profiles removal — the entry carries no profile id');
+      expect(doc.marks.single.containsKey('profile_id'), isFalse,
+          reason: 'the mark row is entry_date/mark_type/author only');
+      expect(decoded.containsKey('profiles'), isFalse,
+          reason: 'the profiles list does not exist any more');
+    });
+
+    test('planner: the temp_disturbances mask never invalidates a row', () {
+      // Coercible field, like mucus/sex_timings: broken junk collapses to
+      // 0, the row stays a counted write.
+      final summary = planMerge(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {
+              'date': '2026-03-01',
+              'bleeding': 'none',
+              'temp_disturbances': 9999,
+            },
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'a broken mask is coerced, not gated');
+      expect(summary.entriesWritten, 1);
+    });
+
+    test('writer: out-of-range/junk temp_disturbances collapse to 0', () {
+      for (final bad in <Object?>[16, -1, '3', null, true]) {
+        final entry = tryDailyEntryFromExport(<String, Object?>{
+          'date': '2026-03-01',
+          'bleeding': 'none',
+          'temp_disturbances': bad,
+        });
+        expect(entry, isNotNull,
+            reason: 'a broken mask ($bad) is never a row killer');
+        expect(entry!.tempDisturbances, 0, reason: 'bad mask $bad → 0');
+      }
+    });
+  });
+
+  group('old-document translation (v1–4 documents → v5 domain shape)', () {
+    test(
+        'writer: exclude_illness → the kr bit, exclude_alcohol → the alk '
+        'bit; travel/other leave no bit', () {
+      // The old exclusion reasons lose their reason identity (Reise and
+      // 'other' have no disturbance flag), but illness/alcohol keep it via
+      // the raw mask — and EVERY previously-excluded day keeps its analysis
+      // semantics through the derived excludedFromAnalysis mark (db-level
+      // adapter concern, tested against the database).
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'date': '2026-03-01',
+        'bleeding': 'none',
+        'exclude_illness': true,
+        'exclude_alcohol': true,
+        'exclude_travel': true,
+        'exclude_other': true,
+      });
+      expect(entry, isNotNull, reason: 'the raw flags never killed a row');
+      expect(entry!.tempDisturbances,
+          TempDisturbance.kr.bit | TempDisturbance.alk.bit,
+          reason: 'illness = kr (bit 8), alcohol = alk (bit 4); travel/'
+              'other contribute to the derived mark only');
+      expect(entry.isInterrupted, isTrue);
+    });
+
+    test(
+        'writer: mood/desire keys of old documents are dropped, the row '
+        'stays valid', () {
+      final entry = tryDailyEntryFromExport(const <String, Object?>{
+        'date': '2026-03-01',
+        'bleeding': 'none',
+        'mood': true,
+        'desire': true,
+      });
+      expect(entry, isNotNull,
+          reason: 'Stimmung/Lust booleans are dropped, never row killers');
+      // The domain model has no mood/desire identity to assert against —
+      // the dropped flags simply do not exist on the entry any more (they
+      // are compile-time absent; the day note stays intact).
+      expect(entry!.tempDisturbances, 0);
+    });
+
+    test(
+        'planner: old exclude_*/mood/desire rows count exactly what the '
+        'writer writes', () {
+      final summary = planMerge(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {
+              'date': '2026-03-01',
+              'bleeding': 'none',
+              'exclude_travel': true,
+              'mood': true,
+              'desire': true,
+            },
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'the old keys never gate the row (they are coercible)');
+      expect(summary.entriesWritten, 1);
+    });
+
+    test(
+        'planner: profile_id/profiles keys of old documents never gate '
+        'anything', () {
+      // The planner ignores the profile keys entirely (they are not read);
+      // only the day / (day, mark_type) gates remain.
+      final summary = planMerge(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {
+              'profile_id': 7,
+              'date': '2026-03-01',
+              'bleeding': 'none',
+            },
+          ],
+          marks: const <Map<String, Object?>>[
+            {
+              'profile_id': 7,
+              'entry_date': '2026-03-02',
+              'mark_type': 'mucusPeakDay',
+              'author': 'user',
+            },
+          ],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
+      expect(summary.entriesInvalid, 0,
+          reason: 'the profile_id key is tolerated, never gated');
+      expect(summary.entriesNew, 1);
+      expect(summary.marksNew, 1);
+    });
+
+    test('merge keys are day-based: entries ISO day, marks (day, mark_type)',
+        () {
+      expect(importEntryKey('2026-03-05'), '2026-03-05');
+      expect(importMarkKey('2026-03-05', 'excludedFromAnalysis'),
+          '2026-03-05|excludedFromAnalysis');
+      expect(importMarkKey('2026-03-05', 'excludedFromAnalysis'),
+          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')));
     });
   });
 }

@@ -9,9 +9,11 @@
 //
 // Covered: the prompt appears only for a SUGGESTED menstruation-level day
 // (level >= 2), confirming persists the user-authored mark, dismissing
-// persists nothing, a level-1 day (spotting) prompts nothing, and a
+// persists nothing, a level-1 day (spotting) prompts nothing, a
 // menstruation-level day that continues the previous day's bleeding
-// (mid-flow) prompts nothing.
+// (mid-flow) prompts nothing, and the prompt is SUPPRESSED by the
+// excludedFromAnalysis mark (the analysis exclusion is the mark, no longer
+// an entry flag).
 //
 // The database is an in-memory override, same pattern as
 // test/diary_measured_time_test.dart; the German locale is pinned so the
@@ -81,7 +83,7 @@ void main() {
 
   /// The stored mark types for the selected day, from the REAL database.
   Future<List<String>> storedMarkTypes(DateTime day) async =>
-      (await _db!.marksDao.marksForDay(1, day)).map((m) => m.markType).toList();
+      (await _db!.marksDao.marksForDay(day)).map((m) => m.markType).toList();
 
   testWidgets(
       'a suggested menstruation-level day prompts for the cycle start; '
@@ -107,16 +109,14 @@ void main() {
 
     expect(find.byType(AlertDialog), findsNothing,
         reason: 'confirming closes the prompt');
-    final marks = await _db!.marksDao.marksForDay(1, _day);
-    expect(marks.map((m) => m.markType),
-        contains(CycleMarkTypes.cycleStart),
+    final marks = await _db!.marksDao.marksForDay(_day);
+    expect(marks.map((m) => m.markType), contains(CycleMarkTypes.cycleStart),
         reason: 'the confirmed suggestion places the authoritative '
             'cycle-boundary mark through the MarksDao');
     final mark =
         marks.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
     expect(mark.author, 'user',
         reason: 'the confirmed placement is user-authored');
-    expect(mark.profileId, 1);
   });
 
   testWidgets('dismissing the prompt places no mark', (tester) async {
@@ -171,5 +171,31 @@ void main() {
         reason: 'fresh menstruation starts after a break or on the first '
             'day — a continuous menstruation is mid-flow, not a new start');
     expect(await storedMarkTypes(_day), isEmpty);
+  });
+
+  testWidgets(
+      'an excludedFromAnalysis mark on the day suppresses the prompt '
+      '(exclusion is the mark — no entry flag required)', (tester) async {
+    tallSurface(tester);
+    await tester.pumpWidget(_scope(seed: (db) async {
+      // The day already carries the analysis-exclusion mark: a
+      // menstruation-level bleeding day with that mark is interrupted —
+      // it must not suggest a cycle start.
+      await db.marksDao.addMark(
+        _day,
+        CycleMarkTypes.excludedFromAnalysis,
+        author: 'user',
+      );
+    }));
+    await tester.pumpAndSettle();
+
+    await saveWithBleeding(tester, 'leicht');
+
+    expect(find.byType(AlertDialog), findsNothing,
+        reason: 'the excludedFromAnalysis mark suppresses the suggestion — '
+            'the raw entry data never drives the prompt');
+    expect(await storedMarkTypes(_day), [CycleMarkTypes.excludedFromAnalysis],
+        reason: 'the mark stays untouched (auto-set only, never '
+            'auto-removed)');
   });
 }

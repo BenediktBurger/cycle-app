@@ -22,14 +22,15 @@ abstract final class CycleMarkTypes {
   /// First higher measurement after the peak ("erste höhere Messung").
   static const firstHigherMeasurement = 'firstHigherMeasurement';
 
-  /// Baseline line ("Basislinie").
-  static const baseline = 'baseline';
-
-  /// Fertile window marker.
-  static const fertileWindow = 'fertileWindow';
-
-  /// Interrupted-day / cycle interruption marker.
-  static const interruption = 'interruption';
+  /// The analysis-exclusion mark ("vom Auswerten ausschließen"): a marked
+  /// day is an interrupted day for evaluation — a gap day, never a cycle
+  /// start — regardless of the raw disturbance flags (which are rendering
+  /// input only). The diary save auto-SETs this mark (idempotently) when
+  /// any tempDisturbances flag is selected; a mark is NEVER auto-removed
+  /// when the flags clear. Foreign imports (drip CSV temperature.exclude,
+  /// old export documents with exclude_* keys) derive it with author
+  /// 'import'.
+  static const excludedFromAnalysis = 'excludedFromAnalysis';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
   /// MORNING (the SUZ bar renders at the day column's start). The computed
@@ -49,20 +50,18 @@ abstract final class CycleMarkTypes {
   static const cycleStart = 'cycleStart';
 }
 
-/// One mark a user placed onto one calendar day.
+/// One mark placed onto one calendar day (no profile dimension — the
+/// (entry_date, mark_type) unique index is the whole key).
 ///
 /// Decoupled from any storage layer; equality compares every field and
 /// judges dates by calendar day (like DailyEntry), so a local-time and a
 /// UTC representation of the same day are equal.
 final class CycleMark {
   const CycleMark({
-    required this.profileId,
     required this.date,
     required this.type,
     this.author = 'user',
   });
-
-  final int profileId;
 
   /// The marked calendar day. Normalized to UTC midnight on the way into
   /// the domain (mapper + DateOnly convention), so time-of-day components
@@ -74,8 +73,8 @@ final class CycleMark {
   /// the vocabulary authority).
   final String type;
 
-  /// Who placed the mark ('user' today; open TEXT in storage for future
-  /// authoring modes).
+  /// Who placed the mark ('user' today; 'import' for marks derived from
+  /// foreign data; open TEXT in storage for future authoring modes).
   final String author;
 
   @override
@@ -83,14 +82,12 @@ final class CycleMark {
     if (identical(this, other)) return true;
     return other is CycleMark &&
         DateOnly.sameDay(date, other.date) &&
-        profileId == other.profileId &&
         type == other.type &&
         author == other.author;
   }
 
   @override
   int get hashCode => Object.hash(
-        profileId,
         DateOnly.normalize(date),
         type,
         author,
@@ -99,5 +96,5 @@ final class CycleMark {
   @override
   String toString() =>
       'CycleMark(${DateOnly.normalize(date).toIso8601String()}, '
-      'profile:$profileId, type:$type, author:$author)';
+      'type:$type, author:$author)';
 }

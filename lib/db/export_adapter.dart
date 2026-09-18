@@ -4,19 +4,22 @@
 //
 // Import semantics (per the merge policy over there):
 //  - entries: full replace of a day via EntriesDao.upsertDaily for rows whose
-//    (profile, date) key exists on-device; inserts otherwise; structurally
-//    invalid rows are skipped and counted.
+//    day key exists on-device; inserts otherwise; structurally invalid rows
+//    are skipped and counted.
 //  - marks: added idempotently via MarksDao.addMark (existing ones skipped).
-//  - profiles required by imported rows are available on the device after
-//    preparation: a DOCUMENT profile id that already exists on this device
-//    addresses that same profile (the merge key is the profile id), an
-//    unknown id gets the profile re-created (exported name/ordinal when the
-//    document lists it, a neutral fallback name otherwise; new AUTO id) and
-//    the document id is REMAPPED to the actual row id during the writes
-//    below. Rows referencing an id that could not be prepared are skipped.
+//  - old documents (v1–4) carry profile keys (`profile_id` on every row, a
+//    root `profiles` list): both are ACCEPTED and IGNORED — rows merge by
+//    day / (day, mark_type), never by profile. Their exclude_* keys
+//    translate into the temp_disturbances mask bits (illness → kr, alcohol
+//    → alk; travel/other have no flag any more) AND any of the four true
+//    derives an excludedFromAnalysis mark (author 'import') for that day,
+//    preserving the old interrupted-day analysis semantics. The derived
+//    marks are written inside the import transaction (idempotently, like
+//    the document's own marks); they are not part of the planner's counts.
 
 import '../domain/cervix.dart';
 import '../domain/export_import.dart';
+import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
 import 'cycle_database.dart';
@@ -35,35 +38,19 @@ final class ImportFailedException implements Exception {
   String toString() => 'ImportFailedException: $cause';
 }
 
-/// First matching row of [rows] by a predicate on the profile id helper.
-Map<String, Object?>? _firstProfileDefinition(
-  List<Map<String, Object?>> rows,
-  bool Function(Map<String, Object?>) test,
-) {
-  for (final row in rows) {
-    if (test(row)) return row;
-  }
-  return null;
-}
-
 // --- export (rows -> ExportBlob -> JSON string) ---------------------------
 
-/// Collects every table of [db] into the export document.
+/// Collects every table of [db] into the export document (profile-free:
+/// the v5 document carries no profile keys anywhere).
 Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
-  final profiles = await db.profilesDao.allProfiles();
-  final entries = await db.entriesDao.allEntriesForAllProfiles();
-  final marks = await db.marksDao.allMarksForAllProfiles();
+  final entries = await db.entriesDao.allEntries();
+  final marks = await db.marksDao.allMarks();
 
   return ExportBlob(
     exportedAt: DateTime.now(),
-    profiles: [
-      for (final p in profiles)
-        {'id': p.id, 'name': p.name, 'ordinal': p.ordinal},
-    ],
     entries: [
       for (final e in entries)
         {
-          'profile_id': e.profileId,
           'date': formatIsoDay(e.date),
           'bbt_c': e.bbtC,
           // The measurement time is metadata of the temperature (see
@@ -74,10 +61,7 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           // round trip is idempotent.
           'measured_at_minutes': e.bbtC == null ? null : e.measuredAtMinutes,
           'bleeding': e.bleeding.level,
-          'exclude_illness': e.excludeIllness,
-          'exclude_alcohol': e.excludeAlcohol,
-          'exclude_travel': e.excludeTravel,
-          'exclude_other': e.excludeOther,
+          'temp_disturbances': e.tempDisturbances,
           'mucus_sign': e.mucusSign,
           'mucus_quality': e.mucusQuality,
           'cervix_position': e.cervixPosition,
@@ -85,8 +69,6 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'cervix_firmness': e.cervixFirmness,
           'pain_breast': e.painBreast,
           'pain_mittelschmerz': e.painMittelschmerz,
-          'mood': e.mood,
-          'desire': e.desire,
           'sex_timings': e.sexTimings,
           'notes': e.notes,
         },
@@ -94,7 +76,6 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
     marks: [
       for (final m in marks)
         {
-          'profile_id': m.profileId,
           'entry_date': formatIsoDay(m.entryDate),
           'mark_type': m.markType,
           'author': m.author,
@@ -110,10 +91,6 @@ Future<String> exportDatabaseToJson(CycleDatabase db) =>
 
 // --- import (JSON string -> ExportBlob -> plan -> writes) -----------------
 
-/// Earliest neutral profile name for rows whose document doesn't describe
-/// the profile they belong to (fallback; visible in the merged dataset).
-const String importFallbackProfileName = 'migration-unknown';
-
 /// Validates the document with [parseExportJson] and COUNTS the import plan
 /// against the current database state (no writes). Useful for showing the
 /// user a summary BEFORE applying (not wired into the UI yet — kept for the
@@ -125,7 +102,6 @@ Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
     doc,
     existingEntryKeys: existing.entryKeys,
     existingMarkKeys: existing.markKeys,
-    existingProfileIds: existing.profileIds,
   );
 }
 
@@ -150,47 +126,63 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         doc,
         existingEntryKeys: existing.entryKeys,
         existingMarkKeys: existing.markKeys,
-        existingProfileIds: existing.profileIds,
       );
 
-      // 1) Make every (referenced) profile id available on this device and
-      //    learn the ACTUAL id to write for it: re-created profiles get
-      //    their own auto id, which may differ from the document's id.
-      final remap = await _prepareProfiles(db, doc, existing.profileIds);
-
-      // 2) Entries in document order. Duplicate (profile, date) keys inside
-      //    the document were counted and excluded by the plan; the FIRST
-      //    occurrence of a key wins. The document's profile id is remapped
-      //    to the actual (possibly re-created) profile id on write.
+      // 1) Entries in document order. Duplicate same-day keys inside the
+      //    document were counted and excluded by the merge plan; the FIRST
+      //    occurrence of a key wins (this also collapses old multi-profile
+      //    rows that differed only by profile_id — the key is the day).
+      //    The seen key is added ONLY for structurally valid rows (exactly
+      //    like the merge planner counts: an invalid row never consumes a
+      //    key, so
+      //    a later valid row for the same day still writes) — counted ==
+      //    written.
+      final excludedDays = <String>{};
+      final seenEntryKeys = <String>{};
       for (final row in doc.entries) {
         final entry = tryDailyEntryFromExport(row);
         if (entry == null) continue;
-        final actualProfileId = remap[entry.profileId];
-        if (actualProfileId == null) continue; // profile not preparable
-        await db.entriesDao.upsertDaily(entry, profileId: actualProfileId);
+        final key = formatIsoDay(entry.date);
+        if (!seenEntryKeys.add(key)) continue; // duplicate: first wins
+        await db.entriesDao.upsertDaily(entry);
+
+        // Old-document translation: any of the four exclude_* keys derives
+        // the analysis-exclusion mark for that day (author 'import') — the
+        // raw-data side of the translation (illness/alcohol mask bits)
+        // already happened inside tryDailyEntryFromExport.
+        if (_oldDocExcluded(row)) {
+          final day = formatIsoDay(entry.date);
+          excludedDays.add(day);
+        }
       }
 
-      // 3) Marks idempotently (addMark skips existing ones silently), under
-      //    the remapped profile ids as well.
+      // 2) Marks idempotently (addMark skips existing ones silently). The
+      //    document's own excludedFromAnalysis rows suppress the derived
+      //    ones for the same day (no duplicates, no double marks).
+      final documentExcludedDays = {
+        for (final row in doc.marks)
+          if (row['mark_type'] == CycleMarkTypes.excludedFromAnalysis &&
+              row['entry_date'] is String)
+            row['entry_date']! as String,
+      };
+      for (final day in excludedDays) {
+        if (documentExcludedDays.contains(day)) continue;
+        await db.marksDao.addMark(
+          tryParseIsoDay(day)!,
+          CycleMarkTypes.excludedFromAnalysis,
+          author: 'import',
+        );
+      }
       for (final row in doc.marks) {
-        // Shared id tolerance (planner + writers); a raw `as int?` cast
-        // would abort the whole transaction on a numeric-string id.
-        final docProfileId = parseExportId(row['profile_id']);
-        final actualProfileId =
-            docProfileId == null ? null : remap[docProfileId];
         final day = row['entry_date'] is String
             ? tryParseIsoDay(row['entry_date'] as String)
             : null;
         final type = row['mark_type'];
         final authority = row['author'];
-        if (actualProfileId == null ||
-            day == null ||
-            type is! String ||
-            type.isEmpty) {
+        if (day == null || type is! String || type.isEmpty) {
           continue;
         }
         await db.marksDao.addMark(
-          actualProfileId,
           day,
           type,
           author:
@@ -209,86 +201,30 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
   }
 }
 
-/// Document profile id -> the profile id to WRITE for it after preparation:
-/// known device ids map to themselves; unknown ids are re-created on the
-/// device (with the document's name/ordinal when defined) and map to the
-/// ACTUAL id of the new row. Referenced ids whose re-creation fails stay
-/// absent from the map — their rows are skipped by the writer.
-Future<Map<int, int>> _prepareProfiles(
-  CycleDatabase db,
-  ExportBlob doc,
-  Set<int> deviceProfileIds,
-) async {
-  final referenced = <int>{};
-  Map<String, Object?>? definitionOf(int id) => _firstProfileDefinition(
-      doc.profiles, (p) => parseExportId(p['id']) == id);
-
-  String? nameOf(int id) {
-    final row = definitionOf(id);
-    if (row == null) return null;
-    final name = row['name'];
-    return name is String && name.isNotEmpty ? name : null;
-  }
-
-  int? ordinalOf(int id) {
-    final ordinal = definitionOf(id)?['ordinal'];
-    return ordinal is int ? ordinal : null;
-  }
-
-  // Same shared id tolerance as the planner (parser accepts numeric
-  // strings); ids the planner already accepted must still be prepared here.
-  for (final row in doc.entries) {
-    final id = parseExportId(row['profile_id']);
-    if (id != null) referenced.add(id);
-  }
-  for (final row in doc.marks) {
-    final id = parseExportId(row['profile_id']);
-    if (id != null) referenced.add(id);
-  }
-  for (final row in doc.profiles) {
-    final id = parseExportId(row['id']);
-    if (id != null) referenced.add(id);
-  }
-
-  final remap = <int, int>{
-    for (final id in deviceProfileIds) id: id,
-  };
-  for (final id in referenced) {
-    if (remap.containsKey(id)) continue;
-    try {
-      final created = await db.profilesDao.addProfile(
-        nameOf(id) ?? importFallbackProfileName,
-        ordinal: ordinalOf(id),
-      );
-      remap[id] = created.id;
-    } catch (_) {
-      continue; // leave the id unprepared; its rows are skipped below.
-    }
-  }
-  return remap;
-}
+/// Whether the (old-document) row carries any of the four legacy exclusion
+/// keys as `true` — the trigger for the derived excludedFromAnalysis mark.
+bool _oldDocExcluded(Map<String, Object?> row) =>
+    row['exclude_illness'] == true ||
+    row['exclude_alcohol'] == true ||
+    row['exclude_travel'] == true ||
+    row['exclude_other'] == true;
 
 final class _Existing {
-  _Existing(this.profileIds, this.entryKeys, this.markKeys);
+  _Existing(this.entryKeys, this.markKeys);
 
-  final Set<int> profileIds;
   final Set<String> entryKeys;
   final Set<String> markKeys;
 }
 
 Future<_Existing> _existingKeys(CycleDatabase db) async {
-  final profiles = await db.profilesDao.allProfiles();
-  final entries = await db.entriesDao.allEntriesForAllProfiles();
-  final marks = await db.marksDao.allMarksForAllProfiles();
+  final entries = await db.entriesDao.allEntries();
+  final marks = await db.marksDao.allMarks();
 
   return _Existing(
-    {for (final p in profiles) p.id},
-    {
-      for (final e in entries) importEntryKey(e.profileId, formatIsoDay(e.date))
-    },
+    {for (final e in entries) importEntryKey(formatIsoDay(e.date))},
     {
       for (final m in marks)
-        importMarkKey(m.profileId, formatIsoDay(m.entryDate), m.markType),
+        importMarkKey(formatIsoDay(m.entryDate), m.markType),
     },
   );
 }
@@ -302,15 +238,20 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 /// with its quality nulled (both via the shared mucus parse helpers + the
 /// pair sanitize rule, lib/domain/mucus.dart), an out-of-vocabulary
 /// cervix token collapses to null (lib/domain/cervix.dart helpers), and an
-/// out-of-range sex_timings mask collapses to 0.
+/// out-of-range sex_timings or temp_disturbances mask collapses to 0.
+///
+/// Old-document translation (v1–4 documents): `exclude_illness` maps onto
+/// the kr bit (8), `exclude_alcohol` onto the alk bit (4) — OR-combined
+/// with the v5 `temp_disturbances` field when one is present. The other
+/// two keys (`exclude_travel` / `exclude_other`) leave NO mask bit (no
+/// equivalent flag exists; their analysis effect is the DERIVED mark,
+/// written by the import transaction). `mood` / `desire` keys are dropped
+/// (the row stays valid, notes untouched) — and the `profile_id` /
+/// `profiles` keys are simply never read.
 DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
-  // parseExportId (shared with the merge planner) accepts numeric-string
-  // ids as well — otherwise planner-counted rows would be silently skipped
-  // here.
-  final profileId = parseExportId(row['profile_id']);
   final day =
       row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
-  if (profileId == null || day == null) return null;
+  if (day == null) return null;
 
   // Shared vocabulary helper (models.dart) — the SAME function the planner
   // validates bleeding with; a planner-local duplicate is exactly what let
@@ -334,29 +275,32 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   final measuredAtMinutes =
       tryParseMeasuredAtMinutes(row['measured_at_minutes']);
 
+  // The raw disturbance mask: an int within the 0..15 TempDisturbance
+  // vocabulary is taken verbatim; anything else — a missing key (older
+  // documents predate the field), a non-int, an out-of-range value —
+  // collapses to 0 ("no disturbance"), never a row killer (same principle
+  // as mucus). The old-document exclude_* keys contribute their bits on
+  // top (illness → kr, alcohol → alk) — see the doc comment above.
+  final mask = tryParseTempDisturbances(row['temp_disturbances']) |
+      (flag('exclude_illness') ? TempDisturbance.kr.bit : 0) |
+      (flag('exclude_alcohol') ? TempDisturbance.alk.bit : 0);
+
   // The sex timings mask: an int within the 0..7 SexTiming vocabulary is
   // taken verbatim; anything else — a missing key (older documents predate
   // the field), a non-int, an out-of-range value — collapses to 0 ("no sex
-  // recorded"), never a row killer (same principle as mucus). The
-  // ≤(redefined-v4) boolean `sex` flag is deliberately NOT read here: it
-  // has no mask identity (see export_import.dart's version note on the
-  // pre-release redefinition).
+  // recorded"), never a row killer. The ≤(redefined-v4) boolean `sex` flag
+  // is deliberately NOT read here: it has no mask identity.
   final rawTimings = row['sex_timings'];
-  final sexTimings = rawTimings is int && rawTimings >= 0 && rawTimings <= 7
-      ? rawTimings
-      : 0;
+  final sexTimings =
+      rawTimings is int && rawTimings >= 0 && rawTimings <= 7 ? rawTimings : 0;
 
   try {
     return DailyEntry(
       date: day,
-      profileId: profileId,
       bbtC: bbt is num ? bbt.toDouble() : null,
       measuredAtMinutes: measuredAtMinutes,
       bleeding: bleeding,
-      excludeIllness: flag('exclude_illness'),
-      excludeAlcohol: flag('exclude_alcohol'),
-      excludeTravel: flag('exclude_travel'),
-      excludeOther: flag('exclude_other'),
+      tempDisturbances: mask,
       mucusSign: mucus.sign,
       mucusQuality: mucus.quality,
       // Muttermund options through the shared vocabulary helpers
@@ -368,11 +312,10 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       sexTimings: sexTimings,
       // The generic `pain` flag of ≤v3 documents is deliberately NOT read
       // here: it has no B/M identity, so the flag is dropped while the row
-      // itself stays valid (see export_import.dart's version note).
+      // itself stays valid. The dropped `mood` / `desire` keys are never
+      // read either.
       painBreast: flag('pain_breast'),
       painMittelschmerz: flag('pain_mittelschmerz'),
-      mood: flag('mood'),
-      desire: flag('desire'),
       notes: row['notes'] is String ? row['notes'] as String : null,
     );
   } on AssertionError {

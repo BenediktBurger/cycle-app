@@ -151,13 +151,14 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
     expect(stored.bbtC, 36.4, reason: 'the temperature itself is kept');
     expect(stored.measuredAtMinutes, isNull,
         reason: 'a day without time entry is legal; nothing is invented');
   });
 
-  testWidgets('a temperature-less save stores no time, even after the '
+  testWidgets(
+      'a temperature-less save stores no time, even after the '
       'prefill was shown', (WidgetTester tester) async {
     tallSurface(tester);
     await tester.pumpWidget(_scope());
@@ -177,7 +178,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
     expect(stored.bbtC, isNull);
     expect(stored.mucusSign, 's');
     expect(stored.measuredAtMinutes, isNull,
@@ -195,7 +196,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(1, _selectedDay))!;
+    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
     expect(stored.bbtC, 36.5);
     expect(stored.measuredAtMinutes, 14 * 60 + 35, // the injected "now"
         reason: 'a temperature with the prefilled measurement time stores '

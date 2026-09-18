@@ -175,11 +175,10 @@ void main() {
       // 35 (2026-02-24) opens the second cycle there — mid-month, hence a
       // plain day number despite the cycle start.
       final marks = [
-        CycleMark(
-            profileId: 1, date: _day(35), type: CycleMarkTypes.cycleStart),
+        CycleMark(date: _day(35), type: CycleMarkTypes.cycleStart),
       ];
-      await tester.pumpWidget(
-          _chartHarness(entries: _entries(40), marks: marks));
+      await tester
+          .pumpWidget(_chartHarness(entries: _entries(40), marks: marks));
       await tester.pumpAndSettle();
 
       // The initial auto-scroll puts the window at the newest days: the 40

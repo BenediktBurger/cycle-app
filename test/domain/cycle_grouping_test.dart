@@ -6,6 +6,13 @@
 // SUGGESTS a cycle start (isSuggestedCycleStart — the prompt/derivation
 // gate, never a boundary). The old automatic "first bleeding day starts a
 // cycle" rule is superseded; bleeding sequences alone form ONE group.
+//
+// Exclusion semantics (NER alignment): the ANALYSIS exclusion lives in the
+// excludedFromAnalysis MARK, not in entry raw data. Raw disturbance flags
+// (tempDisturbances) alone must NOT exclude a day from the analysis; a
+// day carrying the excludedFromAnalysis mark does — even without flags.
+// The suggestion predicate therefore takes the excluded-state as EXPLICIT
+// parameters (entries stay raw-data-only).
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,22 +26,27 @@ DailyEntry d(
   int month,
   int day, {
   Bleeding bleeding = Bleeding.none,
-  bool interrupted = false,
+  int tempDisturbances = 0,
 }) {
   return DailyEntry(
     date: DateTime(year, month, day),
     bleeding: bleeding,
-    excludeIllness: interrupted && bleeding == Bleeding.medium,
-    excludeTravel: interrupted && bleeding != Bleeding.medium,
+    tempDisturbances: tempDisturbances,
   );
 }
 
-/// A user-placed cycleStart mark on (year, month, day).
-CycleMark start(int year, int month, int day, {int profileId = 1}) =>
-    CycleMark(
-      profileId: profileId,
+/// A user-placed cycleStart mark on (year, month, day); a CycleMark carries
+/// no profile dimension any more (v9 profile-free model).
+CycleMark start(int year, int month, int day) => CycleMark(
       date: DateTime(year, month, day),
       type: CycleMarkTypes.cycleStart,
+    );
+
+/// An analysis-exclusion mark on (year, month, day) — the ONLY exclusion
+/// signal the analysis consumes (raw disturbance flags never exclude).
+CycleMark excludedDay(int year, int month, int day) => CycleMark(
+      date: DateTime(year, month, day),
+      type: CycleMarkTypes.excludedFromAnalysis,
     );
 
 void main() {
@@ -86,7 +98,8 @@ void main() {
       expect(cycles.single.days, hasLength(7));
     });
 
-    test('a mark on an untracked gap day opens the group at the next '
+    test(
+        'a mark on an untracked gap day opens the group at the next '
         'tracked day (startsAtMenstruation == true)', () {
       final entries = [
         d(2026, 3, 1),
@@ -107,19 +120,20 @@ void main() {
       expect(cycles[1].days.map((e) => e.date.day), [4, 5]);
     });
 
-    test('a mark mid-cycle is authoritative wherever placed — including '
+    test(
+        'a mark mid-cycle is authoritative wherever placed — including '
         'an excluded (interrupted) day', () {
       final entries = [
         d(2026, 3, 1, bleeding: Bleeding.medium),
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, bleeding: Bleeding.medium),
-        // The mark sits on an excluded day: the exclusion flags are
-        // temperature-interruption concerns; the cycle-start mark binds
-        // regardless (no exclusion-flag interplay).
-        d(2026, 3, 6, bleeding: Bleeding.medium, interrupted: true),
+        // The mark sits on an EXCLUDED day: the exclusion is the
+        // excludedFromAnalysis mark (raw flags do not exclude); the
+        // cycle-start mark binds regardless (no exclusion interplay).
+        d(2026, 3, 6, bleeding: Bleeding.medium),
         d(2026, 3, 7),
       ];
-      final marks = [start(2026, 3, 6)];
+      final marks = [start(2026, 3, 6), excludedDay(2026, 3, 6)];
 
       final cycles = groupIntoCycles(entries, marks);
 
@@ -130,7 +144,8 @@ void main() {
       expect(cycles[1].days.map((e) => e.date.day), [6, 7]);
     });
 
-    test('a mark on the first tracked day opens the first group itself '
+    test(
+        'a mark on the first tracked day opens the first group itself '
         '(no leading group forms)', () {
       final entries = [d(2026, 3, 1), d(2026, 3, 2)];
       final marks = [start(2026, 3, 1)];
@@ -186,15 +201,11 @@ void main() {
       final entries = [d(2026, 3, 1), d(2026, 3, 2), d(2026, 3, 3)];
       final marks = [
         CycleMark(
-            profileId: 1,
-            date: DateTime(2026, 3, 2),
-            type: CycleMarkTypes.mucusPeakDay),
+            date: DateTime(2026, 3, 2), type: CycleMarkTypes.mucusPeakDay),
         CycleMark(
-            profileId: 1,
             date: DateTime(2026, 3, 3),
             type: CycleMarkTypes.firstHigherMeasurement),
-        CycleMark(
-            profileId: 1, date: DateTime(2026, 3, 3), type: CycleMarkTypes.suzEvening),
+        CycleMark(date: DateTime(2026, 3, 3), type: CycleMarkTypes.suzEvening),
       ];
 
       final cycles = groupIntoCycles(entries, marks);
@@ -203,45 +214,14 @@ void main() {
       expect(cycles.single.startsAtMenstruation, isFalse);
     });
 
-    test('marks of another profile do not open groups for this profile\'s '
-        'entries (per-entry profileId decides)', () {
-      final entries = [d(2026, 3, 1), d(2026, 3, 2), d(2026, 3, 3)];
-      final marks = [start(2026, 3, 2, profileId: 2)];
-
-      final cycles = groupIntoCycles(entries, marks);
-
-      expect(cycles, hasLength(1));
-      expect(cycles.single.startsAtMenstruation, isFalse);
-    });
-
-    test('entries of different profiles each follow their own marks', () {
-      final entries = [
-        d(2026, 3, 1),
-        DailyEntry(date: DateTime(2026, 3, 2), profileId: 2),
-        d(2026, 3, 3),
-      ];
-      final marks = [
-        start(2026, 3, 2, profileId: 2),
-        start(2026, 3, 3, profileId: 1),
-      ];
-
-      final cycles = groupIntoCycles(entries, marks);
-
-      // Mar 2 is a profile-2 entry and opens for profile 2's mark; Mar 3
-      // is a profile-1 entry and opens for profile 1's mark.
-      expect(cycles, hasLength(3));
-      expect(cycles[0].startsAtMenstruation, isFalse);
-      expect(cycles[1].startsAtMenstruation, isTrue);
-      expect(cycles[1].startDate, DateTime(2026, 3, 2));
-      expect(cycles[2].startsAtMenstruation, isTrue);
-      expect(cycles[2].startDate, DateTime(2026, 3, 3));
-    });
+    // (The per-profile grouping tests are gone: there is no profile
+    // dimension any more — marks key to days only.)
 
     test('empty entries produce no cycles, even with marks', () {
-      expect(groupIntoCycles(const <DailyEntry>[], [start(2026, 3, 1)]),
-          isEmpty);
-      expect(groupIntoCycles(const <DailyEntry>[], const <CycleMark>[]),
-          isEmpty);
+      expect(
+          groupIntoCycles(const <DailyEntry>[], [start(2026, 3, 1)]), isEmpty);
+      expect(
+          groupIntoCycles(const <DailyEntry>[], const <CycleMark>[]), isEmpty);
     });
 
     test('unsorted input is sorted internally', () {
@@ -328,19 +308,28 @@ void main() {
     });
   });
 
-  group('isSuggestedCycleStart — the bleeding suggestion predicate '
+  group(
+      'isSuggestedCycleStart — the bleeding suggestion predicate '
       '(characterization: the old automatic rule, demoted to a suggestion '
       'gate)', () {
     test('a menstruation-level day after a non-bleeding day suggests', () {
       final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
       final previous = d(2026, 3, 1);
 
-      expect(isSuggestedCycleStart(entry, previous), isTrue);
+      expect(
+        isSuggestedCycleStart(entry, previous,
+            entryExcluded: false, previousExcluded: false),
+        isTrue,
+      );
     });
 
     test('a first entry with no previous day suggests', () {
       final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
-      expect(isSuggestedCycleStart(entry, null), isTrue);
+      expect(
+        isSuggestedCycleStart(entry, null,
+            entryExcluded: false, previousExcluded: false),
+        isTrue,
+      );
     });
 
     test('a data gap (previous day untracked) lets the day suggest', () {
@@ -349,39 +338,92 @@ void main() {
       final entry = d(2026, 3, 10, bleeding: Bleeding.heavy);
       final previous = d(2026, 3, 1);
 
-      expect(isSuggestedCycleStart(entry, previous), isTrue);
+      expect(
+        isSuggestedCycleStart(entry, previous,
+            entryExcluded: false, previousExcluded: false),
+        isTrue,
+      );
     });
 
-    test('a mid-flow day does not suggest (previous day also bleeding '
+    test(
+        'a mid-flow day does not suggest (previous day also bleeding '
         'level >= 2)', () {
       final entry = d(2026, 3, 3, bleeding: Bleeding.medium);
       final previous = d(2026, 3, 2, bleeding: Bleeding.heavy);
 
-      expect(isSuggestedCycleStart(entry, previous), isFalse);
+      expect(
+        isSuggestedCycleStart(entry, previous,
+            entryExcluded: false, previousExcluded: false),
+        isFalse,
+      );
     });
 
     test('spotting (level 1) never suggests', () {
       final entry = d(2026, 3, 2, bleeding: Bleeding.spotting);
-      expect(isSuggestedCycleStart(entry, null), isFalse);
+      expect(
+        isSuggestedCycleStart(entry, null,
+            entryExcluded: false, previousExcluded: false),
+        isFalse,
+      );
     });
 
-    test('an excluded (interrupted) menstruation day never suggests', () {
-      final entry = d(2026, 3, 2, bleeding: Bleeding.medium, interrupted: true);
-      expect(isSuggestedCycleStart(entry, null), isFalse);
+    test(
+        'RAW disturbance flags alone do NOT exclude a day from the '
+        'suggestion (exclusion is the excludedFromAnalysis mark)', () {
+      // A day carrying raw temperature-disturbance flags (spät ins Bett,
+      // Krank, …) is still an ordinary tracked day for the suggestion
+      // predicate: the flags are raw data and must not swallow the
+      // suggestion — only the excludedFromAnalysis MARK does.
+      final entry = d(
+        2026,
+        3,
+        2,
+        bleeding: Bleeding.medium,
+        tempDisturbances: TempDisturbance.kr.bit | TempDisturbance.sp.bit,
+      );
+      expect(
+        isSuggestedCycleStart(entry, null,
+            entryExcluded: false, previousExcluded: false),
+        isTrue,
+        reason: 'raw flags (isInterrupted) no longer drive exclusion',
+      );
     });
 
-    test('an excluded previous menstruation day does not suppress the '
-        'suggestion (the interrupted day may hide the true onset)', () {
+    test(
+        'an excluded (interrupted) day — the excludedFromAnalysis mark — '
+        'never suggests, even with menstruation-level bleeding', () {
+      final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
+      expect(
+        isSuggestedCycleStart(entry, null,
+            entryExcluded: true, previousExcluded: false),
+        isFalse,
+        reason: 'the mark excludes the day from the analysis (no flags '
+            'required)',
+      );
+    });
+
+    test(
+        'an excluded previous day does not suppress the suggestion (the '
+        'interrupted day may hide the true onset)', () {
       final entry = d(2026, 3, 3, bleeding: Bleeding.medium);
-      final previous =
-          d(2026, 3, 2, bleeding: Bleeding.medium, interrupted: true);
+      final previous = d(2026, 3, 2, bleeding: Bleeding.medium);
 
-      expect(isSuggestedCycleStart(entry, previous), isTrue);
+      expect(
+        isSuggestedCycleStart(entry, previous,
+            entryExcluded: false, previousExcluded: true),
+        isTrue,
+        reason: 'the previous day carries the exclusion mark — it cannot '
+            'prove a continuous menstruation',
+      );
     });
 
     test('light (level 2) suggests like any menstruation level', () {
-      expect(isSuggestedCycleStart(d(2026, 3, 2, bleeding: Bleeding.light),
-          d(2026, 3, 1)), isTrue);
+      expect(
+        isSuggestedCycleStart(
+            d(2026, 3, 2, bleeding: Bleeding.light), d(2026, 3, 1),
+            entryExcluded: false, previousExcluded: false),
+        isTrue,
+      );
     });
   });
 }

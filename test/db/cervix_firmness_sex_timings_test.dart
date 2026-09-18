@@ -52,15 +52,15 @@ void main() {
       // cervix_firmness must reject it.
       await expectLater(
         db.customStatement(
-          "INSERT INTO cycle_entries (profile_id, date, cervix_firmness) "
-          "VALUES (1, 20000, 'middle')",
+          "INSERT INTO cycle_entries (date, cervix_firmness) "
+          "VALUES (20000, 'middle')",
         ),
         throwsA(isA<Exception>()),
       );
       // Sanity: an in-vocabulary token goes through.
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, cervix_firmness) "
-        "VALUES (1, 20001, 'halfSoft')",
+        "INSERT INTO cycle_entries (date, cervix_firmness) "
+        "VALUES (20001, 'halfSoft')",
       );
     });
 
@@ -73,7 +73,7 @@ void main() {
       await db.entriesDao.upsertDaily(
         DailyEntry(date: DateTime(2026, 8, 15)),
       );
-      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 8, 15)))!;
+      final row = (await db.entriesDao.entryFor(DateTime(2026, 8, 15)))!;
       expect(row.cervixFirmness, isNull);
     });
   });
@@ -109,7 +109,7 @@ void main() {
       await db.into(db.cycleEntries).insert(
             CycleEntriesCompanion.insert(date: DateTime(2026, 7, 20)),
           );
-      final row = await db.entriesDao.entryFor(1, DateTime(2026, 7, 20));
+      final row = await db.entriesDao.entryFor(DateTime(2026, 7, 20));
       expect(row!.sexTimings, 0);
       final raw = await db
           .customSelect('SELECT sex_timings FROM cycle_entries')
@@ -120,22 +120,22 @@ void main() {
     test('sex_timings is engine-rejected outside 0..7', () async {
       await expectLater(
         db.customStatement(
-          'INSERT INTO cycle_entries (profile_id, date, sex_timings) '
-          'VALUES (1, 20000, 8)',
+          'INSERT INTO cycle_entries (date, sex_timings) '
+          'VALUES (20000, 8)',
         ),
         throwsA(isA<Exception>()),
       );
       await expectLater(
         db.customStatement(
-          'INSERT INTO cycle_entries (profile_id, date, sex_timings) '
-          'VALUES (1, 20002, -1)',
+          'INSERT INTO cycle_entries (date, sex_timings) '
+          'VALUES (20002, -1)',
         ),
         throwsA(isA<Exception>()),
       );
       // Sanity: an in-range mask goes through.
       await db.customStatement(
-        'INSERT INTO cycle_entries (profile_id, date, sex_timings) '
-        'VALUES (1, 20003, 7)',
+        'INSERT INTO cycle_entries (date, sex_timings) '
+        'VALUES (20003, 7)',
       );
     });
 
@@ -148,7 +148,7 @@ void main() {
       await db.entriesDao.upsertDaily(
         DailyEntry(date: DateTime(2026, 7, 15)),
       );
-      final row = (await db.entriesDao.entryFor(1, DateTime(2026, 7, 15)))!;
+      final row = (await db.entriesDao.entryFor(DateTime(2026, 7, 15)))!;
       expect(row.sexTimings, 0);
     });
   });
@@ -159,11 +159,11 @@ void main() {
       // Raw SQL write (e.g. a future import path) proves the column's CHECK
       // admits the new token.
       await db.customStatement(
-        "INSERT INTO cycle_entries (profile_id, date, mucus_sign) "
-        "VALUES (1, 20000, 'a')",
+        "INSERT INTO cycle_entries (date, mucus_sign) "
+        "VALUES (20000, 'a')",
       );
       final row =
-          await db.entriesDao.entryFor(1, DateTime(2024, 10, 4)); // day 20000
+          await db.entriesDao.entryFor(DateTime(2024, 10, 4)); // day 20000
       expect(row!.mucusSign, 'a');
 
       // The DAO write path stores the enum name, not a glyph.
@@ -180,8 +180,8 @@ void main() {
       // mucus_sign = 's', so 'a' with a quality cannot be written.
       await expectLater(
         db.customStatement(
-          "INSERT INTO cycle_entries (profile_id, date, mucus_sign, "
-          "mucus_quality) VALUES (1, 20000, 'a', 'w')",
+          "INSERT INTO cycle_entries (date, mucus_sign, "
+          "mucus_quality) VALUES (20000, 'a', 'w')",
         ),
         throwsA(isA<Exception>()),
       );

@@ -3,36 +3,52 @@
 //
 // SQL-level naming: drift converts camelCase getter names to snake_case
 // column names, matching the naming used in the plan and migration notes.
+//
+// Profile-free schema: there is no Profiles table and no profile_id column
+// anywhere — a tracked day is identified by its calendar day alone, and a
+// mark by (entry_date, mark_type).
 
 import 'package:drift/drift.dart';
 
 import '../domain/models.dart';
 import 'converters.dart';
 
-// NOTE: data classes (CycleEntry, UserMark, Profile), companions, and
-// the table info classes are generated into cycle_database.g.dart, which is a
-// part of the cycle_database.dart library — the DAOs there (also part files)
-// can see them directly.
+// NOTE: data classes (CycleEntry, UserMark), companions, and the table info
+// classes are generated into cycle_database.g.dart, which is a part of the
+// cycle_database.dart library — the DAOs there (also part files) can see
+// them directly.
 
 /// Tracked symptom days — the core table of the app.
 ///
-/// One row exists per (profile, calendar day). Uniqueness is enforced by the
-/// unique index [cycleEntriesProfileDateUnique], which the EntriesDao upsert
-/// methods rely on.
+/// One row exists per calendar day. Uniqueness is enforced by the unique
+/// index [cycleEntriesDateUnique] (@TableIndex below), which the EntriesDao
+/// upsert methods rely on.
 @TableIndex(
-  name: 'cycle_entries_profile_date_unique',
-  columns: {#profileId, #date},
+  name: 'cycle_entries_date_unique',
+  columns: {#date},
   unique: true,
 )
 class CycleEntries extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  /// FK to Profiles; defaults to the seeded main profile (id 1).
-  IntColumn get profileId =>
-      integer().withDefault(const Constant(1)).references(Profiles, #id)();
-
   /// Calendar day, stored as unix-epoch days (see EpochDayConverter).
   IntColumn get date => integer().map(const EpochDayConverter())();
+
+  /// Raw temperature-disturbance flags of the day (the NER "Störungen"
+  /// vocabulary): one INTEGER mask, the OR of the [TempDisturbance] bits —
+  /// sp(1) late to bed, a(2) frequent night awakening, alk(4) alcohol,
+  /// kr(8) illness. 0 = no disturbance. Reise (travel) is deliberately NOT
+  /// representable. This is RAW data for the interrupted-temperature
+  /// rendering; the analysis exclusion is the separate
+  /// excludedFromAnalysis MARK (user_marks), never this mask.
+  /// customConstraint replaces drift's own constraints, so NOT NULL, the
+  /// default 0 and the 0..15 range check are written out explicitly inside
+  /// the constraint string (a bare CHECK would silently drop both). The
+  /// engine-level CHECK mirrors the domain constructor assert so foreign
+  /// data cannot write an impossible mask.
+  IntColumn get tempDisturbances =>
+      integer().withDefault(const Constant(0)).customConstraint(
+          'NOT NULL DEFAULT 0 CHECK (temp_disturbances BETWEEN 0 AND 15)')();
 
   /// Basal body temperature in degrees Celsius, when measured.
   RealColumn get bbtC => real().nullable()();
@@ -56,29 +72,23 @@ class CycleEntries extends Table {
       .map(const BleedingLevelConverter())
       .withDefault(const Constant(0))();
 
-  // Disturbance/exclusion flags for interrupted days (NFP "Störungen").
-  BoolColumn get excludeIllness =>
-      boolean().withDefault(const Constant(false))();
-  BoolColumn get excludeAlcohol =>
-      boolean().withDefault(const Constant(false))();
-  BoolColumn get excludeTravel =>
-      boolean().withDefault(const Constant(false))();
-  BoolColumn get excludeOther => boolean().withDefault(const Constant(false))();
-
   /// Fertility sign recorded on the day: NULL when no observation, else one
-  /// of the stable tokens 't' / 'nothing' / 'f' / 's' / 'a' (the MucusSign
-  /// enum names — TEXT, unlike bleeding's numeric column; never display
-  /// glyphs). customConstraint replaces drift's own constraints, which is
-  /// fine here: SQLite columns admit NULL unless NOT NULL is written, and
-  /// the check below allows exactly NULL or the vocabulary.
+  /// of the stable tokens 't' / 'nothing' / 'f' / 's' / 'fs' / 'a' (the
+  /// MucusSign enum names — TEXT, unlike bleeding's numeric column; never
+  /// display glyphs; 'fs' is "f vor S an einem Tag", a sign of its own with
+  /// NO quality qualifier). customConstraint replaces drift's own
+  /// constraints, which is fine here: SQLite columns admit NULL unless NOT
+  /// NULL is written, and the check below allows exactly NULL or the
+  /// vocabulary.
   TextColumn get mucusSign => text().nullable().customConstraint(
         "CHECK (mucus_sign IS NULL OR mucus_sign IN "
-        "('t', 'nothing', 'f', 's', 'a'))",
+        "('t', 'nothing', 'f', 's', 'fs', 'a'))",
       )();
 
   /// Quality qualifier of the mucus sign S; NULL for every sign other than
-  /// 's' and for days without a sign. Enforced at the engine level so broken
-  /// data (e.g. from a future import path) cannot be written.
+  /// 's' and for days without a sign ('fs' deliberately carries no
+  /// quality — it is not the S sign). Enforced at the engine level so
+  /// broken data (e.g. from a future import path) cannot be written.
   TextColumn get mucusQuality => text().nullable().customConstraint(
         "CHECK (mucus_quality IS NULL OR (mucus_sign = 's' AND "
         "mucus_quality IN ('w', 'mi', 'cr', 'kl', 'glb', 'g', 'ew', 'gl', "
@@ -119,13 +129,10 @@ class CycleEntries extends Table {
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and
   /// ovulation pain / Mittelschmerz (painMittelschmerz, letter M). Modeled
-  /// like the exclusion flags: plain booleans, no interval system.
+  /// like the disturbance flags: plain booleans, no interval system.
   BoolColumn get painBreast => boolean().withDefault(const Constant(false))();
   BoolColumn get painMittelschmerz =>
       boolean().withDefault(const Constant(false))();
-
-  BoolColumn get mood => boolean().withDefault(const Constant(false))();
-  BoolColumn get desire => boolean().withDefault(const Constant(false))();
 
   /// Times of day sex happened, as an INTEGER bitmask of [SexTiming.bit]:
   /// start(1) / middle(2) / end(4), OR-combined — multiple bits mean
@@ -147,19 +154,17 @@ class CycleEntries extends Table {
 
 /// Assisted-mode markers a user places onto specific days (Mode M, ADR-001).
 ///
-/// One mark of a given type per (profile, day). The type is an open TEXT
-/// vocabulary so future marking tools can add types without a migration;
-/// well-known initial types are listed in [MarkTypes].
+/// One mark of a given type per day. The type is an open TEXT vocabulary so
+/// future marking tools can add types without a migration; well-known
+/// initial types are listed in [MarkTypes]. Uniqueness is enforced by the
+/// unique index [userMarksDateTypeUnique] (@TableIndex below).
 @TableIndex(
-  name: 'user_marks_profile_date_type_unique',
-  columns: {#profileId, #entryDate, #markType},
+  name: 'user_marks_date_type_unique',
+  columns: {#entryDate, #markType},
   unique: true,
 )
 class UserMarks extends Table {
   IntColumn get id => integer().autoIncrement()();
-
-  IntColumn get profileId =>
-      integer().withDefault(const Constant(1)).references(Profiles, #id)();
 
   /// Calendar day the mark belongs to (unix-epoch days).
   IntColumn get entryDate => integer().map(const EpochDayConverter())();
@@ -167,20 +172,23 @@ class UserMarks extends Table {
   /// Marking tool identifier, e.g. one of the [MarkTypes] constants.
   TextColumn get markType => text()();
 
-  /// Who placed the mark. 'user' today; later milestones may add modes
-  /// (e.g. an 'assist' author for Mode-S suggestions — deliberately kept
-  /// open TEXT instead of constraining to an enum).
+  /// Who placed the mark. 'user' today; foreign imports (drip CSV, old
+  /// export documents) derive marks with the 'import' author; open TEXT in
+  /// storage for future authoring modes instead of constraining to an enum.
   TextColumn get author => text().withDefault(const Constant('user'))();
 }
 
-/// Well-known initial mark types (Mode M tools, data-model-ready in M1,
-/// UI deferred — see ADR-001).
+/// Well-known initial mark types (Mode M tools; UI on the cycle-day sheet).
 abstract final class MarkTypes {
   static const firstHigherMeasurement = 'firstHigherMeasurement';
-  static const baseline = 'baseline';
   static const mucusPeakDay = 'mucusPeakDay';
-  static const fertileWindow = 'fertileWindow';
-  static const interruption = 'interruption';
+
+  /// The analysis-exclusion mark ("vom Auswerten ausschließen"): a marked
+  /// day is interrupted for evaluation — a gap day, never a cycle start —
+  /// regardless of the raw disturbance flags (which are rendering input
+  /// only). Auto-SET (idempotently) by the diary save when any disturbance
+  /// flag is selected; never auto-REMOVED when the flags clear.
+  static const excludedFromAnalysis = 'excludedFromAnalysis';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
   /// MORNING: the SUZ bar renders at the day column's START (x − 0.5).
@@ -197,11 +205,4 @@ abstract final class MarkTypes {
   /// boundary of the mark-driven grouping (bleeding only suggests a cycle
   /// start — see lib/domain/cycle_grouping.dart).
   static const cycleStart = 'cycleStart';
-}
-
-/// Evaluation profiles on this device (partner mode, v0 schema, UI later).
-class Profiles extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text()();
-  IntColumn get ordinal => integer().withDefault(const Constant(0))();
 }

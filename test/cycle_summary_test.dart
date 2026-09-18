@@ -81,14 +81,11 @@ final _twoCycleEntries = <DailyEntry>[
 /// The cycleStart marks open the three cycle groups (at the days that used
 /// to be the bleeding onsets — the mark is the authoritative boundary).
 final _ruleDMarks = <CycleMark>[
-  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
-  CycleMark(profileId: 1, date: d(3, 28), type: CycleMarkTypes.cycleStart),
-  CycleMark(profileId: 1, date: d(4, 20), type: CycleMarkTypes.cycleStart),
-  CycleMark(profileId: 1, date: d(3, 14), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(
-      profileId: 1,
-      date: d(3, 15),
-      type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 28), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(4, 20), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 14), type: CycleMarkTypes.mucusPeakDay),
+  CycleMark(date: d(3, 15), type: CycleMarkTypes.firstHigherMeasurement),
 ];
 
 List<CycleEvaluation> _evaluations(List<DailyEntry> entries,
@@ -114,9 +111,9 @@ final _leadingEntries = <DailyEntry>[
 /// keeps `startsAtMenstruation == false` while the marked days open the
 /// three cycle groups.
 final _leadingMarks = <CycleMark>[
-  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
-  CycleMark(profileId: 1, date: d(3, 28), type: CycleMarkTypes.cycleStart),
-  CycleMark(profileId: 1, date: d(4, 20), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 28), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(4, 20), type: CycleMarkTypes.cycleStart),
 ];
 
 // ---------------------------------------------------------------------------
@@ -141,11 +138,8 @@ final _stoppedEntries = <DailyEntry>[
 ];
 
 final _stoppedMarks = <CycleMark>[
-  CycleMark(profileId: 1, date: d(3, 1), type: CycleMarkTypes.cycleStart),
-  CycleMark(
-      profileId: 1,
-      date: d(3, 10),
-      type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 10), type: CycleMarkTypes.firstHigherMeasurement),
 ];
 
 // ---------------------------------------------------------------------------
@@ -154,7 +148,9 @@ final _stoppedMarks = <CycleMark>[
 
 List<DailyEntry> _onsetEntries(int count) => [
       for (var i = 0; i < count; i++) ...[
-        DailyEntry(date: d(3, 1).add(Duration(days: 25 * i)), bleeding: Bleeding.heavy),
+        DailyEntry(
+            date: d(3, 1).add(Duration(days: 25 * i)),
+            bleeding: Bleeding.heavy),
         DailyEntry(
             date: d(3, 1).add(Duration(days: 25 * i + 1)),
             bleeding: Bleeding.light),
@@ -166,7 +162,6 @@ List<DailyEntry> _onsetEntries(int count) => [
 List<CycleMark> _onsetMarks(int count) => [
       for (var i = 0; i < count; i++)
         CycleMark(
-            profileId: 1,
             date: d(3, 1).add(Duration(days: 25 * i)),
             type: CycleMarkTypes.cycleStart),
     ];
@@ -230,11 +225,11 @@ Finder _header(int column) =>
 
 Finder _scroll() => find.byKey(const ValueKey('cycleSummaryScroll'));
 
-double _maxScrollExtent(WidgetTester tester) =>
-    tester.state<ScrollableState>(find.descendant(
-            of: _scroll(), matching: find.byType(Scrollable)))
-        .position
-        .maxScrollExtent;
+double _maxScrollExtent(WidgetTester tester) => tester
+    .state<ScrollableState>(
+        find.descendant(of: _scroll(), matching: find.byType(Scrollable)))
+    .position
+    .maxScrollExtent;
 
 void main() {
   group('attribute rows and per-cycle columns (direct construction)', () {
@@ -262,10 +257,14 @@ void main() {
       expect(_header(0), findsOneWidget);
       expect(_header(1), findsOneWidget);
       expect(_header(2), findsOneWidget);
-      expect(find.byWidgetPredicate((w) =>
+      expect(
+          find.byWidgetPredicate((w) =>
               w.key is ValueKey<String> &&
-              (w.key as ValueKey<String>).value.startsWith('cycleSummaryHeader-')),
-          findsNWidgets(3), reason: 'exactly one column per cycle group');
+              (w.key as ValueKey<String>)
+                  .value
+                  .startsWith('cycleSummaryHeader-')),
+          findsNWidgets(3),
+          reason: 'exactly one column per cycle group');
       expect(find.text('Cycle 1'), findsOneWidget);
       expect(find.text('Cycle 2'), findsOneWidget);
       expect(find.text('Cycle 3'), findsOneWidget);
@@ -302,19 +301,29 @@ void main() {
       // Cycle length: days between consecutive marked starts (Mar 1 ->
       // Mar 28 = 27
       // days, Mar 28 -> Apr 20 = 23); the open last cycle shows the dash.
-      expect(find.descendant(of: _cell('length', 0), matching: find.text('27 days')),
+      expect(
+          find.descendant(
+              of: _cell('length', 0), matching: find.text('27 days')),
           findsOneWidget);
-      expect(find.descendant(of: _cell('length', 1), matching: find.text('23 days')),
+      expect(
+          find.descendant(
+              of: _cell('length', 1), matching: find.text('23 days')),
           findsOneWidget);
       expect(find.descendant(of: _cell('length', 2), matching: find.text('—')),
           findsOneWidget);
 
       // Period start: each marked group's own bleeding onset date.
-      expect(find.descendant(of: _cell('start', 0), matching: find.text(yMd(d(3, 1), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('start', 0), matching: find.text(yMd(d(3, 1), 'en'))),
           findsOneWidget);
-      expect(find.descendant(of: _cell('start', 1), matching: find.text(yMd(d(3, 28), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('start', 1), matching: find.text(yMd(d(3, 28), 'en'))),
           findsOneWidget);
-      expect(find.descendant(of: _cell('start', 2), matching: find.text(yMd(d(4, 20), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('start', 2), matching: find.text(yMd(d(4, 20), 'en'))),
           findsOneWidget);
 
       // Period end: the LAST menstruation-level (>= 2) bleeding day of the
@@ -322,16 +331,24 @@ void main() {
       // The open cycle 3 has its first day itself bleeding, so its period
       // end is the marked start day (only its LENGTH stays undetermined —
       // no next start exists yet).
-      expect(find.descendant(of: _cell('end', 0), matching: find.text(yMd(d(3, 3), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('end', 0), matching: find.text(yMd(d(3, 3), 'en'))),
           findsOneWidget);
-      expect(find.descendant(of: _cell('end', 1), matching: find.text(yMd(d(3, 30), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('end', 1), matching: find.text(yMd(d(3, 30), 'en'))),
           findsOneWidget);
-      expect(find.descendant(of: _cell('end', 2), matching: find.text(yMd(d(4, 20), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('end', 2), matching: find.text(yMd(d(4, 20), 'en'))),
           findsOneWidget);
 
       // Mucus peak: the user-placed mark of cycle 1; unmarked cycles show
       // the dash.
-      expect(find.descendant(of: _cell('peak', 0), matching: find.text(yMd(d(3, 14), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('peak', 0), matching: find.text(yMd(d(3, 14), 'en'))),
           findsOneWidget);
       expect(find.descendant(of: _cell('peak', 1), matching: find.text('—')),
           findsOneWidget);
@@ -340,8 +357,9 @@ void main() {
 
       // SUZ begin + rule: Mar 17 under rule D (rule-to-time phrasing, "in
       // the evening" for D).
-      final suz0 = tester.widget<Text>(find.descendant(
-              of: _cell('suz', 0), matching: find.byType(Text)))
+      final suz0 = tester
+          .widget<Text>(
+              find.descendant(of: _cell('suz', 0), matching: find.byType(Text)))
           .data!;
       expect(suz0, contains(yMd(d(3, 17), 'en')),
           reason: 'the SUZ cell carries the begin day');
@@ -353,7 +371,8 @@ void main() {
           findsOneWidget);
 
       // Status: SUZ day + rule once determined, the dash otherwise.
-      final status0 = tester.widget<Text>(find.descendant(
+      final status0 = tester
+          .widget<Text>(find.descendant(
               of: _cell('status', 0), matching: find.byType(Text)))
           .data!;
       expect(status0, contains('SUZ from'),
@@ -369,14 +388,17 @@ void main() {
     testWidgets(
         'the leading group shows the dash for the bleeding attributes and '
         'its own header', (tester) async {
-      await tester.pumpWidget(
-          _tableHarness(evaluations: _evaluations(_leadingEntries, _leadingMarks)));
+      await tester.pumpWidget(_tableHarness(
+          evaluations: _evaluations(_leadingEntries, _leadingMarks)));
       await tester.pumpAndSettle();
 
       // Four columns: the leading group plus three marked groups.
-      expect(find.byWidgetPredicate((w) =>
+      expect(
+          find.byWidgetPredicate((w) =>
               w.key is ValueKey<String> &&
-              (w.key as ValueKey<String>).value.startsWith('cycleSummaryHeader-')),
+              (w.key as ValueKey<String>)
+                  .value
+                  .startsWith('cycleSummaryHeader-')),
           findsNWidgets(4));
 
       // The leading group's header mirrors the Tagebuch's leading-group
@@ -396,35 +418,44 @@ void main() {
           findsOneWidget);
       expect(find.descendant(of: _cell('end', 0), matching: find.text('—')),
           findsOneWidget);
-      expect(find.descendant(of: _cell('length', 1), matching: find.text('27 days')),
+      expect(
+          find.descendant(
+              of: _cell('length', 1), matching: find.text('27 days')),
           findsOneWidget,
           reason: 'the following marked group is unaffected: the length is '
               'counted between its own start (Mar 1) and the next start '
               '(Mar 28), never via the leading group');
-      expect(find.descendant(of: _cell('start', 1), matching: find.text(yMd(d(3, 1), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('start', 1), matching: find.text(yMd(d(3, 1), 'en'))),
           findsOneWidget);
     });
 
     testWidgets(
         'the R2 stop renders the localized stopped note in the status row '
         'and keeps the SUZ undetermined', (tester) async {
-      await tester.pumpWidget(
-          _tableHarness(evaluations: _evaluations(_stoppedEntries, _stoppedMarks)));
+      await tester.pumpWidget(_tableHarness(
+          evaluations: _evaluations(_stoppedEntries, _stoppedMarks)));
       await tester.pumpAndSettle();
 
       expect(_header(0), findsOneWidget);
-      expect(find.byWidgetPredicate((w) =>
+      expect(
+          find.byWidgetPredicate((w) =>
               w.key is ValueKey<String> &&
-              (w.key as ValueKey<String>).value.startsWith('cycleSummaryHeader-')),
+              (w.key as ValueKey<String>)
+                  .value
+                  .startsWith('cycleSummaryHeader-')),
           findsNWidgets(1),
           reason: 'exactly one cycle group exists in this scenario');
 
       expect(find.descendant(of: _cell('suz', 0), matching: find.text('—')),
           findsOneWidget,
           reason: 'a connectedness break leaves the SUZ undetermined');
-      expect(find.descendant(of: _cell('status', 0),
-              matching: find.textContaining(
-                  'The automatic evaluation has stopped')),
+      expect(
+          find.descendant(
+              of: _cell('status', 0),
+              matching:
+                  find.textContaining('The automatic evaluation has stopped')),
           findsOneWidget,
           reason: 'the status shows the localized R2 stopped note');
     });
@@ -473,13 +504,17 @@ void main() {
 
       // The table is present with the seeded values.
       expect(_scroll(), findsOneWidget);
-      expect(find.descendant(of: _cell('length', 0), matching: find.text('27 days')),
+      expect(
+          find.descendant(
+              of: _cell('length', 0), matching: find.text('27 days')),
           findsOneWidget);
-      expect(find.descendant(of: _cell('peak', 0),
-              matching: find.text(yMd(d(3, 14), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('peak', 0), matching: find.text(yMd(d(3, 14), 'en'))),
           findsOneWidget);
-      final suz0 = tester.widget<Text>(find.descendant(
-              of: _cell('suz', 0), matching: find.byType(Text)))
+      final suz0 = tester
+          .widget<Text>(
+              find.descendant(of: _cell('suz', 0), matching: find.byType(Text)))
           .data!;
       expect(suz0, contains('rule D'));
 
@@ -493,8 +528,7 @@ void main() {
               w.scrollDirection == Axis.horizontal &&
               w.key != const ValueKey('cycleSummaryScroll'))));
       final tableRect = tester.getRect(_scroll());
-      final noteRect =
-          tester.getRect(find.textContaining('Evaluation marks:'));
+      final noteRect = tester.getRect(find.textContaining('Evaluation marks:'));
       expect(tableRect.top, greaterThan(chartRect.bottom),
           reason: 'the table sits below the chart card');
       expect(noteRect.top, greaterThan(tableRect.bottom),
@@ -525,11 +559,13 @@ void main() {
       marks.add(_ruleDMarks);
       await tester.pumpAndSettle();
 
-      expect(find.descendant(of: _cell('peak', 0),
-              matching: find.text(yMd(d(3, 14), 'en'))),
+      expect(
+          find.descendant(
+              of: _cell('peak', 0), matching: find.text(yMd(d(3, 14), 'en'))),
           findsOneWidget,
           reason: 'the placed peak renders in the table immediately');
-      final status0 = tester.widget<Text>(find.descendant(
+      final status0 = tester
+          .widget<Text>(find.descendant(
               of: _cell('status', 0), matching: find.byType(Text)))
           .data!;
       expect(status0, contains('SUZ from'),
@@ -537,7 +573,9 @@ void main() {
 
       // The bleeding attributes (entry-derived, not mark-derived) are
       // untouched by the marks re-emit.
-      expect(find.descendant(of: _cell('length', 0), matching: find.text('27 days')),
+      expect(
+          find.descendant(
+              of: _cell('length', 0), matching: find.text('27 days')),
           findsOneWidget);
     });
   });

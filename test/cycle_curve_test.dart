@@ -1,16 +1,21 @@
 // Unit tests of the pure curve-structure helpers (lib/ui/cycle_curve.dart):
 // adjacent-day connectivity runs and lighter-rendering of interrupted
-// (excluded) temperatures — the rule set the temperature chart draws by.
+// temperatures — the rule set the temperature chart draws by. The
+// interruption flag comes from the RAW disturbance mask on the entry
+// (isInterrupted): the lighter rendering is keyed to the mask, never to the
+// excludedFromAnalysis mark (a manually-excluded day without flags renders
+// normally — the flags are the representable raw data).
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/ui/cycle_curve.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Entry for chart day index [i] (2026-09-03 = index 0); the helpers are
 /// day-index driven, so dates only provide the calendar offset.
-DailyEntry _entry(int i, {double? bbt, bool excluded = false}) => DailyEntry(
+DailyEntry _entry(int i, {double? bbt, bool interrupted = false}) => DailyEntry(
       date: DateTime.utc(2026, 9, 3).add(Duration(days: i)),
       bbtC: bbt,
-      excludeIllness: excluded,
+      tempDisturbances:
+          interrupted ? TempDisturbance.kr.bit : 0, // raw mask only
     );
 
 void main() {
@@ -50,14 +55,17 @@ void main() {
       }
     });
 
-    test('excluded temperatures count as measured days for connectivity', () {
+    test(
+        'interrupted (mask-flagged) temperatures count as measured days '
+        'for connectivity', () {
       final runs = curveRuns({
         0: _entry(0, bbt: 36.5),
-        1: _entry(1, bbt: 36.4, excluded: true),
+        1: _entry(1, bbt: 36.4, interrupted: true),
         2: _entry(2, bbt: 36.7),
       });
       expect(runs, hasLength(1));
-      expect(runs.single.points[1].excluded, isTrue);
+      expect(runs.single.points[1].excluded, isTrue,
+          reason: 'the raw mask drives the interruption flag');
       expect(runs.single.points[0].excluded, isFalse);
     });
 
@@ -106,7 +114,7 @@ void main() {
     test('interrupted day WITHOUT temperature just breaks the run', () {
       final runs = curveRuns({
         0: _entry(0, bbt: 36.5),
-        1: _entry(1, excluded: true), // interrupted, but no measurement
+        1: _entry(1, interrupted: true), // interrupted, but no measurement
         2: _entry(2, bbt: 36.7),
       });
       expect(runs, hasLength(2));

@@ -16,16 +16,20 @@
 // Output is a standard export document of the CURRENT schema version (see
 // lib/domain/export_import.dart) that the write phase feeds through the
 // EXISTING importJsonToDatabase — no second db writer for this feature.
-// On top of the mapped entries the mapper DERIVES cycleStart marks (author
-// 'import') from the bleeding sequence via the shared suggestion predicate
-// (isSuggestedCycleStart, lib/domain/cycle_grouping.dart) — bleeding only
-// SUGGESTS a cycle start; the derived mark is what the mark-driven cycle
-// grouping consumes (see lib/domain/marks.dart). Cycle-app's own export
-// already carries its marks verbatim, so re-importing an app export never
-// re-derives anything: the derivation lives only in this CSV mapping.
+// On top of the mapped entries the mapper DERIVES marks (author 'import')
+// from the CSV content: cycleStart marks from the bleeding sequence via the
+// shared suggestion predicate (isSuggestedCycleStart,
+// lib/domain/cycle_grouping.dart) — bleeding only SUGGESTS a cycle start;
+// the derived mark is what the mark-driven cycle grouping consumes (see
+// lib/domain/marks.dart) — and excludedFromAnalysis marks from
+// temperature.exclude (drip's "not usable for fertility detection": the
+// roadmap's "drip excluded temp → a mark, not an observation"). Cycle-app's
+// own export already carries its marks verbatim, so re-importing an app
+// export never re-derives anything: the derivation lives only in this CSV
+// mapping. The produced document (and every row map in it) is profile-free.
 //
-// Mapping decisions live in the tables below and in the plan document;
-// every assumption an INER expert should re-check carries a
+// Mapping decisions live in the mapping table right below; every
+// assumption an INER expert should re-check carries a
 // TODO(user-review) marker.
 
 import 'cervix.dart';
@@ -162,10 +166,13 @@ final class DripCsvImport {
   const DripCsvImport({required this.json, required this.stats});
 
   /// A current-version export document (see lib/domain/export_import.dart)
-  /// with the seeded main profile `[{id: 1, name: 'main', ordinal: 0}]`,
-  /// the mapped entries, and the DERIVED cycleStart marks (author 'import')
-  /// — drip has no mark analogue of its own, so foreign imports get their
-  /// cycle-start boundaries derived from the imported bleeding sequence.
+  /// — profile-free: the document root is exactly schema_version /
+  /// exported_at / entries / marks — with the mapped entries and the
+  /// DERIVED marks (author 'import'): cycleStart marks for the suggested
+  /// cycle-start days and excludedFromAnalysis marks for the
+  /// temperature.exclude days (drip has no mark analogue of its own, so
+  /// foreign imports get their cycle boundaries and analysis exclusions
+  /// derived from the imported data).
   final String json;
 
   final DripCsvStats stats;
@@ -174,8 +181,7 @@ final class DripCsvImport {
 /// Maps a raw drip CSV export into a current-version export document (see
 /// lib/domain/export_import.dart for the document shape).
 ///
-/// Every row lands under profile 1 (drip has no multi-profile concept). A
-/// row maps to an entry only when at least one MAPPED field carries data;
+/// A row maps to an entry only when at least one MAPPED field carries data;
 /// otherwise it counts as skipped-empty (drip exports a row for every day
 /// it knows, most of which are blank). Only a broken date invalidates a
 /// data row; every other wart degrades field-by-field. Unknown header
@@ -213,22 +219,11 @@ DripCsvImport dripCsvToExportJson(String raw) {
   bool boolCell(List<String> row, String name) =>
       cell(row, name)?.toLowerCase() == 'true';
 
-  /// Any nonempty cell in the `<family>.*` columns except the family's note.
-  bool flagInFamily(List<String> row, String family) {
-    final noteColumn = '$family.note';
-    final prefix = '$family.';
-    for (var i = 0; i < header.length; i++) {
-      final name = header[i];
-      if (!name.startsWith(prefix) || name == noteColumn) continue;
-      if (cellAt(row, i).toLowerCase() == 'true') return true;
-    }
-    return false;
-  }
-
   String? prefixedLine(String tag, String? text) =>
       text == null ? null : '$tag $text';
 
   final entries = <Map<String, Object?>>[];
+  final excludedDays = <String>{};
   var skippedEmpty = 0;
   var invalid = 0;
 
@@ -237,10 +232,13 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final day = dateCell == null ? null : tryParseIsoDay(dateCell);
 
     final bbtC = _parseBbtC(cell(dataRow, 'temperature.value'));
-    // TODO(user-review): drip's "not usable for fertility detection" is
-    // mapped to cycle-app's day-level excludeOther (interrupted day) because
-    // drip has no reason field; per-symptom excludes have no storage here.
-    final excludeOther = boolCell(dataRow, 'temperature.exclude');
+    // drip's "not usable for fertility detection" (temperature.exclude)
+    // maps to the derived excludedFromAnalysis MARK (author 'import') —
+    // NOT to an entry flag and NOT to mask bits (drip has no reason
+    // column). The day still counts as a data row (the exclusion is
+    // meaningful data, and the mark needs its day), but the entry itself
+    // carries the neutral mask 0 and no exclude_* key.
+    final excluded = boolCell(dataRow, 'temperature.exclude');
     // drip records the measurement's time of day in temperature.time as
     // plain `HH:MM` (24 h). A time belongs to its measurement — hasData
     // below deliberately does not count a lone time cell as data, and the
@@ -266,14 +264,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
       firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
-    // desire.value is drip's 0=low/1=medium/2=high intensity vocabulary —
-    // NOT a real boolean (the flag collapses it: intensity is not storable
-    // here, see the mapping table). Any present cell means desire; only a
-    // literal trimmed `false` is ignored entirely — not data, not desire
-    // (drip lowercases every string cell, so a real export says just
-    // `false`).
-    final desireCell = cell(dataRow, 'desire.value');
-    final desire = desireCell != null && desireCell.trim() != 'false';
+    // desire.value is DROPPED entirely (Lust is removed everywhere): the
+    // intensity was never storable and the flag is not data any more — a
+    // desire-only row imports nothing (skipped-empty).
     // drip tracks sex as activity (solo/partner) plus the contraceptive
     // methods used (condom, pill, iud, patch, ring, implant, diaphragm,
     // other — and `none`, the "no contraception used" choice;
@@ -312,6 +305,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final tempNote = cell(dataRow, 'temperature.note');
     final painNote = cell(dataRow, 'pain.note');
     final sexNote = cell(dataRow, 'sex.note');
+    // The mood NOTE is raw note text — still data (notes are raw notes).
+    // The mood FLAGS are dropped (Stimmung is removed everywhere).
     final moodNote = cell(dataRow, 'mood.note');
     // drip's pain kinds map onto the letter-coded pain options where a
     // storage option exists: ovulation pain is exactly the Mittelschmerz
@@ -323,29 +318,27 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // a flag imports nothing (but the pain note below still does).
     // TODO(user-review): whether the remaining pain kinds deserve options
     // of their own instead of being dropped.
-    final mood = flagInFamily(dataRow, 'mood') || moodNote != null;
 
     // A row is only worth an entry when something mappable was recorded.
     // Dropped columns (bleeding/mucus/cervix excludes, the sex variants
     // that do not map — solo, a contraceptive method —, unmappable pain
-    // kinds, symptom-flag FALSEs) are
-    // NOT data — otherwise every blank drip day would import. A measured
-    // time belongs to its measurement, so a time cell alone never makes a
-    // blank day an entry. A row carrying ONLY an out-of-range cervix
+    // kinds, symptom-flag FALSEs, the dropped mood/desire FLAGS) are NOT
+    // data — otherwise every blank drip day would import. A measured time
+    // belongs to its measurement, so a time cell alone never makes a blank
+    // day an entry. A row carrying ONLY an out-of-range cervix
     // position/opening index is skipped as well — such an index decodes to
     // no stored observation (the clamp word the old free-text helper
     // fabricated was noise).
     final hasData = bbtC != null ||
-        excludeOther ||
+        excluded ||
         bleeding != null ||
         mucus != null ||
         cervixObservation != null ||
-        desire ||
         sex ||
         painBreast ||
         painMittelschmerz ||
         painNote != null ||
-        mood ||
+        moodNote != null ||
         dayNote != null ||
         tempNote != null ||
         sexNote != null;
@@ -370,16 +363,15 @@ DripCsvImport dripCsvToExportJson(String raw) {
       prefixedLine('[mood]', moodNote),
     ].whereType<String>().where((n) => n.isNotEmpty).join('\n');
 
+    if (excluded) {
+      excludedDays.add(formatIsoDay(day));
+    }
     final entry = <String, Object?>{
-      'profile_id': 1,
       'date': formatIsoDay(day),
       'bbt_c': bbtC,
       'measured_at_minutes': measuredAtMinutes,
       'bleeding': bleeding ?? 0,
-      'exclude_illness': false,
-      'exclude_alcohol': false,
-      'exclude_travel': false,
-      'exclude_other': excludeOther,
+      'temp_disturbances': 0,
       'mucus_sign': mucus?.sign?.name,
       'mucus_quality': mucus?.quality?.name,
       'cervix_position': cervixObservation?.position?.name,
@@ -387,8 +379,6 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'cervix_firmness': cervixObservation?.firmness?.name,
       'pain_breast': painBreast,
       'pain_mittelschmerz': painMittelschmerz,
-      'mood': mood,
-      'desire': desire,
       'sex_timings': sex ? SexTiming.middle.bit : 0,
       'notes': notes.isEmpty ? null : notes,
     };
@@ -396,11 +386,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
   }
 
   final blob = ExportBlob(
-    profiles: const [
-      {'id': 1, 'name': 'main', 'ordinal': 0},
-    ],
     entries: entries,
-    marks: _deriveCycleStartMarks(entries),
+    marks: _deriveMarks(entries, excludedDays),
     exportedAt: DateTime.now(),
   );
 
@@ -417,33 +404,35 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
 // --- vocabulary tables (drip: components/helpers/labels.js, 0-based) -------
 
-/// Derives the foreign-import cycleStart marks from the mapped entry rows
-/// (drip has no mark analogue of its own, so the cycle-start boundaries are
-/// derived from the imported bleeding sequence; the derivation replays the
-/// exact rows that the export document carries, and the idempotent marks
-/// writer makes a repeated import of the same CSV a no-op).
+/// Derives the foreign-import marks from the mapped entry rows (drip has
+/// no mark analogue of its own, so the cycle-start boundaries and the
+/// analysis exclusions are derived from the imported data; the derivation
+/// replays the exact rows that the export document carries, and the
+/// idempotent marks writer makes a repeated import of the same CSV a
+/// no-op). The rows carry no profile id (there is none).
 ///
-/// The rows are replayed through the SHARED suggestion predicate
-/// [isSuggestedCycleStart] — no derivation-local bleeding rule: a
-/// menstruation-level day (light or heavier) that does not continue the
-/// previous calendar day's menstruation-level flow suggests a cycle start,
-/// and every suggested day becomes a `cycleStart` row with author
-/// 'import', profile 1 (drip has no multi-profile concept).
+/// Two mark kinds, both with author 'import':
+/// - `cycleStart`: replayed through the SHARED suggestion predicate
+///   [isSuggestedCycleStart] — no derivation-local bleeding rule: a
+///   menstruation-level day (light or heavier) that does not continue the
+///   previous calendar day's menstruation-level flow suggests a cycle
+///   start. The excluded-state comes from [excludedDays] (the
+///   temperature.exclude days): an excluded day never suggests, and an
+///   excluded previous day does not suppress the next day's suggestion.
+/// - `excludedFromAnalysis`: one per temperature.exclude day — the roadmap's
+///   "drip excluded temp → a mark, not an observation". Drip has no reason
+///   column, so no mask bits come from drip.
 ///
 /// Replay details (kept in step with the import merge plan):
 /// - the rows are judged in DAY order, not CSV row order (drip exports one
 ///   row per calendar day, but the previous-day check of the predicate
 ///   must always see the prior day, wherever it sat in the file);
-/// - duplicated (profile, date) keys keep their FIRST occurrence, like the
-///   merge plan counts them.
-List<Map<String, Object?>> _deriveCycleStartMarks(
-    List<Map<String, Object?>> entries) {
-  // Row map -> the [DailyEntry] fields the suggestion predicate reads:
-  // the bleeding level through the shared vocabulary helper
-  // tryParseBleeding, the interruption flags as stored (drip maps
-  // temperature.exclude onto exclude_other). The remaining entry fields
-  // stay neutral — the predicate never reads them (shared helpers
-  // guarantee the used fields parse, so the replay always succeeds).
+/// - duplicated same-day keys keep their FIRST occurrence, like the merge
+///   plan counts them;
+/// - the derived rows are ordered by day, then type (deterministic
+///   document order; the merge is idempotent regardless of order).
+List<Map<String, Object?>> _deriveMarks(
+    List<Map<String, Object?>> entries, Set<String> excludedDays) {
   final seenDates = <String>{};
   final replayed = <DailyEntry>[];
   for (final row in entries) {
@@ -453,25 +442,41 @@ List<Map<String, Object?>> _deriveCycleStartMarks(
     if (day == null) continue;
     replayed.add(DailyEntry(
       date: day,
-      profileId: 1,
       bleeding: tryParseBleeding(row['bleeding']) ?? Bleeding.none,
-      excludeOther: row['exclude_other'] == true,
     ));
   }
   replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
 
   final marks = <Map<String, Object?>>[];
   for (var i = 0; i < replayed.length; i++) {
-    final previous = i == 0 ? null : replayed[i - 1];
-    if (isSuggestedCycleStart(replayed[i], previous)) {
+    final entry = replayed[i];
+    final iso = formatIsoDay(entry.date);
+    if (excludedDays.contains(iso)) {
       marks.add(<String, Object?>{
-        'profile_id': 1,
-        'entry_date': formatIsoDay(replayed[i].date),
+        'entry_date': iso,
+        'mark_type': CycleMarkTypes.excludedFromAnalysis,
+        'author': 'import',
+      });
+    }
+    final previous = i == 0 ? null : replayed[i - 1];
+    if (isSuggestedCycleStart(entry, previous,
+        entryExcluded: excludedDays.contains(iso),
+        previousExcluded: previous == null
+            ? false
+            : excludedDays.contains(formatIsoDay(previous.date)))) {
+      marks.add(<String, Object?>{
+        'entry_date': iso,
         'mark_type': CycleMarkTypes.cycleStart,
         'author': 'import',
       });
     }
   }
+  marks.sort((a, b) {
+    final byDay =
+        (a['entry_date']! as String).compareTo(b['entry_date']! as String);
+    if (byDay != 0) return byDay;
+    return (a['mark_type']! as String).compareTo(b['mark_type']! as String);
+  });
   return marks;
 }
 
@@ -617,6 +622,9 @@ int? _resolveNfp({
       mappedFirmness == null) {
     return null;
   }
-  return (position: mappedPosition, opening: mappedOpening,
-      firmness: mappedFirmness);
+  return (
+    position: mappedPosition,
+    opening: mappedOpening,
+    firmness: mappedFirmness
+  );
 }

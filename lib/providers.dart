@@ -35,31 +35,27 @@ final databaseProvider = FutureProvider<CycleDatabase>((ref) {
 /// current time" is deterministic (no race against the real minute boundary).
 final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// The profile all M1 UI reads/writes. Multi-profile (partner mode) is in
-/// the schema, but deliberately not exposed in the M1 UI.
-const int defaultProfileId = 1;
-
-/// Live stream of the tracked days (as pure domain models) for the default
-/// profile — the single source of truth behind Tagebuch, Zyklus and
-/// Statistik screens. Re-emits on every write.
+/// Live stream of the tracked days (as pure domain models) — the single
+/// source of truth behind Tagebuch, Zyklus and Statistik screens. Re-emits
+/// on every write.
 final dailyEntriesProvider =
     StreamProvider.autoDispose<List<DailyEntry>>((ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.entriesDao
-      .watchAll(defaultProfileId)
+      .watchAll()
       .map((rows) => rows.map(dailyEntryFromDrift).toList());
 });
 
-/// Live stream of the user-placed marks (as pure domain models) for the
-/// default profile — the read side of the evaluation feature (Mode M, the
-/// counterpart to [dailyEntriesProvider]). Re-emits on every mark write
-/// (add/remove); consumers recompute the derived evaluation (baseline,
-/// circled higher measurements, SUZ) from it at render time — never from a
-/// persisted copy, per ADR-0001.
+/// Live stream of the user-placed marks (as pure domain models) — the read
+/// side of the evaluation feature (Mode M, the counterpart to
+/// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
+/// consumers recompute the derived evaluation (baseline, circled higher
+/// measurements, SUZ) from it at render time — never from a persisted copy,
+/// per ADR-0001.
 final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.marksDao
-      .watchAllMarks(defaultProfileId)
+      .watchAll()
       .map((rows) => rows.map(cycleMarkFromDrift).toList());
 });
 

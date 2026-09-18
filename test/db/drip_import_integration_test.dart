@@ -40,7 +40,7 @@ void main() {
   /// (DailyEntry == compares every entry field + the day, no timestamps —
   /// created_at/updated_at bookkeeping is excluded from equality this way).
   Future<List<DailyEntry>> storedEntries() async {
-    final rows = await db.entriesDao.allEntriesForAllProfiles();
+    final rows = await db.entriesDao.allEntries();
     final list = rows.map(dailyEntryFromDrift).toList();
     list.sort((a, b) => a.date.compareTo(b.date));
     return list;
@@ -48,40 +48,33 @@ void main() {
 
   /// The stored day row for an ISO date, as the domain object.
   Future<DailyEntry> dayRow(String iso) async {
-    final rows = await db.entriesDao.allEntriesForAllProfiles();
+    final rows = await db.entriesDao.allEntries();
     return rows.map(dailyEntryFromDrift).singleWhere(
           (e) => formatIsoDay(e.date) == iso,
         );
   }
 
   group('drip csv through importJsonToDatabase', () {
-    test('first import stores exactly the 28 mapped days under the main '
-        'profile', () async {
+    test('first import stores exactly the 27 mapped days, day-keyed', () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
       final summary = await importJsonToDatabase(db, mapping.json);
 
       // Full accounting: nothing invalid, nothing new beyond the new days.
       expect(summary.entriesInvalid, 0);
-      expect(summary.entriesNew, 28);
+      expect(summary.entriesNew, 27,
+          reason: '2026-08-20 (desire + mood flags only) imports nothing: '
+              'mood/desire are no longer data');
       expect(summary.entriesOverwritten, 0);
-      expect(summary.entriesWritten, 28);
-      expect(summary.marksNew, 3,
-          reason: 'the fixture carries three bleeding episodes, each '
-              'deriving one cycleStart mark (author import)');
-      expect(summary.profilesToInsert, 0,
-          reason: 'document profile 1 is the seeded main profile');
+      expect(summary.entriesWritten, 27);
+      expect(summary.marksNew, 4,
+          reason: 'three bleeding episodes derive one cycleStart mark each '
+              '(author import) and the temperature.exclude day derives one '
+              'excludedFromAnalysis mark (author import)');
 
-      final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(28),
-          reason: '28 data rows, 45 blank calendar days skipped');
-      expect(rows.every((r) => r.profileId == 1), isTrue,
-          reason: 'drip has no multi-profile concept');
-
-      // The seeded profile is still alone and unmodified.
-      final profiles = await db.profilesDao.allProfiles();
-      expect(profiles, hasLength(1));
-      expect(profiles.single.name, 'main');
-      expect(profiles.single.id, 1);
+      final rows = await db.entriesDao.allEntries();
+      expect(rows, hasLength(27),
+          reason: '27 data rows, 46 blank calendar days skipped — merged '
+              'by day alone (no profile dimension)');
     });
 
     test('exact stored field values for the pinned days', () async {
@@ -97,25 +90,32 @@ void main() {
       expect(mucusDay.cervixFirmness, CervixFirmness.soft);
       expect(mucusDay.bbtC, isNull);
       expect(mucusDay.bleeding, Bleeding.none);
-      expect(mucusDay.excludeOther, isFalse);
+      expect(mucusDay.tempDisturbances, 0);
 
       // 2026-07-09: bleeding value 1 (light) with bleeding.exclude=true →
       // the level is the +1-shifted stored level (light); the PER-SYMPTOM
-      // exclusion is
-      // dropped (no storage), so no day-level exclude flag is set.
+      // exclusion is dropped (no storage), no mask bits and no exclusion
+      // mark come from it.
       final bleedingDay = await dayRow('2026-07-09');
       expect(bleedingDay.bleeding, Bleeding.light);
-      expect(bleedingDay.excludeOther, isFalse,
+      expect(bleedingDay.tempDisturbances, 0,
           reason: 'bleeding.exclude has no storage and is dropped');
-      expect(bleedingDay.excludeIllness, isFalse);
 
-      // 2026-09-13: excluded temperature day — value kept, day-level
-      // excludeOther set, temperature note under the [temp] prefix.
+      // 2026-09-13: excluded temperature day — value kept, mask 0 (drip
+      // has no reason column), temperature note under the [temp] prefix,
+      // and the ANALYSIS exclusion rides as the derived mark.
       final tempDay = await dayRow('2026-09-13');
       expect(tempDay.bbtC, 36.7);
-      expect(tempDay.excludeOther, isTrue);
+      expect(tempDay.tempDisturbances, 0);
       expect(tempDay.notes, '[temp] measured late');
       expect(tempDay.bleeding, Bleeding.none);
+      final exclusionMarks =
+          (await db.marksDao.marksForDay(DateTime(2026, 9, 13)))
+              .where((m) => m.markType == 'excludedFromAnalysis');
+      expect(exclusionMarks, hasLength(1),
+          reason: 'temperature.exclude derives the excludedFromAnalysis '
+              'mark (author import) — not a raw entry flag');
+      expect(exclusionMarks.single.author, 'import');
 
       // 2026-09-15: note-only day — rides in because the note is data.
       final noteOnlyDay = await dayRow('2026-09-15');
@@ -133,12 +133,22 @@ void main() {
 
       // 2026-07-17: partner sex WITH a condom — the sex timings mask stays
       // 0 (only partner sex without contraception maps); the [sex] note
-      // and the desire flag still make it a data row.
+      // still makes it a data row. The desire flag is dropped entirely.
       final condomDay = await dayRow('2026-07-17');
       expect(condomDay.sexTimings, 0,
           reason: 'partner sex with contraception is not the mapped variant');
-      expect(condomDay.desire, isTrue);
       expect(condomDay.notes, '[sex] with condom, quite good');
+
+      // 2026-08-20 (desire + mood flags only): gone entirely — dropping
+      // the flags makes the day data-less, so no row is stored.
+      final dates = (await db.entriesDao.allEntries())
+          .map((r) => formatIsoDay(r.date))
+          .toSet();
+      expect(dates.contains('2026-08-20'), isFalse,
+          reason: 'a desire/mood-only day is skipped-empty now');
+      // 2026-08-31 keeps its bleeding data (the [mood] note stays data).
+      expect((await dayRow('2026-08-31')).bleeding, Bleeding.medium);
+      expect((await dayRow('2026-08-31')).notes, '[mood] first day jitters');
 
       // 2026-09-12: solo sex with a note — note rides in, the mask stays 0.
       final soloDay = await dayRow('2026-09-12');
@@ -156,10 +166,12 @@ void main() {
     test('blank calendar days are absent from the database', () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
       await importJsonToDatabase(db, mapping.json);
-      final rows = await db.entriesDao.allEntriesForAllProfiles();
+      final rows = await db.entriesDao.allEntries();
 
       final dates = rows.map((r) => formatIsoDay(r.date)).toSet();
-      // 2026-07-10..14, 19, 21, 22 are all-empty rows in the fixture.
+      // 2026-07-10..14, 19, 21, 22 and 2026-08-20 are all-empty rows in
+      // the fixture (2026-08-20 since mood/desire stopped counting as
+      // data).
       for (final blank in [
         '2026-07-10',
         '2026-07-11',
@@ -169,14 +181,16 @@ void main() {
         '2026-07-19',
         '2026-07-21',
         '2026-07-22',
+        '2026-08-20',
       ]) {
         expect(dates.contains(blank), isFalse,
             reason: '$blank is an empty drip day and must not be stored');
       }
-      expect(dates, hasLength(28));
+      expect(dates, hasLength(27));
     });
 
-    test('temperature measurement times persist through the import → db '
+    test(
+        'temperature measurement times persist through the import → db '
         'round trip', () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
       await importJsonToDatabase(db, mapping.json);
@@ -246,12 +260,12 @@ void main() {
 
       // Idempotence in the counters: nothing new, everything merged.
       expect(summary2.entriesNew, 0);
-      expect(summary2.entriesOverwritten, 28);
+      expect(summary2.entriesOverwritten, 27);
       expect(summary2.entriesInvalid, 0);
       expect(summary2.marksNew, 0);
 
-      final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(28), reason: 'no duplicates on re-import');
+      final rows = await db.entriesDao.allEntries();
+      expect(rows, hasLength(27), reason: 'no duplicates on re-import');
 
       final afterSecond = await storedEntries();
       // Full-row equality for EVERY affected day, list-ordered.
@@ -273,12 +287,12 @@ void main() {
       final summary = await importJsonToDatabase(db, mapping.json);
 
       // The drip days overwrite/merge independently of the resident day.
-      expect(summary.entriesNew, 28);
+      expect(summary.entriesNew, 27);
       expect(summary.entriesOverwritten, 0);
 
-      final rows = await db.entriesDao.allEntriesForAllProfiles();
-      expect(rows, hasLength(29),
-          reason: '28 drip days + the unrelated pre-existing day');
+      final rows = await db.entriesDao.allEntries();
+      expect(rows, hasLength(28),
+          reason: '27 drip days + the unrelated pre-existing day');
       final storedList = rows.map(dailyEntryFromDrift).toList();
 
       final kept = storedList
@@ -290,19 +304,21 @@ void main() {
   group('derived cycleStart marks (foreign imports round-trip)', () {
     /// The stored cycleStart marks, ordered by day.
     Future<List<UserMark>> storedCycleStarts(CycleDatabase target) async {
-      final marks = await target.marksDao.allMarksForAllProfiles();
-      final starts = marks
-          .where((m) => m.markType == 'cycleStart')
-          .toList()
-            ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
+      final marks = await target.marksDao.allMarks();
+      final starts = marks.where((m) => m.markType == 'cycleStart').toList()
+        ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
       return starts;
     }
 
-    test('the fixture import derives one cycleStart mark per bleeding '
+    test(
+        'the fixture import derives one cycleStart mark per bleeding '
         'episode (author import)', () async {
       final mapping = dripCsvToExportJson(fixtureRaw);
       final summary = await importJsonToDatabase(db, mapping.json);
-      expect(summary.marksNew, 3);
+      expect(summary.marksNew, 4,
+          reason: '3 cycleStart marks + the derived excludedFromAnalysis '
+              'mark carry the import authorship (the merge plan counts every '
+              'document mark row)');
       expect(summary.marksInvalid, 0);
 
       final starts = await storedCycleStarts(db);
@@ -310,48 +326,48 @@ void main() {
           ['2026-07-05', '2026-08-02', '2026-08-30'],
           reason: 'one mark per bleeding episode (07-05..09, 08-02..05, '
               '08-30..09-02), each on the episode\'s first day');
-      expect(
-          starts.every((m) => m.profileId == 1 && m.author == 'import'),
-          isTrue,
-          reason: 'drip has no multi-profile concept and the derived marks '
-              'carry the import authorship');
+      expect(starts.every((m) => m.author == 'import'), isTrue,
+          reason: 'the derived marks carry the import authorship');
     });
 
-    test('re-importing the same drip CSV derives nothing new (idempotent '
+    test(
+        're-importing the same drip CSV derives nothing new (idempotent '
         'marks)', () async {
       await importJsonToDatabase(db, dripCsvToExportJson(fixtureRaw).json);
 
-      final second =
-          await importJsonToDatabase(db, dripCsvToExportJson(fixtureRaw).json);
+      final second = await importJsonToDatabase(
+        db,
+        dripCsvToExportJson(fixtureRaw).json,
+      );
       expect(second.marksNew, 0,
           reason: 'the mapping is deterministic: the same rows derive the '
               'same marks, which the idempotent addMark skips');
-      expect(second.marksSkipped, 3);
+      expect(second.marksSkipped, 4,
+          reason: '3 cycleStart marks + the derived excludedFromAnalysis '
+              'mark are all skip-idempotent on re-import');
       expect(await storedCycleStarts(db), hasLength(3));
     });
 
-    test('cycleStart marks survive the cycle-app export → import round trip '
+    test(
+        'cycleStart marks survive the cycle-app export → import round trip '
         'with their author column (nothing re-derives)', () async {
       // Hand-authored document: one cycleStart mark with author 'import'
       // (as a foreign drip import writes it) and one with author 'user'
-      // (as the diary prompt writes it), each on its own tracked day.
+      // (as the diary prompt writes it), each on its own tracked day. The
+      // document is profile-free v5 shape: no `profile_id` keys, no
+      // `profiles` list.
       final doc = buildExportJson(ExportBlob(
-        profiles: const [
-          {'id': 1, 'name': 'main', 'ordinal': 0},
-        ],
         entries: const [
-          {'profile_id': 1, 'date': '2026-01-01', 'bleeding': 3},
-          {'profile_id': 1, 'date': '2026-02-01', 'bleeding': 3},
+          {'date': '2026-01-01', 'bleeding': 3},
+          {'date': '2026-02-01', 'bleeding': 3},
         ],
         marks: const [
           {
-            'profile_id': 1,
             'entry_date': '2026-01-01',
             'mark_type': 'cycleStart',
             'author': 'import',
           },
           {
-            'profile_id': 1,
             'entry_date': '2026-02-01',
             'mark_type': 'cycleStart',
             'author': 'user',

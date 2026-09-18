@@ -24,14 +24,10 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
   );
   return DailyEntry(
     date: e.date,
-    profileId: e.profileId,
     bbtC: e.bbtC,
     measuredAtMinutes: e.measuredAtMinutes,
     bleeding: e.bleeding,
-    excludeIllness: e.excludeIllness,
-    excludeAlcohol: e.excludeAlcohol,
-    excludeTravel: e.excludeTravel,
-    excludeOther: e.excludeOther,
+    tempDisturbances: e.tempDisturbances,
     mucusSign: mucus.sign,
     mucusQuality: mucus.quality,
     cervixPosition: tryParseCervixPosition(e.cervixPosition),
@@ -39,8 +35,6 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     cervixFirmness: tryParseCervixFirmness(e.cervixFirmness),
     painBreast: e.painBreast,
     painMittelschmerz: e.painMittelschmerz,
-    mood: e.mood,
-    desire: e.desire,
     // Stored as the mask itself (0..7, engine CHECK); no per-bit conversion
     // happens on either side — the SexTiming.bit values ARE the storage.
     sexTimings: e.sexTimings,
@@ -58,15 +52,11 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
   // always satisfy the SQL CHECK even if that invariant ever weakens.
   final mucus = sanitizeMucusPair(sign: d.mucusSign, quality: d.mucusQuality);
   return CycleEntriesCompanion(
-    profileId: Value(d.profileId),
     date: Value(DateOnly.normalize(d.date)),
     bbtC: Value(d.bbtC),
     measuredAtMinutes: Value(d.measuredAtMinutes),
     bleeding: Value(d.bleeding),
-    excludeIllness: Value(d.excludeIllness),
-    excludeAlcohol: Value(d.excludeAlcohol),
-    excludeTravel: Value(d.excludeTravel),
-    excludeOther: Value(d.excludeOther),
+    tempDisturbances: Value(d.tempDisturbances),
     // Stable enum-name TEXT tokens (bleeding itself is the numeric level
     // column), written post-sanitize so the pair can never violate the SQL
     // CHECK.
@@ -79,8 +69,6 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     cervixFirmness: Value(d.cervixFirmness?.name),
     painBreast: Value(d.painBreast),
     painMittelschmerz: Value(d.painMittelschmerz),
-    mood: Value(d.mood),
-    desire: Value(d.desire),
     // The mask as-is (DailyEntry's constructor already asserts 0..7, which
     // the SQL CHECK mirrors); the SexTiming.bit values ARE the storage, no
     // per-bit conversion happens here either.
@@ -94,7 +82,6 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
 /// the round trip verbatim (future tools write them; the schema is the
 /// vocabulary authority, not the mapper).
 CycleMark cycleMarkFromDrift(UserMark m) => CycleMark(
-      profileId: m.profileId,
       date: m.entryDate,
       type: m.markType,
       author: m.author,
@@ -104,7 +91,6 @@ CycleMark cycleMarkFromDrift(UserMark m) => CycleMark(
 /// in the DAO), never partial patches, so every field is written explicitly
 /// — a companion built from a [CycleMark] is a complete replacement row.
 UserMarksCompanion cycleMarkToCompanion(CycleMark mark) => UserMarksCompanion(
-      profileId: Value(mark.profileId),
       entryDate: Value(DateOnly.normalize(mark.date)),
       markType: Value(mark.type),
       author: Value(mark.author),

@@ -62,10 +62,10 @@ ProviderScope _scope({required DateTime selectedDay}) {
 
 /// The BBT field is the first form field; its controller text is the
 /// round-trip signal for "which day's entry is loaded".
-String _bbtText(WidgetTester tester) =>
-    tester.widget<TextFormField>(find.byType(TextFormField).first)
-        .controller!
-        .text;
+String _bbtText(WidgetTester tester) => tester
+    .widget<TextFormField>(find.byType(TextFormField).first)
+    .controller!
+    .text;
 
 String _dayLabel(DateTime day) =>
     DateFormat.yMd('de').format(DateOnly.normalize(day).toLocal());
@@ -84,8 +84,8 @@ void main() {
 
     expect(_bbtText(tester), '36.4',
         reason: 'the form opens on the seeded first day');
-    expect(find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
-        findsOneWidget);
+    expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day1)), findsOneWidget);
 
     // Next: the form moves to the adjacent day and loads ITS entry.
     await tester.tap(find.byIcon(Icons.chevron_right));
@@ -95,8 +95,8 @@ void main() {
     final container = ProviderScope.containerOf(context);
     expect(container.read(selectedDateProvider), _day2,
         reason: 'the next button moves the selection one day forward');
-    expect(find.widgetWithText(OutlinedButton, _dayLabel(_day2)),
-        findsOneWidget,
+    expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day2)), findsOneWidget,
         reason: 'the date button shows the new day');
     expect(_bbtText(tester), '36.9',
         reason: 'the new day\'s entry is loaded into the form');
@@ -106,8 +106,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(container.read(selectedDateProvider), _day1);
-    expect(find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
-        findsOneWidget);
+    expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day1)), findsOneWidget);
     expect(_bbtText(tester), '36.4');
 
     // The chevron buttons carry localized tooltips (German pinned locale).
@@ -186,8 +186,8 @@ void main() {
     expect(_bbtText(tester), '36.4',
         reason: 'the discarded edit never reached the database');
 
-    final stored1 = await _db!.entriesDao.entryFor(defaultProfileId, _day1);
-    final stored2 = await _db!.entriesDao.entryFor(defaultProfileId, _day2);
+    final stored1 = await _db!.entriesDao.entryFor(_day1);
+    final stored2 = await _db!.entriesDao.entryFor(_day2);
     expect(stored1!.bbtC, 36.4,
         reason: 'navigation must not write the unsaved edit');
     expect(stored2!.bbtC, 36.9);

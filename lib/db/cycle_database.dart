@@ -1,8 +1,8 @@
-// The app's drift database (schema version 8).
+// The app's drift database (schema version 9, profile-free).
 //
-// File organization: the DAO files (entries_dao.dart, marks_dao.dart,
-// profiles_dao.dart) are PARTS of this library. That is the standard drift
-// layout when DAOs reference generated data classes — drift writes all data
+// File organization: the DAO files (entries_dao.dart, marks_dao.dart) are
+// PARTS of this library. That is the standard drift layout when DAOs
+// reference generated data classes — drift writes all data
 // classes/companions and the _$DaoMixin classes into a single
 // cycle_database.g.dart, and parts share the library's scope. Tables live in
 // lib/db/tables.dart, converters in lib/db/converters.dart, and the
@@ -24,11 +24,10 @@ part 'cycle_database.g.dart';
 
 part 'entries_dao.dart';
 part 'marks_dao.dart';
-part 'profiles_dao.dart';
 
 @DriftDatabase(
-  tables: [Profiles, CycleEntries, UserMarks],
-  daos: [EntriesDao, MarksDao, ProfilesDao],
+  tables: [CycleEntries, UserMarks],
+  daos: [EntriesDao, MarksDao],
 )
 class CycleDatabase extends _$CycleDatabase {
   // Accepts any QueryExecutor; tests pass NativeDatabase.memory(), the
@@ -37,13 +36,12 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
-          await _seedDefaultProfile();
         },
         onUpgrade: (m, from, to) async {
           // Pre-release policy: the app is unpublished, no database with real
@@ -51,9 +49,9 @@ class CycleDatabase extends _$CycleDatabase {
           // obligation. Every upgrade drops the app's tables and recreates
           // them from the current schema, which keeps schema work cheap:
           // changing the schema is then just bumping [schemaVersion] above.
-          // Also: `PRAGMA foreign_keys` is still OFF at this point (it is
-          // only enabled in beforeOpen below), so the drop order cannot
-          // trip over the profile references.
+          // `deleteTable('profiles')` stays so an old (v8) database file
+          // loses its legacy profiles table too — nothing recreates or
+          // re-seeds it (the schema is profile-free).
           //
           // From the FIRST PUBLISHED RELEASE on this must become real one
           // version step at a time migrations that preserve user data.
@@ -61,19 +59,13 @@ class CycleDatabase extends _$CycleDatabase {
           await m.deleteTable('user_marks');
           await m.deleteTable('profiles');
           await m.createAll();
-          await _seedDefaultProfile();
         },
         // SQLite only enforces FOREIGN KEY constraints when the pragma is
         // enabled for the connection; make that explicit. Idempotent if
-        // drift's defaults already set it.
+        // drift's defaults already set it. (There are no foreign keys left
+        // in the profile-free schema; the pragma costs nothing.)
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON;');
         },
       );
-
-  /// Seeds the default profile so `profile_id` defaults (1) reference a valid
-  /// row from the very first open — used by both onCreate and the destructive
-  /// onUpgrade path.
-  Future<void> _seedDefaultProfile() =>
-      into(profiles).insert(ProfilesCompanion.insert(name: 'main'));
 }

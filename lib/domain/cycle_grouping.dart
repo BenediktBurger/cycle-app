@@ -3,7 +3,7 @@
 // Boundary rule (decided — the cycle start is a user mark):
 //
 //   A new cycle group opens at the first tracked day on/after a user-placed
-//   `cycleStart` mark (CycleMarkTypes.cycleStart) for that profile. The mark
+//   `cycleStart` mark (CycleMarkTypes.cycleStart). The mark
 //   is AUTHORITATIVE and binds wherever it sits — including on days without
 //   menstruation bleeding, on excluded (interrupted) days, and on untracked
 //   gap days (the group then opens at the next tracked entry). Bleeding
@@ -11,6 +11,9 @@
 //   [isSuggestedCycleStart] (prompts / derived marks). A leading group of
 //   entries that predate the first mark keeps
 //   `startsAtMenstruation == false`.
+//
+// Profile-free: marks key to days only (the (entry_date, mark_type) unique
+// index is the whole key); grouping is no longer per profile.
 
 import 'date_only.dart';
 import 'marks.dart';
@@ -54,33 +57,30 @@ List<DateTime> menstruationOnsetDates(
 /// Groups the given (possibly unsorted) entries into cycles.
 ///
 /// Entries are sorted by date; entry timing (date-only) decides grouping.
-/// A group starts at the first tracked day on/after a cycleStart mark for
-/// that entry's profile; leading entries (before the first mark) form one
-/// leading group with `startsAtMenstruation == false`.
+/// A group starts at the first tracked day on/after a cycleStart mark;
+/// leading entries (before the first mark) form one leading group with
+/// `startsAtMenstruation == false`. Day-keyed: every cycleStart mark in
+/// [marks] contributes (there is no profile dimension).
 List<Cycle> groupIntoCycles(
   List<DailyEntry> entries,
   List<CycleMark> marks,
 ) {
   if (entries.isEmpty) return const [];
 
-  // The cycleStart mark dates per profile (marks of other types never
-  // create boundaries). Normalized so calendar-day comparisons are exact.
-  final markDates = <int, List<DateTime>>{};
+  // The cycleStart mark dates (marks of other types never create
+  // boundaries). Normalized so calendar-day comparisons are exact.
+  final markDates = <DateTime>[];
   for (final mark in marks) {
     if (mark.type != CycleMarkTypes.cycleStart) continue;
-    markDates
-        .putIfAbsent(mark.profileId, () => <DateTime>[])
-        .add(DateOnly.normalize(mark.date));
+    markDates.add(DateOnly.normalize(mark.date));
   }
-  for (final dates in markDates.values) {
-    dates.sort();
-  }
+  markDates.sort();
 
-  // Per profile: index of the next NOT-yet-consumed mark. A mark is
-  // consumed when the group it opens has started (all marks on/before that
-  // day together — they cannot open a second group for the same day, and
-  // anything on/before the group's start is a no-op anyway).
-  final cursor = <int, int>{};
+  // Index of the next NOT-yet-consumed mark. A mark is consumed when the
+  // group it opens has started (all marks on/before that day together —
+  // they cannot open a second group for the same day, and anything on/before
+  // the group's start is a no-op anyway).
+  var cursor = 0;
 
   final sorted = [...entries]
     ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
@@ -99,8 +99,8 @@ List<Cycle> groupIntoCycles(
     currentDays = <DailyEntry>[];
   }
 
-  /// True when the next unconsumed cycleStart mark for [profileId] opens a
-  /// group at [entryDate]:
+  /// True when the next unconsumed cycleStart mark opens a group at
+  /// [entryDate]:
   /// - the very first tracked group opens when a mark sits on or before
   ///   [entryDate] (no leading group forms before that mark);
   /// - an already-open group is left when the next mark lies after the
@@ -108,12 +108,9 @@ List<Cycle> groupIntoCycles(
   ///   the current group's start is a no-op.
   /// On success all marks on or before [entryDate] are consumed (they
   /// cannot open a second group for the same day).
-  bool markOpensGroup(int profileId, DateTime entryDate, bool haveGroup) {
-    final dates = markDates[profileId];
-    if (dates == null) return false;
-    final index = cursor[profileId] ?? 0;
-    if (index >= dates.length) return false;
-    final nextMark = dates[index];
+  bool markOpensGroup(DateTime entryDate, bool haveGroup) {
+    if (cursor >= markDates.length) return false;
+    final nextMark = markDates[cursor];
     final day = DateOnly.normalize(entryDate);
     if (haveGroup) {
       final lower = DateOnly.normalize(currentStart!);
@@ -123,17 +120,18 @@ List<Cycle> groupIntoCycles(
     } else if (nextMark.compareTo(day) > 0) {
       return false;
     }
-    var consumed = index;
-    while (consumed < dates.length && dates[consumed].compareTo(day) <= 0) {
+    var consumed = cursor;
+    while (consumed < markDates.length &&
+        markDates[consumed].compareTo(day) <= 0) {
       consumed++;
     }
-    cursor[profileId] = consumed;
+    cursor = consumed;
     return true;
   }
 
   for (final entry in sorted) {
     final isGroupOpen = currentStart != null;
-    final opens = markOpensGroup(entry.profileId, entry.date, isGroupOpen);
+    final opens = markOpensGroup(entry.date, isGroupOpen);
     if (opens || !isGroupOpen) {
       // A new boundary always opens a group; the very first group opens
       // regardless (leading, non-boundary group starts at false — unless a
@@ -155,14 +153,25 @@ List<Cycle> groupIntoCycles(
 /// day is also a non-excluded menstruation-level day (i.e. we are in the
 /// middle of one continuous menstruation). This gates prompts and derived
 /// marks — it NEVER creates a cycle boundary by itself.
-bool isSuggestedCycleStart(DailyEntry entry, DailyEntry? previous) {
+///
+/// The excluded-state comes as EXPLICIT parameters, decided by the CALLER
+/// from the excludedFromAnalysis marks (see lib/domain/evaluation.dart for
+/// how the excluded-day set is built from marks): entries stay raw-data-only
+/// — raw disturbance flags ([DailyEntry.tempDisturbances]) do NOT exclude a
+/// day from the suggestion, a mark does.
+bool isSuggestedCycleStart(
+  DailyEntry entry,
+  DailyEntry? previous, {
+  required bool entryExcluded,
+  required bool previousExcluded,
+}) {
   if (entry.bleeding.level < 2) return false;
-  if (entry.isExcluded) return false;
+  if (entryExcluded) return false;
 
   if (previous != null &&
       DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date)) &&
       previous.bleeding.level >= 2 &&
-      !previous.isExcluded) {
+      !previousExcluded) {
     return false;
   }
   return true;

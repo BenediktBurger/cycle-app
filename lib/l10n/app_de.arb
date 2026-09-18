@@ -26,11 +26,6 @@
   "bleedingLight": "leicht",
   "bleedingMedium": "mittel",
   "bleedingHeavy": "stark",
-  "excludeIllness": "Krank",
-  "excludeAlcohol": "Alkohol",
-  "excludeTravel": "Reise",
-  "excludeOther": "Sonstiges",
-  "excludesCaption": "Störungstage (werten bewertungstechnisch wie unterbrochen):",
   "mucusSign": "Zeichen der Fruchtbarkeit",
   "mucusSignUnset": "—",
   "mucusQuality": "Qualität",
@@ -53,8 +48,6 @@
   "cervixFirmnessSoft": "weich",
   "painBreast": "Brustschmerzen (B)",
   "painMittelschmerz": "Mittelschmerz (M)",
-  "mood": "Stimmung",
-  "desire": "Lust",
   "sex": "Sex",
   "sexTimingStart": "Anfang",
   "sexTimingMiddle": "Mitte",
@@ -216,7 +209,7 @@
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: Verschlüsselung/Sperre ist in ADR-0005 geplant (native später mit SQLCipher, Web über PIN).",
   "settingsExport": "JSON-Export",
-  "settingsExportNote": "Alle Profile, Einträge und Markierungen als JSON-Dokument.",
+  "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument.",
   "settingsImport": "JSON-Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
   "exportTitle": "JSON-Vorschau",
@@ -233,36 +226,11 @@
   "importApply": "Import durchführen",
   "importInvalid": "Ungültiges Dokument (kein gültiger cycle-app-Export).",
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
-  "importSummary": "Neue Profile: {profiles}, Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
-  "@importSummary": {
-    "placeholders": {
-      "profiles": {
-        "type": "int"
-      },
-      "newDays": {
-        "type": "int"
-      },
-      "overwritten": {
-        "type": "int"
-      },
-      "duplicates": {
-        "type": "int"
-      },
-      "invalid": {
-        "type": "int"
-      },
-      "newMarks": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
+  "importSummary": "Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
   "dripImportTitle": "Drip-Daten importieren",
   "dripImportButton": "CSV importieren",
-  "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Import läuft in das Hauptprofil; Störungskennzeichen pro Symptom (außer Temperatur) fallen weg.",
+  "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Eine ausgeschlossene Temperatur erzeugt eine „vom Auswerten ausschließen“-Markierung; Stimmung- und Lust-Kennzeichen fallen weg (ihre Notizen bleiben erhalten).",
   "dripImportApply": "CSV importieren",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",
   "dripImportInvalid": "Das ist kein Drip-CSV-Export (keine „date“-Spalte in der Kopfzeile).",
@@ -285,5 +253,10 @@
         "type": "int"
       }
     }
-  }
+  },
+  "disturbancesCaption": "Temperaturstörungstage (Kennzeichen der Messung; das Ausschließen vom Auswerten ist die Markierung im Zyklustag-Blatt):",
+  "disturbanceLateToBed": "Spät ins Bett (sp)",
+  "disturbanceNightAwakening": "Nachts öfter aufstehen (a)",
+  "disturbanceAlcohol": "Alkohol (alk)",
+  "disturbanceIllness": "Krank (kr)"
 }

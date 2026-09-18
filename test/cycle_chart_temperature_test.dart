@@ -1,8 +1,10 @@
-// Widget tests of the temperature curve's connectivity and exclusion
+// Widget tests of the temperature curve's connectivity and interruption
 // rendering: the line connects two temperatures ONLY when their calendar
-// days are adjacent; excluded (interrupted) temperatures count as measured
-// days, keep the line continuous, but render lighter (dot AND touching
-// segments). Same harness pattern as test/cycle_chart_weekend_test.dart.
+// days are adjacent; interrupted temperatures (a NON-ZERO raw disturbance
+// mask on the entry — the rendering is keyed to the raw mask, NOT to the
+// excludedFromAnalysis mark) count as measured days, keep the line
+// continuous, but render lighter (dot AND touching segments). Same harness
+// pattern as test/cycle_chart_weekend_test.dart.
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
@@ -118,11 +120,12 @@ void main() {
   });
 
   group('excluded temperatures render lighter', () {
-    // Thu and Sat: ordinary measurements; Fri: temperature with an
-    // exclusion flag (illness) — measured, but interrupted.
+    // Thu and Sat: ordinary measurements; Fri: temperature with a raw
+    // disturbance flag (Krank = kr) — measured, but interrupted.
     final excludedMiddle = <DailyEntry>[
       DailyEntry(date: _thu, bbtC: 36.5),
-      DailyEntry(date: _fri, bbtC: 36.6, excludeIllness: true),
+      DailyEntry(
+          date: _fri, bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
       DailyEntry(date: _sat, bbtC: 36.7),
     ];
 
@@ -191,8 +194,10 @@ void main() {
       // Thu and Fri both measured AND both excluded: one segment, but every
       // part of it — line and both dots — renders lighter.
       await tester.pumpWidget(_chartHarness(entries: [
-        DailyEntry(date: _thu, bbtC: 36.5, excludeIllness: true),
-        DailyEntry(date: _fri, bbtC: 36.6, excludeIllness: true),
+        DailyEntry(
+            date: _thu, bbtC: 36.5, tempDisturbances: TempDisturbance.kr.bit),
+        DailyEntry(
+            date: _fri, bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
       ]));
       await tester.pumpAndSettle();
 
@@ -213,9 +218,8 @@ void main() {
       ];
       expect(dotBars, hasLength(1), reason: 'one continuous measured run');
       for (var i = 0; i < dotBars.first.spots.length; i++) {
-        final painter = dotBars.first.dotData
-            .getDotPainter(dotBars.first.spots[i], 0, dotBars.first, i)
-            as FlDotCirclePainter;
+        final painter = dotBars.first.dotData.getDotPainter(
+            dotBars.first.spots[i], 0, dotBars.first, i) as FlDotCirclePainter;
         expect(painter.color.a, closeTo(0.4, 1e-6),
             reason: 'excluded dot ${dotBars.first.spots[i].x.round()} '
                 'renders lighter');
@@ -225,13 +229,15 @@ void main() {
       }
     });
 
-    testWidgets('excluded dot at a run edge connects to the adjacent normal day',
+    testWidgets(
+        'excluded dot at a run edge connects to the adjacent normal day',
         (tester) async {
       // Fri: excluded; Sat: normal. The excluded edge day is still drawn
       // connected — adjacency, not exclusion, decides connectivity.
       await tester.pumpWidget(_chartHarness(entries: [
         DailyEntry(date: _thu, bbtC: 36.5),
-        DailyEntry(date: _fri, bbtC: 36.2, excludeTravel: true),
+        DailyEntry(
+            date: _fri, bbtC: 36.2, tempDisturbances: TempDisturbance.sp.bit),
         DailyEntry(date: _sat, bbtC: 37.0),
       ]));
       await tester.pumpAndSettle();
@@ -269,8 +275,7 @@ void main() {
     double chartHeight(WidgetTester tester) =>
         tester.getRect(find.byType(LineChart)).height;
 
-    testWidgets('a small y-span keeps the base height of 260',
-        (tester) async {
+    testWidgets('a small y-span keeps the base height of 260', (tester) async {
       // Five days around 36.5: the rounded bounds span 1 °C.
       await tester.pumpWidget(_chartHarness(entries: [
         for (var i = 0; i < 5; i++)
@@ -295,7 +300,8 @@ void main() {
           reason: 'a 4.5 °C span grows the plot: 260 + (4.5 − 3) × 80');
     });
 
-    testWidgets('the height is capped — a wide span does not grow without '
+    testWidgets(
+        'the height is capped — a wide span does not grow without '
         'bounds', (tester) async {
       // 34.5 .. 41.5 → rounded bounds 34.0..42.0 (span 8 °C, far past the
       // growth range).

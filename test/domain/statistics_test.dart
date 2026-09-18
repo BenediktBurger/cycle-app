@@ -19,9 +19,15 @@ DailyEntry d(
 /// A user-placed cycleStart mark on (year, month, day) — the cycle-length
 /// anchor (see lib/domain/cycle_grouping.dart: grouping is mark-driven).
 CycleMark start(int year, int month, int day) => CycleMark(
-      profileId: 1,
       date: DateTime(year, month, day),
       type: CycleMarkTypes.cycleStart,
+    );
+
+/// An analysis-exclusion mark on (year, month, day) — the only exclusion
+/// signal the data model knows (raw disturbance flags never exclude).
+CycleMark excludedDay(int year, int month, int day) => CycleMark(
+      date: DateTime(year, month, day),
+      type: CycleMarkTypes.excludedFromAnalysis,
     );
 
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
@@ -56,18 +62,17 @@ void main() {
     test('lengths are mark-driven, not bleeding-driven', () {
       // The old rule split at menstruation-level bleeding onsets; now only
       // the user-placed cycleStart marks anchor the lengths — the bleeding
-      // pattern below would have produced different boundaries.
+      // pattern below would have produced different boundaries. (Raw
+      // disturbance flags on the middle day would not matter either:
+      // statistics are purely mark-driven.)
       final entries = [
         d(2026, 4, 1, bleeding: Bleeding.medium),
-        DailyEntry(
-          date: DateTime(2026, 4, 28),
-          bleeding: Bleeding.medium,
-          excludeIllness: true,
-        ),
+        DailyEntry(date: DateTime(2026, 4, 28), bleeding: Bleeding.medium),
         d(2026, 4, 29, bleeding: Bleeding.medium),
       ];
       // Marks on Apr 1 and Apr 29: a single length from Apr 1 to Apr 29.
-      expect(cycleLengthsInDays(entries, [start(2026, 4, 1), start(2026, 4, 29)]),
+      expect(
+          cycleLengthsInDays(entries, [start(2026, 4, 1), start(2026, 4, 29)]),
           [28]);
       // Without marks there are no boundaries and no lengths at all.
       expect(cycleLengthsInDays(entries, const []), isEmpty);
@@ -76,17 +81,19 @@ void main() {
     test('a mark on an excluded day anchors a length too', () {
       final entries = [
         d(2026, 4, 1, bleeding: Bleeding.medium),
-        DailyEntry(
-          date: DateTime(2026, 4, 28),
-          bleeding: Bleeding.medium,
-          excludeIllness: true,
-        ),
+        DailyEntry(date: DateTime(2026, 4, 28), bleeding: Bleeding.medium),
         d(2026, 4, 29, bleeding: Bleeding.medium),
       ];
-      // The Apr 28 mark sits on an excluded day — the mark binds wherever
-      // placed (no exclusion-flag interplay), so it anchors a length.
-      final lengths = cycleLengthsInDays(
-          entries, [start(2026, 4, 1), start(2026, 4, 28), start(2026, 4, 29)]);
+      // The Apr 28 mark sits on an EXCLUDED day (the analysis exclusion is
+      // the excludedFromAnalysis mark — raw flags do not exclude); the
+      // cycle-start mark binds wherever placed (no exclusion interplay),
+      // so it anchors a length.
+      final lengths = cycleLengthsInDays(entries, [
+        start(2026, 4, 1),
+        excludedDay(2026, 4, 28),
+        start(2026, 4, 28),
+        start(2026, 4, 29),
+      ]);
       expect(lengths, [27, 1]);
     });
 
@@ -96,7 +103,8 @@ void main() {
         d(2026, 2, 2, bleeding: Bleeding.medium),
         // no known next start: cycle 2 is open-ended
       ];
-      expect(cycleLengthsInDays(entries, [start(2026, 1, 5), start(2026, 2, 2)]),
+      expect(
+          cycleLengthsInDays(entries, [start(2026, 1, 5), start(2026, 2, 2)]),
           [28]);
     });
 

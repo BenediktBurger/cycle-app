@@ -35,10 +35,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   final _notesController = TextEditingController();
 
   Bleeding _bleeding = Bleeding.none;
-  bool _excludeIllness = false;
-  bool _excludeAlcohol = false;
-  bool _excludeTravel = false;
-  bool _excludeOther = false;
+  int _tempDisturbances = 0;
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
@@ -46,8 +43,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   CervixOpening? _cervixOpening;
   bool _painBreast = false;
   bool _painMittelschmerz = false;
-  bool _mood = false;
-  bool _desire = false;
   int _sexTimings = 0;
   CervixFirmness? _cervixFirmness;
 
@@ -70,7 +65,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Future<void> _loadEntry(DateTime date) async {
     final db = await ref.read(databaseProvider.future);
-    final existing = await db.entriesDao.entryFor(defaultProfileId, date);
+    final existing = await db.entriesDao.entryFor(date);
     if (!mounted) return;
     setState(() {
       _applyEntry(existing == null ? null : dailyEntryFromDrift(existing));
@@ -79,10 +74,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   void _applyEntry(DailyEntry? entry) {
     _bleeding = entry?.bleeding ?? Bleeding.none;
-    _excludeIllness = entry?.excludeIllness ?? false;
-    _excludeAlcohol = entry?.excludeAlcohol ?? false;
-    _excludeTravel = entry?.excludeTravel ?? false;
-    _excludeOther = entry?.excludeOther ?? false;
+    _tempDisturbances = entry?.tempDisturbances ?? 0;
     // Measured time: a fresh day (nothing stored yet) starts from the
     // CURRENT time as a convenience; a re-opened day keeps what was stored
     // — including deliberately cleared days (stored null), which never
@@ -99,8 +91,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _cervixFirmness = entry?.cervixFirmness;
     _painBreast = entry?.painBreast ?? false;
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
-    _mood = entry?.mood ?? false;
-    _desire = entry?.desire ?? false;
     _sexTimings = entry?.sexTimings ?? 0;
     final bbt = entry?.bbtC;
     _bbtController.text = bbt == null ? '' : bbt.toString();
@@ -137,8 +127,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _measuredAt ??
-          TimeOfDay.fromDateTime(ref.read(nowProvider)()),
+      initialTime:
+          _measuredAt ?? TimeOfDay.fromDateTime(ref.read(nowProvider)()),
     );
     if (!mounted || picked == null) return;
     setState(() => _measuredAt = picked);
@@ -158,24 +148,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final date = ref.read(selectedDateProvider);
     // Enforce the domain rule once more at the save boundary: any quality
     // on a sign other than S collapses to null (mirrors the SQL CHECK).
-    final (:sign, :quality) =
-        sanitizeMucusPair(sign: _sign, quality: _quality);
+    final (:sign, :quality) = sanitizeMucusPair(sign: _sign, quality: _quality);
     final entry = DailyEntry(
       date: date,
-      profileId: defaultProfileId,
       bbtC: parseDecimalInput(_bbtController.text),
       // The domain model drops a time without a temperature (see
       // DailyEntry.measuredAtMinutes) — the picker row above is only
       // reachable while a temperature is entered, and a temperature that
       // was cleared before saving takes the time with it.
-      measuredAtMinutes: _measuredAt == null
-          ? null
-          : _timeToMinutes(_measuredAt!),
+      measuredAtMinutes:
+          _measuredAt == null ? null : _timeToMinutes(_measuredAt!),
       bleeding: _bleeding,
-      excludeIllness: _excludeIllness,
-      excludeAlcohol: _excludeAlcohol,
-      excludeTravel: _excludeTravel,
-      excludeOther: _excludeOther,
+      tempDisturbances: _tempDisturbances,
       mucusSign: sign,
       mucusQuality: quality,
       cervixPosition: _cervixPosition,
@@ -183,8 +167,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       cervixFirmness: _cervixFirmness,
       painBreast: _painBreast,
       painMittelschmerz: _painMittelschmerz,
-      mood: _mood,
-      desire: _desire,
       // The mask is 0..7 by construction: every chip below toggles exactly
       // one SexTiming bit, so no extra sanitizing is needed here — the
       // DailyEntry constructor assert remains the single guard (same
@@ -196,6 +178,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
     final db = await ref.read(databaseProvider.future);
     await db.entriesDao.upsertDaily(entry);
+    // Auto-set the analysis-exclusion mark when ANY disturbance flag is
+    // selected: the mark (never the raw mask) is what the evaluation
+    // consumes, so a flagged day must carry it. addMark is idempotent, so
+    // repeated saves are no-ops. AUTO-SET ONLY: a mask back to 0 NEVER
+    // removes the mark — a manually-placed mark stays in place.
+    if (entry.tempDisturbances != 0) {
+      await db.marksDao.addMark(date, CycleMarkTypes.excludedFromAnalysis);
+    }
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.
     if (!mounted) return;
@@ -204,19 +194,26 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // Bleeding only SUGGESTS a cycle start (the user places the mark, the
     // authoritative cycleStart one): after saving a menstruation-level day
     // that the shared suggestion predicate flags, the app ASKS before
-    // placing the mark. `isSuggestedCycleStart` already requires bleeding
-    // level >= 2 on a not-interrupted day that does not continue the
-    // previous calendar day's menstruation-level bleeding — one gate is
-    // enough. A mark of this type already on the day is harmless: addMark
-    // is idempotent. The cheap bleeding-level/exclusion pre-check runs
-    // BEFORE the previous-day lookup, so the common (non-suggesting) save
-    // path skips the indexed DB fetch entirely.
-    if (entry.bleeding.level < 2 || entry.isExcluded) return;
-    final previousRow = await db.entriesDao
-        .entryFor(defaultProfileId, DateOnly.addDays(date, -1));
+    // placing the mark. `isSuggestedCycleStart` requires bleeding level >= 2
+    // on a day that the excludedFromAnalysis MARK does not exclude and that
+    // does not continue the previous calendar day's menstruation-level
+    // bleeding. The excluded-state comes from the MARKS (the analysis
+    // exclusion is the mark; raw flags never suppress a suggestion).
+    if (entry.bleeding.level < 2) return;
+    final dayMarks = await db.marksDao.marksForDay(date);
+    final entryExcluded =
+        dayMarks.any((m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
+    final previousDay = DateOnly.addDays(date, -1);
+    final previousRow = await db.entriesDao.entryFor(previousDay);
     final previous =
         previousRow == null ? null : dailyEntryFromDrift(previousRow);
-    if (!isSuggestedCycleStart(entry, previous)) return;
+    final previousMarks = await db.marksDao.marksForDay(previousDay);
+    final previousExcluded = previousMarks
+        .any((m) => m.markType == CycleMarkTypes.excludedFromAnalysis);
+    if (!isSuggestedCycleStart(entry, previous,
+        entryExcluded: entryExcluded, previousExcluded: previousExcluded)) {
+      return;
+    }
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -236,8 +233,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       ),
     );
     if (confirmed == true) {
-      await db.marksDao
-          .addMark(defaultProfileId, date, CycleMarkTypes.cycleStart);
+      await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
     }
   }
 
@@ -434,36 +430,34 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // --- exclusion flags (compact) ---------------------------
-              // Always visible: interruptions (illness, alcohol, travel,
-              // other) apply to temperature interruptions regardless of
-              // bleeding; exclusion flags never block a cycleStart mark.
-              Text(l10n.excludesCaption,
+              // --- temperature disturbances (raw flags) -----------------
+              // Always visible: the disturbance flags apply to the
+              // temperature measurement regardless of bleeding. Each chip
+              // toggles its own bit in the day's tempDisturbances mask
+              // (raw data for the interrupted-temperature rendering);
+              // saving with any flag auto-SETS the analysis-exclusion mark
+              // (see _save) — the flags alone never exclude from analysis.
+              Text(l10n.disturbancesCaption,
                   style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
                 children: [
-                  FilterChip(
-                    label: Text(l10n.excludeIllness),
-                    selected: _excludeIllness,
-                    onSelected: (v) => setState(() => _excludeIllness = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.excludeAlcohol),
-                    selected: _excludeAlcohol,
-                    onSelected: (v) => setState(() => _excludeAlcohol = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.excludeTravel),
-                    selected: _excludeTravel,
-                    onSelected: (v) => setState(() => _excludeTravel = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.excludeOther),
-                    selected: _excludeOther,
-                    onSelected: (v) => setState(() => _excludeOther = v),
-                  ),
+                  for (final disturbance in TempDisturbance.values)
+                    FilterChip(
+                      label: Text(switch (disturbance) {
+                        TempDisturbance.sp => l10n.disturbanceLateToBed,
+                        TempDisturbance.a => l10n.disturbanceNightAwakening,
+                        TempDisturbance.alk => l10n.disturbanceAlcohol,
+                        TempDisturbance.kr => l10n.disturbanceIllness,
+                      }),
+                      selected: _tempDisturbances & disturbance.bit != 0,
+                      onSelected: (selected) => setState(() {
+                        _tempDisturbances = selected
+                            ? _tempDisturbances | disturbance.bit
+                            : _tempDisturbances & ~disturbance.bit;
+                      }),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -619,16 +613,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     label: Text(l10n.painMittelschmerz),
                     selected: _painMittelschmerz,
                     onSelected: (v) => setState(() => _painMittelschmerz = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.mood),
-                    selected: _mood,
-                    onSelected: (v) => setState(() => _mood = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.desire),
-                    selected: _desire,
-                    onSelected: (v) => setState(() => _desire = v),
                   ),
                 ],
               ),
@@ -820,7 +804,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           height: 18,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        if (day.isExcluded)
+        // The raw disturbance flags are the interrupted-day rendering
+        // signal here (the list tile's little warning badge) — the
+        // analysis exclusion is the mark, not this.
+        if (day.isInterrupted)
           Positioned(
             right: -6,
             top: -6,

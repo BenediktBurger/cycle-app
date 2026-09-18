@@ -50,14 +50,9 @@ final _entries = <DailyEntry>[
 ];
 
 /// Marks seeded through the DAO BEFORE the UI builds.
-final _peakMark = CycleMark(
-    profileId: defaultProfileId,
-    date: _d(12),
-    type: CycleMarkTypes.mucusPeakDay);
-final _firstHigherMark = CycleMark(
-    profileId: defaultProfileId,
-    date: _d(14),
-    type: CycleMarkTypes.firstHigherMeasurement);
+final _peakMark = CycleMark(date: _d(12), type: CycleMarkTypes.mucusPeakDay);
+final _firstHigherMark =
+    CycleMark(date: _d(14), type: CycleMarkTypes.firstHigherMeasurement);
 
 /// The database instance created by the scope's override, so tests can
 /// assert what was actually STORED.
@@ -85,8 +80,7 @@ Future<void> _pump(
         _db = db;
         ref.onDispose(db.close);
         for (final mark in seedMarks) {
-          await db.marksDao.addMark(mark.profileId, mark.date, mark.type,
-              author: mark.author);
+          await db.marksDao.addMark(mark.date, mark.type, author: mark.author);
         }
         return db;
       }),
@@ -127,9 +121,7 @@ Future<void> _tapDay(WidgetTester tester, int index) async {
 
 /// The stored mark types for one calendar day, from the REAL database.
 Future<List<String>> _storedTypes(DateTime day) async =>
-    (await _db!.marksDao.marksForDay(defaultProfileId, day))
-        .map((m) => m.markType)
-        .toList();
+    (await _db!.marksDao.marksForDay(day)).map((m) => m.markType).toList();
 
 /// The dot painter the chart uses for the temperature dot of [dayIndex].
 FlDotPainter? _dotPainter(WidgetTester tester, int dayIndex) {
@@ -243,10 +235,7 @@ void main() {
     // FIRST circle — its sheet line counts within the circle kind only.
     final entries = [..._entries, DailyEntry(date: _d(17), bbtC: 36.5)];
     await _pump(tester, entries: entries, seedMarks: [
-      CycleMark(
-          profileId: defaultProfileId,
-          date: _d(15),
-          type: CycleMarkTypes.mucusPeakDay),
+      CycleMark(date: _d(15), type: CycleMarkTypes.mucusPeakDay),
       _firstHigherMark,
     ]);
 
@@ -386,10 +375,7 @@ void main() {
       DailyEntry(date: _d(17), bbtC: 36.9), // would-be candidate, NOT marked
     ];
     await _pump(tester, entries: entries, seedMarks: [
-      CycleMark(
-          profileId: defaultProfileId,
-          date: _d(12),
-          type: CycleMarkTypes.mucusPeakDay),
+      CycleMark(date: _d(12), type: CycleMarkTypes.mucusPeakDay),
       _firstHigherMark,
     ]);
 
@@ -438,29 +424,24 @@ void main() {
       await tester.tap(find.text('Set cycle start'));
       await tester.pumpAndSettle();
 
-      final stored = await _db!.marksDao.marksForDay(defaultProfileId, _d(10));
-      expect(stored.map((m) => m.markType),
-          contains(CycleMarkTypes.cycleStart),
+      final stored = await _db!.marksDao.marksForDay(_d(10));
+      expect(stored.map((m) => m.markType), contains(CycleMarkTypes.cycleStart),
           reason: 'the cycle start is persisted through the MarksDao '
               '(the user places the mark — bleeding only suggests)');
       final mark =
           stored.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
       expect(mark.author, 'user',
           reason: 'the sheet placement is user-authored');
-      expect(mark.profileId, defaultProfileId,
-          reason: 'the mark binds to the sheet\'s profile');
       expect(find.text('Remove cycle start'), findsOneWidget,
           reason: 'the sheet re-renders contextually after the write');
       expect(find.text('Set cycle start'), findsNothing);
     });
 
-    testWidgets('a present cycle start shows the removal wording and '
+    testWidgets(
+        'a present cycle start shows the removal wording and '
         'the remove action deletes it', (tester) async {
       await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(
-            profileId: defaultProfileId,
-            date: _d(10),
-            type: CycleMarkTypes.cycleStart),
+        CycleMark(date: _d(10), type: CycleMarkTypes.cycleStart),
       ]);
 
       await _tapDay(tester, 4); // 9/10: the marked day
@@ -492,8 +473,8 @@ void main() {
           find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsOneWidget,
           reason: 'the viewed day equals the computed suzBegins and '
               'no user SUZ mark exists anywhere in the cycle');
-      expect(find.textContaining('begins this evening (rule D)'),
-          findsOneWidget,
+      expect(
+          find.textContaining('begins this evening (rule D)'), findsOneWidget,
           reason: 'rule D: the suggestion names the rule AND carries the '
               'evening phrasing (rule D begins the SUZ that evening)');
       expect(find.textContaining('begins this morning'), findsNothing,
@@ -522,8 +503,8 @@ void main() {
 
       expect(find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
           findsOneWidget);
-      expect(find.textContaining('begins this morning (rule E)'),
-          findsOneWidget,
+      expect(
+          find.textContaining('begins this morning (rule E)'), findsOneWidget,
           reason: 'rule E: the suggestion names the rule AND carries the '
               'morning phrasing (rule E begins the SUZ that morning)');
       expect(find.textContaining('begins this evening'), findsNothing,
@@ -537,10 +518,7 @@ void main() {
       await _pump(tester, entries: _entries, seedMarks: [
         _peakMark,
         _firstHigherMark,
-        CycleMark(
-            profileId: defaultProfileId,
-            date: _d(13),
-            type: CycleMarkTypes.suzMorning),
+        CycleMark(date: _d(13), type: CycleMarkTypes.suzMorning),
       ]);
 
       await _tapDay(tester, 10); // 9/16: the computed suzBegins
@@ -633,10 +611,7 @@ void main() {
       await _pump(tester, entries: _entries, seedMarks: [
         _peakMark,
         _firstHigherMark,
-        CycleMark(
-            profileId: defaultProfileId,
-            date: _d(12),
-            type: CycleMarkTypes.suzEvening),
+        CycleMark(date: _d(12), type: CycleMarkTypes.suzEvening),
       ]);
 
       await _tapDay(tester, 8); // 9/14: circled candidate #1
@@ -653,10 +628,8 @@ void main() {
     // The six-previous-calendar-day window of a mark on 9/13 is 9/7..9/12,
     // whose baseline is 36.40 (9/9); the marked day itself carries 36.30 —
     // NOT strictly above the baseline, so the placement is inconsistent.
-    CycleMark markOn13() => CycleMark(
-        profileId: defaultProfileId,
-        date: _d(13),
-        type: CycleMarkTypes.firstHigherMeasurement);
+    CycleMark markOn13() =>
+        CycleMark(date: _d(13), type: CycleMarkTypes.firstHigherMeasurement);
 
     testWidgets(
         'placing an inconsistent mark warns with the arithmetic and '

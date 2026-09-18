@@ -34,35 +34,34 @@ import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 
-/// A tracked day; [t] is the measured BBT (null = day without measurement),
-/// [excluded] sets one exclusion flag (illness) — any flag behaves the same
-/// for the arithmetic (an interrupted day is an interrupted day).
+/// A tracked day; [t] is the measured BBT (null = day without measurement).
+///
+/// NOTE on exclusion: raw disturbance flags (tempDisturbances) do NOT
+/// exclude a day from the analysis any more — the exclusion is the
+/// excludedFromAnalysis MARK (see [excludedDay]), supplied alongside the
+/// entries in the marks list.
 DailyEntry d(
   int year,
   int month,
   int day, {
   double? t,
-  bool excluded = false,
   Bleeding bleeding = Bleeding.none,
 }) {
   return DailyEntry(
     date: DateTime(year, month, day),
     bbtC: t,
     bleeding: bleeding,
-    excludeIllness: excluded,
   );
 }
 
 /// A user-placed mucus peak mark on (year, month, day).
 CycleMark peak(int year, int month, int day) => CycleMark(
-      profileId: 1,
       date: DateTime(year, month, day),
       type: CycleMarkTypes.mucusPeakDay,
     );
 
 /// A user-placed first-higher-measurement mark on (year, month, day).
 CycleMark rise(int year, int month, int day) => CycleMark(
-      profileId: 1,
       date: DateTime(year, month, day),
       type: CycleMarkTypes.firstHigherMeasurement,
     );
@@ -71,9 +70,15 @@ CycleMark rise(int year, int month, int day) => CycleMark(
 /// cycle boundary (see lib/domain/cycle_grouping.dart: grouping is
 /// mark-driven; bleeding only suggests).
 CycleMark start(int year, int month, int day) => CycleMark(
-      profileId: 1,
       date: DateTime(year, month, day),
       type: CycleMarkTypes.cycleStart,
+    );
+
+/// The analysis-exclusion mark on (year, month, day): the ONLY exclusion
+/// signal the evaluation consumes. Raw disturbance flags never exclude.
+CycleMark excludedDay(int year, int month, int day) => CycleMark(
+      date: DateTime(year, month, day),
+      type: CycleMarkTypes.excludedFromAnalysis,
     );
 
 /// The evaluation of the cycle group whose first tracked day is [start].
@@ -82,7 +87,7 @@ CycleEvaluation evalFor(
   List<CycleMark> marks,
   DateTime start,
 ) {
-  return evaluateCycles(entries, marks, profileId: 1).firstWhere(
+  return evaluateCycles(entries, marks).firstWhere(
     (e) => DateOnly.sameDay(e.cycle.startDate, start),
   );
 }
@@ -132,8 +137,7 @@ void main() {
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 5)));
     });
 
-    test('baseline segment: starts at low #6, ends at the last candidate',
-        () {
+    test('baseline segment: starts at low #6, ends at the last candidate', () {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       // R10: the segment starts at the earliest numbered low day (low #6 —
@@ -613,7 +617,8 @@ void main() {
       expect(e.evaluationStopped, isFalse);
     });
 
-    test('peak ON the rise day → the rise-day candidate is an ARROW, '
+    test(
+        'peak ON the rise day → the rise-day candidate is an ARROW, '
         'later candidates are circles', () {
       final marks = [peak(2026, 3, 10), rise(2026, 3, 10)];
 
@@ -746,7 +751,8 @@ void main() {
         d(2026, 3, 10, t: 36.8), // marked rise (between the peaks) → arrow 1
         d(2026, 3, 11, t: 36.9), // arrow 2
         d(2026, 3, 12, t: 37.0), // peak 2 (late) → arrow 3 (peak-day candidate)
-        d(2026, 3, 13, t: 37.0), // circle 1 — first candidate after the LAST peak
+        d(2026, 3, 13,
+            t: 37.0), // circle 1 — first candidate after the LAST peak
         d(2026, 3, 14, t: 37.0), // circle 2
         d(2026, 3, 15, t: 36.7), // circle 3, ≥ +0.2 K → rule D fires HERE
       ];
@@ -878,8 +884,7 @@ void main() {
 
     test(
         'two rise marks: the LATER one anchors the six-low window, the '
-        'baseline and the walk; the earlier rise day renders no candidate',
-        () {
+        'baseline and the walk; the earlier rise day renders no candidate', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1039,8 +1044,7 @@ void main() {
 
     test(
         'D/E count circles only: arrows before the peak do not advance the '
-        'trigger — the SUZ fires on the 3rd CIRCLE, not the 3rd candidate',
-        () {
+        'trigger — the SUZ fires on the 3rd CIRCLE, not the 3rd candidate', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1141,8 +1145,9 @@ void main() {
       'rule R8 — excluded days in the candidate sequence (excluded like '
       'missing)', () {
     test(
-        'ONE excluded day between candidates consumes the tolerated gap; '
-        'an above-baseline excluded value is never a candidate', () {
+        'an excludedFromAnalysis MARK without any raw flags excludes: ONE '
+        'marked day between candidates consumes the tolerated gap; its '
+        'above-baseline value is never a candidate', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1153,12 +1158,17 @@ void main() {
         d(2026, 3, 8, t: 36.3),
         d(2026, 3, 9, t: 36.2), // peak day
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
-        d(2026, 3, 11, t: 37.2, excluded: true), // alcohol spike — a GAP,
-        // not a candidate, despite being far above the baseline
+        d(2026, 3, 11, t: 37.2), // alcohol spike — a GAP via the MARK,
+        // not a candidate, despite being far above the baseline (the entry
+        // carries no raw exclusion flags at all)
         d(2026, 3, 12, t: 36.9), // candidate 2
         d(2026, 3, 13, t: 37.0), // candidate 3 → SUZ (rule D)
       ];
-      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        excludedDay(2026, 3, 11)
+      ];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
@@ -1174,7 +1184,13 @@ void main() {
       expect(e.evaluationStopped, isFalse);
     });
 
-    test('TWO excluded days in a row break the sequence', () {
+    test(
+        'raw disturbance flags alone do NOT exclude: a flagged spike '
+        'stays a candidate and the day is not a gap', () {
+      // The mask (spät ins Bett, Krank, …) is RAW data for the interrupted
+      // rendering — the analysis exclusion comes from the mark only. A
+      // flagged 37.2 must therefore remain a candidate like any other
+      // above-baseline measurement.
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1185,11 +1201,53 @@ void main() {
         d(2026, 3, 8, t: 36.3),
         d(2026, 3, 9, t: 36.2), // peak day
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
-        d(2026, 3, 11, t: 37.2, excluded: true), // gap 1
-        d(2026, 3, 12, t: 37.0, excluded: true), // gap 2 → break
-        d(2026, 3, 13, t: 36.9), // would-be candidate — NOT marked
+        DailyEntry(
+          date: DateTime(2026, 3, 11),
+          bbtC: 37.2,
+          tempDisturbances:
+              TempDisturbance.alk.bit | TempDisturbance.kr.bit, // flags only
+        ), // candidate 2 — the flags alone do NOT exclude it
+        d(2026, 3, 12, t: 36.9), // candidate 3 → SUZ (rule D)
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.circle, 1),
+          (11, MarkKind.circle, 2),
+          (12, MarkKind.circle, 3),
+        ],
+        reason: 'raw flags no longer exclude from the analysis — the '
+            'flagged day is an ordinary candidate',
+      );
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 12)));
+      expect(e.evaluationStopped, isFalse);
+    });
+
+    test('TWO marked (excluded) days in a row break the sequence', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4), // baseline
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2), // peak day
+        d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
+        d(2026, 3, 11, t: 37.2), // marked excluded — gap 1
+        d(2026, 3, 12, t: 37.0), // marked excluded — gap 2 → break
+        d(2026, 3, 13, t: 36.9), // would-be candidate — NOT marked
+      ];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        excludedDay(2026, 3, 11),
+        excludedDay(2026, 3, 12),
+      ];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
@@ -1226,10 +1284,9 @@ void main() {
           [(3, 7), (4, 6), (5, 5)]);
       // The segment starts at the earliest numbered low day (the #5 day,
       // Mar 5) — the old stretch-back arithmetic reached Mar 3 instead.
-      expect(e.baselineSpan!.startDay,
-          DateOnly.normalize(DateTime(2026, 3, 5)));
-      expect(e.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 3, 10)));
+      expect(
+          e.baselineSpan!.startDay, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 10)));
     });
 
     test('a cycle with tracked days after the last candidate ends at it', () {
@@ -1254,8 +1311,7 @@ void main() {
       // Only two circles (the later days are at/below the baseline); the
       // segment ends at the LAST MARKED CANDIDATE, not at the cycle end.
       expect(e.higherMeasurements, hasLength(2));
-      expect(e.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 11)));
     });
 
     test(
@@ -1304,15 +1360,13 @@ void main() {
       // begins on Mar 15 — the R10 min() clamps cannot pull the end
       // earlier by construction (the next cycle always starts after this
       // cycle's days).
-      expect(a.baselineSpan!.startDay,
-          DateOnly.normalize(DateTime(2026, 3, 4)));
-      expect(a.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(
+          a.baselineSpan!.startDay, DateOnly.normalize(DateTime(2026, 3, 4)));
+      expect(a.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 13)));
       // B has its own, independent segment.
-      expect(b.baselineSpan!.startDay,
-          DateOnly.normalize(DateTime(2026, 3, 15)));
-      expect(b.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 3, 23)));
+      expect(
+          b.baselineSpan!.startDay, DateOnly.normalize(DateTime(2026, 3, 15)));
+      expect(b.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 23)));
     });
 
     test('multi-cycle evaluations carry independent baseline segments', () {
@@ -1357,15 +1411,13 @@ void main() {
 
       // A: low #6 is Mar 5 (the window reaches back over the 7-day gap);
       // the segment ends at A's last circle and does NOT reach into B.
-      expect(a.baselineSpan!.startDay,
-          DateOnly.normalize(DateTime(2026, 3, 5)));
-      expect(a.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(
+          a.baselineSpan!.startDay, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(a.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 13)));
       // B: low #6 is Apr 8 (the window covers Apr 8–13).
-      expect(b.baselineSpan!.startDay,
-          DateOnly.normalize(DateTime(2026, 4, 8)));
-      expect(b.baselineSpan!.endDay,
-          DateOnly.normalize(DateTime(2026, 4, 16)));
+      expect(
+          b.baselineSpan!.startDay, DateOnly.normalize(DateTime(2026, 4, 8)));
+      expect(b.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 4, 16)));
     });
 
     test('no marked candidates → no segment (null span)', () {
@@ -1413,7 +1465,8 @@ void main() {
     });
   });
 
-  group('six-low window and baseline (calendar positions, owner ruling '
+  group(
+      'six-low window and baseline (calendar positions, owner ruling '
       '2026-09-17)', () {
     test('untracked days inside the window get no number — numbers skip', () {
       final entries = [
@@ -1440,7 +1493,8 @@ void main() {
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
-    test('an unmeasured window day gets no number — numbers skip, no '
+    test(
+        'an unmeasured window day gets no number — numbers skip, no '
         'stretch-back', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
@@ -1469,12 +1523,12 @@ void main() {
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
-    test('an excluded day before the window changes nothing', () {
+    test('a marked (excluded) day before the window changes nothing', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 37.0, excluded: true), // fever — before the window,
-        // and excluded anyway: contributes no temperature, hence no low.
+        d(2026, 3, 4, t: 37.0), // fever day — before the window, and
+        // excluded via the MARK: contributes no temperature, hence no low.
         d(2026, 3, 5, t: 36.3),
         d(2026, 3, 6, t: 36.4), // baseline
         d(2026, 3, 7, t: 36.2),
@@ -1484,7 +1538,11 @@ void main() {
         d(2026, 3, 11, t: 36.2),
         d(2026, 3, 12, t: 36.8), // first higher (marked)
       ];
-      final marks = [peak(2026, 3, 9), rise(2026, 3, 12)];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 12),
+        excludedDay(2026, 3, 4)
+      ];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
@@ -1497,7 +1555,8 @@ void main() {
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
-    test('fewer than six measured days inside the window: number only '
+    test(
+        'fewer than six measured days inside the window: number only '
         'what exists', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
@@ -1589,20 +1648,22 @@ void main() {
     });
 
     test(
-        'an excluded day occupies its calendar day and contributes no '
-        'temperature (number skipped, no baseline contribution)', () {
+        'a marked (excluded) day occupies its calendar day and contributes '
+        'no temperature (number skipped, no baseline contribution) — with '
+        'no raw flags at all', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 6, t: 36.4), // rise−6 → #6 — highest inside the window
-        d(2026, 3, 7, t: 37.5, excluded: true), // rise−5: the day EXISTS,
-        // but the excluded 37.5 gets no number and raises no baseline
+        d(2026, 3, 7, t: 37.5), // rise−5: the day EXISTS and is measured,
+        // but the excludedFromAnalysis MARK makes its 37.5 get no number
+        // and raise no baseline (the entry carries no raw flags)
         d(2026, 3, 8, t: 36.3), // rise−4 → #4
         d(2026, 3, 9, t: 36.1), // rise−3 → #3
         d(2026, 3, 10, t: 36.3), // rise−2 → #2
         d(2026, 3, 11, t: 36.2), // rise−1 → #1
         d(2026, 3, 12, t: 36.8), // marked rise
       ];
-      final marks = [rise(2026, 3, 12)];
+      final marks = [rise(2026, 3, 12), excludedDay(2026, 3, 7)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
@@ -1677,12 +1738,17 @@ void main() {
       expect(e.riseMarkConsistent, isFalse);
     });
 
-    test('false when the marked day is excluded', () {
+    test(
+        'false when the marked day is excluded (excludedFromAnalysis mark, '
+        'no raw flags needed)', () {
       final entries = [
         ...baseEntries.take(7),
-        d(2026, 3, 11, t: 37.0, excluded: true), // fever day
+        d(2026, 3, 11, t: 37.0), // fever day — measured, but excluded via
+        // the MARK (raw flags do not exclude)
       ];
-      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+      final marks = [rise(2026, 3, 11), excludedDay(2026, 3, 11)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.riseMarkConsistent, isFalse,
           reason: 'an excluded temperature is not usable for the check');
@@ -1812,7 +1878,7 @@ void main() {
         rise(2026, 4, 14),
       ];
 
-      final evaluations = evaluateCycles(entries, marks, profileId: 1);
+      final evaluations = evaluateCycles(entries, marks);
       expect(evaluations, hasLength(2));
 
       final a = evalFor(entries, marks, DateTime(2026, 3, 2));
@@ -1840,31 +1906,6 @@ void main() {
       expect(b.suzBegins, DateOnly.normalize(DateTime(2026, 4, 16)));
       expect(b.suzRule, SuzRule.d);
       expect(b.evaluationStopped, isFalse);
-    });
-
-    test(
-        'entries and marks of other profiles are ignored when profileId is '
-        'given', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.3),
-        DailyEntry(date: DateTime(2026, 3, 5), profileId: 2, bbtC: 37.5),
-      ];
-      final marks = [
-        CycleMark(
-          profileId: 2,
-          date: DateTime(2026, 3, 5),
-          type: CycleMarkTypes.mucusPeakDay,
-        ),
-      ];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      expect(e.mucusPeakDay, isNull);
-      expect(e.firstHigherDay, isNull);
-      expect(e.numberedLows, isEmpty);
-      expect(e.higherMeasurements, isEmpty);
-      expect(e.suzBegins, isNull);
     });
 
     test('empty input yields no evaluations', () {
@@ -1923,7 +1964,8 @@ void main() {
       expect(b.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 14)));
     });
 
-    test('without a cycleStart mark the same data is ONE window — the '
+    test(
+        'without a cycleStart mark the same data is ONE window — the '
         'latest rise anchors the whole run', () {
       final entries = [
         d(2026, 3, 1),
@@ -1952,7 +1994,7 @@ void main() {
         rise(2026, 3, 17),
       ];
 
-      final evaluations = evaluateCycles(entries, marks, profileId: 1);
+      final evaluations = evaluateCycles(entries, marks);
       expect(evaluations, hasLength(1));
       expect(evaluations.single.firstHigherDay,
           DateOnly.normalize(DateTime(2026, 3, 17)),
