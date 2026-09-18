@@ -3,24 +3,34 @@
 - **Date:** 2026-09-18
 - **Status:** Accepted
 
-> **Author's note (2026-09-18, post-schema-v9):** the record below was
-> written against the multi-profile database (ADR-0008's single-user
-> posture had not yet been revisited). The schema v9 work removed the
-> profiles machinery completely — there is one tracked-day table with no
-> profile dimension, marks are unique per (entry_date, mark_type), and
-> grouping is day-keyed. Wherever this record says "for that profile" /
-> "per profile", read it as history: the current code has no profile
-> argument anywhere. The DECISION itself (cycle start is a user-owned
-> mark; bleeding only suggests; the suggestion predicate gates prompts
-> and derivations but never creates boundaries) is unchanged and stays
-> accepted. Two mechanics also moved with v9: the analysis exclusion is
-> the `excludedFromAnalysis` MARK (the old exclude_* raw flags are gone —
-> the raw disturbance mask is rendering input only, see
-> lib/domain/models.dart), so open question (a)'s "exclusion flags never
-> block it" now reads "the exclusion mark never blocks it" (unchanged
-> behavior); and `isSuggestedCycleStart` takes the excluded-state as an
-> explicit parameter (the entries stay raw-data-only), which is what
-> (b)'s "non-excluded day" means today.
+> **Author's note (2026-09-18, post-schema-v9 and Phase 3):** the record
+> below was written against the multi-profile database (this ADR's
+> single-user posture had not yet been revisited). Two later rounds of
+> work moved mechanics without touching the DECISION — the decision
+> itself (cycle start is a user-owned mark; bleeding only suggests; the
+> suggestion predicate gates prompts and derivations but never creates
+> boundaries) is unchanged and stays ACCEPTED.
+>
+> Schema v9 removed the profiles machinery completely — one tracked-day
+> table with no profile dimension, marks unique per (entry_date,
+> mark_type), grouping day-keyed. Wherever this record says "for that
+> profile" / "per profile", read it as history: the current code has no
+> profile argument anywhere.
+>
+> The temperature-ignore mark is now named `ignoreTemperature`
+> (owner decision 2026-09-18; formerly sketched as an "analysis
+> exclusion" mark) and is temperature-evaluation-scoped only: the
+> evaluation arithmetic (lib/domain/evaluation.dart) treats a marked day
+> like an unmeasured one in the six-low window, the candidate gap walk
+> and the rise-consistency check. The old exclude_* raw flags are gone;
+> the raw disturbance mask is rendering input only
+> (lib/domain/models.dart), so open question (a)'s "exclusion flags
+> never block it" now reads "the temperature-ignore mark never blocks
+> it" (unchanged behavior). `isSuggestedCycleStart(entry, previous)` no
+> longer takes an excluded-state parameter: the suppression is keyed
+> PURELY to bleeding continuity (a day whose previous calendar day also
+> bleeds at level >= 2 is mid-flow), which is what (b)'s
+> "non-excluded day" means today — a marked bleeding day still suggests.
 
 ## Context
 
@@ -106,15 +116,21 @@ the app never decides a boundary on its own.
 
 ### Open questions for INER experts (`TODO(user-review)`)
 
-(a) **Mark-on-excluded-day interplay:** should a `cycleStart` mark on an
-excluded/interrupted day ever be rejected or reworded? Current behavior: no
-— the mark is authoritative wherever placed (owner decision); exclusion
-flags never block it.
+(a) **Mark-on-temperature-ignored-day interplay:** should a `cycleStart`
+mark on a `ignoreTemperature`-marked (temperature-evaluation-ignored) day
+ever be rejected or reworded? Current behavior: no — the mark is
+authoritative wherever placed (owner decision); the temperature-ignore
+mark never blocks it (unchanged behavior; the old exclude_* flags are
+gone, see the author's note).
 
-(b) **Suggestion predicate's mid-flow suppression:** the predicate does not
-suggest on a day whose previous non-excluded calendar day is also bleeding
-level >= 2. Keep this as-is, or should the suppression stem from bleeding
-continuity instead of the strict previous-day rule?
+(b) **Suggestion predicate's mid-flow suppression (reworded 2026-09-18 to
+the bleeding-only predicate):** the predicate does not suggest on a day
+whose previous CALENDAR day is also bleeding level >= 2 — bleeding
+continuity is the ONLY suppression; the `ignoreTemperature` mark and the
+raw disturbance mask do not affect it (a marked bleeding day still
+suggests). Keep the strict previous-day rule as-is, or should the
+suppression stem from a wider bleeding-continuity notion instead of the
+strict previous-day rule?
 
 (c) **Wording of the prompt rows:** the committed dialog wording (title,
 body, confirm, dismiss — en/de above) is a first draft; iterate it here,
