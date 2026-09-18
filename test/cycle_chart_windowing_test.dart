@@ -34,18 +34,9 @@ List<DailyEntry> _longEntries() => [
 // A many-day range: 2026-01-01 .. 2026-05-30 (150 days, indexes 0..149) —
 // long enough that the scroll window and its margin sit strictly inside
 // the recorded range, so windowing and margin semantics stay distinguishable.
-// The accompanying cycle-start marks (one every 25 days) keep the header's
-// day-of-cycle labels in the two-digit range a real recording stays in (the
-// day-of-cycle counter restarts at every cycle boundary).
 List<DailyEntry> _manyEntries() => [
       for (var i = 0; i < 150; i++)
         DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
-
-List<CycleMark> _manyCycleStartMarks() => [
-      for (var i = 24; i <= 149; i += 25)
-        CycleMark(
-            profileId: 1, date: _day(i), type: CycleMarkTypes.cycleStart),
     ];
 
 List<DailyEntry> _shortEntries() => [
@@ -63,13 +54,12 @@ const _columnWidth = 24.0;
 Widget _chartHarness({
   required List<DailyEntry> entries,
   Stream<List<DailyEntry>>? entriesStream,
-  List<CycleMark> marks = const <CycleMark>[],
 }) =>
     ProviderScope(
       overrides: [
         dailyEntriesProvider
             .overrideWith((ref) => entriesStream ?? Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(marks)),
+        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
         selectedDateProvider.overrideWith((ref) => entries.first.date),
       ],
       child: MaterialApp(
@@ -98,7 +88,7 @@ void main() {
     testWidgets('the first data frame auto-scrolls to the newest days',
         (tester) async {
       await tester.pumpWidget(_chartHarness(
-          entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       // The newest days sit at the content's right edge, so the initial
@@ -135,7 +125,7 @@ void main() {
     testWidgets('dragging scrolls the window; y bounds stay global',
         (tester) async {
       await tester.pumpWidget(_chartHarness(
-          entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       // The initial window sits at the newest days; drag BACK toward the
@@ -167,7 +157,6 @@ void main() {
       addTearDown(controller.close);
       await tester.pumpWidget(_chartHarness(
           entries: _manyEntries(),
-          marks: _manyCycleStartMarks(),
           entriesStream: controller.stream));
       controller.add(_manyEntries());
       await tester.pumpAndSettle();
@@ -214,7 +203,6 @@ void main() {
       addTearDown(controller.close);
       await tester.pumpWidget(_chartHarness(
           entries: _manyEntries(),
-          marks: _manyCycleStartMarks(),
           entriesStream: controller.stream));
       controller.add(const <DailyEntry>[]);
       await tester.pumpAndSettle();
@@ -240,7 +228,7 @@ void main() {
         'past the visible edges, not further', (tester) async {
       await tester.pumpWidget(
           _chartHarness(
-              entries: _manyEntries(), marks: _manyCycleStartMarks()));
+              entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
@@ -290,7 +278,7 @@ void main() {
         'not rebuilt for travel the margin absorbs', (tester) async {
       await tester.pumpWidget(
           _chartHarness(
-              entries: _manyEntries(), marks: _manyCycleStartMarks()));
+              entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
@@ -348,7 +336,7 @@ void main() {
     testWidgets('jump-to-date: picking a date moves the window onto it',
         (tester) async {
       await tester.pumpWidget(_chartHarness(
-          entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       // Drag to the content's start first: the picker opens on the
@@ -447,7 +435,7 @@ void main() {
     testWidgets('only the scroll window\'s numbering cells render',
         (tester) async {
       await tester.pumpWidget(_chartHarness(
-          entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       // The initial auto-scroll parks the window at the newest days: only
@@ -472,7 +460,7 @@ void main() {
         'the windowed numbering cells keep their global column positions',
         (tester) async {
       await tester.pumpWidget(_chartHarness(
-          entries: _manyEntries(), marks: _manyCycleStartMarks()));
+          entries: _manyEntries()));
       await tester.pumpAndSettle();
 
       // The window spacer (the signal rows' pattern) keeps cell i at its

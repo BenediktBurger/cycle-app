@@ -1825,12 +1825,19 @@ final class _DayHeaderRow extends StatelessWidget {
                     ),
                   ),
                   // Day of cycle: subtler than the 1–6 numbering (that one
-                  // is an evaluation artifact in the primary color).
-                  Text(
-                    '${days.cycleDayByIndex[i]}',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  // is an evaluation artifact in the primary color). Long
+                  // mark-driven cycles — e.g. during pregnancy, when no
+                  // cycle start is marked — produce three-digit day-of-cycle
+                  // numbers; FittedBox scales them down to fit the narrow
+                  // column, like the day-of-month label above.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${days.cycleDayByIndex[i]}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],

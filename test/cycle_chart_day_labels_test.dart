@@ -226,15 +226,10 @@ void main() {
       // the later labels carry the content of THEIR day, not of a
       // re-indexed window. The parked window carries an extra screen-width
       // of margin past the visible edges (31 columns at this viewport), so
-      // the earliest days (index 0..36) stay outside it. One trailing
-      // cycle-start mark keeps the day-of-cycle labels two-digit (a real
-      // recording restarts its cycle count).
-      final marks = [
-        CycleMark(
-            profileId: 1, date: _day(96), type: CycleMarkTypes.cycleStart),
-      ];
-      await tester.pumpWidget(_chartHarness(
-          entries: _entries(100), marks: marks));
+      // the earliest days (index 0..36) stay outside it. The fixture keeps
+      // its 100 days for exactly that windowing margin: at ~60 days the
+      // parked window would swallow index 0.
+      await tester.pumpWidget(_chartHarness(entries: _entries(100)));
       await tester.pumpAndSettle();
 
       expect(_dayLabel(0), findsNothing,
@@ -252,6 +247,53 @@ void main() {
           reason: 'March 1st shows the short month form even mid-window');
       expect(_label(40, '1.'), findsNothing);
       expect(_label(40, '41'), findsOneWidget);
+    });
+  });
+
+  group('three-digit day-of-cycle labels', () {
+    testWidgets(
+        'a long mark-driven cycle (no cycle start in the recorded range — '
+        'e.g. during pregnancy) keeps the three-digit day-of-cycle label '
+        'inside its column', (tester) async {
+      // 104 recorded days (2026-01-20 .. 2026-05-03) with NO cycleStart
+      // marks: the leading cycle group's day-of-cycle counter runs 1..104,
+      // so the range's tail renders three-digit day-of-cycle labels. The
+      // 104 columns overflow the viewport, so every column renders at the
+      // 24 px minimum width — the narrowest layout the chart ever uses.
+      await tester.pumpWidget(_chartHarness(entries: _entries(104)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull,
+          reason: 'the three-digit day-of-cycle label must not overflow '
+              'its 24 px column');
+
+      // Day index 103 shows day-of-cycle 104 (the leading group counts
+      // from 2026-01-20) and sits inside the parked window at the newest
+      // days. Its rendered label must not paint past its column bounds.
+      final column = tester.getRect(_dayLabel(103));
+      final label = tester.getRect(
+          find.descendant(of: _dayLabel(103), matching: find.text('104')));
+      expect(label.left, greaterThanOrEqualTo(column.left - 0.5),
+          reason: 'the rendered label does not paint left of its column');
+      expect(label.right, lessThanOrEqualTo(column.right + 0.5),
+          reason: 'the rendered label does not paint right of its column');
+    });
+
+    testWidgets(
+        'short day-of-cycle labels keep their natural size — the label '
+        'scales down only, never shrinks 1–2 digit numbers', (tester) async {
+      await tester.pumpWidget(_chartHarness(entries: _entries(104)));
+      await tester.pumpAndSettle();
+
+      // Day index 45 shows day-of-cycle 46 (the leading group counts from
+      // 2026-01-20) and sits inside the parked window at the newest days.
+      // In the test font every glyph is a 1 em square, so the natural
+      // (unshrunk) width of the label at fontSize 9 is exactly 2 * 9 = 18.
+      final label = tester.getRect(
+          find.descendant(of: _dayLabel(45), matching: find.text('46')));
+      expect(label.width, closeTo(18.0, 0.5),
+          reason: 'a two-digit day-of-cycle label renders at its natural, '
+              'unshrunk size (it must never be scaled down to fit)');
     });
   });
 

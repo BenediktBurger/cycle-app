@@ -18,20 +18,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// A many-day recorded range (2026-01-01 onwards); the cycle-start marks
-// keep the header's day-of-cycle labels in the two-digit range a real
-// recording stays in (same fixture pattern as the windowing tests).
+// A many-day recorded range (2026-01-01 onwards, 600 days).
 DateTime _day(int index) => DateTime.utc(2026, 1, 1).add(Duration(days: index));
 
 List<DailyEntry> _entries() => [
       for (var i = 0; i < 600; i++)
         DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
-
-List<CycleMark> _cycleStartMarks() => [
-      for (var i = 24; i <= 599; i += 25)
-        CycleMark(
-            profileId: 1, date: _day(i), type: CycleMarkTypes.cycleStart),
     ];
 
 Finder _hScrollView() => find.byWidgetPredicate((w) =>
@@ -61,7 +53,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(_cycleStartMarks())),
+        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
         selectedDateProvider.overrideWith((ref) => entries.first.date),
       ],
       child: MaterialApp(
