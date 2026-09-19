@@ -17,6 +17,11 @@ A record is in exactly one of these states:
 
 A status is never "silently downgraded": when a Hypothesis is validated (or
 rejected), a new ADR is written that supersedes the old one and references it.
+A promotion from Hypothesis to Accepted may also be made **in place**, however,
+when the owner of the unanswered assumption settles it themselves — in that
+case the status line must record the decision date and the decision-maker (as
+[ADR-0001](0001-iner-mode-m-hypothesis.md) does), and any INER-validation
+question remains visible wherever the ADR marks unresolved assumptions.
 
 ## Index
 
