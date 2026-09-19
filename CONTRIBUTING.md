@@ -98,6 +98,46 @@ losing persistence. The persistence medium is picked per browser (OPFS when
 supported, else IndexedDB) — data survives a normal page reload, but
 clearing site data/private windows do not (expected browser behaviour).
 
+### Running on your own Android device
+
+The Android toolchain setup (JDK, SDK, licenses) is described in
+[`docs/release.md`](docs/release.md), Phase A. Once `flutter devices` lists
+your phone (or emulator), you can run the app directly on it:
+
+```sh
+flutter devices                        # connected devices / emulators
+flutter run -d <device-id>             # debug build with hot reload
+flutter run --release -d <device-id>   # closer to production behaviour
+```
+
+To install without a running session, build an APK once and either install
+via adb or sideload manually:
+
+```sh
+flutter build apk --release            # universal APK; debug-signed locally is fine for testing
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
+Sideload without adb: copy
+`build/app/outputs/flutter-apk/app-release.apk` to the phone (USB file
+transfer, KDE Connect, …), open it with the file manager, and allow
+"install unknown apps" for that app when prompted.
+
+**adb over Wi-Fi (Android 11+):** enable *Developer options → Wireless
+debugging* on the phone, then:
+
+```sh
+adb pair <ip>:<pair-port>   # pairing code shown under "Pair device with pairing code"
+adb connect <ip>:<port>     # port from "IP address & port"
+```
+
+Phone and machine must be on the same Wi-Fi network. The pairing port and
+the connect port are different numbers — both are shown on the Wireless
+debugging screen. Pairing is a one-time step; the connect port changes
+whenever wireless debugging is toggled or the phone reboots, so re-run
+`adb connect` with the current port. Afterwards `flutter run -d
+<device-id>` works over Wi-Fi as well.
+
 ## 4. Analyze, test, build
 
 The local gate mirrors [.github/workflows/ci.yml](.github/workflows/ci.yml)
