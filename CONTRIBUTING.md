@@ -173,16 +173,15 @@ core assertions without the test runner (useful when hunting failures):
 
 ## 5. JSON export/import limits
 
-- **Export paths differ per platform on purpose** — no file-picker/share
-  plugin dependencies: Settings → JSON export shows the whole document
-  as copyable text on ALL platforms; a file save/download additionally
-  exists on web (browser download) and on desktop (written next to the
-  user's home directory, when `HOME`/`USERPROFILE` is set).
-- **Android/iOS:** iOS offers the copy path instead of a share sheet today;
-  a share/picker requires a plugin dependency, to be added when the need
-  arises.
-- **Import:** paste the exported JSON into the settings import dialog
-  (web additionally offers a file picker). Merge policy: merges by
+- **Export paths differ per platform on purpose** — no share-sheet plugin:
+  Settings → JSON export shows the whole document as copyable text on ALL
+  platforms; a file save/download additionally exists on web (browser
+  download) and on desktop (written next to the user's home directory,
+  when `HOME`/`USERPROFILE` is set).
+- **Import:** paste the exported JSON into the settings import dialog, or
+  pick a file — every platform except the bare stub offers the picker
+  (web: browser file input; native/Android: `file_selector`, SAF-backed on
+  Android). Merge policy: merges by
   (profile, day) with **overwrite** of conflicting days; known marks are
   skipped (idempotent); unknown profiles are re-created. A summary counts
   new/overwritten/skipped rows.

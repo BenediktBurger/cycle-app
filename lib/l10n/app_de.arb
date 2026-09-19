@@ -232,7 +232,7 @@
   "exportNothing": "Datenbank ist leer — nichts zu exportieren.",
   "importTitle": "JSON einfügen",
   "importHint": "Exportiertes cycle-app-Dokument hier einfügen …",
-  "importPickFile": "Datei wählen (nur Web)",
+  "importPickFile": "Datei wählen",
   "importApply": "Import durchführen",
   "importInvalid": "Ungültiges Dokument (kein gültiger cycle-app-Export).",
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",

@@ -336,7 +336,7 @@
   "exportNothing": "Database is empty — nothing to export.",
   "importTitle": "Paste JSON",
   "importHint": "Paste an exported cycle-app document here …",
-  "importPickFile": "Pick file (web only)",
+  "importPickFile": "Pick file",
   "importApply": "Apply import",
   "importInvalid": "Invalid document (not a valid cycle-app export).",
   "importFailed": "Import failed — the data was not changed.",

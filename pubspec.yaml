@@ -38,10 +38,13 @@ environment:
 #   hard failure when the SDK pins a different intl than a guessed caret range.
 #   Pin it explicitly later (CONTRIBUTING.md) if so desired.
 #
+# File picking on the native targets ships via `file_selector` (dependency
+# below); the web target keeps its own file input, exotic targets fall back
+# to the paste-only stub (see lib/ui/file_transfer.dart).
+#
 # Deliberately NOT here: sqlcipher_flutter_libs (ADR-005 — only when encryption
-# is wired, later milestone), pdf/printing (deferred past M1), file pickers
-# (M1 exports/imports are copy-to-clipboard + web download + paste, see
-# lib/ui/settings.dart), and no Android-only plugins (ADR-003). ERROR
+# is wired, later milestone), pdf/printing (deferred past M1), and no
+# Android-only plugins (ADR-003). ERROR
 # NOTE: if this file ever reverts to "A new Flutter project" defaults, a
 # `flutter create` run has clobbered it — restore from git history.
 
@@ -58,6 +61,9 @@ dependencies:
   # Temperature curve chart; version range chosen to stay compatible
   # with the installed Flutter/Dart (resolved against Dart 3.13 — see lock).
   fl_chart: ^1.0.0
+  # File picker for the import dialogs on the native targets (SAF-backed on
+  # Android); web keeps its own file input, the stub covers exotic targets.
+  file_selector: ^1.1.0
 
 dev_dependencies:
   flutter_test:

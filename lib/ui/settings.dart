@@ -2,13 +2,14 @@
 // switcher (System/light/dark), the PIN-lock stub (non-functional in M1 by
 // design, ADR-0005), and JSON export/import.
 //
-// Export UX (no new dependencies, see lib/ui/file_transfer.dart): an
-// always-available JSON text screen with a copy button on every platform,
-// plus a file save/download where the platform supports it (web, desktop
-// with a home directory). Import: paste-JSON dialog everywhere, plus a file
-// picker on web. The drip CSV import (below the JSON card) reuses the same
-// dialog shape: the mapper turns the CSV into an export document that goes
-// through the existing importJsonToDatabase (merge policy for free).
+// Export UX: an always-available JSON text screen with a copy button on
+// every platform, plus a file save/download where the platform supports it
+// (web, desktop with a home directory). Import: paste-JSON dialog
+// everywhere, plus a file picker on web and on the native targets (the
+// file_selector plugin, SAF-backed on Android). The drip CSV import (below
+// the JSON card) reuses the same dialog widget: the mapper turns the CSV
+// into an export document that goes through the existing
+// importJsonToDatabase (merge policy for free).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -350,82 +351,21 @@ class EinstellungenScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _openImportDialog(BuildContext context, WidgetRef ref) async {
+  /// Opens the self-contained JSON import dialog (see [_ImportDialog]).
+  Future<void> _openImportDialog(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController();
-    // The Apply action must react to BOTH the pasted text and the running
-    // import, so the dialog listens to controller + pending flag together
-    // (a one-time build here would freeze the button — there is no widget
-    // rebuild of the actions while the user types).
-    final running = ValueNotifier<bool>(false);
-    final listenable = Listenable.merge([controller, running]);
-
-    await showDialog<void>(
+    return showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(l10n.importTitle),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (canPickFile) ...[
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final text = await pickFileText();
-                      if (text != null) {
-                        controller.text = text;
-                      }
-                    },
-                    icon: const Icon(Icons.file_open_outlined),
-                    label: Text(l10n.importPickFile),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                TextField(
-                  controller: controller,
-                  maxLines: 10,
-                  decoration: InputDecoration(hintText: l10n.importHint),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(
-                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
-              ),
-            ),
-            ListenableBuilder(
-              listenable: listenable,
-              builder: (context, _) {
-                final busy = running.value;
-                final hasText = controller.text.trim().isNotEmpty;
-                return FilledButton(
-                  onPressed: !hasText || busy
-                      ? null
-                      : () async {
-                          final raw = controller.text;
-                          running.value = true;
-                          try {
-                            await _applyImport(
-                                dialogContext, context, ref, raw);
-                          } finally {
-                            running.value = false;
-                          }
-                        },
-                  child: Text(l10n.importApply),
-                );
-              },
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => _ImportDialog(
+        title: l10n.importTitle,
+        hint: l10n.importHint,
+        applyLabel: l10n.importApply,
+        // Same accept list as the web implementation: exported JSON.
+        accept: 'application/json,.json',
+        apply: (applyContext, raw) =>
+            _applyImport(applyContext, context, ref, raw),
+      ),
     );
-    controller.dispose();
-    running.dispose();
   }
 
   Future<void> _applyImport(
@@ -475,84 +415,26 @@ class EinstellungenScreen extends ConsumerWidget {
     }
   }
 
-  /// Drip CSV import dialog: same shape as [_openImportDialog] — a paste
-  /// textarea everywhere, a file picker on web (accepting CSV), and a
-  /// shared controller + busy-flag listener so Apply tracks both.
+  /// Opens the self-contained drip CSV import dialog — the same widget as
+  /// the JSON import, parameterized with the drip title/hint/labels and the
+  /// CSV accept list (see [_ImportDialog]).
   Future<void> _openDripImportDialog(
     BuildContext context,
     WidgetRef ref,
-  ) async {
+  ) {
     final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController();
-    final running = ValueNotifier<bool>(false);
-    final listenable = Listenable.merge([controller, running]);
-
-    await showDialog<void>(
+    return showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(l10n.dripImportTitle),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (canPickFile) ...[
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final text = await pickFileText(accept: '.csv,text/csv');
-                      if (text != null) {
-                        controller.text = text;
-                      }
-                    },
-                    icon: const Icon(Icons.file_open_outlined),
-                    label: Text(l10n.importPickFile),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                TextField(
-                  controller: controller,
-                  maxLines: 10,
-                  decoration: InputDecoration(hintText: l10n.dripImportHint),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(
-                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
-              ),
-            ),
-            ListenableBuilder(
-              listenable: listenable,
-              builder: (context, _) {
-                final busy = running.value;
-                final hasText = controller.text.trim().isNotEmpty;
-                return FilledButton(
-                  onPressed: !hasText || busy
-                      ? null
-                      : () async {
-                          final raw = controller.text;
-                          running.value = true;
-                          try {
-                            await _applyDripImport(
-                                dialogContext, context, ref, raw);
-                          } finally {
-                            running.value = false;
-                          }
-                        },
-                  child: Text(l10n.dripImportApply),
-                );
-              },
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => _ImportDialog(
+        title: l10n.dripImportTitle,
+        hint: l10n.dripImportHint,
+        applyLabel: l10n.dripImportApply,
+        // CSV from the sibling project, both the extension and the MIME.
+        accept: '.csv,text/csv',
+        apply: (applyContext, raw) =>
+            _applyDripImport(applyContext, context, ref, raw),
+      ),
     );
-    controller.dispose();
-    running.dispose();
   }
 
   /// Maps the pasted CSV into an export document and feeds it through the
@@ -608,6 +490,140 @@ class EinstellungenScreen extends ConsumerWidget {
         SnackBar(content: Text(l10n.importFailed)),
       );
     }
+  }
+}
+
+/// Self-contained import dialog used by both the JSON and the drip CSV
+/// import: a paste textarea everywhere plus a file picker where the
+/// platform provides one ([canPickFile], accept list from the caller).
+///
+/// Owns all dialog state in its State (the text controller and the busy
+/// flag): everything is disposed together with the widget tree, so a scrim
+/// dismissal while an import is still running can never touch disposed
+/// state afterwards — the busy-flag reset in the running future simply
+/// becomes a no-op once [State.mounted] is gone. The content is
+/// small-screen safe: the whole dialog is scrollable and the textarea's
+/// height is capped at a fraction of the viewport, so it can never exceed
+/// the screen with or without keyboard insets.
+final class _ImportDialog extends StatefulWidget {
+  const _ImportDialog({
+    required this.title,
+    required this.hint,
+    required this.applyLabel,
+    required this.accept,
+    required this.apply,
+  });
+
+  final String title;
+  final String hint;
+  final String applyLabel;
+
+  /// HTML-style accept list forwarded to the file picker (ignored on
+  /// paste-only platforms).
+  final String accept;
+
+  /// Runs the import for the current textarea content with the dialog's own
+  /// context: pops the dialog on success and reports problems itself (the
+  /// dialog only manages the busy flag around it).
+  final Future<void> Function(BuildContext dialogContext, String raw) apply;
+
+  @override
+  State<_ImportDialog> createState() => _ImportDialogState();
+}
+
+final class _ImportDialogState extends State<_ImportDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The Apply action must react to BOTH the pasted text and the running
+    // import — the stateful rebuild covers both (a one-time build here
+    // would freeze the button while the user types).
+    _controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_onTextChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    final text = await pickFileText(accept: widget.accept);
+    if (text != null && mounted) {
+      setState(() => _controller.text = text);
+    }
+  }
+
+  Future<void> _apply() async {
+    final raw = _controller.text;
+    setState(() => _running = true);
+    try {
+      await widget.apply(context, raw);
+    } finally {
+      // A scrim dismissal during the import disposes this State while the
+      // future is still running — resetting the flag afterwards must stay a
+      // silent no-op in that case (and a build must not be requested).
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final applyEnabled = _controller.text.trim().isNotEmpty && !_running;
+    return AlertDialog(
+      scrollable: true,
+      title: Text(widget.title),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canPickFile) ...[
+              OutlinedButton.icon(
+                onPressed: _running ? null : _pickFile,
+                icon: const Icon(Icons.file_open_outlined),
+                label: Text(AppLocalizations.of(context).importPickFile),
+              ),
+              const SizedBox(height: 8),
+            ],
+            // Height-capped expanding textarea: on small viewports (keyboard
+            // up) the field shrinks to the available space instead of
+            // overflowing — the dialog itself scrolls when still too tall.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.35,
+              ),
+              child: TextField(
+                controller: _controller,
+                minLines: 4,
+                maxLines: null,
+                decoration: InputDecoration(hintText: widget.hint),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          // Cancel stays enabled even while the import is running: a scrim
+          // tap is equally possible, so gating only this button would be a
+          // pretense — the busy handling is the dialog State's concern.
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: applyEnabled ? _apply : null,
+          child: Text(widget.applyLabel),
+        ),
+      ],
+    );
   }
 }
 
