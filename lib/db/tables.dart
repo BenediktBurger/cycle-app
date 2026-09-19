@@ -155,7 +155,7 @@ class CycleEntries extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-/// Assisted-mode markers a user places onto specific days (Mode M, ADR-001).
+/// Assisted-mode markers a user places onto specific days (Mode M, ADR-0001).
 ///
 /// One mark of a given type per day. The type is an open TEXT vocabulary so
 /// future marking tools can add types without a migration; well-known

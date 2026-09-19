@@ -8,9 +8,14 @@ menstrual-cycle symptoms and manually evaluating them per **NER rules
 authority; the app is a tool (visualization, arithmetic, statistics), not the
 decision-maker.
 
-> **INER framing is a working assumption** (NFP/NER "Mode M", see
-> [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), status: *Hypothesis*) —
-> to be validated with INER experts before any interpretive feature ships.
+> **The app supports, it never decides.** The product shape is
+> "Mode M" (NFP/NER assisted marking, see
+> [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), status: *Accepted* —
+> by owner decision, 2026-09-19). The user/couple stays in control and
+> takes conscious decisions; the app computes and warns about arithmetic,
+> but never gives a fertility verdict. Knowing the method (book or course)
+> is a prerequisite for reliable interpretation. This posture is the
+> owner's, **not endorsed by INER**.
 > For the full picture read [docs/product/vision.md](docs/product/vision.md).
 
 - **Package name `cycle_app`** is an explicit **PLACEHOLDER** (ADR-0002) —
@@ -61,8 +66,9 @@ and the analyze/test/build commands — notably `flutter pub get` before
 Working app: Tagebuch / Zyklus / Statistik / Einstellungen on a local
 drift database (SQLite file on Android/iOS, WebAssembly/OPFS in the
 browser; data persists across reloads), with JSON export/import. The UI is
-German-first with an English switch. Still open: the Mode-M marking UI
-([docs/roadmap.md](docs/roadmap.md)).
+German-first with an English switch, including the Mode-M marking UI
+(first higher measurement, mucus peak, SUZ — computed evaluation marks on
+the cycle chart, see [docs/roadmap.md](docs/roadmap.md) for open work).
 
 ## Import from drip
 

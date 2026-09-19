@@ -1,7 +1,7 @@
 # ADR-0001: INER-compatible "Mode M" product shape
 
 - **Date:** 2026-09-15
-- **Status:** Hypothesis
+- **Status:** Accepted (owner decision, 2026-09-19)
 
 ## Context
 
@@ -33,9 +33,20 @@ position, where the human decides fully: the user places all marks themselves
 and the app provides only visualization, arithmetic (baseline/coverline from
 six prior low measurements, counts, phase lines) and statistics.
 
-This is a **Hypothesis, NOT an INER resolution**: it is our tool-role
-assumption, to be validated with INER experts. It remains flagged
-`TODO(user-review)`/expert-review in code and docs until validated.
+This is **accepted by owner decision (2026-09-19), not by INER-expert
+resolution**: the app supports the user but never gives the final answer.
+It is crucial that the woman / the couple remains in control and takes
+conscious decisions — there should be no unwanted pregnancy because
+someone trusted this app without knowing what they do. The app may compute
+derived values (temperature differences, baseline shifts) and may surface
+warnings about arithmetic/record anomalies (e.g. a first higher
+measurement placed on a day below the baseline) — that is app behavior,
+not interpretation. A fertility verdict is never the app's output: the
+user/couple stays the authority. Knowing the method itself (via book or
+course) — proper observation of temperature and mucus, and analysis — is
+a prerequisite, so that the interpretation of fertility becomes reliable;
+the app cannot replace that knowledge. No INER resolution or expert
+statement backs this posture; it rests on the owner's judgment alone.
 
 Modes S (suggest + override, rules engine) and A (automatic, rules engine +
 trust concept) are **explicitly deferred** — their data models are designed to
@@ -45,17 +56,24 @@ the schema assumes a specific mode), but no S/A functionality is built.
 ## Consequences
 
 - The app UI and domain layer only *compute*, never *interpret*: statistics
-  show arithmetic only, no status conclusions.
+  show arithmetic only, no status conclusions. Arithmetic and anomaly
+  warnings (e.g. a flagged first-higher-measurement below the baseline,
+  computed temperature differences) are legitimate compute-only app
+  behavior; a fertility verdict is not — the user/couple stays the
+  authority.
 - Data model (marks, phases) is designed mode-agnostic so S/A remain possible
   later without a rewrite.
-- The posture must be brought to INER experts for validation. If experts
-  confirm (or correct) the interpretation, a follow-up ADR records the
-  validated posture and supersedes this Hypothesis. If rejected, the product
-  shape changes accordingly before more UI is built on top of it.
-- Cycle-boundary rules and mapping tables encoded in the domain layer
-  (e.g. first non-spotting period day starts a cycle; NFP 0–4 mucus mapping)
-  inherit review flags from this ADR and are themselves assumptions to
-  validate.
+- The posture is settled: changing it now requires a new ADR that
+  supersedes this one. The posture remains attributable to the owner's
+  decision; it has not been reviewed by INER experts.
+- Historically, cycle-boundary rules and mapping tables encoded in the
+  domain layer (e.g. first non-spotting period day starts a cycle; NFP 0–4
+  mucus mapping) inherited review flags from this ADR — they were
+  themselves assumptions to validate. Both have since been removed or
+  superseded by the Updates below, so **no remaining review flags inherit
+  from this ADR**. Open `TODO(user-review)` questions in code and docs are
+  separate, narrower interpretation questions (rule wording, rendering
+  details), not the posture itself.
 
   **Update (2026-09-16):** the "NFP 0–4 mucus mapping" assumption listed above
   has been removed — mucus is no longer stored or shown as a 0–4 number, but

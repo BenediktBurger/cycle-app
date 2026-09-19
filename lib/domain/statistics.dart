@@ -4,9 +4,9 @@
 // NO fertility interpretation of any kind. The functions here return
 // arithmetic facts only (lists of lengths/dates, averages, bucket counts).
 // There is deliberately NO status/day classification, NO fertile-window or
-// phase computation, and NO textual evaluation in this layer — such
-// conclusions would be Mode-M/INER territory requiring expert validation
-// (ADR-0001, status: Hypothesis). Keep it that way in reviews.
+// phase computation, and NO textual evaluation in this layer — statistics
+// stay arithmetic-only (Mode M, ADR-0001, Accepted): no fertility verdicts.
+// Keep it that way in reviews.
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';

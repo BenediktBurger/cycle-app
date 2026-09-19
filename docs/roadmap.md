@@ -73,8 +73,6 @@ the sections above track planned work, git history keeps the record (see
   already carries the cycle start mark (harmless — addMark is idempotent):
   -> suppress the prompt when the mark is already present on the saved day.
 
-- [ ] set adr 1 to accepted adapted to this decision: It is crucial that the woman / the couple remains in control and takes consciens decisions. There should be no unwanted pregnancy because someone trusted this app without knowing what they do. Therefore, the app should support the user but not give the final answer. It is fine if it raises a warning (like setting the first higher measruement to a day which is below the baseline), if it calculates temperature differences etc. Also, it should be clear that you need to know the method (either via book or a course) regarding proper oberservations (temperature and mucus) and analysis such that the interpretation (fertility) becomes reliable.
-
 ### Convenience
 
 - Password protection for the database — first revisit

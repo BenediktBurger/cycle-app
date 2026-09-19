@@ -25,8 +25,9 @@
 // only for small glyphs; the baseline segment fits inside fl_chart as a
 // dashed two-spot bar, so the chart itself stays fl_chart).
 //
-// Rendering assumptions (validate with an expert reviewer, see
-// docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
+// Rendering assumptions (see docs/adr/0001-iner-mode-m-hypothesis.md for
+// the Mode-M context; the posture is Accepted — the per-item flags below
+// are separate, still-open rendering-detail questions):
 //
 //   TODO(user-review): A peak day without a recorded entry renders NO dot
 //   in the mucus row (the rows show recorded observations only). The

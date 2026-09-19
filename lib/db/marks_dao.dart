@@ -1,4 +1,4 @@
-// MarksDao: assisted-mode markers per day (Mode M, ADR-001).
+// MarksDao: assisted-mode markers per day (Mode M, ADR-0001).
 // Part of the cycle_database.dart library — see its header.
 //
 // Day-keyed: a mark is identified by (entry_date, mark_type) — the unique

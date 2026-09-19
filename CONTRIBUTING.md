@@ -158,13 +158,14 @@ report the full analyzer/test output back so issues can be fixed promptly.
 - **Package name** `cycle_app` is a placeholder ([ADR-0002](docs/adr/0002-package-name-cycle-app-placeholder.md));
   do not rely on it in code
 - **Unresolved working assumptions** are marked in code and docs — in
-  particular the overall "Mode M" product shape
-  ([ADR-001](docs/adr/0001-iner-mode-m-hypothesis.md), status: Hypothesis),
-  the open questions (`TODO(user-review)`) in
-  [ADR-0008](docs/adr/0008-cycle-start-as-mark.md), and the statistics
-  bucket edges (`lib/domain/statistics.dart`). Treat marked comments like
-  `// TODO(user-review)` as questions to bring to INER experts, not as
-  settled behavior.
+  particular the open questions (`TODO(user-review)`) in
+  [ADR-0008](docs/adr/0008-cycle-start-as-mark.md), the statistics
+  bucket edges (`lib/domain/statistics.dart`), and per-rule interpretation
+  questions under `lib/domain/evaluation.dart` (the overall "Mode M"
+  product shape itself is settled —
+  [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), Accepted). Treat
+  marked comments like `// TODO(user-review)` as questions to bring to
+  INER experts, not as settled behavior.
 - **In-memory-only state for now**: the language selection resets to the
   system-language default on web reload by design (system language when
   available, otherwise English; persisting an explicit choice — e.g. a

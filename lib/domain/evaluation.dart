@@ -76,8 +76,9 @@
 //       rendering concern of the chart, not domain arithmetic. A cycle with
 //       NO marked candidate draws no segment (null span).
 //
-// Interpretive assumptions (validate with an expert reviewer, see
-// docs/adr/0001-iner-mode-m-hypothesis.md, status: Hypothesis):
+// Interpretive assumptions (see docs/adr/0001-iner-mode-m-hypothesis.md
+// for the Mode-M rule-interpretation context; mode-M posture itself is
+// Accepted — the per-rule flags below are separate, still-open questions):
 //
 //   Settled rule (owner-confirmed 2026-09-17): the six-low window is the
 //   SIX PREVIOUS CALENDAR DAYS before the user-marked first higher
@@ -116,9 +117,10 @@
 //   measurement) drive rules D and E, so arrows never start the SUZ.
 //   Circles exist only AFTER the mucus peak day (R4), so an arrow
 //   sequence (peak unset, or all candidates at or before the peak) never
-//   yields an SUZ. Honesty note: the overall Mode-M posture — including
-//   this reading of the rules — is still a Hypothesis (ADR-0001); the
-//   owner confirmed the rule interpretation, not the INER expert review.
+//   yields an SUZ. Posture note: the overall Mode-M posture — including
+//   this reading of the rules — is accepted (ADR-0001, Accepted by owner
+//   decision); only the per-rule interpretation questions flagged below
+//   stay open.
 //   TODO(user-review): R10 with fewer than six numbered lows: the segment
 //   START falls on the earliest AVAILABLE low day instead of a low #6 that
 //   does not exist. R10 defines only the six-low case; the fallback is this
@@ -136,8 +138,8 @@
 //   then starts at the next strictly-above measurement from the mark
 //   onward (R3); above-baseline days before the mark are user error or a
 //   separately-handled disturbance (see R3). The overall Mode-M posture
-//   is still a Hypothesis (ADR-0001) — the owner confirmed this rule
-//   interpretation, not the INER expert review.
+//   is accepted (ADR-0001, Accepted by owner decision); the per-rule
+//   interpretation questions flagged here stay open.
 //   No open assumption, settled rule: multiple peak / first-higher marks
 //   inside one cycle are EXPECTED, not a user-data problem (delayed
 //   ovulation; re-marking after a broken Hochlage). The MOST RECENT mark
