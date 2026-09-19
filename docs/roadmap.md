@@ -48,8 +48,6 @@ the sections above track planned work, git history keeps the record (see
   new release → migrations preserve cycle data) as repeatable discipline
   (release.md Phase D, per-release checklist)
 - [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
-- [ ] check whether dependencies are up to date
-- [ ] could CI (tooling) catch more errors/improve the quality (also for android)?
 - choose and set a license
 
 #### Domain / UI
