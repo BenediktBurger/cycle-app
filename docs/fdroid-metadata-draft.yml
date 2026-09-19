@@ -1,0 +1,77 @@
+# Draft for the future F-Droid metadata file (would live as
+# `metadata/io.github.benediktburger.cycleapp.yml` in the `fdroiddata`
+# repository at submission time).
+#
+# DRAFT INSIDE THIS REPO, NEVER SUBMITTED ANYWHERE YET.
+# Submission (docs/release.md Phase E) is blocked by Gate G2: the license
+# is still TBD, so the `License:` line below is a visible placeholder —
+# do not refile without replacing it.
+#
+# Recipe/field conventions in `fdroiddata` move: verify every commented
+# block against current upstream templates at submission time, do not
+# copy them from this draft from memory.
+
+RepoType: git
+Repo: https://github.com/BenediktBurger/cycle-app
+
+# PLACEHOLDER — the real licenses value is chosen once Gate G2 resolves
+# (GPL-3-compatible intent, see README); F-Droid rejects this literal
+# value, which is intentional while the draft is unsubmittable.
+License: TBD-DO-NOT-SUBMIT-YET
+
+AuthorName: Benedikt Burger
+# Repo has no email published in pubspec; leave AuthorEmail empty for now.
+
+Summary: >-
+  Lokale Zyklusbewertung nach NER (Rötzer) — Daten bleiben auf dem Gerät.
+# Description mirrors fastlane/metadata/android/de-DE/full_description.txt
+# (keep in sync when editing). F-Droid actually prefers the fastlane
+# files when they exist; these fields are the fallback.
+Description: >-
+  Diese App unterstützt die Beobachtung des weiblichen Zyklus und dessen
+  manuelle Auswertung nach den NER-Regeln (Rötzer), im Geiste der INER —
+  als eigenständiges Werkzeug ohne jede Verbindung zur INER: Die App ist
+  nicht von der INER geprüft, unterstützt oder empfohlen.
+
+
+  Die Auswertung bleibt in Ihrer Hand: Sie setzen jede Markierung auf der
+  Zykluskurve selbst. Die App übernimmt nur die Rechenarbeit, die Sie sonst
+  von Hand ausführen würden — die Basislinie aus den sechs vorherigen
+  niedrigen Messungen, Zählungen, Linien und Statistiken (Zyklus- und
+  Phasenlängen). Sie rechnet und zeigt an; sie schlägt nichts vor und
+  entscheidet nichts („unterstützte Markierung“, Modus M). Für eine
+  zuverlässige Beurteilung der Fruchtbarkeit brauchen Sie
+  Methodenkenntnisse — aus einem Lehrbuch oder einer Schulung.
+
+
+  Alle Daten bleiben auf dem Gerät — keine Cloud, keine Analysewerkzeuge,
+  keine Internet-Berechtigung. JSON-Export und JSON-Import in den
+  Einstellungen. Oberfläche auf Deutsch, auf Englisch umschaltbar. Offene
+  Quelle; die endgültige Lizenz ist noch nicht festgelegt.
+
+
+  Hinweis: „Cycle App“ ist ein Arbeitstitel; der endgültige Name steht
+  noch nicht fest.
+
+AutoUpdateMode: None
+# Conservative choice until F-Droid build conventions are re-checked at
+# submission time (check the current fdroiddata templates then).
+
+UpdateCheckMode: Tags
+# Tags mode: a version poll turns git tags into candidate versions.
+UpdateCheckData: ^v([0-9]+\.[0-9]+\.[0-9]+)\+?([0-9]+)?$
+# PLACEHOLDER pattern — validate against actual tag practice before MR.
+
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
+
+# Skeleton only — build recipes (gradle flavor structure, `flutter` arg,
+# `sudo`/`rm` lines if any) MUST be checked against recent Flutter apps in
+# fdroiddata at submission time; do not copy this skeleton unchecked.
+# Builds:
+#   - versionName: 0.1.0
+#     versionCode: 1
+#     commit: v0.1.0       # git tag / commit hash of the release
+#     output: build/app/outputs/flutter-apk/app-release.apk
+#     flutter:             # recipe name + pin the exact Flutter version
+#       version: <pin>

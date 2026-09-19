@@ -1,0 +1,32 @@
+This app helps you track menstrual-cycle symptoms day by day and evaluate
+your records manually following the NER rules (Rötzer), in the spirit of
+INER — but as an independent tool with no ties to INER: the app is not
+reviewed, supported or endorsed by INER.
+
+The evaluation stays with you: you place every mark on the cycle chart
+yourself. The app only does the arithmetic you would otherwise do by hand
+— the baseline drawn from the six prior low measurements, counts, lines,
+and statistics (cycle and phase lengths). It computes and displays; it
+never suggests and never decides ("assisted marking", Mode M). For a
+reliable interpretation of fertility you need knowledge of the method —
+from a textbook or a course.
+
+What makes this app what it is:
+
+• All your data stays on the device — no cloud, no analytics, no network
+  permission.
+• German interface by default, switchable to English.
+• Daily entry of basal body temperature, bleeding (with exclusion flags
+  for disturbances such as illness, alcohol or travel, and for spotting),
+  cervical mucus in the NER shorthand notation (t, Ø, f, S), optional
+  cervix, pain, mood, sex, and notes.
+• Evaluation tools: first temperature above the baseline, count of low
+  measurements, mucus peak day, calendar-based fertile window, exclusion
+  of disturbed days.
+• JSON export and JSON import in the settings — your data always remain
+  your own.
+• Open source; the final license is not yet decided, GPL-3 compatibility
+  is intended.
+
+Note: "Cycle App" is a working title; the final name has not been chosen
+yet.

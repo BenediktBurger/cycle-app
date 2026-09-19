@@ -1,0 +1,34 @@
+Diese App unterstützt die Beobachtung des weiblichen Zyklus und dessen
+manuelle Auswertung nach den NER-Regeln (Rötzer), im Geiste der INER — als
+eigenständiges Werkzeug ohne jede Verbindung zur INER: Die App ist nicht
+von der INER geprüft, unterstützt oder empfohlen.
+
+Die Auswertung bleibt in Ihrer Hand: Sie setzen jede Markierung auf der
+Zykluskurve selbst. Die App übernimmt nur die Rechenarbeit, die Sie sonst
+von Hand ausführen würden — die Basislinie aus den sechs vorherigen
+niedrigen Messungen, Zählungen, Linien und Statistiken (Zyklus- und
+Phasenlängen). Sie rechnet und zeigt an; sie schlägt nichts vor und
+entscheidet nichts („unterstützte Markierung“, Modus M). Für eine
+zuverlässige Beurteilung der Fruchtbarkeit brauchen Sie Methodenkenntnisse
+— aus einem Lehrbuch oder einer Schulung.
+
+Funktionen:
+
+• Alle Daten bleiben auf dem Gerät — keine Cloud, keine Analysewerkzeuge,
+  keine Internet-Berechtigung.
+• Oberfläche standardmäßig auf Deutsch, auf Englisch umschaltbar.
+• Tägliche Erfassung von Basaltemperatur, Blutung (mit Ausschlusskenn-
+  zeichnung für Störungen wie Krankheit, Alkohol oder Reisen und für
+  Schmierblutungen), Zervixschleim in der Zeichen-Schreibweise der NER
+  (t, Ø, f, S), Muttermund (wahlweise), Schmerzen, Stimmung, sexuelle
+  Aktivität und Notizen.
+• Auswertungswerkzeuge: erste Temperatur über der Basislinie, Zählung der
+  tiefen Messungen, Schleimspitzentag, fruchtbares Fenster nach der
+  Kalenderregel, Ausschluss von Störungstagen.
+• JSON-Export und JSON-Import über die Einstellungen — die Daten bleiben
+  jederzeit Ihre eigenen.
+• Offene Quelle (Open Source); die endgültige Lizenz ist noch nicht
+  festgelegt, eine GPL-3-Verträglichkeit ist beabsichtigt.
+
+Hinweis: „Cycle App“ ist ein Arbeitstitel; der endgültige Name steht noch
+nicht fest.

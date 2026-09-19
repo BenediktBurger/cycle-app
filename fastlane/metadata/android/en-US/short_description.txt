@@ -1,0 +1,1 @@
+Local cycle evaluation per the NER rules (Rötzer) — data stays on device.
