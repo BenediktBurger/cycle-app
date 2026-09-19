@@ -23,6 +23,12 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
+#### Android
+
+- [ ] does not show a file picker option to load csv files for drip ("bottom overflowed by 79 pixels"). Clicking somewhere else raises an error
+- [ ] error on framework.dart: failed assertion line 6281 pos 12: _dependents.isEmpty is not True
+- [ ] selected mucus sign show some reflow error (only partially visible), probably due to size constraints. on f/S it is too small and reflows -> two rows, everything gets higher
+
 ### Necessary
 
 #### Building the app
@@ -52,6 +58,10 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
+- [ ] make the journals save button always visible (top bar?) such that you can save wherever you changed something, not only at the bottom
+- [ ] remove stale text line "von der Auswertung ausgeschlossen" from the add mark sheet
+- [ ] make sure that it works also in horizontal view (especially for the cycle, to see more of the cycle better)
+- [ ] diary: make it compacter (temperature and time on the same line?)
 - Cycle-length statistics during a very long mark-driven cycle: during
   pregnancy a cycle runs arbitrarily long (day-of-cycle > 100 on the
   chart) and skews cycle-length statistics — `cycleLengthsInDays`
