@@ -5,44 +5,17 @@
 // the evaluation-arithmetic note. Localized in en and de.
 //
 // Same harness pattern as test/cycle_chart_rows_test.dart.
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_summary.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/chart_pump.dart';
 
 List<DailyEntry> _entries(int count) => [
       for (var i = 0; i < count; i++)
         DailyEntry(date: DateTime.utc(2026, 9, 7 + i), bbtC: 36.5),
     ];
-
-Widget _chartHarness({
-  required List<DailyEntry> entries,
-  Locale locale = const Locale('en'),
-}) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const ZyklusScreen(),
-      ),
-    );
 
 /// The glossary entries (en wording); each is asserted inside the help
 /// sheet. The "Ignored temperature" entry presents the VISUAL consequence
@@ -99,6 +72,12 @@ const _arithmeticNoteDe =
     'Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung '
     'setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur '
     'für die Anzeige berechnet — keine Fruchtbarkeitsangabe.';
+
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  Locale locale = const Locale('en'),
+}) =>
+    chartHarness(entries: entries, locale: locale, withScaffold: false);
 
 void main() {
   group('help sheet', () {

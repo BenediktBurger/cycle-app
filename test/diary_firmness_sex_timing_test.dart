@@ -13,42 +13,13 @@
 //
 // Provider-override harness pattern from diary_cervix_selector_test.dart;
 // German labels are pinned per that file's convention (pinned locale de).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/diary.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ProviderScope _appScope(Locale locale) => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        localeProvider.overrideWith((ref) => locale),
-      ],
-      child: const CycleApp(),
-    );
+import 'support/diary_harness.dart';
 
-Future<({CycleDatabase db, DateTime date})> _savedDayOf(
-    WidgetTester tester) async {
-  final context = tester.element(find.byType(TagebuchScreen));
-  final container = ProviderScope.containerOf(context);
-  final db = await container.read(databaseProvider.future);
-  return (db: db, date: container.read(selectedDateProvider));
-}
+ProviderScope _appScope(Locale locale) => diarySelectorScope(locale);
 
 void main() {
   testWidgets('the mucus sign picker offers the A (Ausfluss) segment',
@@ -92,7 +63,7 @@ void main() {
 
     // Read the saved day back through the database provider — the same
     // instance the form writes through, not a second connection.
-    final (:db, :date) = await _savedDayOf(tester);
+    final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.cervixFirmness, 'soft',
@@ -117,7 +88,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final (:db, :date) = await _savedDayOf(tester);
+    final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.cervixFirmness, isNull,
@@ -151,7 +122,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final (:db, :date) = await _savedDayOf(tester);
+    final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.sexTimings, 1 | 4,
@@ -177,7 +148,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final (:db, :date) = await _savedDayOf(tester);
+    final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
     expect(row!.sexTimings, 4,

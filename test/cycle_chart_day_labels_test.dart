@@ -7,13 +7,11 @@
 // test/cycle_chart_windowing_test.dart).
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/chart_pump.dart';
 
 // A recorded range starting 2026-01-20 so the day of cycle (1, 2, …) never
 // coincides with the day of month (20., 21., …) — the two label lines stay
@@ -55,23 +53,7 @@ Widget _chartHarness({
   List<CycleMark> marks = const [],
   Locale locale = const Locale('en'),
 }) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(marks)),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
+    chartHarness(entries: entries, marks: marks, locale: locale);
 
 void main() {
   group('per-day column labels', () {

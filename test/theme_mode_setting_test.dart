@@ -7,42 +7,19 @@
 // dispatcher; the app itself is unchanged: in-memory drift database
 // override, no platform channels (same pattern as theme_brightness_test.dart
 // and locale_default_test.dart).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/finders.dart';
+
+import 'support/database.dart';
+
 /// App scope for the theme-mode tests. A null [themeMode] means: leave the
 /// provider at its real default (the "System" option); anything else is an
 /// explicit settings choice.
-ProviderScope _appScope({ThemeMode? themeMode}) => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith((ref) {
-          final db = CycleDatabase(
-            DatabaseConnection(
-              NativeDatabase.memory(),
-              closeStreamsSynchronously: true,
-            ),
-          );
-          ref.onDispose(db.close);
-          return db;
-        }),
-        if (themeMode != null)
-          themeModeProvider.overrideWith((ref) => themeMode),
-      ],
-      child: const CycleApp(),
-    );
-
-/// The color-scheme brightness actually materialized by the running app,
-/// taken from the shell's Scaffold (below the MaterialApp theme wiring).
-Brightness _materializedBrightness(WidgetTester tester) {
-  final scaffoldContext = tester.element(find.byType(Scaffold).first);
-  return Theme.of(scaffoldContext).colorScheme.brightness;
-}
+ProviderScope _appScope({ThemeMode? themeMode}) =>
+    appScope(themeMode: themeMode);
 
 void main() {
   testWidgets('system default follows the device brightness (dark device)',
@@ -53,7 +30,7 @@ void main() {
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
 
-    expect(_materializedBrightness(tester), Brightness.dark,
+    expect(materializedBrightness(tester), Brightness.dark,
         reason: 'The default must be System: follow the device brightness');
   });
 
@@ -63,7 +40,7 @@ void main() {
     await tester.pumpWidget(_appScope(themeMode: ThemeMode.dark));
     await tester.pumpAndSettle();
 
-    expect(_materializedBrightness(tester), Brightness.dark,
+    expect(materializedBrightness(tester), Brightness.dark,
         reason: 'An explicit dark choice must beat the device brightness');
   });
 
@@ -75,7 +52,7 @@ void main() {
     await tester.pumpWidget(_appScope(themeMode: ThemeMode.light));
     await tester.pumpAndSettle();
 
-    expect(_materializedBrightness(tester), Brightness.light,
+    expect(materializedBrightness(tester), Brightness.light,
         reason: 'An explicit light choice must beat the device brightness');
   });
 
@@ -121,7 +98,7 @@ void main() {
     await tester
         .tap(find.descendant(of: themeSwitcher, matching: find.text('Dark')));
     await tester.pumpAndSettle();
-    expect(_materializedBrightness(tester), Brightness.dark,
+    expect(materializedBrightness(tester), Brightness.dark,
         reason: 'Selecting Dark must switch the app to dark immediately');
     final switcher2 = tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher);
     expect(switcher2.selected, {ThemeMode.dark});
@@ -130,7 +107,7 @@ void main() {
     await tester
         .tap(find.descendant(of: themeSwitcher, matching: find.text('Light')));
     await tester.pumpAndSettle();
-    expect(_materializedBrightness(tester), Brightness.light,
+    expect(materializedBrightness(tester), Brightness.light,
         reason: 'Selecting Light must switch the app to light immediately');
     final switcher3 = tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher);
     expect(switcher3.selected, {ThemeMode.light});
@@ -139,7 +116,7 @@ void main() {
     await tester
         .tap(find.descendant(of: themeSwitcher, matching: find.text('System')));
     await tester.pumpAndSettle();
-    expect(_materializedBrightness(tester), Brightness.light,
+    expect(materializedBrightness(tester), Brightness.light,
         reason: 'Selecting System must follow the device brightness again');
     final switcher4 = tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher);
     expect(switcher4.selected, {ThemeMode.system});

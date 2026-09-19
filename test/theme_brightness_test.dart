@@ -6,37 +6,15 @@
 // what ThemeMode.system (MaterialApp default) resolves against. An in-memory
 // drift database is injected so the widget shell materializes like in the
 // app shell smoke test.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ProviderScope _appScope() => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith((ref) {
-          final db = CycleDatabase(
-            DatabaseConnection(
-              NativeDatabase.memory(),
-              closeStreamsSynchronously: true,
-            ),
-          );
-          ref.onDispose(db.close);
-          return db;
-        }),
-      ],
-      child: const CycleApp(),
-    );
+import 'support/finders.dart';
 
-/// The color-scheme brightness actually materialized by the running app,
-/// taken from the shell's Scaffold (below the MaterialApp theme wiring).
-Brightness _materializedBrightness(WidgetTester tester) {
-  final scaffoldContext = tester.element(find.byType(Scaffold).first);
-  return Theme.of(scaffoldContext).colorScheme.brightness;
-}
+import 'support/database.dart';
+
+ProviderScope _appScope() => appScope();
 
 void main() {
   testWidgets('dark OS setting renders the app with a dark scheme',
@@ -48,7 +26,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      _materializedBrightness(tester),
+      materializedBrightness(tester),
       Brightness.dark,
       reason:
           'The app must follow the device dark setting, not stay light-only',
@@ -61,6 +39,6 @@ void main() {
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
 
-    expect(_materializedBrightness(tester), Brightness.light);
+    expect(materializedBrightness(tester), Brightness.light);
   });
 }

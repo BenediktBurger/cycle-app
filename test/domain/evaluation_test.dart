@@ -92,6 +92,21 @@ CycleEvaluation evalFor(
   );
 }
 
+/// The shared base of the standard scenarios: cycle onset (unmeasured)
+/// plus the six-low run with the baseline on Mar 6 and the peak day on
+/// Mar 9 — the entry lists of most tests append their marked rise day and
+/// tail via the spread below.
+final _baseLowRun = <DailyEntry>[
+  d(2026, 3, 2, bleeding: Bleeding.medium), // cycle onset, unmeasured
+  d(2026, 3, 3, t: 36.2),
+  d(2026, 3, 4, t: 36.1),
+  d(2026, 3, 5, t: 36.3),
+  d(2026, 3, 6, t: 36.4), // baseline — the highest of the six lows
+  d(2026, 3, 7, t: 36.2),
+  d(2026, 3, 8, t: 36.3),
+  d(2026, 3, 9, t: 36.2), // peak day (most scenarios set it here)
+];
+
 void main() {
   group('textbook pattern (happy path)', () {
     final entries = [
@@ -188,14 +203,7 @@ void main() {
   group('rule R1 — candidacy is strictly above the baseline, any margin', () {
     test('a day exactly AT the baseline is not a candidate', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline (highest of the six)
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.4), // marked rise, but exactly AT the baseline
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
@@ -212,14 +220,7 @@ void main() {
 
     test('a day ANY amount above the baseline is a candidate (+0.01 K)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.41), // marked rise, +0.01 K — still circled
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
@@ -238,14 +239,7 @@ void main() {
   group('rule R2 — connectedness: one gap tolerated, two stop the run', () {
     test('ONE missing day between candidates keeps the sequence going', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         // Mar 11: untracked — the single tolerated gap day
         d(2026, 3, 12, t: 36.9), // candidate 2
@@ -270,14 +264,7 @@ void main() {
 
     test('ONE day at/below the baseline between candidates keeps it going', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11, t: 36.3), // BELOW the baseline — the tolerated gap
         d(2026, 3, 12, t: 36.9), // candidate 2
@@ -299,14 +286,7 @@ void main() {
         'ONE missing day between the last ARROW and the first CIRCLE keeps '
         'the sequence going (R2 spans the kind transition)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2),
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
         d(2026, 3, 11, t: 36.9), // peak day → arrow 2
         // Mar 12: untracked — the single tolerated gap day at the
@@ -335,14 +315,7 @@ void main() {
         'TWO missing days at the arrow→circle transition break the sequence '
         'too', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2),
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
         d(2026, 3, 11, t: 36.9), // peak day → arrow 2
         // Mar 12–13: two untracked days across the transition → break
@@ -367,14 +340,7 @@ void main() {
         'TWO missing days between candidates STOP the evaluation: no SUZ, '
         'no automatic re-search (later higher days stay unmarked)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         // Mar 11–12: two untracked days — more than one gap → break
         d(2026, 3, 13, t: 36.9), // would-be candidate — NOT marked
@@ -395,14 +361,7 @@ void main() {
 
     test('TWO days at/below the baseline between candidates break it too', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11, t: 36.3), // below baseline (gap 1)
         d(2026, 3, 12, t: 36.4), // exactly at baseline (gap 2)
@@ -424,14 +383,7 @@ void main() {
         'a gap run at the END of the data is not a break (nothing '
         'followed, so no two candidates are disconnected)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11), // tracked but unmeasured (gap 1)
         d(2026, 3, 12), // tracked but unmeasured (gap 2) — data ends here
@@ -495,14 +447,7 @@ void main() {
         'the rise mark is taken verbatim: when the marked day is not above '
         'the baseline, the sequence starts at the next above-baseline day', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.4), // marked rise, but AT the baseline
         d(2026, 3, 11, t: 36.9), // first day above the baseline → candidate 1
       ];
@@ -523,14 +468,7 @@ void main() {
   group('rule R4 — arrow vs circle, PER CANDIDATE', () {
     // Shared fixture: baseline 36.4 (Mar 6), rise on Mar 10.
     final entries = [
-      d(2026, 3, 2, bleeding: Bleeding.medium),
-      d(2026, 3, 3, t: 36.2),
-      d(2026, 3, 4, t: 36.1),
-      d(2026, 3, 5, t: 36.3),
-      d(2026, 3, 6, t: 36.4), // baseline
-      d(2026, 3, 7, t: 36.2),
-      d(2026, 3, 8, t: 36.3),
-      d(2026, 3, 9, t: 36.2),
+      ..._baseLowRun,
       d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
       d(2026, 3, 11, t: 36.9), // candidate 2
       d(2026, 3, 12, t: 37.0), // candidate 3
@@ -740,14 +678,7 @@ void main() {
         'arrows, circles start at 1 after it; rule D fires on the 3rd '
         'circle under the late peak', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline (highest of the six lows)
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak 1 (early) — also low #1
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise (between the peaks) → arrow 1
         d(2026, 3, 11, t: 36.9), // arrow 2
         d(2026, 3, 12, t: 37.0), // peak 2 (late) → arrow 3 (peak-day candidate)
@@ -798,14 +729,7 @@ void main() {
       // flip: adding the later peak re-evaluates the SAME marks and the
       // candidates up to and including the new peak day become arrows.
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak 1
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8),
         d(2026, 3, 11, t: 36.9),
         d(2026, 3, 12, t: 37.0),
@@ -843,14 +767,7 @@ void main() {
         'a peak marked AFTER all candidates: every candidate stays an '
         'arrow → no SUZ (rules D/E count circles only)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak 1 (early, before the rise)
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
         d(2026, 3, 11, t: 36.9), // arrow 2
         d(2026, 3, 12, t: 37.0), // arrow 3 — last candidate; data ends here
@@ -886,14 +803,7 @@ void main() {
         'two rise marks: the LATER one anchors the six-low window, the '
         'baseline and the walk; the earlier rise day renders no candidate', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4),
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // EARLIER rise mark (premature Hochlage)
         d(2026, 3, 11, t: 36.3), // values fall back — the earlier rise broke
         d(2026, 3, 12, t: 36.4),
@@ -943,14 +853,7 @@ void main() {
         'rule D regression: the 3rd CIRCLE exactly +0.2 K above the '
         'baseline triggers the SUZ (floating-point tolerance)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline (highest inside the six window)
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2),
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.3), // peak day — low #1 (Mar 11 is low #2)
         d(2026, 3, 12, t: 36.5), // marked rise → circle 1 (+0.1)
         d(2026, 3, 13, t: 36.5), // circle 2 (+0.1)
@@ -973,14 +876,7 @@ void main() {
         'rule E: 3rd circle below the margin, 4th circle at ANY margin → '
         'SUZ begins the MORNING of the 4th circle', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1 (+0.1)
         d(2026, 3, 11, t: 36.5), // circle 2 (+0.1)
         d(2026, 3, 12, t: 36.5), // circle 3 (+0.1 — below the +0.2 margin)
@@ -1012,14 +908,7 @@ void main() {
         'exactly 3 circles, the 3rd below the +0.2 margin, data ends → '
         'NO SUZ, NOT stopped (rule E needs the 4th circle)', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1 (+0.1)
         d(2026, 3, 11, t: 36.5), // circle 2 (+0.1)
         d(2026, 3, 12, t: 36.5), // circle 3 (+0.1 — below the margin); END
@@ -1046,14 +935,7 @@ void main() {
         'D/E count circles only: arrows before the peak do not advance the '
         'trigger — the SUZ fires on the 3rd CIRCLE, not the 3rd candidate', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2),
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → arrow 1 (+0.1)
         d(2026, 3, 11, t: 36.5), // peak day → arrow 2 (+0.1)
         d(2026, 3, 12, t: 36.6), // circle 1 (+0.2 — 3rd CANDIDATE, but only
@@ -1086,14 +968,7 @@ void main() {
         'a break between the 3rd (below the margin) and the 4th circle '
         'prevents rule E: no SUZ, evaluation stopped', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.5), // circle 2
         d(2026, 3, 12, t: 36.5), // circle 3 — below the +0.2 margin
@@ -1119,14 +994,7 @@ void main() {
 
     test('only two circles and the data ends: no SUZ, not stopped', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.5), // circle 2 — data ends
       ];
@@ -1149,14 +1017,7 @@ void main() {
         'marked day between candidates consumes the tolerated gap; its '
         'above-baseline value is never a candidate', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11, t: 37.2), // alcohol spike — a GAP via the MARK,
         // not a candidate, despite being far above the baseline (the entry
@@ -1192,14 +1053,7 @@ void main() {
       // flagged 37.2 must therefore remain a candidate like any other
       // above-baseline measurement.
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         DailyEntry(
           date: DateTime(2026, 3, 11),
@@ -1229,14 +1083,7 @@ void main() {
 
     test('TWO marked (excluded) days in a row break the sequence', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11, t: 37.2), // marked excluded — gap 1
         d(2026, 3, 12, t: 37.0), // marked excluded — gap 2 → break
@@ -1291,14 +1138,7 @@ void main() {
 
     test('a cycle with tracked days after the last candidate ends at it', () {
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.5), // circle 2 — data continues…
         d(2026, 3, 12, bleeding: Bleeding.light), // …but stays low
@@ -1319,14 +1159,7 @@ void main() {
         'vacuous by construction, pinned defensively)', () {
       final entries = [
         // Cycle A: last candidate on its last tracked day (Mar 13)…
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.5), // circle 2
         d(2026, 3, 12, t: 36.5), // circle 3 — below the margin
@@ -1424,14 +1257,7 @@ void main() {
       // The rise mark sits exactly at the baseline: no candidate ever
       // appears, so R10 draws no baseline segment.
       final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.1),
-        d(2026, 3, 5, t: 36.3),
-        d(2026, 3, 6, t: 36.4), // baseline
-        d(2026, 3, 7, t: 36.2),
-        d(2026, 3, 8, t: 36.3),
-        d(2026, 3, 9, t: 36.2), // peak day
+        ..._baseLowRun,
         d(2026, 3, 10, t: 36.4), // marked rise, but AT the baseline
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];

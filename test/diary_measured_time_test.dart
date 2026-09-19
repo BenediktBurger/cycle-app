@@ -14,63 +14,18 @@
 // database is an in-memory override, same pattern as test/app_shell_test.dart.
 // The German locale is pinned (like the sibling widget tests) so the 24 h
 // format assertions stay deterministic.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/diary_harness.dart';
 
 // Injected "now" for every test in this file.
 final _fixedNow = DateTime(2026, 4, 10, 14, 35); // 14:35
 
-// The day pre-selected in the entry form (override of selectedDateProvider).
-final _selectedDay = DateOnly.normalize(_fixedNow);
-
-/// The database instance created by the scope's override (set on first
-/// watch), so tests can assert what was actually STORED.
-CycleDatabase? _db;
-
-ProviderScope _scope({Future<void> Function(CycleDatabase db)? seed}) {
-  return ProviderScope(
-    overrides: [
-      databaseProvider.overrideWith((ref) async {
-        final db = CycleDatabase(
-          DatabaseConnection(
-            NativeDatabase.memory(),
-            closeStreamsSynchronously: true,
-          ),
-        );
-        _db = db;
-        ref.onDispose(db.close);
-        // Seeding inside the database future guarantees the form (which
-        // reads only through databaseProvider.future) sees the seeded day.
-        await seed?.call(db);
-        return db;
-      }),
-      nowProvider.overrideWith((ref) => () => _fixedNow),
-      selectedDateProvider.overrideWith((ref) => _selectedDay),
-      localeProvider.overrideWith((ref) => const Locale('de')),
-    ],
-    child: const CycleApp(),
-  );
-}
+final harness = DiaryHarness(now: _fixedNow);
 
 void main() {
-  /// Enlarges the test surface: the form is tall, and the day tiles plus the
-  /// save button sit BELOW the default 800x600 test viewport — with the
-  /// lazy ListView they are not even built there, so finders miss them.
-  void tallSurface(WidgetTester tester, {double height = 2400}) {
-    tester.view.physicalSize = Size(800, height);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-  }
-
   /// Types into the temperature field (the first form field) and lets the
   /// controller listener rebuild the form (the time row's visibility
   /// follows the temperature).
@@ -81,7 +36,7 @@ void main() {
 
   testWidgets('the time row appears only once a temperature is entered',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_scope());
+    await tester.pumpWidget(harness.scope());
     await tester.pumpAndSettle();
 
     expect(find.text('Gemessen um'), findsNothing,
@@ -103,7 +58,7 @@ void main() {
     // The row mirrors the validator's plausibility gate (isWithinBbtRange):
     // "999" parses as a number but can never be saved as a temperature, so
     // no measurement time may be recorded for it.
-    await tester.pumpWidget(_scope());
+    await tester.pumpWidget(harness.scope());
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '999');
@@ -115,9 +70,9 @@ void main() {
 
   testWidgets('a stored time stays on re-open for editing (no re-prefill)',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_scope(seed: (db) async {
+    await tester.pumpWidget(harness.scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
-        date: _selectedDay,
+        date: harness.selectedDay,
         bbtC: 36.4,
         measuredAtMinutes: 407, // 06:47 — measured in the early morning
       ));
@@ -131,10 +86,10 @@ void main() {
 
   testWidgets('clearing the time is possible and stores null',
       (WidgetTester tester) async {
-    tallSurface(tester);
-    await tester.pumpWidget(_scope(seed: (db) async {
+    harness.tallSurface(tester);
+    await tester.pumpWidget(harness.scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
-        date: _selectedDay,
+        date: harness.selectedDay,
         bbtC: 36.4,
         measuredAtMinutes: 407,
       ));
@@ -151,7 +106,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
+    final stored = (await harness.db!.entriesDao.entryFor(harness.selectedDay))!;
     expect(stored.bbtC, 36.4, reason: 'the temperature itself is kept');
     expect(stored.measuredAtMinutes, isNull,
         reason: 'a day without time entry is legal; nothing is invented');
@@ -160,8 +115,8 @@ void main() {
   testWidgets(
       'a temperature-less save stores no time, even after the '
       'prefill was shown', (WidgetTester tester) async {
-    tallSurface(tester);
-    await tester.pumpWidget(_scope());
+    harness.tallSurface(tester);
+    await tester.pumpWidget(harness.scope());
     await tester.pumpAndSettle();
 
     // The user starts typing a temperature (the time row appears with the
@@ -178,7 +133,7 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
+    final stored = (await harness.db!.entriesDao.entryFor(harness.selectedDay))!;
     expect(stored.bbtC, isNull);
     expect(stored.mucusSign, 's');
     expect(stored.measuredAtMinutes, isNull,
@@ -188,15 +143,15 @@ void main() {
 
   testWidgets('saving a temperature stores the (prefilled) time with it',
       (WidgetTester tester) async {
-    tallSurface(tester);
-    await tester.pumpWidget(_scope());
+    harness.tallSurface(tester);
+    await tester.pumpWidget(harness.scope());
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '36.5');
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _db!.entriesDao.entryFor(_selectedDay))!;
+    final stored = (await harness.db!.entriesDao.entryFor(harness.selectedDay))!;
     expect(stored.bbtC, 36.5);
     expect(stored.measuredAtMinutes, 14 * 60 + 35, // the injected "now"
         reason: 'a temperature with the prefilled measurement time stores '
@@ -207,8 +162,8 @@ void main() {
       (WidgetTester tester) async {
     // The time lives on a DIFFERENT day than the selected one, so the only
     // possible source of the string is the tile, not the form.
-    tallSurface(tester);
-    await tester.pumpWidget(_scope(seed: (db) async {
+    harness.tallSurface(tester);
+    await tester.pumpWidget(harness.scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 1, 5),
         bbtC: 36.4,

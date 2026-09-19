@@ -20,82 +20,29 @@
 //     and the below-block rows (time, note) at the rail's tail.
 // Same harness pattern as test/cycle_chart_rows_test.dart (long-range
 // frozen-content test mirrors test/cycle_chart_windowing_test.dart).
-import 'package:cycle_app/domain/cervix.dart';
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/domain/mucus.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fixtures.dart';
+
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 // Nine chart days covering one recorded fact per signal (the per-signal
 // rows fixture of test/cycle_chart_rows_test.dart, shifted a year later):
 // temperatures 36.4..37.0, so the scale spans 36..37.5 and every 0.5 step
-// tick exists.
+// tick exists. Unlike the rows fixture, day 4 carries NO Mittelschmerz.
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
-final _entries = <DailyEntry>[
-  DailyEntry(date: _day(0), bbtC: 36.5, measuredAtMinutes: 6 * 60 + 30),
-  DailyEntry(date: _day(1), bbtC: 36.6, bleeding: Bleeding.light),
-  DailyEntry(date: _day(2), bbtC: 36.7, bleeding: Bleeding.spotting),
-  DailyEntry(date: _day(3), bbtC: 36.4, bleeding: Bleeding.heavy),
-  DailyEntry(
-    date: _day(4),
-    bbtC: 36.5,
-    mucusSign: MucusSign.s,
-    mucusQuality: MucusQuality.ew,
-  ),
-  DailyEntry(
-    date: _day(5),
-    bbtC: 36.8,
-    cervixPosition: CervixPosition.low,
-    cervixFirmness: CervixFirmness.soft,
-  ),
-  DailyEntry(date: _day(6), bbtC: 37.0, sexTimings: SexTiming.start.bit),
-  DailyEntry(date: _day(7), bbtC: 36.9, painBreast: true),
-  DailyEntry(date: _day(8)),
-];
-
-// A long recorded range (60 days, indexes 0..59) so the content overflows
-// and actually scrolls — the frozen-rail check needs a moving content.
-DateTime _longDay(int index) =>
-    DateTime.utc(2026, 1, 1).add(Duration(days: index));
-
-List<DailyEntry> _longEntries() => [
-      for (var i = 0; i < 60; i++)
-        DailyEntry(date: _longDay(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
+final _entries = nineDayRowsFixture(day: _day, withMittelschmerz: false);
 
 // 5 uniform days at 36.5: the scale is a compact two-tick-plus interval.
 List<DailyEntry> _flatEntries() => [
       for (var i = 0; i < 5; i++) DailyEntry(date: _day(i), bbtC: 36.5),
     ];
-
-Widget _chartHarness({
-  required List<DailyEntry> entries,
-  Locale locale = const Locale('en'),
-}) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
 
 Finder _rail() => find.byKey(const ValueKey('leftRail'));
 
@@ -115,25 +62,23 @@ List<String> _scaleLabels(WidgetTester tester) {
   return [for (final e in entries) e.text];
 }
 
-/// The horizontal scroll view that carries the chart block (the evaluation
-/// table below has its own keyed scroller, excluded here like in the other
-/// chart tests).
-Finder _chartScrollView() => find.byWidgetPredicate((w) =>
-    w is SingleChildScrollView &&
-    w.scrollDirection == Axis.horizontal &&
-    w.key != const ValueKey('cycleSummaryScroll'));
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  Locale locale = const Locale('en'),
+}) =>
+    chartHarness(entries: entries, locale: locale);
 
 void main() {
   group('frozen left rail', () {
     testWidgets(
         'the rail renders outside the horizontal scroll and stays frozen '
         'while the day columns move', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: longRangeEntries()));
       await tester.pumpAndSettle();
 
       expect(_rail(), findsOneWidget,
           reason: 'the chart block has a fixed left rail');
-      expect(find.descendant(of: _chartScrollView(), matching: _rail()),
+      expect(find.descendant(of: chartScrollView(), matching: _rail()),
           findsNothing,
           reason: 'the rail is outside the horizontally scrolling content — '
               'the temperature scale cannot scroll away anymore');
@@ -147,12 +92,12 @@ void main() {
       // the windowing tests), so the content movement is checked against
       // the settled scroll offset, not the dragged distance.
       final scrollState = tester.state<ScrollableState>(find.descendant(
-          of: _chartScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       final offsetBefore = scrollState.position.pixels;
 
       // Scroll the window toward earlier days (as the windowing tests do):
       // the day columns move, the rail does not.
-      await tester.drag(_chartScrollView(), const Offset(260, 0));
+      await tester.drag(chartScrollView(), const Offset(260, 0));
       await tester.pumpAndSettle();
       final offsetAfter = scrollState.position.pixels;
 

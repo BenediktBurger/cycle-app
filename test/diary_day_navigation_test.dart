@@ -9,17 +9,15 @@
 // day (selectedDateProvider override), same pattern as
 // diary_measured_time_test.dart. The German locale is pinned so the date
 // label and tooltip assertions stay deterministic.
-import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/diary_harness.dart';
 import 'package:intl/intl.dart';
 
 // Injected "now" for every test in this file.
@@ -30,35 +28,15 @@ final _fixedNow = DateTime(2026, 4, 10, 14, 35); // Friday, 10.4.2026
 final _day1 = DateOnly.normalize(DateTime(2026, 4, 8));
 final _day2 = DateOnly.normalize(DateTime(2026, 4, 9));
 
-/// The database instance created by the scope's override (set on first
-/// watch), so tests can assert what was actually STORED.
-CycleDatabase? _db;
+final harness = DiaryHarness(now: _fixedNow);
 
-ProviderScope _scope({required DateTime selectedDay}) {
-  return ProviderScope(
-    overrides: [
-      databaseProvider.overrideWith((ref) async {
-        final db = CycleDatabase(
-          DatabaseConnection(
-            NativeDatabase.memory(),
-            closeStreamsSynchronously: true,
-          ),
-        );
-        _db = db;
-        ref.onDispose(db.close);
-        // Two adjacent days with distinct temperatures: the form must show
-        // the one belonging to the currently selected day.
-        await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
-        await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
-        return db;
-      }),
-      nowProvider.overrideWith((ref) => () => _fixedNow),
-      selectedDateProvider.overrideWith((ref) => selectedDay),
-      localeProvider.overrideWith((ref) => const Locale('de')),
-    ],
-    child: const CycleApp(),
-  );
-}
+ProviderScope _scope({required DateTime selectedDay}) =>
+    harness.scope(seed: (db) async {
+      // Two adjacent days with distinct temperatures: the form must show
+      // the one belonging to the currently selected day.
+      await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
+      await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
+    }, selectedDay: selectedDay);
 
 /// The BBT field is the first form field; its controller text is the
 /// round-trip signal for "which day's entry is loaded".
@@ -186,8 +164,8 @@ void main() {
     expect(_bbtText(tester), '36.4',
         reason: 'the discarded edit never reached the database');
 
-    final stored1 = await _db!.entriesDao.entryFor(_day1);
-    final stored2 = await _db!.entriesDao.entryFor(_day2);
+    final stored1 = await harness.db!.entriesDao.entryFor(_day1);
+    final stored2 = await harness.db!.entriesDao.entryFor(_day2);
     expect(stored1!.bbtC, 36.4,
         reason: 'navigation must not write the unsaved edit');
     expect(stored2!.bbtC, 36.9);

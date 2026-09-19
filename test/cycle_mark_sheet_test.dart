@@ -22,37 +22,26 @@ import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// 2026-09-06 is a Sunday; the run covers 9/6 (idx 0) .. 9/16 (idx 10).
+import 'support/finders.dart';
+
+import 'support/database.dart';
+import 'support/fixtures.dart';
+
+// The evaluation scenario is the shared copy in support/fixtures.dart
+// (same days as the chart-evaluation rendering tests). [_d] names the
+// scenario's days for the sheet-driven write assertions.
 DateTime _d(int day) => DateTime.utc(2026, 9, day);
 
-/// Same evaluation scenario as test/cycle_chart_evaluation_test.dart:
-/// six lows 9/8..9/13 (numbered 6..1), the highest low 9/9 = baseline 36.4,
-/// mucus peak 9/12 (idx 6), first higher 9/14 (idx 8), higher 9/15, 9/16.
-final _entries = <DailyEntry>[
-  DailyEntry(date: _d(6), bbtC: 36.9),
-  DailyEntry(date: _d(7), bbtC: 36.3),
-  DailyEntry(date: _d(8), bbtC: 36.2),
-  DailyEntry(date: _d(9), bbtC: 36.4),
-  DailyEntry(date: _d(10), bbtC: 36.3),
-  DailyEntry(date: _d(11), bbtC: 36.1),
-  DailyEntry(date: _d(12), bbtC: 36.2),
-  DailyEntry(date: _d(13), bbtC: 36.3),
-  DailyEntry(date: _d(14), bbtC: 36.9),
-  DailyEntry(date: _d(15), bbtC: 36.9),
-  DailyEntry(date: _d(16), bbtC: 37.0),
-];
+/// The scenario's user marks, seeded through the DAO before the UI builds.
+final _peakMark = evaluationScenarioMarks()[0];
+final _firstHigherMark = evaluationScenarioMarks()[1];
 
-/// Marks seeded through the DAO BEFORE the UI builds.
-final _peakMark = CycleMark(date: _d(12), type: CycleMarkTypes.mucusPeakDay);
-final _firstHigherMark =
-    CycleMark(date: _d(14), type: CycleMarkTypes.firstHigherMeasurement);
+final _entries = evaluationScenarioEntries();
 
 /// The database instance created by the scope's override, so tests can
 /// assert what was actually STORED.
@@ -70,20 +59,15 @@ Future<void> _pump(
       DateOnly.normalize(selectedDate ?? DateTime.utc(2026, 9, 1));
   final container = ProviderContainer(
     overrides: [
-      databaseProvider.overrideWith((ref) async {
-        final db = CycleDatabase(
-          DatabaseConnection(
-            NativeDatabase.memory(),
-            closeStreamsSynchronously: true,
-          ),
-        );
-        _db = db;
-        ref.onDispose(db.close);
-        for (final mark in seedMarks) {
-          await db.marksDao.addMark(mark.date, mark.type, author: mark.author);
-        }
-        return db;
-      }),
+      inMemoryDatabase(
+        seed: (db) async {
+          for (final mark in seedMarks) {
+            await db.marksDao
+                .addMark(mark.date, mark.type, author: mark.author);
+          }
+        },
+        onCreated: (db) => _db = db,
+      ),
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
       selectedDateProvider.overrideWith((ref) => initialSelected),
       tabIndexProvider.overrideWith((ref) => initialTab),
@@ -132,21 +116,6 @@ Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
 /// The stored mark types for one calendar day, from the REAL database.
 Future<List<String>> _storedTypes(DateTime day) async =>
     (await _db!.marksDao.marksForDay(day)).map((m) => m.markType).toList();
-
-/// The dot painter the chart uses for the temperature dot of [dayIndex].
-FlDotPainter? _dotPainter(WidgetTester tester, int dayIndex) {
-  final chart = tester.widget<LineChart>(find.byType(LineChart));
-  for (final bar in chart.data.lineBarsData) {
-    final color = bar.color;
-    if (color != null && color.a != 0) continue; // only the dot-only bars
-    for (final spot in bar.spots) {
-      if (spot.x.round() == dayIndex) {
-        return bar.dotData.getDotPainter(spot, 0, bar, bar.spots.indexOf(spot));
-      }
-    }
-  }
-  return null;
-}
 
 void main() {
   testWidgets('tapping a chart day opens the mark-entry sheet, not the form',
@@ -278,7 +247,7 @@ void main() {
     // ring on the temperature curve.
     expect(find.byKey(const ValueKey('peakDot-6')), findsOneWidget,
         reason: 'the symbol row re-renders from the marks stream');
-    expect(_dotPainter(tester, 6), isNot(isA<RingDotPainter>()),
+    expect(dotPainterOrNull(tester, 6), isNot(isA<RingDotPainter>()),
         reason: 'the peak day keeps a plain dot on the curve (R6)');
   });
 

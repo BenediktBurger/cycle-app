@@ -8,28 +8,20 @@
 // count the scroll path causes.
 //
 // Same harness pattern as test/cycle_chart_windowing_test.dart.
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// A many-day recorded range (2026-01-01 onwards, 600 days).
-DateTime _day(int index) => DateTime.utc(2026, 1, 1).add(Duration(days: index));
+import 'support/fixtures.dart';
 
-List<DailyEntry> _entries() => [
-      for (var i = 0; i < 600; i++)
-        DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
+import 'support/finders.dart';
 
-Finder _hScrollView() => find.byWidgetPredicate((w) =>
-    w is SingleChildScrollView &&
-    w.scrollDirection == Axis.horizontal &&
-    w.key != const ValueKey('cycleSummaryScroll'));
+import 'support/chart_pump.dart';
+
+// A many-day recorded range (2026-01-01 onwards, 600 days; the shared
+// long-range fixture with a longer count).
+List<DailyEntry> _entries() => longRangeEntries(600);
 
 /// The day indexes whose signal cells are currently built.
 Set<int> _builtCells(WidgetTester tester) {
@@ -50,19 +42,8 @@ void main() {
       'scrolling a long distance re-windows the chart only a handful of '
       'times, not once per day column', (tester) async {
     final entries = _entries();
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    ));
+    // No theme wiring here: the test counts window rebuilds, not looks.
+    await tester.pumpWidget(chartHarness(entries: entries, themed: false));
     await tester.pumpAndSettle();
 
     // Travel 2000 px in 10 px steps (one pump per step): with a parked
@@ -73,7 +54,7 @@ void main() {
     var built = _builtCells(tester);
     const steps = 200;
     final gesture = await tester
-        .startGesture(tester.getCenter(_hScrollView().first));
+        .startGesture(tester.getCenter(chartScrollView().first));
     for (var i = 0; i < steps; i++) {
       await gesture.moveBy(const Offset(10, 0)); // toward earlier days
       await tester.pump(const Duration(milliseconds: 16));

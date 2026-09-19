@@ -11,16 +11,13 @@
 // Also pins the degenerate single-day chart: its domain stays a usable
 // non-zero-width window (−0.5..0.5) and taps still map to the one recorded
 // day.
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/chart_pump.dart';
 
 // 2026-09-03 is a Thursday: a five-day Thu..Mon range fits the viewport.
 DateTime _day(int index) => DateTime.utc(2026, 9, 3).add(Duration(days: index));
@@ -29,24 +26,6 @@ List<DailyEntry> _entries(int count) => [
       for (var i = 0; i < count; i++)
         DailyEntry(date: _day(i), bbtC: 36.5 + (i % 5) * 0.1),
     ];
-
-Widget _chartHarness({required List<DailyEntry> entries}) => ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
 
 /// The rendered global x of day [dayIndex]'s chart dot: the chart maps its
 /// x domain linearly onto the plot area, which spans the chart widget's
@@ -61,6 +40,9 @@ double _dotX(WidgetTester tester, int dayIndex) {
 
 double _cellCenterX(WidgetTester tester, String key) =>
     tester.getRect(find.byKey(ValueKey(key))).center.dx;
+
+Widget _chartHarness({required List<DailyEntry> entries}) =>
+    chartHarness(entries: entries);
 
 void main() {
   testWidgets(

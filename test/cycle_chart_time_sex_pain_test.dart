@@ -12,17 +12,14 @@
 // test/cycle_chart_cervix_test.dart (localized en, plus a de wording
 // check).
 import 'package:cycle_app/domain/cervix.dart';
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
@@ -59,32 +56,11 @@ List<DailyEntry> _entries() => [
       ),
     ];
 
-Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
-
-Finder _inCell(int i, String row, Finder inner) =>
-    find.descendant(of: _cell(i, row), matching: inner);
-
 Widget _chartHarness({
   required List<DailyEntry> entries,
   Locale locale = const Locale('en'),
 }) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
+    chartHarness(entries: entries, locale: locale);
 
 void main() {
   group('measurement time — its own row below the chart block', () {
@@ -98,16 +74,16 @@ void main() {
       final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
       // Own row below the block: the time row starts after the chart, and
       // after the below-curve rows (cervix, pain, disturbance).
-      expect(tester.getRect(_cell(0, 'time')).top, greaterThan(chartBottom),
+      expect(tester.getRect(chartCell(0, 'time')).top, greaterThan(chartBottom),
           reason: 'the time row is not part of the chart block');
       for (final row in ['cervix', 'pain']) {
-        expect(tester.getRect(_cell(0, 'time')).top,
-            greaterThan(tester.getRect(_cell(0, row)).bottom),
+        expect(tester.getRect(chartCell(0, 'time')).top,
+            greaterThan(tester.getRect(chartCell(0, row)).bottom),
             reason: 'the time row renders below the $row row');
       }
       // Every day with a recorded time renders its HH:mm (the fixture's
       // only recorded time is day 0).
-      expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget);
+      expect(chartCellContent(0, 'time', find.text('06:30')), findsOneWidget);
     });
 
     testWidgets(
@@ -129,7 +105,7 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: entries));
       await tester.pumpAndSettle();
 
-      expect(tester.getRect(_cell(59, 'time')).width, closeTo(24, 0.5),
+      expect(tester.getRect(chartCell(59, 'time')).width, closeTo(24, 0.5),
           reason: 'precondition: columns at the minimum usable width');
 
       Finder timeCells() => find.byWidgetPredicate((w) =>
@@ -167,11 +143,11 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: entries));
       await tester.pumpAndSettle();
 
-      expect(tester.getRect(_cell(24, 'time')).width, closeTo(29, 1.5),
+      expect(tester.getRect(chartCell(24, 'time')).width, closeTo(29, 1.5),
           reason: 'precondition: narrow, non-minimum column width');
       expect(
           find.descendant(
-              of: _cell(24, 'time'),
+              of: chartCell(24, 'time'),
               matching: find.descendant(
                   of: find.byWidgetPredicate(
                       (w) => w is RotatedBox && w.quarterTurns != 0),
@@ -185,14 +161,14 @@ void main() {
       await tester.pumpWidget(_chartHarness(entries: _entries()));
       await tester.pumpAndSettle();
 
-      expect(tester.getRect(_cell(0, 'time')).width, greaterThan(32),
+      expect(tester.getRect(chartCell(0, 'time')).width, greaterThan(32),
           reason: 'precondition: a wide column');
       expect(
           find.descendant(
-              of: _cell(0, 'time'), matching: find.byType(RotatedBox)),
+              of: chartCell(0, 'time'), matching: find.byType(RotatedBox)),
           findsNothing,
           reason: 'a wide column keeps the horizontal HH:mm text');
-      expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget);
+      expect(chartCellContent(0, 'time', find.text('06:30')), findsOneWidget);
     });
   });
   testWidgets('the measurement time renders localized HH:mm text on days '
@@ -203,17 +179,17 @@ void main() {
 
     // 8+1 chart days fit the viewport comfortably, so the columns are wide
     // enough for the time text.
-    expect(_inCell(0, 'time', find.text('06:30')), findsOneWidget,
+    expect(chartCellContent(0, 'time', find.text('06:30')), findsOneWidget,
         reason: 'the temperature day WITH a recorded time shows the HH:mm '
             'text in its own time cell');
-    expect(_inCell(1, 'time', find.text('06:30')), findsNothing,
+    expect(chartCellContent(1, 'time', find.text('06:30')), findsNothing,
         reason: 'a temperature WITHOUT a recorded time shows no time text');
-    expect(_inCell(2, 'time', find.byType(Text)), findsNothing,
+    expect(chartCellContent(2, 'time', find.byType(Text)), findsNothing,
         reason: 'a temperature-free day can never carry a measurement time '
             '(the domain drops the time without a temperature)');
-    expect(_inCell(6, 'time', find.byType(Text)), findsNothing,
+    expect(chartCellContent(6, 'time', find.byType(Text)), findsNothing,
         reason: 'a plain temperature day without a time shows nothing');
-    expect(_inCell(2, 'time', find.byIcon(Icons.schedule)), findsNothing,
+    expect(chartCellContent(2, 'time', find.byIcon(Icons.schedule)), findsNothing,
         reason: 'no per-day clock icon — the clock lives only in the row '
             'corner slot');
   });
@@ -223,11 +199,11 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(2, 'sex', find.text('X')), findsOneWidget,
+    expect(chartCellContent(2, 'sex', find.text('X')), findsOneWidget,
         reason: 'the sex day shows the X glyph in its own cell');
-    expect(_inCell(0, 'sex', find.text('X')), findsNothing,
+    expect(chartCellContent(0, 'sex', find.text('X')), findsNothing,
         reason: 'no X on a temperature day without sex');
-    expect(_inCell(6, 'sex', find.text('X')), findsNothing);
+    expect(chartCellContent(6, 'sex', find.text('X')), findsNothing);
   });
 
   testWidgets('every set sex time slot renders its own X — multiple slots '
@@ -235,9 +211,9 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(5, 'sex', find.text('X')), findsNWidgets(2),
+    expect(chartCellContent(5, 'sex', find.text('X')), findsNWidgets(2),
         reason: 'two recorded slots (start + end) render two X marks');
-    expect(_inCell(2, 'sex', find.text('X')), findsOneWidget,
+    expect(chartCellContent(2, 'sex', find.text('X')), findsOneWidget,
         reason: 'a single recorded slot renders exactly one X');
   });
 
@@ -249,14 +225,14 @@ void main() {
     double fractionOf(Rect cell, Rect glyph) =>
         (glyph.center.dx - cell.left) / cell.width;
 
-    final cell2 = tester.getRect(_cell(2, 'sex'));
-    final startX = tester.getRect(_inCell(2, 'sex', find.text('X')));
+    final cell2 = tester.getRect(chartCell(2, 'sex'));
+    final startX = tester.getRect(chartCellContent(2, 'sex', find.text('X')));
     expect(fractionOf(cell2, startX), closeTo(1 / 6, 0.05),
         reason: 'a start-slot X renders in the START third (center ~1/6) of '
             'the day column');
 
-    final cell5 = tester.getRect(_cell(5, 'sex'));
-    final xRects = _inCell(5, 'sex', find.text('X')).evaluate().map((element) {
+    final cell5 = tester.getRect(chartCell(5, 'sex'));
+    final xRects = chartCellContent(5, 'sex', find.text('X')).evaluate().map((element) {
       final box = element.renderObject! as RenderBox;
       return box.localToGlobal(Offset.zero) & box.size;
     }).toList()
@@ -274,24 +250,24 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(3, 'pain', find.text('B')), findsOneWidget,
+    expect(chartCellContent(3, 'pain', find.text('B')), findsOneWidget,
         reason: 'breast pain shows the B letter in the pain row');
-    expect(_inCell(3, 'pain', find.text('M')), findsNothing,
+    expect(chartCellContent(3, 'pain', find.text('M')), findsNothing,
         reason: 'no Mittelschmerz letter without the flag — and the M '
             'letter home is its own row anyway');
-    expect(_inCell(4, 'mittelschmerz', find.text('M')), findsOneWidget,
+    expect(chartCellContent(4, 'mittelschmerz', find.text('M')), findsOneWidget,
         reason: 'Mittelschmerz shows the M letter in its own row beneath '
             'the mucus row (flagged TODO(user-review) in the chart code)');
-    expect(_inCell(4, 'pain', find.text('M')), findsNothing,
+    expect(chartCellContent(4, 'pain', find.text('M')), findsNothing,
         reason: 'the M letter no longer renders in the below-curve pain '
             'row');
-    expect(_inCell(4, 'pain', find.text('B')), findsNothing,
+    expect(chartCellContent(4, 'pain', find.text('B')), findsNothing,
         reason: 'no breast letter without the flag');
-    expect(_inCell(5, 'pain', find.text('B')), findsOneWidget);
-    expect(_inCell(5, 'mittelschmerz', find.text('M')), findsOneWidget);
-    expect(_inCell(6, 'pain', find.text('B')), findsNothing,
+    expect(chartCellContent(5, 'pain', find.text('B')), findsOneWidget);
+    expect(chartCellContent(5, 'mittelschmerz', find.text('M')), findsOneWidget);
+    expect(chartCellContent(6, 'pain', find.text('B')), findsNothing,
         reason: 'a plain day shows no pain letter');
-    expect(_inCell(6, 'mittelschmerz', find.text('M')), findsNothing);
+    expect(chartCellContent(6, 'mittelschmerz', find.text('M')), findsNothing);
   });
 
   testWidgets('a combined day carries the sex X marks alongside both pain '
@@ -300,12 +276,12 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(5, 'sex', find.text('X')), findsNWidgets(2),
+    expect(chartCellContent(5, 'sex', find.text('X')), findsNWidgets(2),
         reason: 'the sex X marks render in their own row');
-    expect(_inCell(5, 'pain', find.text('B')), findsOneWidget,
+    expect(chartCellContent(5, 'pain', find.text('B')), findsOneWidget,
         reason: 'the pain letter renders in its own row beside the sex '
             'row');
-    expect(_inCell(5, 'mittelschmerz', find.text('M')), findsOneWidget,
+    expect(chartCellContent(5, 'mittelschmerz', find.text('M')), findsOneWidget,
         reason: 'the Mittelschmerz letter renders in its own row beneath '
             'the mucus row');
   });
@@ -315,11 +291,11 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
     await tester.pumpAndSettle();
 
-    expect(_inCell(7, 'cervix', find.text('w')), findsOneWidget,
+    expect(chartCellContent(7, 'cervix', find.text('w')), findsOneWidget,
         reason: 'the soft-firmness glyph (paper shorthand w) renders in its '
             'own cell');
     for (final glyph in ['t', 'm', 'h', 'sh', 'u']) {
-      expect(_inCell(7, 'cervix', find.text(glyph)), findsNothing,
+      expect(chartCellContent(7, 'cervix', find.text(glyph)), findsNothing,
           reason: 'no position letter ($glyph) without a position '
               'observation');
     }

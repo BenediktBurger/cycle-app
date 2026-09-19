@@ -7,36 +7,16 @@
 // The platform locale is simulated through the test binding's platform
 // dispatcher; the app itself is unchanged: in-memory drift database
 // override, no platform channels (same pattern as app_shell_test.dart).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/database.dart';
+
 /// App scope for the language tests. A null [locale] means: leave the
 /// provider at its real default (the "System" option); anything else is an
 /// explicit settings choice.
-ProviderScope _appScope({Locale? locale}) => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        if (locale != null) localeProvider.overrideWith((ref) => locale),
-      ],
-      child: const CycleApp(),
-    );
+ProviderScope _appScope({Locale? locale}) => appScope(locale: locale);
 
 void main() {
   testWidgets('system-default on a German device resolves to German UI',

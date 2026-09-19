@@ -11,15 +11,13 @@
 // Same harness pattern as test/cycle_chart_rows_test.dart.
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 // 2026-09-07 is a Monday: a 12-day run Mon .. Fri (next week).
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
@@ -55,29 +53,6 @@ final _gapMarks = <CycleMark>[
   CycleMark(date: _day(3), type: CycleMarkTypes.cycleStart),
 ];
 
-Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
-
-Widget _chartHarness(
-        {required List<DailyEntry> entries,
-        List<CycleMark> marks = const []}) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(marks)),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
-
 LineChartData _chartData(WidgetTester tester) =>
     tester.widget<LineChart>(find.byType(LineChart)).data;
 
@@ -89,7 +64,7 @@ ColorScheme _scheme(WidgetTester tester) =>
 /// unlike every glyph's own decoration (uniform Border.all or none).
 Border _cellRightBorder(WidgetTester tester, int index, String row) {
   final containers = tester.widgetList<Container>(
-      find.descendant(of: _cell(index, row), matching: find.byType(Container)));
+      find.descendant(of: chartCell(index, row), matching: find.byType(Container)));
   return containers
       .map((c) => c.decoration)
       .whereType<BoxDecoration>()
@@ -98,6 +73,10 @@ Border _cellRightBorder(WidgetTester tester, int index, String row) {
       .firstWhere((b) => !b.isUniform,
           orElse: () => fail('no cell border found in cell $index of $row'));
 }
+
+Widget _chartHarness(
+    {required List<DailyEntry> entries, List<CycleMark> marks = const []}) =>
+    chartHarness(entries: entries, marks: marks);
 
 void main() {
   group('vertical day lines', () {

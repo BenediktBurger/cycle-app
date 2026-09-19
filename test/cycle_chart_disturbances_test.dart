@@ -10,18 +10,15 @@
 // pinned by test/cycle_chart_temperature_test.dart.
 //
 // Same harness pattern as test/cycle_chart_rows_test.dart.
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
@@ -49,34 +46,11 @@ final _entries = <DailyEntry>[
   ),
 ];
 
-Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
-
-Finder _corner(String row) => find.byKey(ValueKey('${row}Corner'));
-
-Finder _inCell(int i, String row, Finder inner) =>
-    find.descendant(of: _cell(i, row), matching: inner);
-
 Widget _chartHarness({
   required List<DailyEntry> entries,
   Locale locale = const Locale('en'),
 }) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
+    chartHarness(entries: entries, locale: locale);
 
 void main() {
   testWidgets(
@@ -94,17 +68,17 @@ void main() {
       3: 'sp',
       4: 'a',
     }.entries) {
-      final cellRect = tester.getRect(_cell(entry.key, 'disturbance'));
+      final cellRect = tester.getRect(chartCell(entry.key, 'disturbance'));
       expect(cellRect.top, greaterThan(chartBottom),
           reason: 'the disturbance row sits at the bottom of the chart '
               'block, below the curve');
-      expect(_inCell(entry.key, 'disturbance', find.text(entry.value)),
+      expect(chartCellContent(entry.key, 'disturbance', find.text(entry.value)),
           findsOneWidget,
           reason: 'day ${entry.key} carries its disturbance flag\'s letter '
               'code (${entry.value}) in the day\'s column');
       // The letter sits inside its day column horizontally (same column
       // geometry as every other row).
-      final curveCell = tester.getRect(_cell(entry.key, 'bleeding'));
+      final curveCell = tester.getRect(chartCell(entry.key, 'bleeding'));
       expect(cellRect.left, closeTo(curveCell.left, 0.5),
           reason: 'the disturbance cell shares the day column geometry');
     }
@@ -116,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final letter in ['kr', 'alk', 'sp', 'a']) {
-      expect(_inCell(0, 'disturbance', find.text(letter)), findsNothing,
+      expect(chartCellContent(0, 'disturbance', find.text(letter)), findsNothing,
           reason: 'a plain day shows no letter code');
     }
   });
@@ -126,9 +100,9 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    final cell = tester.getRect(_cell(5, 'disturbance'));
+    final cell = tester.getRect(chartCell(5, 'disturbance'));
     for (final letter in ['kr', 'alk', 'sp', 'a']) {
-      final rects = _inCell(5, 'disturbance', find.text(letter))
+      final rects = chartCellContent(5, 'disturbance', find.text(letter))
           .evaluate()
           .map((element) {
         final box = element.renderObject! as RenderBox;
@@ -145,9 +119,9 @@ void main() {
     // paper sheet writes disturbance codes one under the other). Render
     // order follows the mask's token order — alk (bit 4) stacks above
     // kr (bit 8).
-    final krRect = tester.getRect(_inCell(5, 'disturbance', find.text('kr')));
+    final krRect = tester.getRect(chartCellContent(5, 'disturbance', find.text('kr')));
     final alkRect =
-        tester.getRect(_inCell(5, 'disturbance', find.text('alk')));
+        tester.getRect(chartCellContent(5, 'disturbance', find.text('alk')));
     expect(alkRect.bottom, lessThanOrEqualTo(krRect.top),
         reason: 'the stacked letters do not overlap');
   });
@@ -157,7 +131,7 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    await tester.tap(_cell(1, 'disturbance'), warnIfMissed: false);
+    await tester.tap(chartCell(1, 'disturbance'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(find.byType(BottomSheet), findsOneWidget);
@@ -172,10 +146,10 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    expect(_corner('disturbance'), findsOneWidget);
+    expect(chartCellCorner('disturbance'), findsOneWidget);
     final tooltips = tester
         .widgetList<Tooltip>(find.descendant(
-            of: _corner('disturbance'), matching: find.byType(Tooltip)))
+            of: chartCellCorner('disturbance'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(tooltips, ['Disturbed measurement'],
@@ -183,9 +157,9 @@ void main() {
 
     // Vertical alignment with its row (shared row heights, like every
     // other rail glyph).
-    final cornerCenter = tester.getRect(_corner('disturbance')).center.dy;
+    final cornerCenter = tester.getRect(chartCellCorner('disturbance')).center.dy;
     final cellCenter =
-        tester.getRect(_cell(3, 'disturbance')).center.dy;
+        tester.getRect(chartCell(3, 'disturbance')).center.dy;
     expect(cornerCenter, closeTo(cellCenter, 0.5),
         reason: 'the disturbance rail glyph is vertically centered on the '
             'row');
@@ -195,7 +169,7 @@ void main() {
     await tester.pumpAndSettle();
     final deTooltips = tester
         .widgetList<Tooltip>(find.descendant(
-            of: _corner('disturbance'), matching: find.byType(Tooltip)))
+            of: chartCellCorner('disturbance'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(deTooltips, ['Messstörung'],

@@ -10,67 +10,29 @@
 // recorded range without touching the database.
 import 'dart:async';
 
-import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// A long recorded range: 60 consecutive days starting 2026-01-01 — far
-/// too long for one viewport, so the day window matters.
-DateTime _day(int index) => DateTime.utc(2026, 1, 1).add(Duration(days: index));
+import 'support/fixtures.dart';
 
-List<DailyEntry> _longEntries() => [
-      for (var i = 0; i < 60; i++)
-        DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
+import 'support/finders.dart';
 
-/// The navigation bar carries each tab's label exactly once; scoping the
-/// taps here keeps them unambiguous even though every screen (and its
-/// AppBar) is mounted at once.
-Finder _navLabel(String label) =>
-    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+import 'support/database.dart';
 
 /// The horizontal scroll view that carries the cycle chart block, scoped to
-/// the Zyklus screen (other tabs have their own scrollables). The evaluation
-/// table below the chart block has its own horizontal scroller (key
-/// `cycleSummaryScroll`) — it is not the chart block, so it is excluded by
-/// that key here.
+/// the Zyklus screen (other tabs have their own scrollables).
 Finder _chartScrollView() => find.descendant(
-      of: find.byType(ZyklusScreen),
-      matching: find.byWidgetPredicate((w) =>
-          w is SingleChildScrollView &&
-          w.scrollDirection == Axis.horizontal &&
-          w.key != const ValueKey('cycleSummaryScroll')),
-    );
+    of: find.byType(ZyklusScreen),
+    matching: chartScrollView());
 
-Widget _appScope(StreamController<List<DailyEntry>> entries) => ProviderScope(
-      overrides: [
-        // In-memory database: no files, no platform channels, no FFI paths
-        // (same remedy for stream-teardown timers as in app_shell_test.dart).
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        // Broadcast so the diary and the cycle chart (both watch this
-        // provider) can listen at the same time.
-        dailyEntriesProvider.overrideWith((ref) => entries.stream),
-        localeProvider.overrideWith((ref) => const Locale('de')),
-      ],
-      child: const CycleApp(),
+Widget _appScope(StreamController<List<DailyEntry>> entries) =>
+    // Broadcast so the diary and the cycle chart (both watch this provider)
+    // can listen at the same time.
+    appScope(
+      entriesStream: entries.stream,
+      locale: const Locale('de'),
     );
 
 void main() {
@@ -87,11 +49,11 @@ void main() {
     // The provider subscribes during the build above; an emit before that
     // would be dropped by the broadcast stream, so seed now and let the
     // shell settle with data.
-    entries.add(_longEntries());
+    entries.add(longRangeEntries());
     await tester.pumpAndSettle();
 
     // Switch to the Zyklus tab.
-    await tester.tap(_navLabel('Zyklus'));
+    await tester.tap(navLabel('Zyklus'));
     await tester.pumpAndSettle();
 
     // Drag the window away from its initial position. A timed drag carries
@@ -134,9 +96,9 @@ void main() {
         reason: 'the scrolled window must render day cells');
 
     // Roundtrip: to the diary tab and back.
-    await tester.tap(_navLabel('Tagebuch'));
+    await tester.tap(navLabel('Tagebuch'));
     await tester.pumpAndSettle();
-    await tester.tap(_navLabel('Zyklus'));
+    await tester.tap(navLabel('Zyklus'));
     await tester.pumpAndSettle();
 
     expect(chartScrollState().position.pixels, offsetBefore,

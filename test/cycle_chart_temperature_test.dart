@@ -11,46 +11,17 @@
 // (with the marksProvider override pattern from the help-sheet tests).
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/chart_pump.dart';
 
 // 2026-09-03 is a Thursday: Thu..Sun as a compact adjacent-day strip.
 final _thu = DateTime.utc(2026, 9, 3);
 final _fri = DateTime.utc(2026, 9, 4);
 final _sat = DateTime.utc(2026, 9, 5);
 final _sun = DateTime.utc(2026, 9, 6);
-
-final _seedColor = const Color(0xFF6750A4);
-
-Widget _chartHarness({
-  required List<DailyEntry> entries,
-  List<CycleMark> marks = const [],
-}) =>
-    MaterialApp(
-      themeMode: ThemeMode.system,
-      theme:
-          ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: _seedColor)),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: _seedColor, brightness: Brightness.dark),
-      ),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('en'),
-      home: ProviderScope(
-        overrides: [
-          dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-          marksProvider.overrideWith((ref) => Stream.value(marks)),
-          selectedDateProvider.overrideWith((ref) => entries.first.date),
-        ],
-        child: Scaffold(body: ZyklusScreen()),
-      ),
-    );
 
 List<LineChartBarData> _bars(WidgetTester tester) =>
     tester.widget<LineChart>(find.byType(LineChart)).data.lineBarsData;
@@ -81,6 +52,17 @@ bool _spansAGap(WidgetTester tester) => _segmentBars(tester).any((bar) {
 
 ThemeData _themeOf(WidgetTester tester) =>
     tester.widget<MaterialApp>(find.byType(MaterialApp)).theme!;
+
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  List<CycleMark> marks = const [],
+}) =>
+    chartHarness(
+      entries: entries,
+      marks: marks,
+      darkTheme: true,
+      scopeInsideMaterialApp: true,
+    );
 
 void main() {
   group('adjacent-day connectivity', () {

@@ -3,13 +3,11 @@
 // background band behind their chart column, weekdays get none. The band
 // color is theme-derived so it stays readable in light AND dark mode.
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/chart_pump.dart';
 
 // 2026-09-03 is a Thursday: Thu, Fri, Sat, Sun, Mon — a run that starts and
 // ends on a weekday with the weekend in the middle (indexes 2 and 3).
@@ -27,31 +25,6 @@ final _entries = <DailyEntry>[
   DailyEntry(date: _mon, bbtC: 36.6),
 ];
 
-Widget _chartHarness({List<DailyEntry>? entries, DateTime? selected}) =>
-    MaterialApp(
-      // Same seed scheme wiring as CycleApp (lib/main.dart) so the dark
-      // test below exercises the dark scheme, not a themeless MaterialApp.
-      themeMode: ThemeMode.system,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF6750A4), brightness: Brightness.dark),
-      ),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('en'),
-      home: ProviderScope(
-        overrides: [
-          dailyEntriesProvider
-              .overrideWith((ref) => Stream.value(entries ?? _entries)),
-          selectedDateProvider.overrideWith((ref) => selected ?? _thu),
-        ],
-        child: Scaffold(body: ZyklusScreen()),
-      ),
-    );
-
 /// The weekend background bands currently configured on the chart, in
 /// ascending x order.
 List<VerticalRangeAnnotation> _weekendBands(WidgetTester tester) => tester
@@ -68,6 +41,16 @@ Color _bandColor(VerticalRangeAnnotation band) {
       reason: 'bands are configured by color, not gradient');
   return color!;
 }
+
+Widget _chartHarness({List<DailyEntry>? entries, DateTime? selected}) =>
+    // Same seed scheme wiring as CycleApp (lib/main.dart) so the dark
+    // tests below exercise the dark scheme, not a themeless MaterialApp.
+    chartHarness(
+      entries: entries ?? _entries,
+      selectedDate: selected ?? _thu,
+      darkTheme: true,
+      scopeInsideMaterialApp: true,
+    );
 
 void main() {
   testWidgets('weekend columns get background bands, weekday columns none',

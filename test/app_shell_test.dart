@@ -4,58 +4,21 @@
 //
 // `flutter test` runs gen-l10n automatically (l10n.yaml), so the generated
 // AppLocalizations import resolves on first run.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// One test database override shared by the widget smoke tests.
-///
-/// `closeStreamsSynchronously: true` is drift's documented remedy for widget
-/// tests failing with "A Timer is still pending even after the widget tree
-/// was disposed": without it, drift delays query-stream cancellation by one
-/// event-loop turn (Timer.run), and streams cancelled while Riverpod disposes
-/// the ProviderScope during tree teardown can never reach that turn in the
-/// test's fake async zone.
-///
+import 'support/finders.dart';
+
+import 'support/database.dart';
+
 /// [locale] pins an explicit app language for the duration of the test: the
 /// app's real default is the system language (nullable localeProvider), and
 /// unpinned the test runner exposes an English device — so the German-string
 /// assertions below have to request German explicitly (the system-follow
 /// default itself is covered by locale_default_test.dart).
-ProviderScope _appScope([Locale? locale]) => ProviderScope(
-      overrides: [
-        // In-memory database: no files, no platform channels, no FFI paths.
-        // ref.onDispose closes it together with the test's ProviderScope
-        // (same closing semantics as the production provider).
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        if (locale != null) localeProvider.overrideWith((ref) => locale),
-      ],
-      child: const CycleApp(),
-    );
-
-/// The navigation bar carries each tab's label exactly once; scoping the
-/// taps here keeps them unambiguous even though every screen (and its
-/// AppBar) is mounted at once — the shell keeps all tabs mounted in an
-/// IndexedStack, so a bare find.text(label) matches the bar's destination
-/// AND the mounted screen's AppBar title.
-Finder _navLabel(String label) =>
-    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+ProviderScope _appScope([Locale? locale]) =>
+    appScope(locale: locale);
 
 void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (
@@ -82,7 +45,7 @@ void main() {
     // carrying the same localized name as its label).
     const switchTargets = ['Zyklus', 'Statistik', 'Einstellungen', 'Tagebuch'];
     for (final label in switchTargets) {
-      await tester.tap(_navLabel(label));
+      await tester.tap(navLabel(label));
       await tester.pumpAndSettle();
       expect(
         find.text(label),
@@ -96,7 +59,7 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
-    await tester.tap(_navLabel('Tagebuch'));
+    await tester.tap(navLabel('Tagebuch'));
     await tester.pumpAndSettle();
 
     // The sign picker offers the unset option plus the four glyphs
@@ -157,7 +120,7 @@ void main() {
     // it would falsely signal an existing protection (ADR-0005).
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
-    await tester.tap(_navLabel('Einstellungen'));
+    await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
     final pinSwitch =

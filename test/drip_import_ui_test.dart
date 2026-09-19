@@ -5,34 +5,14 @@
 // The locale is pinned explicitly so the German-string assertions hold no
 // matter what locale the test runner's system reports (the system-follow
 // default itself is covered by locale_default_test.dart).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/settings.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ProviderScope _appScope([Locale? locale]) => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        if (locale != null) localeProvider.overrideWith((ref) => locale),
-      ],
-      child: const CycleApp(),
-    );
+import 'support/database.dart';
+
+ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
 
 /// Whether the widget [tree] rooted at [w] contains a [Text] with [text]
 /// (walks the plain container widgets the settings cards are made of; enough

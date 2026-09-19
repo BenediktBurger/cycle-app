@@ -13,37 +13,16 @@
 //    i.e. English is the first/last supported locale.
 import 'dart:io';
 
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ProviderScope _appScope(Locale locale) => ProviderScope(
-      overrides: [
-        // In-memory database: no files, no platform channels, no FFI paths
-        // (same remedy for stream-teardown timers as in app_shell_test.dart).
-        databaseProvider.overrideWith(
-          (ref) {
-            final db = CycleDatabase(
-              DatabaseConnection(
-                NativeDatabase.memory(),
-                closeStreamsSynchronously: true,
-              ),
-            );
-            ref.onDispose(db.close);
-            return db;
-          },
-        ),
-        // An active language that exists in neither supported language —
-        // what the app *resolves it to* is the fallback under test.
-        localeProvider.overrideWith((ref) => locale),
-      ],
-      child: const CycleApp(),
-    );
+import 'support/database.dart';
+
+ProviderScope _appScope(Locale locale) =>
+    // An active language that exists in neither supported language — what
+    // the app *resolves it to* is the fallback under test.
+    appScope(locale: locale);
 
 void main() {
   testWidgets('unsupported active language resolves to English, not German',

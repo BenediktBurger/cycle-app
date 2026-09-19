@@ -7,18 +7,15 @@
 // opens the day's mark-entry sheet like every other cell.
 //
 // Same harness pattern as test/cycle_chart_rows_test.dart.
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
@@ -34,34 +31,11 @@ final _entries = <DailyEntry>[
   DailyEntry(date: _day(3), bbtC: 36.4),
 ];
 
-Finder _cell(int i, String row) => find.byKey(ValueKey('${row}Cell-$i'));
-
-Finder _corner(String row) => find.byKey(ValueKey('${row}Corner'));
-
-Finder _inCell(int i, String row, Finder inner) =>
-    find.descendant(of: _cell(i, row), matching: inner);
-
 Widget _chartHarness({
   required List<DailyEntry> entries,
   Locale locale = const Locale('en'),
 }) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: locale,
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
+    chartHarness(entries: entries, locale: locale);
 
 void main() {
   testWidgets(
@@ -73,19 +47,19 @@ void main() {
     // The glyph rides in the day's column (below the time row, paper
     // "Bemerkungen" home).
     final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
-    final noteRect = tester.getRect(_cell(1, 'note'));
+    final noteRect = tester.getRect(chartCell(1, 'note'));
     expect(noteRect.top, greaterThan(chartBottom),
         reason: 'the note-indicator row sits below the chart block');
-    expect(tester.getRect(_cell(1, 'time')).top, lessThan(noteRect.top),
+    expect(tester.getRect(chartCell(1, 'time')).top, lessThan(noteRect.top),
         reason: 'the note indicator renders below the measurement-time '
             'row, below the chart block');
-    final cell = tester.getRect(_cell(1, 'bleeding'));
+    final cell = tester.getRect(chartCell(1, 'bleeding'));
     expect(noteRect.left, closeTo(cell.left, 0.5),
         reason: 'the note cell shares the day column geometry');
 
     // The indicator glyphs: the sticky-note icon, one per noted day.
     expect(
-        _inCell(1, 'note',
+        chartCellContent(1, 'note',
             find.byIcon(Icons.sticky_note_2_outlined)),
         findsOneWidget,
         reason: 'noted day 1 shows the indicator glyph in its column');
@@ -97,7 +71,7 @@ void main() {
 
     for (final i in [0, 2, 3]) {
       expect(
-          _inCell(i, 'note', find.byIcon(Icons.sticky_note_2_outlined)),
+          chartCellContent(i, 'note', find.byIcon(Icons.sticky_note_2_outlined)),
           findsNothing,
           reason: 'day $i carries no note text');
     }
@@ -108,7 +82,7 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    await tester.tap(_cell(1, 'note'), warnIfMissed: false);
+    await tester.tap(chartCell(1, 'note'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(find.byType(BottomSheet), findsOneWidget);
@@ -121,17 +95,17 @@ void main() {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    expect(_corner('note'), findsOneWidget);
+    expect(chartCellCorner('note'), findsOneWidget);
     final tooltips = tester
         .widgetList<Tooltip>(find.descendant(
-            of: _corner('note'), matching: find.byType(Tooltip)))
+            of: chartCellCorner('note'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(tooltips, ['Note'],
         reason: 'the note corner carries the localized row name');
 
-    final cornerCenter = tester.getRect(_corner('note')).center.dy;
-    final cellCenter = tester.getRect(_cell(1, 'note')).center.dy;
+    final cornerCenter = tester.getRect(chartCellCorner('note')).center.dy;
+    final cellCenter = tester.getRect(chartCell(1, 'note')).center.dy;
     expect(cornerCenter, closeTo(cellCenter, 0.5),
         reason: 'the note rail glyph is vertically centered on the row');
 
@@ -140,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
     final deTooltips = tester
         .widgetList<Tooltip>(find.descendant(
-            of: _corner('note'), matching: find.byType(Tooltip)))
+            of: chartCellCorner('note'), matching: find.byType(Tooltip)))
         .map((t) => t.message)
         .toList();
     expect(deTooltips, ['Notiz'], reason: 'de: the note row is "Notiz"');

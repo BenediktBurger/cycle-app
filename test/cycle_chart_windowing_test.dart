@@ -12,35 +12,25 @@
 // Same harness pattern as test/cycle_chart_weekend_test.dart.
 import 'dart:async';
 
-import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// A long recorded range: 2026-01-01 .. 2026-03-01 (60 days, indexes 0..59).
-DateTime _day(int index) => DateTime.utc(2026, 1, 1).add(Duration(days: index));
+import 'support/fixtures.dart';
 
-List<DailyEntry> _longEntries() => [
-      for (var i = 0; i < 60; i++)
-        DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
+import 'support/finders.dart';
+
+import 'support/chart_pump.dart';
 
 // A many-day range: 2026-01-01 .. 2026-05-30 (150 days, indexes 0..149) —
 // long enough that the scroll window and its margin sit strictly inside
 // the recorded range, so windowing and margin semantics stay distinguishable.
-List<DailyEntry> _manyEntries() => [
-      for (var i = 0; i < 150; i++)
-        DailyEntry(date: _day(i), bbtC: 36.4 + (i % 10) * 0.05),
-    ];
+List<DailyEntry> _manyEntries() => longRangeEntries(150);
 
 List<DailyEntry> _shortEntries() => [
-      for (var i = 0; i < 5; i++) DailyEntry(date: _day(i), bbtC: 36.5),
+      for (var i = 0; i < 5; i++) DailyEntry(date: longRangeDay(i), bbtC: 36.5),
     ];
 
 Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
@@ -51,37 +41,15 @@ Finder _marksCell(int index) => find.byKey(ValueKey('marksCell-$index'));
 // minimum usable width and the content exceeds the viewport.
 const _columnWidth = 24.0;
 
-Widget _chartHarness({
-  required List<DailyEntry> entries,
-  Stream<List<DailyEntry>>? entriesStream,
-}) =>
-    ProviderScope(
-      overrides: [
-        dailyEntriesProvider
-            .overrideWith((ref) => entriesStream ?? Stream.value(entries)),
-        marksProvider.overrideWith((ref) => Stream.value(const <CycleMark>[])),
-        selectedDateProvider.overrideWith((ref) => entries.first.date),
-      ],
-      child: MaterialApp(
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-        ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(body: ZyklusScreen()),
-      ),
-    );
-
 /// The finder for the horizontal scroll view that carries the chart block.
 /// The evaluation table below the chart block has its own horizontal
 /// scroller (key `cycleSummaryScroll`) — it is not the chart block, so it
 /// is excluded by that key here.
-Finder _hScrollView() => find.byWidgetPredicate((w) =>
-    w is SingleChildScrollView &&
-    w.scrollDirection == Axis.horizontal &&
-    w.key != const ValueKey('cycleSummaryScroll'));
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  Stream<List<DailyEntry>>? entriesStream,
+}) =>
+    chartHarness(entries: entries, entriesStream: entriesStream);
 
 void main() {
   group('long recorded range', () {
@@ -102,7 +70,7 @@ void main() {
       // The jump is instant (no animation): the offset sits at the maximum
       // extent already after the settle.
       final state = tester.state<ScrollableState>(find.descendant(
-          of: _hScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.maxScrollExtent, greaterThan(0),
           reason: '150 day columns need more width than the viewport provides');
       expect(state.position.pixels, state.position.maxScrollExtent,
@@ -110,10 +78,10 @@ void main() {
     });
 
     testWidgets('the chart block scrolls horizontally', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: longRangeEntries()));
       await tester.pumpAndSettle();
 
-      final scrollView = _hScrollView();
+      final scrollView = chartScrollView();
       expect(scrollView, findsOneWidget,
           reason: 'the whole chart block is horizontally scrollable');
       final state = tester.state<ScrollableState>(
@@ -132,7 +100,7 @@ void main() {
       // earliest days and assert the window follows the scroll. The drag
       // exceeds the maximum scroll extent, so it settles at the content's
       // start (the earliest days).
-      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
 
       expect(_bleedingCell(149), findsNothing,
@@ -162,7 +130,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
-          of: _hScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the first data frame jumped to the newest days');
 
@@ -170,7 +138,7 @@ void main() {
       // wide window margin no longer reaches the range's end). A timed
       // drag has no fling momentum, so the settled offset is
       // deterministic.
-      await tester.timedDrag(_hScrollView(), const Offset(900, 0),
+      await tester.timedDrag(chartScrollView(), const Offset(900, 0),
           const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
       final offsetAfterDrag = state.position.pixels;
@@ -179,7 +147,7 @@ void main() {
       // Emit a NEW list instance (one extra day at the end): the user's
       // scrolled position must survive — no re-jump back to the end.
       controller.add(
-          [..._manyEntries(), DailyEntry(date: _day(150), bbtC: 36.5)]);
+          [..._manyEntries(), DailyEntry(date: longRangeDay(150), bbtC: 36.5)]);
       await tester.pumpAndSettle();
 
       expect(state.position.pixels, offsetAfterDrag,
@@ -209,7 +177,7 @@ void main() {
 
       // No data: the chart block is not built at all, so there is nothing
       // to jump (the screen shows its no-data state instead).
-      expect(_hScrollView(), findsNothing);
+      expect(chartScrollView(), findsNothing);
 
       controller.add(_manyEntries());
       await tester.pumpAndSettle();
@@ -217,7 +185,7 @@ void main() {
       // The first NON-EMPTY data frame mounts the chart and auto-scrolls
       // to the newest days.
       final state = tester.state<ScrollableState>(find.descendant(
-          of: _hScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       expect(state.position.pixels, state.position.maxScrollExtent,
           reason: 'the first non-empty data frame jumps to the newest days');
       expect(_bleedingCell(149), findsOneWidget);
@@ -232,7 +200,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
-          of: _hScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       // The scroll viewport: block width (800 test viewport, 12 body
       // padding on each side) minus the frozen rail left of the scroll.
       const scrollViewport = 800.0 - 2 * 12 - 44; // 732
@@ -282,7 +250,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final state = tester.state<ScrollableState>(find.descendant(
-          of: _hScrollView(), matching: find.byType(Scrollable)));
+          of: chartScrollView(), matching: find.byType(Scrollable)));
       const scrollViewport = 800.0 - 2 * 12 - 44; // 732
       final marginDays = (scrollViewport / _columnWidth).ceil();
       final maxExtent = state.position.maxScrollExtent;
@@ -314,7 +282,7 @@ void main() {
     testWidgets(
         'the jump-to-date affordance sits in the AppBar actions, next to '
         'the info action', (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: longRangeEntries()));
       await tester.pumpAndSettle();
 
       final jump = find.byKey(const ValueKey('calendarJumpButton'));
@@ -344,7 +312,7 @@ void main() {
       // with the window parked at the earliest days it opens on January —
       // independent of how wide the window margin sits behind the visible
       // edge.
-      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('calendarJumpButton')));
@@ -367,12 +335,12 @@ void main() {
 
     testWidgets('tapping the curve in the scrolled window opens the day sheet',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: longRangeEntries()));
       await tester.pumpAndSettle();
 
       // Scroll to the end (content is much wider than the viewport, so a
       // large leftward drag lands at maxScrollExtent).
-      await tester.drag(_hScrollView(), const Offset(-1000, 0));
+      await tester.drag(chartScrollView(), const Offset(-1000, 0));
       await tester.pumpAndSettle();
 
       // Content is 60 day columns, no leading strip (the temperature scale
@@ -405,10 +373,10 @@ void main() {
 
     testWidgets('a long press on the curve opens the day sheet too',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _longEntries()));
+      await tester.pumpWidget(_chartHarness(entries: longRangeEntries()));
       await tester.pumpAndSettle();
 
-      await tester.drag(_hScrollView(), const Offset(-1000, 0));
+      await tester.drag(chartScrollView(), const Offset(-1000, 0));
       await tester.pumpAndSettle();
 
       // Same column mapping as the tap above (day 58's column center at
@@ -448,7 +416,7 @@ void main() {
 
       // Drag back to the earliest days: the numbering window follows the
       // scroll, like the signal rows it mirrors.
-      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
       expect(_marksCell(0), findsOneWidget,
           reason: 'the numbering cells appear once their days scroll in');
@@ -478,7 +446,7 @@ void main() {
       // The initial window sits at the newest days ...
       expectSharedColumn(130);
       // ... and the dragged-to window at the earliest days.
-      await tester.drag(_hScrollView(), const Offset(3000, 0));
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
       expectSharedColumn(10);
     });
@@ -495,7 +463,7 @@ void main() {
             reason: 'a short range fits usefully on one screen');
       }
 
-      final scrollView = _hScrollView();
+      final scrollView = chartScrollView();
       expect(scrollView, findsOneWidget,
           reason: 'the chart is still laid out as one scrollable block');
       final state = tester.state<ScrollableState>(

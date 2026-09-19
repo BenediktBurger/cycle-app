@@ -21,14 +21,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/fixtures.dart';
+
 // 2026-09-03 is a Thursday, so this sequence runs Sun (9/6) .. Wed (9/16).
-// Day indexes: 9/6 -> 0 ... 9/16 -> 10.
+// Day indexes: 9/6 -> 0 ... 9/16 -> 10. (The shared scenario copy lives in
+// support/fixtures.dart; these constants name the days for the assertions.)
 final _sun6 = DateTime.utc(2026, 9, 6);
-final _mon7 = DateTime.utc(2026, 9, 7);
-final _tue8 = DateTime.utc(2026, 9, 8);
-final _wed9 = DateTime.utc(2026, 9, 9);
-final _thu10 = DateTime.utc(2026, 9, 10);
-final _fri11 = DateTime.utc(2026, 9, 11);
 final _sat12 = DateTime.utc(2026, 9, 12);
 final _sun13 = DateTime.utc(2026, 9, 13);
 final _mon14 = DateTime.utc(2026, 9, 14);
@@ -37,41 +35,12 @@ final _wed16 = DateTime.utc(2026, 9, 16);
 final _thu17 = DateTime.utc(2026, 9, 17);
 final _fri18 = DateTime.utc(2026, 9, 18);
 
-/// Main evaluation scenario (peak before the rise -> CIRCLES):
-///
-/// - 9/6 (idx 0): 36.9 — a rise BEFORE the marked first higher: never a
-///   candidate (R3), renders as an ordinary temperature dot.
-/// - 9/7 (idx 1): 36.3 — the 7th day before the first higher, outside the
-///   six-low window -> no number.
-/// - 9/8..9/13 (idx 2..7): the six low measurements, numbered BACK from the
-///   first higher (9/13 = 1 ... 9/8 = 6).
-/// - 9/9 (idx 3, 36.4): the HIGHEST of the six lows -> baseline 36.4.
-/// - 9/12 (idx 6): mucus-peak mark -> SOLID DOT in the mucus row (R6),
-///   NO ring on the temperature curve.
-/// - 9/14 (idx 8): first-higher mark; 36.9 -> circled #1.
-/// - 9/15 (idx 9): 36.9 -> circled #2.
-/// - 9/16 (idx 10): 37.0 -> circled #3, >= 0.2 K above the baseline ->
-///   rule D fires, the sequence ends here (SUZ evening).
-final _entries = <DailyEntry>[
-  DailyEntry(date: _sun6, bbtC: 36.9),
-  DailyEntry(date: _mon7, bbtC: 36.3),
-  DailyEntry(date: _tue8, bbtC: 36.2),
-  DailyEntry(date: _wed9, bbtC: 36.4),
-  DailyEntry(date: _thu10, bbtC: 36.3),
-  DailyEntry(date: _fri11, bbtC: 36.1),
-  DailyEntry(date: _sat12, bbtC: 36.2),
-  DailyEntry(date: _sun13, bbtC: 36.3),
-  DailyEntry(date: _mon14, bbtC: 36.9),
-  DailyEntry(date: _tue15, bbtC: 36.9),
-  DailyEntry(date: _wed16, bbtC: 37.0),
-];
+/// Main evaluation scenario (peak before the rise -> CIRCLES) — the
+/// shared fixture in support/fixtures.dart; see the per-day role comments
+/// there.
+final _entries = evaluationScenarioEntries();
 
-/// The mucus-peak mark lies BEFORE the first higher measurement (9/12 <
-/// 9/14), so the candidates render CIRCLED (R4).
-final _marks = <CycleMark>[
-  CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
-];
+final _marks = evaluationScenarioMarks();
 
 Widget _harness(
         {required List<DailyEntry> entries, required List<CycleMark> marks}) =>

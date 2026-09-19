@@ -6,14 +6,10 @@
 // test/cycle_chart_temperature_test.dart (localized en).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _seedColor = const Color(0xFF6750A4);
+import 'support/chart_pump.dart';
 
 List<DailyEntry> _entries() => [
       for (var i = 0; i < CervixPosition.values.length; i++)
@@ -33,25 +29,8 @@ List<DailyEntry> _entries() => [
       DailyEntry(date: DateTime.utc(2026, 9, 12), bbtC: 37.0),
     ];
 
-Widget _chartHarness({required List<DailyEntry> entries}) => MaterialApp(
-      themeMode: ThemeMode.system,
-      theme:
-          ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: _seedColor)),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: _seedColor, brightness: Brightness.dark),
-      ),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('en'),
-      home: ProviderScope(
-        overrides: [
-          dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-          selectedDateProvider.overrideWith((ref) => entries.first.date),
-        ],
-        child: Scaffold(body: ZyklusScreen()),
-      ),
-    );
+Widget _chartHarness({required List<DailyEntry> entries}) =>
+    chartHarness(entries: entries, darkTheme: true, scopeInsideMaterialApp: true);
 
 void main() {
   testWidgets('every recorded position renders one glyph under the curve',
