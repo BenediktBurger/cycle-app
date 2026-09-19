@@ -10,7 +10,10 @@ development iterates on web. Distribution planning surfaced the following
 starting state:
 
 - No Android SDK on the dev machine yet; CI is deliberately web-only
-  ([ADR-0006](0006-ci.md)).
+  ([ADR-0006](0006-ci.md)) — the original decision preceded this ADR's
+  follow-up above; decision #6 now supersedes the web-only clause, and
+  ADR-0006 has since been amended to also compile an Android debug build
+  and run tag-triggered signed releases.
 - `android/` started from the untouched Flutter template: release build signed
   with the *debug* key, `applicationId` was the
   [ADR-0002](0002-package-name-cycle-app-placeholder.md) placeholder
@@ -67,9 +70,15 @@ sideload/F-Droid, so key custody is a governance question in itself.
    migration is a data-loss incident, not a bug.
 6. **Documentation split.** The enactable runbook (commands, checklists,
    gates) lives in [`docs/release.md`](../release.md); the work queue lives in
-   [`docs/roadmap.md`](../roadmap.md). CI stays web-only
-   ([ADR-0006](0006-ci.md)): signed release builds are **not** automated
-   without a separate decision, keeping secrets out of CI.
+   [`docs/roadmap.md`](../roadmap.md). Tag-triggered signed release builds
+   run in CI: a release workflow builds signed artifacts on `vX.Y.Z` tags,
+   with the release keystore provisioned as a GPG-encrypted GitHub Actions
+   secret and decrypted only into the runner's ephemeral temp directory —
+   the keystore is never committed (custody per decision #2 above) and never
+   decrypted outside `$RUNNER_TEMP`; the offline backups remain authoritative.
+   (Supersedes the earlier "CI stays web-only" clause —
+   [ADR-0006](0006-ci.md) itself now also compiles the Android target in
+   debug mode as a correctness gate.)
 
 ## Consequences
 
