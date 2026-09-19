@@ -17,8 +17,7 @@ import 'support/database.dart';
 /// unpinned the test runner exposes an English device — so the German-string
 /// assertions below have to request German explicitly (the system-follow
 /// default itself is covered by the locale tests, test/locale_test.dart).
-ProviderScope _appScope([Locale? locale]) =>
-    appScope(locale: locale);
+ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
 
 void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (

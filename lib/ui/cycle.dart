@@ -609,8 +609,7 @@ final class _CycleChartState extends State<_CycleChart> {
     // themselves come from the settings range and never depend on the data,
     // so the scale never rescales while scrolling.
     final runs = curveRuns(_days.byIndex,
-        ignoredDayIndexes: _days.ignoredDayIndexes,
-        displayRange: widget.range);
+        ignoredDayIndexes: _days.ignoredDayIndexes, displayRange: widget.range);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -934,10 +933,8 @@ final class _CycleChartState extends State<_CycleChart> {
                                             // bottom at the fixed hang drop.
                                             FlSpot(suz.barX.clamp(-0.5, lastX),
                                                 yMax),
-                                            FlSpot(
-                                                suz.barX.clamp(-0.5, lastX),
-                                                yMax -
-                                                    suzBarHangSpanDegrees),
+                                            FlSpot(suz.barX.clamp(-0.5, lastX),
+                                                yMax - suzBarHangSpanDegrees),
                                           ],
                                           isCurved: false,
                                           barWidth: 2,
@@ -952,10 +949,8 @@ final class _CycleChartState extends State<_CycleChart> {
                                         // live above).
                                         LineChartBarData(
                                           spots: [
-                                            FlSpot(
-                                                suz.barX.clamp(-0.5, lastX),
-                                                yMax -
-                                                    suzArrowTopInsetDegrees),
+                                            FlSpot(suz.barX.clamp(-0.5, lastX),
+                                                yMax - suzArrowTopInsetDegrees),
                                           ],
                                           color: Colors.transparent,
                                           dotData: FlDotData(
@@ -1012,11 +1007,10 @@ final class _CycleChartState extends State<_CycleChart> {
                                       horizontalInterval: 0.1,
                                       getDrawingHorizontalLine: (value) {
                                         final tenths = (value * 10).round();
-                                        final emphasized =
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.45);
+                                        final emphasized = Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.45);
                                         final onSurface = Theme.of(context)
                                             .colorScheme
                                             .onSurface;

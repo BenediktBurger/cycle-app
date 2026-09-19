@@ -596,8 +596,7 @@ void main() {
 
   group('exclusion group (the manual temperature-exclusion toggle)', () {
     /// The exclusion group of the sheet (test-visible key).
-    final excludeGroup =
-        find.byKey(const ValueKey('cycleSheetExcludeGroup'));
+    final excludeGroup = find.byKey(const ValueKey('cycleSheetExcludeGroup'));
 
     /// [_entries] with the disturbance flags [mask] recorded on day 9/10
     /// (index 4).
@@ -610,8 +609,7 @@ void main() {
     testWidgets(
         'a day WITH recorded disturbance flags: the group carries only the '
         'exclusion title and the toggle — neither flag labels nor an empty '
-        'line (the chart row shows the letters)',
-        (tester) async {
+        'line (the chart row shows the letters)', (tester) async {
       await _pump(tester,
           entries: entriesWithDay4Mask(
               TempDisturbance.alk.bit | TempDisturbance.kr.bit));
@@ -649,8 +647,7 @@ void main() {
 
     testWidgets(
         'a day WITHOUT recorded flags shows the same toggle-only group — '
-        'no empty-state line, no editable chips',
-        (tester) async {
+        'no empty-state line, no editable chips', (tester) async {
       await _pump(tester, entries: _entries);
 
       await _tapDay(tester, 4); // 9/10: no flags recorded
@@ -682,7 +679,8 @@ void main() {
         'the toggle inside the group keeps its write behavior: it places '
         'the ignoreTemperature mark through the MarksDao and flips to the '
         'include wording within the group', (tester) async {
-      await _pump(tester, entries: entriesWithDay4Mask(TempDisturbance.alk.bit));
+      await _pump(tester,
+          entries: entriesWithDay4Mask(TempDisturbance.alk.bit));
 
       await _tapDay(tester, 4); // 9/10
       await tester.tap(find.text('Ignore temperature'));

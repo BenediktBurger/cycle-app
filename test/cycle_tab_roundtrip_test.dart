@@ -23,9 +23,8 @@ import 'support/database.dart';
 
 /// The horizontal scroll view that carries the cycle chart block, scoped to
 /// the Zyklus screen (other tabs have their own scrollables).
-Finder _chartScrollView() => find.descendant(
-    of: find.byType(ZyklusScreen),
-    matching: chartScrollView());
+Finder _chartScrollView() =>
+    find.descendant(of: find.byType(ZyklusScreen), matching: chartScrollView());
 
 Widget _appScope(StreamController<List<DailyEntry>> entries) =>
     // Broadcast so the diary and the cycle chart (both watch this provider)

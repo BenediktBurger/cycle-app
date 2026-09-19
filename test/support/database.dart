@@ -79,8 +79,7 @@ ProviderScope appScope({
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated),
       if (locale != null) localeProvider.overrideWith((ref) => locale),
-      if (themeMode != null)
-        themeModeProvider.overrideWith((ref) => themeMode),
+      if (themeMode != null) themeModeProvider.overrideWith((ref) => themeMode),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null)
         selectedDateProvider.overrideWith((ref) => selectedDay),

@@ -59,8 +59,8 @@ Finder _maxField() => find.byKey(const ValueKey('temperatureRangeMax'));
 /// The picker widget itself (the form field wraps a DropdownButton that
 /// carries value + items).
 DropdownButton<double> _picker(WidgetTester tester, Finder field) =>
-    tester.widget<DropdownButton<double>>(
-        find.descendant(of: field, matching: find.byType(DropdownButton<double>)));
+    tester.widget<DropdownButton<double>>(find.descendant(
+        of: field, matching: find.byType(DropdownButton<double>)));
 
 void main() {
   testWidgets(
@@ -70,22 +70,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final range = _container(tester).read(temperatureRangeProvider);
-    expect(range.min, 36.0,
-        reason: 'no override → the default 36–38 °C range');
-    expect(range.max, 38.0,
-        reason: 'no override → the default 36–38 °C range');
+    expect(range.min, 36.0, reason: 'no override → the default 36–38 °C range');
+    expect(range.max, 38.0, reason: 'no override → the default 36–38 °C range');
 
     await _openSettings(tester);
 
     expect(find.text('Temperature range'), findsOneWidget,
         reason: 'the card offers the chart\'s y range');
-    expect(
-        _picker(tester, _minField()).value,
-        36.0,
+    expect(_picker(tester, _minField()).value, 36.0,
         reason: 'the lower-limit picker shows the current range min');
-    expect(
-        _picker(tester, _maxField()).value,
-        38.0,
+    expect(_picker(tester, _maxField()).value, 38.0,
         reason: 'the upper-limit picker shows the current range max');
   });
 
@@ -105,9 +99,7 @@ void main() {
     expect(range.min, 35.0,
         reason: 'selecting a half-degree step writes the provider at once');
     expect(range.max, 38.0, reason: 'the upper limit stays untouched');
-    expect(
-        _picker(tester, _minField()).value,
-        35.0);
+    expect(_picker(tester, _minField()).value, 35.0);
   });
 
   testWidgets(

@@ -197,8 +197,7 @@ void main() {
 
     test('a temperature above the range clips to exactly the upper boundary',
         () {
-      final point =
-          pointIn({0: 39.5}, displayRange: defaultRange);
+      final point = pointIn({0: 39.5}, displayRange: defaultRange);
       expect(point.bbtC, 38.0,
           reason: 'a fever value renders AT maxY, not beyond the plot');
     });
@@ -221,7 +220,8 @@ void main() {
       expect(pointIn({0: 37.85}, displayRange: defaultRange).bbtC, 37.85);
     });
 
-    test('a run with an out-of-range day stays connected (clipping does '
+    test(
+        'a run with an out-of-range day stays connected (clipping does '
         'not break adjacency)', () {
       final runs = curveRuns(
         {
@@ -241,9 +241,9 @@ void main() {
       expect(clampBbtC(36.8, defaultRange), 36.8);
     });
 
-    test('without a display range the raw values pass through (the chart '
-        'always passes one — the default keeps historical callers honest)',
-        () {
+    test(
+        'without a display range the raw values pass through (the chart '
+        'always passes one — the default keeps historical callers honest)', () {
       expect(pointIn({0: 39.5}).bbtC, 39.5);
     });
   });

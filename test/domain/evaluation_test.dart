@@ -1124,8 +1124,8 @@ void main() {
   group('baseline span (R10)', () {
     test('fewer than six lows: the segment starts at the oldest numbered low',
         () {
-      final e = evalFor(
-          _fewerThanSixLows, _fewerThanSixMarks, DateTime(2026, 3, 2));
+      final e =
+          evalFor(_fewerThanSixLows, _fewerThanSixMarks, DateTime(2026, 3, 2));
 
       // Only three measured days sit inside the six-calendar-day window
       // rise−1 … rise−6 = Mar 9 … Mar 4 (Mar 9, 8, 4 are untracked): the
@@ -1293,7 +1293,9 @@ void main() {
         // Mar 9: untracked — rise−2 carries NO number either
         d(2026, 3, 10, t: 36.3), // rise−1 → #1
         d(2026, 3, 11, t: 36.8), // marked rise
-      ], [rise(2026, 3, 11)], DateTime(2026, 3, 2));
+      ], [
+        rise(2026, 3, 11)
+      ], DateTime(2026, 3, 2));
       expect(e.numberedLows.map((l) => (l.number, l.date.day)),
           [(1, 10), (3, 8), (5, 6), (6, 5)]);
 
@@ -1310,12 +1312,15 @@ void main() {
         d(2026, 3, 10, t: 36.2),
         d(2026, 3, 11, t: 36.3),
         d(2026, 3, 12, t: 36.7), // first higher (marked)
-      ], [peak(2026, 3, 9), rise(2026, 3, 12)], DateTime(2026, 3, 2));
+      ], [
+        peak(2026, 3, 9),
+        rise(2026, 3, 12)
+      ], DateTime(2026, 3, 2));
       expect(untracked.numberedLows.map((l) => (l.number, l.date.day)),
           [(1, 11), (2, 10), (3, 9), (4, 8), (6, 6)]);
       expect(untracked.baseline!.value, 36.4);
-      expect(untracked.baseline!.date,
-          DateOnly.normalize(DateTime(2026, 3, 6)));
+      expect(
+          untracked.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
 
       // A tracked but UNMEASURED day is skipped as well — the window is
       // rise−1 … rise−6 = Mar 11 … Mar 6 (Mar 11 and Mar 10 untracked,
@@ -1331,13 +1336,16 @@ void main() {
         d(2026, 3, 8, t: 36.3),
         d(2026, 3, 9, t: 36.1), // peak day
         d(2026, 3, 12, t: 36.8), // first higher (marked)
-      ], [peak(2026, 3, 9), rise(2026, 3, 12)], DateTime(2026, 3, 2));
+      ], [
+        peak(2026, 3, 9),
+        rise(2026, 3, 12)
+      ], DateTime(2026, 3, 2));
       expect(unmeasured.numberedLows.map((l) => (l.number, l.date.day)),
           [(3, 9), (4, 8), (5, 7), (6, 6)]);
       expect(unmeasured.numberedLows.map((l) => l.number), [3, 4, 5, 6]);
       expect(unmeasured.baseline!.value, 36.4);
-      expect(unmeasured.baseline!.date,
-          DateOnly.normalize(DateTime(2026, 3, 6)));
+      expect(
+          unmeasured.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
     test(
@@ -1358,7 +1366,10 @@ void main() {
         d(2026, 3, 10, t: 36.3), // rise−2 → #2
         d(2026, 3, 11, t: 36.2), // rise−1 → #1
         d(2026, 3, 12, t: 36.8), // marked rise
-      ], [rise(2026, 3, 12), excludedDay(2026, 3, 7)], DateTime(2026, 3, 2));
+      ], [
+        rise(2026, 3, 12),
+        excludedDay(2026, 3, 7)
+      ], DateTime(2026, 3, 2));
       expect(e.numberedLows.map((l) => (l.number, l.date.day)),
           [(1, 11), (2, 10), (3, 9), (4, 8), (6, 6)]);
       // The excluded 37.5 (which would have raised the baseline) counts
@@ -1435,8 +1446,7 @@ void main() {
       expect(five.baseline!.value, 36.4);
       expect(five.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
       expect(
-        five.higherMeasurements
-            .map((h) => (h.date.day, h.markKind, h.ordinal)),
+        five.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
       expect(five.suzBegins, isNull);

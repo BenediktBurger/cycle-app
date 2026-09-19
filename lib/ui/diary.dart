@@ -71,8 +71,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // disturbance mask): an externally placed ignoreTemperature mark —
     // day sheet, imports — shows up as "excluded" in the form.
     final dayMarks = await db.marksDao.marksForDay(date);
-    final excludeMarked = dayMarks
-        .any((m) => m.markType == CycleMarkTypes.ignoreTemperature);
+    final excludeMarked =
+        dayMarks.any((m) => m.markType == CycleMarkTypes.ignoreTemperature);
     if (!mounted) return;
     setState(() {
       _applyEntry(existing == null ? null : dailyEntryFromDrift(existing),
@@ -464,8 +464,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                       dense: true,
                       title: Text(l10n.diaryExcludeTemperatureSwitch),
                       value: _excludeTemperature,
-                      onChanged: (v) =>
-                          setState(() => _excludeTemperature = v),
+                      onChanged: (v) => setState(() => _excludeTemperature = v),
                     ),
                   ],
                 ),

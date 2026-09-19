@@ -29,8 +29,7 @@ const String exportFileName = 'cycle_app_export.json';
 /// bounds in °C). Built from integer half-steps (k / 2) so no float drift
 /// creeps into the 0.5 step grid; the °C unit is the seam a later
 /// Fahrenheit conversion would hook into (see the settings card comment).
-final List<double> temperatureRangeSteps =
-    List.unmodifiable(<double>[
+final List<double> temperatureRangeSteps = List.unmodifiable(<double>[
   for (var k = (TemperatureRange.windowLower / 0.5).round(),
           upper = (TemperatureRange.windowUpper / 0.5).round();
       k <= upper;
@@ -186,7 +185,8 @@ class EinstellungenScreen extends ConsumerWidget {
                             ],
                             onChanged: (value) {
                               if (value == null) return;
-                              ref.read(temperatureRangeProvider.notifier)
+                              ref
+                                  .read(temperatureRangeProvider.notifier)
                                   .state = TemperatureRange(
                                 min: value,
                                 max: range.max,
@@ -214,7 +214,8 @@ class EinstellungenScreen extends ConsumerWidget {
                             ],
                             onChanged: (value) {
                               if (value == null) return;
-                              ref.read(temperatureRangeProvider.notifier)
+                              ref
+                                  .read(temperatureRangeProvider.notifier)
                                   .state = TemperatureRange(
                                 min: range.min,
                                 max: value,

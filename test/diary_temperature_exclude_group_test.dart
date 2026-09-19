@@ -92,11 +92,10 @@ void main() {
   }
 
   /// The stored mark types for the selected day (from the real database).
-  Future<List<String>> storedMarkTypes() async => (await _db!
-          .marksDao
-          .marksForDay(_selectedDay))
-      .map((m) => m.markType)
-      .toList();
+  Future<List<String>> storedMarkTypes() async =>
+      (await _db!.marksDao.marksForDay(_selectedDay))
+          .map((m) => m.markType)
+          .toList();
 
   testWidgets(
       'saving a flagged day WITHOUT the exclude switch does NOT create '
@@ -112,9 +111,7 @@ void main() {
     await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
     await save(tester);
 
-    expect(
-        await storedMarkTypes(),
-        isEmpty,
+    expect(await storedMarkTypes(), isEmpty,
         reason: 'a disturbance flag alone never excludes the day from the '
             'analysis — the explicit exclude switch decides');
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
@@ -135,8 +132,7 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(marks.map((m) => m.markType),
-        [CycleMarkTypes.ignoreTemperature],
+    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
         reason: 'the manual switch is the diary-side writer of the '
             'analysis-exclusion mark (exactly one, no flag needed)');
     expect(marks.single.author, 'user',
@@ -149,8 +145,7 @@ void main() {
 
     // Re-save with the switch untouched: addMark is idempotent.
     await save(tester);
-    expect((await _db!.marksDao.marksForDay(_selectedDay)),
-        hasLength(1),
+    expect((await _db!.marksDao.marksForDay(_selectedDay)), hasLength(1),
         reason: 'repeated saves with the switch on stay at one mark '
             '(idempotent)');
   });
@@ -160,8 +155,7 @@ void main() {
       'and saving REMOVES the mark', (tester) async {
     tallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
-      await db.marksDao.addMark(_selectedDay,
-          CycleMarkTypes.ignoreTemperature);
+      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
     }));
     await tester.pumpAndSettle();
 
@@ -184,8 +178,7 @@ void main() {
       (tester) async {
     tallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
-      await db.marksDao.addMark(_selectedDay,
-          CycleMarkTypes.ignoreTemperature);
+      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
     }));
     await tester.pumpAndSettle();
 
@@ -196,9 +189,7 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(
-        marks.map((m) => m.markType),
-        [CycleMarkTypes.ignoreTemperature],
+    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
         reason: 'the flagged save neither removes nor duplicates the '
             'pre-existing mark — no auto behavior in either direction');
     expect(marks.single.author, 'user');
@@ -211,11 +202,9 @@ void main() {
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: _selectedDay,
-        tempDisturbances:
-            TempDisturbance.sp.bit | TempDisturbance.alk.bit,
+        tempDisturbances: TempDisturbance.sp.bit | TempDisturbance.alk.bit,
       ));
-      await db.marksDao.addMark(_selectedDay,
-          CycleMarkTypes.ignoreTemperature);
+      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
     }));
     await tester.pumpAndSettle();
 
@@ -224,9 +213,7 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(
-        marks.map((m) => m.markType),
-        [CycleMarkTypes.ignoreTemperature],
+    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
         reason: 'clearing the flags never lifts the exclusion — only the '
             'switch does');
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
