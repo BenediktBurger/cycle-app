@@ -102,8 +102,8 @@ final class SettingsStore {
             themeMode = _themeModeFromStored(decoded);
           case SettingKeys.temperatureRange:
             if (decoded is Map<String, Object?>) {
-              // fromJson rejects mistyped/unordered bounds; that rejection
-              // keeps the default below.
+              // fromJson rejects mistyped/unordered/out-of-window bounds;
+              // that rejection keeps the default below.
               temperatureRange = TemperatureRange.fromJson(decoded);
             }
         }

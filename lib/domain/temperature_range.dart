@@ -42,9 +42,12 @@ final class TemperatureRange {
   /// ({"min":..,"max":..} — the exact shape the app_settings column holds).
   Map<String, Object?> toJson() => {'min': min, 'max': max};
 
-  /// Restores a range from a [toJson] map. Missing or mistyped bounds, and
-  /// a wrongly ordered window, throw [ArgumentError] — readers of persisted
-  /// material (the settings store) catch that and keep their default.
+  /// Restores a range from a [toJson] map. Missing or mistyped bounds, a
+  /// wrongly ordered window, and bounds outside the [windowLower]–
+  /// [windowUpper] °C window all throw [ArgumentError] — readers of
+  /// persisted material (the settings store) catch that and keep their
+  /// default. Any single bound outside the window is enough to reject: the
+  /// mixed cases (one bound below the window, one inside) are invalid too.
   static TemperatureRange fromJson(Map<String, Object?> json) {
     final min = json['min'];
     final max = json['max'];
@@ -54,6 +57,14 @@ final class TemperatureRange {
     }
     if (min >= max) {
       throw ArgumentError.value(json, 'json', 'needs min < max');
+    }
+    if (min < windowLower || max > windowUpper) {
+      throw ArgumentError.value(
+        json,
+        'json',
+        'needs both bounds inside the '
+            '$windowLower–$windowUpper °C window',
+      );
     }
     return TemperatureRange(min: min.toDouble(), max: max.toDouble());
   }

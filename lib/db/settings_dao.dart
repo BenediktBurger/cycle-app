@@ -32,8 +32,9 @@ class SettingsDao extends DatabaseAccessor<CycleDatabase>
   /// row per key, ever.
   Future<void> writeValue(String key, String value) async {
     if (key.isEmpty) {
-      // Fired from within the async body so the rejection reaches the
-      // CALLER's await, not an escaped synchronous throw.
+      // Every DAO method rejects an empty key with ArgumentError; thrown
+      // inside these async bodies, the rejection is delivered through the
+      // returned future — uniformly in all three.
       throw ArgumentError.value(key, 'key', 'must not be empty');
     }
     await into(appSettings).insertOnConflictUpdate(

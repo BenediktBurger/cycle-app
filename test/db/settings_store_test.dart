@@ -152,6 +152,24 @@ void main() {
       );
     });
 
+    test('bounds outside the 34–42 °C window are rejected as a range', () {
+      expect(
+        () => TemperatureRange.fromJson(const {'min': 30.0, 'max': 45.0}),
+        throwsArgumentError,
+      );
+      // Mixed: min below the window, max inside — any bound outside the
+      // window is invalid, not just a fully out-of-window pair.
+      expect(
+        () => TemperatureRange.fromJson(const {'min': 30.0, 'max': 39.0}),
+        throwsArgumentError,
+      );
+      // Mirror case: min inside, max above the window.
+      expect(
+        () => TemperatureRange.fromJson(const {'min': 36.0, 'max': 45.0}),
+        throwsArgumentError,
+      );
+    });
+
     test('bad range shapes fall back to the default range on load', () async {
       for (final raw in [
         '"opaque string"', // JSON string, not a map
@@ -159,6 +177,8 @@ void main() {
         '{"max":39.0}', // missing min
         '{"min":"35","max":"39"}', // bounds are strings
         '{"min":39.0,"max":35.5}', // wrongly ordered
+        '{"min":30.0,"max":45.0}', // both bounds outside the allowed window
+        '{"min":30.0,"max":39.0}', // min below the window, max inside
         '[35.5,39.0]', // top-level list instead of an object
       ]) {
         await seedRaw(SettingKeys.temperatureRange, raw);
