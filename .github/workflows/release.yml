@@ -86,9 +86,12 @@ jobs:
 
       # Prints the signing certificate fingerprint — this goes into the
       # release notes as the trust anchor (F-Droid metadata cross-checks it).
+      # apksigner ships with the runner's preinstalled Android SDK
+      # build-tools but is not on PATH — resolve the newest one.
       - name: Verify APK signature
         run: |
-          apksigner verify --print-certs \
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$apksigner" verify --print-certs \
             build/app/outputs/flutter-apk/app-release.apk
 
       # AAB is uploaded as a workflow artifact; the Play upload itself stays
