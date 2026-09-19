@@ -293,79 +293,8 @@ void main() {
           reason: 'the day/cycle header sits above the chart, not below it');
     });
 
-    testWidgets(
-        'the header corner (now in the frozen left rail, outside the '
-        'scroll) shows the two column prototypes '
-        '(a date sample and a cycle-day sample) with localized tooltips '
-        'and semantics labels', (tester) async {
-      // 5 days from 2026-01-20: no column label is "14." and no day of
-      // cycle is 5, so the two prototype texts are unambiguous.
-      await tester.pumpWidget(_chartHarness(entries: _entries(5)));
-      await tester.pumpAndSettle();
-
-      final corner = find.byKey(const ValueKey('dayHeaderCorner'));
-      expect(corner, findsOneWidget);
-      expect(find.descendant(of: corner, matching: find.text('14.')),
-          findsOneWidget,
-          reason: 'the date column prototype renders in the corner slot');
-      expect(find.descendant(of: corner, matching: find.text('#5')),
-          findsOneWidget,
-          reason: 'the cycle-day column prototype renders in the corner slot');
-
-      // Tooltips: the date prototype explains itself as the date column,
-      // the cycle-day prototype as the cycle-day column.
-      final tooltips = tester
-          .widgetList<Tooltip>(
-              find.descendant(of: corner, matching: find.byType(Tooltip)))
-          .map((t) => t.message)
-          .toList();
-      expect(tooltips, containsAll(['Date', 'Cycle day']),
-          reason: 'both prototypes carry their localized tooltip');
-
-      // Semantics: the same labels are announced to screen readers.
-      expect(
-        find.descendant(
-            of: corner,
-            matching: find.byWidgetPredicate(
-                (w) => w is Semantics && w.properties.label == 'Date')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-            of: corner,
-            matching: find.byWidgetPredicate(
-                (w) => w is Semantics && w.properties.label == 'Cycle day')),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the corner prototypes use the German wording in de',
-        (tester) async {
-      await tester.pumpWidget(
-          _chartHarness(entries: _entries(5), locale: const Locale('de')));
-      await tester.pumpAndSettle();
-
-      final corner = find.byKey(const ValueKey('dayHeaderCorner'));
-      final tooltips = tester
-          .widgetList<Tooltip>(
-              find.descendant(of: corner, matching: find.byType(Tooltip)))
-          .map((t) => t.message)
-          .toList();
-      expect(tooltips, containsAll(['Datum', 'Zyklustag']));
-      expect(
-        find.descendant(
-            of: corner,
-            matching: find.byWidgetPredicate(
-                (w) => w is Semantics && w.properties.label == 'Datum')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-            of: corner,
-            matching: find.byWidgetPredicate(
-                (w) => w is Semantics && w.properties.label == 'Zyklustag')),
-        findsOneWidget,
-      );
-    });
+    // The header corner itself (a superset test with localized en tooltips,
+    // semantics and the de wording variants) lives beside the rail it slots
+    // into: test/cycle_chart_left_rail_test.dart.
   });
 }

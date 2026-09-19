@@ -496,57 +496,6 @@ void main() {
     });
   });
 
-  group('legend (the symbol glossary help sheet)', () {
-    testWidgets(
-        'the help sheet explains the new glyphs: solid peak dot, '
-        'circled and arrowed higher measurements, baseline', (tester) async {
-      await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
-      await tester.pumpAndSettle();
-
-      // The legend moved into the help sheet: open it first.
-      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-      await tester.pumpAndSettle();
-
-      // The evaluation table below the chart card renders its own row
-      // labels behind the sheet (its "Mucus peak" attribute row), so the
-      // sheet's glossary entries are asserted scoped to the sheet.
-      expect(
-          find.descendant(
-              of: find.byKey(const ValueKey('cycleHelpSheet')),
-              matching: find.text('Mucus peak')),
-          findsOneWidget,
-          reason: 'the solid-dot legend entry replaced the old ring entry');
-      expect(
-          find.descendant(
-              of: find.byKey(const ValueKey('cycleHelpSheet')),
-              matching: find.text('Circled higher measurements')),
-          findsOneWidget);
-      expect(
-          find.descendant(
-              of: find.byKey(const ValueKey('cycleHelpSheet')),
-              matching: find.text('Premature temperature rise')),
-          findsOneWidget,
-          reason: 'arrows now mean: no peak before the rise (R4), worded '
-              'after the paper sheet\'s term');
-      expect(
-          find.descendant(
-              of: find.byKey(const ValueKey('cycleHelpSheet')),
-              matching: find.text('Baseline')),
-          findsOneWidget); // The pre-peak wording is gone (R4 removed the special case).
-      expect(find.text('Higher measurement before the peak'), findsNothing);
-    });
-
-    testWidgets('the help sheet explains the SUZ glyph', (tester) async {
-      await tester.pumpWidget(_harness(entries: _entries, marks: _marks));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-      await tester.pumpAndSettle();
-      expect(find.text('Sicher unfruchtbare Zeit (SUZ)'), findsOneWidget,
-          reason: 'the SUZ bar+arrow glyph has its own legend entry');
-    });
-  });
-
   group('all mucus peaks render (from the marks stream)', () {
     testWidgets(
         'two peak marks in one cycle render two solid dots — even '

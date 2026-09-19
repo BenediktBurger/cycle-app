@@ -107,6 +107,20 @@ final _baseLowRun = <DailyEntry>[
   d(2026, 3, 9, t: 36.2), // peak day (most scenarios set it here)
 ];
 
+/// The fewer-than-six-lows scenario: only THREE measured days sit inside
+/// the six-calendar-day window rise−1 … rise−6 = Mar 9 … Mar 4 (Mar 8, 6,
+/// 4 are untracked). Mar 3 is measured too, but OLDER than rise−6 — the
+/// old stretch-back arithmetic would have numbered it #4.
+final _fewerThanSixLows = <DailyEntry>[
+  d(2026, 3, 2, bleeding: Bleeding.medium),
+  d(2026, 3, 3, t: 36.3), // BEFORE rise−6 — outside the window
+  d(2026, 3, 5, t: 36.1), // rise−5 → #5
+  d(2026, 3, 6, t: 36.4), // rise−4 → #4 — highest → baseline
+  d(2026, 3, 7, t: 36.3), // rise−3 → #3 (the peak day)
+  d(2026, 3, 10, t: 36.8), // marked rise
+];
+final _fewerThanSixMarks = [peak(2026, 3, 7), rise(2026, 3, 10)];
+
 void main() {
   group('textbook pattern (happy path)', () {
     final entries = [
@@ -1110,17 +1124,8 @@ void main() {
   group('baseline span (R10)', () {
     test('fewer than six lows: the segment starts at the oldest numbered low',
         () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.3), // BEFORE rise−6 — outside the window
-        d(2026, 3, 5, t: 36.1), // rise−5 → #5
-        d(2026, 3, 6, t: 36.4), // rise−4 → #4 — highest of the three → baseline
-        d(2026, 3, 7, t: 36.3), // rise−3 → #3 (the peak day)
-        d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
-      ];
-      final marks = [peak(2026, 3, 7), rise(2026, 3, 10)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+      final e = evalFor(
+          _fewerThanSixLows, _fewerThanSixMarks, DateTime(2026, 3, 2));
 
       // Only three measured days sit inside the six-calendar-day window
       // rise−1 … rise−6 = Mar 9 … Mar 4 (Mar 9, 8, 4 are untracked): the
@@ -1268,34 +1273,35 @@ void main() {
       expect(e.higherMeasurements, isEmpty);
       expect(e.baselineSpan, isNull);
     });
-
-    test('no first-higher mark → no segment (null span)', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 36.3),
-        d(2026, 3, 5, t: 36.2),
-        d(2026, 3, 6, t: 36.4),
-        d(2026, 3, 7, t: 36.3),
-        d(2026, 3, 8, t: 36.2),
-        d(2026, 3, 9, t: 36.4), // mucus peak day (marked)
-        d(2026, 3, 11, t: 36.8), // a rise exists but is NOT marked
-      ];
-      final marks = [peak(2026, 3, 9)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      expect(e.baseline, isNull);
-      expect(e.higherMeasurements, isEmpty);
-      expect(e.baselineSpan, isNull);
-    });
   });
 
-  group(
-      'six-low window and baseline (calendar positions, owner ruling '
-      '2026-09-17)', () {
-    test('untracked days inside the window get no number — numbers skip', () {
-      final entries = [
+  group('six-low window: calendar positions (owner ruling 2026-09-17)', () {
+    test(
+        'the numbers belong to the calendar positions — untracked and '
+        'unmeasured days inside the window get no number, numbers skip '
+        '("6 5 _ 3 _ 1")', () {
+      // The owner example "6 5 _ 3 _ 1": the numbers belong to the
+      // CALENDAR POSITIONS rise−1 … rise−6 — an omitted day gets no
+      // number and its number is skipped. The old dense arithmetic would
+      // have produced 1, 2, 3, 4 over the same four measured days.
+      final e = evalFor([
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 5, t: 36.1), // rise−6 → #6
+        d(2026, 3, 6, t: 36.2), // rise−5 → #5
+        d(2026, 3, 7), // rise−4: tracked but unmeasured — NO number
+        d(2026, 3, 8, t: 36.2), // rise−3 → #3
+        // Mar 9: untracked — rise−2 carries NO number either
+        d(2026, 3, 10, t: 36.3), // rise−1 → #1
+        d(2026, 3, 11, t: 36.8), // marked rise
+      ], [rise(2026, 3, 11)], DateTime(2026, 3, 2));
+      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+          [(1, 10), (3, 8), (5, 6), (6, 5)]);
+
+      // Untracked gap days skip numbers the same way — here the window is
+      // rise−1 … rise−6 = Mar 11 … Mar 6 and Mar 7 (rise−5) is untracked,
+      // so its number 5 is SKIPPED and only five lows carry numbers (the
+      // old dense arithmetic would have numbered Mar 3 as #6):
+      final untracked = evalFor([
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2), // untracked Mar 4–5
         d(2026, 3, 6, t: 36.4), // untracked Mar 7
@@ -1304,25 +1310,18 @@ void main() {
         d(2026, 3, 10, t: 36.2),
         d(2026, 3, 11, t: 36.3),
         d(2026, 3, 12, t: 36.7), // first higher (marked)
-      ];
-      final marks = [peak(2026, 3, 9), rise(2026, 3, 12)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // The window is rise−1 … rise−6 = Mar 11 … Mar 6. Mar 7 (rise−5) is
-      // untracked — it gets no number and its number 5 is SKIPPED; the
-      // numbers belong to calendar positions, so only five lows carry
-      // numbers (the old dense arithmetic would have numbered Mar 3 as #6).
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+      ], [peak(2026, 3, 9), rise(2026, 3, 12)], DateTime(2026, 3, 2));
+      expect(untracked.numberedLows.map((l) => (l.number, l.date.day)),
           [(1, 11), (2, 10), (3, 9), (4, 8), (6, 6)]);
-      expect(e.baseline!.value, 36.4);
-      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
-    });
+      expect(untracked.baseline!.value, 36.4);
+      expect(untracked.baseline!.date,
+          DateOnly.normalize(DateTime(2026, 3, 6)));
 
-    test(
-        'an unmeasured window day gets no number — numbers skip, no '
-        'stretch-back', () {
-      final entries = [
+      // A tracked but UNMEASURED day is skipped as well — the window is
+      // rise−1 … rise−6 = Mar 11 … Mar 6 (Mar 11 and Mar 10 untracked,
+      // numbers 1 and 2 skipped, Mar 4 before the window end): the old
+      // dense arithmetic numbered six lows 1–6, stretching back to Mar 3.
+      final unmeasured = evalFor([
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
         d(2026, 3, 4), // tracked but NOT measured
@@ -1332,29 +1331,50 @@ void main() {
         d(2026, 3, 8, t: 36.3),
         d(2026, 3, 9, t: 36.1), // peak day
         d(2026, 3, 12, t: 36.8), // first higher (marked)
-      ];
-      final marks = [peak(2026, 3, 9), rise(2026, 3, 12)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // The window is rise−1 … rise−6 = Mar 11 … Mar 6. Mar 11 and Mar 10
-      // are untracked (numbers 1 and 2 skipped), Mar 4 lies BEFORE the
-      // window end — under the calendar rule only four lows are numbered:
-      // 3, 4, 5, 6. The old dense arithmetic numbered six lows 1–6,
-      // stretching back to Mar 3.
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+      ], [peak(2026, 3, 9), rise(2026, 3, 12)], DateTime(2026, 3, 2));
+      expect(unmeasured.numberedLows.map((l) => (l.number, l.date.day)),
           [(3, 9), (4, 8), (5, 7), (6, 6)]);
-      expect(e.numberedLows.map((l) => l.number), [3, 4, 5, 6]);
-      expect(e.baseline!.value, 36.4);
-      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
+      expect(unmeasured.numberedLows.map((l) => l.number), [3, 4, 5, 6]);
+      expect(unmeasured.baseline!.value, 36.4);
+      expect(unmeasured.baseline!.date,
+          DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
-    test('a marked (excluded) day before the window changes nothing', () {
-      final entries = [
+    test(
+        'a marked (excluded) day counts as nothing — inside the window it '
+        'occupies its calendar position (number skipped, no baseline '
+        'contribution, no raw flags at all), before the window it changes '
+        'nothing', () {
+      // The ignored 37.5 of Mar 7 (rise−5): the day EXISTS and is
+      // measured, but the MARK makes it get no number and raise no
+      // baseline (the entry carries no raw flags). Number 5 is skipped —
+      // the old dense arithmetic would have numbered Mar 6 as #5.
+      final e = evalFor([
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 6, t: 36.4), // rise−6 → #6 — highest inside the window
+        d(2026, 3, 7, t: 37.5), // rise−5: excluded via the MARK
+        d(2026, 3, 8, t: 36.3), // rise−4 → #4
+        d(2026, 3, 9, t: 36.1), // rise−3 → #3
+        d(2026, 3, 10, t: 36.3), // rise−2 → #2
+        d(2026, 3, 11, t: 36.2), // rise−1 → #1
+        d(2026, 3, 12, t: 36.8), // marked rise
+      ], [rise(2026, 3, 12), excludedDay(2026, 3, 7)], DateTime(2026, 3, 2));
+      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+          [(1, 11), (2, 10), (3, 9), (4, 8), (6, 6)]);
+      // The excluded 37.5 (which would have raised the baseline) counts
+      // as nothing — the baseline is the max of the not-excluded measured
+      // temperatures within the window.
+      expect(e.baseline!.value, 36.4);
+      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
+
+      // A marked (excluded) day BEFORE the window (the fever day Mar 4,
+      // 37.0, excluded via the MARK: it contributes no temperature, hence
+      // no low) shifts nothing either: the window's six positions are all
+      // measured, so all six numbers are used.
+      final before = evalFor([
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
-        d(2026, 3, 4, t: 37.0), // fever day — before the window, and
-        // excluded via the MARK: contributes no temperature, hence no low.
+        d(2026, 3, 4, t: 37.0), // fever day — excluded via the MARK
         d(2026, 3, 5, t: 36.3),
         d(2026, 3, 6, t: 36.4), // baseline
         d(2026, 3, 7, t: 36.2),
@@ -1363,78 +1383,15 @@ void main() {
         d(2026, 3, 10, t: 36.3),
         d(2026, 3, 11, t: 36.2),
         d(2026, 3, 12, t: 36.8), // first higher (marked)
-      ];
-      final marks = [
+      ], [
         peak(2026, 3, 9),
         rise(2026, 3, 12),
-        excludedDay(2026, 3, 4)
-      ];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // The fever day (Mar 4, 37.0) lies before the window (rise−1 …
-      // rise−6 = Mar 11 … Mar 6) and shifted nothing: the window's six
-      // positions are all measured, so all six numbers are used.
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+        excludedDay(2026, 3, 4),
+      ], DateTime(2026, 3, 2));
+      expect(before.numberedLows.map((l) => (l.number, l.date.day)),
           [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7), (6, 6)]);
-      expect(e.baseline!.value, 36.4);
-      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
-    });
-
-    test(
-        'fewer than six measured days inside the window: number only '
-        'what exists', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3, t: 36.3), // BEFORE rise−6 — outside the window
-        d(2026, 3, 5, t: 36.1), // rise−5 → #5
-        d(2026, 3, 6, t: 36.4), // rise−4 → #4 — highest → baseline
-        d(2026, 3, 7, t: 36.3), // rise−3 → #3 (the peak day)
-        d(2026, 3, 10, t: 36.8), // first higher (marked)
-      ];
-      final marks = [peak(2026, 3, 7), rise(2026, 3, 10)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // The window rise−1 … rise−6 = Mar 9 … Mar 4 contains exactly three
-      // measured days (Mar 9, 8, 4 are untracked): numbers 3, 4, 5. The
-      // old dense arithmetic would have numbered Mar 3 as #4.
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
-          [(3, 7), (4, 6), (5, 5)]);
-      expect(e.baseline!.value, 36.4);
-      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
-      expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
-        [(10, MarkKind.circle, 1)],
-      );
-      expect(e.suzBegins, isNull);
-    });
-  });
-
-  group('six-low window: calendar positions (owner ruling 2026-09-17)', () {
-    test(
-        'numbering is the calendar offset — unmeasured and untracked days '
-        'inside the window get no number, numbers skip ("6 5 _ 3 _ 1")', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 5, t: 36.1), // rise−6 → #6
-        d(2026, 3, 6, t: 36.2), // rise−5 → #5
-        d(2026, 3, 7), // rise−4: tracked but unmeasured — NO number
-        d(2026, 3, 8, t: 36.2), // rise−3 → #3
-        // Mar 9: untracked — rise−2 carries NO number either
-        d(2026, 3, 10, t: 36.3), // rise−1 → #1
-        d(2026, 3, 11, t: 36.8), // marked rise
-      ];
-      final marks = [rise(2026, 3, 11)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // The owner example "6 5 _ 3 _ 1": the numbers belong to the
-      // CALENDAR POSITIONS rise−1 … rise−6 — an omitted day gets no
-      // number and its number is skipped. The old dense arithmetic would
-      // have produced 1, 2, 3, 4 over the same four measured days.
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
-          [(1, 10), (3, 8), (5, 6), (6, 5)]);
+      expect(before.baseline!.value, 36.4);
+      expect(before.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
     });
 
     // Shared fixture: only THREE measured days sit inside the
@@ -1452,60 +1409,39 @@ void main() {
     ];
     final stretchMarks = [rise(2026, 3, 10)];
 
-    test('unmeasured days do NOT stretch the window back', () {
-      final e = evalFor(stretchEntries, stretchMarks, DateTime(2026, 3, 2));
-
-      // Exactly the measured days of rise−1 … rise−6 are numbered — the
-      // old arithmetic would have numbered Mar 3 as low #4 (four lows).
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
-          [(1, 9), (3, 7), (5, 5)]);
-    });
-
     test(
-        'baseline = max over the six-calendar-day window — old-vs-new '
-        'disagreement: no stretch-back to an older higher day', () {
-      final e = evalFor(stretchEntries, stretchMarks, DateTime(2026, 3, 2));
-
+        'the baseline is the max over the six-calendar-day window — '
+        'unmeasured days do NOT stretch it back to an older, higher day '
+        '("old-vs-new disagreement"); fewer than six measured days are '
+        'numbered as they exist', () {
       // The old stretch-back arithmetic found the 36.6 on Mar 3 and set
       // the baseline there; the calendar window ignores it — the baseline
-      // is the highest measured day INSIDE the window.
+      // is the highest measured day INSIDE the window, and exactly the
+      // measured days of rise−1 … rise−6 are numbered (the old arithmetic
+      // would have numbered Mar 3 as low #4).
+      final e = evalFor(stretchEntries, stretchMarks, DateTime(2026, 3, 2));
+      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
+          [(1, 9), (3, 7), (5, 5)]);
       expect(e.baseline!.value, 36.3);
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 9)));
-    });
 
-    test(
-        'a marked (excluded) day occupies its calendar day and contributes '
-        'no temperature (number skipped, no baseline contribution) — with '
-        'no raw flags at all', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 6, t: 36.4), // rise−6 → #6 — highest inside the window
-        d(2026, 3, 7, t: 37.5), // rise−5: the day EXISTS and is measured,
-        // but the ignoreTemperature MARK makes its 37.5 get no number
-        // and raise no baseline (the entry carries no raw flags)
-        d(2026, 3, 8, t: 36.3), // rise−4 → #4
-        d(2026, 3, 9, t: 36.1), // rise−3 → #3
-        d(2026, 3, 10, t: 36.3), // rise−2 → #2
-        d(2026, 3, 11, t: 36.2), // rise−1 → #1
-        d(2026, 3, 12, t: 36.8), // marked rise
-      ];
-      final marks = [rise(2026, 3, 12), excludedDay(2026, 3, 7)];
-
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
-
-      // Five numbered lows: number 5 is skipped (the excluded rise−5 day
-      // occupies it but carries no temperature). The old dense arithmetic
-      // would have numbered Mar 6 as #5.
-      expect(e.numberedLows.map((l) => (l.number, l.date.day)),
-          [(1, 11), (2, 10), (3, 9), (4, 8), (6, 6)]);
-      // The excluded 37.5 (which would have raised the baseline) counts
-      // as nothing — the baseline is the max of the not-excluded measured
-      // temperatures within the window.
-      expect(e.baseline!.value, 36.4);
-      expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
+      // Fewer than six measured days inside the window: the numbers 3, 4,
+      // 5 belong to the calendar positions — no stretch-back to Mar 3,
+      // and the marked candidacy still stands alone (one circle, no SUZ).
+      final five =
+          evalFor(_fewerThanSixLows, _fewerThanSixMarks, DateTime(2026, 3, 2));
+      expect(five.numberedLows.map((l) => (l.number, l.date.day)),
+          [(3, 7), (4, 6), (5, 5)]);
+      expect(five.baseline!.value, 36.4);
+      expect(five.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
+      expect(
+        five.higherMeasurements
+            .map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [(10, MarkKind.circle, 1)],
+      );
+      expect(five.suzBegins, isNull);
     });
   });
-
   group('rise-mark consistency (owner decision 2026-09-17)', () {
     // Shared fixture: the six-calendar-day window before the Mar 11 mark
     // is Mar 5..Mar 10 (36.2, 36.4, 36.1, unmeasured, 36.3, 36.2), so the

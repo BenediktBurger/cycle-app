@@ -9,8 +9,7 @@
 // marks), and the letter-coded pain flags B (breast, in the pain row) and
 // M (Mittelschmerz, in its own row beneath the mucus row). Days without
 // the respective fact render nothing. Same harness pattern as
-// test/cycle_chart_cervix_test.dart (localized en, plus a de wording
-// check).
+// test/cycle_chart_cervix_test.dart (localized en).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -194,6 +193,18 @@ void main() {
             'corner slot');
   });
 
+  testWidgets('the German locale renders the German HH:mm form',
+      (tester) async {
+    await tester.pumpWidget(
+        _chartHarness(entries: _entries(), locale: const Locale('de')));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.descendant(of: chartCell(0, 'time'), matching: find.text('06:30')),
+        findsOneWidget,
+        reason: 'the German locale keeps the padded HH:mm form');
+  });
+
   testWidgets('sex renders X marks only on days with recorded time slots',
       (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries()));
@@ -299,45 +310,5 @@ void main() {
           reason: 'no position letter ($glyph) without a position '
               'observation');
     }
-  });
-
-  testWidgets('the help sheet names the measurement time, sex, firmness, '
-      'and the pain letters', (tester) async {
-    await tester.pumpWidget(_chartHarness(entries: _entries()));
-    await tester.pumpAndSettle();
-
-    // The on-screen legend moved into the help sheet.
-    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-    await tester.pumpAndSettle();
-    expect(find.text('Measurement time'), findsOneWidget,
-        reason: 'the clock glyph needs a legend entry');
-    expect(find.text('Sex (X per time of day)'), findsOneWidget,
-        reason: 'the X glyph needs a legend entry; the wording mentions the '
-            'per-slot X now that a day can carry several');
-    expect(find.text('Cervix firmness'), findsOneWidget,
-        reason: 'the firmness glyph needs a legend entry, parallel to the '
-            'position entry');
-    expect(find.text('Breast pain (B)'), findsOneWidget,
-        reason: 'the B letter keeps its legend entry (the M letter has '
-            'its own row and its own entry)');
-    expect(find.text('Mittelschmerz (M)'), findsOneWidget,
-        reason: 'the M letter has its own legend entry — it renders in '
-            'its own row beneath the mucus row');
-  });
-
-  testWidgets('the German help sheet uses the German wording',
-      (tester) async {
-    await tester.pumpWidget(_chartHarness(
-        entries: _entries(), locale: const Locale('de')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-    await tester.pumpAndSettle();
-    expect(find.text('Messzeitpunkt'), findsOneWidget);
-    expect(find.text('Sex (X je Zeitpunkt)'), findsOneWidget,
-        reason: 'the diary already uses "Sex" in the German vocabulary');
-    expect(find.text('Muttermund-Festigkeit'), findsOneWidget);
-    expect(find.text('Brustschmerz (B)'), findsOneWidget);
-    expect(find.text('Mittelschmerz (M)'), findsOneWidget);
   });
 }

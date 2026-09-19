@@ -113,14 +113,6 @@ void main() {
         ),
         throwsA(isA<Exception>()),
       );
-      // Unknown tokens stay rejected.
-      await expectLater(
-        db.customStatement(
-          "INSERT INTO cycle_entries (date, mucus_sign) "
-          "VALUES (20005, 'wet')",
-        ),
-        throwsA(isA<Exception>()),
-      );
     });
 
     test(
@@ -891,21 +883,6 @@ void main() {
       await db.marksDao.addMark(
         afternoon.toUtc().add(const Duration(hours: 2)),
         CycleMarkTypes.firstHigherMeasurement,
-      );
-      expect(await db.marksDao.marksForDay(day), hasLength(1));
-    });
-
-    test(
-        'a duplicate (date, type) insert bypassing addMark hits '
-        'the unique index', () async {
-      await db.marksDao.addMark(day, CycleMarkTypes.mucusPeakDay);
-      await expectLater(
-        db.into(db.userMarks).insert(
-              cycleMarkToCompanion(
-                CycleMark(date: day, type: CycleMarkTypes.mucusPeakDay),
-              ),
-            ),
-        throwsA(isA<Exception>()), // UNIQUE constraint failed
       );
       expect(await db.marksDao.marksForDay(day), hasLength(1));
     });

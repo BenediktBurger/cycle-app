@@ -208,6 +208,11 @@ void main() {
       expect(importMarkKey('2026-03-05', 'baseline'),
           isNot(importMarkKey('2026-03-05', 'mucusPeakDay')),
           reason: 'the mark key distinguishes types, nothing else');
+      // The open-vocabulary tokens key the same (day|type) way.
+      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
+          '2026-03-05|ignoreTemperature');
+      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
+          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')));
     });
 
     test('merge policy constant documents the overwrite behaviour', () {
@@ -961,15 +966,6 @@ void main() {
           reason: 'the profile_id key is tolerated, never gated');
       expect(summary.entriesNew, 1);
       expect(summary.marksNew, 1);
-    });
-
-    test('merge keys are day-based: entries ISO day, marks (day, mark_type)',
-        () {
-      expect(importEntryKey('2026-03-05'), '2026-03-05');
-      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
-          '2026-03-05|ignoreTemperature');
-      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
-          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')));
     });
   });
 }

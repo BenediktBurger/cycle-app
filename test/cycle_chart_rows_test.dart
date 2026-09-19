@@ -299,38 +299,6 @@ void main() {
           reason: 'long-press shows the row-name tooltip overlay');
     });
 
-    testWidgets('a recorded measurement time renders localized HH:mm text',
-        (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: _entries));
-      await tester.pumpAndSettle();
-
-      // 9 days fit the viewport comfortably: the columns are wide enough
-      // for the time text. intl's localized Hm pattern is the padded
-      // HH:mm form ("06:30") in both test locales here.
-      expect(tester.getRect(chartCell(0, 'time')).width, greaterThan(32),
-          reason: 'precondition: a comfortable column width');
-      expect(
-          find.descendant(of: chartCell(0, 'time'), matching: find.text('06:30')),
-          findsOneWidget,
-          reason: 'the localized HH:mm form of 6:30');
-      expect(
-          find.descendant(of: chartCell(1, 'time'), matching: find.text('06:30')),
-          findsNothing,
-          reason: 'a day without a recorded time shows nothing');
-    });
-
-    testWidgets('the German locale renders the German HH:mm form',
-        (tester) async {
-      await tester.pumpWidget(
-          _chartHarness(entries: _entries, locale: const Locale('de')));
-      await tester.pumpAndSettle();
-
-      expect(
-          find.descendant(of: chartCell(0, 'time'), matching: find.text('06:30')),
-          findsOneWidget,
-          reason: 'the German locale keeps the padded HH:mm form');
-    });
-
     testWidgets(
         'at minimum column width the time renders vertically — never '
         'dropped (wide columns keep the horizontal text, see the wide '

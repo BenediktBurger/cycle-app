@@ -248,6 +248,35 @@ void main() {
       );
     });
 
+    testWidgets('the corner prototypes use the German wording in de',
+        (tester) async {
+      await tester.pumpWidget(
+          _chartHarness(entries: _entries, locale: const Locale('de')));
+      await tester.pumpAndSettle();
+
+      final corner = find.byKey(const ValueKey('dayHeaderCorner'));
+      final tooltips = tester
+          .widgetList<Tooltip>(
+              find.descendant(of: corner, matching: find.byType(Tooltip)))
+          .map((t) => t.message)
+          .toList();
+      expect(tooltips, containsAll(['Datum', 'Zyklustag']));
+      expect(
+        find.descendant(
+            of: corner,
+            matching: find.byWidgetPredicate(
+                (w) => w is Semantics && w.properties.label == 'Datum')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: corner,
+            matching: find.byWidgetPredicate(
+                (w) => w is Semantics && w.properties.label == 'Zyklustag')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets(
         'a flat temperature record keeps the scale usable (degenerate '
         'span guard)', (tester) async {

@@ -2,8 +2,9 @@
 // recorded position renders as a glyph in the cervix row under the
 // temperature curve, the firmness glyph renders BESIDE the position glyph
 // (one cervix line, two observations), days without an observation stay
-// empty, and the legend names the position symbol. Same harness pattern as
-// test/cycle_chart_temperature_test.dart (localized en).
+// empty. Same harness pattern as
+// test/cycle_chart_temperature_test.dart (localized en). The glyph's
+// glossary entry lives in the symbol help sheet (cycle_chart_help_sheet_test).
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:flutter/material.dart';
@@ -89,16 +90,5 @@ void main() {
       reason: 'the firmness glyph renders beside the position glyph in the '
           'same cervix line',
     );
-  });
-
-  testWidgets('the help sheet names the Muttermund symbol', (tester) async {
-    await tester.pumpWidget(_chartHarness(entries: _entries()));
-    await tester.pumpAndSettle();
-
-    // The on-screen legend moved into the help sheet.
-    await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-    await tester.pumpAndSettle();
-    expect(find.text('Cervix position'), findsOneWidget,
-        reason: 'the glyph row needs a legend entry');
   });
 }

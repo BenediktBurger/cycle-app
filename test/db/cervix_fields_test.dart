@@ -109,7 +109,9 @@ void main() {
   });
 
   group('Muttermund fields at the export document boundary', () {
-    test('export carries the stored tokens and a v4 document round-trips them',
+    test(
+        'export carries the stored tokens and a v4 document round-trips '
+        'them to schema_version 5',
         () async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 4, 2),
