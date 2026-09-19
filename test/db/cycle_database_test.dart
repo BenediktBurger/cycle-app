@@ -708,6 +708,40 @@ void main() {
       expect(mapped.mucusSign, MucusSign.f);
       expect(mapped.mucusQuality, isNull);
     });
+    group('mucus sign A (Ausfluss) storage vocabulary', () {
+      test("'a' is accepted by the engine and round-trips as its token",
+          () async {
+        // Raw SQL write (e.g. a future import path) proves the column's CHECK
+        // admits the new token.
+        await db.customStatement(
+          "INSERT INTO cycle_entries (date, mucus_sign) "
+          "VALUES (20000, 'a')",
+        );
+        final row =
+            await db.entriesDao.entryFor(DateTime(2024, 10, 4)); // day 20000
+        expect(row!.mucusSign, 'a');
+
+        // The DAO write path stores the enum name, not a glyph.
+        final stored = await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 8, 5),
+          mucusSign: MucusSign.a,
+        ));
+        expect(stored.mucusSign, 'a', reason: 'TEXT token, not a glyph');
+        expect(dailyEntryFromDrift(stored).mucusSign, MucusSign.a);
+      });
+
+      test('a quality token stays engine-rejected on an A sign', () async {
+        // Quality remains exclusive to S — the CHECK below still encodes
+        // mucus_sign = 's', so 'a' with a quality cannot be written.
+        await expectLater(
+          db.customStatement(
+            "INSERT INTO cycle_entries (date, mucus_sign, "
+            "mucus_quality) VALUES (20000, 'a', 'w')",
+          ),
+          throwsA(isA<Exception>()),
+        );
+      });
+    });
   });
 
   group('EntriesDao.range / watch / delete', () {

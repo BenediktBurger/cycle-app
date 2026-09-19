@@ -1,16 +1,18 @@
-// Muttermund (cervix) per-day fields: position + opening round trip,
-// storage vocabulary, and the export/import document boundary.
+// Cervix fields (position, opening, firmness), sex timings and their
+// storage, plus the export/import document boundary — the whole cervix
+// storage family in one file (the former cervix_fields_test.dart and
+// cervix_firmness_sex_timings_test.dart; the mucus 'a' (Ausfluss)
+// vocabulary group moved to the mucus coverage in cycle_database_test.dart).
 //
 // Patterns and harnesses match test/db/cycle_database_test.dart: pure Dart
-// against NativeDatabase.memory(), one list per namespace.
-import 'package:drift/native.dart';
-import 'package:flutter_test/flutter_test.dart';
-
+// against NativeDatabase.memory(), one group per vocabulary.
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   // Not final: setUp assigns a fresh in-memory database before every test
@@ -111,8 +113,7 @@ void main() {
   group('Muttermund fields at the export document boundary', () {
     test(
         'export carries the stored tokens and a v4 document round-trips '
-        'them to schema_version 5',
-        () async {
+        'them to schema_version 5', () async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 4, 2),
         cervixPosition: CervixPosition.veryHigh,
@@ -176,6 +177,137 @@ void main() {
       final second = (await db.entriesDao.entryFor(DateTime(2026, 5, 2)))!;
       expect(second.cervixPosition, 'low');
       expect(second.cervixOpening, isNull);
+    });
+  });
+
+  group('cervix firmness storage & domain round trip', () {
+    test('every firmness value round-trips the drift layer as its TEXT token',
+        () async {
+      for (var i = 0; i < CervixFirmness.values.length; i++) {
+        final firmness = CervixFirmness.values[i];
+        final day = DateTime(2026, 8, 1 + i);
+        final stored = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
+          DailyEntry(date: day, cervixFirmness: firmness),
+        ));
+        expect(stored.cervixFirmness, firmness.name,
+            reason: '${firmness.name} must be stored as its TEXT token');
+        final mapped = dailyEntryFromDrift(stored);
+        expect(mapped.cervixFirmness, firmness,
+            reason: '${firmness.name} must map back to the enum member');
+      }
+    });
+
+    test('a day without a firmness observation reads null', () async {
+      final stored = await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2026, 8, 20)),
+      );
+      expect(stored.cervixFirmness, isNull);
+      expect(dailyEntryFromDrift(stored).cervixFirmness, isNull);
+    });
+
+    test('firmness is engine-rejected outside its vocabulary', () async {
+      // 'middle' is the OPENING token — a classic mix-up; the CHECK on
+      // cervix_firmness must reject it.
+      await expectLater(
+        db.customStatement(
+          "INSERT INTO cycle_entries (date, cervix_firmness) "
+          "VALUES (20000, 'middle')",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      // Sanity: an in-vocabulary token goes through.
+      await db.customStatement(
+        "INSERT INTO cycle_entries (date, cervix_firmness) "
+        "VALUES (20001, 'halfSoft')",
+      );
+    });
+
+    test('full replace clears a previously stored firmness (null written)',
+        () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 8, 15),
+        cervixFirmness: CervixFirmness.hard,
+      ));
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2026, 8, 15)),
+      );
+      final row = (await db.entriesDao.entryFor(DateTime(2026, 8, 15)))!;
+      expect(row.cervixFirmness, isNull);
+    });
+  });
+
+  group('sex timings storage & domain round trip', () {
+    test('every mask 0..7 round-trips the drift layer as the INTEGER mask',
+        () async {
+      for (var mask = 0; mask <= 7; mask++) {
+        final day = DateTime(2026, 7, 1 + mask);
+        final stored = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
+          DailyEntry(date: day, sexTimings: mask),
+        ));
+        expect(stored.sexTimings, mask,
+            reason: 'mask $mask must survive storage verbatim');
+        expect(dailyEntryFromDrift(stored).sexTimings, mask);
+      }
+    });
+
+    test('each SexTiming bit is representable alone (by bit, never by index)',
+        () async {
+      for (final timing in SexTiming.values) {
+        final day = DateTime(2026, 7, 10 + timing.index);
+        final stored = await db.entriesDao.upsertDaily(
+          DailyEntry(date: day, sexTimings: timing.bit),
+        );
+        expect(stored.sexTimings, timing.bit,
+            reason: '${timing.name} stores its bit (${timing.bit}), not its '
+                'declaration index (${timing.index})');
+      }
+    });
+
+    test('a fresh day defaults to 0 — no sex recorded', () async {
+      await db.into(db.cycleEntries).insert(
+            CycleEntriesCompanion.insert(date: DateTime(2026, 7, 20)),
+          );
+      final row = await db.entriesDao.entryFor(DateTime(2026, 7, 20));
+      expect(row!.sexTimings, 0);
+      final raw = await db
+          .customSelect('SELECT sex_timings FROM cycle_entries')
+          .getSingle();
+      expect(raw.data['sex_timings'], 0, reason: 'the column default is 0');
+    });
+
+    test('sex_timings is engine-rejected outside 0..7', () async {
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO cycle_entries (date, sex_timings) '
+          'VALUES (20000, 8)',
+        ),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO cycle_entries (date, sex_timings) '
+          'VALUES (20002, -1)',
+        ),
+        throwsA(isA<Exception>()),
+      );
+      // Sanity: an in-range mask goes through.
+      await db.customStatement(
+        'INSERT INTO cycle_entries (date, sex_timings) '
+        'VALUES (20003, 7)',
+      );
+    });
+
+    test('full replace clears a previously stored mask (default 0 written)',
+        () async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 7, 15),
+        sexTimings: 3,
+      ));
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2026, 7, 15)),
+      );
+      final row = (await db.entriesDao.entryFor(DateTime(2026, 7, 15)))!;
+      expect(row.sexTimings, 0);
     });
   });
 }

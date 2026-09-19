@@ -5,8 +5,11 @@
 //
 // The platform brightness is simulated through the test binding's platform
 // dispatcher; the app itself is unchanged: in-memory drift database
-// override, no platform channels (same pattern as theme_brightness_test.dart
-// and locale_default_test.dart).
+// override, no platform channels (same pattern as the locale tests,
+// in this directory). The first test pins the light OS surface (formerly
+// its own file, theme_brightness_test.dart — merged here, its "dark OS
+// setting" duplicate having been removed in the earlier dedupe); the rest
+// cover the dark surface and the explicit light/dark choices.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +25,18 @@ ProviderScope _appScope({ThemeMode? themeMode}) =>
     appScope(themeMode: themeMode);
 
 void main() {
+  // Light OS surface: the dispatcher defaults to light (no test value is
+  // set), and the light look is today's baseline. The whole family shares
+  // the _appScope above, so the former file's identical wrapper dropped
+  // away with the merge.
+  testWidgets('light OS setting keeps the app light (today\'s look)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_appScope());
+    await tester.pumpAndSettle();
+
+    expect(materializedBrightness(tester), Brightness.light);
+  });
+
   testWidgets('system default follows the device brightness (dark device)',
       (WidgetTester tester) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;

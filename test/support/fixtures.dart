@@ -7,8 +7,9 @@ import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 
-/// The shared evaluation scenario (used by cycle_chart_evaluation_test.dart
-/// for rendering and cycle_mark_sheet_test.dart for write-through): days
+/// The shared evaluation scenario (used by the evaluation section of
+/// test/cycle_chart_test.dart and cycle_mark_sheet_test.dart for the
+/// write-through): days
 /// 2026-09-06..16 with
 ///
 ///  - 9/6 (idx 0): the rise BEFORE the marked first higher — never a
@@ -38,8 +39,7 @@ List<DailyEntry> evaluationScenarioEntries() => [
 /// the first higher measurement (9/14), so the candidates render CIRCLED.
 List<CycleMark> evaluationScenarioMarks() => [
       CycleMark(
-          date: DateTime.utc(2026, 9, 12),
-          type: CycleMarkTypes.mucusPeakDay),
+          date: DateTime.utc(2026, 9, 12), type: CycleMarkTypes.mucusPeakDay),
       CycleMark(
           date: DateTime.utc(2026, 9, 14),
           type: CycleMarkTypes.firstHigherMeasurement),
@@ -57,7 +57,7 @@ List<DailyEntry> longRangeEntries([int count = 60]) => [
     ];
 
 /// Nine chart days covering one recorded fact per signal (the per-signal
-/// rows fixture of cycle_chart_rows_test.dart):
+/// rows fixture of the chart test's rows section):
 ///  0: temperature WITH a recorded measurement time (6:30)
 ///  1: bleeding light
 ///  2: bleeding spotting

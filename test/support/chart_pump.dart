@@ -1,5 +1,6 @@
 // Shared chart pump harness: one scope wiring for the cycle-chart widget
-// tests. Every `cycle_chart_*_test.dart` pumps the ZyklusScreen with the
+// tests. Every chart test (test/cycle_chart_test.dart) pumps the
+// ZyklusScreen with the
 // same three stream overrides (daily entries, marks, selected date) plus
 // the app's MaterialApp wiring (localization delegates, en locale, seeded
 // color scheme); the parameters below cover the shapes the tests grew into —

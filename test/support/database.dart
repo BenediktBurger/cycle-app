@@ -4,7 +4,7 @@
 //
 // All pins are optional; leaving one out keeps the provider at its real
 // default, which is exactly what the "system follows the device" tests rely
-// on (see locale_default_test.dart / theme_mode_setting_test.dart).
+// on (see locale_test.dart / theme_mode_setting_test.dart).
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/main.dart';

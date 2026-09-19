@@ -7,7 +7,8 @@
 // difference to the baseline for marked candidates and the
 // stopped-evaluation notice).
 //
-// Unlike test/cycle_chart_evaluation_test.dart (fixed marks streams), these
+// Unlike the evaluation section of test/cycle_chart_test.dart (fixed
+// marks streams), these
 // tests write through the REAL MarksDao against an in-memory database —
 // the sheet must persist and the surface (chart overlay, sheet labels) must
 // re-render from the marks stream after every write. Same harness pattern

@@ -4,7 +4,7 @@
 //
 // The locale is pinned explicitly so the German-string assertions hold no
 // matter what locale the test runner's system reports (the system-follow
-// default itself is covered by locale_default_test.dart).
+// default itself is covered by the locale tests, test/locale_test.dart).
 import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

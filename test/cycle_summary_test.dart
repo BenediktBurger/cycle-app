@@ -10,7 +10,8 @@
 //
 // Two harnesses: direct CycleSummaryTable construction (cell values, keys,
 // both locales) and the ZyklusScreen integration (the harness pattern of
-// test/cycle_chart_rows_test.dart, with stream controllers for the live
+// test/cycle_chart_test.dart's rows section, with stream controllers for
+// the live
 // marks update).
 import 'dart:async';
 

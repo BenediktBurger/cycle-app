@@ -16,7 +16,7 @@ import 'support/database.dart';
 /// app's real default is the system language (nullable localeProvider), and
 /// unpinned the test runner exposes an English device — so the German-string
 /// assertions below have to request German explicitly (the system-follow
-/// default itself is covered by locale_default_test.dart).
+/// default itself is covered by the locale tests, test/locale_test.dart).
 ProviderScope _appScope([Locale? locale]) =>
     appScope(locale: locale);
 
@@ -26,7 +26,7 @@ void main() {
   ) async {
     // Explicit German pin so the German labels below hold; how German is
     // *reached* (system device vs. switcher choice) is tested in
-    // locale_default_test.dart.
+    // test/locale_test.dart.
     await tester.pumpWidget(_appScope(const Locale('de')));
     // Let the gated shell resolve the (already-synchronous-ish) database
     // future, then settle screens and any transcription animations.
