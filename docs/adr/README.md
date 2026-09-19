@@ -30,3 +30,4 @@ rejected), a new ADR is written that supersedes the old one and references it.
 | [0006](0006-ci.md) | Automated verification — local testing AND GitHub Actions CI (analyze + test + build web) | Accepted |
 | [0007](0007-language-policy.md) | Language policy — English code, multilingual app | Accepted |
 | [0008](0008-cycle-start-as-mark.md) | Cycle start is a user-owned mark; bleeding only suggests | Accepted |
+| [0009](0009-release-pipeline-and-signing.md) | Release pipeline — Android-first publishing, signing custody, store accounts | Accepted |

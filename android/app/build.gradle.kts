@@ -21,6 +21,9 @@ android {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
+            // A relative `storeFile` value resolves against the `:app` module
+            // directory (`android/app/`); prefer absolute paths in key.properties
+            // (as templated in docs/release.md).
             storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
             storePassword = keystoreProperties.getProperty("storePassword")
         }

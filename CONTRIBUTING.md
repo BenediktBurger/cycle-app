@@ -27,7 +27,10 @@ details live in [AGENTS.md](AGENTS.md). In brief:
 
 Setup path and daily commands below; open work is tracked in
 [`docs/roadmap.md`](docs/roadmap.md), architecture decisions in
-[`docs/adr/`](docs/adr/README.md).
+[`docs/adr/`](docs/adr/README.md). Release and publishing (local APKs,
+F-Droid, Google Play) follow the runbook in
+[`docs/release.md`](docs/release.md), with the decisions recorded in
+[ADR-0009](docs/adr/0009-release-pipeline-and-signing.md).
 
 ## 1. Install the Flutter SDK (stable channel)
 

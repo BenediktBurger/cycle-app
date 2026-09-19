@@ -23,7 +23,7 @@ AuthorName: Benedikt Burger
 # Repo has no email published in pubspec; leave AuthorEmail empty for now.
 
 Summary: >-
-  Lokale Zyklusbewertung nach NER (Rötzer) — Daten bleiben auf dem Gerät.
+  Lokale Zyklusbewertung nach den NER-Regeln — Daten bleiben auf dem Gerät.
 # Description mirrors fastlane/metadata/android/de-DE/full_description.txt
 # (keep in sync when editing). F-Droid actually prefers the fastlane
 # files when they exist; these fields are the fallback.

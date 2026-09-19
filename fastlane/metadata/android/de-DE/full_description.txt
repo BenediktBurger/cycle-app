@@ -17,11 +17,11 @@ Funktionen:
 • Alle Daten bleiben auf dem Gerät — keine Cloud, keine Analysewerkzeuge,
   keine Internet-Berechtigung.
 • Oberfläche standardmäßig auf Deutsch, auf Englisch umschaltbar.
-• Tägliche Erfassung von Basaltemperatur, Blutung (mit Ausschlusskenn-
-  zeichnung für Störungen wie Krankheit, Alkohol oder Reisen und für
-  Schmierblutungen), Zervixschleim in der Zeichen-Schreibweise der NER
-  (t, Ø, f, S), Muttermund (wahlweise), Schmerzen, Stimmung, sexuelle
-  Aktivität und Notizen.
+• Tägliche Erfassung von Basaltemperatur, Blutung (mit
+  Ausschlusskennzeichnung für Störungen wie Krankheit, Alkohol oder
+  Reisen und für Schmierblutungen), Zervixschleim in der
+  Zeichen-Schreibweise der NER (t, Ø, f, S), Muttermund (wahlweise),
+  Schmerzen, Stimmung, sexuelle Aktivität und Notizen.
 • Auswertungswerkzeuge: erste Temperatur über der Basislinie, Zählung der
   tiefen Messungen, Schleimspitzentag, fruchtbares Fenster nach der
   Kalenderregel, Ausschluss von Störungstagen.
