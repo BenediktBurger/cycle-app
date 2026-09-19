@@ -18,6 +18,7 @@ import 'db/mappers.dart';
 import 'domain/date_only.dart';
 import 'domain/marks.dart';
 import 'domain/models.dart';
+import 'domain/temperature_range.dart';
 
 /// The one open database for the app lifetime. `FutureProvider` (without
 /// autoDispose) keeps the instance cached; disposing the ProviderScope
@@ -92,6 +93,23 @@ final localeProvider = StateProvider<Locale?>((ref) => null);
 /// but resets to System on web reload BY DESIGN (see the persistence note
 /// there — no settings table in drift at this milestone).
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
+/// The cycle chart's temperature display range ("Temperaturbereich"
+/// settings card): the FIXED y bounds the chart's plot and the frozen
+/// rail's scale share — settings-selectable, default 36–38 °C. Curve
+/// values outside the range CLIP at the boundary (pure helper
+/// [clampBbtC] in lib/ui/cycle_curve.dart); the scale never stretches to
+/// fit an outlier.
+///
+/// In-memory only, mirroring [localeProvider]/[themeModeProvider] — but
+/// here the reset-on-restart is DELIBERATE at this milestone (owner
+/// decision 2026-09-19, not a deferred bug): the range's persistence will
+/// land together with the other deferred settings persistence as one
+/// batch, after a storage decision (docs/roadmap.md backlog). No drift
+/// table, no schema change — this provider is deliberately NOT a storage
+/// precedent for later settings.
+final temperatureRangeProvider =
+    StateProvider<TemperatureRange>((ref) => TemperatureRange.defaults);
 
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when

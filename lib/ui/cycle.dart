@@ -5,14 +5,15 @@
 // own row directly beneath the mucus row (TODO(user-review): the exact
 // home of the M letter is an owner-eyeball choice — the paper sheet writes
 // it under the mucus letters; clinicians may want it twice, with the
-// below-block pain row) and sex — pure recording, no interpretation; the
-// curve runs through the main body BELOW those rows. UNDER the curve come
-// the 1–6 numbering, the rows not on the paper sheet's grid (cervix,
-// remaining pain) and — at the very bottom of the block — the
-// disturbance-letter row for the day's temperature-disturbance (exclusion)
-// flags; below the block come the measurement-time row (vertical text in
-// narrow columns) and — at the very bottom, the paper sheet's remarks
-// home — the day-note indicator row. The COMPUTED evaluation overlay
+// pain row of the below-chart strip) and sex — pure recording, no
+// interpretation; the curve runs through the main body BELOW those rows. UNDER the curve come
+// the 1–6 numbering and the single below-chart strip (the paper's strip
+// under the grid, the owner-decided order): the measurement-time row
+// (vertical text in narrow columns), the disturbance-letter row for the
+// day's temperature-disturbance (exclusion) flags, the rows not on the
+// paper sheet's grid (cervix, remaining pain) and — at the very bottom,
+// the paper sheet's remarks home — the day-note indicator row. The
+// COMPUTED evaluation overlay
 // (Mode M, ADR-0001): the user places the mucus-peak
 // and first-higher marks, the app
 // derives the rest for DISPLAY ONLY — circled higher measurements (every
@@ -60,6 +61,7 @@ import '../domain/evaluation.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
+import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'cycle_curve.dart';
@@ -122,6 +124,11 @@ class ZyklusScreen extends ConsumerWidget {
           // persisted. This is the screen's ONLY marks watch: the
           // evaluations and the raw marks are computed once and handed to
           // both the chart overlay and the table below.
+          // The temperature display range ("Temperaturbereich" settings
+          // card): watched here so a settings change rebuilds the chart
+          // with the new fixed bounds — constructor data like
+          // entries/marks, the chart keeps no riverpod dependency.
+          final temperatureRange = ref.watch(temperatureRangeProvider);
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
           final evaluations = evaluateCycles(entries, marks);
@@ -132,6 +139,7 @@ class ZyklusScreen extends ConsumerWidget {
                 entries: entries,
                 marks: marks,
                 evaluations: evaluations,
+                range: temperatureRange,
               ),
               const SizedBox(height: 12),
               // The paper's bottom summary: the evaluation table, one row
@@ -197,8 +205,8 @@ final class _ChartDays {
 
   /// The chart day indexes whose temperature is IGNORED: computed from the
   /// `ignoreTemperature` marks (owner decision 2026-09-19 — the mark is
-  /// the curve's rendering key; the raw disturbance mask is the diary
-  /// badge's input, not
+  /// the curve's rendering key; the raw disturbance mask is read-only
+  /// display input elsewhere (diary badge, sheet labels), not
   /// the curve's). A mark on an untracked gap day yields no entry, hence no
   /// curve point — harmless.
   late final Set<int> ignoredDayIndexes;
@@ -242,13 +250,17 @@ final class _ChartDays {
 /// on its day column's center — the column geometry the label, marks and
 /// symbol rows share: calendar gaps (days without any measurement) stay
 /// honest as distance, not compressed.
-/// Y bounds are rounded to the nearest half degree so the gridlines carry
-/// typical 0.25 °C steps without a "good range" being implied.
+/// Y bounds are the SETTINGS-selected temperature range (in-memory
+/// provider, default 36–38 °C): a fixed scale without data-adaptive
+/// padding — curve values outside the range clip AT the boundary
+/// (pure helper in cycle_curve.dart), so an outlier never stretches the
+/// scale and the rail's labels never move for it.
 final class _CycleChart extends StatefulWidget {
   const _CycleChart({
     required this.entries,
     required this.marks,
     required this.evaluations,
+    required this.range,
   });
 
   final List<DailyEntry> entries;
@@ -260,6 +272,11 @@ final class _CycleChart extends StatefulWidget {
   /// The per-cycle evaluations the overlay draws its artifacts from —
   /// computed once per screen build, never re-derived here.
   final List<CycleEvaluation> evaluations;
+
+  /// The settings-selected temperature display range: the chart's FIXED
+  /// y bounds (and, via the shared scale, the rail's labels); out-of-range
+  /// curve values clip at the data layer into it.
+  final TemperatureRange range;
 
   @override
   State<_CycleChart> createState() => _CycleChartState();
@@ -586,11 +603,14 @@ final class _CycleChartState extends State<_CycleChart> {
     // The curve is split into runs of adjacent measured days (curve helpers,
     // lib/ui/cycle_curve.dart): the line connects two temperatures only when
     // their calendar days are adjacent, so a day without a temperature
-    // (missing entry or entry without bbtC) breaks the line. This global
-    // structure feeds the Y bounds: the scale must cover the whole recorded
-    // range so scrolling never rescales the curve.
-    final runs =
-        curveRuns(_days.byIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
+    // (missing entry or entry without bbtC) breaks the line. The runs also
+    // CLIP every temperature into the fixed settings range at the data
+    // layer. The static structure feeds the emptiness check; the y bounds
+    // themselves come from the settings range and never depend on the data,
+    // so the scale never rescales while scrolling.
+    final runs = curveRuns(_days.byIndex,
+        ignoredDayIndexes: _days.ignoredDayIndexes,
+        displayRange: widget.range);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -600,21 +620,21 @@ final class _CycleChartState extends State<_CycleChart> {
       );
     }
 
-    final yValues = [for (final point in points) point.bbtC];
-    var yMin = _floorToHalf(yValues.reduce((a, b) => a < b ? a : b) - 0.4)
-        .clamp(34.0, 40.0);
-    var yMax = _ceilToHalf(yValues.reduce((a, b) => a > b ? a : b) + 0.4)
-        .clamp(35.5, 42.0);
-    if (yMax <= yMin) {
-      // Never let degenerate bounds through to the chart.
-      yMax = yMin + 0.5;
-    }
+    // The y bounds are the SETTINGS-selected display range (the
+    // "Temperaturbereich" card, in-memory provider, default 36–38 °C): a
+    // fixed scale, not the old data-adaptive ±0.4 rounding anymore. Curve
+    // values outside the range already clipped in the runs above — dots
+    // and segments ride the boundary instead of stretching the scale.
+    // No degenerate-span guard is needed: the settings card enforces
+    // min < max by construction.
+    final yMin = widget.range.min;
+    final yMax = widget.range.max;
 
     // The chart plot's height adapts to the y-span (the paper's sheet gives
-    // wider temperature ranges more room): a comfortable ~3 °C span fits
-    // the 260 px base height; beyond that every extra degree adds 80 px,
-    // capped so extreme ranges cannot stretch the sheet endlessly. The
-    // y bounds logic itself stays untouched.
+    // wider temperature ranges more room): the span is max − min of the
+    // SETTINGS range only; a comfortable ~3 °C span fits the 260 px base
+    // height, beyond that every extra degree adds 80 px, capped so extreme
+    // settings ranges cannot stretch the sheet endlessly.
     // TODO(user-review): the growth rate (80 px/°C) and the 400 px cap are
     // tuned display heuristics, not rules from the cheat sheet.
     const chartBaseHeight = 260.0;
@@ -629,6 +649,19 @@ final class _CycleChartState extends State<_CycleChart> {
     // rail's scale labels (see _TemperatureScale).
     final scale =
         _TemperatureScale(min: yMin, max: yMax, plotHeight: chartHeight);
+
+    // The SUZ glyph's top anchoring (°C value units — independent of the
+    // plot's pixel height): the SUZ bar hangs DOWN from the chart's top
+    // border by a fixed [suzBarHangSpanDegrees] drop, and the arrow glyph
+    // anchors [suzArrowTopInsetDegrees] below that border (inside the hung
+    // band), so the whole glyph sits below the sex row above the plot.
+    // TODO(user-review): both values are owner-eyeball rendering details,
+    // not settled rules. TODO(user-review): top-border collision — a
+    // temperature dot near the scale top (especially a CLIPPED dot, which
+    // stops exactly AT the boundary yMax) can visually meet the top
+    // arrow; accepted for now, no avoidance logic.
+    const suzBarHangSpanDegrees = 0.5;
+    const suzArrowTopInsetDegrees = 0.25;
 
     // Ignored (marked) TEMPERATURES read lighter: the scheme color at the
     // shared lighter alpha (owner decision 2026-09-19: the
@@ -681,8 +714,9 @@ final class _CycleChartState extends State<_CycleChart> {
             if (entry.key >= winStart && entry.key <= winEnd)
               entry.key: entry.value,
         };
-        final winRuns =
-            curveRuns(winByIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
+        final winRuns = curveRuns(winByIndex,
+            ignoredDayIndexes: _days.ignoredDayIndexes,
+            displayRange: widget.range);
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{
           for (final run in winRuns)
@@ -873,12 +907,16 @@ final class _CycleChartState extends State<_CycleChart> {
                                           dotData: const FlDotData(show: false),
                                         ),
                                       // The user-placed SUZ marks: a VERTICAL
-                                      // bar spanning the plot height at the SUZ
-                                      // day's column (column START x − 0.5 for
-                                      // suzMorning, column MIDDLE x for
-                                      // suzEvening) plus a right-pointing arrow
-                                      // whose base starts at the bar. Only
-                                      // user-placed marks render — the computed
+                                      // bar hanging down from the chart's
+                                      // TOP border by a fixed °C drop at the
+                                      // SUZ day's column (column START x − 0.5
+                                      // for suzMorning, column MIDDLE x for
+                                      // suzEvening) plus a right-pointing
+                                      // arrow whose base starts at the bar,
+                                      // anchored just below that border — the
+                                      // whole glyph sits below the sex row
+                                      // above the plot. Only user-placed
+                                      // marks render — the computed
                                       // suzBegins drives the sheet's
                                       // suggestion instead, never the chart.
                                       // The bar rides inside fl_chart as a
@@ -892,10 +930,14 @@ final class _CycleChartState extends State<_CycleChart> {
                                             // suzEvening, clamped to the plot
                                             // bounds like the weekend bands (the
                                             // edge columns keep their full width).
-                                            FlSpot(suz.barX.clamp(-0.5, lastX),
-                                                yMin),
+                                            // Top at the plot's upper border,
+                                            // bottom at the fixed hang drop.
                                             FlSpot(suz.barX.clamp(-0.5, lastX),
                                                 yMax),
+                                            FlSpot(
+                                                suz.barX.clamp(-0.5, lastX),
+                                                yMax -
+                                                    suzBarHangSpanDegrees),
                                           ],
                                           isCurved: false,
                                           barWidth: 2,
@@ -904,17 +946,16 @@ final class _CycleChartState extends State<_CycleChart> {
                                         ),
                                         // The arrow: a single-spot dot bar whose
                                         // painter draws the glyph — base at the
-                                        // bar, anchored at the cycle's baseline
-                                        // value when one exists, else the plot
-                                        // middle (TODO(user-review): the
-                                        // arrow's vertical anchor is an
-                                        // owner-eyeball rendering detail).
+                                        // bar, anchored just below the top
+                                        // border, inside the hung band (the
+                                        // constants and their collision notes
+                                        // live above).
                                         LineChartBarData(
                                           spots: [
                                             FlSpot(
                                                 suz.barX.clamp(-0.5, lastX),
-                                                suz.arrowValueY ??
-                                                    (yMin + yMax) / 2),
+                                                yMax -
+                                                    suzArrowTopInsetDegrees),
                                           ],
                                           color: Colors.transparent,
                                           dotData: FlDotData(
@@ -952,6 +993,52 @@ final class _CycleChartState extends State<_CycleChart> {
                                             .withValues(alpha: 0.12),
                                         strokeWidth: 0.5,
                                       ),
+                                      // The NER-style temperature grid: a
+                                      // horizontal line every 0.1 K across
+                                      // the settings range — thick SOLID at
+                                      // every full degree, DASHED (same
+                                      // emphasis weight) at the 0.5
+                                      // midpoints, the plain day-hairline
+                                      // style for the remaining 0.1 steps.
+                                      // The line style classifies via the
+                                      // ×10 integer (tenths of a degree) —
+                                      // the 0.1 grid values are not exactly
+                                      // representable in binary, so float
+                                      // equality would misclassify.
+                                      // Unlabeled: the rail's half-degree
+                                      // labels (shared scale) are the grid's
+                                      // numbering, like the paper sheet.
+                                      drawHorizontalLine: true,
+                                      horizontalInterval: 0.1,
+                                      getDrawingHorizontalLine: (value) {
+                                        final tenths = (value * 10).round();
+                                        final emphasized =
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.45);
+                                        final onSurface = Theme.of(context)
+                                            .colorScheme
+                                            .onSurface;
+                                        if (tenths % 10 == 0) {
+                                          return FlLine(
+                                            color: emphasized,
+                                            strokeWidth: 1.2,
+                                          );
+                                        }
+                                        if (tenths % 5 == 0) {
+                                          return FlLine(
+                                            color: emphasized,
+                                            strokeWidth: 1.2,
+                                            dashArray: const [4, 3],
+                                          );
+                                        }
+                                        return FlLine(
+                                          color:
+                                              onSurface.withValues(alpha: 0.12),
+                                          strokeWidth: 0.5,
+                                        );
+                                      },
                                     ),
                                     baselineX: -0.5,
                                     // The cycle-start separators: a THICK solid
@@ -1055,25 +1142,18 @@ final class _CycleChartState extends State<_CycleChart> {
                             windowEnd: winEnd,
                           ),
                           const SizedBox(height: 4),
-                          // BELOW the curve, outside the paper sheet's grid:
-                          // the rows the sheet does not carry (cervix and
-                          // the breast pain letter B; the Mittelschmerz
-                          // letter M moved into the top block above —
+                          // BELOW the chart block, the single below-chart
+                          // strip (the paper's strip under the grid, the
+                          // measurement-time strip plus its remarks block):
+                          // the measurement time first (vertical text in
+                          // narrow columns), the disturbance letters, then
+                          // the rows the paper grid does not carry — cervix
+                          // and the breast pain letter B — and at the very
+                          // bottom, the paper sheet's remarks ("Bemerkungen")
+                          // home, the day-note indicator (the Mittelschmerz
+                          // letter M is drawn in the top block above —
                           // TODO(user-review): the experts may want M
-                          // rendered here as well).
-                          _SignalRows(
-                            kinds: _belowCurveKinds,
-                            days: _days,
-                            cellWidth: colW,
-                            windowStart: winStart,
-                            windowEnd: winEnd,
-                            peakIndexes: overlay.peakIndexes,
-                            onDayTap: _openDaySheet,
-                          ),
-                          const SizedBox(height: 4),
-                          // The measurement-time row, its own row BELOW the
-                          // chart block (the paper's strip under the grid;
-                          // narrow columns write the time vertically).
+                          // rendered in the pain row as well).
                           _SignalRows(
                             kinds: _belowChartKinds,
                             days: _days,
@@ -1103,7 +1183,7 @@ final class _CycleChartState extends State<_CycleChart> {
 /// beneath the mucus row, and sex (the same order the rows render in).
 /// TODO(user-review): the M letter's home (own row beneath the mucus row)
 /// is an owner-eyeball choice; the paper writes it under the mucus letters
-/// and clinicians may prefer it in the below-block pain row too.
+/// and clinicians may prefer it in the below-chart strip's pain row too.
 const _topSignalKinds = <_SignalKind>[
   _SignalKind.bleeding,
   _SignalKind.mucus,
@@ -1111,24 +1191,23 @@ const _topSignalKinds = <_SignalKind>[
   _SignalKind.sex,
 ];
 
-/// Below the curve, outside the paper grid: the rows the sheet does not
-/// carry — cervix and the breast pain letter B — and at the very bottom
-/// of the chart block the disturbance row (the paper writes its
-/// disturbance codes low inside the temperature block).
-const _belowCurveKinds = <_SignalKind>[
+/// Below the chart block, the paper layout's single below-chart strip, in
+/// the owner-decided top-down order: the measurement time first, then the
+/// disturbance letters, then the rows the paper grid does not carry —
+/// cervix and the breast pain letter B — and at the very bottom (the
+/// paper sheet's remarks "Bemerkungen" home) the day-note indicator.
+/// TODO(user-review): the note indicator's home (the strip's last row,
+/// mirroring the paper sheet's bottom remarks block) and the exact
+/// disturbance-row placement inside the strip are owner-eyeball choices;
+/// the experts may prefer the note elsewhere (e.g. in the day-header
+/// column).
+const _belowChartKinds = <_SignalKind>[
+  _SignalKind.time,
+  _SignalKind.disturbance,
   _SignalKind.cervix,
   _SignalKind.pain,
-  _SignalKind.disturbance,
+  _SignalKind.note,
 ];
-
-/// BELOW the chart block entirely (the paper's strip under the grid):
-/// the measurement time, and — at the very bottom, the paper sheet's
-/// remarks ("Bemerkungen") home — the day-note indicator.
-/// TODO(user-review): the note indicator's home (own row below the time
-/// row, mirroring the paper sheet's bottom remarks block) is an
-/// owner-eyeball choice; the experts may prefer it elsewhere (e.g. in the
-/// day-header column).
-const _belowChartKinds = <_SignalKind>[_SignalKind.time, _SignalKind.note];
 
 /// One recording row per segment signal, top-down in segment order. Every
 /// row renders for every day (auto-hide of unused rows is deferred),
@@ -1225,17 +1304,18 @@ double _signalSegmentHeight(List<_SignalKind> kinds) => kinds.fold(
 
 /// The recording signals, with the row ORDER grouped by segment (paper
 /// order within each segment: the top block bleeding → mucus → M → sex;
-/// below the curve cervix → pain; below the chart block the measurement
-/// time). The enum's declaration order matches the full render order.
+/// below the chart block the owner-decided strip order measurement time →
+/// disturbance → cervix → pain → note). The enum's declaration order
+/// matches the full render order.
 enum _SignalKind {
   bleeding,
   mucus,
   mittelschmerz,
   sex,
+  time,
+  disturbance,
   cervix,
   pain,
-  disturbance,
-  time,
   note,
 }
 
@@ -1577,8 +1657,7 @@ final class _SignalRow extends StatelessWidget {
   /// unknown" is deliberately not representable, DailyEntry.sexTimings).
   /// No collision with the disturbance codes: interrupted days render as
   /// LIGHTER CURVE POINTS in the plot, and their letter codes live in the
-  /// disturbance row at the bottom of the chart block — never in this
-  /// cell.
+  /// disturbance row of the below-chart strip — never in this cell.
   /// TODO(user-review): the X is the provisional glyph from the product
   /// wishlist, and the third-of-column placement is an ad-hoc geometry
   /// choice — experts may want a different mark/placement.
@@ -1606,14 +1685,14 @@ final class _SignalRow extends StatelessWidget {
   }
 
   /// Pain: the breast pain letter B — the letter-coded pain option of the
-  /// cheat sheet that still renders in this below-curve row. The
-  /// Mittelschmerz letter M renders in its OWN row directly beneath the
-  /// mucus row, inside the top of the temperature block (the paper sheet
-  /// writes M under the mucus letters; TODO(user-review): the M's home is
-  /// an owner-eyeball choice, the below-block row here could carry it too
-  /// if the experts want it twice). The UPPERCASE letter keeps it
+  /// cheat sheet that still renders in this pain row of the below-chart
+  /// strip. The Mittelschmerz letter M renders in its OWN row directly
+  /// beneath the mucus row, inside the top of the temperature block (the
+  /// paper sheet writes M under the mucus letters; TODO(user-review): the
+  /// M's home is an owner-eyeball choice, the pain row here could also
+  /// carry it if the experts want it twice). The UPPERCASE letter keeps it
   /// distinguishable from the lowercase cervix letters in the cervix row
-  /// below; the row shares the same neutral on-surface ink (no scheme hue
+  /// above; the row shares the same neutral on-surface ink (no scheme hue
   /// claimed).
   /// TODO(user-review): the letter mirrors the vocabulary of the entry
   /// form ("Brustschmerzen (B)") — the same ad-hoc glyph caveat as the
@@ -1675,7 +1754,8 @@ final class _SignalRow extends StatelessWidget {
 
   /// Measurement time: the localized HH:mm text of a recorded
   /// temperature-measurement time, rendered in the time row BELOW the
-  /// chart block. Narrow day columns (below [_timeCellMinColumnWidth],
+  /// chart block (the below-chart strip's first row). Narrow day columns
+  /// (below [_timeCellMinColumnWidth],
   /// including the 24 px minimum) write the time VERTICALLY (RotatedBox,
   /// reading bottom-to-top like the paper's vertical strip handwriting)
   /// so the time is never dropped at the space constraint; wide columns
@@ -1712,9 +1792,10 @@ final class _SignalRow extends StatelessWidget {
 
   /// Note indicator: a small sticky-note glyph for a day whose entry
   /// carries a NON-EMPTY notes text (empty/absent render nothing). The
-  /// row sits below the measurement-time row — the paper sheet's remarks
-  /// (Bemerkungen) block is the very bottom (TODO(user-review): flagged
-  /// on _belowChartKinds). Tapping the cell opens the day's mark-entry
+  /// row is the below-chart strip's LAST row, below the cervix and pain
+  /// rows — the paper sheet's remarks (Bemerkungen) block is the very
+  /// bottom (TODO(user-review): flagged on _belowChartKinds). Tapping the
+  /// cell opens the day's mark-entry
   /// sheet like every other cell; the note text itself is edited in the
   /// Diary form (the sheet's "edit day" jump).
   static Widget _noteContent(BuildContext context, DailyEntry? day) {
@@ -1872,9 +1953,10 @@ Widget _columnPrototype({
 // --- temperature scale (chart domain + frozen-rail labels) ------------------
 
 /// The temperature scale's single source of truth: the chart's y domain
-/// (rounded half degrees) over the plot height feeds BOTH the chart config
-/// (minY/maxY) and the frozen rail's scale labels, so the rail's labels and
-/// the curve can never disagree about where a value sits. fl_chart maps
+/// (the settings-selected temperature range) over the plot height feeds
+/// BOTH the chart config (minY/maxY) and the frozen rail's scale labels,
+/// so the rail's labels and the curve can never disagree about where a
+/// value sits. fl_chart maps
 /// values linearly over the plot area, and the rail uses the identical
 /// mapping ([pixelFor] — the plot reserves no axis width because its left
 /// titles are disabled, so the plot rect is the chart widget's rect).
@@ -1885,10 +1967,12 @@ final class _TemperatureScale {
     required this.plotHeight,
   });
 
-  /// The chart's lower y bound (a rounded half degree, ≥ 34).
+  /// The chart's lower y bound in °C: the settings range's min (within the
+  /// 34–42 °C settings window).
   final double min;
 
-  /// The chart's upper y bound (a rounded half degree, ≤ 42).
+  /// The chart's upper y bound in °C: the settings range's max (within the
+  /// 34–42 °C settings window).
   final double max;
 
   /// The plot area's height in pixels.
@@ -1899,10 +1983,9 @@ final class _TemperatureScale {
   /// (pixelY = plotHeight − (value − min) / span * plotHeight).
   double pixelFor(double value) => (max - value) / (max - min) * plotHeight;
 
-  /// The scale's tick values: every half degree across the domain (both
-  /// bounds are rounded half degrees upstream, so the step count is exact;
-  /// the degenerate single-value record is guarded by min < max in the
-  /// bounds computation).
+  /// The scale's tick values: every half degree across the domain (the
+  /// settings UI's step granularity keeps both bounds half-degree-aligned,
+  /// so the step count is exact; the card enforces min < max).
   List<double> get ticks =>
       [for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5];
 
@@ -2017,19 +2100,15 @@ final class _LeftRail extends StatelessWidget {
             ),
             // The marks-row slot: empty in the rail (the 1–6 numbering is
             // per-day content), but kept so the glyph segment below starts
-            // exactly where the rows below the curve start.
+            // exactly where the below-chart strip starts.
             const SizedBox(height: 4),
             SizedBox(height: EvaluationMarksRow.cellHeight),
             const SizedBox(height: 4),
-            // The name glyphs of the rows BELOW the curve (cervix, pain —
-            // the rows the paper sheet does not carry in its grid),
-            // mirroring the content column's below-curve segment.
-            _railSignalSegment(context, l10n, _belowCurveKinds),
-            const SizedBox(height: 4),
-            // The name glyphs of the rows BELOW the chart block (the
-            // measurement time and, at the very bottom, the day-note
-            // indicator — the paper's strip under the grid and its remarks
-            // block).
+            // The name glyphs of the below-chart strip's rows (the
+            // measurement time, the disturbance letters, cervix, the pain
+            // letter B and, at the very bottom, the day-note indicator —
+            // the paper's strip under the grid with its remarks block),
+            // mirroring the content column's single below-chart segment.
             _railSignalSegment(context, l10n, _belowChartKinds),
           ],
         ),
@@ -2073,13 +2152,16 @@ final class _LeftRail extends StatelessWidget {
 
 // --- half-degree formatting ---------------------------------------------------
 
+/// The rail's tick labels: integers plain ("37"), halves with one decimal
+/// ("36.5") — the numbering behaves exactly like the paper sheet's margin
+/// scale values.
 String _formatHalfDegree(double value) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0
       ? rounded.toStringAsFixed(0)
       : rounded.toStringAsFixed(1);
 }
-
-double _floorToHalf(double v) => (v * 2).floorToDouble() / 2;
-
-double _ceilToHalf(double v) => (v * 2).ceilToDouble() / 2;
+// TODO(user-review): Fahrenheit stays out of scope — [_formatHalfDegree]
+// (and the settings pickers' 0.5 °C step unit) are the cheap °C-coupled
+// seams a later conversion would hook into; the range/provider/curve math
+// stays in °C domain units.

@@ -31,12 +31,13 @@ abstract final class CycleMarkTypes {
   /// 2026-09-19 it IS the temperature curve's rendering key (marked days
   /// render lighter — see lib/ui/cycle_curve.dart; the raw mask survives
   /// only as the diary
-  /// badge's input). The diary save auto-SETs this mark (idempotently)
-  /// when any
-  /// tempDisturbances flag is selected; a mark is NEVER auto-removed when
-  /// the flags clear. Foreign imports (drip CSV temperature.exclude, old
-  /// export documents with exclude_* keys) derive it with author
-  /// 'import'.
+  /// badge's input). The mark is MANUAL ONLY (owner decision 2026-09-19,
+  /// the old flag-driven auto-set on diary saves is deleted): the diary
+  /// form's exclude switch (inside the disturbance group) and the day
+  /// sheet's toggle are its writers/removers; a flagged save never
+  /// auto-sets it, and clearing the flags never auto-removes it. Foreign
+  /// imports (drip CSV temperature.exclude, old export documents with
+  /// exclude_* keys) derive it with author 'import'.
   static const ignoreTemperature = 'ignoreTemperature';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a

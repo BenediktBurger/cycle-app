@@ -114,12 +114,15 @@ enum SexTiming {
 /// the db mapping MUST go through `bit`, never the Dart declaration index.
 /// NOTE the vocabulary decision: Reise (travel) is NOT representable — the
 /// old exclusion-reason booleans are gone. This mask is RAW data whose
-/// remaining visual consumer is the Tagebuch list's interrupted-day badge
-/// (the temperature curve is MARK-keyed since owner decision 2026-09-19: the
+/// remaining visual consumers are the Tagebuch list's interrupted-day
+/// badge and the cycle surfaces' read-only flag labels (the temperature
+/// curve is MARK-keyed since owner decision 2026-09-19: the
 /// ignoreTemperature mark, not this mask, dims the curve). The temperature
 /// evaluation uses the separate ignoreTemperature MARK (see
-/// lib/domain/evaluation.dart), which the diary save auto-sets
-/// (idempotently) whenever a flag is selected; cycle-start suggestions are
+/// lib/domain/evaluation.dart), which is MANUAL ONLY (owner decision
+/// 2026-09-19): the diary form's exclude switch and the day sheet's toggle
+/// write/remove it — a flagged day is never auto-excluded, and clearing
+/// the flags never auto-removes the mark; cycle-start suggestions are
 /// untouched by both (bleeding continuity only).
 enum TempDisturbance {
   /// Late to bed ("spät ins Bett").

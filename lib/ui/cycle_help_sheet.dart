@@ -253,6 +253,11 @@ final class _HelpEntry extends StatelessWidget {
       _HelpEntryShape.line => Container(width: 16, height: 2, color: color),
       // The SUZ glyph: the chart's vertical bar plus the right-pointing
       // arrow from it (same shapes as the chart's painter).
+      // TODO(user-review): the legend wording was re-checked against the
+      // new top-anchored glyph (the bar now hangs down from the
+      // temperature chart's top border, the arrow sits just below it) and
+      // kept unchanged: the wording names the concept, not the placement,
+      // so nothing here lies.
       _HelpEntryShape.suz => SuzArrowGlyph(color: color),
       // Sample measurement-time glyph: the clock icon (help sheet only —
       // the chart's day cells show the recorded time as text instead).

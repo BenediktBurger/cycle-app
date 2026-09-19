@@ -315,7 +315,11 @@ void main() {
         of: find.byType(AlertDialog), matching: find.text('Keep')));
     await tester.pumpAndSettle();
 
-    // Removing the second mark keeps the first one untouched.
+    // Removing the second mark keeps the first one untouched. The remove
+    // row can sit below the sheet fold now that the column carries the
+    // disturbance/exclusion group too — scroll it into view first (same
+    // pattern as the SUZ rows).
+    await scrollSheetTo(tester, find.text('Remove first higher measurement'));
     await tester.tap(find.text('Remove first higher measurement'));
     await tester.pumpAndSettle();
     expect(await _storedTypes(_d(12)), ['mucusPeakDay'],
@@ -592,6 +596,103 @@ void main() {
     });
   });
 
+  group('disturbance ↔ exclusion group (read-only flags + the manual toggle)',
+      () {
+    /// The disturbance/exclusion group of the sheet (test-visible key).
+    final excludeGroup =
+        find.byKey(const ValueKey('cycleSheetExcludeGroup'));
+
+    /// [_entries] with the disturbance flags [mask] recorded on day 9/10
+    /// (index 4).
+    List<DailyEntry> entriesWithDay4Mask(int mask) {
+      final entries = [..._entries];
+      entries[4] = entries[4].copyWith(tempDisturbances: mask);
+      return entries;
+    }
+
+    testWidgets(
+        'the group renders the day\'s set disturbance flags READ-ONLY '
+        'directly above the ignore toggle, under one heading',
+        (tester) async {
+      await _pump(tester,
+          entries: entriesWithDay4Mask(
+              TempDisturbance.alk.bit | TempDisturbance.kr.bit));
+
+      await _tapDay(tester, 4); // 9/10: flags alk + kr recorded
+
+      expect(excludeGroup, findsOneWidget,
+          reason: 'the flag info and the ignore toggle live in ONE '
+              'visibly coupled group (keyed cycleSheetExcludeGroup)');
+      expect(
+          find.descendant(
+              of: excludeGroup, matching: find.text('Alcohol (alk)')),
+          findsOneWidget,
+          reason: 'the set flags surface as read-only info next to the '
+              'toggle — the diary is where they are EDITED');
+      expect(
+          find.descendant(
+              of: excludeGroup, matching: find.text('Illness (kr)')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: excludeGroup, matching: find.text('Ignore temperature')),
+          findsOneWidget,
+          reason: 'the temperature-ignore toggle sits inside the same '
+              'group as the flag info');
+    });
+
+    testWidgets(
+        'a day without recorded flags shows the explicit no-disturbance '
+        'line — and the group still carries no editable chips (read-only)',
+        (tester) async {
+      await _pump(tester, entries: entriesWithDay4Mask(0));
+
+      await _tapDay(tester, 4); // 9/10: no flags recorded
+
+      expect(excludeGroup, findsOneWidget,
+          reason: 'the group renders even on a flag-less day: the '
+              '"no disturbance recorded" line plus the toggle');
+      expect(
+          find.descendant(
+              of: excludeGroup,
+              matching: find.text('No temperature disturbance recorded')),
+          findsOneWidget,
+          reason: 'the empty state is explicit, not a blank group');
+      expect(
+          find.descendant(
+              of: excludeGroup, matching: find.text('Late to bed (sp)')),
+          findsNothing,
+          reason: 'unset flags render nothing');
+      // Read-only: the sheet never EDITS the flags (data entry stays in
+      // the diary) — no FilterChips anywhere in the sheet.
+      expect(
+          find.descendant(
+              of: find.byType(BottomSheet), matching: find.byType(FilterChip)),
+          findsNothing);
+    });
+
+    testWidgets(
+        'the toggle inside the group keeps its write behavior: it places '
+        'the ignoreTemperature mark through the MarksDao and flips to the '
+        'include wording within the group', (tester) async {
+      await _pump(tester, entries: entriesWithDay4Mask(TempDisturbance.alk.bit));
+
+      await _tapDay(tester, 4); // 9/10
+      await tester.tap(find.text('Ignore temperature'));
+      await tester.pumpAndSettle();
+
+      expect(await _storedTypes(_d(10)),
+          contains(CycleMarkTypes.ignoreTemperature),
+          reason: 'the group toggle writes through the same mark path');
+      expect(
+          find.descendant(
+              of: excludeGroup,
+              matching: find.text('Temperature evaluated again')),
+          findsOneWidget,
+          reason: 'the flipped toggle stays visible inside the group');
+    });
+  });
+
   group('SUZ mark + suggestion (the app suggests, the user places)', () {
     testWidgets(
         'the computed SUZ day suggests the start with the EVENING phrasing, '
@@ -680,6 +781,10 @@ void main() {
       await _pump(tester, entries: _entries);
       await _tapDay(tester, 4); // 9/10 — an arbitrary day (actions on ANY day)
 
+      // The row can sit below the sheet fold now that the column carries
+      // the disturbance/exclusion group too — scroll it into view first
+      // (the helper used throughout for the bottom rows).
+      await scrollSheetTo(tester, find.text('SUZ from this evening'));
       await tester.tap(find.text('SUZ from this evening'));
       await tester.pumpAndSettle();
       expect(await _storedTypes(_d(10)), contains(CycleMarkTypes.suzEvening),

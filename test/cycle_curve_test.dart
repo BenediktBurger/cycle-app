@@ -6,7 +6,13 @@
 // marks (owner decision 2026-09-19 — the MARK is the rendering key, not
 // the raw tempDisturbances mask). A flagged day whose mark was removed
 // renders normally; a marked day without flags renders lighter.
+//
+// The display-range group pins the owner-decided CLIP rule: curve values
+// outside the chart's fixed settings range (default 36–38 °C) are clamped
+// to exactly the boundary at the data layer — the scale never stretches
+// to fit an outlier.
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/ui/cycle_curve.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -102,7 +108,7 @@ void main() {
       expect(flaggedUnmarked.single.points[1].excluded, isFalse,
           reason: 'raw flags are no longer a rendering input');
 
-      // Marked AND flagged (the common auto-set path): lighter.
+      // Marked AND flagged (the typical manually excluded day): lighter.
       final markedAndFlagged = curveRuns(
         {
           0: _entry(0, bbt: 36.5),
@@ -170,6 +176,75 @@ void main() {
       );
       expect(runs, hasLength(2));
       expect(runs.map((r) => r.points.single.dayIndex), [0, 2]);
+    });
+  });
+
+  group('display-range clipping (clip, never rescale)', () {
+    const defaultRange = TemperatureRange(min: 36.0, max: 38.0);
+
+    CurvePoint pointIn(Map<int, double> temps,
+        {TemperatureRange? displayRange}) {
+      final entries = {
+        for (final MapEntry(:key, :value) in temps.entries)
+          key: _entry(key, bbt: value),
+      };
+      final runs = curveRuns(entries, displayRange: displayRange);
+      return [
+        for (final run in runs)
+          for (final point in run.points) point,
+      ].single;
+    }
+
+    test('a temperature above the range clips to exactly the upper boundary',
+        () {
+      final point =
+          pointIn({0: 39.5}, displayRange: defaultRange);
+      expect(point.bbtC, 38.0,
+          reason: 'a fever value renders AT maxY, not beyond the plot');
+    });
+
+    test('a temperature below the range clips to exactly the lower boundary',
+        () {
+      final point = pointIn({0: 35.2}, displayRange: defaultRange);
+      expect(point.bbtC, 36.0, reason: 'a low value renders AT minY');
+    });
+
+    test('a value exactly at a boundary passes through unchanged', () {
+      expect(pointIn({0: 38.0}, displayRange: defaultRange).bbtC, 38.0,
+          reason: 'clamp at the boundary must return the value itself');
+      expect(pointIn({0: 36.0}, displayRange: defaultRange).bbtC, 36.0,
+          reason: 'clamp at the lower boundary must return the value itself');
+    });
+
+    test('in-range values pass through unchanged', () {
+      expect(pointIn({0: 36.5}, displayRange: defaultRange).bbtC, 36.5);
+      expect(pointIn({0: 37.85}, displayRange: defaultRange).bbtC, 37.85);
+    });
+
+    test('a run with an out-of-range day stays connected (clipping does '
+        'not break adjacency)', () {
+      final runs = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1, bbt: 40.1),
+          2: _entry(2, bbt: 36.7),
+        },
+        displayRange: defaultRange,
+      );
+      expect(runs, hasLength(1), reason: 'adjacency is untouched by the clip');
+      expect([for (final p in runs.single.points) p.bbtC], [36.5, 38.0, 36.7]);
+    });
+
+    test('the pure helper clamps independently of runs', () {
+      expect(clampBbtC(39.5, defaultRange), 38.0);
+      expect(clampBbtC(35.4, defaultRange), 36.0);
+      expect(clampBbtC(36.8, defaultRange), 36.8);
+    });
+
+    test('without a display range the raw values pass through (the chart '
+        'always passes one — the default keeps historical callers honest)',
+        () {
+      expect(pointIn({0: 39.5}).bbtC, 39.5);
     });
   });
 }

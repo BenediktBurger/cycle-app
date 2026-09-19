@@ -192,9 +192,11 @@ abstract final class MarkTypes {
   /// number, no baseline contribution, a gap in the candidate sequence),
   /// see lib/domain/evaluation.dart. The mark never touches cycle-start
   /// suggestions (the suggestion is keyed purely to bleeding continuity —
-  /// see lib/domain/cycle_grouping.dart). Auto-SET (idempotently) by the
-  /// diary save when any disturbance flag is selected; never auto-REMOVED
-  /// when the flags clear.
+  /// see lib/domain/cycle_grouping.dart). MANUAL ONLY (owner decision
+  /// 2026-09-19): written/removed by the diary form's exclude switch and
+  /// the day sheet's toggle; disturbance flags never auto-set it and
+  /// clearing them never auto-removes it. Foreign imports derive it with
+  /// author 'import'.
   static const ignoreTemperature = 'ignoreTemperature';
 
   /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a

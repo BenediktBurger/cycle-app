@@ -1,9 +1,10 @@
 // Widget tests of the Tagebuch screen's time and navigation behavior —
 // the whole family in one file: the measured-time picker (conditional
 // visibility, prefill, round-trip, clearing, day-tile display), the
-// previous/next day chevrons (with their edit-discard semantics), the
-// cycle-start suggestion prompt and the disturbance flags' auto-set
-// of the analysis-exclusion mark.
+// previous/next day chevrons (with their edit-discard semantics) and the
+// cycle-start suggestion prompt (the disturbance flags' analysis-exclusion
+// marking works without any auto behavior — see
+// test/diary_temperature_exclude_group_test.dart's manual exclude switch).
 //
 // Each section below (kicked off by a `════ former` banner) carries
 // the former file's header comments verbatim; test bodies were
@@ -124,19 +125,6 @@ final _promptHarness = DiaryHarness(
   now: DateTime(2026, 9, 15, 10, 30),
   selectedDay: _day,
 );
-
-// Widget tests for the analysis-exclusion AUTO-SET on the Tagebuch screen:
-// saving a day with ANY disturbance flag selected (sp/a/alk/kr) auto-SETs
-// the ignoreTemperature mark (idempotent); saving a flag-less day never
-// creates the mark. The REVERSE direction — a mark is never auto-REMOVED
-// when the flags clear — is pinned in the cycle-start-prompt section
-// (it asserts the mark does NOT suppress the cycle-start
-// prompt while the pre-existing mark survives the save).
-//
-// The database is an in-memory override and the German locale is pinned,
-// same _autoMarkHarness pattern as the measured-time section.
-
-final _autoMarkHarness = DiaryHarness(now: DateTime(2026, 4, 10, 14, 35));
 
 void main() {
 // ═══════════ measured time ═══════════
@@ -548,109 +536,13 @@ void main() {
           CycleMarkTypes.cycleStart,
         ]),
         reason: 'confirming places the cycleStart mark; the pre-existing '
-            'ignoreTemperature mark stays untouched (auto-set only, never '
-            'auto-removed)');
+            'ignoreTemperature mark stays untouched (the form\'s exclude '
+            'switch seeds from the existing mark, so the plain save keeps '
+            'it — no auto behavior in either direction)');
     final start =
         marks.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
     expect(start.author, 'user',
         reason: 'the confirmed placement is user-authored even on a '
             'marked day');
-  });
-
-// ═══════════ disturbance auto-mark ═══════════
-// former test/diary_disturbance_auto_mark_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
-
-  /// Selects the disturbance chip [label] (German: the pinned locale) —
-  /// the disturbance options are FilterChips (independent toggles).
-  Future<void> toggleDisturbanceChip(
-      WidgetTester tester, String chipLabel) async {
-    await tester.tap(find.widgetWithText(FilterChip, chipLabel));
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> save(WidgetTester tester) async {
-    await tester.tap(find.text('Speichern'));
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets(
-      'saving a day with a disturbance flag selected auto-sets the '
-      'ignoreTemperature mark (user-authored, once)', (tester) async {
-    _autoMarkHarness.tallSurface(tester);
-    await tester.pumpWidget(_autoMarkHarness.scope());
-    await tester.pumpAndSettle();
-
-    expect(
-        await _autoMarkHarness.db!.marksDao
-            .marksForDay(_autoMarkHarness.selectedDay),
-        isEmpty,
-        reason: 'guard: a fresh day carries no marks');
-
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
-    await save(tester);
-
-    final marks = await _autoMarkHarness.db!.marksDao
-        .marksForDay(_autoMarkHarness.selectedDay);
-    expect(marks.map((m) => m.markType),
-        contains(CycleMarkTypes.ignoreTemperature),
-        reason: 'any selected disturbance flag auto-SETs the '
-            'analysis-exclusion mark on save (the raw mask alone is '
-            'rendering input, the analysis is mark-driven)');
-    final mark = marks
-        .singleWhere((m) => m.markType == CycleMarkTypes.ignoreTemperature);
-    expect(mark.author, 'user',
-        reason: 'the diary save is user-placed data — the mark is '
-            'user-authored like every sheet toggle');
-    expect(marks, hasLength(1),
-        reason: 'the auto-set is idempotent: exactly one mark lands');
-
-    final entry = await _autoMarkHarness.db!.entriesDao
-        .entryFor(_autoMarkHarness.selectedDay);
-    expect(entry!.tempDisturbances, TempDisturbance.sp.bit,
-        reason: 'the raw mask is stored on the entry as well');
-  });
-
-  testWidgets('re-saving with another flag keeps exactly one mark',
-      (tester) async {
-    _autoMarkHarness.tallSurface(tester);
-    await tester.pumpWidget(_autoMarkHarness.scope());
-    await tester.pumpAndSettle();
-
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
-    await save(tester);
-    // The form keeps its saved state (no reload after save): clear the
-    // first flag explicitly, then select a different one and re-save — the
-    // storage write is a full replace, and the auto-set re-runs
-    // idempotently on the new mask.
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)'); // deselect
-    await toggleDisturbanceChip(tester, 'Krank (kr)');
-    await save(tester);
-
-    final marks = await _autoMarkHarness.db!.marksDao
-        .marksForDay(_autoMarkHarness.selectedDay);
-    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
-        reason: 'still exactly ONE exclusion mark (addMark is idempotent)');
-    final entry = await _autoMarkHarness.db!.entriesDao
-        .entryFor(_autoMarkHarness.selectedDay);
-    expect(entry!.tempDisturbances, TempDisturbance.kr.bit,
-        reason: 'the second save fully replaced the mask (sp cleared, kr '
-            'set)');
-  });
-
-  testWidgets('a save without any disturbance flag creates NO mark',
-      (tester) async {
-    _autoMarkHarness.tallSurface(tester);
-    await tester.pumpWidget(_autoMarkHarness.scope());
-    await tester.pumpAndSettle();
-
-    await _autoMarkHarness.saveWithBleeding(tester, 'leicht'); // bleeding only
-
-    expect(
-        await _autoMarkHarness.db!.marksDao
-            .marksForDay(_autoMarkHarness.selectedDay),
-        isEmpty,
-        reason: 'auto-set is flag-driven only: a plain save must not '
-            'exclude the day from the analysis');
   });
 }

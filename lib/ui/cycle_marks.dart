@@ -16,8 +16,9 @@
 // and the solid peak dot ABOVE the mucus entry in the mucus row (R6 — the
 // peak no longer touches the temperature curve; EVERY placed peak renders,
 // driven from the marks stream so peaks render even when no evaluation
-// exists). The SUZ renders ONLY user-placed marks (a vertical bar spanning
-// the plot height plus a right-pointing arrow from the bar); the computed
+// exists). The SUZ renders ONLY user-placed marks (a vertical bar hanging
+// down from the temperature chart's top border plus a right-pointing arrow
+// just below it); the computed
 // suzBegins drives the sheet's suggestion instead — clean
 // compute-only/manual separation. Rendered across fl_chart's dot painters +
 // line bars, with the glyph shapes painted by hand where fl_chart has no
@@ -42,10 +43,15 @@
 //   ordinary circle/arrow mark, just without a number — the curve never
 //   paints candidate ordinals; the sheet's circle-numbering line is the
 //   only ordinal surface (circles-only, see cycle_mark_sheet.dart).
-//   TODO(user-review): The SUZ arrow's vertical anchor — the cycle's
-//   baseline value when one exists, else the plot middle — is an
-//   owner-eyeball rendering detail, not a settled rule. (The glyph's SIZE
-//   is chosen: shaft 8 px, head 7 x 11 px — see paintSuzArrowGlyph; the
+//   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
+//   from the temperature chart's top border by a fixed °C drop and the
+//   arrow anchors just below that border — is an owner-eyeball placement,
+//   not a settled rule (the constants live beside the chart's SUZ bar
+//   code in cycle.dart; the old baseline anchor is retired). A
+//   temperature dot near the scale top can visually meet the top arrow —
+//   accepted, no avoidance logic.
+//   (The glyph's SIZE is chosen: shaft 8 px, head 7 x 11 px — see
+//   paintSuzArrowGlyph; the
 //   original 5 px shaft / 4 px head / Size(9, 8) footprint rendered too
 //   small next to the day columns.)
 
@@ -84,14 +90,16 @@ final class BaselineSegment {
 }
 
 /// One user-placed SUZ mark, mapped onto the chart's day-index space. The
-/// chart draws a VERTICAL bar spanning the plot height (x = column START
-/// `dayIndex − 0.5` for `suzMorning`, column MIDDLE `dayIndex` for
-/// `suzEvening`) plus a right-pointing arrow whose base starts at the bar.
+/// chart draws a VERTICAL bar hanging down from the temperature chart's
+/// top border (x = column START `dayIndex − 0.5` for `suzMorning`, column
+/// MIDDLE `dayIndex` for `suzEvening`) plus a right-pointing arrow whose
+/// base starts at the bar, just below that border. Only the x anchoring
+/// and the morning/evening VARIANT live here — the vertical placement is
+/// the chart's top-anchored constants (see the SUZ bar code in cycle.dart).
 final class SuzOverlayMark {
   const SuzOverlayMark({
     required this.dayIndex,
     required this.morning,
-    this.arrowValueY,
   });
 
   /// The marked day's chart index (the bar's x anchor derives from it: see
@@ -106,12 +114,6 @@ final class SuzOverlayMark {
   /// START (dayIndex − 0.5) for suzMorning, the column MIDDLE (dayIndex)
   /// for suzEvening. The chart clamps it to the recorded range.
   double get barX => morning ? dayIndex - 0.5 : dayIndex.toDouble();
-
-  /// The y value the arrow glyph anchors at: the cycle's baseline value
-  /// when one exists, else null (the chart falls back to the plot middle).
-  /// TODO(user-review): the arrow's vertical anchor is an owner-eyeball
-  /// rendering detail.
-  final double? arrowValueY;
 }
 
 /// The per-day evaluation artifacts, mapped onto the chart's day-index
@@ -185,8 +187,10 @@ EvaluationOverlay buildEvaluationOverlay({
   for (var e = 0; e < evaluations.length; e++) {
     final evaluation = evaluations[e];
     // The SUZ marks belong to the cycle whose attribution window contains
-    // them (isDayInCycleWindow — the shared UI-side helper).
-    final arrowValueY = evaluation.baseline?.value;
+    // them (isDayInCycleWindow — the shared UI-side helper). Their
+    // vertical placement is the chart's top anchoring, so the evaluation
+    // only decides WHICH marks render — their y no longer derives from
+    // the cycle's baseline.
     for (final mark in marks) {
       final isSuz = mark.type == CycleMarkTypes.suzEvening ||
           mark.type == CycleMarkTypes.suzMorning;
@@ -198,7 +202,6 @@ EvaluationOverlay buildEvaluationOverlay({
       suz.add(SuzOverlayMark(
         dayIndex: i,
         morning: mark.type == CycleMarkTypes.suzMorning,
-        arrowValueY: arrowValueY,
       ));
     }
 
@@ -407,8 +410,9 @@ void paintSuzArrowGlyph(Canvas canvas, Offset base, {required Color color}) {
 /// The SUZ arrow glyph as a fl_chart dot painter: fl_chart's painters paint
 /// at spots, and the SUZ arrow's anchor is exactly one spot — the bar's x
 /// (column start for suzMorning, column middle for suzEvening) at the
-/// arrow's y value (the cycle's baseline value, or the plot middle — see
-/// [SuzOverlayMark.arrowValueY]). Unlike the other dot painters this one
+/// chart's top-anchored arrow y (just below the temperature chart's top
+/// border, inside the hung band — see the SUZ bar code in cycle.dart).
+/// Unlike the other dot painters this one
 /// paints NO temperature dot underneath: the SUZ mark is its own artifact,
 /// not a temperature rendering.
 final class SuzArrowDotPainter extends FlDotPainter {
@@ -594,8 +598,12 @@ class _ArrowUpGlyphPainter extends CustomPainter {
 
 /// The SUZ glyph as a standalone widget for the legend: the same
 /// right-pointing arrow the chart's [SuzArrowDotPainter] paints, plus the
-/// vertical bar it hangs from (the bar spans the plot height on the chart;
-/// here it is drawn to fit the legend's sample box).
+/// vertical bar it hangs from. Placement-INDEPENDENT by design: on the
+/// chart the bar hangs down from the temperature chart's top border and
+/// the arrow sits just below it, while the legend sample draws the bar
+/// across its sample box at full height (the legend shows the glyph's
+/// SHAPE, not the chart's vertical anchoring — the sample stays valid
+/// through the shared arrow painter).
 final class SuzArrowGlyph extends StatelessWidget {
   const SuzArrowGlyph({super.key, required this.color});
 
@@ -622,7 +630,8 @@ class _SuzArrowGlyphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
     // The vertical bar: full sample height, at the sample's left edge —
-    // the chart's bar spans the plot height at the SUZ day's column.
+    // a shape sample of the chart's bar, which hangs down from the chart's
+    // top border at the SUZ day's column.
     canvas.drawRect(
       Rect.fromLTWH(0.5, 0, 2, size.height),
       paint,

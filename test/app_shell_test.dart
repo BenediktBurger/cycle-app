@@ -123,6 +123,12 @@ void main() {
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
+    // The settings list has grown (the temperature-range card sits first):
+    // the PIN stub can start below the scroll's initial cache extent, so
+    // bring the list down until the stub renders.
+    await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+    await tester.pumpAndSettle();
+
     final pinSwitch =
         tester.widget<SwitchListTile>(find.byType(SwitchListTile));
     expect(pinSwitch.value, isFalse);

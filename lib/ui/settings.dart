@@ -16,12 +16,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db/export_adapter.dart';
 import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
+import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'file_transfer.dart';
 
 /// Export file name used by the save/download path.
 const String exportFileName = 'cycle_app_export.json';
+
+/// The selectable half-degree steps of the temperature-range pickers,
+/// across the allowed 34.0..42.0 °C window (the temperature chart's y
+/// bounds in °C). Built from integer half-steps (k / 2) so no float drift
+/// creeps into the 0.5 step grid; the °C unit is the seam a later
+/// Fahrenheit conversion would hook into (see the settings card comment).
+final List<double> temperatureRangeSteps =
+    List.unmodifiable(<double>[
+  for (var k = (TemperatureRange.windowLower / 0.5).round(),
+          upper = (TemperatureRange.windowUpper / 0.5).round();
+      k <= upper;
+      k++)
+    k * 0.5,
+]);
 
 class EinstellungenScreen extends ConsumerWidget {
   const EinstellungenScreen({super.key});
@@ -122,6 +137,99 @@ class EinstellungenScreen extends ConsumerWidget {
                   // web reload by design (documented on themeModeProvider +
                   // docs/roadmap.md; mirrors the language switcher).
                   Text(l10n.settingsThemeModeNote,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- temperature range ---------------------------------------
+          // The cycle chart's y range ("Temperaturbereich"): two
+          // half-degree pickers inside the allowed 34.0..42.0 °C window;
+          // min < max is enforced BY CONSTRUCTION — each picker only
+          // offers the values strictly on its side of the other bound (no
+          // error states, the chart never sees an invalid range).
+          // In-memory ONLY for now: the range resets on restart by design
+          // (documented on temperatureRangeProvider + docs/roadmap.md;
+          // mirrors the language/theme switcher). The 0.5 °C step unit is
+          // the seam a later Fahrenheit conversion would hook into (out of
+          // scope; the range math stays in °C domain units).
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsTemperatureRange,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Builder(builder: (context) {
+                    final range = ref.watch(temperatureRangeProvider);
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<double>(
+                            key: const ValueKey('temperatureRangeMin'),
+                            initialValue: range.min,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: l10n.settingsRangeLower,
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: [
+                              for (final step in temperatureRangeSteps
+                                  .where((step) => step < range.max))
+                                DropdownMenuItem(
+                                  value: step,
+                                  child: Text('${step.toStringAsFixed(1)} °C'),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              ref.read(temperatureRangeProvider.notifier)
+                                  .state = TemperatureRange(
+                                min: value,
+                                max: range.max,
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<double>(
+                            key: const ValueKey('temperatureRangeMax'),
+                            initialValue: range.max,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: l10n.settingsRangeUpper,
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: [
+                              for (final step in temperatureRangeSteps
+                                  .where((step) => step > range.min))
+                                DropdownMenuItem(
+                                  value: step,
+                                  child: Text('${step.toStringAsFixed(1)} °C'),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              ref.read(temperatureRangeProvider.notifier)
+                                  .state = TemperatureRange(
+                                min: range.min,
+                                max: value,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  // In-memory ONLY: resets to the default 36–38 °C after a
+                  // restart by design (documented on
+                  // temperatureRangeProvider + docs/roadmap.md).
+                  Text(l10n.settingsTemperatureRangeNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),

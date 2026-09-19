@@ -2,9 +2,10 @@
 // chart family in one file: grid alignment, the Muttermund (cervix)
 // row, per-day column labels, the temperature-disturbance letters,
 // the computed evaluation marks (mucus-peak/first-higher-based
-// candidates, numbering, baseline segment, SUZ), the vertical grid
-// lines, the symbol help sheet, the frozen left rail, the day-note
-// indicator, the per-signal rows, the temperature curve's
+// candidates, numbering, baseline segment, SUZ), the grid lines (vertical
+// day lines plus the 0.1 K horizontal temperature grid over the fixed
+// settings range), the symbol help sheet, the frozen left rail, the
+// day-note indicator, the per-signal rows, the temperature curve's
 // connectivity and ignore rendering (the unit-level curve runs stay
 // in cycle_curve_test.dart — those pin the pure rule set, these pin
 // how the chart draws it), measurement time / sex / pain glyphs,
@@ -27,6 +28,7 @@ import 'dart:async';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
@@ -162,10 +164,10 @@ Widget _dayLabelsHarness({
 }) =>
     chartHarness(entries: entries, marks: marks, locale: locale);
 
-// Widget tests of the temperature-disturbance letters at the bottom of
-// the cycle chart block: a day carrying one of the NER disturbance flags
-// (late to bed, night awakening, alcohol, illness) renders its letter
-// code in the disturbance row — in the day's column, keyed like the
+// Widget tests of the temperature-disturbance letters in the cycle
+// chart's below-chart strip: a day carrying one of the NER disturbance
+// flags (late to bed, night awakening, alcohol, illness) renders its
+// letter code in the disturbance row — in the day's column, keyed like the
 // other rows — while plain days render nothing. The letters are the raw
 // TempDisturbance tokens of the day's tempDisturbances mask, read
 // through a single letter-mapping seam (see the comment on
@@ -501,14 +503,15 @@ Iterable<Element> outsideTable(Finder finder) =>
 //     aligned with its signal row's fixed-height slot; the rows' segments
 //     mirror the scroll content: the top-of-block rows (bleeding, mucus,
 //     M, sex) stack between the header prototypes and the temperature
-//     scale, the below-curve rows (cervix, pain) below the marks slot,
-//     and the below-block rows (time, note) at the rail's tail.
+//     scale, and the below-chart strip's rows (time, disturbance, cervix,
+//     pain, note) form ONE segment below the marks slot.
 // The long-range frozen-content test mirrors the windowing section.
 
 // Nine chart days covering one recorded fact per signal (the per-signal rows fixture of the rows
 // section):
-// temperatures 36.4..37.0, so the scale spans 36..37.5 and every 0.5 step
-// tick exists. Unlike the rows fixture, day 4 carries NO Mittelschmerz.
+// temperatures 36.4..37.0 — with the default settings range 36..38 °C every
+// half-degree tick between the fixed bounds exists. Unlike the rows
+// fixture, day 4 carries NO Mittelschmerz.
 DateTime _leftRailDay(int index) => DateTime.utc(2026, 9, 7 + index);
 
 final _leftRailEntries =
@@ -540,14 +543,16 @@ List<String> _scaleLabels(WidgetTester tester) {
 Widget _leftRailHarness({
   required List<DailyEntry> entries,
   Locale locale = const Locale('en'),
+  TemperatureRange? range,
 }) =>
-    chartHarness(entries: entries, locale: locale);
+    chartHarness(entries: entries, locale: locale, temperatureRange: range);
 
 // Widget tests of the day-note indicator on the cycle chart: a day whose
 // entry carries a non-empty notes text shows a small indicator glyph in
-// its day column in the row BELOW the chart block (per the paper sheet,
-// whose remarks block sits under the Uhrzeit strip at the very bottom —
-// placement flagged TODO(user-review) in the chart code). Days with an
+// its day column in the row BELOW the chart block — the LAST row of the
+// below-chart strip (per the paper sheet, whose remarks block sits at the
+// very bottom under the Uhrzeit strip — placement flagged
+// TODO(user-review) in the chart code). Days with an
 // empty/absent notes field render nothing. Tapping the indicator cell
 // opens the day's mark-entry sheet like every other cell.
 //
@@ -574,8 +579,8 @@ Widget _noteHarness({
 
 // Widget tests of the per-signal rows under the cycle chart (the paper's
 // recording rows): one always-rendered row per signal — bleeding, mucus
-// (with the reserved solid peak-dot slot above the glyph), cervix, sex,
-// pain, measurement time. The rows hold ONLY day cells — their sample
+// (with the reserved solid peak-dot slot above the glyph), measurement
+// time, cervix, pain. The rows hold ONLY day cells — their sample
 // glyphs and localized row names live in the frozen left rail (see
 // the left-rail section), keyed `${row}Corner` there. The
 // measurement time renders as localized HH:mm text ONLY when the day
@@ -594,19 +599,18 @@ const _dayCount = 9;
 
 // The chart block's recording rows, top-down in render order: the top
 // block inside the temperature grid (bleeding, mucus, Mittelschmerz M,
-// sex), then below the curve: cervix, pain, disturbance (the disturbance
-// letters sit at the bottom of the chart block), then below the chart
-// block: time, note (the note indicator at the very bottom — the paper
-// sheet's remarks home).
+// sex), then the single below-chart strip in the owner-decided order —
+// measurement time first, the disturbance letters, cervix, pain, and at
+// the very bottom (the paper sheet's remarks home) the note indicator.
 const _signalRows = [
   'bleeding',
   'mucus',
   'mittelschmerz',
   'sex',
+  'time',
+  'disturbance',
   'cervix',
   'pain',
-  'disturbance',
-  'time',
   'note',
 ];
 
@@ -675,17 +679,20 @@ ThemeData _themeOf(WidgetTester tester) =>
 Widget _temperatureHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
+  TemperatureRange? range,
 }) =>
     chartHarness(
       entries: entries,
       marks: marks,
       darkTheme: true,
       scopeInsideMaterialApp: true,
+      temperatureRange: range,
     );
 
 // Widget tests of the cycle tab's recorded-fact glyphs in the per-signal
 // rows under the temperature curve: the measurement time renders as
-// localized HH:mm text in its OWN row BELOW the chart block — rotated
+// localized HH:mm text in its OWN row BELOW the chart block (the first
+// row of the below-chart strip) — rotated
 // vertically when the day column is narrower than the text (never dropped,
 // the old space-constraint bug), horizontal in wide columns (the old
 // per-day clock glyph is gone — the clock lives only in the row corner),
@@ -882,6 +889,13 @@ void main() {
       expect(dotX, closeTo(_cellCenterX(tester, 'marksCell-$i'), 0.5),
           reason: 'day $i: the chart dot must sit at the marks cell\'s '
               'horizontal center');
+      // The below-chart strip's rows keep the shared center too (their
+      // windowed cells sit at the same global column positions).
+      for (final row in ['time', 'disturbance', 'cervix', 'pain', 'note']) {
+        expect(dotX, closeTo(_cellCenterX(tester, '${row}Cell-$i'), 0.5),
+            reason: 'day $i: the below-chart strip\'s $row row keeps the '
+                'shared column center');
+      }
     }
   });
 
@@ -1226,8 +1240,8 @@ void main() {
 
   testWidgets(
       'each set temperature-disturbance flag renders its letter token in '
-      'the disturbance row at the bottom of the chart block, in the '
-      'day\'s column', (tester) async {
+      'the disturbance row of the below-chart strip, in the day\'s column',
+      (tester) async {
     await tester.pumpWidget(_disturbanceHarness(entries: _disturbanceEntries));
     await tester.pumpAndSettle();
 
@@ -1240,8 +1254,8 @@ void main() {
     }.entries) {
       final cellRect = tester.getRect(chartCell(entry.key, 'disturbance'));
       expect(cellRect.top, greaterThan(chartBottom),
-          reason: 'the disturbance row sits at the bottom of the chart '
-              'block, below the curve');
+          reason: 'the disturbance row is part of the below-chart strip, '
+              'below the curve');
       expect(chartCellContent(entry.key, 'disturbance', find.text(entry.value)),
           findsOneWidget,
           reason: 'day ${entry.key} carries its disturbance flag\'s letter '
@@ -1781,10 +1795,16 @@ void main() {
   });
 
   group('SUZ marks render (user-placed only)', () {
+    // The glyph's top anchoring: the bar hangs DOWN from the chart's top
+    // border by a fixed °C drop and the arrow anchors just below that
+    // border, so the whole glyph sits below the sex row above the plot.
+    // The two pinned values (hang span 0.5 °C, arrow inset 0.25 °C) are
+    // owner-eyeball rendering details — update a pin together with its
+    // named constant in lib/ui/cycle.dart.
     testWidgets(
-        'a suzEvening mark renders a vertical bar at the column middle '
-        'spanning the plot height, plus a right-pointing arrow whose '
-        'base starts at the bar', (tester) async {
+        'a suzEvening mark renders a vertical bar hanging from the '
+        'chart\'s top border at the column middle, plus a right-pointing '
+        'arrow whose base starts at the bar near the top', (tester) async {
       await tester.pumpWidget(_harness(
         entries: _evaluationEntries,
         marks: [
@@ -1799,25 +1819,30 @@ void main() {
       expect(bars, hasLength(1), reason: 'one user SUZ mark -> one bar');
       final bar = bars.single;
       // suzEvening anchors the bar at the day column's MIDDLE (x = day
-      // index); the bar spans the whole plot height.
+      // index); the bar hangs DOWN from the chart's top border by a fixed
+      // °C drop instead of spanning the whole plot height.
       expect(bar.spots.first.x, 10.0,
           reason: 'suzEvening anchors at the column middle (9/16, idx 10)');
       expect(bar.spots.last.x, 10.0);
-      expect(bar.spots.first.y, data.minY,
-          reason: 'the bar spans the plot height');
-      expect(bar.spots.last.y, data.maxY);
+      expect(bar.spots.first.y, data.maxY,
+          reason: 'the bar hangs from the chart\'s top border');
+      expect(bar.spots.last.y, data.maxY - 0.5,
+          reason: 'the bar spans a fixed 0.5 °C drop from the top '
+              '(owner-eyeball value, pinned here)');
       expect(bar.color, chartScheme(tester).secondary,
           reason: 'the SUZ bar shares the baseline\'s evaluation-family '
               'color role (secondary)');
 
-      // The right-pointing arrow: base at the bar, vertically anchored at
-      // the cycle's baseline value (geometry flagged for owner review).
+      // The right-pointing arrow: base at the bar, anchored inside the
+      // hung band, close to the top border (no longer at the cycle's
+      // baseline value — the baseline-anchor concept is retired).
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull, reason: 'the SUZ arrow renders with the bar');
       final (spot, painter) = arrow!;
       expect(spot.x, 10.0, reason: 'the arrow base starts at the bar');
-      expect(spot.y, 36.4,
-          reason: 'the arrow anchors at the cycle\'s baseline value');
+      expect(spot.y, data.maxY - 0.25,
+          reason: 'the arrow anchors 0.25 °C below the top border, inside '
+              'the hung band (owner-eyeball value, pinned here)');
       expect(painter, isA<SuzArrowDotPainter>());
       expect(
           (painter as SuzArrowDotPainter).color, chartScheme(tester).secondary,
@@ -1836,17 +1861,25 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      final data = chartData(tester);
       final bars = _suzBars(tester);
       expect(bars, hasLength(1));
       final bar = bars.single;
       expect(bar.spots.first.x, 8.5,
           reason: 'suzMorning anchors at the column start (9/15, idx 9 − 0.5)');
       expect(bar.spots.last.x, 8.5);
+      // The hang-span/inset values do not depend on the x anchoring.
+      expect(bar.spots.first.y, data.maxY,
+          reason: 'the bar hangs from the chart\'s top border');
+      expect(bar.spots.last.y, data.maxY - 0.5,
+          reason: 'the bar spans a fixed 0.5 °C drop from the top '
+              '(owner-eyeball value, pinned here)');
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull);
       expect(arrow!.$1.x, 8.5, reason: 'the arrow base starts at the bar');
-      expect(arrow.$1.y, 36.4,
-          reason: 'the arrow anchors at the cycle\'s baseline value');
+      expect(arrow.$1.y, data.maxY - 0.25,
+          reason: 'the arrow anchors 0.25 °C below the top border, inside '
+              'the hung band (owner-eyeball value, pinned here)');
     });
 
     testWidgets(
@@ -1866,13 +1899,23 @@ void main() {
 
       final bars = _suzBars(tester);
       expect(bars, hasLength(1));
+      final data = chartData(tester);
       final bar = bars.single;
       expect(bar.spots.first.x, -0.5,
           reason: 'day 0\'s column start is the domain\'s minX (−0.5)');
       expect(bar.spots.last.x, -0.5);
+      // The clamping affects only x — the top-anchored y values stand.
+      expect(bar.spots.first.y, data.maxY,
+          reason: 'the bar hangs from the chart\'s top border');
+      expect(bar.spots.last.y, data.maxY - 0.5,
+          reason: 'the bar spans a fixed 0.5 °C drop from the top '
+              '(owner-eyeball value, pinned here)');
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull);
       expect(arrow!.$1.x, -0.5, reason: 'the arrow base starts at the bar');
+      expect(arrow.$1.y, data.maxY - 0.25,
+          reason: 'the arrow anchors 0.25 °C below the top border, inside '
+              'the hung band (owner-eyeball value, pinned here)');
     });
 
     testWidgets(
@@ -2085,6 +2128,100 @@ void main() {
       expect(verticalLines.map((l) => l.x), contains(4.5),
           reason: 'the group opened across the untracked gap days draws '
               'its separator across the gap');
+    });
+  });
+
+  group('horizontal NER temperature grid', () {
+    FlGridData grid(WidgetTester tester) => chartData(tester).gridData;
+
+    Color emphasizedLine(WidgetTester tester) =>
+        chartScheme(tester).onSurface.withValues(alpha: 0.45);
+
+    Color plainLine(WidgetTester tester) =>
+        chartScheme(tester).onSurface.withValues(alpha: 0.12);
+
+    /// The horizontal-line styling for one temperature value.
+    FlLine horizontalLine(WidgetTester tester, double value) =>
+        grid(tester).getDrawingHorizontalLine(value);
+
+    testWidgets(
+        'the temperature body carries horizontal lines every 0.1 °C over '
+        'the fixed display range', (tester) async {
+      // The entries keep 36.5 — well inside the default 36–38 °C range; the
+      // grid interval is fixed at 0.1 regardless of the data.
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      expect(grid(tester).drawHorizontalLine, isTrue,
+          reason: 'the paper grid rules the temperature body horizontally');
+      expect(grid(tester).horizontalInterval, 0.1,
+          reason: 'one grid line per 0.1 K step (paper convention)');
+    });
+
+    testWidgets(
+        'full degrees draw SOLID, thick emphasis lines (×10 integer '
+        'classification, no float equality)', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      for (final value in const [36.0, 37.0, 38.0]) {
+        final line = horizontalLine(tester, value);
+        expect(line.strokeWidth, closeTo(1.2, 0.01),
+            reason: '$value is a full degree: the grid emphasizes it');
+        expect(line.dashArray, isNull,
+            reason: '$value: a full-degree line is solid');
+        expect(line.color, emphasizedLine(tester),
+            reason: '$value: the emphasis tint on the on-surface color');
+      }
+    });
+
+    testWidgets('the 0.5 midpoints draw DASHED lines at the emphasis weight',
+        (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      for (final value in const [36.5, 37.5]) {
+        final line = horizontalLine(tester, value);
+        expect(line.strokeWidth, closeTo(1.2, 0.01),
+            reason: '$value: the half midpoint keeps the emphasis weight');
+        expect(line.dashArray, [4, 3], reason: '$value is dashed');
+        expect(line.color, emphasizedLine(tester),
+            reason: '$value: the emphasis tint on the on-surface color');
+      }
+    });
+
+    testWidgets('the remaining 0.1 steps draw the plain day-hairline style',
+        (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      for (final value in const [36.1, 36.2, 36.3, 36.4, 36.6, 36.9, 37.9]) {
+        final line = horizontalLine(tester, value);
+        expect(line.strokeWidth, closeTo(0.5, 0.01),
+            reason: '$value: an in-between step stays a hairline');
+        expect(line.dashArray, isNull, reason: '$value is solid');
+        expect(line.color, plainLine(tester),
+            reason: '$value: the same subtle tint as the vertical day lines');
+      }
+    });
+
+    testWidgets(
+        'the vertical day lines are unchanged by the horizontal grid: '
+        'interval 1, hairline style', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      expect(grid(tester).drawVerticalLine, isTrue);
+      expect(grid(tester).verticalInterval, 1);
+      final vertical = grid(tester).getDrawingVerticalLine(0.5);
+      expect(vertical.strokeWidth, lessThanOrEqualTo(1));
+      expect(vertical.color, plainLine(tester),
+          reason: 'the day hairline style keeps its subtle tint');
     });
   });
 
@@ -2309,11 +2446,12 @@ void main() {
       await tester.pumpWidget(_leftRailHarness(entries: _leftRailEntries));
       await tester.pumpAndSettle();
 
-      // Values 36.4..37.0 → rounded bounds 36..37.5 → every half-degree
-      // tick, top-down 37.5 .. 36.
-      expect(_scaleLabels(tester), ['37.5', '37', '36.5', '36'],
-          reason: 'half-degree ticks with integers plain and halves '
-              'one-decimal');
+      // The fixed settings range 36..38 supplies the bounds (not the
+      // data rounding anymore): every half-degree tick between them,
+      // top-down 38 .. 36.
+      expect(_scaleLabels(tester), ['38', '37.5', '37', '36.5', '36'],
+          reason: 'half-degree ticks over the default range, integers '
+              'plain and halves one-decimal');
     });
 
     testWidgets(
@@ -2361,6 +2499,31 @@ void main() {
             1,
             reason: 'row $row\'s rail glyph keeps its row-name tooltip');
       }
+    });
+
+    testWidgets(
+        'the below-chart strip is ONE rail segment: its glyph slots keep '
+        'the owner-decided order time, disturbance, cervix, pain, note',
+        (tester) async {
+      await tester.pumpWidget(_leftRailHarness(entries: _leftRailEntries));
+      await tester.pumpAndSettle();
+
+      double top(String row) =>
+          tester.getRect(find.byKey(ValueKey('${row}Corner'))).top;
+      const strip = ['time', 'disturbance', 'cervix', 'pain', 'note'];
+      final tops = [for (final row in strip) top(row)];
+      expect(tops, equals([...tops]..sort()),
+          reason: 'the below-chart strip mirrors the content column\'s '
+              'single segment: time first, notes last (owner order)');
+      // The strip starts after the marks-row slot, mirroring the content
+      // column (the marks slot sits between the temperature scale and the
+      // segment).
+      expect(
+          top('time'),
+          greaterThan(
+              tester.getRect(find.byKey(const ValueKey('railScale'))).bottom),
+          reason: 'the below-chart segment begins below the scale and the '
+              'marks slot, as in the content column');
     });
 
     testWidgets(
@@ -2430,14 +2593,15 @@ void main() {
     });
 
     testWidgets(
-        'a flat temperature record keeps the scale usable (degenerate '
-        'span guard)', (tester) async {
-      // All five days at 36.5: the rounded bounds stay 36..37 so the
-      // scale has ticks and the mapping never divides by zero.
+        'a flat temperature record keeps the scale usable (the fixed '
+        'range always has ticks)', (tester) async {
+      // All five days at 36.5: the bounds stay the settings range 36..38,
+      // so the scale always has ticks and the mapping never divides by
+      // zero — no data-dependent degenerate span can appear anymore.
       await tester.pumpWidget(_leftRailHarness(entries: _flatEntries()));
       await tester.pumpAndSettle();
 
-      expect(_scaleLabels(tester), ['37', '36.5', '36'],
+      expect(_scaleLabels(tester), ['38', '37.5', '37', '36.5', '36'],
           reason: 'a single-value record still renders a half-degree scale');
       final data = tester.widget<LineChart>(find.byType(LineChart)).data;
       final chartRect = tester.getRect(find.byType(LineChart));
@@ -2449,6 +2613,37 @@ void main() {
           .dy;
       expect(midCenter, closeTo(expectedMid, 0.5),
           reason: 'the flat record\'s value maps mid-scale in both places');
+    });
+
+    testWidgets(
+        'an overridden settings range moves the bounds AND the rail '
+        'labels (one source of truth)', (tester) async {
+      await tester.pumpWidget(_leftRailHarness(
+        entries: _leftRailEntries,
+        range: const TemperatureRange(min: 35.0, max: 39.0),
+      ));
+      await tester.pumpAndSettle();
+
+      final data = tester.widget<LineChart>(find.byType(LineChart)).data;
+      expect(data.minY, 35.0,
+          reason: 'the overridden range\'s lower bound is the chart minY');
+      expect(data.maxY, 39.0,
+          reason: 'the overridden range\'s upper bound is the chart maxY');
+      expect(
+          _scaleLabels(tester),
+          [
+            '39',
+            '38.5',
+            '38',
+            '37.5',
+            '37',
+            '36.5',
+            '36',
+            '35.5',
+            '35',
+          ],
+          reason: 'every half-degree tick between the overridden bounds '
+              'renders in the rail');
     });
   });
 
@@ -2462,8 +2657,8 @@ void main() {
     await tester.pumpWidget(_noteHarness(entries: _noteEntries));
     await tester.pumpAndSettle();
 
-    // The glyph rides in the day's column (below the time row, paper
-    // "Bemerkungen" home).
+    // The glyph rides in the day's column (the LAST row of the
+    // below-chart strip, the paper "Bemerkungen" home).
     final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
     final noteRect = tester.getRect(chartCell(1, 'note'));
     expect(noteRect.top, greaterThan(chartBottom),
@@ -2471,6 +2666,11 @@ void main() {
     expect(tester.getRect(chartCell(1, 'time')).top, lessThan(noteRect.top),
         reason: 'the note indicator renders below the measurement-time '
             'row, below the chart block');
+    for (final row in ['disturbance', 'cervix', 'pain']) {
+      expect(noteRect.top, greaterThan(tester.getRect(chartCell(1, row)).top),
+          reason: 'the note indicator renders below the $row row — notes '
+              'are last in the below-chart strip');
+    }
     final cell = tester.getRect(chartCell(1, 'bleeding'));
     expect(noteRect.left, closeTo(cell.left, 0.5),
         reason: 'the note cell shares the day column geometry');
@@ -2590,7 +2790,7 @@ void main() {
             reason: 'the $row row renders in the TOP of the temperature '
                 'block, above the curve (paper sheet)');
       }
-      for (final row in ['cervix', 'pain', 'time']) {
+      for (final row in ['time', 'disturbance', 'cervix', 'pain', 'note']) {
         expect(tester.getRect(chartCell(0, row)).top, greaterThan(chartBottom),
             reason: 'the $row row stays below the temperature block');
       }
@@ -2599,7 +2799,8 @@ void main() {
     testWidgets(
         'the rows render in the paper order — bleeding, mucus, M '
         '(Mittelschmerz directly beneath the mucus row), sex — and the '
-        'below-block rows follow the curve segment', (tester) async {
+        'below-chart strip follows with time first, notes last',
+        (tester) async {
       await tester.pumpWidget(_rowsHarness(entries: _rowsEntries));
       await tester.pumpAndSettle();
 
@@ -2611,20 +2812,23 @@ void main() {
           ]..sort(),
           reason: 'M sits directly beneath the mucus row (paper sheet), '
               'sex after it, bleeding on top');
-      // The below-block rows keep their relative order (cervix before
-      // pain before time) with a clear gap across the curve between the
-      // segments.
-      expect(top('cervix'),
+      // The below-chart strip keeps the owner-decided order (time first,
+      // notes last): time, disturbance, cervix, pain, note after the top
+      // segment and the curve.
+      expect(top('time'),
           greaterThan(tester.getRect(chartCellCorner('sex')).bottom),
-          reason: 'the below-block segment starts after the top segment '
+          reason: 'the below-chart strip starts after the top segment '
               'and the curve');
+      expect(top('disturbance'), greaterThan(top('time')));
+      expect(top('cervix'), greaterThan(top('disturbance')));
       expect(top('pain'), greaterThan(top('cervix')));
-      expect(top('time'), greaterThan(top('pain')));
+      expect(top('note'), greaterThan(top('pain')));
     });
 
     testWidgets(
         'the Mittelschmerz letter M renders in its own row beneath the '
-        'mucus row; the below-block pain row carries only B', (tester) async {
+        'mucus row; the pain row of the below-chart strip carries only B',
+        (tester) async {
       await tester.pumpWidget(_rowsHarness(entries: _rowsEntries));
       await tester.pumpAndSettle();
 
@@ -2636,10 +2840,10 @@ void main() {
           reason: 'Mittelschmerz renders its M letter in its own row, '
               'directly beneath the mucus row (paper sheet)');
       expect(chartCellContent(4, 'pain', find.text('M')), findsNothing,
-          reason: 'the M letter moved out of the below-block pain row — '
+          reason: 'the M letter moved out of the strip\'s pain row — '
               'flagged with TODO(user-review) in the chart code');
       expect(chartCellContent(7, 'pain', find.text('B')), findsOneWidget,
-          reason: 'breast pain B stays in the below-block pain row');
+          reason: 'breast pain B stays in the strip\'s pain row');
       expect(chartCellContent(7, 'mittelschmerz', find.text('M')), findsNothing,
           reason: 'no M without the Mittelschmerz flag');
     });
@@ -2661,8 +2865,8 @@ void main() {
   group('per-signal rows', () {
     testWidgets(
         'every signal row renders for every windowed day, in order '
-        'bleeding, mucus, mittelschmerz, sex, cervix, pain, time',
-        (tester) async {
+        'bleeding, mucus, mittelschmerz, sex, time, disturbance, cervix, '
+        'pain, note', (tester) async {
       await tester.pumpWidget(_rowsHarness(entries: _rowsEntries));
       await tester.pumpAndSettle();
 
@@ -2674,9 +2878,9 @@ void main() {
         }
       }
 
-      // Row ORDER: the corner slots appear top-down bleeding .. time
+      // Row ORDER: the corner slots appear top-down bleeding .. note
       // (paper layout: the first four inside the top of the temperature
-      // block, the rest below).
+      // block, the rest in the below-chart strip, time first).
       final corners =
           _signalRows.map((row) => tester.getRect(chartCellCorner(row)));
       final tops = corners.map((r) => r.top).toList();
@@ -2825,8 +3029,7 @@ void main() {
     testWidgets(
         'at minimum column width the time renders vertically — never '
         'dropped (wide columns keep the horizontal text, see the wide '
-        'HH:mm test above and the measurement-time section)',
-        (tester) async {
+        'HH:mm test above and the measurement-time section)', (tester) async {
       Finder timeCellFinder() => find.byWidgetPredicate((w) =>
           w.key is ValueKey<String> &&
           (w.key as ValueKey<String>).value.startsWith('timeCell-'));
@@ -3115,10 +3318,11 @@ void main() {
     });
 
     testWidgets(
-        'a marked AND flagged day renders lighter (the common auto-set '
-        'path)', (tester) async {
-      // Flags auto-set the mark (auto-set only), so the usual flagged day
-      // carries both: mask AND mark — still lighter (mark-keyed).
+        'a marked AND flagged day renders lighter (mark-keyed, even with '
+        'raw flags)', (tester) async {
+      // The typical interrupted day carries both: the raw mask (flags)
+      // AND the manually placed ignoreTemperature mark — still lighter
+      // (mark-keyed).
       final flaggedMarked = <DailyEntry>[
         DailyEntry(date: _temperatureThu, bbtC: 36.5),
         DailyEntry(
@@ -3223,12 +3427,14 @@ void main() {
     });
   });
 
-  group('adaptive chart height', () {
+  group('adaptive chart height (span of the settings range)', () {
     double chartHeight(WidgetTester tester) =>
         tester.getRect(find.byType(LineChart)).height;
 
-    testWidgets('a small y-span keeps the base height of 260', (tester) async {
-      // Five days around 36.5: the rounded bounds span 1 °C.
+    testWidgets('the default 36–38 °C range keeps the base height of 260',
+        (tester) async {
+      // The default range spans 2 °C — inside the comfortable ~3 °C span,
+      // so no growth regardless of the recorded values.
       await tester.pumpWidget(_temperatureHarness(entries: [
         for (var i = 0; i < 5; i++)
           DailyEntry(date: _temperatureThu.add(Duration(days: i)), bbtC: 36.5),
@@ -3236,16 +3442,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(chartHeight(tester), closeTo(260, 0.5),
-          reason: 'a comfortable ~1 °C span needs the base height');
+          reason: 'a comfortable ~2 °C range needs the base height');
     });
 
-    testWidgets('the height grows with the y-span', (tester) async {
-      // 36.5 .. 40.0 → rounded bounds 36.0..40.5 (span 4.5 °C): 260 base
-      // plus 1.5 °C beyond the comfortable 3 °C at 80 px per degree.
-      await tester.pumpWidget(_temperatureHarness(entries: [
-        DailyEntry(date: _temperatureThu, bbtC: 36.5),
-        DailyEntry(date: _temperatureFri, bbtC: 40.0),
-      ]));
+    testWidgets('the height grows with the range span', (tester) async {
+      // The settings range 36.0..40.5 → span 4.5 °C: 260 base plus
+      // 1.5 °C beyond the comfortable 3 °C at 80 px per degree.
+      await tester.pumpWidget(_temperatureHarness(
+        entries: [
+          DailyEntry(date: _temperatureThu, bbtC: 36.5),
+          DailyEntry(date: _temperatureFri, bbtC: 40.0),
+        ],
+        range: const TemperatureRange(min: 36.0, max: 40.5),
+      ));
       await tester.pumpAndSettle();
 
       expect(chartHeight(tester), closeTo(380, 0.5),
@@ -3253,14 +3462,17 @@ void main() {
     });
 
     testWidgets(
-        'the height is capped — a wide span does not grow without '
-        'bounds', (tester) async {
-      // 34.5 .. 41.5 → rounded bounds 34.0..42.0 (span 8 °C, far past the
-      // growth range).
-      await tester.pumpWidget(_temperatureHarness(entries: [
-        DailyEntry(date: _temperatureThu, bbtC: 34.5),
-        DailyEntry(date: _temperatureFri, bbtC: 41.5),
-      ]));
+        'the height is capped — a wide settings range does not grow '
+        'without bounds', (tester) async {
+      // The window maximum 34.0..42.0 → span 8 °C, far past the growth
+      // range.
+      await tester.pumpWidget(_temperatureHarness(
+        entries: [
+          DailyEntry(date: _temperatureThu, bbtC: 34.5),
+          DailyEntry(date: _temperatureFri, bbtC: 41.5),
+        ],
+        range: const TemperatureRange(min: 34.0, max: 42.0),
+      ));
       await tester.pumpAndSettle();
 
       expect(chartHeight(tester), closeTo(400, 0.5),
@@ -3268,28 +3480,125 @@ void main() {
     });
   });
 
+  group('fixed display range and boundary clipping', () {
+    LineChartData data(WidgetTester tester) =>
+        tester.widget<LineChart>(find.byType(LineChart)).data;
+
+    /// The segment bar connecting day indexes [a] and [b].
+    LineChartBarData segmentBar(WidgetTester tester, int a, int b) => tester
+        .widget<LineChart>(find.byType(LineChart))
+        .data
+        .lineBarsData
+        .firstWhere((bar) =>
+            bar.spots.length == 2 &&
+            bar.spots[0].x == a.toDouble() &&
+            bar.spots[1].x == b.toDouble() &&
+            bar.color != null &&
+            bar.color!.a > 0);
+
+    testWidgets(
+        'the y bounds are the provider\'s range (default 36.0..38.0), '
+        'never the data', (tester) async {
+      // The record spans 35.9..37.0, BELOW the old lower half-degree
+      // rounding behaviour's interest — the settings range fixes the
+      // bounds 36..38 regardless.
+      await tester.pumpWidget(_temperatureHarness(entries: [
+        DailyEntry(date: _temperatureThu, bbtC: 36.5),
+        DailyEntry(date: _temperatureFri, bbtC: 37.0),
+        DailyEntry(date: _temperatureSat, bbtC: 35.9),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(data(tester).minY, 36.0,
+          reason: 'the default range\'s lower bound is the fixed minY');
+      expect(data(tester).maxY, 38.0,
+          reason: 'the default range\'s upper bound is the fixed maxY');
+    });
+
+    testWidgets(
+        'a fever above the range renders its curve VALUE clamped to '
+        'exactly the upper boundary — the bounds never move', (tester) async {
+      await tester.pumpWidget(_temperatureHarness(
+        entries: [
+          DailyEntry(date: _temperatureThu, bbtC: 36.5),
+          DailyEntry(date: _temperatureFri, bbtC: 39.5),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final segment = segmentBar(tester, 0, 1);
+      expect(segment.spots[1].y, 38.0,
+          reason: 'the clipped temperature stops AT the boundary 38.0');
+      expect(segment.spots[0].y, 36.5,
+          reason: 'the in-range neighbor keeps its raw value');
+
+      // Axis bounds and (per the rail tests) the rail labels never move.
+      expect(data(tester).minY, 36.0);
+      expect(data(tester).maxY, 38.0);
+    });
+
+    testWidgets('a below-range value clamps to exactly the lower boundary',
+        (tester) async {
+      await tester.pumpWidget(_temperatureHarness(
+        entries: [
+          DailyEntry(date: _temperatureThu, bbtC: 36.5),
+          DailyEntry(date: _temperatureFri, bbtC: 35.0),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final segment = segmentBar(tester, 0, 1);
+      expect(segment.spots[1].y, 36.0,
+          reason: 'the clipped temperature stops AT the lower boundary 36.0');
+      expect(data(tester).minY, 36.0, reason: 'the bounds never move');
+    });
+
+    testWidgets(
+        'values exactly at the boundaries render unchanged (clamp '
+        'passthrough)', (tester) async {
+      await tester.pumpWidget(_temperatureHarness(
+        entries: [
+          DailyEntry(date: _temperatureThu, bbtC: 36.0),
+          DailyEntry(date: _temperatureFri, bbtC: 38.0),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final segment = segmentBar(tester, 0, 1);
+      expect(segment.spots[0].y, 36.0);
+      expect(segment.spots[1].y, 38.0);
+    });
+  });
+
 // ═══════════ measurement time, sex and pain ═══════════
 // former test/cycle_chart_time_sex_pain_test.dart (bodies concatenated verbatim; see
 // the file header for the merge mechanics)
 
-  group('measurement time — its own row below the chart block', () {
+  group(
+      'measurement time — its own row below the chart block, first in '
+      'the below-chart strip', () {
     testWidgets(
-        'the time row renders BELOW the chart block, below the '
-        'below-curve rows, for every day with a recorded measurement time',
-        (tester) async {
+        'the time row renders BELOW the chart block, at the strip\'s top '
+        '— above the disturbance, cervix and pain rows — for every '
+        'day with a recorded measurement time', (tester) async {
       await tester
           .pumpWidget(_timeSexPainHarness(entries: _timeSexPainEntries()));
       await tester.pumpAndSettle();
 
       final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
-      // Own row below the block: the time row starts after the chart, and
-      // after the below-curve rows (cervix, pain, disturbance).
+      // Own row below the block, first in the strip: the time row starts
+      // after the chart, but above disturbance/cervix/pain (owner order:
+      // time first in the below-chart strip).
       expect(tester.getRect(chartCell(0, 'time')).top, greaterThan(chartBottom),
           reason: 'the time row is not part of the chart block');
+      expect(tester.getRect(chartCell(0, 'time')).bottom,
+          lessThan(tester.getRect(chartCell(0, 'disturbance')).top),
+          reason: 'the time row renders above the disturbance row');
       for (final row in ['cervix', 'pain']) {
         expect(tester.getRect(chartCell(0, 'time')).top,
-            greaterThan(tester.getRect(chartCell(0, row)).bottom),
-            reason: 'the time row renders below the $row row');
+            lessThan(tester.getRect(chartCell(0, row)).top),
+            reason: 'the time row renders above the $row row — time is '
+                'the first row of the below-chart strip');
       }
       // Every day with a recorded time renders its HH:mm (the fixture's
       // only recorded time is day 0).
@@ -3492,8 +3801,7 @@ void main() {
         reason: 'Mittelschmerz shows the M letter in its own row beneath '
             'the mucus row (flagged TODO(user-review) in the chart code)');
     expect(chartCellContent(4, 'pain', find.text('M')), findsNothing,
-        reason: 'the M letter no longer renders in the below-curve pain '
-            'row');
+        reason: 'the M letter no longer renders in the pain row');
     expect(chartCellContent(4, 'pain', find.text('B')), findsNothing,
         reason: 'no breast letter without the flag');
     expect(chartCellContent(5, 'pain', find.text('B')), findsOneWidget);
@@ -3711,8 +4019,9 @@ void main() {
           reason: 'the earliest days appear once scrolled to');
 
       // The temperature scale must NOT rescale per window: the y bounds are
-      // computed over the whole recorded range, so the curve keeps its
-      // absolute heights while scrolling.
+      // the fixed settings-derived range (default 36..38 °C, well above the
+      // coldest recorded day here), so the curve keeps its absolute heights
+      // while scrolling.
       final chartMinY =
           tester.widget<LineChart>(find.byType(LineChart)).data.minY;
       final recordedValues = _manyEntries().map((e) => e.bbtC!).toList();

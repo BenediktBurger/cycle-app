@@ -8,6 +8,7 @@
 // scheme, and optionally no theme wiring at all.
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
@@ -34,7 +35,9 @@ const chartSeedColor = Color(0xFF6750A4);
 ///    (no Scaffold shell);
 ///  - [scopeInsideMaterialApp] moves the ProviderScope below the
 ///    MaterialApp — the shape of the dark-scheme variants, so the scope
-///    re-creates on theme changes like in the real app.
+///    re-creates on theme changes like in the real app;
+///  - [temperatureRange] pins the settings temperature range (the display
+///    range / y-bounds tests); default null keeps the provider default.
 Widget chartHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
@@ -45,6 +48,7 @@ Widget chartHarness({
   bool withScaffold = true,
   bool scopeInsideMaterialApp = false,
   DateTime? selectedDate,
+  TemperatureRange? temperatureRange,
 }) {
   final overrides = [
     dailyEntriesProvider
@@ -52,6 +56,8 @@ Widget chartHarness({
     marksProvider.overrideWith((ref) => Stream.value(marks)),
     selectedDateProvider
         .overrideWith((ref) => selectedDate ?? entries.first.date),
+    if (temperatureRange != null)
+      temperatureRangeProvider.overrideWith((ref) => temperatureRange),
   ];
   final screen = withScaffold
       ? const Scaffold(body: ZyklusScreen())

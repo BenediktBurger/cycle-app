@@ -36,6 +36,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Bleeding _bleeding = Bleeding.none;
   int _tempDisturbances = 0;
+  bool _excludeTemperature = false;
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
@@ -66,15 +67,23 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Future<void> _loadEntry(DateTime date) async {
     final db = await ref.read(databaseProvider.future);
     final existing = await db.entriesDao.entryFor(date);
+    // The exclude switch seeds from the day's ACTUAL mark state (not the
+    // disturbance mask): an externally placed ignoreTemperature mark —
+    // day sheet, imports — shows up as "excluded" in the form.
+    final dayMarks = await db.marksDao.marksForDay(date);
+    final excludeMarked = dayMarks
+        .any((m) => m.markType == CycleMarkTypes.ignoreTemperature);
     if (!mounted) return;
     setState(() {
-      _applyEntry(existing == null ? null : dailyEntryFromDrift(existing));
+      _applyEntry(existing == null ? null : dailyEntryFromDrift(existing),
+          excludeMarked);
     });
   }
 
-  void _applyEntry(DailyEntry? entry) {
+  void _applyEntry(DailyEntry? entry, bool excludeMarked) {
     _bleeding = entry?.bleeding ?? Bleeding.none;
     _tempDisturbances = entry?.tempDisturbances ?? 0;
+    _excludeTemperature = excludeMarked;
     // Measured time: a fresh day (nothing stored yet) starts from the
     // CURRENT time as a convenience; a re-opened day keeps what was stored
     // — including deliberately cleared days (stored null), which never
@@ -178,13 +187,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
     final db = await ref.read(databaseProvider.future);
     await db.entriesDao.upsertDaily(entry);
-    // Auto-set the analysis-exclusion mark when ANY disturbance flag is
-    // selected: the mark (never the raw mask) is what the evaluation
-    // consumes, so a flagged day must carry it. addMark is idempotent, so
-    // repeated saves are no-ops. AUTO-SET ONLY: a mask back to 0 NEVER
-    // removes the mark — a manually-placed mark stays in place.
-    if (entry.tempDisturbances != 0) {
+    // The analysis-exclusion mark follows the EXCLUDE SWITCH alone (owner
+    // decision 2026-09-19: manual-only coupling — the old flag-driven
+    // auto-set is deleted): a flagged save without the switch does not
+    // exclude the day, and the switch toggles the mark in BOTH directions
+    // (addMark is idempotent, deleteMark no-ops when nothing is there).
+    // The switch seeds from the day's existing mark (see _loadEntry), so
+    // an untouched switch keeps an externally placed mark (sheet toggle,
+    // imports) in place.
+    if (_excludeTemperature) {
       await db.marksDao.addMark(date, CycleMarkTypes.ignoreTemperature);
+    } else {
+      await db.marksDao.deleteMark(date, CycleMarkTypes.ignoreTemperature);
     }
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.
@@ -422,36 +436,65 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // --- temperature disturbances (raw flags) -----------------
-              // Always visible: the disturbance flags apply to the
-              // temperature measurement regardless of bleeding. Each chip
-              // toggles its own bit in the day's tempDisturbances mask
-              // (raw data for the diary list's interrupted-day badge — the
-              // curve renders MARK-keyed); saving with any flag auto-SETS
-              // the temperature-ignore mark (see _save) — the flags alone
-              // never exclude the day from the analysis.
-              Text(l10n.disturbancesCaption,
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final disturbance in TempDisturbance.values)
-                    FilterChip(
-                      label: Text(switch (disturbance) {
-                        TempDisturbance.sp => l10n.disturbanceLateToBed,
-                        TempDisturbance.a => l10n.disturbanceNightAwakening,
-                        TempDisturbance.alk => l10n.disturbanceAlcohol,
-                        TempDisturbance.kr => l10n.disturbanceIllness,
-                      }),
-                      selected: _tempDisturbances & disturbance.bit != 0,
-                      onSelected: (selected) => setState(() {
-                        _tempDisturbances = selected
-                            ? _tempDisturbances | disturbance.bit
-                            : _tempDisturbances & ~disturbance.bit;
-                      }),
+              // --- temperature disturbance group (flags + exclude switch)
+              // One labelled group, one decision (owner decision
+              // 2026-09-19: the coupling between the disturbance flags and
+              // the analysis exclusion is MANUAL — each flag chip toggles
+              // its own bit in the day's tempDisturbances mask — raw data,
+              // e.g. the diary list's interrupted-day badge — while the
+              // exclude switch is the only diary-side input that writes
+              // the ignoreTemperature mark on save). No auto behavior in
+              // either direction: flagging never excludes the day, and
+              // clearing the flags never lifts an exclusion. The switch
+              // seeds from the day's existing mark (see _loadEntry).
+              // TODO(user-review): the group wording (heading + switch
+              // label) is pending the expert review.
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.disturbancesCaption,
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final disturbance in TempDisturbance.values)
+                          FilterChip(
+                            label: Text(switch (disturbance) {
+                              TempDisturbance.sp => l10n.disturbanceLateToBed,
+                              TempDisturbance.a =>
+                                l10n.disturbanceNightAwakening,
+                              TempDisturbance.alk => l10n.disturbanceAlcohol,
+                              TempDisturbance.kr => l10n.disturbanceIllness,
+                            }),
+                            selected: _tempDisturbances & disturbance.bit != 0,
+                            onSelected: (selected) => setState(() {
+                              _tempDisturbances = selected
+                                  ? _tempDisturbances | disturbance.bit
+                                  : _tempDisturbances & ~disturbance.bit;
+                            }),
+                          ),
+                      ],
                     ),
-                ],
+                    SwitchListTile(
+                      key: const ValueKey('diaryExcludeTemperatureSwitch'),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(l10n.diaryExcludeTemperatureSwitch),
+                      value: _excludeTemperature,
+                      onChanged: (v) =>
+                          setState(() => _excludeTemperature = v),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----

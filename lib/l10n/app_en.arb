@@ -316,6 +316,10 @@
   "themeSystem": "System",
   "themeLight": "Light",
   "themeDark": "Dark",
+  "settingsTemperatureRange": "Temperature range",
+  "settingsRangeLower": "Lower limit",
+  "settingsRangeUpper": "Upper limit",
+  "settingsTemperatureRangeNote": "In-memory only — resets to the default 36–38 °C when the app restarts (persistence planned with the other settings).",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: encryption/lock is planned in ADR-0005 (native later via SQLCipher, web via PIN).",
   "settingsExport": "JSON export",
@@ -364,7 +368,8 @@
       }
     }
   },
-  "disturbancesCaption": "Disturbed temperature days (flag the measurement, the exclusion is the mark on the day sheet):",
+  "disturbancesCaption": "Temperature disturbance (flag the measurement):",
+  "diaryExcludeTemperatureSwitch": "Exclude from the evaluation",
   "disturbanceLateToBed": "Late to bed (sp)",
   "disturbanceNightAwakening": "Frequent night awakening (a)",
   "disturbanceAlcohol": "Alcohol (alk)",
@@ -393,5 +398,7 @@
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
   "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
+  "cycleSheetExcludeGroupTitle": "Temperature disturbance / excluded from the evaluation",
+  "cycleSheetNoDisturbance": "No temperature disturbance recorded",
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

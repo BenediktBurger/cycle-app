@@ -212,6 +212,10 @@
   "themeSystem": "System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
+  "settingsTemperatureRange": "Temperaturbereich",
+  "settingsRangeLower": "Untergrenze",
+  "settingsRangeUpper": "Obergrenze",
+  "settingsTemperatureRangeNote": "Nur im Speicher — beim Neustart zurückgesetzt auf den Standard 36–38 °C (Persistenz geplant mit den anderen Einstellungen).",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: Verschlüsselung/Sperre ist in ADR-0005 geplant (native später mit SQLCipher, Web über PIN).",
   "settingsExport": "JSON-Export",
@@ -260,12 +264,15 @@
       }
     }
   },
-  "disturbancesCaption": "Temperaturstörungstage (Kennzeichen der Messung; das Ausschließen vom Auswerten ist die Markierung im Zyklustag-Blatt):",
+  "disturbancesCaption": "Temperaturstörung (Kennzeichen der Messung):",
+  "diaryExcludeTemperatureSwitch": "Von der Auswertung ausschließen",
   "disturbanceLateToBed": "Spät ins Bett (sp)",
   "disturbanceNightAwakening": "Nachts öfter aufstehen (a)",
   "disturbanceAlcohol": "Alkohol (alk)",
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
   "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
+  "cycleSheetExcludeGroupTitle": "Temperaturstörung / von der Auswertung ausgeschlossen",
+  "cycleSheetNoDisturbance": "Keine Temperaturstörung vermerkt",
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

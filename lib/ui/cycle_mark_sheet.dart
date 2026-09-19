@@ -401,17 +401,35 @@ final class CycleDaySheet extends ConsumerWidget {
     final hasCycleStart = _hasMark(marks, CycleMarkTypes.cycleStart);
     final infoLines = _infoLines(context, l10n, entries, marks);
 
-    // The recorded fact the chart glyph cannot carry: the temperature
-    // measurement time — the symbol row renders only a clock glyph on days
-    // with a recorded time (the tiny 24 px column cannot spell a value).
-    // Sex and pain need no sheet line: their glyphs (X, B/M) already carry
-    // the full binary/letter information.
+    // The recorded facts the chart glyphs cannot carry: the temperature
+    // measurement time (the symbol row renders only a clock glyph on days
+    // with a recorded time — the tiny 24 px column cannot spell a value)
+    // and the day's raw disturbance mask (the sheet shows it read-only in
+    // the disturbance/exclusion group below; flag EDITING stays in the
+    // diary). Sex and pain need no sheet line: their glyphs (X, B/M)
+    // already carry the full binary/letter information.
     int? measuredAt;
+    int tempDisturbances = 0;
     for (final entry in entries) {
       if (DateOnly.sameDay(entry.date, day)) {
         measuredAt = entry.measuredAtMinutes;
+        tempDisturbances = entry.tempDisturbances;
       }
     }
+
+    // The day's set disturbance flags as localized read-only labels, in
+    // the diary's chip order; empty when no flag is recorded (an absent
+    // entry and a 0 mask render the same "none" line).
+    final disturbanceLabels = [
+      for (final disturbance in TempDisturbance.values)
+        if (tempDisturbances & disturbance.bit != 0)
+          switch (disturbance) {
+            TempDisturbance.sp => l10n.disturbanceLateToBed,
+            TempDisturbance.a => l10n.disturbanceNightAwakening,
+            TempDisturbance.alk => l10n.disturbanceAlcohol,
+            TempDisturbance.kr => l10n.disturbanceIllness,
+          },
+    ];
 
     return SafeArea(
       // Scrollable: the sheet's actions grew (cycle start, peak, first
@@ -486,24 +504,73 @@ final class CycleDaySheet extends ConsumerWidget {
               onTap: () => _writeMark(ref,
                   type: CycleMarkTypes.mucusPeakDay, remove: hasPeak),
             ),
-            _SheetAction(
-              // The temperature-ignore toggle ("Temperatur ignorieren"):
-              // a marked day's temperature is excluded from the evaluation
-              // arithmetic (the day behaves like an unmeasured one — see
-              // lib/domain/evaluation.dart). The mark does NOT affect
-              // cycle-start suggestions (bleeding continuity only), and it
-              // IS the temperature curve's rendering key (marked days
-              // render lighter — owner decision 2026-09-19). It is the
-              // same mark the diary save auto-SETs when a disturbance flag
-              // is
-              // selected (auto-set only, never auto-removed); this row is
-              // the manual correction affordance.
-              icon: Icons.visibility_off_outlined,
-              label: hasExcluded
-                  ? l10n.cycleSheetRemoveIgnoreTemperature
-                  : l10n.cycleSheetSetIgnoreTemperature,
-              onTap: () => _writeMark(ref,
-                  type: CycleMarkTypes.ignoreTemperature, remove: hasExcluded),
+            // The disturbance ↔ exclusion group (owner decision
+            // 2026-09-19: manual-only coupling, made visible): the day's
+            // raw disturbance flags render read-only directly above the
+            // temperature-ignore toggle, so "exclude this temperature"
+            // is visibly the decision sitting next to the flags that
+            // typically motivate it. No auto behavior in either
+            // direction — the flags never write/remove the mark, and the
+            // toggle works on days without flags too. Flag EDITING stays
+            // diary-side (data entry), the toggle goes through the
+            // unchanged _writeMark path.
+            // TODO(user-review): the group wording (title, empty line)
+            // is pending the expert review.
+            Column(
+              key: const ValueKey('cycleSheetExcludeGroup'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text(
+                    l10n.cycleSheetExcludeGroupTitle,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                for (final label in disturbanceLabels)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                if (disturbanceLabels.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Text(
+                      l10n.cycleSheetNoDisturbance,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                _SheetAction(
+                  // The temperature-ignore toggle ("Temperatur ignorieren"
+                  // / "Temperatur wieder auswerten"): inside the group so
+                  // it visibly belongs to the flag info above it; a
+                  // marked day's temperature is excluded from the
+                  // evaluation arithmetic (the day behaves like an
+                  // unmeasured one — see lib/domain/evaluation.dart). The
+                  // mark does NOT affect cycle-start suggestions
+                  // (bleeding continuity only), and it IS the temperature
+                  // curve's rendering key (marked days render lighter —
+                  // owner decision 2026-09-19). It writes through the
+                  // same _writeMark path as every other toggle here.
+                  icon: Icons.visibility_off_outlined,
+                  label: hasExcluded
+                      ? l10n.cycleSheetRemoveIgnoreTemperature
+                      : l10n.cycleSheetSetIgnoreTemperature,
+                  onTap: () => _writeMark(ref,
+                      type: CycleMarkTypes.ignoreTemperature,
+                      remove: hasExcluded),
+                ),
+              ],
             ),
             _SheetAction(
               icon: Icons.adjust,

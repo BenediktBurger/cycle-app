@@ -1,9 +1,12 @@
 // Pure curve-structure helpers for the Zyklus temperature chart: which
-// days form drawable line runs (adjacent-day connectivity) and which
-// segments are interrupted (ignored) and must render lighter. No Flutter
-// or chart types here — the widget layer (lib/ui/cycle.dart) maps these
-// onto fl_chart bars; tests assert the rule set directly.
+// days form drawable line runs (adjacent-day connectivity), which
+// segments are interrupted (ignored) and must render lighter, and how a
+// measured temperature clips into the chart's fixed display range
+// ([clampBbtC] — clip, never rescale). No Flutter or chart types here —
+// the widget layer (lib/ui/cycle.dart) maps these onto fl_chart bars;
+// tests assert the rule set directly.
 import '../domain/models.dart';
+import '../domain/temperature_range.dart';
 
 /// The alpha the IGNORED temperatures render with (owner decision
 /// 2026-09-19: the ignoreTemperature mark is the rendering key; marked
@@ -58,6 +61,20 @@ final class CurveSegment {
   bool get lighter => a.excluded || b.excluded;
 }
 
+/// Clips a measured temperature into the chart's fixed display range
+/// (owner decision: clip, never rescale — the scale's bounds come from
+/// the settings, so an out-of-range reading renders AT the boundary
+/// value, its dot riding the plot edge; no axis label moves for it).
+/// A value exactly at a boundary passes through unchanged (clamp returns
+/// the value itself).
+///
+/// TODO(user-review): a separate LONG-LIVED marker for clipped days was
+/// decided against for now — the dot riding the boundary IS the signal,
+/// and any cap glyph would collide with the SUZ arrow at the top border.
+/// Revisit at the expert review.
+double clampBbtC(double value, TemperatureRange displayRange) =>
+    value.clamp(displayRange.min, displayRange.max).toDouble();
+
 /// Splits the recorded days into maximal runs of adjacent-day measurements.
 ///
 /// [entriesByDayIndex] maps day index -> entry over the chart range (see
@@ -71,16 +88,25 @@ final class CurveSegment {
 /// carries raw disturbance flags; a flagged day whose mark was removed
 /// renders normally (the mask is the diary badge's input, not the
 /// curve's).
+///
+/// [displayRange] clips every point's temperature into the chart's fixed
+/// settings range ([clampBbtC]) — the chart always passes its range, so
+/// an out-of-range reading renders at the boundary instead of sitting
+/// beyond the plot. Connectivity (adjacency) is decided BEFORE the clip,
+/// so a clipped day still joins its neighbors into one run.
 List<CurveRun> curveRuns(
   Map<int, DailyEntry> entriesByDayIndex, {
   Set<int> ignoredDayIndexes = const {},
+  TemperatureRange? displayRange,
 }) {
   final measured = <CurvePoint>[
     for (final MapEntry(:key, value: entry) in entriesByDayIndex.entries)
       if (entry.bbtC != null)
         CurvePoint(
           dayIndex: key,
-          bbtC: entry.bbtC!,
+          bbtC: displayRange == null
+              ? entry.bbtC!
+              : clampBbtC(entry.bbtC!, displayRange),
           excluded: ignoredDayIndexes.contains(key),
         ),
   ]..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));
