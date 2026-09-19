@@ -6,6 +6,8 @@
 //  - locale resets to the system default on web reload (documented
 //    limitation; see the doc comment on [localeProvider] and
 //    docs/roadmap.md),
+//  - the theme mode resets to System on web reload for the same reason
+//    (see the doc comment on [themeModeProvider]),
 //  - the PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +16,9 @@ import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'domain/date_only.dart';
+import 'domain/marks.dart';
 import 'domain/models.dart';
+import 'domain/temperature_range.dart';
 
 /// The one open database for the app lifetime. `FutureProvider` (without
 /// autoDispose) keeps the instance cached; disposing the ProviderScope
@@ -32,19 +36,28 @@ final databaseProvider = FutureProvider<CycleDatabase>((ref) {
 /// current time" is deterministic (no race against the real minute boundary).
 final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// The profile all M1 UI reads/writes. Multi-profile (partner mode) is in
-/// the schema, but deliberately not exposed in the M1 UI.
-const int defaultProfileId = 1;
-
-/// Live stream of the tracked days (as pure domain models) for the default
-/// profile — the single source of truth behind Tagebuch, Zyklus and
-/// Statistik screens. Re-emits on every write.
+/// Live stream of the tracked days (as pure domain models) — the single
+/// source of truth behind Tagebuch, Zyklus and Statistik screens. Re-emits
+/// on every write.
 final dailyEntriesProvider =
     StreamProvider.autoDispose<List<DailyEntry>>((ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.entriesDao
-      .watchAll(defaultProfileId)
+      .watchAll()
       .map((rows) => rows.map(dailyEntryFromDrift).toList());
+});
+
+/// Live stream of the user-placed marks (as pure domain models) — the read
+/// side of the evaluation feature (Mode M, the counterpart to
+/// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
+/// consumers recompute the derived evaluation (baseline, circled higher
+/// measurements, SUZ) from it at render time — never from a persisted copy,
+/// per ADR-0001.
+final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
+  final db = await ref.watch(databaseProvider.future);
+  yield* db.marksDao
+      .watchAll()
+      .map((rows) => rows.map(cycleMarkFromDrift).toList());
 });
 
 /// Tab index of the bottom navigation shell. Simple StateProvider: screens
@@ -71,8 +84,46 @@ final tabIndexProvider = StateProvider<int>((ref) => 0);
 /// Recorded in docs/roadmap.md as the language-persistence TODO.
 final localeProvider = StateProvider<Locale?>((ref) => null);
 
+/// Theme mode of the whole app: `ThemeMode.system` (the default) follows the
+/// device brightness setting, an explicit light/dark choice from the settings
+/// switcher wins over the platform. The light/dark `ThemeData`s themselves
+/// live in `main.CycleApp` (both derived from one seed color).
+///
+/// In-memory only, mirroring [localeProvider]: switching works immediately
+/// but resets to System on web reload BY DESIGN (see the persistence note
+/// there — no settings table in drift at this milestone).
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
+/// The cycle chart's temperature display range ("Temperaturbereich"
+/// settings card): the FIXED y bounds the chart's plot and the frozen
+/// rail's scale share — settings-selectable, default 36–38 °C. Curve
+/// values outside the range CLIP at the boundary (pure helper
+/// [clampBbtC] in lib/ui/cycle_curve.dart); the scale never stretches to
+/// fit an outlier.
+///
+/// In-memory only, mirroring [localeProvider]/[themeModeProvider] — but
+/// here the reset-on-restart is DELIBERATE at this milestone (owner
+/// decision 2026-09-19, not a deferred bug): the range's persistence will
+/// land together with the other deferred settings persistence as one
+/// batch, after a storage decision (docs/roadmap.md backlog). No drift
+/// table, no schema change — this provider is deliberately NOT a storage
+/// precedent for later settings.
+final temperatureRangeProvider =
+    StateProvider<TemperatureRange>((ref) => TemperatureRange.defaults);
+
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when
 /// it changes. Normalized to UTC midnight on read/write (DateOnly).
 final selectedDateProvider =
     StateProvider<DateTime>((ref) => DateOnly.normalize(DateTime.now()));
+
+/// The cycle chart's jump-to-date affordance. The button lives in the Zyklus
+/// AppBar's actions (next to the info action — a row of its own above the
+/// chart wasted vertical space), but the jump logic needs the chart's scroll
+/// state (the viewport/column geometry, the day mapping and the scroll
+/// controller all live on the chart state), so the chart state registers its
+/// action here while mounted and clears it again on dispose. Null while no
+/// chart is on screen (entries still loading, no data) — the AppBar hides
+/// the button then, exactly like the old in-chart row never rendered there.
+final cycleChartJumpProvider =
+    StateProvider<void Function(BuildContext context)?>((ref) => null);

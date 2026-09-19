@@ -34,11 +34,11 @@ Future<bool> saveFile(String filename, String content) async {
   return true;
 }
 
-/// Opens a JSON file picker and reads the chosen file's text; null when the
-/// user cancelled or no file was chosen.
-Future<String?> pickJsonFileText() {
-  final input = html.InputElement(type: 'file')
-    ..accept = 'application/json,.json';
+/// Opens a file picker filtered by [accept] (an HTML accept list such as
+/// `application/json,.json` or `.csv,text/csv`) and reads the chosen file's
+/// text; null when the user cancelled or no file was chosen.
+Future<String?> pickFileText({String accept = 'application/json,.json'}) {
+  final input = html.InputElement(type: 'file')..accept = accept;
   final picked = Completer<String?>();
 
   input.onChange.listen((event) {

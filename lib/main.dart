@@ -1,5 +1,6 @@
 // Root widget: Material app, German-first localization whose language
-// follows the system until overridden in the settings screen, and the
+// follows the system until overridden in the settings screen, a theme mode
+// that likewise follows the device brightness until overridden, and the
 // database gating shell.
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,6 +13,11 @@ import 'ui/cycle.dart';
 import 'ui/diary.dart';
 import 'ui/settings.dart';
 import 'ui/statistics.dart';
+
+/// Seed for both brightness' color schemes: Flutter's Material 3 default
+/// seed, i.e. the scheme the app materialized before dark mode was made
+/// explicit — keeping it keeps the light look byte-for-byte familiar.
+const _themeSeedColor = Color(0xFF6750A4);
 
 void main() {
   runApp(const ProviderScope(child: CycleApp()));
@@ -28,7 +34,25 @@ class CycleApp extends ConsumerWidget {
     // else (English is the fallback language, ADR-0007). An explicit
     // settings choice is always applied as-is.
     final Locale? explicitLocale = ref.watch(localeProvider);
+    // ThemeMode.system (the themeModeProvider default) follows the device
+    // brightness; an explicit light/dark choice from the settings switcher
+    // wins over the platform.
+    final ThemeMode themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
+      // Theme: explicit Material 3 color schemes from one seed. The light
+      // scheme is Flutter's own default seed, so light mode looks exactly
+      // as before; dark mode derives from the same seed
+      // (ColorScheme.fromSeed(brightness: dark)) so both schemes stay in
+      // the same tonal neighborhood, and the app follows the device
+      // brightness setting (themeMode: system).
+      themeMode: themeMode,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: _themeSeedColor),
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: _themeSeedColor, brightness: Brightness.dark),
+      ),
       locale: explicitLocale,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       localizationsDelegates: const [
@@ -139,7 +163,13 @@ class _HomeShell extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final index = ref.watch(tabIndexProvider);
     return Scaffold(
-      body: _screens[index],
+      // All tabs stay mounted in an IndexedStack: switching away and back
+      // preserves each screen's widget state (e.g. the cycle chart's scroll
+      // window survives the Tagebuch→Zyklus roundtrip), and the offstage
+      // screens keep watching their providers so they are up to date when
+      // shown. Offstage children are built and laid out but neither painted
+      // nor hit-testable.
+      body: IndexedStack(index: index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (int newIndex) =>
@@ -148,22 +178,22 @@ class _HomeShell extends ConsumerWidget {
           NavigationDestination(
             icon: const Icon(Icons.event_outlined),
             selectedIcon: const Icon(Icons.event),
-            label: l10n.navTagebuch,
+            label: l10n.navDiary,
           ),
           NavigationDestination(
             icon: const Icon(Icons.loop_outlined),
             selectedIcon: const Icon(Icons.loop),
-            label: l10n.navZyklus,
+            label: l10n.navCycle,
           ),
           NavigationDestination(
             icon: const Icon(Icons.bar_chart_outlined),
             selectedIcon: const Icon(Icons.bar_chart),
-            label: l10n.navStatistik,
+            label: l10n.navStatistics,
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),
             selectedIcon: const Icon(Icons.settings),
-            label: l10n.navEinstellungen,
+            label: l10n.navSettings,
           ),
         ],
       ),

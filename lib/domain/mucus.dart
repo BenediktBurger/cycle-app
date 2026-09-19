@@ -1,6 +1,7 @@
 // The "Zeichen der Fruchtbarkeit" vocabulary from the INER cheat sheet
-// (docs/cheatsheet.md): fertility signs t / Ø (nichts) / f / S, with quality
-// qualifiers that are ONLY valid together with the sign S.
+// (docs/cheatsheet.md): fertility signs t / Ø (nichts) / f / S / A
+// (Ausfluss), with quality qualifiers that are ONLY valid together with the
+// sign S (the discharge sign A has no quality of its own).
 //
 // Mode M posture (ADR-0001, docs/adr/0001-iner-mode-m-hypothesis.md): the app
 // records these observations faithfully and NEVER interprets them — no rule
@@ -19,7 +20,13 @@
 /// - `nothing`: nichts gesehen/gespürt — displays as `Ø`
 /// - `f`: feucht, reine Empfindung (moist feeling, no mucus)
 /// - `s`: S = Schleim aus den Krypten des Gebärmutterhalses (mucus)
-enum MucusSign { t, nothing, f, s }
+/// - `fs`: f/S — "f vor S an einem Tag" (the moist feeling before the
+///   mucus, observed on ONE day); displays as `f/S`. A sign of its own:
+///   NOT combinable with a quality qualifier (the quality qualifiers stay
+///   exclusive to S — the general quality-requires-S rule covers it).
+/// - `a`: Ausfluss (discharge) — displays as `A`; no quality exists for it,
+///   the quality qualifiers stay exclusive to S.
+enum MucusSign { t, nothing, f, s, fs, a }
 
 /// A quality qualifier of the mucus sign S (bare S without a qualifier is
 /// equally valid). ONE vocabulary from the cheat sheet, split only by the
@@ -79,12 +86,15 @@ MucusPair sanitizeMucusPair({
       quality: sign == MucusSign.s ? quality : null,
     );
 
-/// Display glyph of a sign (cheat sheet): `t`, `Ø` for `nothing`, `f`, `S`.
+/// Display glyph of a sign (cheat sheet): `t`, `Ø` for `nothing`, `f`, `S`,
+/// `f/S` for `fs` ("f vor S an einem Tag"), `A` for `a` (Ausfluss).
 String mucusSignSymbol(MucusSign sign) => switch (sign) {
       MucusSign.t => 't',
       MucusSign.nothing => 'Ø',
       MucusSign.f => 'f',
       MucusSign.s => 'S',
+      MucusSign.fs => 'f/S',
+      MucusSign.a => 'A',
     };
 
 /// Display token of a quality (cheat sheet): everything keeps its token

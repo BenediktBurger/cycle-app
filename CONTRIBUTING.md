@@ -1,7 +1,36 @@
 # Contributing
 
-Setup path, daily commands, and project conventions. Open work and upcoming
-milestones are tracked in [`docs/roadmap.md`](docs/roadmap.md).
+Contributions are very much appreciated — there are many ways to help, and
+several need no code at all:
+
+- **Translations** — add or improve strings in the `.arb` files
+  (German-first with English mirrored).
+- **Bug reports and feature suggestions**
+- **Fixing texts** — wording, grammar, and clarity in UI strings and docs.
+- **Improving the UI** — usability, layout, visual polish.
+- **Implementing features**
+
+Whatever you take on, a few expectations keep the project consistent; the
+details live in [AGENTS.md](AGENTS.md). In brief:
+
+- **Improvement notes have fixed destinations**: agent behavior you want
+  changed → a rule in AGENTS.md; doubts about a decision → the ADR in
+  question; actual work items → the backlog of
+  [`docs/roadmap.md`](docs/roadmap.md).
+- **Roadmap readiness**: only checkbox items (`- [ ]`) are ready to
+  implement; plain bullets are under discussion — ask instead of guessing
+  scope.
+- **No work-package IDs** in code, docs, or tool/file names.
+- **Run the full test gate** before you consider work done:
+  `flutter analyze` and `flutter test --no-pub -r expanded` (why that
+  reporter: [AGENTS.md](AGENTS.md); commands: section 4 below).
+
+Setup path and daily commands below; open work is tracked in
+[`docs/roadmap.md`](docs/roadmap.md), architecture decisions in
+[`docs/adr/`](docs/adr/README.md). Release and publishing (local APKs,
+F-Droid, Google Play) follow the runbook in
+[`docs/release.md`](docs/release.md), with the decisions recorded in
+[ADR-0009](docs/adr/0009-release-pipeline-and-signing.md).
 
 ## 1. Install the Flutter SDK (stable channel)
 
@@ -71,16 +100,24 @@ clearing site data/private windows do not (expected browser behaviour).
 
 ## 4. Analyze, test, build
 
+The local gate mirrors [.github/workflows/ci.yml](.github/workflows/ci.yml)
+(see [ADR-0006](docs/adr/0006-ci.md) for the decision):
+
 ```sh
 flutter pub get    # prerequisite of test runs (also runs gen-l10n)
 flutter analyze
+dart format --output=none --set-exit-if-changed .   # check-only
 flutter test
 flutter build web
 ```
 
-All three must pass before you push. CI runs exactly these (see
-[.github/workflows/ci.yml](.github/workflows/ci.yml) and
-[ADR-0006](docs/adr/0006-ci.md)).
+All four checks must pass before you push. To fix formatting instead of
+merely checking it, run a plain `dart format .` (only the check variant is
+part of the gate).
+
+`flutter build apk --debug` is available locally as well once the local
+Android toolchain is green (see [`docs/release.md`](docs/release.md),
+Phase A) — the web build remains the primary correctness gate until then.
 
 **Linux note (database tests):** the drift tests under `test/db/` open the
 real SQLite engine through `sqlite3`'s dart:ffi bindings on the host.
@@ -129,15 +166,18 @@ report the full analyzer/test output back so issues can be fixed promptly.
 - **Package name** `cycle_app` is a placeholder ([ADR-0002](docs/adr/0002-package-name-cycle-app-placeholder.md));
   do not rely on it in code
 - **Unresolved working assumptions** are marked in code and docs — in
-  particular the overall "Mode M" product shape
-  ([ADR-001](docs/adr/0001-iner-mode-m-hypothesis.md), status: Hypothesis),
-  the cycle-boundary rule
-  (`lib/domain/cycle_grouping.dart`), and the statistics bucket edges
-  (`lib/domain/statistics.dart`). Treat marked comments like
-  `// TODO(user-review)` as questions to bring to INER experts, not as
-  settled behavior.
+  particular the open questions (`TODO(user-review)`) in
+  [ADR-0008](docs/adr/0008-cycle-start-as-mark.md), the statistics
+  bucket edges (`lib/domain/statistics.dart`), and per-rule interpretation
+  questions under `lib/domain/evaluation.dart` (the overall "Mode M"
+  product shape itself is settled —
+  [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), Accepted). Treat
+  marked comments like `// TODO(user-review)` as questions to bring to
+  INER experts, not as settled behavior.
 - **In-memory-only state for now**: the language selection resets to the
   system-language default on web reload by design (system language when
   available, otherwise English; persisting an explicit choice — e.g. a
   settings table or localStorage — is future work; see `localeProvider` in
-  `lib/providers.dart`).
+  `lib/providers.dart`). The theme-mode selection shares the same
+  in-memory limitation (reverts to the system theme after a web reload;
+  see `themeModeProvider` in `lib/providers.dart`).

@@ -4,11 +4,13 @@
   "@appTitle": {
     "description": "App-Titel. Arbeitstitel — der Package-Name cycle_app ist ein Platzhalter (ADR-0002)."
   },
-  "navTagebuch": "Diary",
-  "navZyklus": "Cycle",
-  "navStatistik": "Statistics",
-  "navEinstellungen": "Settings",
+  "navDiary": "Diary",
+  "navCycle": "Cycle",
+  "navStatistics": "Statistics",
+  "navSettings": "Settings",
   "entryDate": "Date",
+  "entryPreviousDay": "Previous day",
+  "entryNextDay": "Next day",
   "temperature": "Temperature",
   "measuredTime": "Measured at",
   "measuredTimeUnset": "not set",
@@ -27,28 +29,42 @@
   "bleedingLight": "light",
   "bleedingMedium": "medium",
   "bleedingHeavy": "heavy",
-  "excludeIllness": "illness",
-  "excludeAlcohol": "alcohol",
-  "excludeTravel": "travel",
-  "excludeOther": "other",
-  "excludesCaption": "Interrupted days (count as disturbed for evaluation):",
   "mucusSign": "Fertility sign",
   "mucusSignUnset": "—",
   "mucusQuality": "Quality",
-  "cervix": "Cervix (optional)",
-  "pain": "pain",
-  "mood": "mood",
-  "desire": "desire",
+  "cervixPosition": "Cervix position",
+  "cervixPositionUnset": "—",
+  "cervixPositionLow": "low",
+  "cervixPositionMedium": "medium",
+  "cervixPositionHigh": "high",
+  "cervixPositionVeryHigh": "very high",
+  "cervixPositionUnreachable": "unreachable",
+  "cervixOpening": "Cervix opening",
+  "cervixOpeningUnset": "—",
+  "cervixOpeningClosed": "closed",
+  "cervixOpeningMiddle": "middle",
+  "cervixOpeningOpen": "open",
+  "cervixFirmness": "Cervix firmness",
+  "cervixFirmnessUnset": "—",
+  "cervixFirmnessHard": "hard",
+  "cervixFirmnessHalfSoft": "h-w",
+  "cervixFirmnessSoft": "soft",
+  "painBreast": "Breast pain (B)",
+  "painMittelschmerz": "Mittelschmerz (M)",
   "sex": "sex",
+  "sexTimingStart": "start",
+  "sexTimingMiddle": "middle",
+  "sexTimingEnd": "end",
   "errorTemperature": "One temperature using comma or dot, two decimals max",
   "errorTemperatureRange": "Plausibility: temperatures between 25 and 45 °C",
-  "cycleGroupLeading": "Without period onset (until {day})",
+  "cycleGroupLeading": "Before the first cycle start (until {day})",
   "@cycleGroupLeading": {
     "placeholders": {
       "day": {
         "type": "String"
       }
-    }
+    },
+    "description": "Diary/evaluation-table title for the LEADING cycle group: entries that predate the first user-placed cycleStart mark, so the group's begin is unknown and only the end is shown."
   },
   "cycleGroupOnset": "Cycle from {day}",
   "@cycleGroupOnset": {
@@ -67,21 +83,223 @@
     }
   },
   "cycleTapToEdit": "Tap a day to edit it",
-  "zyklusLegendTemperature": "BBT (temperature)",
-  "zyklusLegendBleeding": "Bleeding",
-  "zyklusLegendMucus": "Fertility sign (mucus)",
-  "zyklusNoData": "The temperature curve appears once days with measurements exist.",
-  "zyklusArithmeticNote": "Pure signal recording — no evaluation, no fertility statement. Marks (e.g. baseline/coverline) follow later (Mode M, ADR-0001).",
-  "statistikNote": "Numbers only (cycle lengths derived from the assumed menstruation-onset definition) — no evaluation or fertility conclusions. Interrupted days never start a cycle — assumption; will be reviewed with the experts (ADR-0001).",
-  "statistikNoData": "Cycle lengths appear once two period onsets are recorded.",
-  "statistikCycles": "Cycle lengths",
-  "statistikOnsets": "Period onsets",
-  "statistikAverage": "Average",
-  "statistikShortest": "Shortest",
-  "statistikLongest": "Longest",
-  "statistikDistribution": "Distribution",
-  "statistikDays": "{n} days",
-  "@statistikDays": {
+  "cycleColumnDate": "Date",
+  "@cycleColumnDate": {
+    "description": "Column-header tooltip for the day-of-month prototype (\"14.\") on the cycle chart."
+  },
+  "cycleColumnCycleDay": "Cycle day",
+  "@cycleColumnCycleDay": {
+    "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
+  },
+  "cycleLegendTemperature": "BBT (temperature)",
+  "cycleRowBleeding": "Bleeding",
+  "@cycleRowBleeding": {
+    "description": "Row name (corner tooltip/semantics) of the bleeding row on the cycle chart."
+  },
+  "cycleRowMucus": "Fertility sign (mucus)",
+  "cycleRowCervix": "Cervix",
+  "cycleRowSex": "Sex",
+  "cycleRowMittelschmerz": "Mittelschmerz",
+  "@cycleRowMittelschmerz": {
+    "description": "Row name (corner tooltip/semantics) of the Mittelschmerz row on the cycle chart, rendered directly beneath the mucus row inside the top of the temperature block."
+  },
+  "cycleRowPain": "Pain",
+  "cycleRowDisturbance": "Disturbed measurement",
+  "@cycleRowDisturbance": {
+    "description": "Row name (corner tooltip/semantics) of the disturbance row at the bottom of the cycle chart block: the letter codes of the day's temperature-disturbance (exclusion) flags."
+  },
+  "cycleRowMeasurementTime": "Measurement time",
+  "cycleRowNote": "Note",
+  "@cycleRowNote": {
+    "description": "Row name (corner tooltip/semantics) of the note-indicator row at the very bottom of the cycle chart block: a small glyph marks the days whose entry carries a non-empty notes text."
+  },
+  "cycleHelpShow": "Show symbol glossary",
+  "@cycleHelpShow": {
+    "description": "AppBar action tooltip opening the cycle chart's symbol glossary bottom sheet."
+  },
+  "cycleHelpTitle": "Symbol glossary",
+  "cycleLegendBleeding": "Bleeding",
+  "cycleLegendMucus": "Fertility sign (mucus)",
+  "cycleLegendMucusPeak": "Mucus peak",
+  "cycleLegendCircledHigher": "Circled higher measurements",
+  "cycleLegendArrowHigher": "Premature temperature rise",
+  "cycleLegendBaseline": "Baseline",
+  "cycleLegendCervix": "Cervix position",
+  "cycleLegendCervixFirmness": "Cervix firmness",
+  "cycleNoData": "The temperature curve appears once days with measurements exist.",
+  "cycleJumpToDate": "Jump to date",
+  "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
+  "cycleSheetEditDay": "Edit day",
+  "cycleSheetSetMucusPeak": "Set mucus peak",
+  "cycleSheetRemoveMucusPeak": "Remove mucus peak",
+  "cycleSheetSetFirstHigher": "Set first higher measurement",
+  "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
+  "cycleSheetBaselineInfo": "Baseline: {value}",
+  "@cycleSheetBaselineInfo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleSheetLowInfo": "Low measurement {number}",
+  "@cycleSheetLowInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleSheetCircledInfo": "Circled higher measurement {number}",
+  "@cycleSheetCircledInfo": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleSheetDifferenceInfo": "+{value} K above the baseline",
+  "@cycleSheetDifferenceInfo": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "The difference of a circled/arrowed higher measurement to the baseline (R7); the value is pre-formatted with the locale's decimal style."
+  },
+  "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
+  "cycleSheetRiseConsistencyTitle": "First higher measurement",
+  "@cycleSheetRiseConsistencyTitle": {
+    "description": "Title of the non-blocking dialog shown after PLACING an inconsistent first-higher-measurement mark (the marked day carries no measured, not-excluded temperature strictly above the baseline). Neutral on purpose — it names the mark, never a verdict."
+  },
+  "cycleSheetRiseConsistencyBelow": "{value} °C on the marked day is not above the baseline {baseline} °C.",
+  "@cycleSheetRiseConsistencyBelow": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      },
+      "baseline": {
+        "type": "String"
+      }
+    },
+    "description": "Body of the rise-mark consistency dialog: the arithmetic fact only (marked value vs baseline value, both pre-formatted with the locale's decimal style). TODO(user-review): the exact wording is pending the expert review."
+  },
+  "cycleSheetRiseConsistencyNoValue": "The marked day carries no usable temperature (unmeasured or interrupted).",
+  "cycleSheetRiseConsistencyKeep": "Keep",
+  "cycleSheetRiseInconsistent": "No measurement on the marked day is above the baseline {value} °C.",
+  "@cycleSheetRiseInconsistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
+  },
+  "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
+  "cycleSheetSetSuzEvening": "SUZ from this evening",
+  "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",
+  "cycleSheetSetSuzMorning": "SUZ from this morning",
+  "cycleSheetRemoveSuzMorning": "Remove SUZ from this morning",
+  "cycleSheetSetCycleStart": "Set cycle start",
+  "@cycleSheetSetCycleStart": {
+    "description": "Mark-sheet action placing the cycleStart mark — the authoritative cycle boundary; bleeding only suggests it, bleeding never creates a boundary by itself."
+  },
+  "cycleSheetRemoveCycleStart": "Remove cycle start",
+  "diaryCycleStartPromptTitle": "Start new cycle?",
+  "@diaryCycleStartPromptTitle": {
+    "description": "Confirmation prompt after the diary saves a day whose menstruation-level bleeding SUGGESTS a new cycle start (not a continuation of the previous day's bleeding)."
+  },
+  "diaryCycleStartPromptBody": "The bleeding on this day suggests that a new cycle begins here. Set a cycle start mark on this day?",
+  "diaryCycleStartPromptConfirm": "Set cycle start",
+  "diaryCycleStartPromptDismiss": "Not now",
+  "cycleSheetSuzSuggestionEvening": "Suggested: sicher unfruchtbare Zeit begins this evening (rule D)",
+  "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
+  "cycleLegendMeasuredAt": "Measurement time",
+  "cycleLegendSex": "Sex (X per time of day)",
+  "cycleLegendPain": "Breast pain (B)",
+  "@cycleLegendPain": {
+    "description": "The breast pain letter B; the Mittelschmerz letter M has its own legend entry (it renders beneath the mucus row on the chart)."
+  },
+  "cycleLegendMittelschmerz": "Mittelschmerz (M)",
+  "cycleLegendDisturbance": "Interrupted days (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
+  "@cycleLegendDisturbance": {
+    "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
+  },
+  "cycleLegendNote": "Note (this day carries a note in the Diary)",
+  "@cycleLegendNote": {
+    "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
+  },
+  "cycleSheetMeasuredAt": "Measurement time: {time}",
+  "@cycleSheetMeasuredAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cycleSummaryCycleLength": "Cycle length",
+  "@cycleSummaryCycleLength": {
+    "description": "Row label of the cycle screen's evaluation table: the days between consecutive cycle starts (the user-placed cycleStart marks that open a cycle group)."
+  },
+  "cycleSummaryPeriodStart": "Period start",
+  "@cycleSummaryPeriodStart": {
+    "description": "Row label of the cycle screen's evaluation table: the cycle's first menstruation-level bleeding day."
+  },
+  "cycleSummaryPeriodEnd": "Period end",
+  "@cycleSummaryPeriodEnd": {
+    "description": "Row label of the cycle screen's evaluation table: the cycle's last menstruation-level bleeding day."
+  },
+  "cycleSummaryPeak": "Mucus peak",
+  "@cycleSummaryPeak": {
+    "description": "Row label of the cycle screen's evaluation table: the user-placed mucus-peak day."
+  },
+  "cycleSummarySuz": "SUZ start",
+  "@cycleSummarySuz": {
+    "description": "Row label of the cycle screen's evaluation table: the computed start of the sicher unfruchtbare Zeit with its rule (D/E)."
+  },
+  "cycleSummaryStatus": "Evaluation",
+  "@cycleSummaryStatus": {
+    "description": "Row label of the cycle screen's evaluation table's status row: the SUZ day with its rule once determined, the stopped note while the automatic evaluation is broken, or the missing marker."
+  },
+  "cycleSummaryColumn": "Cycle {n}",
+  "@cycleSummaryColumn": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Column header of the evaluation table's per-cycle columns, numbered over the recorded cycle starts (the user-placed cycleStart marks that open a cycle group)."
+  },
+  "cycleSummarySuzEvening": "rule D (in the evening)",
+  "@cycleSummarySuzEvening": {
+    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule D begins the SUZ in the evening of the trigger day."
+  },
+  "cycleSummarySuzMorning": "rule E (in the morning)",
+  "@cycleSummarySuzMorning": {
+    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule E begins the SUZ in the morning of the trigger day."
+  },
+  "cycleSummarySuzFrom": "SUZ from {day}",
+  "@cycleSummarySuzFrom": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    },
+    "description": "Status-row text for a determined SUZ: the begin day (pre-formatted) followed by the rule."
+  },
+  "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
+  "statisticsNoData": "Cycle lengths appear once two cycle starts are recorded.",
+  "statisticsCycles": "Cycle lengths",
+  "statisticsOnsets": "Cycle starts",
+  "@statisticsOnsets": {
+    "description": "Card title of the statistics screen's list of the mark-driven cycle starts (the recorded dates of the user-placed cycleStart marks that opened a cycle group). The key mirrors the domain function menstruationOnsetDates on purpose, to keep one name across the boundary."
+  },
+  "statisticsAverage": "Average",
+  "statisticsShortest": "Shortest",
+  "statisticsLongest": "Longest",
+  "statisticsDistribution": "Distribution",
+  "statisticsDays": "{n} days",
+  "@statisticsDays": {
     "placeholders": {
       "n": {
         "type": "int"
@@ -93,10 +311,19 @@
   "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
+  "settingsThemeMode": "Theme",
+  "settingsThemeModeNote": "In-memory only — reverts to the System setting after reload (persistent storage planned).",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "settingsTemperatureRange": "Temperature range",
+  "settingsRangeLower": "Lower limit",
+  "settingsRangeUpper": "Upper limit",
+  "settingsTemperatureRangeNote": "In-memory only — resets to the default 36–38 °C when the app restarts (persistence planned with the other settings).",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: encryption/lock is planned in ADR-0005 (native later via SQLCipher, web via PIN).",
   "settingsExport": "JSON export",
-  "settingsExportNote": "All profiles, entries and marks as one JSON document.",
+  "settingsExportNote": "All entries and marks as one JSON document.",
   "settingsImport": "JSON import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
   "exportTitle": "JSON preview",
@@ -108,40 +335,16 @@
   "exportNativeHint": "On Android/iOS: copy the text above (a share sheet will follow).",
   "exportNothing": "Database is empty — nothing to export.",
   "importTitle": "Paste JSON",
-  "importHint": "Paste an export document (schema_version 1, 2, or 3) here …",
+  "importHint": "Paste an exported cycle-app document here …",
   "importPickFile": "Pick file (web only)",
   "importApply": "Apply import",
-  "importInvalid": "Invalid document (not an export / schema_version 1, 2, or 3).",
+  "importInvalid": "Invalid document (not a valid cycle-app export).",
   "importFailed": "Import failed — the data was not changed.",
-  "importSummary": "New profiles: {profiles}, days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
-  "@importSummary": {
-    "placeholders": {
-      "profiles": {
-        "type": "int"
-      },
-      "newDays": {
-        "type": "int"
-      },
-      "overwritten": {
-        "type": "int"
-      },
-      "duplicates": {
-        "type": "int"
-      },
-      "invalid": {
-        "type": "int"
-      },
-      "newMarks": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
+  "importSummary": "Days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
   "importEmpty": "Import: nothing to change (document empty or already identical).",
   "dripImportTitle": "Import drip data",
-  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. Imports into the main profile; per-symptom interrupt flags (except temperature) are dropped.",
+  "dripImportButton": "Import CSV",
+  "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. An excluded temperature derives an \"exclude from analysis\" mark; mood and desire flags are dropped (their notes are kept).",
   "dripImportApply": "Import CSV",
   "dripImportHint": "Paste a drip CSV export here …",
   "dripImportInvalid": "Not a drip CSV export (no \"date\" column in the header row).",
@@ -164,5 +367,37 @@
         "type": "int"
       }
     }
-  }
+  },
+  "disturbancesCaption": "Temperature disturbance (flag the measurement):",
+  "diaryExcludeTemperatureSwitch": "Exclude from the evaluation",
+  "disturbanceLateToBed": "Late to bed (sp)",
+  "disturbanceNightAwakening": "Frequent night awakening (a)",
+  "disturbanceAlcohol": "Alcohol (alk)",
+  "disturbanceIllness": "Illness (kr)",
+  "@importSummary": {
+    "placeholders": {
+      "newDays": {
+        "type": "int"
+      },
+      "overwritten": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "invalid": {
+        "type": "int"
+      },
+      "newMarks": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "cycleSheetSetIgnoreTemperature": "Ignore temperature",
+  "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
+  "cycleSheetExcludeGroupTitle": "Excluded from the evaluation",
+  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

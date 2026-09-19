@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/marks.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
@@ -24,15 +25,17 @@ class StatistikScreen extends ConsumerWidget {
     final entriesAsync = ref.watch(dailyEntriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navStatistik)),
+      appBar: AppBar(title: Text(l10n.navStatistics)),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text(l10n.loadFailed)),
         data: (entries) {
-          final lengths = cycleLengthsInDays(entries);
+          final marks =
+              ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+          final lengths = cycleLengthsInDays(entries, marks);
           final summary = summarizeCycleLengths(lengths);
           final buckets = cycleLengthDistribution(lengths);
-          final onsets = menstruationOnsetDates(entries);
+          final onsets = menstruationOnsetDates(entries, marks);
           String day(DateTime d) =>
               DateFormat.yMd(locale).format(DateOnly.normalize(d).toLocal());
 
@@ -40,22 +43,22 @@ class StatistikScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(12),
             children: [
               Text(
-                l10n.statistikNote,
+                l10n.statisticsNote,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
               if (summary.lengths.isEmpty) ...[
-                Text(l10n.statistikNoData),
+                Text(l10n.statisticsNoData),
               ] else ...[
                 _StatCard(
-                  title: l10n.statistikCycles,
+                  title: l10n.statisticsCycles,
                   child: Column(
                     children: [
                       for (final length in summary.lengths)
                         ListTile(
                           dense: true,
                           leading: const Icon(Icons.loop_outlined),
-                          title: Text(l10n.statistikDays(length)),
+                          title: Text(l10n.statisticsDays(length)),
                         ),
                     ],
                   ),
@@ -65,7 +68,7 @@ class StatistikScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: _StatCard(
-                        title: l10n.statistikAverage,
+                        title: l10n.statisticsAverage,
                         child: Text(
                           summary.average!.toStringAsFixed(1),
                           style: Theme.of(context).textTheme.headlineSmall,
@@ -75,7 +78,7 @@ class StatistikScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _StatCard(
-                        title: l10n.statistikShortest,
+                        title: l10n.statisticsShortest,
                         child: Text(
                           '${summary.shortest}',
                           style: Theme.of(context).textTheme.headlineSmall,
@@ -85,7 +88,7 @@ class StatistikScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _StatCard(
-                        title: l10n.statistikLongest,
+                        title: l10n.statisticsLongest,
                         child: Text(
                           '${summary.longest}',
                           style: Theme.of(context).textTheme.headlineSmall,
@@ -95,10 +98,11 @@ class StatistikScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // The raw onset dates keep the length list auditable against
-                // the (assumed) boundary rule without adding any evaluation.
+                // The raw cycle-start dates keep the length list auditable
+                // against the mark-driven boundaries without adding any
+                // evaluation.
                 _StatCard(
-                  title: l10n.statistikOnsets,
+                  title: l10n.statisticsOnsets,
                   child: Column(
                     children: [
                       for (final onset in onsets)
@@ -112,7 +116,7 @@ class StatistikScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 _StatCard(
-                  title: l10n.statistikDistribution,
+                  title: l10n.statisticsDistribution,
                   child: Column(
                     children: [
                       for (final bucket in buckets)

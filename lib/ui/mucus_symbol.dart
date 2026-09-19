@@ -52,6 +52,10 @@ final class MucusSymbolText extends StatelessWidget {
           if (superscript != null)
             WidgetSpan(
               alignment: PlaceholderAlignment.aboveBaseline,
+              // Current Flutter requires an explicit baseline for spans that
+              // align to one; alphabetic keeps the historical placement of
+              // the superscript next to the base glyph.
+              baseline: TextBaseline.alphabetic,
               child: Text(
                 superscript,
                 style: baseStyle.copyWith(fontSize: fontSize * 0.78),

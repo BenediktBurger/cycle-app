@@ -4,19 +4,24 @@
 // NO fertility interpretation of any kind. The functions here return
 // arithmetic facts only (lists of lengths/dates, averages, bucket counts).
 // There is deliberately NO status/day classification, NO fertile-window or
-// phase computation, and NO textual evaluation in this layer — such
-// conclusions would be Mode-M/INER territory requiring expert validation
-// (ADR-0001, status: Hypothesis). Keep it that way in reviews.
+// phase computation, and NO textual evaluation in this layer — statistics
+// stay arithmetic-only (Mode M, ADR-0001, Accepted): no fertility verdicts.
+// Keep it that way in reviews.
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';
+import 'marks.dart';
 import 'models.dart';
 
-/// Cycle lengths in days: differences between consecutive menstruation
-/// onsets (see lib/domain/cycle_grouping.dart for the boundary rule).
-/// A trailing onset with no known follow-up contributes no length.
-List<int> cycleLengthsInDays(List<DailyEntry> entries) {
-  final onsets = menstruationOnsetDates(entries);
+/// Cycle lengths in days: differences between consecutive mark-driven
+/// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
+/// group at every user-placed cycleStart mark). A trailing cycle start with
+/// no known follow-up contributes no length.
+List<int> cycleLengthsInDays(
+  List<DailyEntry> entries,
+  List<CycleMark> marks,
+) {
+  final onsets = menstruationOnsetDates(entries, marks);
   final lengths = <int>[];
   for (var i = 0; i + 1 < onsets.length; i++) {
     // Day-component arithmetic (not DateTime.difference): difference()

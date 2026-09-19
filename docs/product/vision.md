@@ -12,10 +12,11 @@ decision-maker.
 baseline/counts/lines/stats) is the product shape; **Modes S** (suggest +
 override) **and A** (automatic) are explicitly deferred.
 
-> **Note on ADR-001:** Mode M as the product shape is recorded in
-> [ADR-001](../adr/0001-iner-mode-m-hypothesis.md) with status **Hypothesis** —
-> explicitly *not* as an accepted decision, and *not* as an INER resolution.
-> It is a tool-role assumption to be validated with INER experts.
+> **Note on ADR-0001:** Mode M as the product shape is recorded in
+> [ADR-0001](../adr/0001-iner-mode-m-hypothesis.md) with status **Accepted**
+> (owner decision, 2026-09-19) — accepted by the owner, *not* endorsed by
+> INER. The app supports the user but never gives the final answer; knowing
+> the method (book or course) is a prerequisite for reliable interpretation.
 
 ## Functional requirements
 
@@ -54,10 +55,11 @@ override) **and A** (automatic) are explicitly deferred.
 
 | Mode | Name | Who decides | How the app helps | Status in this project |
 | ---- | ---- | ----------- | ----------------- | ---------------------- |
-| **M** | **Assisted marking** | **Human decides fully.** The user places every mark on the cycle chart themselves. | The app provides visualization and arithmetic: baseline/coverline from the six prior low measurements, counts, phase lines, statistics — it computes only, it never suggests or interprets autonomously. | **Planned default product shape** — recorded in [ADR-001](../adr/0001-iner-mode-m-hypothesis.md) with status **Hypothesis** (a tool-role working assumption to be validated with INER experts, not an INER resolution). |
+| **M** | **Assisted marking** | **Human decides fully.** The user places every mark on the cycle chart themselves. | The app provides visualization and arithmetic: baseline/coverline from the six prior low measurements, counts, phase lines, statistics — it computes only, it never suggests or interprets autonomously. | **Current product shape** — recorded in [ADR-0001](../adr/0001-iner-mode-m-hypothesis.md) with status **Accepted** (owner decision, 2026-09-19, not an INER-endorsed resolution). |
 | **S** | Suggest + override | Human decides, informed by app suggestions. | The app suggests marks/phases per a **rules engine**; the user can override every suggestion. | Explicitly deferred. |
 | **A** | Automatic | App evaluates per a **rules engine** + **trust concept**. | The app places marks and evaluates automatically; the human supervises. | Explicitly deferred. |
 
-Mode M is the planned default: the user stays fully in charge — the app only
-does the arithmetic the user would otherwise do by hand (baseline
-calculations, counts, lines, statistics).
+Mode M is the current product shape: the user stays fully in charge — the app
+only does the arithmetic the user would otherwise do by hand (baseline
+calculations, counts, lines, statistics), and it warns about arithmetic
+anomalies instead of giving a fertility verdict.

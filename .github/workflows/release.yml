@@ -1,0 +1,143 @@
+name: Release
+
+# Tag-triggered signed-release pipeline per ADR-0009 (amended): a `vX.Y.Z`
+# tag push builds signed Android artifacts in CI, with the release keystore
+# provisioned from GPG-encrypted GitHub Actions secrets.
+#
+# PREREQUISITE: the five repository secrets below must exist BEFORE the
+# first tag push (see docs/release.md, "CI release path"):
+#   RELEASE_KEYSTORE_GPG_BASE64, RELEASE_KEYSTORE_PASSPHRASE,
+#   RELEASE_KEYSTORE_KEY_ALIAS, RELEASE_KEYSTORE_KEY_PASSWORD,
+#   RELEASE_KEYSTORE_STORE_PASSWORD
+# The local keystore and its offline backups remain authoritative
+# (ADR-0009 custody rules); CI consumes a copy, it never owns the key.
+#
+# Dry runs: trigger manually via workflow_dispatch.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # softprops/action-gh-release creates the GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install sqlite3 (database test suite)
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
+      # Full correctness gate — a release tag never ships untested code.
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Test
+        run: flutter test
+
+      # Pre-flight: refuse to run without the secrets. Without this check,
+      # Gradle would silently fall back to the debug signing config and a
+      # debug-signed APK would end up attached to a public Release
+      # (docs/release.md, "CI release path").
+      - name: Pre-flight — all release secrets must be set
+        run: |
+          required=(
+            RELEASE_KEYSTORE_GPG_BASE64 RELEASE_KEYSTORE_PASSPHRASE
+            RELEASE_KEYSTORE_KEY_ALIAS RELEASE_KEYSTORE_KEY_PASSWORD
+            RELEASE_KEYSTORE_STORE_PASSWORD
+          )
+          missing=0
+          for var in "${required[@]}"; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Secret ${var} is not set — refusing to build."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+        env:
+          RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
+          RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
+          RELEASE_KEYSTORE_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_KEY_ALIAS }}
+          RELEASE_KEYSTORE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_STORE_PASSWORD }}
+
+      # Keystore provisioning: everything is written into $RUNNER_TEMP only,
+      # so the decrypted keystore never outlives the job and never lands
+      # outside that directory on the runner. The passphrase is fed to GPG
+      # on file descriptor 0, never as a command-line argument (the latter
+      # would be readable by any process on the runner via the process list).
+      - name: Decode keystore to a temporary file
+        run: |
+          printf '%s' "$RELEASE_KEYSTORE_PASSPHRASE" | \
+            gpg --quiet --batch --yes --decrypt \
+              --passphrase-fd 0 \
+              --output "$RUNNER_TEMP/cycleapp-release.jks" \
+              <(printf '%s' "$RELEASE_KEYSTORE_GPG_BASE64" | base64 -d)
+        env:
+          RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
+          RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
+
+      # Generated for the Gradle signing config; never committed
+      # (android/.gitignore covers it) and never written outside $RUNNER_TEMP.
+      - name: Write key.properties (gitignored, generated)
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/cycleapp-release.jks
+          storePassword=$RELEASE_KEYSTORE_STORE_PASSWORD
+          keyAlias=$RELEASE_KEYSTORE_KEY_ALIAS
+          keyPassword=$RELEASE_KEYSTORE_KEY_PASSWORD
+          EOF
+        env:
+          RELEASE_KEYSTORE_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_KEY_ALIAS }}
+          RELEASE_KEYSTORE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_STORE_PASSWORD }}
+
+      - name: Build universal release APK
+        run: flutter build apk --release
+
+      - name: Build app bundle (AAB)
+        run: flutter build appbundle --release
+
+      # Prints the signing certificate fingerprint — this goes into the
+      # release notes as the trust anchor (F-Droid metadata cross-checks it).
+      # apksigner ships with the runner's preinstalled Android SDK
+      # build-tools but is not on PATH — resolve the newest one.
+      - name: Verify APK signature
+        run: |
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$apksigner" verify --print-certs \
+            build/app/outputs/flutter-apk/app-release.apk
+
+      # AAB is uploaded as a workflow artifact; the Play upload itself stays
+      # a manual step for now (Phase F discipline, docs/release.md).
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-bundle
+          path: build/app/outputs/bundle/release/app-release.aab
+
+      # Universal APK attached to the GitHub Release with auto-generated
+      # notes. NOTE: even with tagged CI releases, the device upgrade test
+      # (docs/release.md checklist) stays mandatory before a release counts
+      # as "shipped".
+      - name: Attach APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
+          draft: false

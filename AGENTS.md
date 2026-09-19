@@ -49,6 +49,20 @@ single durable mapping of those IDs. Therefore:
 
 ## Running tests
 
+In a fresh checkout or git worktree, run `flutter pub get` before any
+`flutter`/`dart` command (`.dart_tool/` is not version-controlled).
+
+### Reusable worktrees
+
+Numbered sibling worktrees are reused across tasks:
+`/home/benediktb/Repositories/cycle-app-wt<NN>` (`wt1`, `wt2`, …). Check
+`git worktree list` first and reuse the first free number; create a missing
+one from the main repo with `git worktree add ../cycle-app-wt<NN> -b
+<branch>` (branch name from the task, e.g. `wt/diary-tab-cleanup`). Never
+clobber an occupied or dirty tree — report back instead. After creating a
+fresh worktree, run `flutter pub get` there (see above) before any
+`flutter`/`dart` command.
+
 Run tests with `flutter test`; the default `compact` reporter redraws one
 line with carriage returns, so captured agent logs end up mangled and
 failures only surface in a summary at the end. Instead:
@@ -56,9 +70,11 @@ failures only surface in a summary at the end. Instead:
 - **Iteration** (fixing one thing, fast loop):
   `flutter test test/domain/<file>_test.dart --fail-fast --no-pub -r expanded`
   (`--plain-name '<substring>'` or `--name '<regexp>'` to narrow further).
-- **Full gate** before "done" (matches CI):
+- **Full gate** before "done" (matches CI): run `flutter analyze`, then
+  `dart format --output=none --set-exit-if-changed .`, then
   `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
-  suite still runs.
+  suite still runs. All three are judged by exit code only (the format
+  check exits non-zero when any file would be reformatted).
 - **Judge by the exit code, not the text.** `flutter test` exits non-zero on
   failure; a green-looking log tail can still hide a failure (and packages
   like `libsqlite3-dev` missing on Linux fail the `test/db/` suite at load

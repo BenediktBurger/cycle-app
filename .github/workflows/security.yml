@@ -1,0 +1,38 @@
+name: Security
+
+# Weekly OSV scan of the resolved dependency set (pubspec.lock) against the
+# OSV.dev database; results land in the "Security > Code scanning" tab.
+# Non-blocking on purpose: the scanner is wired to warn, not to gate, until
+# the first clean run confirms the scan works on this repository.
+on:
+  # Weekly Monday morning UTC run.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  # Also scan when the dependency set actually changes. Tradeoff: these runs
+  # do the same full scan (not a PR-diff scan) and cost a few extra
+  # runner minutes — acceptable for the small number of pubspec edits here.
+  push:
+    paths: ["pubspec.yaml", "pubspec.lock"]
+  pull_request:
+    paths: ["pubspec.yaml", "pubspec.lock"]
+
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Required to write results to the Security > Code scanning tab.
+  security-events: write
+  contents: read
+
+jobs:
+  dependency-vulnerabilities-osv:
+    name: Dependency vulnerabilities (OSV)
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.6.0"
+    with:
+      # Guard: scanner failures and findings do not fail the workflow yet.
+      # Flip this to true (blocking) after the first clean run.
+      fail-on-vuln: false
+    permissions:
+      actions: read
+      security-events: write
+      contents: read

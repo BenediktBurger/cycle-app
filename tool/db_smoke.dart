@@ -16,8 +16,10 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -50,66 +52,134 @@ Future<void> main() async {
   final db = CycleDatabase(NativeDatabase.memory());
 
   // --- schema & migration ---------------------------------------------
-  final profiles = await db.profilesDao.allProfiles();
-  check(profiles.length == 1 && profiles.single.name == 'main',
-      'seeds exactly one profile named main');
+  final tables = await db
+      .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .get();
+  final tableNames = tables.map((r) => r.data['name'] as String).toSet();
+  check(
+      tableNames.contains('cycle_entries') &&
+          tableNames.contains('user_marks') &&
+          !tableNames.contains('profiles'),
+      'schema v9 is profile-free (no profiles table)');
 
   var rejected = false;
   try {
-    await db.customStatement(
-        'INSERT INTO cycle_entries (profile_id, date, mucus_sign) '
-        "VALUES (1, 20000, 'wet')");
+    await db.customStatement('INSERT INTO cycle_entries (date, mucus_sign) '
+        "VALUES (20000, 'wet')");
   } catch (_) {
     rejected = true;
   }
   check(rejected, 'mucus_sign CHECK rejects out-of-vocabulary token');
   rejected = false;
   try {
-    await db.customStatement(
-        'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
-        "mucus_quality) VALUES (1, 20003, 'f', 'w')");
+    await db.customStatement('INSERT INTO cycle_entries (date, mucus_sign, '
+        "mucus_quality) VALUES (20003, 'fs', 'w')");
   } catch (_) {
     rejected = true;
   }
-  check(rejected, 'mucus_quality CHECK rejects quality without the S sign');
+  check(rejected, "mucus_quality CHECK rejects a quality on the 'fs' sign");
   // Sanity: in-vocabulary writes go through (S with a quality qualifier).
-  await db.customStatement(
-      'INSERT INTO cycle_entries (profile_id, date, mucus_sign, '
-      "mucus_quality) VALUES (1, 20001, 's', 'ew')");
+  await db.customStatement('INSERT INTO cycle_entries (date, mucus_sign, '
+      "mucus_quality) VALUES (20001, 's', 'ew')");
 
+  // temp_disturbances: the engine CHECK keeps the raw mask inside the
+  // TempDisturbance vocabulary — exactly the 4 bits, so both 16 and any
+  // negative fail; a row written without the field reads the default 0.
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, '
+        'temp_disturbances) VALUES (20005, 16)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'temp_disturbances CHECK rejects masks above 15');
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, '
+        'temp_disturbances) VALUES (20006, -1)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'temp_disturbances CHECK rejects negative masks');
+
+  // cervix_firmness: the engine CHECK accepts exactly the CervixFirmness
+  // enum-name tokens (or NULL) — nothing else gets in.
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, '
+        "cervix_firmness) VALUES (20004, 'squishy')");
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'cervix_firmness CHECK rejects out-of-vocabulary token');
+
+  // sex_timings: the engine CHECK keeps the mask inside the SexTiming
+  // vocabulary — exactly the 3 bits, so both 8 and any negative fail.
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, sex_timings) '
+        'VALUES (20007, 8)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'sex_timings CHECK rejects masks above 7');
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, sex_timings) '
+        'VALUES (20008, -1)');
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'sex_timings CHECK rejects negative masks');
+
+  // Sanity: the Ausfluss sign 'a' is in vocabulary — and carries NO quality
+  // (the quality CHECK rejects any quality on a sign other than S).
+  await db.customStatement('INSERT INTO cycle_entries (date, mucus_sign) '
+      "VALUES (20009, 'a')");
+  rejected = false;
+  try {
+    await db.customStatement('INSERT INTO cycle_entries (date, mucus_sign, '
+        "mucus_quality) VALUES (20010, 'a', 'w')");
+  } catch (_) {
+    rejected = true;
+  }
+  check(rejected, 'mucus_quality CHECK rejects a quality on the A sign');
+
+  // A duplicate same-day insert that bypasses the upsert hits the (date)
+  // unique index; so does a duplicate (entry_date, mark_type) mark insert.
+  await db.entriesDao.upsertByDate(dailyEntryToCompanion(DailyEntry(
+    date: DateTime(2026, 3, 1),
+    bleeding: Bleeding.medium,
+    bbtC: 36.1,
+  )));
   rejected = false;
   try {
     await db.into(db.cycleEntries).insert(
-          CycleEntriesCompanion.insert(
-            date: DateTime(2026, 3, 1),
-            profileId: const Value(99),
-          ),
+          CycleEntriesCompanion.insert(date: DateTime(2026, 3, 1)),
         );
   } catch (_) {
     rejected = true;
   }
-  check(rejected, 'foreign key rejects unknown profile');
+  check(rejected, 'unique (date) index rejects duplicate entry insert');
 
   // --- EntriesDao upsert -----------------------------------------------
-  final first = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
-    DailyEntry(
-      date: DateTime(2026, 3, 1),
-      bleeding: Bleeding.medium,
-      bbtC: 36.1,
-    ),
-  ));
+  final first =
+      await db.entriesDao.upsertByDate(dailyEntryToCompanion(DailyEntry(
+    date: DateTime(2026, 3, 1),
+    bleeding: Bleeding.medium,
+    bbtC: 36.1,
+  )));
   await Future<void>.delayed(const Duration(milliseconds: 1100));
-  final second = await db.entriesDao.upsertByDate(dailyEntryToCompanion(
-    DailyEntry(
-      date: DateTime(2026, 3, 1),
-      bleeding: Bleeding.none,
-      bbtC: 36.8,
-      notes: 'changed',
-    ),
-  ));
-  // NOTE: the earlier mucus-CHECK probe inserted an extra row for another
-  // day, so assert on the specific day's row count, not the whole table.
-  final marFirstRows = (await db.entriesDao.allEntries(1))
+  final second =
+      await db.entriesDao.upsertByDate(dailyEntryToCompanion(DailyEntry(
+    date: DateTime(2026, 3, 1),
+    bleeding: Bleeding.none,
+    bbtC: 36.8,
+    notes: 'changed',
+  )));
+  // NOTE: the earlier mucus-CHECK probes inserted extra rows for other
+  // days, so assert on the specific day's row count, not the whole table.
+  final marFirstRows = (await db.entriesDao.allEntries())
       .where((r) => r.date.day == 1 && r.date.month == 3)
       .toList();
   check(marFirstRows.length == 1, 're-upsert keeps one row per day');
@@ -119,37 +189,50 @@ Future<void> main() async {
   check(!second.updatedAt.isBefore(second.createdAt),
       'updated_at >= created_at after replace');
 
-  rejected = false;
-  try {
-    await db.into(db.cycleEntries).insert(
-          CycleEntriesCompanion.insert(date: DateTime(2026, 3, 1)),
-        );
-  } catch (_) {
-    rejected = true;
-  }
-  check(rejected, 'unique (profile,date) index rejects duplicate insert');
-
   // --- daily round trip -------------------------------------------------
   final input = DailyEntry(
     date: DateTime(2026, 6, 15),
     bbtC: 36.55,
     bleeding: Bleeding.spotting,
-    excludeIllness: true,
-    excludeAlcohol: true,
-    excludeTravel: true,
-    excludeOther: true,
+    tempDisturbances: TempDisturbance.sp.bit |
+        TempDisturbance.a.bit |
+        TempDisturbance.alk.bit |
+        TempDisturbance.kr.bit,
     mucusSign: MucusSign.s,
     mucusQuality: MucusQuality.gl,
-    cervix: 'closed, low',
-    pain: true,
-    mood: true,
-    desire: true,
-    sex: true,
+    cervixPosition: CervixPosition.veryHigh,
+    cervixOpening: CervixOpening.open,
+    painBreast: true,
+    painMittelschmerz: true,
+    cervixFirmness: CervixFirmness.halfSoft,
+    sexTimings: SexTiming.start.bit | SexTiming.end.bit,
     notes: 'Notiz am Rande.',
   );
   final mappedBack =
       dailyEntryFromDrift(await db.entriesDao.upsertDaily(input));
   check(mappedBack == input, 'domain round trip via drift preserves entry');
+  // The Muttermund options are stored as their TEXT enum-name tokens (the
+  // masks as the raw INTEGER OR of the flag bits).
+  final cervixTokens = await db.customSelect(
+      'SELECT cervix_position, cervix_opening, cervix_firmness, '
+      'sex_timings, temp_disturbances FROM cycle_entries WHERE date = ?',
+      variables: [
+        Variable.withInt(DateOnly.normalize(DateTime(2026, 6, 15))
+            .difference(DateTime.utc(1970))
+            .inDays)
+      ]).getSingle();
+  check(cervixTokens.data['cervix_position'] == 'veryHigh',
+      'raw cervix_position token is the enum name');
+  check(cervixTokens.data['cervix_opening'] == 'open',
+      'raw cervix_opening token is the enum name');
+  check(cervixTokens.data['cervix_firmness'] == 'halfSoft',
+      'raw cervix_firmness token is the enum name');
+  check(
+      cervixTokens.data['sex_timings'] ==
+          SexTiming.start.bit | SexTiming.end.bit,
+      'raw sex_timings is the SexTiming bitmask');
+  check(cervixTokens.data['temp_disturbances'] == 15,
+      'raw temp_disturbances is the TempDisturbance mask');
 
   // --- bleeding levels: all five levels round-trip the drift layer --------
   // The stored number is Bleeding.level (0 none … 4 heavy), mapped through
@@ -173,9 +256,8 @@ Future<void> main() async {
   check(rawHeavy.data['bleeding'] == 4,
       'raw stored bleeding value is the numeric level (4 for heavy)');
   await db.customStatement(
-    'INSERT INTO cycle_entries (profile_id, date, bleeding) '
-    'VALUES (?, ?, ?)',
-    [1, heavyDay + 1, 3],
+    'INSERT INTO cycle_entries (date, bleeding) VALUES (?, ?)',
+    [heavyDay + 1, 3],
   );
   final rawMedium = await db.customSelect(
       'SELECT bleeding FROM cycle_entries WHERE date = ?',
@@ -184,30 +266,39 @@ Future<void> main() async {
       'raw int insert (3) is stored verbatim in the int column');
 
   // --- MarksDao ----------------------------------------------------------
-  final mark = await db.marksDao
-      .addMark(1, DateTime(2026, 3, 12), MarkTypes.mucusPeakDay);
+  final mark =
+      await db.marksDao.addMark(DateTime(2026, 3, 12), MarkTypes.mucusPeakDay);
   check(mark.author == 'user', 'mark default author is user');
-  final again = await db.marksDao
-      .addMark(1, DateTime(2026, 3, 12), MarkTypes.mucusPeakDay);
-  check(mark.id == again.id, 'addMark is idempotent');
+  final again =
+      await db.marksDao.addMark(DateTime(2026, 3, 12), MarkTypes.mucusPeakDay);
+  check(mark.id == again.id, 'addMark is idempotent per (date, type)');
   check(
-      await db.marksDao.toggleMark(1, DateTime(2026, 4, 9), MarkTypes.baseline),
-      'toggleMark adds');
+    await db.marksDao
+        .toggleMark(DateTime(2026, 4, 9), MarkTypes.ignoreTemperature),
+    'toggleMark adds',
+  );
   check(
-      !await db.marksDao
-          .toggleMark(1, DateTime(2026, 4, 9), MarkTypes.baseline),
-      'toggleMark removes');
+    !await db.marksDao
+        .toggleMark(DateTime(2026, 4, 9), MarkTypes.ignoreTemperature),
+    'toggleMark removes',
+  );
 
   // --- cycle grouping ------------------------------------------------------
   DailyEntry d(int y, int m, int day,
-      {Bleeding bleeding = Bleeding.none, bool interrupted = false}) {
+      {Bleeding bleeding = Bleeding.none, int tempDisturbances = 0}) {
     return DailyEntry(
       date: DateTime(y, m, day),
       bleeding: bleeding,
-      excludeIllness: interrupted && bleeding == Bleeding.medium,
-      excludeTravel: interrupted && bleeding != Bleeding.medium,
+      tempDisturbances: tempDisturbances,
     );
   }
+
+  // Cycle grouping is MARK-driven: a cycleStart mark opens a group wherever
+  // it sits; bleeding alone (spotting included) never creates a boundary.
+  List<CycleMark> starts(List<(int, int, int)> days) => [
+        for (final (y, m, dd) in days)
+          CycleMark(date: DateTime(y, m, dd), type: MarkTypes.cycleStart),
+      ];
 
   final entries = [
     d(2026, 3, 2, bleeding: Bleeding.medium),
@@ -218,31 +309,57 @@ Future<void> main() async {
     d(2026, 4, 27, bleeding: Bleeding.medium),
     d(2026, 4, 28),
   ];
-  final cycles = groupIntoCycles(entries);
-  check(cycles.length == 3, 'three cycles grouped');
-  check(cycles.every((c) => c.startsAtMenstruation), 'all cycles bounded');
+
+  final marks = starts([(2026, 3, 2), (2026, 3, 30), (2026, 4, 27)]);
+  final cycles = groupIntoCycles(entries, marks);
+  check(cycles.length == 3, 'three cycles grouped at the cycleStart marks');
+  check(cycles.every((c) => c.startsAtMenstruation),
+      'all cycles opened by marks');
   check(
-    eq(menstruationOnsetDates(entries).map((e) => e.day).toList(), [2, 30, 27]),
-    'onsets: spotting day is NOT a boundary (${menstruationOnsetDates(entries)})',
+    eq(menstruationOnsetDates(entries, marks).map((e) => e.day).toList(),
+        [2, 30, 27]),
+    'onsets: the cycleStart marks anchor the starts',
   );
 
-  // interrupted period day does not start a cycle
-  final interrupted = [
-    d(2026, 4, 1, bleeding: Bleeding.medium),
-    d(2026, 4, 29, bleeding: Bleeding.medium, interrupted: true),
-    d(2026, 4, 30, bleeding: Bleeding.medium),
-  ];
+  // Without marks the bleeding sequence is ONE leading group.
   check(
-    menstruationOnsetDates(interrupted).length == 2 &&
-        menstruationOnsetDates(interrupted)[1].day == 30,
-    'excluded bleeding day does not start a cycle',
+    groupIntoCycles(entries, const []).length == 1,
+    'bleeding alone never opens a group (one group without marks)',
+  );
+
+  // A mark on an untracked gap day opens the group at the next tracked day.
+  final gapEntries = [d(2026, 3, 1), d(2026, 3, 5)];
+  final gapCycles = groupIntoCycles(gapEntries, starts([(2026, 3, 3)]));
+  check(
+    gapCycles.length == 2 &&
+        gapCycles[1].startDate.day == 5 &&
+        gapCycles[1].startsAtMenstruation,
+    'a mark in an untracked gap opens at the next tracked day',
+  );
+
+  // Suggestion suppression is keyed PURELY to bleeding continuity
+  // (temperature-only semantics): raw disturbance flags and the
+  // ignoreTemperature mark are both invisible to the predicate.
+  check(
+    isSuggestedCycleStart(
+      d(2026, 4, 1, bleeding: Bleeding.medium, tempDisturbances: 15),
+      null,
+    ),
+    'raw disturbance flags never reach the suggestion predicate',
+  );
+  check(
+    isSuggestedCycleStart(d(2026, 4, 1, bleeding: Bleeding.medium), null),
+    'an ignoreTemperature-marked day still suggests a cycle start',
   );
 
   // --- statistics ---------------------------------------------------------
-  // 28-day entries have 3 onsets -> 2 interval lengths; add a 4th onset to
-  // exercise the third interval (mirrors threeCycleData in the test suite).
+  // The marked starts (3 onsets within the entry range) -> 2 lengths; add a
+  // 4th mark to exercise the third interval (mirrors threeCycleData in the
+  // test suite).
   final statsEntries = [...entries, d(2026, 5, 25, bleeding: Bleeding.medium)];
-  final lengths = cycleLengthsInDays(statsEntries);
+  final statsMarks =
+      starts([(2026, 3, 2), (2026, 3, 30), (2026, 4, 27), (2026, 5, 25)]);
+  final lengths = cycleLengthsInDays(statsEntries, statsMarks);
   check(eq(lengths, [28, 28, 28]), 'cycle lengths 28/28/28 ($lengths)');
   final summary = summarizeCycleLengths(lengths);
   check(

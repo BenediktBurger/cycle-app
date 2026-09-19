@@ -11,40 +11,6 @@ ephemeral and not versioned — this roadmap is therefore the only durable
 record of those IDs. They appear here and nowhere else: not in code
 comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
 
-## Milestone 1 — Phase 1 (app shell)
-
-- [ ] CI green on GitHub (`flutter analyze` + `flutter test` +
-      `flutter build web`)
-
-## Phase 2 — data layer & real screens (WP2.x)
-
-- [x] **WP2.2 / WP2.2.1** — `openCycleDatabase()` wired: native = lazy
-      background-isolate file DB, web = drift wasm (`web/sqlite3.wasm` +
-      `web/drift_worker.js` vendored); wrapped as the Riverpod
-      `databaseProvider` behind the splash gate
-- [x] **WP2.2 (web)** — wasm + worker assets vendored from the drift 2.35.0
-      release; run note updated in [CONTRIBUTING.md](../CONTRIBUTING.md) §3
-- [x] **WP2.2.2** — language switcher (de/en) in settings; in-memory only
-      (resets to the system default on reload — documented limitation)
-- [x] **WP2.2.3** — JSON export/import in settings: copy-text path on all
-      platforms, browser download + file input on web, home-directory file
-      on desktop; merge policy (profile, date) = overwrite with counts
-- [x] **WP2.2.4** — real Tagebuch entry form (full field set incl. the
-      NFP mucus mapping table, marked as a review-pending assumption)
-- [x] **WP2.2.5** — Tagebuch entries list grouped by cycle: live entry
-      stream → domain cycle grouping, newest cycle first; per-day tiles
-      carry bleeding/exclusion/BBT/NFP/notes and load the day back into
-      the entry form on tap
-- [x] **WP2.2.6** — Zyklus temperature curve (fl_chart) + bleeding/mucus
-      symbol row; tapping a day opens the entry form on that date
-- [x] **WP2.2.7** — real Statistik screens — **arithmetic only**, no
-      interpretive or status conclusions (flagged for INER expert review,
-      ADR-001)
-
-Manual acceptance for each Phase-2 screen (once wired): data survives a page
-reload (persistence), language switch reflects immediately, export/import
-round-trips, Statistik shows arithmetic only.
-
 ## Backlog — issues & improvements
 
 Collector for real issues and improvement ideas that are not (yet) part of a
@@ -57,49 +23,75 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-- [ ] Temperature curve only connects measurements on *consecutive* days:
-      when a day without a measurement lies between two measured days, the
-      line breaks. It should connect across the gap.
-
 ### Necessary
 
-- [ ] Analysis marks storage & UI: place evaluation marks (cervix peak etc.); the "first
-      higher measurement" adds the baseline automatically, based on the preceding measurements
-      User can add marks on the cycle tab: for cervix peak (Schleimhöhepunkt), a circle, and higher temperature: circle around temperature measurement (if after cervix peak) or arrow up if before. Selecting a temperature rise should number the previous six days and draw the baseline according to the cheat sheet rules
-- Data entry aligned with the NER scheme: time of day for sex
-  (morning/midday/evening), … — the exact term list must be specified first.
-  - show sex as an X (and distinguish moring/afternoon)
-  - exclude temperature and a note or keep these different reasons
-  - add "Ausfluss" (A) as an option to mucus
-- Building the actual app (as captured: "building an app" — scope to be
-  clarified: release/packaging vs. remaining placeholder screens).
-- Datenbankschema überarbeiten (manche Dinge pro Zyklus (erste höhere Messung)/als Event (z.B: Messmethode) nicht pro Tag speichern? )
-- mark "exclude" (Temperatur, Blutung) als negative Zahl?
-- [ ] Muttermund Beobachtung ermöglichen mit verschiedenen Positionen auf Chart anzeigen
-- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md)
-- pdf export for consultants (one cycle per sheet?)
-- [ ] show on cycle tab only as many days as can be rendered usefully, allow to scroll and to jump to a certain date
-- [ ] show on cycle tab day of month (and replace the first day with a short form of the month) and day of cycle
-- [ ] drip importer: only sex with partner without contraception is mapped to sex
-- [ ] drip importer: ovulation pain translates to Mittelschmerz (M)
-- [ ] contributing.md: intro that it is very appreciated and that there are many ways like translations, bug reports / feature suggestions, fixing texts, improving ui, implementing features... Also what is expected from contributors
-- [ ] only store time if temperature is added (not for mucus etc.)
-- [ ] show temperature measurement time, sex, and pain (M, B) on cycle tab
-- bleeding should not always start a new cycle. Either choose to ignore bleeding (opt out) or active choice to start a new cycle (maybe suggested at the first bleeding: do you want to start?)
+#### Building the app
+
+- Building the actual app — release/packaging scope has been resolved into a
+  runbook: see [`docs/release.md`](release.md) and
+  [ADR-0009](adr/0009-release-pipeline-and-signing.md); the ready items are
+  below, the blocked ones are plain bullets.
+- [ ] Android toolchain: JDK 21 + Android command-line-tools SDK on the dev
+  machine, `flutter doctor` green, release APK builds (release.md Phase A)
+- [ ] Create the release keystore outside the repo, fill the gitignored
+  `key.properties` (the gradle signing wiring is already in place),
+  verify the signed release APK with `apksigner` (release.md Phase C)
+- [ ] Adaptive launcher icon replacing the default template mipmaps
+  (release.md Phase B)
+- License choice for the app (release.md Gate G2) — the remaining blocker
+  for the F-Droid submission; sideload APKs are not blocked. The
+  application identity is resolved (`io.github.benediktburger.cycleapp`,
+  release.md Gate G1), so this is the last open gate before store
+  submissions; needs an owner decision (GPL-3-compatible intent per
+  README).
+- [ ] Sideload APK + device upgrade test (old release with data → install
+  new release → migrations preserve cycle data) as repeatable discipline
+  (release.md Phase D, per-release checklist)
+- [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
+- choose and set a license
+
+#### Domain / UI
+
+- Cycle-length statistics during a very long mark-driven cycle: during
+  pregnancy a cycle runs arbitrarily long (day-of-cycle > 100 on the
+  chart) and skews cycle-length statistics — `cycleLengthsInDays`
+  (`lib/domain/statistics.dart`) computes lengths as gaps between
+  consecutive cycle-start marks, so the next mark after a pregnancy
+  yields one length spanning the whole pregnancy. Needs discussion how to
+  treat such spans (cap, exclusion, pregnancy marker) — an expert/ADR
+  question.
+- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
+- [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
+- [ ] add the number of cycle to the cycle page somewhere to the cycle start (add a setting for numbers of observed cycles outside this app)
+- [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
+- [ ] cycle: make it possible to click another day without deselecting the first one (maybe add a button to close day options)
+- [ ] add necessary DSVGO notice
+- [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
 
 ### Convenience
 
-- [ ] Dark mode, following the device setting.
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- Import from drip
-- [ ] Wochenende farblich hervorheben
-- [ ] make mode selectable: light mode, dark mode, system setting
-- exclude unabhängig von krank etc machen
+- [ ] persist language and mode choices
+- Settings persistence needs a storage decision before any of these
+  items becomes startable: candidate is a drift key-value settings
+  table (`schemaVersion` bump), alternative platform preferences
+  (e.g. `shared_preferences`). Scope is ONE batch — language and mode
+  choices plus the temperature range (the chart's range setting lands
+  in-memory first, deliberately resetting on start; its persistence is
+  deferred into this same batch).
+- [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
-- Messmethode speichern (rektal...)? einmal nur (am Anfang) oder als Event (wenn man ändert)?
-- [ ] adjust variable names in internationalization to English (if applicable and advisable), make it coherent with the tab name
-- add descriptions (texts TBD) and tooltips
+- Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
+- add descriptions (texts TBD) and tooltips, welcome page, links, help, copyright...
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?
+- [ ] review test suite and clean it up
+- drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
+
+- Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
+- The cycle-summary table's "period start" row label still says period
+  start, while the marked cycle start may sit on a bleeding-free day —
+  wording follow-up; the new label wording should be settled first with the
+  ADR-0008 open question (c) expert review (needs expert wording).
