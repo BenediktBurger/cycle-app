@@ -3,7 +3,7 @@
 // temperatures — the rule set the temperature chart draws by. The
 // interruption flag comes from the IGNORED-DAY-INDEX set passed to
 // curveRuns: the set is computed by the chart from the ignoreTemperature
-// marks (owner decision 4, 2026-09-19 — the MARK is the rendering key, not
+// marks (owner decision 2026-09-19 — the MARK is the rendering key, not
 // the raw tempDisturbances mask). A flagged day whose mark was removed
 // renders normally; a marked day without flags renders lighter.
 import 'package:cycle_app/domain/models.dart';

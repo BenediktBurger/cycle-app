@@ -38,9 +38,12 @@ class CycleEntries extends Table {
   /// vocabulary): one INTEGER mask, the OR of the [TempDisturbance] bits —
   /// sp(1) late to bed, a(2) frequent night awakening, alk(4) alcohol,
   /// kr(8) illness. 0 = no disturbance. Reise (travel) is deliberately NOT
-  /// representable. This is RAW data for the interrupted-temperature
-  /// rendering; the temperature evaluation uses the separate
-  /// ignoreTemperature MARK (user_marks), never this mask.
+  /// representable. This is RAW data whose remaining visual consumer is
+  /// the Tagebuch list's interrupted-day badge (the temperature curve is
+  /// MARK-keyed since owner decision 2026-09-19 — the ignoreTemperature
+  /// mark dims the curve, never this mask); the temperature evaluation
+  /// uses the
+  /// separate ignoreTemperature MARK (user_marks).
   /// customConstraint replaces drift's own constraints, so NOT NULL, the
   /// default 0 and the 0..15 range check are written out explicitly inside
   /// the constraint string (a bare CHECK would silently drop both). The

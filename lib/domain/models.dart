@@ -113,12 +113,14 @@ enum SexTiming {
 /// `temp_disturbances` and in the export document key `temp_disturbances`;
 /// the db mapping MUST go through `bit`, never the Dart declaration index.
 /// NOTE the vocabulary decision: Reise (travel) is NOT representable — the
-/// old exclusion-reason booleans are gone, and this mask is RAW data for
-/// the interrupted-temperature rendering. The temperature evaluation uses
-/// the separate ignoreTemperature MARK (see lib/domain/evaluation.dart),
-/// which the diary save auto-sets (idempotently) whenever a flag is
-/// selected; cycle-start suggestions are untouched by both (bleeding
-/// continuity only).
+/// old exclusion-reason booleans are gone. This mask is RAW data whose
+/// remaining visual consumer is the Tagebuch list's interrupted-day badge
+/// (the temperature curve is MARK-keyed since owner decision 2026-09-19: the
+/// ignoreTemperature mark, not this mask, dims the curve). The temperature
+/// evaluation uses the separate ignoreTemperature MARK (see
+/// lib/domain/evaluation.dart), which the diary save auto-sets
+/// (idempotently) whenever a flag is selected; cycle-start suggestions are
+/// untouched by both (bleeding continuity only).
 enum TempDisturbance {
   /// Late to bed ("spät ins Bett").
   sp(1),
@@ -224,10 +226,11 @@ final class DailyEntry {
 
   /// Raw disturbance flags of the day, as a bitmask of [TempDisturbance.bit]
   /// values (0 = no disturbance; 1 sp / 2 a / 4 alk / 8 kr; OR-combined for
-  /// multiple disturbances on one day). RAW data: it drives the
-  /// interrupted-temperature chart rendering, but NEVER the temperature
-  /// evaluation — that is the ignoreTemperature mark (see
-  /// lib/domain/evaluation.dart).
+  /// multiple disturbances on one day). RAW data: its remaining visual
+  /// consumer is the Tagebuch list's interrupted-day badge — the
+  /// temperature curve is MARK-keyed (the ignoreTemperature mark dims it,
+  /// see lib/ui/cycle_curve.dart) and the temperature evaluation ignores
+  /// marked days entirely (see lib/domain/evaluation.dart).
   final int tempDisturbances;
 
   /// Fertility sign observed on the day (t / Ø-nichts / f / S / f/S
@@ -269,10 +272,11 @@ final class DailyEntry {
   final String? notes;
 
   /// True when the day carries at least one raw disturbance flag, i.e. the
-  /// temperature is interrupted (rendering input — the chart draws the
-  /// touching segments and the dot lighter). The temperature EVALUATION
-  /// uses the separate ignoreTemperature mark; this getter must not be
-  /// used for it (see lib/domain/evaluation.dart).
+  /// temperature is interrupted (the input of the Tagebuch list's
+  /// interrupted-day badge — the curve renders MARK-keyed since owner
+  /// decision 4, and the temperature EVALUATION uses the separate
+  /// ignoreTemperature mark; neither consumes this getter — see
+  /// lib/domain/evaluation.dart).
   bool get isInterrupted => tempDisturbances != 0;
 
   DailyEntry copyWith({

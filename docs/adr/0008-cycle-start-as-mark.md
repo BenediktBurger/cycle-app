@@ -23,14 +23,17 @@
 > evaluation arithmetic (lib/domain/evaluation.dart) treats a marked day
 > like an unmeasured one in the six-low window, the candidate gap walk
 > and the rise-consistency check. The old exclude_* raw flags are gone;
-> the raw disturbance mask is rendering input only
-> (lib/domain/models.dart), so open question (a)'s "exclusion flags
-> never block it" now reads "the temperature-ignore mark never blocks
-> it" (unchanged behavior). `isSuggestedCycleStart(entry, previous)` no
-> longer takes an excluded-state parameter: the suppression is keyed
-> PURELY to bleeding continuity (a day whose previous calendar day also
-> bleeds at level >= 2 is mid-flow), which is what (b)'s
-> "non-excluded day" means today — a marked bleeding day still suggests.
+> since owner decision 2026-09-19 the `ignoreTemperature` mark is
+> ALSO the temperature curve's rendering input — marked days render
+> lighter, and the raw disturbance mask survives only as the Tagebuch
+> list's interrupted-day badge input (lib/domain/models.dart) — so open
+> question (a)'s "exclusion flags never block it" now reads "the
+> temperature-ignore mark never blocks it" (unchanged behavior).
+> `isSuggestedCycleStart(entry, previous)` no longer takes an
+> excluded-state parameter: the suppression is keyed PURELY to bleeding
+> continuity (a day whose previous calendar day also bleeds at level >= 2
+> is mid-flow), which is what (b)'s "non-excluded day" means today — a
+> marked bleeding day still suggests.
 
 ## Context
 
@@ -45,7 +48,13 @@ pattern (e.g. the user wants the cycle to start on a day without bleeding,
 or does not want every first menstruation-level day after a bleeding-free
 day to end the previous cycle). The rule also carried unstated assumptions
 (suppression of a second bleeding day in a row, silence on excluded days)
-that had not been reviewed by INER experts.
+that had not been reviewed by INER experts. **Update (2026-09-19, owner
+decision confirmed with INER experts):** these assumptions have since been
+reviewed and settled — the suppression is bleeding-continuity-based and
+previous-calendar-day only (see the Decision), and the excluded-day
+silence is moot because day-level exclusion semantics are gone entirely:
+the `ignoreTemperature` mark is temperature-evaluation-scoped and does
+not affect suggestions at all.
 
 ## Decision
 
@@ -62,8 +71,9 @@ bleeding only suggests it.**
   `startsAtMenstruation == false` (its begin is unknown; the app shows only
   its end).
 - The mark is **authoritative wherever placed**: it binds on days without
-  bleeding and on excluded/interrupted days alike (owner decision — see the
-  open questions below).
+  bleeding and on temperature-ignored days alike (owner decision
+  2026-09-19, confirmed with INER experts — recorded under Consequences
+  below).
 - Bleeding only **suggests**: `isSuggestedCycleStart(entry, previous)` keeps
   the former automatic predicate verbatim (bleeding level >= 2 on a
   non-excluded day whose previous non-excluded calendar day is not also a
@@ -114,24 +124,28 @@ the app never decides a boundary on its own.
 - Exports/imports round-trip `cycleStart` marks unchanged, including the
   author column (`user` vs. `import` provenance is preserved).
 
+**Settled questions (owner decisions 2026-09-19, confirmed with INER
+experts — no further expert consultation queued):**
+
+(a) **Mark-on-temperature-ignored-day interplay:** a `cycleStart` mark on
+an `ignoreTemperature`-marked (temperature-evaluation-ignored) day is
+never rejected or reworded — the cycleStart mark is authoritative
+wherever placed, and the temperature-ignore mark never blocks it
+(unchanged behavior; the old exclude_* flags are gone, see the author's
+note).
+
+(b) **Suggestion predicate's mid-flow suppression:** keep the strict
+previous-calendar-day bleeding rule — a day whose previous CALENDAR day
+bleeds at level >= 2 does not suggest (bleeding continuity is the ONLY
+suppression; no wider continuity notion). The `ignoreTemperature` mark
+and the raw disturbance mask do not affect the predicate (a marked
+bleeding day still suggests).
+
 ### Open questions for INER experts (`TODO(user-review)`)
-
-(a) **Mark-on-temperature-ignored-day interplay:** should a `cycleStart`
-mark on an `ignoreTemperature`-marked (temperature-evaluation-ignored) day
-ever be rejected or reworded? Current behavior: no — the mark is
-authoritative wherever placed (owner decision); the temperature-ignore
-mark never blocks it (unchanged behavior; the old exclude_* flags are
-gone, see the author's note).
-
-(b) **Suggestion predicate's mid-flow suppression (reworded 2026-09-18 to
-the bleeding-only predicate):** the predicate does not suggest on a day
-whose previous CALENDAR day is also bleeding level >= 2 — bleeding
-continuity is the ONLY suppression; the `ignoreTemperature` mark and the
-raw disturbance mask do not affect it (a marked bleeding day still
-suggests). Keep the strict previous-day rule as-is, or should the
-suppression stem from a wider bleeding-continuity notion instead of the
-strict previous-day rule?
 
 (c) **Wording of the prompt rows:** the committed dialog wording (title,
 body, confirm, dismiss — en/de above) is a first draft; iterate it here,
-not in code comments.
+not in code comments. TODO(user-review): pending wording review — this
+also feeds the roadmap's period-start label wording follow-up (the
+"period start" row label vs. a marked cycle start on a bleeding-free
+day).

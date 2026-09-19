@@ -27,9 +27,12 @@ abstract final class CycleMarkTypes {
   /// evaluation arithmetic (lib/domain/evaluation.dart) treats the day
   /// like an unmeasured one. The mark does NOT affect cycle-start
   /// suggestions (bleeding continuity only, see
-  /// lib/domain/cycle_grouping.dart) and does NOT drive the interrupted-
-  /// temperature chart rendering (the raw tempDisturbances mask does).
-  /// The diary save auto-SETs this mark (idempotently) when any
+  /// lib/domain/cycle_grouping.dart), and since owner decision
+  /// 2026-09-19 it IS the temperature curve's rendering key (marked days
+  /// render lighter — see lib/ui/cycle_curve.dart; the raw mask survives
+  /// only as the diary
+  /// badge's input). The diary save auto-SETs this mark (idempotently)
+  /// when any
   /// tempDisturbances flag is selected; a mark is NEVER auto-removed when
   /// the flags clear. Foreign imports (drip CSV temperature.exclude, old
   /// export documents with exclude_* keys) derive it with author

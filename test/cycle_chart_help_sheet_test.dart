@@ -47,7 +47,7 @@ Widget _chartHarness({
 /// The glossary entries (en wording); each is asserted inside the help
 /// sheet. The "Ignored temperature" entry presents the VISUAL consequence
 /// (the lighter temperature on the curve — the mark is the rendering key,
-/// owner decision 4) while naming where the mark is set.
+/// owner decision 2026-09-19) while naming where the mark is set.
 const _glossaryEn = [
   'BBT (temperature)',
   'Bleeding',

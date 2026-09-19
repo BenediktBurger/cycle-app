@@ -5,8 +5,9 @@
 // onto fl_chart bars; tests assert the rule set directly.
 import '../domain/models.dart';
 
-/// The alpha the IGNORED temperatures render with (owner decision 4: the
-/// ignoreTemperature mark is the rendering key; marked days render lighter).
+/// The alpha the IGNORED temperatures render with (owner decision
+/// 2026-09-19: the ignoreTemperature mark is the rendering key; marked
+/// days render lighter).
 /// Hoisted here so the chart's lighter color (lib/ui/cycle.dart) and the
 /// help sheet's lighter-dot glossary sample derive from ONE constant and
 /// cannot drift.
@@ -15,7 +16,7 @@ const double ignoredTemperatureAlpha = 0.4;
 /// One drawable point of the temperature curve: a measured temperature on
 /// its chart x position (day index), flagged when the day carries the
 /// ignoreTemperature MARK (the rendering is keyed to the MARK, NOT to the
-/// raw `tempDisturbances` mask — owner decision 4, 2026-09-19) and thus
+/// raw `tempDisturbances` mask — owner decision 2026-09-19) and thus
 /// renders lighter.
 final class CurvePoint {
   const CurvePoint({
@@ -64,8 +65,9 @@ final class CurveSegment {
 /// that carries no bbtC — break the line; a day with a temperature counts
 /// as measured even when it is marked ignored. [ignoredDayIndexes] names
 /// the chart's day indexes whose temperature is IGNORED (computed by the
-/// chart from the ignoreTemperature marks — owner decision 4: the mark is
-/// the rendering key). A marked day renders lighter whether or not it
+/// chart from the ignoreTemperature marks — owner decision 2026-09-19:
+/// the mark is the rendering key). A marked day renders lighter whether
+/// or not it
 /// carries raw disturbance flags; a flagged day whose mark was removed
 /// renders normally (the mask is the diary badge's input, not the
 /// curve's).

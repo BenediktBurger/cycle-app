@@ -487,12 +487,13 @@ final class CycleDaySheet extends ConsumerWidget {
               // a marked day's temperature is excluded from the evaluation
               // arithmetic (the day behaves like an unmeasured one — see
               // lib/domain/evaluation.dart). The mark does NOT affect
-              // cycle-start suggestions (bleeding continuity only) and
-              // does NOT drive the interrupted-temperature rendering (the
-              // raw disturbance mask does). It is the same mark the diary
-              // save auto-SETs when a disturbance flag is selected
-              // (auto-set only, never auto-removed); this row is the
-              // manual correction affordance.
+              // cycle-start suggestions (bleeding continuity only), and it
+              // IS the temperature curve's rendering key (marked days
+              // render lighter — owner decision 2026-09-19). It is the
+              // same mark the diary save auto-SETs when a disturbance flag
+              // is
+              // selected (auto-set only, never auto-removed); this row is
+              // the manual correction affordance.
               icon: Icons.visibility_off_outlined,
               label: hasExcluded
                   ? l10n.cycleSheetRemoveIgnoreTemperature

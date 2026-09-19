@@ -172,8 +172,9 @@ final class _ChartDays {
   }
 
   /// The chart day indexes whose temperature is IGNORED: computed from the
-  /// `ignoreTemperature` marks (owner decision 4 — the mark is the curve's
-  /// rendering key; the raw disturbance mask is the diary badge's input, not
+  /// `ignoreTemperature` marks (owner decision 2026-09-19 — the mark is
+  /// the curve's rendering key; the raw disturbance mask is the diary
+  /// badge's input, not
   /// the curve's). A mark on an untracked gap day yields no entry, hence no
   /// curve point — harmless.
   late final Set<int> ignoredDayIndexes;
@@ -507,8 +508,9 @@ final class _CycleChartState extends State<_CycleChart> {
         _TemperatureScale(min: yMin, max: yMax, plotHeight: chartHeight);
 
     // Ignored (marked) TEMPERATURES read lighter: the scheme color at the
-    // shared lighter alpha (owner decision 4: the ignoreTemperature mark is
-    // the rendering key). The dark scheme's primary is a bright color, so
+    // shared lighter alpha (owner decision 2026-09-19: the
+    // ignoreTemperature mark is the rendering key). The dark scheme's
+    // primary is a bright color, so
     // the dimmed tint still keeps darkness-readable contrast (asserted by
     // the dark-mode chart tests).
     final temperatureColor = Theme.of(context).colorScheme.primary;

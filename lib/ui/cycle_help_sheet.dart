@@ -75,7 +75,7 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               // The ignored-temperature entry presents the VISUAL
-              // consequence (owner decision 4: the mark is the curve's
+              // consequence (owner decision 2026-09-19: the mark is the curve's
               // rendering key — marked days render lighter): the sample is
               // a lighter temperature dot, derived from the SAME constant
               // the curve draws with (ignoredTemperatureAlpha) so legend

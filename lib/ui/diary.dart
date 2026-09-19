@@ -426,9 +426,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // Always visible: the disturbance flags apply to the
               // temperature measurement regardless of bleeding. Each chip
               // toggles its own bit in the day's tempDisturbances mask
-              // (raw data for the interrupted-temperature rendering);
-              // saving with any flag auto-SETS the analysis-exclusion mark
-              // (see _save) — the flags alone never exclude from analysis.
+              // (raw data for the diary list's interrupted-day badge — the
+              // curve renders MARK-keyed); saving with any flag auto-SETS
+              // the temperature-ignore mark (see _save) — the flags alone
+              // never exclude the day from the analysis.
               Text(l10n.disturbancesCaption,
                   style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 4),

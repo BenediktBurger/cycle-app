@@ -2,8 +2,9 @@
 // rendering: the line connects two temperatures ONLY when their calendar
 // days are adjacent; ignored temperatures (a day carrying the
 // ignoreTemperature MARK — the rendering is keyed to the mark, NOT to the
-// raw disturbance mask, owner decision 4) count as measured days, keep the
-// line continuous, but render lighter (dot AND touching segments). The
+// raw disturbance mask, owner decision 2026-09-19) count as measured
+// days, keep the line continuous, but render lighter (dot AND touching
+// segments). The
 // mark makes the state visible on the graph: a marked day without flags
 // renders lighter, and a flagged day whose mark was removed renders
 // normally again. Same harness pattern as test/cycle_chart_weekend_test.dart
@@ -206,8 +207,9 @@ void main() {
     testWidgets(
         'a marked day WITHOUT disturbance flags renders lighter '
         '(the mark alone dims the curve)', (tester) async {
-      // Headline new behavior (owner decision 4): the mark is the visible
-      // state, flags are surfaced by other means (diary badge). Fri carries
+      // Headline new behavior (owner decision 2026-09-19): the mark is
+      // the visible state, flags are surfaced by other means (diary
+      // badge). Fri carries
       // ONLY the mark — no tempDisturbances — and still renders lighter.
       final unflaggedMarked = <DailyEntry>[
         DailyEntry(date: _thu, bbtC: 36.5),
@@ -240,9 +242,10 @@ void main() {
     testWidgets(
         'a flagged day WITHOUT the mark renders at FULL alpha '
         '(deleting the mark restores normal rendering)', (tester) async {
-      // THE FLIP (owner decision 4): the mark can be deleted on the day
-      // sheet while the raw flags remain — the curve renders normally
-      // again (the flags are surfaced by the diary badge, not the curve).
+      // THE FLIP (owner decision 2026-09-19): the mark can be deleted on
+      // the day sheet while the raw flags remain — the curve renders
+      // normally again (the flags are surfaced by the diary badge, not
+      // the curve).
       final flaggedUnmarked = <DailyEntry>[
         DailyEntry(date: _thu, bbtC: 36.5),
         DailyEntry(
