@@ -345,11 +345,16 @@ release tag `vX.Y.Z` is pushed. It runs the full gate (analyze, format,
 test), then provisions the keystore and builds.
 
 **Required repository secrets (GitHub Settings → Secrets → Actions), all
-five — the workflow refuses nothing gracefully, it simply fails without
-them, so set them BEFORE the first tag push:**
+five — set them BEFORE the first tag push. Why the hard pre-flight
+requirement: missing secrets are not reported by the build chain itself —
+Gradle silently falls back to the debug signing config, and a debug-signed
+APK would get attached to a public Release. The workflow now aborts with a
+preflight check when a secret is absent, but treat a debug-signed APK on a
+Release as a trigger failure to investigate and never trust it:**
 
 1. `RELEASE_KEYSTORE_GPG_BASE64` — the keystore below, GPG-encrypted then
-   base64-encoded (how to produce it: three commands in Phase C section).
+   base64-encoded (how to produce it: the two commands below; Phase C
+   creates the `.jks`).
 2. `RELEASE_KEYSTORE_PASSPHRASE` — the GPG passphrase used in the same
    encryption (store it in the password manager like the keystore
    passwords; it is NOT the keystore password unless you chose to reuse).

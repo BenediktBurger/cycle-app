@@ -10,10 +10,10 @@ development iterates on web. Distribution planning surfaced the following
 starting state:
 
 - No Android SDK on the dev machine yet; CI is deliberately web-only
-  ([ADR-0006](0006-ci.md)) — the original decision preceded this ADR's
-  follow-up above; decision #6 now supersedes the web-only clause, and
-  ADR-0006 has since been amended to also compile an Android debug build
-  and run tag-triggered signed releases.
+  ([ADR-0006](0006-ci.md)) — that original decision predates this ADR, and
+  this ADR's follow-up decision (#6, documented after the Context section)
+  now supersedes the web-only clause: ADR-0006 has since been amended to
+  also compile an Android debug build and run tag-triggered signed releases.
 - `android/` started from the untouched Flutter template: release build signed
   with the *debug* key, `applicationId` was the
   [ADR-0002](0002-package-name-cycle-app-placeholder.md) placeholder

@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install sqlite3 (host-VM database tests)
+      - name: Install sqlite3 (database test suite)
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
 
       # Full correctness gate — a release tag never ships untested code.
@@ -50,15 +50,44 @@ jobs:
       - name: Test
         run: flutter test
 
+      # Pre-flight: refuse to run without the secrets. Without this check,
+      # Gradle would silently fall back to the debug signing config and a
+      # debug-signed APK would end up attached to a public Release
+      # (docs/release.md, "CI release path").
+      - name: Pre-flight — all release secrets must be set
+        run: |
+          required=(
+            RELEASE_KEYSTORE_GPG_BASE64 RELEASE_KEYSTORE_PASSPHRASE
+            RELEASE_KEYSTORE_KEY_ALIAS RELEASE_KEYSTORE_KEY_PASSWORD
+            RELEASE_KEYSTORE_STORE_PASSWORD
+          )
+          missing=0
+          for var in "${required[@]}"; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Secret ${var} is not set — refusing to build."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+        env:
+          RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
+          RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
+          RELEASE_KEYSTORE_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_KEY_ALIAS }}
+          RELEASE_KEYSTORE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_STORE_PASSWORD }}
+
       # Keystore provisioning: everything is written into $RUNNER_TEMP only,
       # so the decrypted keystore never outlives the job and never lands
-      # outside that directory on the runner.
+      # outside that directory on the runner. The passphrase is fed to GPG
+      # on file descriptor 0, never as a command-line argument (the latter
+      # would be readable by any process on the runner via the process list).
       - name: Decode keystore to a temporary file
         run: |
-          gpg --quiet --batch --yes --decrypt \
-            --passphrase "$RELEASE_KEYSTORE_PASSPHRASE" \
-            --output "$RUNNER_TEMP/cycleapp-release.jks" \
-            <(printf '%s' "$RELEASE_KEYSTORE_GPG_BASE64" | base64 -d)
+          printf '%s' "$RELEASE_KEYSTORE_PASSPHRASE" | \
+            gpg --quiet --batch --yes --decrypt \
+              --passphrase-fd 0 \
+              --output "$RUNNER_TEMP/cycleapp-release.jks" \
+              <(printf '%s' "$RELEASE_KEYSTORE_GPG_BASE64" | base64 -d)
         env:
           RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
           RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
