@@ -272,7 +272,6 @@
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
   "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
-  "cycleSheetExcludeGroupTitle": "Temperaturstörung / von der Auswertung ausgeschlossen",
-  "cycleSheetNoDisturbance": "Keine Temperaturstörung vermerkt",
+  "cycleSheetExcludeGroupTitle": "Von der Auswertung ausgeschlossen",
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

@@ -398,7 +398,6 @@
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
   "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
-  "cycleSheetExcludeGroupTitle": "Temperature disturbance / excluded from the evaluation",
-  "cycleSheetNoDisturbance": "No temperature disturbance recorded",
+  "cycleSheetExcludeGroupTitle": "Excluded from the evaluation",
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

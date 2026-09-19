@@ -596,9 +596,8 @@ void main() {
     });
   });
 
-  group('disturbance ↔ exclusion group (read-only flags + the manual toggle)',
-      () {
-    /// The disturbance/exclusion group of the sheet (test-visible key).
+  group('exclusion group (the manual temperature-exclusion toggle)', () {
+    /// The exclusion group of the sheet (test-visible key).
     final excludeGroup =
         find.byKey(const ValueKey('cycleSheetExcludeGroup'));
 
@@ -611,8 +610,9 @@ void main() {
     }
 
     testWidgets(
-        'the group renders the day\'s set disturbance flags READ-ONLY '
-        'directly above the ignore toggle, under one heading',
+        'a day WITH recorded disturbance flags: the group carries only the '
+        'exclusion title and the toggle — neither flag labels nor an empty '
+        'line (the chart row shows the letters)',
         (tester) async {
       await _pump(tester,
           entries: entriesWithDay4Mask(
@@ -621,50 +621,59 @@ void main() {
       await _tapDay(tester, 4); // 9/10: flags alk + kr recorded
 
       expect(excludeGroup, findsOneWidget,
-          reason: 'the flag info and the ignore toggle live in ONE '
-              'visibly coupled group (keyed cycleSheetExcludeGroup)');
+          reason: 'the exclusion toggle lives in the keyed group '
+              '(cycleSheetExcludeGroup)');
+      expect(find.text('Excluded from the evaluation'), findsOneWidget,
+          reason: 'the group is titled by the exclusion concept only');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Alcohol (alk)')),
-          findsOneWidget,
-          reason: 'the set flags surface as read-only info next to the '
-              'toggle — the diary is where they are EDITED');
+          findsNothing,
+          reason: 'the disturbance letters render on the CHART row, not in '
+              'the sheet — no read-only flags here');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Illness (kr)')),
-          findsOneWidget);
-      expect(
-          find.descendant(
-              of: excludeGroup, matching: find.text('Ignore temperature')),
-          findsOneWidget,
-          reason: 'the temperature-ignore toggle sits inside the same '
-              'group as the flag info');
-    });
-
-    testWidgets(
-        'a day without recorded flags shows the explicit no-disturbance '
-        'line — and the group still carries no editable chips (read-only)',
-        (tester) async {
-      await _pump(tester, entries: entriesWithDay4Mask(0));
-
-      await _tapDay(tester, 4); // 9/10: no flags recorded
-
-      expect(excludeGroup, findsOneWidget,
-          reason: 'the group renders even on a flag-less day: the '
-              '"no disturbance recorded" line plus the toggle');
+          findsNothing);
       expect(
           find.descendant(
               of: excludeGroup,
               matching: find.text('No temperature disturbance recorded')),
+          findsNothing,
+          reason: 'no explicit empty line — flag-less days show the same '
+              'toggle-only group');
+      expect(
+          find.descendant(
+              of: excludeGroup, matching: find.text('Ignore temperature')),
           findsOneWidget,
-          reason: 'the empty state is explicit, not a blank group');
+          reason: 'the temperature-exclusion toggle stays inside the group');
+    });
+
+    testWidgets(
+        'a day WITHOUT recorded flags shows the same toggle-only group — '
+        'no empty-state line, no editable chips',
+        (tester) async {
+      await _pump(tester, entries: _entries);
+
+      await _tapDay(tester, 4); // 9/10: no flags recorded
+
+      expect(excludeGroup, findsOneWidget,
+          reason: 'the group renders on every day: title plus the toggle');
+      expect(find.text('Excluded from the evaluation'), findsOneWidget,
+          reason: 'the exclusion-only title, also without flags');
+      expect(
+          find.descendant(
+              of: excludeGroup,
+              matching: find.text('No temperature disturbance recorded')),
+          findsNothing,
+          reason: 'the explicit empty line is gone — nothing replaces it');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Late to bed (sp)')),
           findsNothing,
           reason: 'unset flags render nothing');
-      // Read-only: the sheet never EDITS the flags (data entry stays in
-      // the diary) — no FilterChips anywhere in the sheet.
+      // Read-only concept stays: the sheet never EDITS the flags (data
+      // entry stays in the diary) — no FilterChips anywhere in the sheet.
       expect(
           find.descendant(
               of: find.byType(BottomSheet), matching: find.byType(FilterChip)),
