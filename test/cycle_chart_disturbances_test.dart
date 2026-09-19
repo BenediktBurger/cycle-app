@@ -80,8 +80,9 @@ Widget _chartHarness({
 
 void main() {
   testWidgets(
-      'each exclusion flag renders its letter code in the disturbance row '
-      'at the bottom of the chart block, in the day\'s column',
+      'each set temperature-disturbance flag renders its letter token in '
+      'the disturbance row at the bottom of the chart block, in the '
+      'day\'s column',
       (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();

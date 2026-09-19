@@ -1325,7 +1325,7 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
       ),
     // Sample disturbance glyph: the first letter code of today's
     // vocabulary (disturbanceLetters below) — the per-day cells stack one
-    // code per set exclusion flag.
+    // code per set temperature-disturbance flag (diary-entered).
     _SignalKind.disturbance => Text(
         'kr',
         style: TextStyle(fontSize: 10, color: scheme.onSurface),
