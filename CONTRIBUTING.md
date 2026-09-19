@@ -100,16 +100,24 @@ clearing site data/private windows do not (expected browser behaviour).
 
 ## 4. Analyze, test, build
 
+The local gate mirrors [.github/workflows/ci.yml](.github/workflows/ci.yml)
+(see [ADR-0006](docs/adr/0006-ci.md) for the decision):
+
 ```sh
 flutter pub get    # prerequisite of test runs (also runs gen-l10n)
 flutter analyze
+dart format --output=none --set-exit-if-changed .   # check-only
 flutter test
 flutter build web
 ```
 
-All three must pass before you push. CI runs exactly these (see
-[.github/workflows/ci.yml](.github/workflows/ci.yml) and
-[ADR-0006](docs/adr/0006-ci.md)).
+All four checks must pass before you push. To fix formatting instead of
+merely checking it, run a plain `dart format .` (only the check variant is
+part of the gate).
+
+`flutter build apk --debug` is available locally as well once the local
+Android toolchain is green (see [`docs/release.md`](docs/release.md),
+Phase A) — the web build remains the primary correctness gate until then.
 
 **Linux note (database tests):** the drift tests under `test/db/` open the
 real SQLite engine through `sqlite3`'s dart:ffi bindings on the host.

@@ -338,6 +338,54 @@ Do **not** start until Android went through Phases A–F at least once.
 8. Confirm the store dashboards show the intended version; observe crash
    reports (Play) / F-Droid comments in the days after.
 
+## CI release path (tag-triggered, ADR-0009 amended)
+
+`.github/workflows/release.yml` automates the build-and-sign step once a
+release tag `vX.Y.Z` is pushed. It runs the full gate (analyze, format,
+test), then provisions the keystore and builds.
+
+**Required repository secrets (GitHub Settings → Secrets → Actions), all
+five — the workflow refuses nothing gracefully, it simply fails without
+them, so set them BEFORE the first tag push:**
+
+1. `RELEASE_KEYSTORE_GPG_BASE64` — the keystore below, GPG-encrypted then
+   base64-encoded (how to produce it: three commands in Phase C section).
+2. `RELEASE_KEYSTORE_PASSPHRASE` — the GPG passphrase used in the same
+   encryption (store it in the password manager like the keystore
+   passwords; it is NOT the keystore password unless you chose to reuse).
+3. `RELEASE_KEYSTORE_KEY_ALIAS` — Phase C keystore alias (`cycleapp-release`).
+4. `RELEASE_KEYSTORE_KEY_PASSWORD` — the key's password.
+5. `RELEASE_KEYSTORE_STORE_PASSWORD` — the keystore's password.
+
+**Create the encrypted secret payload from the Phase C `.jks`:**
+
+```sh
+gpg --symmetric --output ~/keystores/cycleapp-release.jks.gpg ~/keystores/cycleapp-release.jks
+base64 ~/keystores/cycleapp-release.jks.gpg > ~/keystores/cycleapp-release.jks.gpg.b64
+# paste the .b64 content into the RELEASE_KEYSTORE_GPG_BASE64 secret, then
+# keep the passphrase mentally paired with it (password-manager entries).
+```
+
+The workflow decrypts the keystore **only into `$RUNNER_TEMP`** and writes
+a generated, gitignored `android/key.properties` pointing there; nothing
+keystore-shaped is committed or leaves `$RUNNER_TEMP`. The local keystore
+and its offline backups remain authoritative.
+
+**A `vX.Y.Z` tag produces:**
+
+- A **signed universal release APK** attached to a GitHub Release with
+  automatically generated notes (use the notes as the changelog; the
+  workflow prints the signing certificate fingerprint in its log — copy it
+  into the release notes as the trust anchor; F-Droid metadata later
+  cross-checks against the same fingerprint).
+- An **AAB** uploaded as a workflow **artifact** for the manual Play upload
+  (no Play API integration exists; upload from CI is not planned yet).
+
+The workflow itself does **not** make a release count as "shipped": the
+**device upgrade test (Phase D checklist step 5) remains a mandatory manual
+step** before announcing the release. Tag → CI build → download APK →
+upgrade test → then distribute.
+
 ## Fresh-machine recovery (the handover note)
 
 For a later INER takeover or lost laptop — the minimum to rebuild a release

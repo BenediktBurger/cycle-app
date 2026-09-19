@@ -70,9 +70,11 @@ failures only surface in a summary at the end. Instead:
 - **Iteration** (fixing one thing, fast loop):
   `flutter test test/domain/<file>_test.dart --fail-fast --no-pub -r expanded`
   (`--plain-name '<substring>'` or `--name '<regexp>'` to narrow further).
-- **Full gate** before "done" (matches CI):
+- **Full gate** before "done" (matches CI): run `flutter analyze`, then
+  `dart format --output=none --set-exit-if-changed .`, then
   `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
-  suite still runs.
+  suite still runs. All three are judged by exit code only (the format
+  check exits non-zero when any file would be reformatted).
 - **Judge by the exit code, not the text.** `flutter test` exits non-zero on
   failure; a green-looking log tail can still hide a failure (and packages
   like `libsqlite3-dev` missing on Linux fail the `test/db/` suite at load
