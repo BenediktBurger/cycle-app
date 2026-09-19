@@ -1,13 +1,13 @@
 // Widget tests of the temperature-disturbance letters at the bottom of
-// the cycle chart block: a day carrying one of the exclusion flags
-// (illness, alcohol, travel, other) renders its letter code in the
-// disturbance row — in the day's column, keyed like the other rows —
-// while non-excluded days render nothing. The letters use TODAY'S
-// exclusion vocabulary through a single letter-mapping seam (see the
-// comment on disturbanceLetters in lib/ui/cycle.dart): the pending
-// NER-scheme data-entry item owns any vocabulary change and retargets
-// that one function. Excluded temperatures keep rendering as lighter
-// curve dots (pinned by test/cycle_chart_temperature_test.dart).
+// the cycle chart block: a day carrying one of the NER disturbance flags
+// (late to bed, night awakening, alcohol, illness) renders its letter
+// code in the disturbance row — in the day's column, keyed like the
+// other rows — while plain days render nothing. The letters are the raw
+// TempDisturbance tokens of the day's tempDisturbances mask, read
+// through a single letter-mapping seam (see the comment on
+// disturbanceLetters in lib/ui/cycle.dart). The interrupted curve
+// rendering is keyed to the ignoreTemperature MARK, not this mask —
+// pinned by test/cycle_chart_temperature_test.dart.
 //
 // Same harness pattern as test/cycle_chart_rows_test.dart.
 import 'package:cycle_app/domain/marks.dart';
@@ -26,25 +26,26 @@ final _seedColor = const Color(0xFF6750A4);
 DateTime _day(int index) => DateTime.utc(2026, 9, 7 + index);
 
 // Six chart days:
-//  0: plain temperature, no exclusion flag  -> nothing in the row
-//  1: excludeIllness                        -> kr
-//  2: excludeAlcohol                        -> alk
-//  3: excludeTravel                         -> R
-//  4: excludeOther                          -> a
-//  5: all four flags together               -> kr, alk, R, a stacked
+//  0: plain temperature, no disturbance flag   -> nothing in the row
+//  1: illness (kr bit)                         -> kr
+//  2: alcohol (alk bit)                        -> alk
+//  3: late to bed (sp bit)                     -> sp
+//  4: night awakening (a bit)                  -> a
+//  5: all four flags together                  -> kr, alk, sp, a stacked
 final _entries = <DailyEntry>[
   DailyEntry(date: _day(0), bbtC: 36.5),
-  DailyEntry(date: _day(1), bbtC: 36.6, excludeIllness: true),
-  DailyEntry(date: _day(2), bbtC: 36.7, excludeAlcohol: true),
-  DailyEntry(date: _day(3), bbtC: 36.4, excludeTravel: true),
-  DailyEntry(date: _day(4), bbtC: 36.5, excludeOther: true),
+  DailyEntry(
+      date: _day(1), bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
+  DailyEntry(
+      date: _day(2), bbtC: 36.7, tempDisturbances: TempDisturbance.alk.bit),
+  DailyEntry(
+      date: _day(3), bbtC: 36.4, tempDisturbances: TempDisturbance.sp.bit),
+  DailyEntry(
+      date: _day(4), bbtC: 36.5, tempDisturbances: TempDisturbance.a.bit),
   DailyEntry(
     date: _day(5),
     bbtC: 36.8,
-    excludeIllness: true,
-    excludeAlcohol: true,
-    excludeTravel: true,
-    excludeOther: true,
+    tempDisturbances: TempDisturbance.values.fold(0, (mask, d) => mask | d.bit),
   ),
 ];
 
@@ -89,7 +90,7 @@ void main() {
     for (final entry in {
       1: 'kr',
       2: 'alk',
-      3: 'R',
+      3: 'sp',
       4: 'a',
     }.entries) {
       final cellRect = tester.getRect(_cell(entry.key, 'disturbance'));
@@ -98,7 +99,7 @@ void main() {
               'block, below the curve');
       expect(_inCell(entry.key, 'disturbance', find.text(entry.value)),
           findsOneWidget,
-          reason: 'day ${entry.key} carries its exclusion flag\'s letter '
+          reason: 'day ${entry.key} carries its disturbance flag\'s letter '
               'code (${entry.value}) in the day\'s column');
       // The letter sits inside its day column horizontally (same column
       // geometry as every other row).
@@ -108,12 +109,12 @@ void main() {
     }
   });
 
-  testWidgets('non-excluded days render nothing in the disturbance row',
+  testWidgets('plain days render nothing in the disturbance row',
       (tester) async {
     await tester.pumpWidget(_chartHarness(entries: _entries));
     await tester.pumpAndSettle();
 
-    for (final letter in ['kr', 'alk', 'R', 'a']) {
+    for (final letter in ['kr', 'alk', 'sp', 'a']) {
       expect(_inCell(0, 'disturbance', find.text(letter)), findsNothing,
           reason: 'a plain day shows no letter code');
     }
@@ -125,7 +126,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final cell = tester.getRect(_cell(5, 'disturbance'));
-    for (final letter in ['kr', 'alk', 'R', 'a']) {
+    for (final letter in ['kr', 'alk', 'sp', 'a']) {
       final rects = _inCell(5, 'disturbance', find.text(letter))
           .evaluate()
           .map((element) {
@@ -140,11 +141,13 @@ void main() {
           reason: 'the stacked letters stay inside the day column');
     }
     // Stacked: the letters render at DIFFERENT vertical positions (the
-    // paper sheet writes disturbance codes one under the other).
+    // paper sheet writes disturbance codes one under the other). Render
+    // order follows the mask's token order — alk (bit 4) stacks above
+    // kr (bit 8).
     final krRect = tester.getRect(_inCell(5, 'disturbance', find.text('kr')));
     final alkRect =
         tester.getRect(_inCell(5, 'disturbance', find.text('alk')));
-    expect(krRect.bottom, lessThanOrEqualTo(alkRect.top),
+    expect(alkRect.bottom, lessThanOrEqualTo(krRect.top),
         reason: 'the stacked letters do not overlap');
   });
 

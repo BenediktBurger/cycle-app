@@ -275,9 +275,9 @@ final class _HelpEntry extends StatelessWidget {
           'M',
           style: TextStyle(fontSize: 10, color: color),
         ),
-      // Sample disturbance glyphs: the stacked letter codes of today's
-      // exclusion vocabulary (disturbanceLetters in cycle.dart — the
-      // NER-scheme data-entry item may re-vocabulary these).
+      // Sample disturbance glyphs: the stacked letter codes of the NER
+      // disturbance vocabulary (the TempDisturbance tokens that
+      // disturbanceLetters in cycle.dart emits).
       _HelpEntryShape.disturbance => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

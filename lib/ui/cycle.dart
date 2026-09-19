@@ -1353,25 +1353,22 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
 const double _timeCellMinColumnWidth = 32;
 
 /// The temperature-disturbance letter codes of a day, one per set
-/// exclusion flag, in the render order the disturbance row stacks them:
-/// TODAY'S vocabulary — illness → "kr", alcohol → "alk", travel → "R"
-/// (the paper sheet writes "Reise" in full, narrow columns shorten it to
-/// R), other → "a".
+/// disturbance flag, in the render order the disturbance row stacks them:
+/// the NER vocabulary's tokens — late to bed → "sp", night awakening →
+/// "a", alcohol → "alk", illness → "kr" (Reise is not representable in
+/// this vocabulary, so it never appears).
 ///
-/// THE single seam for the letter vocabulary: the pending NER-scheme
-/// data-entry item re-models the exclusion flags (sp/a/alk/kr, Reise
-/// dropped, intflag field) — it retargets THIS function (and the glossary
-/// entry), nothing else on the chart. Nothing on the chart interprets the
-/// letters; they are raw-observation display only (ADR-0001).
+/// THE single seam for the letter vocabulary: nothing on the chart
+/// interprets the letters; they are raw-observation display only
+/// (ADR-0001). Both the chart's disturbance row and the glossary sample
+/// draw through this function.
 /// TODO(user-review): the letter vocabulary mirrors the paper sheet's
 /// disturbance codes; the experts may want different ones.
 List<String> disturbanceLetters(DailyEntry? day) => day == null
     ? const []
     : [
-        if (day.excludeIllness) 'kr',
-        if (day.excludeAlcohol) 'alk',
-        if (day.excludeTravel) 'R',
-        if (day.excludeOther) 'a',
+        for (final disturbance in TempDisturbance.values)
+          if (day.tempDisturbances & disturbance.bit != 0) disturbance.token,
       ];
 
 /// One signal's recording row: the window's day cells only — the row's
@@ -1647,13 +1644,14 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 
-  /// Disturbance: the stacked letter codes of the day's exclusion flags
-  /// ([disturbanceLetters]) — the paper sheet writes disturbance codes one
-  /// under the other. Neutral on-surface ink. The row's fixed height fits
-  /// two codes unscaled; more codes shrink to fit (FittedBox) rather than
-  /// overflow or drop. The excluded temperatures themselves keep rendering
-  /// as LIGHTER curve dots in the plot (unchanged curve behavior; these
-  /// letters only NAME the reason).
+  /// Disturbance: the stacked letter codes of the day's temperature
+  /// disturbances ([disturbanceLetters]) — the paper sheet writes
+  /// disturbance codes one under the other. Neutral on-surface ink. The
+  /// row's fixed height fits two codes unscaled; more codes shrink to fit
+  /// (FittedBox) rather than overflow or drop. The interrupted curve
+  /// rendering is keyed to the ignoreTemperature MARK, not this mask (see
+  /// lib/ui/cycle_curve.dart); these letters only NAME the recorded
+  /// disturbances.
   static Widget _disturbanceContent(BuildContext context, DailyEntry? day) {
     final letters = disturbanceLetters(day);
     if (letters.isEmpty) return const SizedBox.shrink();
