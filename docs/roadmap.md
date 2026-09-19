@@ -83,14 +83,6 @@ the sections above track planned work, git history keeps the record (see
 - Password protection for the database — first revisit
       [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
       pin down the storage decision; implementation then follows it.
-- [ ] persist language and mode choices
-- Settings persistence needs a storage decision before any of these
-  items becomes startable: candidate is a drift key-value settings
-  table (`schemaVersion` bump), alternative platform preferences
-  (e.g. `shared_preferences`). Scope is ONE batch — language and mode
-  choices plus the temperature range (the chart's range setting lands
-  in-memory first, deliberately resetting on start; its persistence is
-  deferred into this same batch).
 - [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.

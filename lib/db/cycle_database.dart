@@ -1,6 +1,7 @@
-// The app's drift database (schema version 9, profile-free).
+// The app's drift database (schema version 10, profile-free).
 //
-// File organization: the DAO files (entries_dao.dart, marks_dao.dart) are
+// File organization: the DAO files (entries_dao.dart, marks_dao.dart,
+// settings_dao.dart) are
 // PARTS of this library. That is the standard drift layout when DAOs
 // reference generated data classes — drift writes all data
 // classes/companions and the _$DaoMixin classes into a single
@@ -24,10 +25,11 @@ part 'cycle_database.g.dart';
 
 part 'entries_dao.dart';
 part 'marks_dao.dart';
+part 'settings_dao.dart';
 
 @DriftDatabase(
-  tables: [CycleEntries, UserMarks],
-  daos: [EntriesDao, MarksDao],
+  tables: [CycleEntries, UserMarks, AppSettings],
+  daos: [EntriesDao, MarksDao, SettingsDao],
 )
 class CycleDatabase extends _$CycleDatabase {
   // Accepts any QueryExecutor; tests pass NativeDatabase.memory(), the
@@ -36,7 +38,7 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +54,13 @@ class CycleDatabase extends _$CycleDatabase {
           // `deleteTable('profiles')` stays so an old (v8) database file
           // loses its legacy profiles table too — nothing recreates or
           // re-seeds it (the schema is profile-free).
+          //
+          // v10 adds nothing to migrate incrementally: the new app_settings
+          // key-value table is created by m.createAll() like every other
+          // table (pre-release policy — an upgraded v9 file already carries
+          // no surviving data). So a v9 → v10 upgrade is just the version
+          // bump shown above; no deleteTable line for app_settings is needed
+          // since createAll() recreates (or CREATEs) it.
           //
           // From the FIRST PUBLISHED RELEASE on this must become real one
           // version step at a time migrations that preserve user data.

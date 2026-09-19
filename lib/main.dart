@@ -1,12 +1,17 @@
 // Root widget: Material app, German-first localization whose language
 // follows the system until overridden in the settings screen, a theme mode
-// that likewise follows the device brightness until overridden, and the
-// database gating shell.
+// that likewise follows the device brightness until overridden, the
+// database gating shell, and the persistence wiring for the three general
+// settings (hydration from / write-through to the app_settings table).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'db/cycle_database.dart';
+import 'db/settings_store.dart';
+import 'domain/temperature_range.dart';
 import 'l10n/app_localizations.dart';
 import 'providers.dart';
 import 'ui/cycle.dart';
@@ -23,11 +28,71 @@ void main() {
   runApp(const ProviderScope(child: CycleApp()));
 }
 
-class CycleApp extends ConsumerWidget {
+class CycleApp extends ConsumerStatefulWidget {
   const CycleApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CycleApp> createState() => _CycleAppState();
+}
+
+class _CycleAppState extends ConsumerState<CycleApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Hydration: every persisted snapshot (loaded by
+    // persistedSettingsProvider the moment the database opens) is applied
+    // into the three settings providers. Fill-if-untouched — only a
+    // provider still holding its default takes the snapshot value, so a
+    // live choice (made in between, or coming from a test override) is
+    // never clobbered, and snapshot defaults are skipped as no-ops. The
+    // snapshot lands shortly after the first frame: the MaterialApp
+    // skeleton renders one frame in defaults until then — accepted
+    // trade-off, the database gate keeps every screen behind the open
+    // database, so nothing can write a contradicting choice in between.
+    // fireImmediately covers the (unlikely) case of the snapshot being
+    // ready before this root widget mounts; normally the callback only
+    // fires on the loading→data transition.
+    ref.listenManual(persistedSettingsProvider, fireImmediately: true,
+        (previous, next) {
+      final snapshot = next.value; // stays null while loading/in error
+      if (snapshot == null) return;
+      final locale = ref.read(localeProvider);
+      if (locale == null && snapshot.locale != null) {
+        ref.read(localeProvider.notifier).state = snapshot.locale;
+      }
+      final themeMode = ref.read(themeModeProvider);
+      if (themeMode == ThemeMode.system &&
+          snapshot.themeMode != ThemeMode.system) {
+        ref.read(themeModeProvider.notifier).state = snapshot.themeMode;
+      }
+      final range = ref.read(temperatureRangeProvider);
+      if (range == TemperatureRange.defaults &&
+          snapshot.temperatureRange != TemperatureRange.defaults) {
+        ref.read(temperatureRangeProvider.notifier).state =
+            snapshot.temperatureRange;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Write-through: every provider change (settings screen, future call
+    // sites) is echoed into app_settings as a fire-and-forget upsert on
+    // the open database. Hydration assignments echo their just-loaded
+    // values back — same row content, an idempotent upsert. A storage
+    // failure cannot undo the in-memory change — it only reverts the
+    // choice to its default on the next start — so the write error is
+    // deliberately ignored, see [_persistSetting].
+    ref.listen<Locale?>(localeProvider, (previous, current) {
+      _persistSetting(ref, (store) => store.persistLocale(current));
+    });
+    ref.listen<ThemeMode>(themeModeProvider, (previous, current) {
+      _persistSetting(ref, (store) => store.persistThemeMode(current));
+    });
+    ref.listen<TemperatureRange>(temperatureRangeProvider, (previous, current) {
+      _persistSetting(ref, (store) => store.persistTemperatureRange(current));
+    });
+
     // null (the localeProvider default) = follow the system language: the
     // platform's locale list is then resolved against supportedLocales,
     // which picks German for German devices and English for everything
@@ -75,6 +140,25 @@ class CycleApp extends ConsumerWidget {
       home: const _DatabaseGate(),
     );
   }
+}
+
+/// Fire-and-forget persistence of one settings-provider change ([write])
+/// through the typed settings store on the app's open database. The write
+/// error is deliberately ignored (see the write-through comment in
+/// [CycleApp.build]): the in-memory choice stands, and the failure only
+/// means the default is restored on the next start.
+void _persistSetting(
+  WidgetRef ref,
+  Future<void> Function(SettingsStore store) write,
+) {
+  unawaited(() async {
+    try {
+      final db = await ref.read(databaseProvider.future);
+      await write(SettingsStore(db.settingsDao));
+    } catch (_) {
+      // Deliberately ignored, see the comment above.
+    }
+  }());
 }
 
 /// Gates the navigation shell behind the database opening: a simple loading

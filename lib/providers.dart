@@ -2,19 +2,22 @@
 // entry streams and cross-screen selection state (tab index, locale, the
 // date pre-selected in the entry form).
 //
-// Simple in-memory state only by design at this milestone:
-//  - locale resets to the system default on web reload (documented
-//    limitation; see the doc comment on [localeProvider] and
-//    docs/roadmap.md),
-//  - the theme mode resets to System on web reload for the same reason
-//    (see the doc comment on [themeModeProvider]),
-//  - the PIN lock stub (Settings screen) is non-functional and local.
+// The three general settings (locale, theme mode, temperature range) are
+// persisted in the app_settings key-value table of the drift database:
+// they load into the StateProviders below right after the database opens
+// ([persistedSettingsProvider], hydration wiring in main.CycleApp) and
+// every change is written back through to that table (also main.CycleApp).
+// The providers stay plain in-memory StateProviders — all overrides and
+// call sites keep working unchanged.
+//
+// The PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
 import 'db/mappers.dart';
+import 'db/settings_store.dart';
 import 'domain/date_only.dart';
 import 'domain/marks.dart';
 import 'domain/models.dart';
@@ -75,13 +78,9 @@ final tabIndexProvider = StateProvider<int>((ref) => 0);
 /// English — for any other device language (ADR-0007; the list lives in
 /// main.dart and the resolution story in its comment).
 ///
-/// In-memory only at this milestone: switching works immediately but resets
-/// on web reload BY DESIGN (persisting it would mean a settings table in
-/// drift or localStorage — the drift database itself is the only durable
-/// state for now). Persistence is a documented TODO:
-/// - on web, localStorage would be the natural place,
-/// - on native, a drift settings table (or SharedPreferences) would fit.
-/// Recorded in docs/roadmap.md as the language-persistence TODO.
+/// Persisted: hydrated from the local app_settings table once the database
+/// opens — before any screen that could change it is reachable (the
+/// database gate) — and written through on every change (main.CycleApp).
 final localeProvider = StateProvider<Locale?>((ref) => null);
 
 /// Theme mode of the whole app: `ThemeMode.system` (the default) follows the
@@ -89,9 +88,9 @@ final localeProvider = StateProvider<Locale?>((ref) => null);
 /// switcher wins over the platform. The light/dark `ThemeData`s themselves
 /// live in `main.CycleApp` (both derived from one seed color).
 ///
-/// In-memory only, mirroring [localeProvider]: switching works immediately
-/// but resets to System on web reload BY DESIGN (see the persistence note
-/// there — no settings table in drift at this milestone).
+/// Persisted, mirroring [localeProvider]: hydrated from the local
+/// app_settings table once the database opens and written through on every
+/// change (main.CycleApp).
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// The cycle chart's temperature display range ("Temperaturbereich"
@@ -101,15 +100,24 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 /// [clampBbtC] in lib/ui/cycle_curve.dart); the scale never stretches to
 /// fit an outlier.
 ///
-/// In-memory only, mirroring [localeProvider]/[themeModeProvider] — but
-/// here the reset-on-restart is DELIBERATE at this milestone (owner
-/// decision 2026-09-19, not a deferred bug): the range's persistence will
-/// land together with the other deferred settings persistence as one
-/// batch, after a storage decision (docs/roadmap.md backlog). No drift
-/// table, no schema change — this provider is deliberately NOT a storage
-/// precedent for later settings.
+/// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
+/// the local app_settings table once the database opens and written through
+/// on every change (main.CycleApp). The °C unit stays the unit of record —
+/// a later Fahrenheit display conversion would happen above this provider.
 final temperatureRangeProvider =
     StateProvider<TemperatureRange>((ref) => TemperatureRange.defaults);
+
+/// The persisted general settings as one snapshot, freshly loaded from the
+/// app_settings table the moment the database opens ([databaseProvider]).
+/// main.CycleApp's hydration listener applies each snapshot into
+/// [localeProvider], [themeModeProvider] and [temperatureRangeProvider].
+/// Non-autoDispose like [databaseProvider] — the load keeps the database
+/// open for the app lifetime.
+final persistedSettingsProvider =
+    FutureProvider<PersistedSettings>((ref) async {
+  final db = await ref.watch(databaseProvider.future);
+  return SettingsStore(db.settingsDao).load();
+});
 
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when

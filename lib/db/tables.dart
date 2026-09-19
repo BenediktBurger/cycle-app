@@ -215,3 +215,23 @@ abstract final class MarkTypes {
   /// start — see lib/domain/cycle_grouping.dart).
   static const cycleStart = 'cycleStart';
 }
+
+/// Generic key-value storage for general settings (language, theme mode,
+/// temperature range, and any future setting such as PDF export options).
+///
+/// Deliberately schema-free: a NEW setting is a NEW KEY with a typed accessor
+/// on top (see lib/db/settings_store.dart), never a new column — the table
+/// shape never changes again, so adding settings needs no schema bump.
+/// The value always stores a JSON-encoded text (e.g. `"de"`, `"dark"`,
+/// `{"min":35.0,"max":39.0}`); the JSON layer lives in the store, not here.
+class AppSettings extends Table {
+  /// Dot-namespaced setting identifier, e.g. 'locale', 'themeMode',
+  /// 'temperatureRange', 'pdfExport.anonymize'.
+  TextColumn get key => text()();
+
+  /// JSON-encoded setting value.
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}

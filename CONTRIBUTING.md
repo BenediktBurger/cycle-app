@@ -214,10 +214,3 @@ report the full analyzer/test output back so issues can be fixed promptly.
   [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), Accepted). Treat
   marked comments like `// TODO(user-review)` as questions to bring to
   INER experts, not as settled behavior.
-- **In-memory-only state for now**: the language selection resets to the
-  system-language default on web reload by design (system language when
-  available, otherwise English; persisting an explicit choice — e.g. a
-  settings table or localStorage — is future work; see `localeProvider` in
-  `lib/providers.dart`). The theme-mode selection shares the same
-  in-memory limitation (reverts to the system theme after a web reload;
-  see `themeModeProvider` in `lib/providers.dart`).

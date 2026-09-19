@@ -2,15 +2,15 @@
 // 36–38 °C) is selectable in the settings screen's "Temperaturbereich"
 // card — two half-degree pickers inside the allowed 34.0–42.0 °C window
 // with min < max enforced by construction. Mirrors the theme-mode/language
-// switcher pattern: an in-memory provider that resets on restart BY DESIGN
-// (owner decision — persistence lands later together with the other
-// settings, after a storage decision).
+// switcher pattern: the choice is written through to the local app_settings
+// table on change and hydrated back on the next start (the persistence
+// round trip itself is pinned in settings_persistence_test.dart).
 //
 // The chart-side reaction to the range is pinned in
 // test/cycle_chart_temperature_test.dart and
 // test/cycle_chart_left_rail_test.dart (overridden provider): the settings
 // tests pin the CARD — the pickers, the defaults and the immediate
-// provider write. No db test — nothing persists in this milestone.
+// provider write.
 //
 // An in-memory drift database override, no platform channels (same
 // pattern as theme_mode_setting_test.dart).

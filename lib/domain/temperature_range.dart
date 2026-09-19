@@ -37,4 +37,31 @@ final class TemperatureRange {
 
   /// The display span in °C (drives the plot-height heuristic).
   double get span => max - min;
+
+  /// JSON-map form for the generic key-value settings store
+  /// ({"min":..,"max":..} — the exact shape the app_settings column holds).
+  Map<String, Object?> toJson() => {'min': min, 'max': max};
+
+  /// Restores a range from a [toJson] map. Missing or mistyped bounds, and
+  /// a wrongly ordered window, throw [ArgumentError] — readers of persisted
+  /// material (the settings store) catch that and keep their default.
+  static TemperatureRange fromJson(Map<String, Object?> json) {
+    final min = json['min'];
+    final max = json['max'];
+    if (min is! num || max is! num) {
+      throw ArgumentError.value(
+          json, 'json', 'needs numeric "min" and "max" bounds');
+    }
+    if (min >= max) {
+      throw ArgumentError.value(json, 'json', 'needs min < max');
+    }
+    return TemperatureRange(min: min.toDouble(), max: max.toDouble());
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TemperatureRange && other.min == min && other.max == max;
+
+  @override
+  int get hashCode => Object.hash(min, max);
 }

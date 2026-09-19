@@ -250,11 +250,11 @@ final class _ChartDays {
 /// on its day column's center — the column geometry the label, marks and
 /// symbol rows share: calendar gaps (days without any measurement) stay
 /// honest as distance, not compressed.
-/// Y bounds are the SETTINGS-selected temperature range (in-memory
-/// provider, default 36–38 °C): a fixed scale without data-adaptive
-/// padding — curve values outside the range clip AT the boundary
-/// (pure helper in cycle_curve.dart), so an outlier never stretches the
-/// scale and the rail's labels never move for it.
+/// Y bounds are the SETTINGS-selected temperature range (the
+/// persisted range provider, default 36–38 °C): a fixed scale without
+/// data-adaptive padding — curve values outside the range clip AT the
+/// boundary (pure helper in cycle_curve.dart), so an outlier never
+/// stretches the scale and the rail's labels never move for it.
 final class _CycleChart extends StatefulWidget {
   const _CycleChart({
     required this.entries,
@@ -619,9 +619,9 @@ final class _CycleChartState extends State<_CycleChart> {
       );
     }
 
-    // The y bounds are the SETTINGS-selected display range (the
-    // "Temperaturbereich" card, in-memory provider, default 36–38 °C): a
-    // fixed scale, not the old data-adaptive ±0.4 rounding anymore. Curve
+    // The y bounds are the SETTINGS-selected display range (the persisted
+    // temperatureRangeProvider, default 36–38 °C): a fixed scale, not the
+    // old data-adaptive ±0.4 rounding anymore. Curve
     // values outside the range already clipped in the runs above — dots
     // and segments ride the boundary instead of stretching the scale.
     // No degenerate-span guard is needed: the settings card enforces

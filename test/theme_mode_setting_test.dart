@@ -1,7 +1,9 @@
 // Theme-mode setting: the app's color-scheme mode (light / dark / system)
 // is selectable in the settings screen. Mirrors the language switcher
-// pattern: an in-memory provider (resets on reload by design — documented
-// limitation), default "System" follows the device brightness setting.
+// pattern: the choice is written through to the local app_settings table on
+// change and hydrated back on the next start (the persistence round trip
+// itself is pinned in settings_persistence_test.dart); the default "System"
+// follows the device brightness setting.
 //
 // The platform brightness is simulated through the test binding's platform
 // dispatcher; the app itself is unchanged: in-memory drift database

@@ -56,13 +56,6 @@ void main() {
       }
     });
 
-    test('the schema version is 9 (the NER-alignment bump)', () async {
-      final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(version.data['user_version'], 9,
-          reason: 'v9 replaces the exclude_* booleans/mood/desire with the '
-              'temp_disturbances mask and widens the mucus vocabulary');
-    });
-
     test(
         'temp_disturbances CHECK rejects masks outside 0..15; the column '
         'defaults to 0', () async {
@@ -343,6 +336,83 @@ void main() {
     });
   });
 
+  group('schema & migration (v10): app_settings key-value store', () {
+    test('the schema version is 10 (the settings-table bump)', () async {
+      final version = await db.customSelect('PRAGMA user_version').getSingle();
+      expect(version.data['user_version'], 10,
+          reason: 'v10 adds the app_settings key-value table for general '
+              'settings (language, theme mode, temperature range, …)');
+    });
+
+    test(
+        'app_settings exists with TEXT key as primary key and NOT NULL TEXT '
+        'value', () async {
+      final columns =
+          await db.customSelect('PRAGMA table_info(app_settings)').get();
+      final byName = {
+        for (final r in columns) r.data['name']! as String: r.data,
+      };
+      expect(byName.keys, containsAll(['key', 'value']),
+          reason: 'the table stores (key, value) pairs');
+      final key = byName['key']!;
+      final value = byName['value']!;
+      expect(key['type'], 'TEXT');
+      expect(value['type'], 'TEXT');
+      expect(value['notnull'], 1,
+          reason: 'a setting row always carries a value');
+      expect(key['pk'], 1,
+          reason: 'the key alone identifies a row — later settings are new '
+              'keys, never new columns');
+      expect(byName.keys, hasLength(2),
+          reason: 'no per-setting columns: the generic pair is all there is');
+    });
+
+    test('re-writing the same key replaces the value (one row per key)',
+        () async {
+      final dao = db.settingsDao;
+      await dao.writeValue('themeMode', 'light');
+      await dao.writeValue('themeMode', 'dark');
+
+      final rows = await db.select(db.appSettings).get();
+      expect(rows, hasLength(1),
+          reason: 'the key is the primary key — an upsert, not a second row');
+      expect(rows.single.value, 'dark');
+      expect(await dao.readValue('themeMode'), 'dark');
+    });
+
+    test('deleteValue removes the row; an absent key reads as null', () async {
+      await db.settingsDao.writeValue('locale', 'de');
+      expect(await db.settingsDao.readValue('locale'), 'de');
+
+      await db.settingsDao.deleteValue('locale');
+      expect(await db.settingsDao.readValue('locale'), isNull);
+      expect(await db.select(db.appSettings).get(), isEmpty);
+
+      // Deleting a key that never existed must not throw.
+      await db.settingsDao.deleteValue('neverWritten');
+      expect(await db.settingsDao.readValue('neverWritten'), isNull);
+    });
+
+    test('distinct keys are independent rows', () async {
+      final dao = db.settingsDao;
+      await dao.writeValue('locale', 'en');
+      await dao.writeValue('temperatureRange', '{"min":35.0,"max":39.0}');
+
+      expect(await dao.readValue('locale'), 'en');
+      expect(
+          await dao.readValue('temperatureRange'), '{"min":35.0,"max":39.0}');
+      expect(await db.select(db.appSettings).get(), hasLength(2));
+    });
+
+    test('an empty key is rejected', () async {
+      await expectLater(
+        db.settingsDao.writeValue('', 'whatever'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(await db.select(db.appSettings).get(), isEmpty);
+    });
+  });
+
   group('destructive upgrade from an older schemaVersion', () {
     late Directory tempDir;
     late File dbFile;
@@ -402,7 +472,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 9,
+      expect(userVersion.data['user_version'], 10,
           reason: 'drift records the upgrade run');
 
       // The profiles table is wiped and NOT recreated — no seeding, no
@@ -452,6 +522,15 @@ void main() {
       final row = await db.entriesDao.entryFor(DateTime(2026, 6, 15));
       expect(row, isNotNull,
           reason: 'the upsert lands on its day with no profile dimension');
+
+      // The v10 settings table is part of the recreated schema too: it did
+      // not exist in the stale file, and a settings write round-trips
+      // through it right after the upgrade.
+      expect(tableNames, contains('app_settings'),
+          reason: 'createAll() builds app_settings on the upgraded file');
+      await db.settingsDao.writeValue('themeMode', 'dark');
+      expect(await db.settingsDao.readValue('themeMode'), 'dark',
+          reason: 'settings storage works immediately after the upgrade');
     });
   });
 

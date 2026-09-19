@@ -86,9 +86,11 @@ class EinstellungenScreen extends ConsumerWidget {
                                 : Locale(selection.first),
                   ),
                   const SizedBox(height: 8),
-                  // In-memory ONLY: reset to the system default after a web
-                  // reload by design for this milestone (documented on
-                  // localeProvider + docs/roadmap.md).
+                  // Persisted: the choice applies immediately and is
+                  // written through to the local drift database
+                  // (app_settings) — restored on the next app start
+                  // (hydration/write-through in main.CycleApp; see
+                  // localeProvider).
                   Text(l10n.settingsLanguageNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
@@ -132,9 +134,10 @@ class EinstellungenScreen extends ConsumerWidget {
                         .state = selection.first,
                   ),
                   const SizedBox(height: 8),
-                  // In-memory ONLY: resets to the system default after a
-                  // web reload by design (documented on themeModeProvider +
-                  // docs/roadmap.md; mirrors the language switcher).
+                  // Persisted, mirroring the language switcher: the choice
+                  // is written through to the local drift database
+                  // (app_settings) and restored on the next app start
+                  // (themeModeProvider).
                   Text(l10n.settingsThemeModeNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
@@ -148,11 +151,12 @@ class EinstellungenScreen extends ConsumerWidget {
           // min < max is enforced BY CONSTRUCTION — each picker only
           // offers the values strictly on its side of the other bound (no
           // error states, the chart never sees an invalid range).
-          // In-memory ONLY for now: the range resets on restart by design
-          // (documented on temperatureRangeProvider + docs/roadmap.md;
-          // mirrors the language/theme switcher). The 0.5 °C step unit is
-          // the seam a later Fahrenheit conversion would hook into (out of
-          // scope; the range math stays in °C domain units).
+          // Persisted, mirroring the language/theme switcher: the range
+          // is written through to the local drift database
+          // (app_settings) and restored on the next app start
+          // (temperatureRangeProvider). The 0.5 °C step unit is the seam a
+          // later Fahrenheit conversion would hook into (out of scope; the
+          // range math stays in °C domain units).
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -227,9 +231,10 @@ class EinstellungenScreen extends ConsumerWidget {
                     );
                   }),
                   const SizedBox(height: 8),
-                  // In-memory ONLY: resets to the default 36–38 °C after a
-                  // restart by design (documented on
-                  // temperatureRangeProvider + docs/roadmap.md).
+                  // Persisted: the range is written through to the local
+                  // drift database (app_settings) and restored on the next
+                  // app start; the default is 36–38 °C
+                  // (temperatureRangeProvider).
                   Text(l10n.settingsTemperatureRangeNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
