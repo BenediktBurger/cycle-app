@@ -27,8 +27,33 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- Building the actual app (as captured: "building an app" — scope to be
-  clarified: release/packaging vs. remaining placeholder screens).
+#### Building the app
+
+- Building the actual app — release/packaging scope has been resolved into a
+  runbook: see [`docs/release.md`](release.md) and
+  [ADR-0009](adr/0009-release-pipeline-and-signing.md); the ready items are
+  below, the blocked ones are plain bullets.
+- [ ] Android toolchain: JDK 21 + Android command-line-tools SDK on the dev
+  machine, `flutter doctor` green, release APK builds (release.md Phase A)
+- [ ] Create the release keystore outside the repo, wire gitignored
+  `key.properties` + signing config, verify with `apksigner` (release.md
+  Phase C)
+- [ ] Adaptive launcher icon replacing the default template mipmaps
+  (release.md Phase B)
+- Application identity rename: final `applicationId`/domain (owner + INER
+  decision, release.md Gate G1) and the license choice for F-Droid (Gate G2) block
+  all store submissions; sideload APKs are not blocked.
+- [ ] Sideload APK + device upgrade test (old release with data → install
+  new release → migrations preserve cycle data) as repeatable discipline
+  (release.md Phase D, per-release checklist)
+- [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
+- [ ] change appId to io.github.benediktburger.cycleapp
+- [ ] check whether dependencies are up to date
+- [ ] could CI (tooling) catch more errors/improve the quality (also for android)?
+- choose and set a license
+
+#### Domain / UI
+
 - [ ] Make the cycle chart more like the paper: first bleeding, then mucus, then temperature. ideas if possible to render entries inside temperature chart, see the image in .opencode/plans, to get closer to paper:
   - render bleeding and mucus inside the temperature chart (at the top of the chart)
   - M below mucus
@@ -38,8 +63,19 @@ the sections above track planned work, git history keeps the record (see
 - [ ] cycle chart: show an indicator if there is a note for a day
 - [ ] SUZ mark should have a larger arrow
 - Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
-- pdf export for consultants (similar to paper form)
 - [ ] with many cycles, scrolling the cycle chart becomes sloppy
+- [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
+- [ ] add the number of cycle to the cycle page somewhere to the cycle start (add a setting for numbers of observed cycles outside this app)
+- [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
+- [ ] prepare Metadata, setup... for local build, fdroid, and for play store
+- [ ] cycle: make it possible to click another day without des electing the first one (maybe add a button to close day options)
+- [ ] add necessary DSVGO notice
+- [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
+- [ ] The diary cycle-start prompt re-fires when re-saving a suggested day that
+  already carries the cycle start mark (harmless — addMark is idempotent):
+  -> suppress the prompt when the mark is already present on the saved day.
+
+- [ ] set adr 1 to accepted adapted to this decision: It is crucial that the woman / the couple remains in control and takes consciens decisions. There should be no unwanted pregnancy because someone trusted this app without knowing what they do. Therefore, the app should support the user but not give the final answer. It is fine if it raises a warning (like setting the first higher measruement to a day which is below the baseline), if it calculates temperature differences etc. Also, it should be clear that you need to know the method (either via book or a course) regarding proper oberservations (temperature and mucus) and analysis such that the interpretation (fertility) becomes reliable.
 
 ### Convenience
 
@@ -58,7 +94,7 @@ the sections above track planned work, git history keeps the record (see
 - add descriptions (texts TBD) and tooltips, welcome page, links, help, copyright...
 - export as password protected zip
 - improve json export (currently quite verbose), better Csv or similar for the days?
-- review test suite and clean it up
+- [ ] review test suite and clean it up
 - drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
@@ -66,7 +102,3 @@ the sections above track planned work, git history keeps the record (see
   start, while the marked cycle start may sit on a bleeding-free day —
   wording follow-up; the new label wording should be settled first with the
   ADR-0008 open question (c) expert review (needs expert wording).
-- The diary cycle-start prompt re-fires when re-saving a suggested day that
-  already carries the cycle start mark (harmless — addMark is idempotent):
-  needs discussion whether to suppress the prompt when the mark is already
-  present on the saved day.
