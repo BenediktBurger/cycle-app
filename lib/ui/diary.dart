@@ -210,16 +210,23 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // that the shared suggestion predicate flags, the app ASKS before
     // placing the mark. `isSuggestedCycleStart` requires bleeding level >= 2
     // on a day that does not continue the previous calendar day's
-    // menstruation-level bleeding — the suppression is keyed PURELY to
-    // bleeding continuity: the ignoreTemperature mark does NOT suppress
-    // the prompt (owner decision 2026-09-18 — the mark is
-    // temperature-evaluation-scoped), so no mark lookups happen here.
+    // menstruation-level bleeding — the prompt is suppressed both by
+    // bleeding continuity and by a cycleStart mark that is already present
+    // on the saved day (a re-save must not re-fire the ask; the mark is
+    // the boundary). The ignoreTemperature mark does NOT suppress the
+    // prompt (owner decision 2026-09-18 — the mark is
+    // temperature-evaluation-scoped).
     if (entry.bleeding.level < 2) return;
     final previousRow =
         await db.entriesDao.entryFor(DateOnly.addDays(date, -1));
     final previous =
         previousRow == null ? null : dailyEntryFromDrift(previousRow);
     if (!isSuggestedCycleStart(entry, previous)) return;
+    final existingMarks = await db.marksDao.marksForDay(date);
+    if (existingMarks
+        .any((mark) => mark.markType == CycleMarkTypes.cycleStart)) {
+      return;
+    }
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -339,10 +346,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: InputDecoration(
-                  labelText: '${l10n.temperature} (°C)',
-                  helperText: '36,6 · 36.65',
-                ),
+                decoration:
+                    InputDecoration(labelText: '${l10n.temperature} (°C)'),
                 validator: (value) {
                   final parsed = parseDecimalInput(value ?? '');
                   if (parsed == null) {
@@ -405,37 +410,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                         );
                 },
               ),
-              // --- bleeding --------------------------------------------
-              // All five levels of the numeric scale, none first. Wrap of
-              // ChoiceChips like the mucus quality row below: a five-label
-              // SegmentedButton risks overflowing small phone widths.
-              Text(l10n.bleeding),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final bleeding in Bleeding.values)
-                    ChoiceChip(
-                      label: Text(
-                        switch (bleeding) {
-                          Bleeding.none => l10n.bleedingNone,
-                          Bleeding.spotting => l10n.bleedingSpotting,
-                          Bleeding.light => l10n.bleedingLight,
-                          Bleeding.medium => l10n.bleedingMedium,
-                          Bleeding.heavy => l10n.bleedingHeavy,
-                        },
-                      ),
-                      selected: _bleeding == bleeding,
-                      onSelected: (selected) => setState(() {
-                        // Tapping the selected chip falls back to none,
-                        // mirroring the mucus quality chips' toggle.
-                        _bleeding = selected ? bleeding : Bleeding.none;
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
               // --- temperature disturbance group (flags + exclude switch)
               // One labelled group, one decision (owner decision
               // 2026-09-19: the coupling between the disturbance flags and
@@ -495,6 +469,37 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              // --- bleeding --------------------------------------------
+              // All five levels of the numeric scale, none first. Wrap of
+              // ChoiceChips like the mucus quality row below: a five-label
+              // SegmentedButton risks overflowing small phone widths.
+              Text(l10n.bleeding),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final bleeding in Bleeding.values)
+                    ChoiceChip(
+                      label: Text(
+                        switch (bleeding) {
+                          Bleeding.none => l10n.bleedingNone,
+                          Bleeding.spotting => l10n.bleedingSpotting,
+                          Bleeding.light => l10n.bleedingLight,
+                          Bleeding.medium => l10n.bleedingMedium,
+                          Bleeding.heavy => l10n.bleedingHeavy,
+                        },
+                      ),
+                      selected: _bleeding == bleeding,
+                      onSelected: (selected) => setState(() {
+                        // Tapping the selected chip falls back to none,
+                        // mirroring the mucus quality chips' toggle.
+                        _bleeding = selected ? bleeding : Bleeding.none;
+                      }),
+                    ),
+                ],
               ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----
@@ -636,23 +641,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // --- toggles ----------------------------------------------
-              Wrap(
-                spacing: 8,
-                children: [
-                  FilterChip(
-                    label: Text(l10n.painBreast),
-                    selected: _painBreast,
-                    onSelected: (v) => setState(() => _painBreast = v),
-                  ),
-                  FilterChip(
-                    label: Text(l10n.painMittelschmerz),
-                    selected: _painMittelschmerz,
-                    onSelected: (v) => setState(() => _painMittelschmerz = v),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
               // --- sex times (multi-select) ------------------------------
               // The three time slots are INDEPENDENT toggles: each tap
               // sets/clears its own bit in the day's sexTimings mask and
@@ -682,6 +670,23 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                             : _sexTimings & ~timing.bit;
                       }),
                     ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // --- pain toggles ----------------------------------------
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilterChip(
+                    label: Text(l10n.painBreast),
+                    selected: _painBreast,
+                    onSelected: (v) => setState(() => _painBreast = v),
+                  ),
+                  FilterChip(
+                    label: Text(l10n.painMittelschmerz),
+                    selected: _painMittelschmerz,
+                    onSelected: (v) => setState(() => _painMittelschmerz = v),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),

@@ -69,9 +69,6 @@ the sections above track planned work, git history keeps the record (see
 - [ ] cycle: make it possible to click another day without deselecting the first one (maybe add a button to close day options)
 - [ ] add necessary DSVGO notice
 - [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
-- [ ] The diary cycle-start prompt re-fires when re-saving a suggested day that
-  already carries the cycle start mark (harmless — addMark is idempotent):
-  -> suppress the prompt when the mark is already present on the saved day.
 
 ### Convenience
 
@@ -86,7 +83,6 @@ the sections above track planned work, git history keeps the record (see
   choices plus the temperature range (the chart's range setting lands
   in-memory first, deliberately resetting on start; its persistence is
   deferred into this same batch).
-- [ ] diary tab: reorder entries: everything of temperature (value, time, exclude) together, all mucus together, all cervix together, sex, pain, extra data
 - [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.

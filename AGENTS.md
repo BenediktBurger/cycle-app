@@ -52,6 +52,17 @@ single durable mapping of those IDs. Therefore:
 In a fresh checkout or git worktree, run `flutter pub get` before any
 `flutter`/`dart` command (`.dart_tool/` is not version-controlled).
 
+### Reusable worktrees
+
+Numbered sibling worktrees are reused across tasks:
+`/home/benediktb/Repositories/cycle-app-wt<NN>` (`wt1`, `wt2`, …). Check
+`git worktree list` first and reuse the first free number; create a missing
+one from the main repo with `git worktree add ../cycle-app-wt<NN> -b
+<branch>` (branch name from the task, e.g. `wt/diary-tab-cleanup`). Never
+clobber an occupied or dirty tree — report back instead. After creating a
+fresh worktree, run `flutter pub get` there (see above) before any
+`flutter`/`dart` command.
+
 Run tests with `flutter test`; the default `compact` reporter redraws one
 line with carriage returns, so captured agent logs end up mangled and
 failures only surface in a summary at the end. Instead:

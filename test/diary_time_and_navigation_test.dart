@@ -108,10 +108,12 @@ IconButton _chevron(WidgetTester tester, IconData icon) =>
 // (level >= 2), confirming persists the user-authored mark, dismissing
 // persists nothing, a level-1 day (spotting) prompts nothing, a
 // menstruation-level day that continues the previous day's bleeding
-// (mid-flow) prompts nothing, and the prompt is keyed PURELY to bleeding
+// (mid-flow) prompts nothing, the prompt is keyed PURELY to bleeding
 // continuity: the ignoreTemperature mark does NOT suppress it any more
 // (owner decision 2026-09-18 — the mark is temperature-evaluation-scoped;
-// a marked bleeding day still prompts and still places the cycleStart).
+// a marked bleeding day still prompts and still places the cycleStart),
+// and a day that ALREADY carries the cycleStart mark re-saves without the
+// prompt re-firing (the mark decides the cycle boundary — no repeat ask).
 //
 // The database is an in-memory override, same pattern as the
 // measured-time section; the German locale is pinned so the
@@ -499,6 +501,32 @@ void main() {
         reason: 'fresh menstruation starts after a break or on the first '
             'day — a continuous menstruation is mid-flow, not a new start');
     expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
+  });
+
+  testWidgets(
+      'a suggested day that already carries the cycleStart mark shows no '
+      'prompt (no re-fire on re-save)', (tester) async {
+    _promptHarness.tallSurface(tester);
+    await tester.pumpWidget(_promptHarness.scope(seed: (db) async {
+      // The user already confirmed the cycle start on this day: re-saving
+      // the still-suggested bleeding day must not ask again — the mark is
+      // the authoritative boundary and stays untouched.
+      await db.marksDao.addMark(
+        _day,
+        CycleMarkTypes.cycleStart,
+        author: 'user',
+      );
+    }));
+    await tester.pumpAndSettle();
+
+    await _promptHarness.saveWithBleeding(tester, 'leicht');
+
+    expect(find.byType(AlertDialog), findsNothing,
+        reason: 'the cycleStart mark is already on the day — the prompt '
+            'must not re-fire on a re-save');
+    expect(await _promptHarness.storedMarkTypes(_day),
+        equals([CycleMarkTypes.cycleStart]),
+        reason: 'the pre-existing cycleStart mark stays exactly as it was');
   });
 
   testWidgets(
