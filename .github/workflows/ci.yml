@@ -1,13 +1,20 @@
 name: CI
 
-# ADR-0006: first real compile check for hand-written code —
-# analyze + test + web build on every push/PR to main; manual runs for convenience.
+# ADR-0006: correctness gate for hand-written code — analyze, dart format,
+# and test on every push/PR; a web build plus an Android debug build compile
+# both shipping targets. development is the primary integration line, main
+# the release line. Manual runs for convenience.
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
-    branches: [main]
+    branches: [main, development]
   workflow_dispatch:
+
+# Superseded runs of the same branch are cancelled to save runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze-test-build:
@@ -15,9 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Pinned to match the dev machine's stable Flutter (currently
+      # 3.47.4 / Dart 3.13.3); update this together with the local SDK.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.4
 
       - name: Install dependencies
         run: flutter pub get
@@ -31,8 +41,24 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
+      # Mirrors the local doc gate (see CONTRIBUTING.md): CI fails on
+      # unformatted files, no leniency.
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+
       - name: Test
         run: flutter test
 
       - name: Build web
         run: flutter build web
+
+      # Android debug build (unsigned, no signing config needed): compiles
+      # the upcoming product target so regressions surface in CI, even
+      # though the local Android toolchain is not yet green.
+      # Accept the SDK licenses non-interactively first, otherwise the
+      # build fails on the license prompt.
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+
+      - name: Build Android (debug)
+        run: flutter build apk --debug
