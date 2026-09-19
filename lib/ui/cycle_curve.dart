@@ -1,14 +1,21 @@
 // Pure curve-structure helpers for the Zyklus temperature chart: which
 // days form drawable line runs (adjacent-day connectivity) and which
-// segments are interrupted (excluded) and must render lighter. No Flutter
+// segments are interrupted (ignored) and must render lighter. No Flutter
 // or chart types here — the widget layer (lib/ui/cycle.dart) maps these
 // onto fl_chart bars; tests assert the rule set directly.
 import '../domain/models.dart';
 
+/// The alpha the IGNORED temperatures render with (owner decision 4: the
+/// ignoreTemperature mark is the rendering key; marked days render lighter).
+/// Hoisted here so the chart's lighter color (lib/ui/cycle.dart) and the
+/// help sheet's lighter-dot glossary sample derive from ONE constant and
+/// cannot drift.
+const double ignoredTemperatureAlpha = 0.4;
+
 /// One drawable point of the temperature curve: a measured temperature on
-/// its chart x position (day index), flagged when the day is interrupted
-/// (a non-zero raw disturbance mask — the rendering is keyed to the raw
-/// `tempDisturbances` mask, NOT to the ignoreTemperature mark) and thus
+/// its chart x position (day index), flagged when the day carries the
+/// ignoreTemperature MARK (the rendering is keyed to the MARK, NOT to the
+/// raw `tempDisturbances` mask — owner decision 4, 2026-09-19) and thus
 /// renders lighter.
 final class CurvePoint {
   const CurvePoint({
@@ -23,8 +30,10 @@ final class CurvePoint {
   /// Measured temperature in °C.
   final double bbtC;
 
-  /// True when the day carries at least one raw disturbance flag
-  /// (tempDisturbances != 0): measured, but lighter.
+  /// True when the day carries the ignoreTemperature mark (passed in as
+  /// the ignored-day-index set): measured, but lighter. The raw mask is
+  /// NOT consulted — a flagged day whose mark was removed renders
+  /// normally, and a marked day without flags renders lighter.
   final bool excluded;
 }
 
@@ -44,7 +53,7 @@ final class CurveSegment {
   final CurvePoint a;
   final CurvePoint b;
 
-  /// A segment touching an interrupted (excluded) day must render lighter.
+  /// A segment touching an interrupted (ignored) day must render lighter.
   bool get lighter => a.excluded || b.excluded;
 }
 
@@ -53,18 +62,24 @@ final class CurveSegment {
 /// [entriesByDayIndex] maps day index -> entry over the chart range (see
 /// _ChartDays). Days WITHOUT a temperature — no entry at all, or an entry
 /// that carries no bbtC — break the line; a day with a temperature counts
-/// as measured even when its raw disturbance mask marks it interrupted
-/// (the mask is rendering input only — the ignoreTemperature mark is
-/// deliberately NOT consulted here: a manually-ignored day without flags
-/// renders normally).
-List<CurveRun> curveRuns(Map<int, DailyEntry> entriesByDayIndex) {
+/// as measured even when it is marked ignored. [ignoredDayIndexes] names
+/// the chart's day indexes whose temperature is IGNORED (computed by the
+/// chart from the ignoreTemperature marks — owner decision 4: the mark is
+/// the rendering key). A marked day renders lighter whether or not it
+/// carries raw disturbance flags; a flagged day whose mark was removed
+/// renders normally (the mask is the diary badge's input, not the
+/// curve's).
+List<CurveRun> curveRuns(
+  Map<int, DailyEntry> entriesByDayIndex, {
+  Set<int> ignoredDayIndexes = const {},
+}) {
   final measured = <CurvePoint>[
     for (final MapEntry(:key, value: entry) in entriesByDayIndex.entries)
       if (entry.bbtC != null)
         CurvePoint(
           dayIndex: key,
           bbtC: entry.bbtC!,
-          excluded: entry.isInterrupted,
+          excluded: ignoredDayIndexes.contains(key),
         ),
   ]..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));
 

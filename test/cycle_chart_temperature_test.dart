@@ -1,10 +1,14 @@
 // Widget tests of the temperature curve's connectivity and interruption
 // rendering: the line connects two temperatures ONLY when their calendar
-// days are adjacent; interrupted temperatures (a NON-ZERO raw disturbance
-// mask on the entry — the rendering is keyed to the raw mask, NOT to the
-// ignoreTemperature mark) count as measured days, keep the line
-// continuous, but render lighter (dot AND touching segments). Same harness
-// pattern as test/cycle_chart_weekend_test.dart.
+// days are adjacent; ignored temperatures (a day carrying the
+// ignoreTemperature MARK — the rendering is keyed to the mark, NOT to the
+// raw disturbance mask, owner decision 4) count as measured days, keep the
+// line continuous, but render lighter (dot AND touching segments). The
+// mark makes the state visible on the graph: a marked day without flags
+// renders lighter, and a flagged day whose mark was removed renders
+// normally again. Same harness pattern as test/cycle_chart_weekend_test.dart
+// (with the marksProvider override pattern from the help-sheet tests).
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
@@ -22,7 +26,11 @@ final _sun = DateTime.utc(2026, 9, 6);
 
 final _seedColor = const Color(0xFF6750A4);
 
-Widget _chartHarness({required List<DailyEntry> entries}) => MaterialApp(
+Widget _chartHarness({
+  required List<DailyEntry> entries,
+  List<CycleMark> marks = const [],
+}) =>
+    MaterialApp(
       themeMode: ThemeMode.system,
       theme:
           ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: _seedColor)),
@@ -36,6 +44,7 @@ Widget _chartHarness({required List<DailyEntry> entries}) => MaterialApp(
       home: ProviderScope(
         overrides: [
           dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
+          marksProvider.overrideWith((ref) => Stream.value(marks)),
           selectedDateProvider.overrideWith((ref) => entries.first.date),
         ],
         child: Scaffold(body: ZyklusScreen()),
@@ -119,40 +128,44 @@ void main() {
     });
   });
 
-  group('excluded temperatures render lighter', () {
-    // Thu and Sat: ordinary measurements; Fri: temperature with a raw
-    // disturbance flag (Krank = kr) — measured, but interrupted.
-    final excludedMiddle = <DailyEntry>[
+  group('ignored temperatures render lighter (mark-keyed)', () {
+    // Thu and Sat: ordinary measurements; Fri: a measured day carrying the
+    // ignoreTemperature MARK (no raw flags needed — the mark is the
+    // rendering key).
+    final ignoredMiddle = <DailyEntry>[
       DailyEntry(date: _thu, bbtC: 36.5),
-      DailyEntry(
-          date: _fri, bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
+      DailyEntry(date: _fri, bbtC: 36.6),
       DailyEntry(date: _sat, bbtC: 36.7),
     ];
+    final friMark =
+        CycleMark(date: _fri, type: CycleMarkTypes.ignoreTemperature);
 
     /// The scheme color the chart derives its normal (opaque) color from.
     Color normalColor(WidgetTester tester) =>
         _themeOf(tester).colorScheme.primary;
 
-    testWidgets('line stays continuous through the excluded day',
+    testWidgets('line stays continuous through the ignored day',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: excludedMiddle));
+      await tester
+          .pumpWidget(_chartHarness(entries: ignoredMiddle, marks: [friMark]));
       await tester.pumpAndSettle();
 
       expect(_connects(tester, 0, 1), isTrue,
-          reason: 'excluded temperature counts as a measured day');
+          reason: 'ignored temperature counts as a measured day');
       expect(_connects(tester, 1, 2), isTrue,
-          reason: 'the line continues through the excluded day');
+          reason: 'the line continues through the ignored day');
     });
 
-    testWidgets('segments touching the excluded day render lighter',
+    testWidgets('segments touching the ignored day render lighter',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: excludedMiddle));
+      await tester
+          .pumpWidget(_chartHarness(entries: ignoredMiddle, marks: [friMark]));
       await tester.pumpAndSettle();
 
       for (final bar in _segmentBars(tester)) {
         final color = bar.color!;
         expect(color.a, closeTo(0.4, 1e-6),
-            reason: 'both segments touch the excluded day -> lighter tint');
+            reason: 'both segments touch the ignored day -> lighter tint');
         // Lighter = theme color at reduced alpha, not a different hue.
         expect(color.r, normalColor(tester).r);
         expect(color.g, normalColor(tester).g);
@@ -160,9 +173,10 @@ void main() {
       }
     });
 
-    testWidgets('the excluded dot renders lighter, normal dots stay opaque',
+    testWidgets('the ignored dot renders lighter, normal dots stay opaque',
         (tester) async {
-      await tester.pumpWidget(_chartHarness(entries: excludedMiddle));
+      await tester
+          .pumpWidget(_chartHarness(entries: ignoredMiddle, marks: [friMark]));
       await tester.pumpAndSettle();
 
       // Dots come from dot-only bars (invisible line): their per-spot dot
@@ -181,31 +195,123 @@ void main() {
       }
       expect(painterByIndex[0]!.a, 1.0,
           reason: 'an ordinary measurement keeps the full-strength dot');
-      final excluded = painterByIndex[1]!;
-      expect(excluded.a, closeTo(0.4, 1e-6),
-          reason: 'the excluded dot renders lighter');
-      expect(excluded.r, normalColor(tester).r);
-      expect(excluded.g, normalColor(tester).g);
-      expect(excluded.b, normalColor(tester).b);
+      final ignored = painterByIndex[1]!;
+      expect(ignored.a, closeTo(0.4, 1e-6),
+          reason: 'the ignored dot renders lighter');
+      expect(ignored.r, normalColor(tester).r);
+      expect(ignored.g, normalColor(tester).g);
+      expect(ignored.b, normalColor(tester).b);
     });
 
-    testWidgets('two consecutive excluded days connect with a lighter segment',
-        (tester) async {
-      // Thu and Fri both measured AND both excluded: one segment, but every
-      // part of it — line and both dots — renders lighter.
-      await tester.pumpWidget(_chartHarness(entries: [
-        DailyEntry(
-            date: _thu, bbtC: 36.5, tempDisturbances: TempDisturbance.kr.bit),
+    testWidgets(
+        'a marked day WITHOUT disturbance flags renders lighter '
+        '(the mark alone dims the curve)', (tester) async {
+      // Headline new behavior (owner decision 4): the mark is the visible
+      // state, flags are surfaced by other means (diary badge). Fri carries
+      // ONLY the mark — no tempDisturbances — and still renders lighter.
+      final unflaggedMarked = <DailyEntry>[
+        DailyEntry(date: _thu, bbtC: 36.5),
+        DailyEntry(date: _fri, bbtC: 36.6), // mask 0
+        DailyEntry(date: _sat, bbtC: 36.7),
+      ];
+      await tester.pumpWidget(
+          _chartHarness(entries: unflaggedMarked, marks: [friMark]));
+      await tester.pumpAndSettle();
+
+      final dotBars = [
+        for (final bar in _bars(tester))
+          if (bar.color == null || bar.color!.a == 0) bar,
+      ];
+      final painterByIndex = <int, Color>{};
+      for (var i = 0; i < dotBars.single.spots.length; i++) {
+        final spot = dotBars.single.spots[i];
+        final painter = dotBars.single.dotData
+            .getDotPainter(spot, 0, dotBars.single, i) as FlDotCirclePainter;
+        painterByIndex[spot.x.round()] = painter.color;
+      }
+      expect(painterByIndex[1]!.a, closeTo(0.4, 1e-6),
+          reason: 'a marked day WITHOUT flags renders lighter');
+      for (final bar in _segmentBars(tester)) {
+        expect(bar.color!.a, closeTo(0.4, 1e-6),
+            reason: 'both segments touch the marked day -> lighter tint');
+      }
+    });
+
+    testWidgets(
+        'a flagged day WITHOUT the mark renders at FULL alpha '
+        '(deleting the mark restores normal rendering)', (tester) async {
+      // THE FLIP (owner decision 4): the mark can be deleted on the day
+      // sheet while the raw flags remain — the curve renders normally
+      // again (the flags are surfaced by the diary badge, not the curve).
+      final flaggedUnmarked = <DailyEntry>[
+        DailyEntry(date: _thu, bbtC: 36.5),
         DailyEntry(
             date: _fri, bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
-      ]));
+        DailyEntry(date: _sat, bbtC: 36.7),
+      ];
+      await tester.pumpWidget(_chartHarness(entries: flaggedUnmarked));
+      await tester.pumpAndSettle();
+
+      for (final bar in _segmentBars(tester)) {
+        expect(bar.color!.a, 1.0,
+            reason: 'flags without the mark render at full alpha — the '
+                'raw mask is no longer a rendering input');
+      }
+      final dotBars = [
+        for (final bar in _bars(tester))
+          if (bar.color == null || bar.color!.a == 0) bar,
+      ];
+      for (var i = 0; i < dotBars.single.spots.length; i++) {
+        final painter = dotBars.single.dotData
+                .getDotPainter(dotBars.single.spots[i], 0, dotBars.single, i)
+            as FlDotCirclePainter;
+        expect(painter.color.a, 1.0,
+            reason: 'the flagged-but-unmarked dot keeps the full-strength '
+                'color');
+      }
+    });
+
+    testWidgets(
+        'a marked AND flagged day renders lighter (the common auto-set '
+        'path)', (tester) async {
+      // Flags auto-set the mark (auto-set only), so the usual flagged day
+      // carries both: mask AND mark — still lighter (mark-keyed).
+      final flaggedMarked = <DailyEntry>[
+        DailyEntry(date: _thu, bbtC: 36.5),
+        DailyEntry(
+            date: _fri, bbtC: 36.6, tempDisturbances: TempDisturbance.kr.bit),
+        DailyEntry(date: _sat, bbtC: 36.7),
+      ];
+      await tester
+          .pumpWidget(_chartHarness(entries: flaggedMarked, marks: [friMark]));
+      await tester.pumpAndSettle();
+
+      for (final bar in _segmentBars(tester)) {
+        expect(bar.color!.a, closeTo(0.4, 1e-6),
+            reason: 'marked + flagged renders lighter (the mark is the '
+                'rendering key)');
+      }
+    });
+
+    testWidgets('two consecutive ignored days connect with a lighter segment',
+        (tester) async {
+      // Thu and Fri both measured AND both ignored (marks): one segment,
+      // but every part of it — line and both dots — renders lighter.
+      final marks = [
+        CycleMark(date: _thu, type: CycleMarkTypes.ignoreTemperature),
+        friMark,
+      ];
+      await tester.pumpWidget(_chartHarness(entries: [
+        DailyEntry(date: _thu, bbtC: 36.5),
+        DailyEntry(date: _fri, bbtC: 36.6),
+      ], marks: marks));
       await tester.pumpAndSettle();
 
       expect(_segmentBars(tester), hasLength(1),
-          reason: 'the two adjacent excluded days form exactly one segment');
+          reason: 'the two adjacent ignored days form exactly one segment');
       final segment = _segmentBars(tester).single;
       expect(segment.color!.a, closeTo(0.4, 1e-6),
-          reason: 'the segment between two excluded days is lighter');
+          reason: 'the segment between two ignored days is lighter');
       expect(segment.color!.r, normalColor(tester).r);
       expect(segment.color!.g, normalColor(tester).g);
       expect(segment.color!.b, normalColor(tester).b);
@@ -221,7 +327,7 @@ void main() {
         final painter = dotBars.first.dotData.getDotPainter(
             dotBars.first.spots[i], 0, dotBars.first, i) as FlDotCirclePainter;
         expect(painter.color.a, closeTo(0.4, 1e-6),
-            reason: 'excluded dot ${dotBars.first.spots[i].x.round()} '
+            reason: 'ignored dot ${dotBars.first.spots[i].x.round()} '
                 'renders lighter');
         expect(painter.color.r, normalColor(tester).r);
         expect(painter.color.g, normalColor(tester).g);
@@ -229,33 +335,33 @@ void main() {
       }
     });
 
-    testWidgets(
-        'excluded dot at a run edge connects to the adjacent normal day',
+    testWidgets('ignored dot at a run edge connects to the adjacent normal day',
         (tester) async {
-      // Fri: excluded; Sat: normal. The excluded edge day is still drawn
-      // connected — adjacency, not exclusion, decides connectivity.
+      // Fri: ignored; Sat: normal. The ignored edge day is still drawn
+      // connected — adjacency, not the mark, decides connectivity.
       await tester.pumpWidget(_chartHarness(entries: [
         DailyEntry(date: _thu, bbtC: 36.5),
-        DailyEntry(
-            date: _fri, bbtC: 36.2, tempDisturbances: TempDisturbance.sp.bit),
+        DailyEntry(date: _fri, bbtC: 36.2),
         DailyEntry(date: _sat, bbtC: 37.0),
+      ], marks: [
+        friMark
       ]));
       await tester.pumpAndSettle();
 
       expect(_connects(tester, 1, 2), isTrue,
-          reason: 'excluded run-edge day connects to its adjacent day');
+          reason: 'ignored run-edge day connects to its adjacent day');
       final segment = _segmentBars(tester)
           .firstWhere((bar) => bar.spots.length == 2 && bar.spots[0].x == 1);
       expect(segment.color!.a, closeTo(0.4, 1e-6),
-          reason: 'the segment touching the excluded edge day is lighter');
+          reason: 'the segment touching the ignored edge day is lighter');
     });
 
-    testWidgets('excluded-temp segments stay dark in dark mode',
-        (tester) async {
+    testWidgets('ignored-temp segments stay dark in dark mode', (tester) async {
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
       addTearDown(tester.platformDispatcher.clearAllTestValues);
 
-      await tester.pumpWidget(_chartHarness(entries: excludedMiddle));
+      await tester
+          .pumpWidget(_chartHarness(entries: ignoredMiddle, marks: [friMark]));
       await tester.pumpAndSettle();
 
       final darkScheme = tester

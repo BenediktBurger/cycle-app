@@ -2,17 +2,19 @@
 // moved into a bottom sheet opened from the AppBar's info_outline action —
 // every symbol the legend carried (temperature, bleeding, mucus, mucus
 // peak, circled higher, arrow higher, baseline, SUZ, cervix position,
-// cervix firmness, measurement time, sex, pain) plus the user-placed
-// analysis-exclusion toggle (a day-sheet mark, no chart glyph — see the
-// entry note) and the evaluation-arithmetic note. The glyph samples reuse
-// the same shapes the chart and its rows render, so the glossary always
-// shows what the screen draws. Pure display — no persistence (ADR-0001).
+// cervix firmness, measurement time, sex, pain) plus the ignored-
+// temperature entry (the lighter temperature rendering of the
+// ignoreTemperature-marked days — see the entry note) and the evaluation-
+// arithmetic note. The glyph samples reuse the same shapes the chart and
+// its rows render, so the glossary always shows what the screen draws.
+// Pure display — no persistence (ADR-0001).
 
 import 'package:flutter/material.dart';
 
 import '../domain/cervix.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
+import 'cycle_curve.dart';
 import 'cycle_marks.dart';
 import 'mucus_symbol.dart';
 
@@ -72,14 +74,15 @@ final class _CycleHelpSheet extends StatelessWidget {
               shape: _HelpEntryShape.dot,
             ),
             _HelpEntry(
-              color: scheme.onSurface,
+              // The ignored-temperature entry presents the VISUAL
+              // consequence (owner decision 4: the mark is the curve's
+              // rendering key — marked days render lighter): the sample is
+              // a lighter temperature dot, derived from the SAME constant
+              // the curve draws with (ignoredTemperatureAlpha) so legend
+              // and chart cannot drift.
+              color: scheme.primary.withValues(alpha: ignoredTemperatureAlpha),
               label: l10n.cycleLegendIgnoreTemperature,
-              // The temperature-ignore mark draws NO chart glyph (the
-              // interrupted-lookup is the raw Temperature mask, and the
-              // mark is deliberately not doubled onto the curve): the
-              // glossary entry therefore carries the day-sheet TOGGLE
-              // affordance itself as its "symbol".
-              shape: _HelpEntryShape.eyeOff,
+              shape: _HelpEntryShape.dot,
             ),
             _HelpEntry(
               color: scheme.primary,
@@ -154,7 +157,6 @@ enum _HelpEntryShape {
   clock,
   sex,
   pain,
-  eyeOff,
 }
 
 final class _HelpEntry extends StatelessWidget {
@@ -227,11 +229,6 @@ final class _HelpEntry extends StatelessWidget {
       // Sample measurement-time glyph: the clock icon (help sheet only —
       // the chart's day cells show the recorded time as text instead).
       _HelpEntryShape.clock => Icon(Icons.schedule, size: 12, color: color),
-      // The temperature-ignore entry: no chart glyph exists (see the
-      // entry note), so the sample is the day sheet's own toggle icon —
-      // the affordance IS the explanation.
-      _HelpEntryShape.eyeOff =>
-        Icon(Icons.visibility_off_outlined, size: 12, color: color),
       // Sample sex glyph: the X, exactly how a recorded sex day renders in
       // the sex row.
       _HelpEntryShape.sex => Text(

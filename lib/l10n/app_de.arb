@@ -261,5 +261,5 @@
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
   "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
-  "cycleLegendIgnoreTemperature": "Temperatur ignorieren (Schalter im Tagesblatt)"
+  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

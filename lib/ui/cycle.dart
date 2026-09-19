@@ -138,6 +138,11 @@ final class _ChartDays {
     for (final e in sorted) {
       byIndex[DateOnly.daysBetween(DateOnly.normalize(e.date), firstDay)] = e;
     }
+    ignoredDayIndexes = {
+      for (final mark in marks)
+        if (mark.type == CycleMarkTypes.ignoreTemperature)
+          DateOnly.daysBetween(DateOnly.normalize(mark.date), firstDay),
+    };
     // Cycle mapping over the whole index range, from the domain's cycle
     // grouping (same groups the Tagebuch list and the evaluation use):
     // every calendar day counts in the cycle whose start is the LATEST
@@ -165,6 +170,13 @@ final class _ChartDays {
       cycleDayByIndex[i] = DateOnly.daysBetween(date, starts[group]) + 1;
     }
   }
+
+  /// The chart day indexes whose temperature is IGNORED: computed from the
+  /// `ignoreTemperature` marks (owner decision 4 — the mark is the curve's
+  /// rendering key; the raw disturbance mask is the diary badge's input, not
+  /// the curve's). A mark on an untracked gap day yields no entry, hence no
+  /// curve point — harmless.
+  late final Set<int> ignoredDayIndexes;
 
   /// UTC-midnight of the first recorded day (day index 0).
   late final DateTime firstDay;
@@ -453,7 +465,8 @@ final class _CycleChartState extends State<_CycleChart> {
     // (missing entry or entry without bbtC) breaks the line. This global
     // structure feeds the Y bounds: the scale must cover the whole recorded
     // range so scrolling never rescales the curve.
-    final runs = curveRuns(_days.byIndex);
+    final runs =
+        curveRuns(_days.byIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -493,12 +506,14 @@ final class _CycleChartState extends State<_CycleChart> {
     final scale =
         _TemperatureScale(min: yMin, max: yMax, plotHeight: chartHeight);
 
-    // Interrupted (excluded) TEMPERATURES read lighter: the scheme color at
-    // a fraction of the alpha. The dark scheme's primary is a bright color,
-    // so the dimmed tint still keeps darkness-readable contrast (asserted
-    // by the dark-mode chart tests).
+    // Ignored (marked) TEMPERATURES read lighter: the scheme color at the
+    // shared lighter alpha (owner decision 4: the ignoreTemperature mark is
+    // the rendering key). The dark scheme's primary is a bright color, so
+    // the dimmed tint still keeps darkness-readable contrast (asserted by
+    // the dark-mode chart tests).
     final temperatureColor = Theme.of(context).colorScheme.primary;
-    final interruptedColor = temperatureColor.withValues(alpha: 0.4);
+    final interruptedColor =
+        temperatureColor.withValues(alpha: ignoredTemperatureAlpha);
     // The evaluation-artifact accent is theme-derived too (secondary: the
     // one scheme color the temperature/bleeding/mucus rendering does not
     // use — see the help sheet's glossary in cycle_help_sheet.dart). It
@@ -541,7 +556,8 @@ final class _CycleChartState extends State<_CycleChart> {
             if (entry.key >= winStart && entry.key <= winEnd)
               entry.key: entry.value,
         };
-        final winRuns = curveRuns(winByIndex);
+        final winRuns =
+            curveRuns(winByIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{
           for (final run in winRuns)

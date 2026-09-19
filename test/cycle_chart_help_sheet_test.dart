@@ -45,15 +45,15 @@ Widget _chartHarness({
     );
 
 /// The glossary entries (en wording); each is asserted inside the help
-/// sheet. The "Ignore temperature" entry covers the day-sheet toggle
-/// (a user mark without a chart glyph — explained under its own switch
-/// icon).
+/// sheet. The "Ignored temperature" entry presents the VISUAL consequence
+/// (the lighter temperature on the curve — the mark is the rendering key,
+/// owner decision 4) while naming where the mark is set.
 const _glossaryEn = [
   'BBT (temperature)',
   'Bleeding',
   'Fertility sign (mucus)',
   'Mucus peak',
-  'Ignore temperature (day-sheet toggle)',
+  'Ignored temperature (lighter; set in the day sheet)',
   'Circled higher measurements',
   'Higher measurement (arrow)',
   'Baseline',
@@ -70,7 +70,7 @@ const _glossaryDe = [
   'Blutung',
   'Zeichen der Fruchtbarkeit (Schleim)',
   'Schleimhöhepunkt',
-  'Temperatur ignorieren (Schalter im Tagesblatt)',
+  'Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)',
   'Umrandete höhere Messungen',
   'höhere Messung (Pfeil)',
   'Basislinie',
@@ -158,6 +158,31 @@ void main() {
               matching: find.text('EW')),
           findsNothing,
           reason: 'the mucus glossary sample carries no EW superscript');
+      // The ignored-temperature entry samples the VISUAL consequence: a
+      // lighter temperature dot (primary at the chart's own 0.4 alpha —
+      // the same constant the curve draws with), replacing the old
+      // day-sheet-toggle icon sample.
+      final scheme = tester
+          .widget<MaterialApp>(find.byType(MaterialApp))
+          .theme!
+          .colorScheme;
+      final lighterDotSamples = find.descendant(
+          of: find.byKey(const ValueKey('cycleHelpSheet')),
+          matching: find.byWidgetPredicate((widget) =>
+              widget is Container &&
+              (widget.decoration as BoxDecoration?)?.color ==
+                  scheme.primary.withValues(alpha: 0.4)));
+      expect(lighterDotSamples, findsOneWidget,
+          reason: 'the glossary samples the lighter temperature dot '
+              '(primary at 0.4 alpha — derived from the same constant the '
+              'chart uses so they cannot drift)');
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('cycleHelpSheet')),
+              matching: find.byIcon(Icons.visibility_off_outlined)),
+          findsNothing,
+          reason: 'the old day-sheet-toggle icon sample is gone — the '
+              'legend shows the rendering consequence, not the affordance');
     });
 
     testWidgets('the glossary uses the German wording in de', (tester) async {

@@ -369,5 +369,5 @@
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
   "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
-  "cycleLegendIgnoreTemperature": "Ignore temperature (day-sheet toggle)"
+  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

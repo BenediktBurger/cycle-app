@@ -1,21 +1,23 @@
 // Unit tests of the pure curve-structure helpers (lib/ui/cycle_curve.dart):
-// adjacent-day connectivity runs and lighter-rendering of interrupted
+// adjacent-day connectivity runs and lighter-rendering of ignored
 // temperatures — the rule set the temperature chart draws by. The
-// interruption flag comes from the RAW disturbance mask on the entry
-// (isInterrupted): the lighter rendering is keyed to the mask, never to the
-// ignoreTemperature mark (a manually-excluded day without flags renders
-// normally — the flags are the representable raw data).
+// interruption flag comes from the IGNORED-DAY-INDEX set passed to
+// curveRuns: the set is computed by the chart from the ignoreTemperature
+// marks (owner decision 4, 2026-09-19 — the MARK is the rendering key, not
+// the raw tempDisturbances mask). A flagged day whose mark was removed
+// renders normally; a marked day without flags renders lighter.
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/ui/cycle_curve.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Entry for chart day index [i] (2026-09-03 = index 0); the helpers are
 /// day-index driven, so dates only provide the calendar offset.
-DailyEntry _entry(int i, {double? bbt, bool interrupted = false}) => DailyEntry(
+/// [flagged] sets the raw disturbance mask (rendering-irrelevant since the
+/// mark keying — kept here to prove the mask no longer drives the flag).
+DailyEntry _entry(int i, {double? bbt, bool flagged = false}) => DailyEntry(
       date: DateTime.utc(2026, 9, 3).add(Duration(days: i)),
       bbtC: bbt,
-      tempDisturbances:
-          interrupted ? TempDisturbance.kr.bit : 0, // raw mask only
+      tempDisturbances: flagged ? TempDisturbance.kr.bit : 0,
     );
 
 void main() {
@@ -56,17 +58,61 @@ void main() {
     });
 
     test(
-        'interrupted (mask-flagged) temperatures count as measured days '
+        'ignored (marked) temperatures count as measured days '
         'for connectivity', () {
-      final runs = curveRuns({
-        0: _entry(0, bbt: 36.5),
-        1: _entry(1, bbt: 36.4, interrupted: true),
-        2: _entry(2, bbt: 36.7),
-      });
+      final runs = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1, bbt: 36.4),
+          2: _entry(2, bbt: 36.7),
+        },
+        ignoredDayIndexes: {1},
+      );
       expect(runs, hasLength(1));
       expect(runs.single.points[1].excluded, isTrue,
-          reason: 'the raw mask drives the interruption flag');
+          reason: 'the day index in the ignored set drives the flag');
       expect(runs.single.points[0].excluded, isFalse);
+    });
+
+    test(
+        'the ignored-day-index set decides the flag — the raw mask does '
+        'not', () {
+      // HEADLINE new behavior: a marked day WITHOUT flags renders lighter.
+      final markedUnflagged = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1, bbt: 36.4), // no tempDisturbances at all
+          2: _entry(2, bbt: 36.7),
+        },
+        ignoredDayIndexes: {1},
+      );
+      expect(markedUnflagged.single.points[1].excluded, isTrue,
+          reason: 'the mark (via the ignored-day-index set) is the '
+              'rendering key — flags are not needed');
+
+      // THE FLIP: a flagged day NOT in the ignored set renders normally
+      // (the user removed the mark — the curve shows the owned state).
+      final flaggedUnmarked = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1, bbt: 36.4, flagged: true), // flags WITHOUT the mark
+          2: _entry(2, bbt: 36.7),
+        },
+      );
+      expect(flaggedUnmarked.single.points[1].excluded, isFalse,
+          reason: 'raw flags are no longer a rendering input');
+
+      // Marked AND flagged (the common auto-set path): lighter.
+      final markedAndFlagged = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1, bbt: 36.4, flagged: true),
+          2: _entry(2, bbt: 36.7),
+        },
+        ignoredDayIndexes: {1},
+      );
+      expect(markedAndFlagged.single.points[1].excluded, isTrue,
+          reason: 'the mark keying makes the flagged+marked day lighter');
     });
 
     test('unordered day indexes still produce the sorted run', () {
@@ -111,12 +157,17 @@ void main() {
   });
 
   group('interrupted semantics at the boundary', () {
-    test('interrupted day WITHOUT temperature just breaks the run', () {
-      final runs = curveRuns({
-        0: _entry(0, bbt: 36.5),
-        1: _entry(1, interrupted: true), // interrupted, but no measurement
-        2: _entry(2, bbt: 36.7),
-      });
+    test(
+        'an ignored day WITHOUT temperature just breaks the run '
+        '(marks cannot bridge a measurement gap)', () {
+      final runs = curveRuns(
+        {
+          0: _entry(0, bbt: 36.5),
+          1: _entry(1), // day index in the ignored set, but no measurement
+          2: _entry(2, bbt: 36.7),
+        },
+        ignoredDayIndexes: {1},
+      );
       expect(runs, hasLength(2));
       expect(runs.map((r) => r.points.single.dayIndex), [0, 2]);
     });
