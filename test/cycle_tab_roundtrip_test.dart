@@ -89,7 +89,8 @@ void main() {
 
     List<int> renderedCells() => [
           for (var i = 0; i < 60; i++)
-            if (find.byKey(ValueKey('bleedingCell-$i')).evaluate().isNotEmpty) i,
+            if (find.byKey(ValueKey('bleedingCell-$i')).evaluate().isNotEmpty)
+              i,
         ];
     final cellsBefore = renderedCells();
     expect(cellsBefore, isNotEmpty,

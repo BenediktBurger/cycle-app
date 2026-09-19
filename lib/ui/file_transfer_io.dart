@@ -31,5 +31,6 @@ Future<bool> saveFile(String filename, String content) async {
 /// No picker on native in M1 (no dev dependency for SAF/pickers); paste
 /// into the import dialog is the route. Kept async-shaped for API parity
 /// and accepting the same [accept] list as the web implementation.
-Future<String?> pickFileText({String accept = 'application/json,.json'}) async =>
+Future<String?> pickFileText(
+        {String accept = 'application/json,.json'}) async =>
     null;

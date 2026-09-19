@@ -261,10 +261,8 @@ void main() {
 
     final setTile = tester.widget<ListTile>(find.ancestor(
         of: find.text('Set mucus peak'), matching: find.byType(ListTile)));
-    expect(
-        setTile.leading,
-        isA<Icon>()
-            .having((icon) => icon.icon, 'icon', Icons.circle),
+    expect(setTile.leading,
+        isA<Icon>().having((icon) => icon.icon, 'icon', Icons.circle),
         reason: 'the set action shows the filled circle — the solid dot the '
             'chart renders for a placed peak');
 

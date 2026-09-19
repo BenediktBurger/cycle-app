@@ -479,9 +479,7 @@ final class CycleDaySheet extends ConsumerWidget {
               // renders for it — the solid dot in the symbol row, R6) and
               // keeps the outline circle for the removal; the circled dot
               // stands for the first higher measurement.
-              icon: hasPeak
-                  ? Icons.radio_button_unchecked
-                  : Icons.circle,
+              icon: hasPeak ? Icons.radio_button_unchecked : Icons.circle,
               label: hasPeak
                   ? l10n.cycleSheetRemoveMucusPeak
                   : l10n.cycleSheetSetMucusPeak,

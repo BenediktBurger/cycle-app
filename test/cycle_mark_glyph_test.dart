@@ -34,8 +34,7 @@ void main() {
     // dimensions.
     const oldPaintedSize = Size(9, 7); // shaft 5 + head 4 wide, head 7 high
 
-    test('the chart painter\'s footprint exceeds the old size by ~1.5x',
-        () {
+    test('the chart painter\'s footprint exceeds the old size by ~1.5x', () {
       const painter = SuzArrowDotPainter(color: Color(0xFF000000));
       final size = painter.getSize(const FlSpot(0, 0));
 
@@ -61,9 +60,8 @@ void main() {
       // _SuzArrowGlyphPainter), so the box is at least bar + inset + glyph
       // wide, and at least the glyph tall. Stated as proportions of the
       // chart glyph's size, not as bare absolutes.
-      final glyphSize =
-          SuzArrowDotPainter(color: const Color(0xFF000000))
-              .getSize(const FlSpot(0, 0));
+      final glyphSize = SuzArrowDotPainter(color: const Color(0xFF000000))
+          .getSize(const FlSpot(0, 0));
       expect(sample.size.width, greaterThanOrEqualTo(glyphSize.width + 2.5),
           reason: 'the bar (2 px) plus its 0.5 px inset precede the glyph — '
               'the sample grew with the enlarged chart glyph');

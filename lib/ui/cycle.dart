@@ -1247,8 +1247,8 @@ final class _SignalRows extends StatelessWidget {
     final rows = [
       for (final kind in kinds)
         Padding(
-          padding: EdgeInsets.only(
-              top: kind == kinds.first ? 0 : _signalRowGap),
+          padding:
+              EdgeInsets.only(top: kind == kinds.first ? 0 : _signalRowGap),
           child: _SignalRow(
             kind: kind,
             days: days,
@@ -1298,8 +1298,8 @@ double _signalRowTop(_SignalKind kind, List<_SignalKind> kinds) {
 }
 
 /// A segment's total height — the rail's glyph segment must match it.
-double _signalSegmentHeight(List<_SignalKind> kinds) => kinds.fold(
-    0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
+double _signalSegmentHeight(List<_SignalKind> kinds) =>
+    kinds.fold(0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
     (kinds.isEmpty ? 0 : _signalRowGap);
 
 /// The recording signals, with the row ORDER grouped by segment (paper

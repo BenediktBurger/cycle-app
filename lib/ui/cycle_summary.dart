@@ -53,16 +53,14 @@ final class CycleSummaryTable extends StatelessWidget {
           ),
         );
 
-    Widget attributeRow(
-            String label, String attribute, List<String?> values) =>
+    Widget attributeRow(String label, String attribute, List<String?> values) =>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: _labelWidth,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 child: Text(label),
               ),
             ),
@@ -155,15 +153,14 @@ final class CycleSummaryTable extends StatelessWidget {
         : DateFormat.yMd(locale).format(DateOnly.normalize(date).toLocal());
 
     // The group's own marked start (the leading group has none).
-    final onset =
-        isOnsetGroup ? DateOnly.normalize(cycle.startDate) : null;
+    final onset = isOnsetGroup ? DateOnly.normalize(cycle.startDate) : null;
     // The next marked start: only a following marked group counts (the
     // leading group is always the first group, so any successor of a
     // marked group is a marked group itself).
-    final nextOnset =
-        index + 1 < evaluations.length && evaluations[index + 1].cycle.startsAtMenstruation
-            ? DateOnly.normalize(evaluations[index + 1].cycle.startDate)
-            : null;
+    final nextOnset = index + 1 < evaluations.length &&
+            evaluations[index + 1].cycle.startsAtMenstruation
+        ? DateOnly.normalize(evaluations[index + 1].cycle.startDate)
+        : null;
 
     // Mensende: the last day of the group whose bleeding level is >= 2
     // (menstruation-level bleeding; spotting continuations do not extend
@@ -185,8 +182,8 @@ final class CycleSummaryTable extends StatelessWidget {
     return _CycleColumn(
       header: isOnsetGroup
           ? // TODO(user-review): the "Zyklus n" label is a first draft — the
-            // experts may want a different caption (or numbering direction).
-            l10n.cycleSummaryColumn(_onsetNumber(evaluations, index))
+          // experts may want a different caption (or numbering direction).
+          l10n.cycleSummaryColumn(_onsetNumber(evaluations, index))
           // The leading group predates the first cycleStart mark: it is
           // not a numbered cycle, so it keeps the Tagebuch's leading-group
           // label with its (knowable) end day.
@@ -223,8 +220,7 @@ final class CycleSummaryTable extends StatelessWidget {
   /// same mapping the day sheet's suggestion phrases carry).
   // TODO(user-review): the rule phrasing ("Regel D (gegen Abend)") is a
   // first draft; the status wording as a whole is a review candidate.
-  String _ruleText(SuzRule rule, AppLocalizations l10n) =>
-      switch (rule) {
+  String _ruleText(SuzRule rule, AppLocalizations l10n) => switch (rule) {
         SuzRule.d => l10n.cycleSummarySuzEvening,
         SuzRule.e => l10n.cycleSummarySuzMorning,
       };
