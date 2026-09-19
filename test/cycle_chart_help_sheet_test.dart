@@ -64,7 +64,8 @@ const _glossaryEn = [
   'Sex (X per time of day)',
   'Mittelschmerz (M)',
   'Breast pain (B)',
-  'Interrupted days (kr illness, alk alcohol, R travel, a other)',
+  'Interrupted days (sp late to bed, a frequent night awakening, '
+      'alk alcohol, kr illness)',
   'Note (this day carries a note in the Diary)',
 ];
 
@@ -84,7 +85,8 @@ const _glossaryDe = [
   'Sex (X je Zeitpunkt)',
   'Mittelschmerz (M)',
   'Brustschmerz (B)',
-  'Gestörte Messung (kr krank, alk Alkohol, R Reise, a anderes)',
+  'Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, '
+      'alk Alkohol, kr Krank)',
   'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
 ];
 

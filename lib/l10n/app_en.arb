@@ -221,9 +221,9 @@
     "description": "The breast pain letter B; the Mittelschmerz letter M has its own legend entry (it renders beneath the mucus row on the chart)."
   },
   "cycleLegendMittelschmerz": "Mittelschmerz (M)",
-  "cycleLegendDisturbance": "Interrupted days (kr illness, alk alcohol, R travel, a other)",
+  "cycleLegendDisturbance": "Interrupted days (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
-    "description": "Glossary entry for the disturbance row's stacked letter codes. The vocabulary (kr/alk/R/a) mirrors today's exclusion flags — the pending NER-scheme data-entry item may re-vocabulary these letters."
+    "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
   },
   "cycleLegendNote": "Note (this day carries a note in the Diary)",
   "@cycleLegendNote": {

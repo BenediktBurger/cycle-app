@@ -211,12 +211,12 @@ void main() {
     expect(
         find.descendant(
             of: find.byKey(const ValueKey('cycleHelpSheet')),
-            matching: find.text(
-                'Interrupted days (kr illness, alk alcohol, R travel, '
-                'a other)')),
+            matching: find.text('Interrupted days (sp late to bed, '
+                'a frequent night awakening, alk alcohol, kr illness)')),
         findsOneWidget,
-        reason: 'the letter codes need a legend entry naming today\'s '
-            'vocabulary (the NER-scheme item may re-vocabulary it)');
+        reason:
+            'the letter codes need a legend entry naming the diary\'s '
+            'disturbance vocabulary');
   });
 
   testWidgets('the German help sheet explains the disturbance letters (de)',
@@ -229,9 +229,8 @@ void main() {
     expect(
         find.descendant(
             of: find.byKey(const ValueKey('cycleHelpSheet')),
-            matching: find.text(
-                'Gestörte Messung (kr krank, alk Alkohol, R Reise, '
-                'a anderes)')),
+            matching: find.text('Gestörte Messung (sp Spät ins Bett, '
+                'a Nachts öfter aufstehen, alk Alkohol, kr Krank)')),
         findsOneWidget,
         reason: 'de: the letter codes carry the German vocabulary');
   });

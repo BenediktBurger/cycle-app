@@ -119,9 +119,9 @@ final class _CycleHelpSheet extends StatelessWidget {
               color: scheme.onSurface,
               label: l10n.cycleLegendDisturbance,
               // Sample disturbance glyph: the stacked letter codes the
-              // disturbance row renders per set exclusion flag (here the
-              // two most common codes; more codes stack further and
-              // shrink to fit the row).
+              // disturbance row renders per set temperature-disturbance
+              // flag of the diary (here the two alcohol/illness codes;
+              // more codes stack further and shrink to fit the row).
               shape: _HelpEntryShape.disturbance,
             ),
             _HelpEntry(
@@ -275,15 +275,17 @@ final class _HelpEntry extends StatelessWidget {
           'M',
           style: TextStyle(fontSize: 10, color: color),
         ),
-      // Sample disturbance glyphs: the stacked letter codes of the NER
+      // Sample disturbance glyphs: the stacked letter codes of the
       // disturbance vocabulary (the TempDisturbance tokens that
-      // disturbanceLetters in cycle.dart emits).
+      // disturbanceLetters in cycle.dart emits) — stacked in the same
+      // render order as a real two-disturbance day (values order:
+      // alk before kr).
       _HelpEntryShape.disturbance => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('kr', style: TextStyle(fontSize: 9, color: color)),
             Text('alk', style: TextStyle(fontSize: 9, color: color)),
+            Text('kr', style: TextStyle(fontSize: 9, color: color)),
           ],
         ),
       // Sample note glyph: the same sticky-note icon a noted day renders

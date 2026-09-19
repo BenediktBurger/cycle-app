@@ -166,7 +166,7 @@
   "cycleLegendSex": "Sex (X je Zeitpunkt)",
   "cycleLegendPain": "Brustschmerz (B)",
   "cycleLegendMittelschmerz": "Mittelschmerz (M)",
-  "cycleLegendDisturbance": "Gestörte Messung (kr krank, alk Alkohol, R Reise, a anderes)",
+  "cycleLegendDisturbance": "Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "cycleSheetMeasuredAt": "Messzeitpunkt: {time}",
   "@cycleSheetMeasuredAt": {
