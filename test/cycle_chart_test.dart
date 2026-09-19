@@ -3499,9 +3499,11 @@ void main() {
     testWidgets(
         'the y bounds are the provider\'s range (default 36.0..38.0), '
         'never the data', (tester) async {
-      // The record spans 35.9..37.0, BELOW the old lower half-degree
-      // rounding behaviour's interest — the settings range fixes the
-      // bounds 36..38 regardless.
+      // The record dips just below the fixed range's lower bound (35.9
+      // vs 36.0) — under the old data-adaptive bounds such a low value
+      // dragged the lower edge to the half degree below (35.5 here), so
+      // this is where the old rounding would have moved the axis; the
+      // settings range pins the bounds 36..38 regardless.
       await tester.pumpWidget(_temperatureHarness(entries: [
         DailyEntry(date: _temperatureThu, bbtC: 36.5),
         DailyEntry(date: _temperatureFri, bbtC: 37.0),
