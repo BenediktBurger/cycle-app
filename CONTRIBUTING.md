@@ -103,7 +103,8 @@ clearing site data/private windows do not (expected browser behaviour).
 Only needed for running the app on an Android device or emulator — and
 for building APKs locally, which includes the release builds themselves:
 releases are built and signed on this machine (local build + sign; see
-[`docs/release.md`](docs/release.md), "Local release path"), so the
+the per-release checklist in
+[`docs/release.md`](docs/release.md)), so the
 toolchain is **required for releases**. It stays optional for web-only
 iteration (§3 above).
 

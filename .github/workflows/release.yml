@@ -2,7 +2,7 @@ name: Release
 
 # PARKED release pipeline per ADR-0009 (amended 2026-09): release artifacts
 # are built and signed locally and attached to GitHub Releases manually —
-# the authoritative flow is docs/release.md, "Local release path". This
+# the authoritative flow is the per-release checklist in docs/release.md. This
 # workflow is kept for a possible later re-enable; the tag trigger is
 # removed, so it only runs via manual workflow_dispatch (a dry run that
 # exercises the full build-and-sign path on a clean machine).
