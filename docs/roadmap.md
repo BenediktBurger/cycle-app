@@ -43,8 +43,6 @@ the sections above track planned work, git history keeps the record (see
   runbook: see [`docs/release.md`](release.md) and
   [ADR-0009](adr/0009-release-pipeline-and-signing.md); the ready items are
   below, the blocked ones are plain bullets.
-- [ ] Android toolchain: JDK 21 + Android command-line-tools SDK on the dev
-  machine, `flutter doctor` green, release APK builds (release.md Phase A)
 - [ ] Create the release keystore outside the repo, fill the gitignored
   `key.properties` (the gradle signing wiring is already in place),
   verify the signed release APK with `apksigner` (release.md Phase C)
@@ -59,6 +57,12 @@ the sections above track planned work, git history keeps the record (see
 - [ ] Sideload APK + device upgrade test (old release with data → install
   new release → migrations preserve cycle data) as repeatable discipline
   (release.md Phase D, per-release checklist)
+- [ ] Release workflow pre-flight: assert the tag name matches the pubspec
+  version (`v` + `pubspec.yaml` `version:` without its `+N` build part
+  equals `${GITHUB_REF_NAME}`); refuse to build on mismatch. The APK
+  embeds the pubspec version regardless of the tag, so a mismatch would
+  silently ship a wrong versionName/versionCode (release.md, per-release
+  checklist step 5)
 - [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
 - choose and set a license
 

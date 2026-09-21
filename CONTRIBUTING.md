@@ -98,11 +98,72 @@ losing persistence. The persistence medium is picked per browser (OPFS when
 supported, else IndexedDB) — data survives a normal page reload, but
 clearing site data/private windows do not (expected browser behaviour).
 
+### Android toolchain (optional — device iteration and local builds)
+
+Only needed for running the app on an Android device or emulator and for
+building APKs locally. Neither web iteration (§3 above) nor release builds
+require it: releases are built and signed in CI (see
+[`docs/release.md`](docs/release.md), CI release path).
+
+Android Studio is a valid alternative: it bundles its own JDK and installs
+the Android SDK through its setup wizard (Settings → Languages &
+Frameworks → Android SDK); `flutter doctor` picks both up automatically.
+The leaner default is the command-line-tools route below (no IDE install).
+
+1. **JDK 21.** Gradle 9.x refuses Java 25 (the system default here); install
+   an LTS alongside it:
+
+   ```sh
+   sudo apt install openjdk-21-jdk
+   /usr/lib/jvm/java-21-openjdk-amd64/bin/java -version
+   ```
+
+   Tell only Flutter about it (does not change the system default):
+
+   ```sh
+   flutter config --jdk-dir=/usr/lib/jvm/java-21-openjdk-amd64
+   ```
+
+2. **Android SDK, command-line tools** (no Android Studio needed):
+
+   ```sh
+   mkdir -p ~/android-sdk/cmdline-tools
+   # download https://dl.google.com/android/repository/commandlinetools-linux_<ver>_latest.zip
+   unzip commandlinetools-linux_*.zip -d ~/android-sdk/cmdline-tools
+   mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
+   ```
+
+   Add to the shell profile:
+
+   ```sh
+   export ANDROID_HOME="$HOME/android-sdk"
+   export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+   ```
+
+3. **SDK packages + licenses.** The platform/build-tools versions must match
+   what the Flutter Gradle plugin selects (`flutter.compileSdkVersion`);
+   check `flutter doctor -v` and install:
+
+   ```sh
+   sdkmanager --list | grep -E 'platforms;android|build-tools' | tail
+   sdkmanager platform-tools 'platforms;android-<N>' 'build-tools;<N>.0.0'
+   flutter doctor --android-licenses
+   flutter doctor -v   # must show the Android toolchain without warnings
+   ```
+
+4. **Device.** Preferred: a real phone via USB (Developer options → USB
+   debugging). Emulator alternative: create with `avdmanager`; usable speed
+   requires KVM (`ls -la /dev/kvm`, `sudo apt install cpu-checker && kvm-ok`).
+
+Gate for local builds: `flutter build apk --release` in the repo root
+succeeds (debug-signed is fine without `key.properties`; release signing is
+maintainer business — [`docs/release.md`](docs/release.md), Phase C).
+
 ### Running on your own Android device
 
-The Android toolchain setup (JDK, SDK, licenses) is described in
-[`docs/release.md`](docs/release.md), Phase A. Once `flutter devices` lists
-your phone (or emulator), you can run the app directly on it:
+Set up the optional toolchain (subsection above) once. Once `flutter
+devices` lists your phone (or emulator), you can run the app directly on
+it:
 
 ```sh
 flutter devices                        # connected devices / emulators
@@ -156,8 +217,8 @@ merely checking it, run a plain `dart format .` (only the check variant is
 part of the gate).
 
 `flutter build apk --debug` is available locally as well once the local
-Android toolchain is green (see [`docs/release.md`](docs/release.md),
-Phase A) — the web build remains the primary correctness gate until then.
+Android toolchain is green (§3 above, "Android toolchain") — the web build
+remains the primary correctness gate until then.
 
 **Linux note (database tests):** the drift tests under `test/db/` open the
 real SQLite engine through `sqlite3`'s dart:ffi bindings on the host.

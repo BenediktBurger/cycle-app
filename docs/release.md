@@ -13,12 +13,17 @@ re-deriving the reasoning. Reasons live in the ADR; this file is the how.
 
 | Channel                      | Role                             | Blocked by                                |
 |------------------------------|----------------------------------|-------------------------------------------|
-| Sideload APK                 | development/testing, demo builds | nothing (Phase A + D)                     |
+| Sideload APK                 | development/testing, demo builds | nothing (Phase D discipline; APK from CI) |
 | Google Play                  | primary store                    | Gate G3 (Phase F; G1 resolved 2026-09)    |
 | F-Droid (official)           | intermediate, possibly permanent | Gate G2 (Phase E; G1 resolved 2026-09)    |
 | iOS (TestFlight → App Store) | deferred workstream              | macOS + Apple Developer Program (Phase G) |
 
 Order of execution is exactly A → C → D, then (whenever gates resolve) B, E, F.
+Routine releases skip the phases entirely: they follow the
+[per-release checklist](#per-release-checklist-every-distribution-update)
+and the
+[CI release path](#ci-release-path-tag-triggered-adr-0009-amended);
+Phases A–G are one-time setup.
 
 ## Decision gates — resolve before the first store upload
 
@@ -48,56 +53,15 @@ These are one-way doors; nothing below Phase D may start until they close.
 
 ## Phase A — Android toolchain (one-time, dev machine)
 
-Goal: `flutter doctor` fully green for the Android toolchain; first release
-APK builds.
-
-1. **JDK 21.** Gradle 9.x refuses Java 25 (the system default here); install
-   an LTS alongside it:
-
-   ```sh
-   sudo apt install openjdk-21-jdk
-   /usr/lib/jvm/java-21-openjdk-amd64/bin/java -version
-   ```
-
-   Tell only Flutter about it (does not change the system default):
-
-   ```sh
-   flutter config --jdk-dir=/usr/lib/jvm/java-21-openjdk-amd64
-   ```
-
-2. **Android SDK, command-line tools** (no Android Studio needed):
-
-   ```sh
-   mkdir -p ~/android-sdk/cmdline-tools
-   # download https://dl.google.com/android/repository/commandlinetools-linux_<ver>_latest.zip
-   unzip commandlinetools-linux_*.zip -d ~/android-sdk/cmdline-tools
-   mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
-   ```
-
-   Add to the shell profile:
-
-   ```sh
-   export ANDROID_HOME="$HOME/android-sdk"
-   export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-   ```
-
-3. **SDK packages + licenses.** The platform/build-tools versions must match
-   what the Flutter Gradle plugin selects (`flutter.compileSdkVersion`);
-   check `flutter doctor -v` and install:
-
-   ```sh
-   sdkmanager --list | grep -E 'platforms;android|build-tools' | tail
-   sdkmanager platform-tools 'platforms;android-<N>' 'build-tools;<N>.0.0'
-   flutter doctor --android-licenses
-   flutter doctor -v   # must show the Android toolchain without warnings
-   ```
-
-4. **Device.** Preferred: a real phone via USB (Developer options → USB
-   debugging). Emulator alternative: create with `avdmanager`; usable speed
-   requires KVM (`ls -la /dev/kvm`, `sudo apt install cpu-checker && kvm-ok`).
+The setup itself — JDK 21, Android SDK, licenses, device connection —
+lives with the contributor docs:
+[CONTRIBUTING.md](../CONTRIBUTING.md), section "Android toolchain"
+(Android Studio is described there as an alternative). It is **optional**
+for releases: the CI release path builds and signs the artifacts, and the
+device upgrade test (Phase D) needs only the downloaded APK.
 
 Gate: `flutter build apk --release` in the repo root succeeds (debug-signed
-is fine in Phase A; real signing comes in Phase C).
+is fine without `key.properties`; real signing comes in Phase C).
 
 ## Phase B — application identity rename (Gate G1 resolved)
 
@@ -329,13 +293,35 @@ Do **not** start until Android went through Phases A–F at least once.
    [ADR-0006](adr/0006-ci.md) conventions).
 3. Fastlane changelog file for the new versionCode (F-Droid) + Play release
    notes draft (DE/EN).
-4. `flutter build apk --release` (+ AAB when Play is involved).
-5. **Upgrade test on the real device** (Phase D) — non-negotiable.
-6. Tag the release commit `vX.Y.Z` (git history is the release diary; the
-   roadmap stays a queue).
-7. Upload/distribute (sideload → testers; Play internal track; F-Droid MR
+4. Optional pre-tag sanity: `flutter build apk --release` locally and
+   install it to eyeball the build. With `key.properties` present this APK
+   is release-signed and can be updated in place later by the CI APK (and
+   vice versa); it does not replace the step-7 upgrade test.
+5. Tag the release commit and push it — the tag push is what triggers
+   `.github/workflows/release.yml`:
+
+   ```sh
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+   The tag must sit on the commit containing the pubspec bump: the APK's
+   version comes from `pubspec.yaml`, not from the tag name, and nothing
+   cross-checks the two (see the backlog item for a workflow pre-flight).
+   (Git history is the release diary; the roadmap stays a queue.)
+6. Wait for the release workflow to finish green; the signed APK then
+   appears on the repo's GitHub Releases page. If the run fails, no
+   release is created — but the tag exists. Investigate, fix, then re-tag
+   (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`, tag the
+   fixed commit, push again). Only point testers at the release once it
+   is visible.
+7. **Upgrade test on the real device** (Phase D) with the **downloaded CI
+   APK** — non-negotiable. The CI artifact is what users install, so it is
+   the artifact that gets tested: install it over the previous release and
+   verify the cycle data survives. When Play is involved, also download
+   the AAB from the workflow artifacts for the upload.
+8. Upload/distribute (sideload → testers; Play internal track; F-Droid MR
    or automatic build on their side).
-8. Confirm the store dashboards show the intended version; observe crash
+9. Confirm the store dashboards show the intended version; observe crash
    reports (Play) / F-Droid comments in the days after.
 
 ## CI release path (tag-triggered, ADR-0009 amended)
@@ -343,6 +329,15 @@ Do **not** start until Android went through Phases A–F at least once.
 `.github/workflows/release.yml` automates the build-and-sign step once a
 release tag `vX.Y.Z` is pushed. It runs the full gate (analyze, format,
 test), then provisions the keystore and builds.
+
+Dry runs work without a tag: trigger manually via **workflow_dispatch**
+(GitHub → Actions → Release → Run workflow) — useful to validate the
+secrets, signing, and the build before pushing a real tag.
+
+Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
+tagged commit; the tag name itself is only the trigger and trust anchor.
+Keep the two in sync (per-release checklist step 5) — nothing in the
+workflow verifies them against each other.
 
 **Required repository secrets (GitHub Settings → Secrets → Actions), all
 five — set them BEFORE the first tag push. Why the hard pre-flight
@@ -387,8 +382,10 @@ and its offline backups remain authoritative.
   (no Play API integration exists; upload from CI is not planned yet).
 
 The workflow itself does **not** make a release count as "shipped": the
-**device upgrade test (Phase D checklist step 5) remains a mandatory manual
-step** before announcing the release. Tag → CI build → download APK →
+**device upgrade test (upgrade-test discipline, Phase D) remains a
+mandatory manual step** before announcing the release — run it with the
+**downloaded CI APK**, since that is the artifact users will install (see
+step 7 of the per-release checklist). Tag → CI build → download APK →
 upgrade test → then distribute.
 
 ## Fresh-machine recovery (the handover note)
@@ -396,8 +393,9 @@ upgrade test → then distribute.
 For a later INER takeover or lost laptop — the minimum to rebuild a release
 machine:
 
-1. Flutter SDK per [CONTRIBUTING.md](../CONTRIBUTING.md) §1; JDK 21
-   (Phase A step 1); Android SDK (Phase A steps 2–3).
+1. Flutter SDK + Android toolchain per
+   [CONTRIBUTING.md](../CONTRIBUTING.md) (§1 and its "Android toolchain"
+   section) — only needed for local builds; CI covers release artifacts.
 2. Restore the **keystore** from the offline backup (custody rules, Phase C)
    — without the `.jks` no update can be signed for the installed base.
 3. Recreate `android/key.properties` from the password-manager record.

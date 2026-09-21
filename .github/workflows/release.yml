@@ -1,16 +1,16 @@
 name: Release
 
 # Tag-triggered signed-release pipeline per ADR-0009 (amended): a `vX.Y.Z`
-# tag push builds signed Android artifacts in CI, with the release keystore
-# provisioned from GPG-encrypted GitHub Actions secrets.
+# tag push builds signed Android artifacts in CI. Full runbook: the
+# "CI release path" section of docs/release.md.
 #
 # PREREQUISITE: the five repository secrets below must exist BEFORE the
-# first tag push (see docs/release.md, "CI release path"):
+# first tag push, else the pre-flight below aborts — Gradle would silently
+# fall back to the debug signing config and a debug-signed APK would end
+# up attached to a public Release:
 #   RELEASE_KEYSTORE_GPG_BASE64, RELEASE_KEYSTORE_PASSPHRASE,
 #   RELEASE_KEYSTORE_KEY_ALIAS, RELEASE_KEYSTORE_KEY_PASSWORD,
 #   RELEASE_KEYSTORE_STORE_PASSWORD
-# The local keystore and its offline backups remain authoritative
-# (ADR-0009 custody rules); CI consumes a copy, it never owns the key.
 #
 # Dry runs: trigger manually via workflow_dispatch.
 
