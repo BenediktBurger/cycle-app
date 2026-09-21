@@ -375,10 +375,12 @@ carry the exact commands):
    at the tagged commit; before creating the release, confirm the tag
    name matches the versionName (one-line eyeball check — nothing
    cross-checks automatically on the local path).
-5. Tag `vX.Y.Z` on the commit containing the pubspec bump — the tag is
-   created with `git tag`/`git push` beforehand, which fixes the one
-   consistent way this runbook does it — and then create the GitHub
-   Release with `gh release create` + the same APK.
+5. Tag `vX.Y.Z` on the commit containing the pubspec bump: create it
+   explicitly with `git tag`/`git push` — the one consistent way this
+   runbook does it — rather than left to `gh release create` to
+   auto-create the tag at the default branch's HEAD, which may not be
+   the pubspec-bump commit. Then create the GitHub Release with
+   `gh release create` + the same APK.
    `--generate-notes` builds the changelog from the commit log; GitHub
    appends it to the `--notes` content, so the pasted SHA-256 certificate
    fingerprint ends up in the release notes body as the trust anchor —

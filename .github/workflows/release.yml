@@ -137,7 +137,8 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
 
       # Universal APK attached to the GitHub Release with auto-generated
-      # notes. NOTE: even with tagged CI releases, the device upgrade test
+      # notes. NOTE: even when re-enabled for tagged CI releases, the device
+      # upgrade test
       # (docs/release.md checklist) stays mandatory before a release counts
       # as "shipped".
       - name: Attach APK to GitHub Release
