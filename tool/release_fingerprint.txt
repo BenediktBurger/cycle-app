@@ -1,0 +1,5 @@
+# Pinned SHA-256 certificate fingerprint of the release signing key
+# (trust anchor for the release notes; F-Droid metadata cross-checks against
+# the same value — see docs/release.md). Written by
+# `dart run tool/make_release.dart --accept-fingerprint`.
+0aa5749804b8ed9e3c207f851b5902775d762207d60c2485a26b5d75eff5355b
