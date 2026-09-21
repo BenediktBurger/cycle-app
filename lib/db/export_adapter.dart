@@ -51,26 +51,35 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
     entries: [
       for (final e in entries)
         {
+          // The day itself — the one key every row carries.
           'date': formatIsoDay(e.date),
-          'bbt_c': e.bbtC,
+          // Sparse shape: every key whose value equals that field's neutral
+          // (not-recorded/not-observed) value is OMITTED — the reader
+          // treats a missing key as the neutral default (missing `bleeding`
+          // = none; see the document shape in lib/domain/export_import.dart
+          // and its schema-version note). Documents that carry all keys —
+          // old ones and hand-built full maps — stay valid inputs.
+          if (e.bbtC != null) 'bbt_c': e.bbtC,
           // The measurement time is metadata of the temperature (see
           // DailyEntry.measuredAtMinutes): a document never carries a time
-          // without its temperature. The copy here normalizes on top of the
-          // constructor rule so legacy rows (written before the rule, e.g.
-          // by an older app version) export clean too — the export → import
-          // round trip is idempotent.
-          'measured_at_minutes': e.bbtC == null ? null : e.measuredAtMinutes,
-          'bleeding': e.bleeding.level,
-          'temp_disturbances': e.tempDisturbances,
-          'mucus_sign': e.mucusSign,
-          'mucus_quality': e.mucusQuality,
-          'cervix_position': e.cervixPosition,
-          'cervix_opening': e.cervixOpening,
-          'cervix_firmness': e.cervixFirmness,
-          'pain_breast': e.painBreast,
-          'pain_mittelschmerz': e.painMittelschmerz,
-          'sex_timings': e.sexTimings,
-          'notes': e.notes,
+          // without its temperature, and the time rides only when actually
+          // recorded. The copy here normalizes on top of the constructor
+          // rule so legacy rows (written before the rule, e.g. by an older
+          // app version) export clean too — the export → import round trip
+          // is idempotent.
+          if (e.bbtC != null && e.measuredAtMinutes != null)
+            'measured_at_minutes': e.measuredAtMinutes,
+          if (e.bleeding.level != 0) 'bleeding': e.bleeding.level,
+          if (e.tempDisturbances != 0) 'temp_disturbances': e.tempDisturbances,
+          if (e.mucusSign != null) 'mucus_sign': e.mucusSign,
+          if (e.mucusQuality != null) 'mucus_quality': e.mucusQuality,
+          if (e.cervixPosition != null) 'cervix_position': e.cervixPosition,
+          if (e.cervixOpening != null) 'cervix_opening': e.cervixOpening,
+          if (e.cervixFirmness != null) 'cervix_firmness': e.cervixFirmness,
+          if (e.painBreast) 'pain_breast': true,
+          if (e.painMittelschmerz) 'pain_mittelschmerz': true,
+          if (e.sexTimings != 0) 'sex_timings': e.sexTimings,
+          if (e.notes != null) 'notes': e.notes,
         },
     ],
     marks: [

@@ -113,7 +113,7 @@ void main() {
   group('Muttermund fields at the export document boundary', () {
     test(
         'export carries the stored tokens and a v4 document round-trips '
-        'them to schema_version 5', () async {
+        'them to schema_version 6', () async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: DateTime(2026, 4, 2),
         cervixPosition: CervixPosition.veryHigh,
@@ -124,13 +124,14 @@ void main() {
       );
 
       final json = await exportDatabaseToJson(db);
-      expect(json, contains('"schema_version": 5'),
-          reason: "v5 is the NER-alignment/profile-free release; the "
+      expect(json, contains('"schema_version": 6'),
+          reason: "v6 is the sparse-entry/profile-free release; the "
               "additive Muttermund fields still ride the entries");
       expect(json, contains('"cervix_position": "veryHigh"'));
       expect(json, contains('"cervix_opening": "open"'));
-      expect(json, contains('"cervix_position": null'),
-          reason: 'a day without an observation exports a null field');
+      expect(json, isNot(contains('"cervix_position": null')),
+          reason: 'the sparse shape omits a day without an observation: '
+              'the reader treats the missing key as no observation');
 
       final target = CycleDatabase(NativeDatabase.memory());
       addTearDown(target.close);

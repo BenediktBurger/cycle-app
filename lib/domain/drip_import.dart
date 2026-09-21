@@ -387,7 +387,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
   final blob = ExportBlob(
     entries: entries,
-    marks: _deriveMarks(entries, excludedDays),
+    marks: deriveDripMarks(entries, excludedDays),
     exportedAt: DateTime.now(),
   );
 
@@ -432,7 +432,13 @@ DripCsvImport dripCsvToExportJson(String raw) {
 ///   plan counts them;
 /// - the derived rows are ordered by day, then type (deterministic
 ///   document order; the merge is idempotent regardless of order).
-List<Map<String, Object?>> _deriveMarks(
+///
+/// Row contract: each entry map carries a parsable `date`, and its
+/// `bleeding` value (when the key is present at all) is a bleeding level
+/// the shared parser accepts — a MISSING key is "no bleeding recorded"
+/// through tryParseBleeding's null rule. [entries] are the SAME row maps
+/// the export document carries (they replay verbatim).
+List<Map<String, Object?>> deriveDripMarks(
     List<Map<String, Object?>> entries, Set<String> excludedDays) {
   final seenDates = <String>{};
   final replayed = <DailyEntry>[];
@@ -443,7 +449,10 @@ List<Map<String, Object?>> _deriveMarks(
     if (day == null) continue;
     replayed.add(DailyEntry(
       date: day,
-      bleeding: tryParseBleeding(row['bleeding']) ?? Bleeding.none,
+      // No fallback: the shared parser maps a MISSING key (JSON null) to
+      // "no bleeding recorded" itself, and the mapper above emits only
+      // accepted levels in this field.
+      bleeding: tryParseBleeding(row['bleeding'])!,
     ));
   }
   replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
