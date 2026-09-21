@@ -30,5 +30,5 @@ Funktionen:
 • Offene Quelle (Open Source); die endgültige Lizenz ist noch nicht
   festgelegt, eine GPL-3-Verträglichkeit ist beabsichtigt.
 
-Hinweis: „Cycle App“ ist ein Arbeitstitel; der endgültige Name steht noch
+Hinweis: „NER Cycle App“ ist ein Arbeitstitel; der endgültige Name steht noch
 nicht fest.

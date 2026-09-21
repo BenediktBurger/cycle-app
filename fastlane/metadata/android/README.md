@@ -19,18 +19,27 @@ English — mirroring the app's own language policy.
 
 The applicationId used by the stores is
 `io.github.benediktburger.cycleapp` (ADR/companion: `docs/release.md`);
-the future `docs/fdroid-metadata-draft.yml` file in the repo holds the
+the `docs/fdroid-metadata-draft.yml` file in the repo holds the
 F-Droid `metadata/<applicationId>.yml` draft pending the fdroiddata MR.
 
-## Status — working title and placeholder assets
+## Status — working title, placeholder assets
 
-- **"Cycle App" is a working title, not a decided name** (display name is
-  explicitly undecided; see release.md Gate G1/G4 notes). The store text
-  files must stay usable as-is (stores parse `title.txt` etc. literally,
-  ≤ 30 characters), so the placeholder caveat lives here and in each
-  locale's `images/README.md`.
-- **All images are pending Gate G4** — none exist yet; the `images/`
-  directories carry only READMEs describing what will go there.
+- **"NER Cycle App" is a working title, not a decided name** — the shown
+  name for test users during testing (store `title.txt` etc. already show
+  it; display name explicitly still undecided, see release.md Gate G1/G4
+  notes). The package name `cycle_app` remains a clearly-marked
+  **internal placeholder** (ADR-0002) and does not affect the shown name
+  (the same caveat lives in each locale's `images/README.md`). The store
+  text files must stay usable as-is (stores parse `title.txt` etc.
+  literally, ≤ 30 characters).
+- **Images: partially done** — `phoneScreenshots/` exists for both locales
+  (2 PNG shots each, English UI, shared by `de-DE` and `en-US`); `icon.png`
+  and `featureGraphic.png` remain pending Gate G4 and do not exist yet.
+- **Screenshot ratio note:** the phone screenshots are 1080×2340 = 19.5:9
+  (near-9:20 tall — a standard modern-phone screenshot ratio; Play accepts
+  up to 9:21), which exceeds F-Droid's classic 16:9/9:16 guidance. They are
+  kept uncropped rather than faking the ratio — re-capture on a 16:9
+  display if an F-Droid reviewer ever objects.
 - Commissioning / endorsement wording constraints come from
   `docs/product/vision.md`: describe the method as "per NER rules (Rötzer),
   in the spirit of INER" — **never claim INER endorsement**.

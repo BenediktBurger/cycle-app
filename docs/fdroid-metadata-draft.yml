@@ -50,8 +50,9 @@ Description: >-
   Quelle; die endgültige Lizenz ist noch nicht festgelegt.
 
 
-  Hinweis: „Cycle App“ ist ein Arbeitstitel; der endgültige Name steht
-  noch nicht fest.
+  Hinweis: „NER Cycle App“ ist ein Arbeitstitel; der endgültige Name steht
+  noch nicht fest. Der Package-Name `cycle_app` ist davon unberührt und
+  bleibt ein interner Platzhalter.
 
 AutoUpdateMode: None
 # Conservative choice until F-Droid build conventions are re-checked at

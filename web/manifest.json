@@ -1,6 +1,6 @@
 {
-  "name": "Zyklus-App (Arbeitstitel)",
-  "short_name": "Zyklus-App",
+  "name": "NER Cycle App",
+  "short_name": "NER Cycle App",
   "description": "Local-first Zyklus-Auswertung nach NER (Rötzer) — lokal, ohne Cloud.",
   "lang": "de",
   "start_url": "/",

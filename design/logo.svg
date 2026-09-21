@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- C: annulus open over the upper right quadrant -->
+    <clipPath id="c">
+      <path d="M 872 512
+               A 360 360 0 1 1 512 152
+               L 512 264
+               A 248 248 0 1 0 760 512
+               Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- background -->
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+
+  <!-- striped C (chart ruled-lines motif shaped as the cycle) -->
+  <g clip-path="url(#c)" fill="#2A4E93">
+    <rect x="152" y="152" width="720" height="40"/>
+    <rect x="152" y="227.5" width="720" height="40"/>
+    <rect x="152" y="303" width="720" height="40"/>
+    <rect x="152" y="378.5" width="720" height="40"/>
+    <rect x="152" y="454" width="720" height="40"/>
+    <rect x="152" y="529.5" width="720" height="40"/>
+    <rect x="152" y="605" width="720" height="40"/>
+    <rect x="152" y="680.5" width="720" height="40"/>
+    <rect x="152" y="756" width="720" height="40"/>
+    <rect x="152" y="831.5" width="720" height="40"/>
+  </g>
+
+  <!-- biphasic curve: rides the cycle, rises through the opening -->
+  <path d="M 220 700
+           C 300 730, 380 700, 450 640
+           C 530 570, 560 500, 620 430
+           C 680 360, 730 315, 795 278"
+        fill="none" stroke="#FFFFFF" stroke-width="56" stroke-linecap="round"/>
+  <path d="M 220 700
+           C 300 730, 380 700, 450 640
+           C 530 570, 560 500, 620 430
+           C 680 360, 730 315, 795 278"
+        fill="none" stroke="#C8102E" stroke-width="34" stroke-linecap="round"/>
+
+  <!-- three higher measurements on the temperature line -->
+  <circle cx="572" cy="493" r="36" fill="#C8102E"/>
+  <circle cx="681" cy="365" r="36" fill="#C8102E"/>
+  <circle cx="776" cy="289" r="36" fill="#C8102E"/>
+</svg>
