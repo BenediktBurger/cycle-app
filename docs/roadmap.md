@@ -87,6 +87,10 @@ the sections above track planned work, git history keeps the record (see
 - [ ] cycle: make it possible to click another day without deselecting the first one (maybe add a button to close day options)
 - [ ] add necessary DSVGO notice
 - [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
+- [ ] add option to delete data
+- should we add the birth bleeding (Wochenbett, marked as ~)?
+- show cycle start mark on journal like temp?
+- render observations above temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
 
 ### Convenience
 
