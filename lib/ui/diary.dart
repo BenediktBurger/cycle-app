@@ -502,29 +502,38 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----
-              // Segments show the cheat-sheet glyphs themselves
-              // (t/Ø/f/S/A); a quality exists only together with S, so the
-              // quality picker appears only while S is selected (hidden
-              // otherwise).
+              // Chips as in the bleeding row above: all six sign options
+              // plus the unset chip would divide the width evenly inside a
+              // SegmentedButton, and the two-glyph f/S label reflowed to
+              // two lines on narrow phone widths (growing the row and
+              // painting a partially visible overflow band). The chips show
+              // the cheat-sheet glyphs themselves (t/Ø/f/S/A). A quality
+              // exists only together with S, so the quality picker appears
+              // only while S is selected (hidden otherwise).
               Text(l10n.mucusSign),
               const SizedBox(height: 4),
-              SegmentedButton<MucusSign?>(
-                segments: [
-                  ButtonSegment(
-                    value: null,
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
                     label: Text(l10n.mucusSignUnset),
+                    selected: _sign == null,
+                    onSelected: (_) => setState(() {
+                      _sign = null;
+                      _quality = null;
+                    }),
                   ),
                   for (final sign in MucusSign.values)
-                    ButtonSegment(
-                      value: sign,
+                    ChoiceChip(
                       label: Text(mucusSignSymbol(sign)),
+                      selected: _sign == sign,
+                      onSelected: (selected) => setState(() {
+                        _sign = selected ? sign : null;
+                        if (_sign != MucusSign.s) _quality = null;
+                      }),
                     ),
                 ],
-                selected: {_sign},
-                onSelectionChanged: (selection) => setState(() {
-                  _sign = selection.first;
-                  if (_sign != MucusSign.s) _quality = null;
-                }),
               ),
               if (_sign == MucusSign.s) ...[
                 const SizedBox(height: 8),

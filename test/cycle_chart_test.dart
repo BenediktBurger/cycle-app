@@ -28,6 +28,7 @@ import 'dart:async';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
@@ -3117,6 +3118,68 @@ void main() {
       // Day 3 = heavy: filled at full strength.
       final heavy = _bleedingBlob(tester, 3).decoration! as BoxDecoration;
       expect(heavy.color, errorColor.withValues(alpha: 1.0));
+    });
+
+    // Cross-check at a narrow viewport (the same device class the diary
+    // sign-row repro used): the mucus cell renders its glyph inside a
+    // 12 px slot below the reserved 10 px peak-dot slot, top-aligned —
+    // the fixed-height row rhythm is the design. The two widest glyph
+    // shapes (the two-glyph f/S token, and the S glyph with its EW
+    // superscript) must lay out without a framework exception at the
+    // minimum usable column width (24 px, forced by a range longer than
+    // the 320 dp viewport).
+    testWidgets(
+        'the mucus glyph renders at the minimum column width without a '
+        'framework exception', (tester) async {
+      tester.view.devicePixelRatio = 3.0;
+      tester.view.physicalSize = const Size(320 * 3, 800 * 3);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final entries = [
+        for (var i = 0; i < 12; i++)
+          DailyEntry(
+            date: _rowsDay(i),
+            bbtC: 36.5,
+            mucusSign: switch (i) {
+              10 => MucusSign.fs,
+              11 => MucusSign.s,
+              _ => null,
+            },
+            mucusQuality: i == 11 ? MucusQuality.ew : null,
+          ),
+      ];
+
+      final errors = <FlutterErrorDetails>[];
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = (details) => errors.add(details);
+      try {
+        await tester.pumpWidget(_rowsHarness(entries: entries));
+        await tester.pumpAndSettle();
+      } finally {
+        FlutterError.onError = originalOnError;
+      }
+
+      // The initial auto-scroll parks the window on the newest days, so
+      // both mucus days render.
+      expect(find.byKey(const ValueKey('mucusCell-10')), findsOneWidget);
+      expect(find.byKey(const ValueKey('mucusCell-11')), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('mucusCell-10')),
+              matching: find.byType(MucusSymbolText)),
+          findsOneWidget,
+          reason: 'the f/S day renders its glyph in the mucus row');
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('mucusCell-11')),
+              matching: find.byType(MucusSymbolText)),
+          findsOneWidget,
+          reason: 'the S+EW day renders its glyph in the mucus row');
+      expect(errors, isEmpty,
+          reason: 'the mucus glyphs must lay out without a framework '
+              'exception at the minimum column width');
+      expect(tester.takeException(), isNull);
     });
   });
 

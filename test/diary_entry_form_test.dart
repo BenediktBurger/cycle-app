@@ -17,6 +17,9 @@
 
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/mucus.dart';
+import 'package:cycle_app/ui/diary.dart';
+import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -213,10 +216,9 @@ void main() {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    // The sign segments show the cheat-sheet glyphs themselves; the A
-    // (Ausfluss) sign joined the vocabulary, so its segment must be
-    // offered (it renders via the same MucusSymbolText pipeline as the
-    // other signs — no picker-specific handling).
+    // The sign chips show the cheat-sheet glyphs themselves; the A
+    // (Ausfluss) sign joined the vocabulary, so its chip must be
+    // offered on the shared form.
     expect(find.text('A'), findsOneWidget,
         reason: 'the Ausfluss sign (A) must be selectable on the form');
   });
@@ -340,5 +342,216 @@ void main() {
     expect(row!.sexTimings, 4,
         reason: 'the re-tapped middle slot must be cleared; Ende (bit 4) '
             'stays');
+  });
+
+// ═══════════ mucus sign row at a narrow viewport ═══════════
+// Device-field reports show the sign row growing taller and painting a
+// partially visible overflow band on narrow Android widths: the row
+// divides the width evenly across all of its options, so the two-glyph
+// f/S label reflows to two lines. The repro pumps the whole app shell at
+// a 320 x 800 dp viewport (physical = 960 x 2400 px, devicePixelRatio 3)
+// and walks every sign option — start width 320 dp, not decremented: the
+// error reproduces deterministically here.
+//
+// The framework error collector is installed only after the shell has
+// pumped and the form is scrolled to the sign row: the other shell tabs
+// stay mounted and laid out (IndexedStack), so anything overflowing
+// elsewhere must not be attributed to this row.
+
+  testWidgets(
+      'the mucus sign row renders every sign without overflow at a narrow '
+      'width and stores an f/S day', (WidgetTester tester) async {
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.physicalSize = const Size(320 * 3, 800 * 3);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpAndSettle();
+
+    final caption = find.text('Zeichen der Fruchtbarkeit');
+    await tester.ensureVisible(caption);
+    await tester.pumpAndSettle();
+
+    // Waive the pump-time record: at this forced width, widget-test font
+    // metrics (square fallback glyphs, wider than device fonts) can
+    // overflow OTHER rows of the tall form once at the initial layout —
+    // e.g. the date row. That single pump-time pass is not what this test
+    // measures; everything that fails from here on, on any interaction
+    // with the sign row, belongs to the row and must stay silent.
+    // (Take the record, not assert on it: render details of OTHER rows
+    // are irrelevant to this repro; any row failure during the taps below
+    // is still collected and fails the test.)
+    tester.takeException();
+
+    final errors = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) => errors.add(details);
+    try {
+      // Walk every option of the row, including the two-glyph f/S: the
+      // single-glyph options around it leave the row narrow, f/S forces
+      // the reflow. Tapping S first brings up the quality row (its rule
+      // is exercised below with f/S).
+      for (final glyph in ['t', 'Ø', 'f', 'S']) {
+        await tester.ensureVisible(find.text(glyph));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(glyph));
+        await tester.pumpAndSettle();
+      }
+      // Selecting S shows the quality row (quality only exists with S);
+      // a recorded quality chips the row on.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'EW'));
+      await tester.pumpAndSettle();
+
+      // Leaving S for f/S hides the quality row again.
+      await tester.ensureVisible(find.text('f/S'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('f/S'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(ChoiceChip, 'EW'),
+        findsNothing,
+        reason: 'the quality row must hide once the sign leaves S',
+      );
+
+      // And A (Ausfluss) — the last two-glyph-risky option after f/S.
+      await tester.tap(find.text('A'));
+      await tester.pumpAndSettle();
+
+      // End on f/S for the save round-trip. Tap-again would deselect (the
+      // unset chip turns null), so A → f/S is the final selection.
+      await tester.tap(find.text('f/S'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Speichern'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Speichern'));
+      await tester.pumpAndSettle();
+
+      final (:db, :date) = await savedDayOf(tester);
+      final row = await db.entriesDao.entryFor(date);
+      expect(row, isNotNull, reason: 'The saved day must exist in the DB');
+      expect(
+        row!.mucusSign,
+        'fs',
+        reason: 'the selected f/S sign must persist with its stored token',
+      );
+      expect(row.mucusQuality, isNull,
+          reason: 'f/S carries no quality qualifier');
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+    expect(
+      errors,
+      isEmpty,
+      reason: 'narrow-width sign-row interaction must not overflow the row',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+// ═══════════ diary day tile at a narrow viewport ═══════════
+// The sign row was one of several surfaces rendering the two-glyph f/S
+// token; the Tagebuch list's day tile renders a recorded observation as a
+// trailing chip whose row also holds the temperature and the measured
+// time. At a narrow width that trailing content is the tile's widest
+// part, so this check pumps the shell at the same 320 x 800 dp viewport
+// as the sign-row repro above and walks the recorded tiles with the
+// framework error collector installed: any overflow here would be a real
+// tile defect, not one of the entry form. (Pump-time noise from the
+// other shell tabs is waived the same way the sign-row repro waives it.)
+
+  testWidgets(
+      'the day tile renders its mucus chip beside temperature and time '
+      'without overflow at a narrow width', (WidgetTester tester) async {
+    tester.view.devicePixelRatio = 3.0;
+    tester.view.physicalSize = const Size(320 * 3, 800 * 3);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    // The two widest chip shapes the tile can render: the two-glyph f/S
+    // token, and the S glyph with its EW superscript. Both days also
+    // carry a temperature and a measured time (and one of them a
+    // bleeding marker) — the maximal trailing/leading content a tile
+    // can hold. The recorded days stay before the pinned "now" so the
+    // cycle-group list offers them as recorded days.
+    final tileHarness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
+    await tester.pumpWidget(tileHarness.scope(seed: (db) async {
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 9, 14),
+        bbtC: 36.4,
+        measuredAtMinutes: 407, // 06:47
+        bleeding: Bleeding.heavy,
+        mucusSign: MucusSign.fs,
+      ));
+      await db.entriesDao.upsertDaily(DailyEntry(
+        date: DateTime(2026, 9, 15),
+        bbtC: 36.9,
+        mucusSign: MucusSign.s,
+        mucusQuality: MucusQuality.ew,
+      ));
+    }));
+    await tester.pumpAndSettle();
+
+    // Waive the pump-time record: at this forced width, widget-test font
+    // metrics can overflow OTHER rows of the shell once at the initial
+    // layout. Everything that fails from here on, while the tiles build
+    // and lay out, belongs to the tile and must stay silent.
+    tester.takeException();
+
+    final errors = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) => errors.add(details);
+    try {
+      // The cycle-group tiles start collapsed; bring the list into view
+      // and expand every group so the recorded days' tiles build and lay
+      // out at the narrow width. The ListView is lazy, so the group
+      // headers only exist once the scroll reaches them.
+      final listView = find
+          .descendant(
+              of: find.byType(TagebuchScreen), matching: find.byType(ListView))
+          .first;
+      final groupTiles = find.descendant(
+          of: find.byType(TagebuchScreen),
+          matching: find.byType(ExpansionTile));
+      for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
+        await tester.drag(listView, const Offset(0, -200));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle();
+
+      final count = tester.widgetList(groupTiles).length;
+      for (var i = 0; i < count; i++) {
+        await tester.ensureVisible(groupTiles.at(i));
+        await tester.pumpAndSettle();
+        await tester.tap(groupTiles.at(i), warnIfMissed: false);
+        await tester.pumpAndSettle();
+      }
+
+      // The recorded tiles render their full content: temperature, the
+      // measured time, and the two mucus chips (one per recorded day).
+      await tester.ensureVisible(find.text('06:47'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('36,90 °C'));
+      await tester.pumpAndSettle();
+      expect(find.text('36,40 °C'), findsOneWidget,
+          reason: 'the f/S day tile shows its temperature');
+      expect(find.text('06:47'), findsOneWidget,
+          reason: 'the f/S day tile shows its measured time');
+      expect(
+        find.descendant(
+            of: find.byType(TagebuchScreen),
+            matching: find.byType(MucusSymbolText)),
+        findsNWidgets(2),
+        reason: 'both recorded days render their mucus chip on the tile',
+      );
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+    expect(
+      errors,
+      isEmpty,
+      reason: 'narrow-width day tiles must not overflow their trailing '
+          'chip row',
+    );
+    expect(tester.takeException(), isNull);
   });
 }
