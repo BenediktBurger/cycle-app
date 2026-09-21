@@ -2,10 +2,17 @@
 // chart tests kept copy-pasting between files. Each fixture is a function
 // (a fresh list per call) so a test can spread or filter it without leaking
 // mutations into a shared static.
+import 'dart:io';
+
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
+
+/// The sample drip CSV export used as import input (the picker override
+/// injects it, mirroring a real picked file).
+final String sampleDripCsv =
+    File('test/fixtures/drip-export-sample.csv').readAsStringSync();
 
 /// The shared evaluation scenario (used by the evaluation section of
 /// test/cycle_chart_test.dart and cycle_mark_sheet_test.dart for the

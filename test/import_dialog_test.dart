@@ -15,8 +15,6 @@
 // inside the IndexedStack, so at narrow widths the (separately tracked)
 // diary form's overflows would land in the error collector and confound the
 // dialog measurement.
-import 'dart:io';
-
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show acceptTypeGroup, pickFileTextOverride;
@@ -27,10 +25,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
-
-/// The sample drip CSV export used as import input.
-final String sampleDripCsv =
-    File('test/fixtures/drip-export-sample.csv').readAsStringSync();
+import 'support/fixtures.dart';
+import 'support/viewport.dart';
 
 /// Runs [pump] with a collector installed in place of
 /// [FlutterError.onError]; returns everything the framework reported so the
@@ -51,21 +47,10 @@ Future<List<FlutterErrorDetails>> collectFrameworkErrors(
   return errors;
 }
 
-/// Shrinks the test view to a 360x640 dp Android-class device and restores
-/// the view at test end. The keyboard inset ([keyboardDp] in dp of bottom
-/// inset) is applied via [showKeyboardUp].
-void useSmallAndroidViewport(WidgetTester tester) {
-  tester.view.devicePixelRatio = 3.0;
-  tester.view.physicalSize = const Size(1080, 1920);
-  addTearDown(() {
-    tester.view.resetDevicePixelRatio();
-    tester.view.resetPhysicalSize();
-    tester.view.resetViewInsets();
-  });
-}
-
 /// Simulates the IME opening: a ~300 cp bottom inset applied to the test
 /// view (the dialogs below relayout into the reduced area, as on a device).
+/// [useSmallAndroidViewport] must have run first; its teardown resets this
+/// inset together with the viewport.
 Future<void> showKeyboardUp(WidgetTester tester) async {
   tester.view.viewInsets = FakeViewPadding(bottom: 300 * 3);
   await tester.pumpAndSettle();

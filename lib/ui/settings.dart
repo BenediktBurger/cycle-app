@@ -369,12 +369,13 @@ class EinstellungenScreen extends ConsumerWidget {
   }
 
   /// Closes the import dialog after a successful import — only while it is
-  /// STILL the route on top. A scrim dismissal (or the cancel button) can
-  /// close the route while the import future is still running; `mounted`
-  /// alone cannot guard the follow-up pop (the dialog's elements stay
-  /// connected until the route is finalized, so the context's ancestor walk
-  /// reaches the root navigator) and the pop would then fire on whatever
-  /// route is now on top — the home — collapsing the whole route stack.
+  /// STILL the route on top. The actual race: the cancel button or a scrim
+  /// tap pops the dialog route WHILE the import future is still in flight,
+  /// before the success-path pop runs. `mounted` alone cannot guard the
+  /// follow-up pop (the dialog's elements stay connected until the route is
+  /// finalized, so the context's ancestor walk reaches the root navigator)
+  /// and the pop would then fire on whatever route is now on top — the
+  /// home — collapsing the whole route stack.
   void _popImportDialogWhileCurrent(BuildContext dialogContext) {
     final route = ModalRoute.of(dialogContext);
     if (route != null && route.isCurrent) {

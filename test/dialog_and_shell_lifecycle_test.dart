@@ -49,8 +49,6 @@
 // guards: (a) covers a plain typed-then-dismissed dialog, (c) covers the
 // mid-form listener reload of the entry form (S + quality selected, then the
 // selected date changed through the provider while the diary tab is hidden).
-import 'dart:io';
-
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';
@@ -64,22 +62,8 @@ import 'package:intl/intl.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
-
-/// The sample drip CSV export used as import input (the picker override
-/// injects it, mirroring a real picked file).
-final String sampleDripCsv =
-    File('test/fixtures/drip-export-sample.csv').readAsStringSync();
-
-/// Shrinks the test view to a 360x640 dp Android-class device and restores
-/// the view at test end (same device class as import_dialog_test.dart).
-void useSmallAndroidViewport(WidgetTester tester) {
-  tester.view.devicePixelRatio = 3.0;
-  tester.view.physicalSize = const Size(1080, 1920);
-  addTearDown(() {
-    tester.view.resetDevicePixelRatio();
-    tester.view.resetPhysicalSize();
-  });
-}
+import 'support/fixtures.dart';
+import 'support/viewport.dart';
 
 /// Runs [body] with a collector installed in place of [FlutterError.onError];
 /// after [body] returns, the whole widget tree is torn down INSIDE the
