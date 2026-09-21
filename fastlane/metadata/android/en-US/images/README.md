@@ -8,21 +8,30 @@ Layout and file set the stores expect:
 - `short_description.txt` — **≤ 80 characters**
 - `full_description.txt` — **≤ 4000 characters**
 - `changelogs/<versionCode>.txt` (one file per versionCode)
-- `images/` — **all placeholder work, not yet done** (Gate G4)
+- `images/` — **partially done**: `phoneScreenshots/` exists (Gate G4
+  pending for the remaining assets)
 
-## Images: pending Gate-G4 placeholder
+## Images: screenshots exist, branding assets pending Gate G4
 
-This app's logo, icon and screenshots do not exist yet; every image used at
-store level is a placeholder until Gate G4 ("branding assets") lands and a
-real logo exists. The files F-Droid/Play expect here:
+`phoneScreenshots/` holds **2 screenshots** (`01.png`, `02.png`, 1080×2340)
+of the app's English UI; the same files are copied byte-identical into
+`../de-DE/images/phoneScreenshots/` (German-store shots mirror the English
+UI for now).
+
+The shots are 1080×2340 = 19.5:9 (near-9:20 tall — a standard modern-phone
+screenshot ratio; Play accepts up to 9:21), which exceeds F-Droid's classic
+16:9/9:16 guidance. They are kept uncropped rather than faking the ratio —
+re-capture on a 16:9 display if an F-Droid reviewer ever objects.
+
+Still missing until Gate G4 ("branding assets") lands and a real logo
+exists:
 
 - `icon.png` (512×512, F-Droid; Play derives 512×512 from adaptive icon or
   high-resolution asset)
 - `featureGraphic.png` (1024×500)
-- `phoneScreenshots/*.png` (≥ 2 screenshots, 16:9 or 9:16)
 
-None of these files exist yet — this README is the directory carrier in
-their place. Do **not** mistake "Cycle App" for a decided product name: it
+These two do not exist yet. Do **not** mistake "Cycle App" for a decided
+product name: it
 is a clearly-marked **working title** (Gate G4 placeholder), recorded as
 such in `docs/release.md`.
 

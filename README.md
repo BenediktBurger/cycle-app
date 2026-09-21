@@ -113,6 +113,14 @@ German-first with an English switch, including the Mode-M marking UI
 (first higher measurement, mucus peak, SUZ — computed evaluation marks on
 the cycle chart, see [docs/roadmap.md](docs/roadmap.md) for open work).
 
+## Screenshots
+
+Two screenshots of the current app (cycle chart and diary) are in the
+fastlane store metadata:
+[01](fastlane/metadata/android/en-US/images/phoneScreenshots/01.png) and
+[02](fastlane/metadata/android/en-US/images/phoneScreenshots/02.png)
+(shown in English, matching the en-US store listing).
+
 ## Import from drip
 
 The Einstellungen screen can import a **CSV export of the drip cycle
