@@ -488,29 +488,18 @@ final class CycleDaySheet extends ConsumerWidget {
             ),
             // The exclusion group (owner decision 2026-09-19: manual-only
             // exclusion, made visible): the temperature-ignore toggle lives
-            // under its own exclusion heading. The day's disturbance flags
-            // are NOT shown here — the chart's disturbance row already
-            // spells them per day — so on a flagged and a flag-less day
-            // alike the group is exactly this title plus the toggle. Flag
-            // EDITING stays diary-side (data entry), the toggle goes
-            // through the unchanged _writeMark path.
-            // TODO(user-review): the group wording (title) is pending the
-            // expert review.
+            // in its own keyed group. The day's disturbance flags are NOT
+            // shown here — the chart's disturbance row already spells them
+            // per day — so on a flagged and a flag-less day alike the group
+            // is exactly this toggle (the label already says what it does:
+            // set remove the exclusion). Flag EDITING stays diary-side
+            // (data entry), the toggle goes through the unchanged
+            // _writeMark path.
             Column(
               key: const ValueKey('cycleSheetExcludeGroup'),
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Text(
-                    l10n.cycleSheetExcludeGroupTitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
                 _SheetAction(
                   // The temperature-ignore toggle ("Temperatur ignorieren"
                   // / "Temperatur wieder auswerten"): under the exclusion

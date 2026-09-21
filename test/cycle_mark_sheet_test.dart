@@ -574,7 +574,7 @@ void main() {
 
     testWidgets(
         'a day WITH recorded disturbance flags: the group carries only the '
-        'exclusion title and the toggle — neither flag labels nor an empty '
+        'toggle — neither heading text, nor flag labels, nor an empty '
         'line (the chart row shows the letters)', (tester) async {
       final (_, _) = await _pump(tester,
           entries: entriesWithDay4Mask(
@@ -585,8 +585,9 @@ void main() {
       expect(excludeGroup, findsOneWidget,
           reason: 'the exclusion toggle lives in the keyed group '
               '(cycleSheetExcludeGroup)');
-      expect(find.text('Excluded from the evaluation'), findsOneWidget,
-          reason: 'the group is titled by the exclusion concept only');
+      expect(find.text('Excluded from the evaluation'), findsNothing,
+          reason: 'the stale exclusion-group heading is gone — the toggle '
+              'label already says what it does');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Alcohol (alk)')),
@@ -619,9 +620,11 @@ void main() {
       await tapCycleDay(tester, 4); // 9/10: no flags recorded
 
       expect(excludeGroup, findsOneWidget,
-          reason: 'the group renders on every day: title plus the toggle');
-      expect(find.text('Excluded from the evaluation'), findsOneWidget,
-          reason: 'the exclusion-only title, also without flags');
+          reason: 'the group renders on every day: the toggle without a '
+              'heading');
+      expect(find.text('Excluded from the evaluation'), findsNothing,
+          reason: 'the stale exclusion-group heading is gone, also without '
+              'flags');
       expect(
           find.descendant(
               of: excludeGroup,

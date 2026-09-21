@@ -308,19 +308,17 @@
     }
   },
   "settingsLanguage": "Language",
-  "settingsLanguageNote": "Saved in the app's local storage — restored on the next app start.",
   "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsThemeMode": "Theme",
-  "settingsThemeModeNote": "Saved in the app's local storage — restored on the next app start.",
   "themeSystem": "System",
   "themeLight": "Light",
   "themeDark": "Dark",
   "settingsTemperatureRange": "Temperature range",
   "settingsRangeLower": "Lower limit",
   "settingsRangeUpper": "Upper limit",
-  "settingsTemperatureRangeNote": "Saved in the app's local storage — restored on the next app start. Default: 36–38 °C.",
+  "settingsTemperatureRangeDefaultHint": "Default: 36–38 °C.",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",
@@ -399,6 +397,5 @@
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
   "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
-  "cycleSheetExcludeGroupTitle": "Excluded from the evaluation",
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

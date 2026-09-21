@@ -86,14 +86,12 @@ class EinstellungenScreen extends ConsumerWidget {
                                 ? null
                                 : Locale(selection.first),
                   ),
-                  const SizedBox(height: 8),
                   // Persisted: the choice applies immediately and is
                   // written through to the local drift database
                   // (app_settings) — restored on the next app start
                   // (hydration/write-through in main.CycleApp; see
-                  // localeProvider).
-                  Text(l10n.settingsLanguageNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  // localeProvider). No action needed by the user, so the
+                  // pane does not repeat it as a note.
                 ],
               ),
             ),
@@ -134,13 +132,11 @@ class EinstellungenScreen extends ConsumerWidget {
                         .read(themeModeProvider.notifier)
                         .state = selection.first,
                   ),
-                  const SizedBox(height: 8),
                   // Persisted, mirroring the language switcher: the choice
                   // is written through to the local drift database
                   // (app_settings) and restored on the next app start
-                  // (themeModeProvider).
-                  Text(l10n.settingsThemeModeNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  // (themeModeProvider). Its note is gone with the language
+                  // card's: persistence is expected, the pane spares it.
                 ],
               ),
             ),
@@ -234,9 +230,11 @@ class EinstellungenScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   // Persisted: the range is written through to the local
                   // drift database (app_settings) and restored on the next
-                  // app start; the default is 36–38 °C
-                  // (temperatureRangeProvider).
-                  Text(l10n.settingsTemperatureRangeNote,
+                  // app start (temperatureRangeProvider). The short note
+                  // below carries only the DEFAULT measurement (the
+                  // half of the old note that actually informs the user
+                  // — the persistence sentence is gone everywhere else).
+                  Text(l10n.settingsTemperatureRangeDefaultHint,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),

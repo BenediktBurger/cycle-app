@@ -204,19 +204,17 @@
     }
   },
   "settingsLanguage": "Sprache",
-  "settingsLanguageNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt.",
   "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsThemeMode": "Design",
-  "settingsThemeModeNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt.",
   "themeSystem": "System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
   "settingsTemperatureRange": "Temperaturbereich",
   "settingsRangeLower": "Untergrenze",
   "settingsRangeUpper": "Obergrenze",
-  "settingsTemperatureRangeNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt. Standard: 36–38 °C.",
+  "settingsTemperatureRangeDefaultHint": "Standard: 36–38 °C.",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
@@ -273,6 +271,5 @@
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
   "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
-  "cycleSheetExcludeGroupTitle": "Von der Auswertung ausgeschlossen",
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

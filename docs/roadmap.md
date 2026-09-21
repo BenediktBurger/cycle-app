@@ -46,11 +46,7 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
-- [ ] make the journals save button always visible (top bar?) such that you can save wherever you changed something, not only at the bottom
-- [ ] remove stale text line "von der Auswertung ausgeschlossen" from the add mark sheet
-- [ ] remove superfluous note on settings pane that the settings are stored (users expect settings to be stored)
 - [ ] make sure that it works also in horizontal view (especially for the cycle, to see more of the cycle better)
-- [ ] diary: make it compacter (temperature and time on the same line?)
 - Cycle-length statistics during a very long mark-driven cycle: during
   pregnancy a cycle runs arbitrarily long (day-of-cycle > 100 on the
   chart) and skews cycle-length statistics — `cycleLengthsInDays`
