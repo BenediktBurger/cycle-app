@@ -18,6 +18,9 @@ decision-maker.
 > owner's, **not endorsed by INER**.
 > For the full picture read [docs/product/vision.md](docs/product/vision.md).
 
+> **⚠️ This is an alpha version — do NOT rely on its data. Data might get
+> lost.**
+
 - **Package name `cycle_app`** is an explicit **PLACEHOLDER** (ADR-0002) —
   rename is a one-line `pubspec.yaml` change later.
 - **⚠️ license-tbd**: No license yet — license is TBD, will likely be
@@ -25,6 +28,46 @@ decision-maker.
   chosen.
 - Local-first: no cloud, no analytics; data stays on the device
   (drift/SQLite, encrypted on native platforms later — ADR-0005).
+
+## Trying it out (testers)
+
+This section is for people who just want to install the app on an **Android**
+device — no Flutter SDK, no development setup needed. (An iOS build does not
+exist yet.)
+
+### Where to get it
+
+Download the APK from the
+[GitHub releases page](https://github.com/BenediktBurger/cycle-app/releases).
+Each release carries one release-signed, universal APK — a single file that
+runs on all Android devices. Every release note also lists the APK's SHA-256
+checksum and the signing certificate's SHA-256 fingerprint, so you can verify
+the download if you want to.
+
+### Installing
+
+1. Download the APK from the latest release.
+2. Open the downloaded file on the device.
+3. Android will warn about installing apps from an external source
+   (sideloading / "unknown sources") — accept it to continue.
+4. Expect an additional "unknown developer" / "unsafe app" style
+   Play-Protect remark: the app is signed with the project's own key and is
+   not distributed through a store. This is expected, not a sign that
+   something is wrong with the file.
+
+### Updating
+
+Download the most recent APK from the releases page and install it over the
+existing version. Because the signing certificate stays the same, Android
+updates the app in place instead of treating it as a new install, and your
+data stays. That said: this is an alpha — data loss is not ruled out, so
+exporting your data (JSON export in the Einstellungen screen) before
+updating is wise.
+
+### Privacy note
+
+The app is fully offline: no network access, no analytics. All data stays on
+your device.
 
 ## Getting started
 
