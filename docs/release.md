@@ -317,24 +317,36 @@ Do **not** start until Android went through Phases A–F at least once.
    APK *is* the artifact users install (byte-identical), so install it over
    the previous release and verify the cycle data survives before anything
    is public.
-7. Sanity-check the version/tag, then tag and publish:
+7. Run the release script — checklist step 7, as a command:
 
    ```sh
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   gh release create vX.Y.Z \
-     build/app/outputs/flutter-apk/app-release.apk \
-     --generate-notes \
-     --notes "SHA-256 certificate fingerprint: <from the apksigner output above>"
+   dart run tool/make_release.dart vX.Y.Z          # do a `--dry-run` first for a look-before-you-leap pass
    ```
 
-   The APK embeds the `version:` from `pubspec.yaml` at the tagged commit —
-   the tag must sit on the commit containing the pubspec bump, and the tag
-   name must match that versionName; nothing cross-checks the two on the
-   local path. The fingerprint goes into the release notes body as the
-   trust anchor (F-Droid metadata later cross-checks against the same
-   fingerprint). Only point testers at the release once it is visible.
-   (Git history is the release diary; the roadmap stays a queue.)
+   The script mechanically performs this step plus the sanity parts of the
+   steps above: it cross-checks the tag against the `pubspec.yaml` version,
+   requires a clean tree, verifies the APK against the pinned release
+   certificate fingerprint (`tool/release_fingerprint.txt` — a mismatch
+   means wrong key or debug-signing fallback, never publish), re-checks the
+   APK's embedded versionName/versionCode via `aapt` (best effort), prints
+   the APK SHA-256, and demands explicit interactive confirmation that
+   step 6's upgrade test was done with **this exact APK** — then it tags,
+   pushes, and creates the GitHub Release with both the fingerprint and the
+   checksum in the notes (`--generate-notes` appends the auto-generated
+   changelog to that body). First run: `--accept-fingerprint` pins the
+   APK's actual certificate fingerprint into `tool/release_fingerprint.txt`,
+   which gets committed (it is public — it goes into the release notes
+   anyway).    The script deliberately does **not** cover steps 4–6: it never builds,
+   never touches the device, and does not *decide* the step 5 trust
+   question — it verifies mechanically that the APK's certificate matches
+   the pin (first run: `--accept-fingerprint` writes the pin after the
+   operator has decided the certificate is genuinely the release key),
+   and it asks for the step 6 outcome instead of performing it. The
+   manual-equivalent commands live in the
+   [local release path](#local-release-path) so every step stays
+   executable by hand even where the script is unusable.
+   Only point testers at the release once it is visible. (Git history is
+   the release diary; the roadmap stays a queue.)
 8. Upload/distribute (sideload → testers; Play internal track; F-Droid MR
    or automatic build on their side). When Play is involved, the AAB is
    also built locally (`flutter build appbundle --release`); there is no
@@ -352,8 +364,13 @@ decision #6's tag-triggered CI flow is
 [parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-local-release-path),
 not deleted).
 
-The sequence aligns with the per-release checklist above (where items 4–7
-carry the exact commands):
+The sequence aligns with the per-release checklist above. With the release
+script (checklist step 7) the operator still works items 1 and 3 below —
+build and device upgrade test are never automated — while item 2's
+fingerprint guard runs inside the script (pinned against
+`tool/release_fingerprint.txt`); the script then replaces items 4–5, and
+they keep the exact manual commands for machines where the script is
+unusable:
 
 1. Build the artifact: `flutter build apk --release` — signed via the
    local `android/key.properties` (Phase C wiring). **Debug-signing
@@ -373,19 +390,35 @@ carry the exact commands):
    publishing (Tag → CI build → download → test → distribute).
 4. Version/tag sanity: the APK embeds the `version:` from `pubspec.yaml`
    at the tagged commit; before creating the release, confirm the tag
-   name matches the versionName (one-line eyeball check — nothing
-   cross-checks automatically on the local path).
-5. Tag `vX.Y.Z` on the commit containing the pubspec bump: create it
-   explicitly with `git tag`/`git push` — the one consistent way this
-   runbook does it — rather than left to `gh release create` to
-   auto-create the tag at the default branch's HEAD, which may not be
-   the pubspec-bump commit. Then create the GitHub Release with
-   `gh release create` + the same APK.
+   name matches the versionName. The release script (checklist step 7)
+   cross-checks this automatically alongside the clean-tree and signature
+   requirements; by hand it is an eyeball check on the local path.
+5. Tag and publish the release by hand — also the **manual fallback** for
+   the release script. Tag `vX.Y.Z` on the commit containing the pubspec
+   bump: create it explicitly with `git tag`/`git push` — the one
+   consistent way this runbook does it — rather than left to
+   `gh release create` to auto-create the tag at the default branch's
+   HEAD, which may not be the pubspec-bump commit. Then create the GitHub
+   Release with `gh release create` + the same APK:
+
+   ```sh
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   gh release create vX.Y.Z \
+     build/app/outputs/flutter-apk/app-release.apk \
+     --generate-notes \
+     --notes "SHA-256 certificate fingerprint: <from step 2's apksigner output>
+   APK SHA-256: <sha256sum build/app/outputs/flutter-apk/app-release.apk>"
+   ```
+
    `--generate-notes` builds the changelog from the commit log; GitHub
    appends it to the `--notes` content, so the pasted SHA-256 certificate
    fingerprint ends up in the release notes body as the trust anchor —
    same practice the CI workflow had, and what F-Droid metadata later
-   cross-checks.
+   cross-checks. When publishing by hand, the pinned-fingerprint guard
+   (and the version cross-check) must be applied by the operator: compare
+   the `apksigner` fingerprint against `tool/release_fingerprint.txt` and
+   the tag name against `pubspec.yaml` before running the commands above.
 6. Distribute (checklist steps 8–9).
 
 AAB note: when Play distribution starts, the bundle is built locally too
@@ -418,7 +451,8 @@ longer runs it — and stays useful as a manual dry run on a clean machine.
 Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
 tagged commit; the tag name itself is only the trigger and trust anchor.
 Keep the two in sync (per-release checklist step 7) — nothing in the
-workflow verifies them against each other.
+workflow verifies them against each other (the local release script does
+have that cross-check, but it only guards the manual publishing path).
 
 **Required repository secrets (GitHub Settings → Secrets → Actions), all
 five — set them BEFORE the first tag push. Why the hard pre-flight
