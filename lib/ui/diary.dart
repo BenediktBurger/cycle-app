@@ -20,6 +20,7 @@ import '../domain/models.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'bleeding_symbol.dart';
 import 'mucus_symbol.dart';
 
 class TagebuchScreen extends ConsumerStatefulWidget {
@@ -471,8 +472,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
-              // All five levels of the numeric scale, none first. Wrap of
-              // ChoiceChips like the mucus quality row below: a five-label
+              // All six levels of the numeric scale, none first. Wrap of
+              // ChoiceChips like the mucus quality row below: a six-label
               // SegmentedButton risks overflowing small phone widths.
               Text(l10n.bleeding),
               const SizedBox(height: 4),
@@ -489,6 +490,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                           Bleeding.light => l10n.bleedingLight,
                           Bleeding.medium => l10n.bleedingMedium,
                           Bleeding.heavy => l10n.bleedingHeavy,
+                          Bleeding.maximum => l10n.bleedingMaximum,
                         },
                       ),
                       selected: _bleeding == bleeding,
@@ -832,27 +834,31 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   }
 
   Widget _bleedingMarker(DailyEntry day) {
-    final color = switch (day.bleeding) {
-      Bleeding.none => Theme.of(context).colorScheme.outlineVariant,
-      // The dot's strength follows the recorded heaviness: spotting is the
-      // faintest error tint, then light/medium step up, heavy gets the full
-      // error color.
-      Bleeding.spotting =>
-        Theme.of(context).colorScheme.error.withValues(alpha: 0.4),
-      Bleeding.light =>
-        Theme.of(context).colorScheme.error.withValues(alpha: 0.6),
-      Bleeding.medium =>
-        Theme.of(context).colorScheme.error.withValues(alpha: 0.8),
-      Bleeding.heavy => Theme.of(context).colorScheme.error,
-    };
+    final scheme = Theme.of(context).colorScheme;
+    // The shared square-box bleeding symbol at the tile's 18 px size
+    // (bleeding_symbol.dart): a box whose bleed fill is a bottom-anchored
+    // fraction of the height, spotting interrupted into dots — the same
+    // convention the cycle chart's cells and the glossary sample render.
+    final marker = day.bleeding == Bleeding.none
+        ? Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+                color: scheme.outlineVariant, shape: BoxShape.circle),
+          )
+        : SizedBox(
+            width: 18,
+            height: 18,
+            child: BleedingSymbol(
+              bleeding: day.bleeding,
+              color: scheme.error,
+              borderColor: scheme.error,
+            ),
+          );
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        marker,
         // The raw disturbance flags are the interrupted-day rendering
         // signal here (the list tile's little warning badge) — the
         // analysis exclusion is the mark, not this.

@@ -44,7 +44,11 @@
 // NER scheme: entries drop the exclude_* booleans and the mood/desire
 // flags and gain `temp_disturbances` (the raw disturbance mask 0..15,
 // sp/a/alk/kr; see models.dart); the analysis exclusion rides as the
-// ignoreTemperature MARK row. Old-document translation (inside the
+// ignoreTemperature MARK row. The current export scale's numeric bleeding
+// field spans 0=none … 5=maximum — the level-5 member was added after v5
+// was pinned, without a schema_version bump (the version-agnostic field
+// parser accepts both older and extended v5 documents; see
+// tryParseBleeding). Old-document translation (inside the
 // import transaction, lib/db/export_adapter.dart): `exclude_illness` →
 // the kr bit (8), `exclude_alcohol` → the alk bit (4), `exclude_travel` /
 // `exclude_other` dropped as raw data (no equivalent flag exists) — and

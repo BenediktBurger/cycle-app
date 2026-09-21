@@ -29,6 +29,7 @@
   "bleedingLight": "light",
   "bleedingMedium": "medium",
   "bleedingHeavy": "heavy",
+  "bleedingMaximum": "maximum",
   "mucusSign": "Fertility sign",
   "mucusSignUnset": "—",
   "mucusQuality": "Quality",

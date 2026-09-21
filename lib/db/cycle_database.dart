@@ -1,4 +1,4 @@
-// The app's drift database (schema version 10, profile-free).
+// The app's drift database (schema version 11, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // settings_dao.dart) are
@@ -38,7 +38,7 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -61,6 +61,12 @@ class CycleDatabase extends _$CycleDatabase {
           // no surviving data). So a v9 → v10 upgrade is just the version
           // bump shown above; no deleteTable line for app_settings is needed
           // since createAll() recreates (or CREATEs) it.
+          //
+          // v11 likewise changes nothing in SQL: the bleeding scale gained
+          // the level-5 vocabulary (maximum), which the bleeding column's
+          // converter interprets — the column's INTEGER DDL is unchanged, so
+          // a v10 → v11 upgrade is only the version bump (the pre-release
+          // drop-and-recreate policy handles any old file regardless).
           //
           // From the FIRST PUBLISHED RELEASE on this must become real one
           // version step at a time migrations that preserve user data.

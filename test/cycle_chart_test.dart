@@ -32,6 +32,7 @@ import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/bleeding_symbol.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
@@ -499,7 +500,7 @@ Iterable<Element> outsideTable(Finder finder) =>
 //     value→pixel mapping as the plot (shared from the chart's min/max and
 //     plot height — one source of truth), with the 0.5 °C interval and the
 //     two-scale numbering (plain integers, halves with one decimal),
-//  3. the per-signal-row corner sample glyphs (bleeding blob, S,
+//  3. the per-signal-row corner sample glyphs (bleeding box, S,
 //     Mittelschmerz M, X, cervix letter, B, clock), each vertically
 //     aligned with its signal row's fixed-height slot; the rows' segments
 //     mirror the scroll content: the top-of-block rows (bleeding, mucus,
@@ -615,13 +616,26 @@ const _signalRows = [
   'note',
 ];
 
-/// The bleeding blob (the circle Container) inside the bleeding cell of
-/// [index].
-Container _bleedingBlob(WidgetTester tester, int index) => tester
-    .widgetList<Container>(find.descendant(
-        of: chartCell(index, 'bleeding'), matching: find.byType(Container)))
-    .firstWhere((container) =>
-        (container.decoration! as BoxDecoration).shape == BoxShape.circle);
+// The bleeding row's dedicated level fixture: every level recorded once,
+// on consecutive days — day 0 none(0), day 1 light, day 2 spotting,
+// day 3 medium, day 4 heavy, day 5 maximum. Every day carries a
+// temperature: with no measurement recorded anywhere the chart renders
+// only its "no temperature" placeholder instead of the signal rows, so
+// the bleeding cells would never exist to assert on.
+final _bleedingRowEntries = [
+  DailyEntry(date: _rowsDay(0), bbtC: 36.5),
+  DailyEntry(date: _rowsDay(1), bbtC: 36.5, bleeding: Bleeding.light),
+  DailyEntry(date: _rowsDay(2), bbtC: 36.5, bleeding: Bleeding.spotting),
+  DailyEntry(date: _rowsDay(3), bbtC: 36.5, bleeding: Bleeding.medium),
+  DailyEntry(date: _rowsDay(4), bbtC: 36.5, bleeding: Bleeding.heavy),
+  DailyEntry(date: _rowsDay(5), bbtC: 36.5, bleeding: Bleeding.maximum),
+];
+
+/// All bleed-fill regions (the shared symbol's fill widgets) inside the
+/// bleeding cell of [index]: the solid bottom bar of a menstruation-level
+/// day, or the dots of a spotting day.
+Finder _bleedingFills(int index) => find.descendant(
+    of: chartCell(index, 'bleeding'), matching: find.byType(BleedingFill));
 
 Widget _rowsHarness({
   required List<DailyEntry> entries,
@@ -2927,15 +2941,16 @@ void main() {
         );
       }
 
-      // The sample glyphs: a bleeding blob, the S mucus glyph, the
+      // The sample glyphs: a bleeding box, the S mucus glyph, the
       // Mittelschmerz M, a cervix letter, the X, the B pain letter, and
       // the clock icon.
       expect(
           find.descendant(
               of: chartCellCorner('bleeding'),
-              matching: find.byType(Container)),
+              matching: find.byType(BleedingSymbol)),
           findsOneWidget,
-          reason: 'the bleeding corner shows the blob sample');
+          reason: 'the bleeding corner shows the box sample (dotted '
+              'spotting, like the row\'s cells render it)');
       expect(
           find.descendant(
               of: chartCellCorner('mucus'),
@@ -3097,27 +3112,80 @@ void main() {
           reason: 'the tapped bleeding cell owns day 3');
     });
 
-    testWidgets('the bleeding blob keeps the graded-opacity convention',
+    // The bleeding row renders the shared square-box convention (see
+    // lib/ui/bleeding_symbol.dart): the cell box is the fill boundary, the
+    // fill is a bottom-anchored fraction of the box height, and the
+    // spotting level interrupts its quarter band into dots. The geometry
+    // is measured with getRect so the convention cannot drift between the
+    // chart cells, the diary tiles and the glossary sample.
+    testWidgets(
+        'bleeding cells fill a bottom-anchored fraction of the cell box',
         (tester) async {
-      await tester.pumpWidget(_rowsHarness(entries: _rowsEntries));
+      await tester.pumpWidget(_rowsHarness(entries: _bleedingRowEntries));
       await tester.pumpAndSettle();
 
-      final errorColor =
-          Theme.of(tester.element(chartCell(1, 'bleeding'))).colorScheme.error;
+      final errorColor = chartScheme(tester).error;
 
-      // Day 2 = spotting: the hollow ring (transparent fill, visible border).
-      final spotting = _bleedingBlob(tester, 2).decoration! as BoxDecoration;
-      expect(spotting.shape, BoxShape.circle);
-      expect(spotting.color, Colors.transparent);
-      expect((spotting.border as Border).top.color, errorColor);
+      // The menstruation levels: cell index → (level, fill fraction of the
+      // box height).
+      final expectations = {
+        1: (Bleeding.light, 1 / 4),
+        3: (Bleeding.medium, 2 / 4),
+        4: (Bleeding.heavy, 3 / 4),
+        5: (Bleeding.maximum, 4 / 4),
+      };
+      for (final MapEntry(:key, :value) in expectations.entries) {
+        final (level, fraction) = value;
+        final cell = tester.getRect(chartCell(key, 'bleeding'));
+        expect(_bleedingFills(key), findsOneWidget,
+            reason: '$level draws exactly one solid fill region');
+        final fill = tester.widget<BleedingFill>(_bleedingFills(key));
+        expect(fill.color, errorColor,
+            reason: '$level fills with the bleeding color');
+        final rect = tester.getRect(_bleedingFills(key));
+        expect(rect.height, closeTo(cell.height * fraction, 0.01),
+            reason: '$level fills $fraction of the box height');
+        expect(rect.bottom, closeTo(cell.bottom, 0.01),
+            reason: '$level: the fill is anchored at the box\'s bottom');
+        expect(rect.left, closeTo(cell.left, 0.01),
+            reason: '$level: the fill spans the full cell width — the '
+                'table cell box serves as the fill boundary');
+      }
 
-      // Day 1 = light: filled at 0.6.
-      final light = _bleedingBlob(tester, 1).decoration! as BoxDecoration;
-      expect(light.color, errorColor.withValues(alpha: 0.6));
+      // Day 0 records bleeding "none": the cell stays empty.
+      expect(_bleedingFills(0), findsNothing,
+          reason: 'bleeding none keeps the empty cell');
+    });
 
-      // Day 3 = heavy: filled at full strength.
-      final heavy = _bleedingBlob(tester, 3).decoration! as BoxDecoration;
-      expect(heavy.color, errorColor.withValues(alpha: 1.0));
+    testWidgets(
+        'spotting renders an interrupted dotted fill in the bottom quarter '
+        'band, not a solid quarter bar', (tester) async {
+      await tester.pumpWidget(_rowsHarness(entries: _bleedingRowEntries));
+      await tester.pumpAndSettle();
+
+      final cell = tester.getRect(chartCell(2, 'bleeding'));
+      final bandTop = cell.top + cell.height * 3 / 4;
+      final dots = _bleedingFills(2).evaluate();
+      expect(dots.length, greaterThanOrEqualTo(3),
+          reason: 'spotting interrupts the 1/4 band into several dots');
+
+      final rects = [
+        for (var i = 0; i < dots.length; i++)
+          tester.getRect(_bleedingFills(2).at(i))
+      ];
+      for (final rect in rects) {
+        expect(rect.top, greaterThanOrEqualTo(bandTop - 0.01),
+            reason: 'the dots stay inside the bottom quarter band');
+        expect(rect.bottom, lessThanOrEqualTo(cell.bottom + 0.01),
+            reason: 'the dots stay inside the bottom quarter band');
+      }
+      final sorted = [...rects]..sort((a, b) => a.left.compareTo(b.left));
+      for (var i = 1; i < sorted.length; i++) {
+        expect(sorted[i].left, greaterThanOrEqualTo(sorted[i - 1].right),
+            reason: 'the dots are disjoint regions, not one merged bar');
+      }
+      expect(sorted.last.right - sorted.first.left, lessThan(cell.width),
+          reason: 'the dotted fill never reads as a solid quarter bar');
     });
 
     // Cross-check at a narrow viewport (the same device class the diary

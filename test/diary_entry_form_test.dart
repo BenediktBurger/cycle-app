@@ -76,18 +76,25 @@ void main() {
 // former test/diary_bleeding_selector_test.dart (bodies concatenated verbatim; see
 // the file header for the merge mechanics)
 
-  testWidgets('bleeding selector offers all five levels and stores heavy',
+  testWidgets('bleeding selector offers all six levels and stores heavy',
       (WidgetTester tester) async {
     await tester.pumpWidget(_appScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The Tagebuch screen is the shell's initial tab; the bleeding control
-    // sits on its entry form. All five levels of the numeric scale must be
+    // sits on its entry form. All six levels of the numeric scale must be
     // offered (German labels, per the pinned locale). NB "mittel" is also
     // the German label of one Muttermund position AND of the opening chip
     // "mittel" on the same form, so the strict one-match assertion does not
     // apply to that one word.
-    const levels = ['keine', 'Schmierblutung', 'leicht', 'mittel', 'stark'];
+    const levels = [
+      'keine',
+      'Schmierblutung',
+      'leicht',
+      'mittel',
+      'stark',
+      'sehr stark',
+    ];
     for (final level in levels) {
       expect(
         find.text(level),
@@ -115,6 +122,33 @@ void main() {
       row!.bleeding,
       Bleeding.heavy,
       reason: 'Selecting "stark" (heavy) and saving must persist level 4',
+    );
+  });
+
+  testWidgets('selecting the top bleeding level persists maximum (level 5)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpAndSettle();
+
+    // The German label of the new top level sits next to "stark"; the exact
+    // matcher below only hits "sehr stark", never the middle chip "stark".
+    await tester.ensureVisible(find.text('sehr stark'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('sehr stark'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Speichern'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Speichern'));
+    await tester.pumpAndSettle();
+
+    final (:db, :date) = await savedDayOf(tester);
+    final row = await db.entriesDao.entryFor(date);
+    expect(row, isNotNull, reason: 'The saved day must exist in the database');
+    expect(
+      row!.bleeding,
+      Bleeding.maximum,
+      reason: 'Selecting "sehr stark" (maximum) and saving must persist '
+          'level 5',
     );
   });
 

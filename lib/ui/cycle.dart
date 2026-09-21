@@ -64,6 +64,7 @@ import '../domain/mucus.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'bleeding_symbol.dart';
 import 'cycle_curve.dart';
 import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';
@@ -1363,13 +1364,16 @@ String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
 Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
   final scheme = Theme.of(context).colorScheme;
   return switch (kind) {
-    _SignalKind.bleeding => Container(
+    // Sample bleeding glyph: the shared square box in its dotted spotting
+    // mode — the level least like a plain fill, rendered exactly like a
+    // recorded spotting day's cell (bleeding_symbol.dart).
+    _SignalKind.bleeding => SizedBox(
         width: 10,
         height: 10,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
+        child: BleedingSymbol(
+          bleeding: Bleeding.spotting,
           color: scheme.error,
-          border: Border.all(width: 1.5, color: scheme.error),
+          borderColor: scheme.error,
         ),
       ),
     // Sample glyph: plain S, matching the sign glyph a recorded mucus day
@@ -1531,36 +1535,14 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 
-  /// Bleeding: the graded-opacity circle convention shared with the diary
-  /// day tiles — none draws the invisible circle, spotting the hollow
-  /// ring, and light/medium/heavy fill the circle with the error color at
-  /// 0.6/0.8/1.0.
+  /// Bleeding: the shared square-box symbol (bleeding_symbol.dart) fills
+  /// the day cell — the table cell box serves as the fill boundary, so
+  /// the bleed fill spans the cell's full width and follows the shared
+  /// bottom-anchored fill-fraction convention (spotting dotted; light to
+  /// maximum raise the bar; none keeps the empty cell).
   static Widget _bleedingContent(BuildContext context, DailyEntry? day) {
     if (day == null) return const SizedBox.shrink();
-    final bleedingColor = Theme.of(context).colorScheme.error;
-    final bleeding = day.bleeding;
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: bleeding.level >= 2
-            ? bleedingColor.withValues(
-                alpha: switch (bleeding) {
-                  // none/spotting are guarded by level >= 2 above.
-                  Bleeding.none || Bleeding.spotting => 1.0,
-                  Bleeding.light => 0.6,
-                  Bleeding.medium => 0.8,
-                  Bleeding.heavy => 1.0,
-                },
-              )
-            : Colors.transparent,
-        border: Border.all(
-          width: 1.5,
-          color: bleeding == Bleeding.none ? Colors.transparent : bleedingColor,
-        ),
-      ),
-    );
+    return BleedingSymbol(bleeding: day.bleeding);
   }
 
   /// Mucus: the reserved solid peak-dot slot above the glyph (R6, classic

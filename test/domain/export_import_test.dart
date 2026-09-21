@@ -252,7 +252,7 @@ void main() {
   });
 
   group('tryParseBleeding: dual-format bleeding parser', () {
-    test('int 0-4 map to the five levels by their stored level', () {
+    test('int 0-5 map to the six levels by their stored level', () {
       // Mapped BY the numeric level, never by declaration index: the
       // name/number pairs below hold even if the enum is ever re-declared
       // in a different member order.
@@ -261,6 +261,7 @@ void main() {
       expect(tryParseBleeding(2)?.name, 'light');
       expect(tryParseBleeding(3)?.name, 'medium');
       expect(tryParseBleeding(4)?.name, 'heavy');
+      expect(tryParseBleeding(5)?.name, 'maximum');
     });
 
     test('values outside the accepted shapes are invalid', () {
@@ -269,7 +270,7 @@ void main() {
         true, // bool sneaks through as int in JS-land, not here
         false,
         -1, // below the scale
-        5, // above the scale
+        6, // above the scale
         '2', // numeric STRING is not a level
         'light', // NEW names are not valid string tokens (only legacy ones)
         'medium',

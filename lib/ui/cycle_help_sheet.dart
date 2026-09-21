@@ -13,8 +13,10 @@
 import 'package:flutter/material.dart';
 
 import '../domain/cervix.dart';
+import '../domain/models.dart';
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
+import 'bleeding_symbol.dart';
 import 'cycle_curve.dart';
 import 'cycle_marks.dart';
 import 'mucus_symbol.dart';
@@ -60,7 +62,11 @@ final class _CycleHelpSheet extends StatelessWidget {
             _HelpEntry(
               color: scheme.error,
               label: l10n.cycleLegendBleeding,
-              shape: _HelpEntryShape.ring,
+              // Sample bleeding glyph: the shared square box in its
+              // dotted spotting mode — the level least like a plain
+              // fill, rendered exactly like a recorded spotting day on
+              // the chart rows and the diary tiles (bleeding_symbol.dart).
+              shape: _HelpEntryShape.bleeding,
             ),
             _HelpEntry(
               color: scheme.tertiary,
@@ -171,7 +177,7 @@ final class _CycleHelpSheet extends StatelessWidget {
 
 enum _HelpEntryShape {
   dot,
-  ring,
+  bleeding,
   text,
   circledDot,
   arrowUp,
@@ -206,13 +212,17 @@ final class _HelpEntry extends StatelessWidget {
           height: 10,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-      _HelpEntryShape.ring => Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            shape: BoxShape.circle,
-            border: Border.all(width: 1.5, color: color),
+      // Sample bleeding glyph: the shared square box symbol in its
+      // dotted spotting mode — the fill-fraction convention's least
+      // plain-looking level, at a small glossary size with the box
+      // outlined so the interrupted quarter band reads as such.
+      _HelpEntryShape.bleeding => SizedBox(
+          width: 14,
+          height: 14,
+          child: BleedingSymbol(
+            bleeding: Bleeding.spotting,
+            color: color,
+            borderColor: color,
           ),
         ),
       _HelpEntryShape.text => MucusSymbolText(

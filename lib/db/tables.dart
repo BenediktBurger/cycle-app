@@ -65,9 +65,10 @@ class CycleEntries extends Table {
         '(measured_at_minutes BETWEEN 0 AND 1439))',
       )();
 
-  /// Bleeding intensity on the shared 5-step numeric scale, stored as the
+  /// Bleeding intensity on the shared 6-step numeric scale, stored as the
   /// INTEGER [Bleeding.level]: none(0) / spotting(1) / light(2) / medium(3) /
-  /// heavy(4). The converter derives every mapping from [Bleeding.level],
+  /// heavy(4) / maximum(5). The converter derives every mapping from
+  /// [Bleeding.level],
   /// never from the declaration index; an unknown stored number throws so
   /// corrupt data is surfaced instead of silently mapped. The default 0
   /// stores an explicit `none` (a day with no observation still has a value).

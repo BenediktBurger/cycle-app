@@ -515,7 +515,9 @@ int? _parseDripTimeMinutes(String? raw) {
 /// indexes mean no observation (null). The returned values are exactly the
 /// numbers the shared parser accepts (tryParseBleeding, models.dart), so
 /// the writer/planner gates (export_import.dart) can never drop one of
-/// these rows.
+/// these rows. The stored scale's top level maximum(5) has no drip
+/// equivalent — drip's scale tops out at heavy(4), so a drip import can
+/// never produce it.
 int? _parseBleeding(String? raw) {
   final v = raw == null ? null : int.tryParse(raw);
   if (v == null || v < 0 || v > 3) return null;

@@ -234,8 +234,8 @@ Future<void> main() async {
   check(cervixTokens.data['temp_disturbances'] == 15,
       'raw temp_disturbances is the TempDisturbance mask');
 
-  // --- bleeding levels: all five levels round-trip the drift layer --------
-  // The stored number is Bleeding.level (0 none … 4 heavy), mapped through
+  // --- bleeding levels: all six levels round-trip the drift layer --------
+  // The stored number is Bleeding.level (0 none … 5 maximum), mapped through
   // the converter — never the Dart declaration index.
   for (var i = 0; i < Bleeding.values.length; i++) {
     final level = Bleeding.values[i];
@@ -257,11 +257,12 @@ Future<void> main() async {
       'raw stored bleeding value is the numeric level (4 for heavy)');
   await db.customStatement(
     'INSERT INTO cycle_entries (date, bleeding) VALUES (?, ?)',
-    [heavyDay + 1, 3],
+    // A free day beyond the six loop days above.
+    [heavyDay + 7, 3],
   );
   final rawMedium = await db.customSelect(
       'SELECT bleeding FROM cycle_entries WHERE date = ?',
-      variables: [Variable.withInt(heavyDay + 1)]).getSingle();
+      variables: [Variable.withInt(heavyDay + 7)]).getSingle();
   check(rawMedium.data['bleeding'] == 3,
       'raw int insert (3) is stored verbatim in the int column');
 

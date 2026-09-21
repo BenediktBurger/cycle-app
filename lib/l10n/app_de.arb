@@ -26,6 +26,7 @@
   "bleedingLight": "leicht",
   "bleedingMedium": "mittel",
   "bleedingHeavy": "stark",
+  "bleedingMaximum": "sehr stark",
   "mucusSign": "Zeichen der Fruchtbarkeit",
   "mucusSignUnset": "—",
   "mucusQuality": "Qualität",

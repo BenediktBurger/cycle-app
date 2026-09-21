@@ -26,7 +26,7 @@ class EpochDayConverter extends TypeConverter<DateTime, int> {
 }
 
 /// Maps the [Bleeding] domain enum to the stored INTEGER bleeding level: the
-/// number is exactly [Bleeding.level] (0 none … 4 heavy), kept in sync with
+/// number is exactly [Bleeding.level] (0 none … 5 maximum), kept in sync with
 /// that field — never the Dart declaration index. An unknown stored number is
 /// data corruption (e.g. foreign data bypassing the engine): reading throws
 /// so drift surfaces the corrupt row instead of silently mapping it.

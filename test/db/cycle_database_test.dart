@@ -209,7 +209,11 @@ void main() {
       );
     });
 
-    test('bleeding round-trips as each of the five levels', () async {
+    test('bleeding round-trips as each of the six levels', () async {
+      // The shared numeric scale spans six steps (0=none … 5=maximum).
+      expect(Bleeding.values.map((b) => b.level), [0, 1, 2, 3, 4, 5],
+          reason: 'the fifth bleeding level extends the stored scale to 5');
+      expect(Bleeding.values.where((b) => b.level == 5).single.name, 'maximum');
       for (final (index, level) in Bleeding.values.indexed) {
         final day = DateTime(2026, 6).add(Duration(days: index));
         await db.entriesDao.upsertDaily(DailyEntry(date: day, bleeding: level));
@@ -218,6 +222,31 @@ void main() {
             reason: '${level.name} (level ${level.level}) must survive the '
                 'db round trip by its stored number');
       }
+    });
+
+    test('raw SQL INSERT stores level 5 that reads back as the top level',
+        () async {
+      // Hand-written SQL (e.g. a future import path) stores the int directly:
+      // 5 must read back as the top bleeding level (by LEVEL, not by
+      // declaration index), and writing that member back must store 5 again.
+      await db.customStatement(
+        'INSERT INTO cycle_entries (date, bleeding) '
+        'VALUES (20002, 5)',
+      );
+      final row =
+          await db.entriesDao.entryFor(DateTime(2024, 10, 6)); // day 20002
+      expect(row!.bleeding.level, 5,
+          reason: 'level 5 is a valid stored bleeding level');
+      expect(row.bleeding, Bleeding.values.where((b) => b.level == 5).single);
+
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2024, 10, 6), bleeding: row.bleeding),
+      );
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries WHERE date = 20002')
+          .getSingle();
+      expect(raw.data['bleeding'], 5,
+          reason: 'the converter writes the new top level as integer 5');
     });
 
     test('bleeding is stored as the numeric level, never a string token',
@@ -263,9 +292,11 @@ void main() {
     test(
         'an unknown stored level is surfaced as an error, not silently '
         'mapped', () async {
+      // 6 is the smallest out-of-range level now that the scale tops out
+      // at 5; anything above it must fail the same way.
       await db.customStatement(
         'INSERT INTO cycle_entries (date, bleeding) '
-        'VALUES (20001, 7)',
+        'VALUES (20001, 6)',
       );
       await expectLater(
         db.entriesDao.entryFor(DateTime(2024, 10, 5)), // day 20001
@@ -336,12 +367,14 @@ void main() {
     });
   });
 
-  group('schema & migration (v10): app_settings key-value store', () {
-    test('the schema version is 10 (the settings-table bump)', () async {
+  group('schema & migration (v10, v11): app_settings key-value store', () {
+    test('the schema version is 11 (the maximum bleeding level bump)',
+        () async {
       final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(version.data['user_version'], 10,
-          reason: 'v10 adds the app_settings key-value table for general '
-              'settings (language, theme mode, temperature range, …)');
+      expect(version.data['user_version'], 11,
+          reason: 'v11 extends the bleeding scale vocabulary to level 5 '
+              '(maximum); the pre-release policy recreates the tables, so '
+              'no incremental migration is needed');
     });
 
     test(
@@ -472,7 +505,7 @@ void main() {
 
       final userVersion =
           await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 10,
+      expect(userVersion.data['user_version'], 11,
           reason: 'drift records the upgrade run');
 
       // The profiles table is wiped and NOT recreated — no seeding, no
@@ -1375,7 +1408,7 @@ void main() {
             Bleeding.spotting);
       });
 
-      test('export → import round trip preserves all five levels exactly',
+      test('export → import round trip preserves all six levels exactly',
           () async {
         // One day per level; the heavy/medium days prove there is no
         // medium-degradation through the document.

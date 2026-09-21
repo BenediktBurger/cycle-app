@@ -108,6 +108,13 @@ Future<void> main() async {
       sexTimings: SexTiming.start.bit | SexTiming.end.bit,
     ),
   );
+  await source.entriesDao.upsertDaily(
+    DailyEntry(
+      date: DateTime(2026, 3, 6),
+      // The top level beyond heavy: exercises the converter at 5.
+      bleeding: Bleeding.maximum,
+    ),
+  );
   await source.marksDao
       .addMark(DateTime(2026, 3, 12), CycleMarkTypes.ignoreTemperature);
   await source.entriesDao.upsertDaily(
@@ -118,8 +125,12 @@ Future<void> main() async {
   check(json.contains('"schema_version": $exportSchemaVersion'),
       'document carries schema version 5');
   // The document shape carries bleeding as NUMERIC levels (Bleeding.level):
-  // heavy(4) from the added day, none(0) from the neutral day.
-  check(json.contains('"bleeding": 4') && json.contains('"bleeding": 0'),
+  // heavy(4) and maximum(5) from the added days, none(0) from the neutral
+  // day.
+  check(
+      json.contains('"bleeding": 4') &&
+          json.contains('"bleeding": 5') &&
+          json.contains('"bleeding": 0'),
       'export carries bleeding as numeric levels');
   check(
       json.contains('"mucus_sign": "s"') &&
@@ -150,7 +161,7 @@ Future<void> main() async {
   // Planning against a fresh target dataset.
   final target = CycleDatabase(NativeDatabase.memory());
   final plan = await planDatabaseImport(target, json);
-  check(plan.entriesNew == 4, 'plan counts all 4 entries as new ($plan)');
+  check(plan.entriesNew == 5, 'plan counts all 5 entries as new ($plan)');
   check(plan.marksNew == 1, 'plan counts the exclusion mark as new');
 
   // Merge: target already holds one day that the document overwrites.
@@ -163,17 +174,17 @@ Future<void> main() async {
     ),
   );
   final plan2 = await planDatabaseImport(target, json);
-  check(plan2.entriesOverwritten == 1 && plan2.entriesNew == 3,
-      'plan flips the pre-existing day to overwrite');
+  check(plan2.entriesOverwritten == 1 && plan2.entriesNew == 4,
+      'plan flips the pre-existing day to overwrite ($plan2)');
 
   final summary = await importJsonToDatabase(target, json);
   check(
-      summary.entriesNew == 3 &&
+      summary.entriesNew == 4 &&
           summary.entriesOverwritten == 1 &&
           summary.marksNew == 1,
       'executed counts match the plan: $summary');
   final migrated = await target.entriesDao.allEntries();
-  check(migrated.length == 4, 'import wrote 4 entry rows total');
+  check(migrated.length == 5, 'import wrote 5 entry rows total');
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
   check(day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
       'import OVERWROTE the existing day with document content');
@@ -186,6 +197,10 @@ Future<void> main() async {
       .firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 5)));
   check(heavyRow.bleeding == Bleeding.heavy,
       'the heavy level survives the export/import round trip');
+  final maxRow = migrated
+      .firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 6)));
+  check(maxRow.bleeding == Bleeding.maximum,
+      'the maximum level survives the export/import round trip');
   // The current document fields: CycleEntry carries the firmness as the raw
   // TEXT token, the sex times as the raw INTEGER mask, and the raw
   // disturbance mask verbatim — check that all of it survived.
@@ -204,12 +219,12 @@ Future<void> main() async {
 
   // Re-import of the SAME document: everything is now idempotent/skipped.
   final second = await importJsonToDatabase(target, json);
-  check(second.entriesOverwritten == 4 && second.marksSkipped == 1,
+  check(second.entriesOverwritten == 5 && second.marksSkipped == 1,
       're-import overwrites all days and skips no marks: $second');
   final afterSecond = await target.entriesDao.allEntries();
-  check(afterSecond.length == 4, 're-import keeps exactly 4 rows');
+  check(afterSecond.length == 5, 're-import keeps exactly 5 rows');
 
-  check((await source.entriesDao.allEntries()).length == 4,
+  check((await source.entriesDao.allEntries()).length == 5,
       'source untouched by import');
 
   // --- old-document translation (v1–4) -------------------------------------

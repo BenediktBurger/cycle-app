@@ -5,8 +5,9 @@ import 'cervix.dart';
 import 'date_only.dart';
 import 'mucus.dart';
 
-/// Bleeding intensity observed on a single day, on the shared 5-step numeric
-/// scale (drip-compatible levels shifted by +1 so an explicit `none` exists).
+/// Bleeding intensity observed on a single day, on the shared 6-step numeric
+/// scale (drip-compatible levels shifted by +1 so an explicit `none` exists,
+/// plus a top level beyond drip's heaviest).
 ///
 /// Stored as INTEGER in SQLite — the [level] number below is what the db
 /// layer and the export document carry; the db mapping MUST go through
@@ -16,11 +17,12 @@ enum Bleeding {
   spotting(1),
   light(2),
   medium(3),
-  heavy(4);
+  heavy(4),
+  maximum(5);
 
   const Bleeding(this.level);
 
-  /// The stored scale value (0=none … 4=heavy).
+  /// The stored scale value (0=none … 5=maximum).
   final int level;
 }
 
@@ -32,7 +34,7 @@ enum Bleeding {
 /// arrive JSON-decoded as the loosest possible shape).
 ///
 /// Two accepted shapes:
-///  - `int` 0–4 → the enum member carrying that [Bleeding.level] (mapped by
+///  - `int` 0–5 → the enum member carrying that [Bleeding.level] (mapped by
 ///    level, NOT by declaration order) — the current document/storage scale;
 ///  - legacy string tokens `none` / `period` / `spotting` from old export
 ///    documents (the member vocabulary before heaviness existed). A string
