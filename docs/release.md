@@ -329,17 +329,20 @@ Do **not** start until Android went through Phases A–F at least once.
    certificate fingerprint (`tool/release_fingerprint.txt` — a mismatch
    means wrong key or debug-signing fallback, never publish), re-checks the
    APK's embedded versionName/versionCode via `aapt` (best effort), prints
-   the APK SHA-256, and demands explicit interactive confirmation that
-   step 6's upgrade test was done with **this exact APK** — then it tags,
-   pushes, and creates the GitHub Release with both the fingerprint and the
-   checksum in the notes (`--generate-notes` appends the auto-generated
-   changelog to that body). First run: `--accept-fingerprint` pins the
-   APK's actual certificate fingerprint into `tool/release_fingerprint.txt`,
-   which gets committed (it is public — it goes into the release notes
-   anyway).    The script deliberately does **not** cover steps 4–6: it never builds,
-   never touches the device, and does not *decide* the step 5 trust
-   question — it verifies mechanically that the APK's certificate matches
-   the pin (first run: `--accept-fingerprint` writes the pin after the
+   the APK SHA-256, and — on a real run — demands explicit interactive
+   confirmation that step 6's upgrade test was done with **this exact APK**
+   — then it tags, pushes, and creates the GitHub Release with both the
+   fingerprint and the checksum in the notes (`--generate-notes` appends
+   the auto-generated changelog to that body). `--dry-run` performs the
+   checks only and does not prompt.
+   First run: `--accept-fingerprint` writes the APK's actual certificate
+   fingerprint into `tool/release_fingerprint.txt` and stops — commit the
+   pin (it is public — it goes into the release notes anyway), then rerun:
+   the rerun matches the APK against the pin and proceeds. The script
+   deliberately does **not** cover steps 4–6: it never builds, never
+   touches the device, and does not *decide* the step 5 trust question —
+   it verifies mechanically that the APK's certificate matches the pin
+   (first run: `--accept-fingerprint` writes the pin and stops, after the
    operator has decided the certificate is genuinely the release key),
    and it asks for the step 6 outcome instead of performing it. The
    manual-equivalent commands live in the
@@ -452,7 +455,8 @@ Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
 tagged commit; the tag name itself is only the trigger and trust anchor.
 Keep the two in sync (per-release checklist step 7) — nothing in the
 workflow verifies them against each other (the local release script does
-have that cross-check, but it only guards the manual publishing path).
+have that cross-check, but it only guards the scripted local publishing
+path; when publishing by hand, the operator applies the same cross-check).
 
 **Required repository secrets (GitHub Settings → Secrets → Actions), all
 five — set them BEFORE the first tag push. Why the hard pre-flight

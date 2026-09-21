@@ -4,9 +4,11 @@
 //
 // These tests deliberately stay on the pure seam: they exercise argument
 // parsing/validation, tag-vs-version matching, apksigner/aapt output parsing,
-// pin-file read/write normalization, and release-notes assembly directly.
-// Nothing here shells out to real git/gh/apksigner/aapt, and nothing touches
-// the repository state (no tags are created) — the process layer of the
+// pin-file read/write normalization, release-notes assembly, and the pure
+// dry-run/first-run gating decisions (pin staging, upgrade-test prompt)
+// directly. Nothing here shells out to real git/gh/apksigner/aapt, and
+// nothing touches the repository state (no tags are created,
+// tool/release_fingerprint.txt is never written) — the process layer of the
 // script stays outside this suite by design.
 // Relative import on purpose: tool/ scripts live outside lib/ and are not
 // addressable through `package:cycle_app/`.
@@ -64,6 +66,80 @@ void main() {
       expect(() => parseArguments(const []), throwsA(isA<UsageException>()));
       expect(() => parseArguments(['v1.2.3', 'v2.0.0']),
           throwsA(isA<UsageException>()));
+    });
+  });
+
+  group('first-run pin staging (write pin, stop, rerun)', () {
+    const accept = Options(
+      tag: 'v0.1.0',
+      acceptFingerprint: true,
+      dryRun: false,
+      tested: false,
+    );
+
+    test('a real run with --accept-fingerprint stops after writing the pin',
+        () {
+      expect(accept.stopsAfterWritingPin, isTrue,
+          reason: 'the fresh pin leaves the tree dirty — tag/push must not '
+              'run with an uncommitted pin file');
+    });
+
+    test('a dry run only prints the pin and continues', () {
+      const dryAccept = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: true,
+        dryRun: true,
+        tested: false,
+      );
+      expect(dryAccept.stopsAfterWritingPin, isFalse);
+    });
+
+    test('runs without --accept-fingerprint never take the write-pin path', () {
+      const plain = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        dryRun: false,
+        tested: false,
+      );
+      expect(plain.stopsAfterWritingPin, isFalse,
+          reason: 'missing pin without --accept-fingerprint aborts without '
+              'writing anything');
+    });
+  });
+
+  group('upgrade-test confirmation gating', () {
+    test('a real run prompts unless --tested is given', () {
+      const realRun = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        dryRun: false,
+        tested: false,
+      );
+      expect(realRun.promptsForUpgradeTest, isTrue);
+      const scripted = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        dryRun: false,
+        tested: true,
+      );
+      expect(scripted.promptsForUpgradeTest, isFalse);
+    });
+
+    test('a dry run never prompts (checks only, nothing to gate)', () {
+      const dry = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: true,
+        dryRun: true,
+        tested: false,
+      );
+      expect(dry.promptsForUpgradeTest, isFalse);
+      const dryTested = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        dryRun: true,
+        tested: true,
+      );
+      expect(dryTested.promptsForUpgradeTest, isFalse);
     });
   });
 

@@ -66,15 +66,29 @@ class Options {
   final String tag;
 
   /// First-run behavior: pin the APK's actual certificate fingerprint into
-  /// [pinFilePath] instead of aborting for the missing pin file.
+  /// [pinFilePath] and stop the run there — the freshly written pin leaves
+  /// the working tree dirty, so the operator commits it and reruns (the
+  /// rerun matches the APK against the pin and proceeds).
   final bool acceptFingerprint;
 
-  /// Check-only mode: no tag, no push, no release.
+  /// Check-only mode: no tag, no push, no release, no prompts.
   final bool dryRun;
 
   /// Scripted use: assume the device upgrade test (checklist step 6) was
   /// done and skip the interactive confirmation.
   final bool tested;
+
+  /// Consulted when the pin file is missing: the run on which
+  /// `--accept-fingerprint` is honored writes the pin and then stops — the
+  /// fresh pin leaves the tree dirty, and tag/push must only happen on a
+  /// clean tree. A dry run only prints the would-be pin and continues.
+  bool get stopsAfterWritingPin => acceptFingerprint && !dryRun;
+
+  /// Whether the script interactively asks for the upgrade-test
+  /// confirmation (checklist step 6). A dry run performs checks only and
+  /// has no publishing side effects to gate, so it never prompts — a short
+  /// note is printed instead.
+  bool get promptsForUpgradeTest => !dryRun && !tested;
 }
 
 /// Parsed `version: X.Y.Z+N` line from pubspec.yaml.
@@ -448,18 +462,20 @@ Future<void> runRelease(List<String> arguments) async {
   } else if (options.acceptFingerprint) {
     print('NO PIN FILE YET — the APK certificate fingerprint is:');
     print('  SHA-256 certificate fingerprint: $fingerprint');
-    if (options.dryRun) {
-      print('dry-run note: outside a dry run, --accept-fingerprint would '
-          'now write $pinFilePath.');
-    } else {
+    if (options.stopsAfterWritingPin) {
       await pinFile.writeAsString(formatPinFile(fingerprint));
-      print('Wrote and pinned it in $pinFilePath.');
+      _fail('Wrote and pinned the fingerprint above in $pinFilePath. The '
+          'run stops here — commit the pin, then rerun the script: the '
+          'rerun matches the APK against the pin and proceeds.\n'
+          '  git add $pinFilePath && git commit -m "pin release '
+          'certificate fingerprint"\n'
+          '(the fingerprint is public — it goes into the release notes '
+          'anyway). Stopping keeps the tree clean — tag and push must not '
+          'run with a fresh, uncommitted pin.');
     }
-    print('First-run instruction: verify the certificate above is your '
-        'RELEASE key (not the debug key), then commit the pin file:\n'
-        '  git add $pinFilePath && git commit -m "pin release certificate '
-        'fingerprint"\n(the fingerprint is public — it goes into the '
-        'release notes anyway).');
+    print('dry-run note: outside a dry run, --accept-fingerprint would '
+        'now write $pinFilePath and stop; the pin would be committed '
+        'before the rerun proceeds.');
   } else {
     _fail('no pin file at $pinFilePath and no --accept-fingerprint given. '
         'Check that the APK certificate fingerprint below is your RELEASE '
@@ -509,7 +525,9 @@ Future<void> runRelease(List<String> arguments) async {
   print('APK SHA-256: $apkSha');
 
   // --- 8. upgrade-test gate ------------------------------------------------
-  if (!options.tested) {
+  // A dry run never reaches the question: it performs checks only and has
+  // no publishing side effects to gate — it prints a note instead.
+  if (options.promptsForUpgradeTest) {
     stdout.writeln(
         'Publishing NOW: tag $tag, push to origin, and create the GitHub '
         'release.');
@@ -522,6 +540,10 @@ Future<void> runRelease(List<String> arguments) async {
           '--tested exists for scripted use and must never be used to skip '
           'the real test.');
     }
+  } else if (options.dryRun) {
+    print('dry-run note: on a real run without --tested, the script here '
+        'asks for confirmation that the device upgrade test (checklist '
+        'step 6) was done with this exact APK before publishing.');
   } else {
     print('upgrade test: asserted done via --tested.');
   }
