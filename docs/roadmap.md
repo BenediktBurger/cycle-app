@@ -37,7 +37,7 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-#### Building the app
+#### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
 - confirm Apache-2.0 (chosen 2026-09) as the final license before the
@@ -70,6 +70,8 @@ the sections above track planned work, git history keeps the record (see
 - should we add the birth bleeding (Wochenbett, marked as ~)?
 - show cycle start mark on journal like temp?
 - render observations above temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
+
+- proof read German texts and let translate changes to english
 
 ### Convenience
 
