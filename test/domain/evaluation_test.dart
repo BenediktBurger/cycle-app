@@ -32,6 +32,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/marks.dart';
+
+import 'mark_fixtures.dart';
 import 'package:cycle_app/domain/models.dart';
 
 /// A tracked day; [t] is the measured BBT (null = day without measurement).
@@ -66,20 +68,7 @@ CycleMark rise(int year, int month, int day) => CycleMark(
       type: CycleMarkTypes.firstHigherMeasurement,
     );
 
-/// A user-placed cycleStart mark on (year, month, day) — the authoritative
-/// cycle boundary (see lib/domain/cycle_grouping.dart: grouping is
-/// mark-driven; bleeding only suggests).
-CycleMark start(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.cycleStart,
-    );
-
-/// The analysis-exclusion mark on (year, month, day): the ONLY exclusion
-/// signal the evaluation consumes. Raw disturbance flags never exclude.
-CycleMark excludedDay(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.ignoreTemperature,
-    );
+// start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).
 
 /// The evaluation of the cycle group whose first tracked day is [start].
 CycleEvaluation evalFor(

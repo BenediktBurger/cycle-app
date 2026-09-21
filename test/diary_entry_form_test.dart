@@ -7,9 +7,9 @@
 //
 // Each section below (kicked off by a `════ former` banner) carries
 // the former file's header comments verbatim; test bodies were
-// concatenated, not rewritten. The single `_appScope` wrapper around
-// support/diary_harness.dart was shared four times byte-for-byte, so
-// it lives here once.
+// concatenated, not rewritten. Every section pumps the app the same way
+// through diarySelectorScope (support/diary_harness.dart); German labels
+// are pinned (locale de).
 
 // No assertion was edited: run the full gate and diff the collected
 // test names against the pre-merge report — only the suite-path
@@ -21,9 +21,10 @@ import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/diary_harness.dart';
+import 'support/viewport.dart';
+import 'support/error_collector.dart';
 
 // Widget test of the bleeding control on the Tagebuch entry form: the
 // selector must offer the full 5-level vocabulary (none/spotting/light/
@@ -34,7 +35,8 @@ import 'support/diary_harness.dart';
 // An in-memory drift database is injected (provider-override pattern from
 // app_shell_test.dart), so the test stays file-free and platform-channel-free.
 
-ProviderScope _appScope(Locale locale) => diarySelectorScope(locale);
+// The tests call diarySelectorScope (support/diary_harness.dart) directly —
+// the one-hundred-percent alias this file used to carry is gone.
 
 // Widget test of the Muttermund (cervix) observation on the Tagebuch entry
 // form: the position (tief … unerreichbar) and the opening
@@ -78,7 +80,7 @@ void main() {
 
   testWidgets('bleeding selector offers all six levels and stores heavy',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The Tagebuch screen is the shell's initial tab; the bleeding control
@@ -127,7 +129,7 @@ void main() {
 
   testWidgets('selecting the top bleeding level persists maximum (level 5)',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The German label of the new top level sits next to "stark"; the exact
@@ -158,7 +160,7 @@ void main() {
 
   testWidgets('Muttermund position and opening are offered and persist',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The pickers are offered with the German vocabulary (pinned locale).
@@ -203,7 +205,7 @@ void main() {
 
   testWidgets('pain options B and M are offered and survive the save path',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // Both options offered on the entry form (German labels, per the
@@ -247,7 +249,7 @@ void main() {
 
   testWidgets('the mucus sign picker offers the A (Ausfluss) segment',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The sign chips show the cheat-sheet glyphs themselves; the A
@@ -259,7 +261,7 @@ void main() {
 
   testWidgets('firmness options are offered and a selection persists',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The firmness vocabulary (paper shorthand h / h-w / w as the chip
@@ -294,7 +296,7 @@ void main() {
 
   testWidgets('tapping the selected firmness again deselects it',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('hart'));
@@ -320,7 +322,7 @@ void main() {
   testWidgets(
       'sex time slots are a multi-select: several chips persist as '
       'the OR of their bits', (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The three time slots (pinned German locale).
@@ -353,7 +355,7 @@ void main() {
 
   testWidgets('tapping a selected sex slot again clears its bit',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Mitte'));
@@ -395,12 +397,9 @@ void main() {
   testWidgets(
       'the mucus sign row renders every sign without overflow at a narrow '
       'width and stores an f/S day', (WidgetTester tester) async {
-    tester.view.devicePixelRatio = 3.0;
-    tester.view.physicalSize = const Size(320 * 3, 800 * 3);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
+    useNarrowPhoneViewport(tester);
 
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     final caption = find.text('Zeichen der Fruchtbarkeit');
@@ -418,65 +417,59 @@ void main() {
     // is still collected and fails the test.)
     tester.takeException();
 
-    final errors = <FlutterErrorDetails>[];
-    final originalOnError = FlutterError.onError;
-    FlutterError.onError = (details) => errors.add(details);
-    try {
-      // Walk every option of the row, including the two-glyph f/S: the
-      // single-glyph options around it leave the row narrow, f/S forces
-      // the reflow. Tapping S first brings up the quality row (its rule
-      // is exercised below with f/S).
-      for (final glyph in ['t', 'Ø', 'f', 'S']) {
-        await tester.ensureVisible(find.text(glyph));
+    await expectNoFrameworkErrors(
+      tester,
+      () async {
+        // Walk every option of the row, including the two-glyph f/S: the
+        // single-glyph options around it leave the row narrow, f/S forces
+        // the reflow. Tapping S first brings up the quality row (its rule
+        // is exercised below with f/S).
+        for (final glyph in ['t', 'Ø', 'f', 'S']) {
+          await tester.ensureVisible(find.text(glyph));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(glyph));
+          await tester.pumpAndSettle();
+        }
+        // Selecting S shows the quality row (quality only exists with S);
+        // a recorded quality chips the row on.
+        await tester.tap(find.widgetWithText(ChoiceChip, 'EW'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(glyph));
+
+        // Leaving S for f/S hides the quality row again.
+        await tester.ensureVisible(find.text('f/S'));
         await tester.pumpAndSettle();
-      }
-      // Selecting S shows the quality row (quality only exists with S);
-      // a recorded quality chips the row on.
-      await tester.tap(find.widgetWithText(ChoiceChip, 'EW'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('f/S'));
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(ChoiceChip, 'EW'),
+          findsNothing,
+          reason: 'the quality row must hide once the sign leaves S',
+        );
 
-      // Leaving S for f/S hides the quality row again.
-      await tester.ensureVisible(find.text('f/S'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('f/S'));
-      await tester.pumpAndSettle();
-      expect(
-        find.widgetWithText(ChoiceChip, 'EW'),
-        findsNothing,
-        reason: 'the quality row must hide once the sign leaves S',
-      );
+        // And A (Ausfluss) — the last two-glyph-risky option after f/S.
+        await tester.tap(find.text('A'));
+        await tester.pumpAndSettle();
 
-      // And A (Ausfluss) — the last two-glyph-risky option after f/S.
-      await tester.tap(find.text('A'));
-      await tester.pumpAndSettle();
+        // End on f/S for the save round-trip. Tap-again would deselect (the
+        // unset chip turns null), so A → f/S is the final selection.
+        await tester.tap(find.text('f/S'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Speichern'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Speichern'));
+        await tester.pumpAndSettle();
 
-      // End on f/S for the save round-trip. Tap-again would deselect (the
-      // unset chip turns null), so A → f/S is the final selection.
-      await tester.tap(find.text('f/S'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Speichern'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Speichern'));
-      await tester.pumpAndSettle();
-
-      final (:db, :date) = await savedDayOf(tester);
-      final row = await db.entriesDao.entryFor(date);
-      expect(row, isNotNull, reason: 'The saved day must exist in the DB');
-      expect(
-        row!.mucusSign,
-        'fs',
-        reason: 'the selected f/S sign must persist with its stored token',
-      );
-      expect(row.mucusQuality, isNull,
-          reason: 'f/S carries no quality qualifier');
-    } finally {
-      FlutterError.onError = originalOnError;
-    }
-    expect(
-      errors,
-      isEmpty,
+        final (:db, :date) = await savedDayOf(tester);
+        final row = await db.entriesDao.entryFor(date);
+        expect(row, isNotNull, reason: 'The saved day must exist in the DB');
+        expect(
+          row!.mucusSign,
+          'fs',
+          reason: 'the selected f/S sign must persist with its stored token',
+        );
+        expect(row.mucusQuality, isNull,
+            reason: 'f/S carries no quality qualifier');
+      },
       reason: 'narrow-width sign-row interaction must not overflow the row',
     );
     expect(tester.takeException(), isNull);
@@ -496,10 +489,7 @@ void main() {
   testWidgets(
       'the day tile renders its mucus chip beside temperature and time '
       'without overflow at a narrow width', (WidgetTester tester) async {
-    tester.view.devicePixelRatio = 3.0;
-    tester.view.physicalSize = const Size(320 * 3, 800 * 3);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
+    useNarrowPhoneViewport(tester);
 
     // The two widest chip shapes the tile can render: the two-glyph f/S
     // token, and the S glyph with its EW superscript. Both days also
@@ -531,58 +521,53 @@ void main() {
     // and lay out, belongs to the tile and must stay silent.
     tester.takeException();
 
-    final errors = <FlutterErrorDetails>[];
-    final originalOnError = FlutterError.onError;
-    FlutterError.onError = (details) => errors.add(details);
-    try {
-      // The cycle-group tiles start collapsed; bring the list into view
-      // and expand every group so the recorded days' tiles build and lay
-      // out at the narrow width. The ListView is lazy, so the group
-      // headers only exist once the scroll reaches them.
-      final listView = find
-          .descendant(
-              of: find.byType(TagebuchScreen), matching: find.byType(ListView))
-          .first;
-      final groupTiles = find.descendant(
-          of: find.byType(TagebuchScreen),
-          matching: find.byType(ExpansionTile));
-      for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
-        await tester.drag(listView, const Offset(0, -200));
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      await tester.pumpAndSettle();
-
-      final count = tester.widgetList(groupTiles).length;
-      for (var i = 0; i < count; i++) {
-        await tester.ensureVisible(groupTiles.at(i));
-        await tester.pumpAndSettle();
-        await tester.tap(groupTiles.at(i), warnIfMissed: false);
-        await tester.pumpAndSettle();
-      }
-
-      // The recorded tiles render their full content: temperature, the
-      // measured time, and the two mucus chips (one per recorded day).
-      await tester.ensureVisible(find.text('06:47'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('36,90 °C'));
-      await tester.pumpAndSettle();
-      expect(find.text('36,40 °C'), findsOneWidget,
-          reason: 'the f/S day tile shows its temperature');
-      expect(find.text('06:47'), findsOneWidget,
-          reason: 'the f/S day tile shows its measured time');
-      expect(
-        find.descendant(
+    await expectNoFrameworkErrors(
+      tester,
+      () async {
+        // The cycle-group tiles start collapsed; bring the list into view
+        // and expand every group so the recorded days' tiles build and lay
+        // out at the narrow width. The ListView is lazy, so the group
+        // headers only exist once the scroll reaches them.
+        final listView = find
+            .descendant(
+                of: find.byType(TagebuchScreen),
+                matching: find.byType(ListView))
+            .first;
+        final groupTiles = find.descendant(
             of: find.byType(TagebuchScreen),
-            matching: find.byType(MucusSymbolText)),
-        findsNWidgets(2),
-        reason: 'both recorded days render their mucus chip on the tile',
-      );
-    } finally {
-      FlutterError.onError = originalOnError;
-    }
-    expect(
-      errors,
-      isEmpty,
+            matching: find.byType(ExpansionTile));
+        for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
+          await tester.drag(listView, const Offset(0, -200));
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        await tester.pumpAndSettle();
+
+        final count = tester.widgetList(groupTiles).length;
+        for (var i = 0; i < count; i++) {
+          await tester.ensureVisible(groupTiles.at(i));
+          await tester.pumpAndSettle();
+          await tester.tap(groupTiles.at(i), warnIfMissed: false);
+          await tester.pumpAndSettle();
+        }
+
+        // The recorded tiles render their full content: temperature, the
+        // measured time, and the two mucus chips (one per recorded day).
+        await tester.ensureVisible(find.text('06:47'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('36,90 °C'));
+        await tester.pumpAndSettle();
+        expect(find.text('36,40 °C'), findsOneWidget,
+            reason: 'the f/S day tile shows its temperature');
+        expect(find.text('06:47'), findsOneWidget,
+            reason: 'the f/S day tile shows its measured time');
+        expect(
+          find.descendant(
+              of: find.byType(TagebuchScreen),
+              matching: find.byType(MucusSymbolText)),
+          findsNWidgets(2),
+          reason: 'both recorded days render their mucus chip on the tile',
+        );
+      },
       reason: 'narrow-width day tiles must not overflow their trailing '
           'chip row',
     );

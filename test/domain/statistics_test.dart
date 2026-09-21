@@ -7,6 +7,8 @@ import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/statistics.dart';
 
+import 'mark_fixtures.dart';
+
 DailyEntry d(
   int year,
   int month,
@@ -16,19 +18,7 @@ DailyEntry d(
   return DailyEntry(date: DateTime(year, month, day), bleeding: bleeding);
 }
 
-/// A user-placed cycleStart mark on (year, month, day) — the cycle-length
-/// anchor (see lib/domain/cycle_grouping.dart: grouping is mark-driven).
-CycleMark start(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.cycleStart,
-    );
-
-/// An analysis-exclusion mark on (year, month, day) — the only exclusion
-/// signal the data model knows (raw disturbance flags never exclude).
-CycleMark excludedDay(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.ignoreTemperature,
-    );
+// start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).
 
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
 /// Consecutive lengths: 28, 28, 28.

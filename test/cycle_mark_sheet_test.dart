@@ -8,100 +8,49 @@
 // stopped-evaluation notice).
 //
 // Unlike the evaluation section of test/cycle_chart_test.dart (fixed
-// marks streams), these
-// tests write through the REAL MarksDao against an in-memory database —
-// the sheet must persist and the surface (chart overlay, sheet labels) must
-// re-render from the marks stream after every write. Same harness pattern
-// as test/app_shell_test.dart; the ProviderScope wraps the MaterialApp (as
-// in the real app), so the modal route the sheet is pushed onto stays
-// inside the scope and can read the providers.
+// marks streams), these tests write through the REAL MarksDao against an
+// in-memory database — the panel must persist and the surface (chart
+// overlay, panel labels) must re-render from the marks stream after every
+// write. The harness body (scope, day taps, stored readback) and the
+// scenario constants are shared once with test/cycle_day_panel_test.dart
+// in support/cycle_list_harness.dart.
 import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/cycle_list_harness.dart';
 import 'support/finders.dart';
+import 'support/viewport.dart';
 
-import 'support/database.dart';
-import 'support/fixtures.dart';
-
-// The evaluation scenario is the shared copy in support/fixtures.dart
-// (same days as the chart-evaluation rendering tests). [_d] names the
-// scenario's days for the sheet-driven write assertions.
-DateTime _d(int day) => DateTime.utc(2026, 9, day);
-
-/// The scenario's user marks, seeded through the DAO before the UI builds.
-final _peakMark = evaluationScenarioMarks()[0];
-final _firstHigherMark = evaluationScenarioMarks()[1];
-
-final _entries = evaluationScenarioEntries();
-
-/// The database instance created by the scope's override, so tests can
-/// assert what was actually STORED.
-CycleDatabase? _db;
-ProviderContainer? _container;
-
-Future<void> _pump(
+/// A tall-enough test surface for every pump: the Zyklus list is lazy and
+/// the panel sits BELOW the chart block, so the default viewport would
+/// leave most panel rows unbuilt below the fold. A tall surface lays the
+/// chart, the open panel and the evaluation table out at once (the modal
+/// sheet of the old layout always fit the viewport on its own — the panel
+/// replaced that self-scroll with the owning list, see the panel comment).
+/// The scenario constants and the write-through harness live once in
+/// support/cycle_list_harness.dart.
+Future<(CycleDatabase, ProviderContainer)> _pump(
   WidgetTester tester, {
   required List<DailyEntry> entries,
   List<CycleMark> seedMarks = const [],
   DateTime? selectedDate,
   int initialTab = 0,
 }) async {
-  final initialSelected =
-      DateOnly.normalize(selectedDate ?? DateTime.utc(2026, 9, 1));
-  final container = ProviderContainer(
-    overrides: [
-      inMemoryDatabase(
-        seed: (db) async {
-          for (final mark in seedMarks) {
-            await db.marksDao
-                .addMark(mark.date, mark.type, author: mark.author);
-          }
-        },
-        onCreated: (db) => _db = db,
-      ),
-      dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-      selectedDateProvider.overrideWith((ref) => initialSelected),
-      tabIndexProvider.overrideWith((ref) => initialTab),
-    ],
+  useTallSurface(tester);
+  return pumpCycleList(
+    tester,
+    entries: entries,
+    seedMarks: seedMarks,
+    selectedDate: selectedDate,
+    initialTab: initialTab,
   );
-  _container = container;
-  addTearDown(container.dispose);
-  await tester.pumpWidget(UncontrolledProviderScope(
-    container: container,
-    child: MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-      ),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('en'),
-      home: const Scaffold(body: ZyklusScreen()),
-    ),
-  ));
-  await tester.pumpAndSettle();
-}
-
-/// Opens the sheet for the chart day at [index] via the marks row cell
-/// under that day (the row cells share the chart's day-index space and are
-/// aligned with the chart columns).
-///
-/// `warnIfMissed: false` because the tap point may fall on the cell's
-/// Center-with-null-child slot (no number rendered), which does not absorb
-/// hits itself — the enclosing InkWell's pointer listener still receives it.
-Future<void> _tapDay(WidgetTester tester, int index) async {
-  await tester.tap(find.byKey(ValueKey('marksCell-$index')),
-      warnIfMissed: false);
-  await tester.pumpAndSettle();
 }
 
 /// Brings a sheet row into view: the toggle rows live in a scrollable
@@ -114,17 +63,14 @@ Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-/// The stored mark types for one calendar day, from the REAL database.
-Future<List<String>> _storedTypes(DateTime day) async =>
-    (await _db!.marksDao.marksForDay(day)).map((m) => m.markType).toList();
-
 void main() {
   testWidgets('tapping a chart day opens the mark-entry sheet, not the form',
       (tester) async {
-    await _pump(tester,
-        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries,
+        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 4); // 9/10, a numbered low (4)
+    await tapCycleDay(tester, 4); // 9/10, a numbered low (4)
 
     expect(find.byType(BottomSheet), findsOneWidget,
         reason: 'the day tap opens the modal sheet');
@@ -146,10 +92,11 @@ void main() {
 
   testWidgets('the info line shows the computed baseline on the baseline day',
       (tester) async {
-    await _pump(tester,
-        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries,
+        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 3); // 9/9: highest of the six lows = baseline
+    await tapCycleDay(tester, 3); // 9/9: highest of the six lows = baseline
 
     expect(find.text('Baseline: 36.40'), findsOneWidget,
         reason: 'the derived baseline value is shown on its own day');
@@ -159,10 +106,11 @@ void main() {
 
   testWidgets('R7: circled days show the difference to the baseline',
       (tester) async {
-    await _pump(tester,
-        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries,
+        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 8); // 9/14: circled candidate #1, +0.50 K
+    await tapCycleDay(tester, 8); // 9/14: circled candidate #1, +0.50 K
 
     expect(find.text('+0.50 K above the baseline'), findsOneWidget,
         reason: 'the difference to the baseline is shown for easy checking');
@@ -175,9 +123,10 @@ void main() {
       'circled ordinal line', (tester) async {
     // Peak unmarked: the candidates become arrows (R4) — the difference
     // display applies to circled AND arrowed days.
-    await _pump(tester, entries: _entries, seedMarks: [_firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries, seedMarks: [scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 8); // 9/14: arrowed candidate #1, +0.50 K
+    await tapCycleDay(tester, 8); // 9/14: arrowed candidate #1, +0.50 K
 
     expect(find.text('+0.50 K above the baseline'), findsOneWidget,
         reason: 'arrowed candidates show the difference too (R7)');
@@ -192,13 +141,14 @@ void main() {
     // its kind's four-cap, so it carries no ordinal — but it stays in the
     // connected sequence (R4) and still shows the R7 difference line.
     final entries = [
-      ..._entries,
-      DailyEntry(date: _d(17), bbtC: 36.5),
-      DailyEntry(date: _d(18), bbtC: 36.5),
+      ...scenarioEntries,
+      DailyEntry(date: scenarioDay(17), bbtC: 36.5),
+      DailyEntry(date: scenarioDay(18), bbtC: 36.5),
     ];
-    await _pump(tester, entries: entries, seedMarks: [_firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: entries, seedMarks: [scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 12); // 9/18: beyond-cap arrow, +0.10 K
+    await tapCycleDay(tester, 12); // 9/18: beyond-cap arrow, +0.10 K
 
     expect(find.text('+0.10 K above the baseline'), findsOneWidget,
         reason: 'beyond-cap candidates stay marked (R4) and show R7');
@@ -213,13 +163,16 @@ void main() {
     // Peak 9/15 lies between the marked rise (9/14) and the later
     // candidates: 9/14 and the peak day itself are arrows, 9/16 is the
     // FIRST circle — its sheet line counts within the circle kind only.
-    final entries = [..._entries, DailyEntry(date: _d(17), bbtC: 36.5)];
-    await _pump(tester, entries: entries, seedMarks: [
-      CycleMark(date: _d(15), type: CycleMarkTypes.mucusPeakDay),
-      _firstHigherMark,
+    final entries = [
+      ...scenarioEntries,
+      DailyEntry(date: scenarioDay(17), bbtC: 36.5)
+    ];
+    final (_, _) = await _pump(tester, entries: entries, seedMarks: [
+      CycleMark(date: scenarioDay(15), type: CycleMarkTypes.mucusPeakDay),
+      scenarioFirstHigherMark,
     ]);
 
-    await _tapDay(tester, 10); // 9/16: first circle after the arrows
+    await tapCycleDay(tester, 10); // 9/16: first circle after the arrows
 
     expect(find.text('Circled higher measurement 1'), findsOneWidget,
         reason: 'the circle ordinal restarts within its own kind (R4)');
@@ -233,13 +186,14 @@ void main() {
   testWidgets(
       'setting a mucus peak persists through the DAO and '
       're-renders the sheet and the chart', (tester) async {
-    await _pump(tester, entries: _entries); // no marks yet
+    final (db, _) =
+        await _pump(tester, entries: scenarioEntries); // no marks yet
 
-    await _tapDay(tester, 6); // 9/12, the day to mark
+    await tapCycleDay(tester, 6); // 9/12, the day to mark
     await tester.tap(find.text('Set mucus peak'));
     await tester.pumpAndSettle();
 
-    expect(await _storedTypes(_d(12)), contains('mucusPeakDay'),
+    expect(await storedMarkTypes(db, scenarioDay(12)), contains('mucusPeakDay'),
         reason: 'the mark is persisted through marksDao');
     expect(find.text('Remove mucus peak'), findsOneWidget,
         reason: 'the sheet re-renders contextually after the write');
@@ -255,9 +209,10 @@ void main() {
   testWidgets(
       'the set-mucus-peak action shows a filled circle icon; the remove '
       'action keeps the outline circle', (tester) async {
-    await _pump(tester, entries: _entries); // no marks yet
+    final (_, _) =
+        await _pump(tester, entries: scenarioEntries); // no marks yet
 
-    await _tapDay(tester, 4); // 9/10, an arbitrary day
+    await tapCycleDay(tester, 4); // 9/10, an arbitrary day
 
     final setTile = tester.widget<ListTile>(find.ancestor(
         of: find.text('Set mucus peak'), matching: find.byType(ListTile)));
@@ -279,15 +234,16 @@ void main() {
   });
 
   testWidgets('tapping the same action again removes the mark', (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark]);
+    final (db, _) = await _pump(tester,
+        entries: scenarioEntries, seedMarks: [scenarioPeakMark]);
 
-    await _tapDay(tester, 6);
+    await tapCycleDay(tester, 6);
     expect(find.text('Remove mucus peak'), findsOneWidget,
         reason: 'the day already carries the peak -> the remove action');
     await tester.tap(find.text('Remove mucus peak'));
     await tester.pumpAndSettle();
 
-    expect(await _storedTypes(_d(12)), isEmpty,
+    expect(await storedMarkTypes(db, scenarioDay(12)), isEmpty,
         reason: 'the mark is removed from storage');
     expect(find.text('Set mucus peak'), findsOneWidget,
         reason: 'the label flips back to the set action');
@@ -295,14 +251,15 @@ void main() {
 
   testWidgets('both marks on one day are two independent toggles',
       (tester) async {
-    await _pump(tester, entries: _entries, seedMarks: [_peakMark]);
+    final (db, _) = await _pump(tester,
+        entries: scenarioEntries, seedMarks: [scenarioPeakMark]);
 
-    await _tapDay(tester, 6);
+    await tapCycleDay(tester, 6);
     // The day already carries the peak; the first-higher mark is addable
     // on the same day (two toggles side by side).
     await tester.tap(find.text('Set first higher measurement'));
     await tester.pumpAndSettle();
-    expect(await _storedTypes(_d(12)),
+    expect(await storedMarkTypes(db, scenarioDay(12)),
         unorderedEquals(['mucusPeakDay', 'firstHigherMeasurement']),
         reason: 'both marks may live on one day');
     // The placement leaves the mark inconsistent (36.20 on 9/12 lies
@@ -320,7 +277,7 @@ void main() {
     await scrollSheetTo(tester, find.text('Remove first higher measurement'));
     await tester.tap(find.text('Remove first higher measurement'));
     await tester.pumpAndSettle();
-    expect(await _storedTypes(_d(12)), ['mucusPeakDay'],
+    expect(await storedMarkTypes(db, scenarioDay(12)), ['mucusPeakDay'],
         reason: 'the two toggles are independent');
     expect(find.text('Remove mucus peak'), findsOneWidget,
         reason: 'the peak toggle is unaffected');
@@ -331,28 +288,29 @@ void main() {
   testWidgets(
       '"edit day" writes the selected date + Tagebuch tab and closes '
       'the sheet', (tester) async {
-    await _pump(
+    final (_, container) = await _pump(
       tester,
-      entries: _entries,
-      selectedDate: _d(1),
+      entries: scenarioEntries,
+      selectedDate: scenarioDay(1),
       initialTab: 2, // a non-Tagebuch tab, so the write is observable
     );
 
-    await _tapDay(tester, 4); // 9/10
+    await tapCycleDay(tester, 4); // 9/10
     await tester.tap(find.text('Edit day'));
     await tester.pumpAndSettle();
 
-    expect(_container!.read(selectedDateProvider), _d(10),
+    expect(container.read(selectedDateProvider), scenarioDay(10),
         reason: 'the tapped day is pre-selected in the entry form');
-    expect(_container!.read(tabIndexProvider), 0,
+    expect(container.read(tabIndexProvider), 0,
         reason: 'the shell switches to the Tagebuch tab');
     expect(find.text('Edit day'), findsNothing,
         reason: 'the sheet closes after the navigation');
   });
 
   testWidgets('a symbol-row cell opens the same sheet', (tester) async {
-    await _pump(tester,
-        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries,
+        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
     // warnIfMissed: false — the tap point may fall on the cell's fixed-height
     // sign slot, which does not absorb hits itself; the enclosing InkWell's
@@ -372,24 +330,26 @@ void main() {
     // Candidate 1 on 9/14, then TWO untracked days (9/15, 9/16), then 9/17
     // above the baseline: the automatic evaluation stops (R2).
     final entries = <DailyEntry>[
-      DailyEntry(date: _d(6), bbtC: 36.2),
-      DailyEntry(date: _d(7), bbtC: 36.1),
-      DailyEntry(date: _d(8), bbtC: 36.4),
-      DailyEntry(date: _d(9), bbtC: 36.3),
-      DailyEntry(date: _d(10), bbtC: 36.2),
-      DailyEntry(date: _d(11), bbtC: 36.3),
-      DailyEntry(date: _d(12), bbtC: 36.1), // peak day
-      DailyEntry(date: _d(13), bbtC: 36.3),
-      DailyEntry(date: _d(14), bbtC: 36.8), // marked rise -> candidate 1
+      DailyEntry(date: scenarioDay(6), bbtC: 36.2),
+      DailyEntry(date: scenarioDay(7), bbtC: 36.1),
+      DailyEntry(date: scenarioDay(8), bbtC: 36.4),
+      DailyEntry(date: scenarioDay(9), bbtC: 36.3),
+      DailyEntry(date: scenarioDay(10), bbtC: 36.2),
+      DailyEntry(date: scenarioDay(11), bbtC: 36.3),
+      DailyEntry(date: scenarioDay(12), bbtC: 36.1), // peak day
+      DailyEntry(date: scenarioDay(13), bbtC: 36.3),
+      DailyEntry(
+          date: scenarioDay(14), bbtC: 36.8), // marked rise -> candidate 1
       // 9/15 + 9/16 untracked -> two gap days -> break.
-      DailyEntry(date: _d(17), bbtC: 36.9), // would-be candidate, NOT marked
+      DailyEntry(
+          date: scenarioDay(17), bbtC: 36.9), // would-be candidate, NOT marked
     ];
-    await _pump(tester, entries: entries, seedMarks: [
-      CycleMark(date: _d(12), type: CycleMarkTypes.mucusPeakDay),
-      _firstHigherMark,
+    final (_, _) = await _pump(tester, entries: entries, seedMarks: [
+      CycleMark(date: scenarioDay(12), type: CycleMarkTypes.mucusPeakDay),
+      scenarioFirstHigherMark,
     ]);
 
-    await _tapDay(tester, 11); // 9/17: the day after the break
+    await tapCycleDay(tester, 11); // 9/17: the day after the break
 
     expect(find.byKey(const ValueKey('cycleSheetEvaluationStopped')),
         findsOneWidget,
@@ -398,10 +358,11 @@ void main() {
 
   testWidgets('a day outside any evaluation data shows no info line',
       (tester) async {
-    await _pump(tester,
-        entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+    final (_, _) = await _pump(tester,
+        entries: scenarioEntries,
+        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-    await _tapDay(tester, 0); // 9/6: before the six-low window
+    await tapCycleDay(tester, 0); // 9/6: before the six-low window
 
     expect(find.text('Edit day'), findsOneWidget);
     expect(find.byType(Text), findsWidgets); // the sheet itself renders
@@ -428,13 +389,14 @@ void main() {
     testWidgets(
         'setting the cycle start persists a user-authored cycleStart mark '
         'and flips the action to the remove wording', (tester) async {
-      await _pump(tester, entries: _entries); // no marks yet
+      final (db, _) =
+          await _pump(tester, entries: scenarioEntries); // no marks yet
 
-      await _tapDay(tester, 4); // 9/10, an arbitrary day
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary day
       await tester.tap(find.text('Set cycle start'));
       await tester.pumpAndSettle();
 
-      final stored = await _db!.marksDao.marksForDay(_d(10));
+      final stored = await db.marksDao.marksForDay(scenarioDay(10));
       expect(stored.map((m) => m.markType), contains(CycleMarkTypes.cycleStart),
           reason: 'the cycle start is persisted through the MarksDao '
               '(the user places the mark — bleeding only suggests)');
@@ -450,18 +412,18 @@ void main() {
     testWidgets(
         'a present cycle start shows the removal wording and '
         'the remove action deletes it', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(date: _d(10), type: CycleMarkTypes.cycleStart),
+      final (db, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
+        CycleMark(date: scenarioDay(10), type: CycleMarkTypes.cycleStart),
       ]);
 
-      await _tapDay(tester, 4); // 9/10: the marked day
+      await tapCycleDay(tester, 4); // 9/10: the marked day
       expect(find.text('Remove cycle start'), findsOneWidget,
           reason: 'the day already carries the mark -> the remove action');
 
       await tester.tap(find.text('Remove cycle start'));
       await tester.pumpAndSettle();
 
-      expect(await _storedTypes(_d(10)), isEmpty,
+      expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the cycle start is removed from storage');
       expect(find.text('Set cycle start'), findsOneWidget,
           reason: 'the action flips back to the set wording');
@@ -480,8 +442,9 @@ void main() {
         'first-higher row: edit day → cycle start → mucus peak → exclude '
         'from analysis → first higher → SUZ evening → SUZ morning',
         (tester) async {
-      await _pump(tester, entries: _entries); // no marks yet
-      await _tapDay(tester, 4); // 9/10, an arbitrary day
+      final (_, _) =
+          await _pump(tester, entries: scenarioEntries); // no marks yet
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary day
 
       expect(find.text('Ignore temperature'), findsOneWidget,
           reason: 'the day carries no ignore mark -> the set wording');
@@ -512,13 +475,14 @@ void main() {
         'tapping the toggle persists an ignoreTemperature mark through '
         'the MarksDao and flips to the include wording; tapping again '
         'removes it', (tester) async {
-      await _pump(tester, entries: _entries); // no marks yet
+      final (db, _) =
+          await _pump(tester, entries: scenarioEntries); // no marks yet
 
-      await _tapDay(tester, 4); // 9/10, an arbitrary day
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary day
       await tester.tap(find.text('Ignore temperature'));
       await tester.pumpAndSettle();
 
-      final stored = await _db!.marksDao.marksForDay(_d(10));
+      final stored = await db.marksDao.marksForDay(scenarioDay(10));
       expect(stored.map((m) => m.markType),
           contains(CycleMarkTypes.ignoreTemperature),
           reason: 'the toggle writes the mark through marksDao '
@@ -535,7 +499,7 @@ void main() {
       await tester.tap(find.text('Temperature evaluated again'));
       await tester.pumpAndSettle();
 
-      expect(await _storedTypes(_d(10)), isEmpty,
+      expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the reverse toggle deletes the mark');
       expect(find.text('Ignore temperature'), findsOneWidget,
           reason: 'the action flips back to the ignore wording');
@@ -545,18 +509,19 @@ void main() {
     testWidgets(
         'a present exclusion mark shows the include wording and the '
         'include action deletes it', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(date: _d(10), type: CycleMarkTypes.ignoreTemperature),
+      final (db, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
+        CycleMark(
+            date: scenarioDay(10), type: CycleMarkTypes.ignoreTemperature),
       ]);
 
-      await _tapDay(tester, 4); // 9/10: the marked day
+      await tapCycleDay(tester, 4); // 9/10: the marked day
       expect(find.text('Temperature evaluated again'), findsOneWidget,
           reason: 'the day already carries the mark -> the include action');
 
       await tester.tap(find.text('Temperature evaluated again'));
       await tester.pumpAndSettle();
 
-      expect(await _storedTypes(_d(10)), isEmpty,
+      expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the mark is removed from storage through the deleteMark '
               'path');
       expect(find.text('Ignore temperature'), findsOneWidget,
@@ -572,11 +537,12 @@ void main() {
       // usable, so the placement warns with the "unmeasured or
       // interrupted" wording (the mark-excluded branch of the dialog
       // body choice).
-      await _pump(tester, entries: _entries, seedMarks: [
-        CycleMark(date: _d(14), type: CycleMarkTypes.ignoreTemperature),
+      final (_, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
+        CycleMark(
+            date: scenarioDay(14), type: CycleMarkTypes.ignoreTemperature),
       ]);
 
-      await _tapDay(tester, 8); // 9/14: measured above the baseline
+      await tapCycleDay(tester, 8); // 9/14: measured above the baseline
       await tester.tap(find.text('Set first higher measurement'));
       await tester.pumpAndSettle();
 
@@ -598,10 +564,10 @@ void main() {
     /// The exclusion group of the sheet (test-visible key).
     final excludeGroup = find.byKey(const ValueKey('cycleSheetExcludeGroup'));
 
-    /// [_entries] with the disturbance flags [mask] recorded on day 9/10
+    /// [scenarioEntries] with the disturbance flags [mask] recorded on day 9/10
     /// (index 4).
     List<DailyEntry> entriesWithDay4Mask(int mask) {
-      final entries = [..._entries];
+      final entries = [...scenarioEntries];
       entries[4] = entries[4].copyWith(tempDisturbances: mask);
       return entries;
     }
@@ -610,11 +576,11 @@ void main() {
         'a day WITH recorded disturbance flags: the group carries only the '
         'exclusion title and the toggle — neither flag labels nor an empty '
         'line (the chart row shows the letters)', (tester) async {
-      await _pump(tester,
+      final (_, _) = await _pump(tester,
           entries: entriesWithDay4Mask(
               TempDisturbance.alk.bit | TempDisturbance.kr.bit));
 
-      await _tapDay(tester, 4); // 9/10: flags alk + kr recorded
+      await tapCycleDay(tester, 4); // 9/10: flags alk + kr recorded
 
       expect(excludeGroup, findsOneWidget,
           reason: 'the exclusion toggle lives in the keyed group '
@@ -648,9 +614,9 @@ void main() {
     testWidgets(
         'a day WITHOUT recorded flags shows the same toggle-only group — '
         'no empty-state line, no editable chips', (tester) async {
-      await _pump(tester, entries: _entries);
+      final (_, _) = await _pump(tester, entries: scenarioEntries);
 
-      await _tapDay(tester, 4); // 9/10: no flags recorded
+      await tapCycleDay(tester, 4); // 9/10: no flags recorded
 
       expect(excludeGroup, findsOneWidget,
           reason: 'the group renders on every day: title plus the toggle');
@@ -679,14 +645,14 @@ void main() {
         'the toggle inside the group keeps its write behavior: it places '
         'the ignoreTemperature mark through the MarksDao and flips to the '
         'include wording within the group', (tester) async {
-      await _pump(tester,
+      final (db, _) = await _pump(tester,
           entries: entriesWithDay4Mask(TempDisturbance.alk.bit));
 
-      await _tapDay(tester, 4); // 9/10
+      await tapCycleDay(tester, 4); // 9/10
       await tester.tap(find.text('Ignore temperature'));
       await tester.pumpAndSettle();
 
-      expect(await _storedTypes(_d(10)),
+      expect(await storedMarkTypes(db, scenarioDay(10)),
           contains(CycleMarkTypes.ignoreTemperature),
           reason: 'the group toggle writes through the same mark path');
       expect(
@@ -704,10 +670,11 @@ void main() {
         'naming rule D', (tester) async {
       // Main scenario: the 3rd circled candidate (9/16, 37.0) is >= 0.2 K
       // above the baseline 36.4 -> rule D fires, SUZ begins 9/16 evening.
-      await _pump(tester,
-          entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+      final (_, _) = await _pump(tester,
+          entries: scenarioEntries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-      await _tapDay(tester, 10); // 9/16: the computed suzBegins
+      await tapCycleDay(tester, 10); // 9/16: the computed suzBegins
 
       expect(
           find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsOneWidget,
@@ -730,16 +697,17 @@ void main() {
       // the SUZ begins the morning of the 4th circled measurement, not the
       // evening).
       final entries = [
-        ..._entries.take(8),
-        DailyEntry(date: _d(14), bbtC: 36.5),
-        DailyEntry(date: _d(15), bbtC: 36.5),
-        DailyEntry(date: _d(16), bbtC: 36.5),
-        DailyEntry(date: _d(17), bbtC: 36.5),
+        ...scenarioEntries.take(8),
+        DailyEntry(date: scenarioDay(14), bbtC: 36.5),
+        DailyEntry(date: scenarioDay(15), bbtC: 36.5),
+        DailyEntry(date: scenarioDay(16), bbtC: 36.5),
+        DailyEntry(date: scenarioDay(17), bbtC: 36.5),
       ];
-      await _pump(tester,
-          entries: entries, seedMarks: [_peakMark, _firstHigherMark]);
+      final (_, _) = await _pump(tester,
+          entries: entries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-      await _tapDay(tester, 11); // 9/17: the computed suzBegins
+      await tapCycleDay(tester, 11); // 9/17: the computed suzBegins
 
       expect(find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
           findsOneWidget);
@@ -755,13 +723,13 @@ void main() {
     testWidgets(
         'the suggestion is suppressed once a user SUZ mark exists in the '
         'cycle', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [
-        _peakMark,
-        _firstHigherMark,
-        CycleMark(date: _d(13), type: CycleMarkTypes.suzMorning),
+      final (_, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
+        scenarioPeakMark,
+        scenarioFirstHigherMark,
+        CycleMark(date: scenarioDay(13), type: CycleMarkTypes.suzMorning),
       ]);
 
-      await _tapDay(tester, 10); // 9/16: the computed suzBegins
+      await tapCycleDay(tester, 10); // 9/16: the computed suzBegins
 
       expect(
           find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsNothing,
@@ -771,10 +739,11 @@ void main() {
 
     testWidgets('no suggestion on days that are not the computed SUZ day',
         (tester) async {
-      await _pump(tester,
-          entries: _entries, seedMarks: [_peakMark, _firstHigherMark]);
+      final (_, _) = await _pump(tester,
+          entries: scenarioEntries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
-      await _tapDay(tester, 8); // 9/14: the marked rise, not the SUZ day
+      await tapCycleDay(tester, 8); // 9/14: the marked rise, not the SUZ day
 
       expect(
           find.byKey(const ValueKey('cycleSheetSuzSuggestion')), findsNothing);
@@ -783,8 +752,9 @@ void main() {
     testWidgets(
         'SUZ actions on any day: set evening, variant-switch to morning, '
         'remove', (tester) async {
-      await _pump(tester, entries: _entries);
-      await _tapDay(tester, 4); // 9/10 — an arbitrary day (actions on ANY day)
+      final (db, _) = await _pump(tester, entries: scenarioEntries);
+      await tapCycleDay(
+          tester, 4); // 9/10 — an arbitrary day (actions on ANY day)
 
       // The row can sit below the sheet fold now that the column carries
       // the disturbance/exclusion group too — scroll it into view first
@@ -792,7 +762,8 @@ void main() {
       await scrollSheetTo(tester, find.text('SUZ from this evening'));
       await tester.tap(find.text('SUZ from this evening'));
       await tester.pumpAndSettle();
-      expect(await _storedTypes(_d(10)), contains(CycleMarkTypes.suzEvening),
+      expect(await storedMarkTypes(db, scenarioDay(10)),
+          contains(CycleMarkTypes.suzEvening),
           reason: 'the SUZ mark is persisted through the MarksDao');
       expect(find.text('Remove SUZ from this evening'), findsOneWidget,
           reason: 'the removal label when the variant is present');
@@ -803,7 +774,7 @@ void main() {
       await scrollSheetTo(tester, find.text('SUZ from this morning'));
       await tester.tap(find.text('SUZ from this morning'));
       await tester.pumpAndSettle();
-      expect(await _storedTypes(_d(10)),
+      expect(await storedMarkTypes(db, scenarioDay(10)),
           unorderedEquals([CycleMarkTypes.suzMorning]),
           reason: 'placing one variant removes the other');
       expect(find.text('Remove SUZ from this morning'), findsOneWidget);
@@ -813,7 +784,7 @@ void main() {
       await scrollSheetTo(tester, find.text('Remove SUZ from this morning'));
       await tester.tap(find.text('Remove SUZ from this morning'));
       await tester.pumpAndSettle();
-      expect(await _storedTypes(_d(10)), isEmpty,
+      expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the removal action deletes the mark');
       expect(find.text('SUZ from this morning'), findsOneWidget,
           reason: 'the morning action flips back to its set label');
@@ -824,11 +795,11 @@ void main() {
       // Wide chart columns spell the time as text in the time row, but the
       // sheet remains where the value surfaces unconditionally (at narrow
       // column widths the row cell stays empty).
-      final entries = [..._entries];
+      final entries = [...scenarioEntries];
       entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
-      await _pump(tester, entries: entries);
+      final (_, _) = await _pump(tester, entries: entries);
 
-      await _tapDay(tester, 4); // 9/10
+      await tapCycleDay(tester, 4); // 9/10
 
       expect(find.textContaining('Measurement time:'), findsOneWidget,
           reason: 'the recorded measurement time value is shown in the day '
@@ -845,9 +816,9 @@ void main() {
 
     testWidgets('no measurement-time line on a day without a recorded time',
         (tester) async {
-      await _pump(tester, entries: _entries);
+      final (_, _) = await _pump(tester, entries: scenarioEntries);
 
-      await _tapDay(tester, 4); // 9/10: temperature without a recorded time
+      await tapCycleDay(tester, 4); // 9/10: temperature without a recorded time
 
       expect(find.textContaining('Measurement time:'), findsNothing,
           reason: 'nothing is shown when no measurement time was recorded');
@@ -856,13 +827,13 @@ void main() {
     testWidgets(
         'a manual SUZ mark never alters the arithmetic — the evaluation '
         'info lines stay as computed', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [
-        _peakMark,
-        _firstHigherMark,
-        CycleMark(date: _d(12), type: CycleMarkTypes.suzEvening),
+      final (_, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
+        scenarioPeakMark,
+        scenarioFirstHigherMark,
+        CycleMark(date: scenarioDay(12), type: CycleMarkTypes.suzEvening),
       ]);
 
-      await _tapDay(tester, 8); // 9/14: circled candidate #1
+      await tapCycleDay(tester, 8); // 9/14: circled candidate #1
 
       expect(find.text('+0.50 K above the baseline'), findsOneWidget,
           reason: 'the difference to the baseline is unchanged by the SUZ '
@@ -876,15 +847,16 @@ void main() {
     // The six-previous-calendar-day window of a mark on 9/13 is 9/7..9/12,
     // whose baseline is 36.40 (9/9); the marked day itself carries 36.30 —
     // NOT strictly above the baseline, so the placement is inconsistent.
-    CycleMark markOn13() =>
-        CycleMark(date: _d(13), type: CycleMarkTypes.firstHigherMeasurement);
+    CycleMark markOn13() => CycleMark(
+        date: scenarioDay(13), type: CycleMarkTypes.firstHigherMeasurement);
 
     testWidgets(
         'placing an inconsistent mark warns with the arithmetic and '
         'Keep keeps the mark', (tester) async {
-      await _pump(tester, entries: _entries); // no marks yet
+      final (db, _) =
+          await _pump(tester, entries: scenarioEntries); // no marks yet
 
-      await _tapDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
+      await tapCycleDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
       await tester.tap(find.text('Set first higher measurement'));
       await tester.pumpAndSettle();
 
@@ -905,7 +877,8 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing,
           reason: 'the dialog is non-blocking: Keep only closes it');
-      expect(await _storedTypes(_d(13)), contains('firstHigherMeasurement'),
+      expect(await storedMarkTypes(db, scenarioDay(13)),
+          contains('firstHigherMeasurement'),
           reason: 'Keep keeps the just-placed mark');
       expect(find.byType(BottomSheet), findsOneWidget,
           reason: 'the sheet stays open across the warning');
@@ -915,9 +888,9 @@ void main() {
 
     testWidgets('the Remove choice removes the just-placed mark',
         (tester) async {
-      await _pump(tester, entries: _entries);
+      final (db, _) = await _pump(tester, entries: scenarioEntries);
 
-      await _tapDay(tester, 7);
+      await tapCycleDay(tester, 7);
       await tester.tap(find.text('Set first higher measurement'));
       await tester.pumpAndSettle();
 
@@ -929,22 +902,23 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);
-      expect(await _storedTypes(_d(13)), isEmpty,
+      expect(await storedMarkTypes(db, scenarioDay(13)), isEmpty,
           reason: 'Remove undoes the placement through the toggle path');
       expect(find.text('Set first higher measurement'), findsOneWidget,
           reason: 'the toggle flipped back after the removal');
     });
 
     testWidgets('placing a consistent mark shows no dialog', (tester) async {
-      await _pump(tester, entries: _entries);
+      final (db, _) = await _pump(tester, entries: scenarioEntries);
 
-      await _tapDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
+      await tapCycleDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
       await tester.tap(find.text('Set first higher measurement'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing,
           reason: 'only an INCONSISTENT placement warns');
-      expect(await _storedTypes(_d(14)), contains('firstHigherMeasurement'),
+      expect(await storedMarkTypes(db, scenarioDay(14)),
+          contains('firstHigherMeasurement'),
           reason: 'the consistent mark is placed without the choice');
     });
 
@@ -952,13 +926,13 @@ void main() {
         'a marked day without a usable temperature warns without a '
         'value arithmetic', (tester) async {
       final entries = [
-        ..._entries.take(7), // 9/6..9/12 measured
-        DailyEntry(date: _d(13)), // 9/13 tracked but UNMEASURED
-        ..._entries.skip(8),
+        ...scenarioEntries.take(7), // 9/6..9/12 measured
+        DailyEntry(date: scenarioDay(13)), // 9/13 tracked but UNMEASURED
+        ...scenarioEntries.skip(8),
       ];
-      await _pump(tester, entries: entries);
+      final (_, _) = await _pump(tester, entries: entries);
 
-      await _tapDay(tester, 7); // 9/13: the unmeasured day (baseline 36.40)
+      await tapCycleDay(tester, 7); // 9/13: the unmeasured day (baseline 36.40)
       await tester.tap(find.text('Set first higher measurement'));
       await tester.pumpAndSettle();
 
@@ -973,9 +947,10 @@ void main() {
     testWidgets(
         'a merely-opened sheet for an existing inconsistent mark shows '
         'the PERSISTENT warning, no dialog', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [markOn13()]);
+      final (_, _) = await _pump(tester,
+          entries: scenarioEntries, seedMarks: [markOn13()]);
 
-      await _tapDay(tester, 7); // 9/13: the marked day
+      await tapCycleDay(tester, 7); // 9/13: the marked day
 
       expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
           findsOneWidget,
@@ -996,11 +971,12 @@ void main() {
       // The mark on 9/14 was placed over the baseline 36.40; an edited
       // 9/11 temperature 36.95 raises the window's baseline past the
       // marked 36.90 — the warning must show without re-placing the mark.
-      final entries = [..._entries];
+      final entries = [...scenarioEntries];
       entries[5] = entries[5].copyWith(bbtC: 36.95); // 9/11, in the window
-      await _pump(tester, entries: entries, seedMarks: [_firstHigherMark]);
+      final (_, _) = await _pump(tester,
+          entries: entries, seedMarks: [scenarioFirstHigherMark]);
 
-      await _tapDay(tester, 8); // 9/14: the marked day
+      await tapCycleDay(tester, 8); // 9/14: the marked day
 
       expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
           findsOneWidget,
@@ -1008,9 +984,10 @@ void main() {
     });
 
     testWidgets('a consistent mark shows no warning line', (tester) async {
-      await _pump(tester, entries: _entries, seedMarks: [_firstHigherMark]);
+      final (_, _) = await _pump(tester,
+          entries: scenarioEntries, seedMarks: [scenarioFirstHigherMark]);
 
-      await _tapDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
+      await tapCycleDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
 
       expect(find.byKey(const ValueKey('cycleSheetRiseConsistency')),
           findsNothing);

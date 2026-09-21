@@ -84,7 +84,6 @@ the sections above track planned work, git history keeps the record (see
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
 - add descriptions (texts TBD) and tooltips, welcome page, links, help, copyright...
 - export as password protected zip
-- [ ] review test suite and clean it up
 - drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 - add (optional) reminder (e.g. every year) to do a backup of your data
 

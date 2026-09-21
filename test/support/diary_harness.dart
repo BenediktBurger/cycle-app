@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'database.dart';
+import 'viewport.dart';
 
 /// Entry-form selector scope: the real app over an in-memory database,
 /// language pinned to [locale] (German in every caller so the German token
@@ -70,12 +71,10 @@ class DiaryHarness {
   /// Enlarges the test surface: the form is tall, and the day tiles plus the
   /// save button sit BELOW the default 800x600 test viewport — with the
   /// lazy ListView they are not even built there, so finders miss them.
-  void tallSurface(WidgetTester tester, {double height = 2400}) {
-    tester.view.physicalSize = Size(800, height);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-  }
+  /// The surface mechanics live once in support/viewport.dart (the diary
+  /// wide/tall surface is the same helper the cycle-list tests use).
+  void tallSurface(WidgetTester tester, {double height = 2400}) =>
+      useTallSurface(tester, height: height);
 
   /// Selects the bleeding chip [chipLabel] (German: the pinned locale) and
   /// saves the day. The labels used here are unique on the form — the
