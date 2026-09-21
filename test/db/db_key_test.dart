@@ -109,5 +109,42 @@ void main() {
         expect(e.toString(), contains('keystore locked'));
       }
     });
+
+    test('a stored key of the wrong shape fails loudly (no regeneration)',
+        () async {
+      final store = _FakeStore()..values[dbKeyStorageName] = 'not-a-key';
+      await expectLater(
+        loadOrCreateDbKey(store: store),
+        throwsA(isA<DbKeyException>()),
+      );
+      // The stored corruption is left untouched: overwriting it with a
+      // fresh key would brick the existing database silently.
+      expect(store.values[dbKeyStorageName], 'not-a-key');
+    });
+
+    test('the format guard rejects near-misses (length, charset, case)',
+        () async {
+      final cases = <String, String>{
+        '63 characters': 'a' * 63,
+        '65 characters': 'a' * 65,
+        'non-hex characters': 'z' * 64,
+        'uppercase hex': 'A' * 64,
+        'whitespace trip': ' ${'a' * 63}',
+      };
+      for (final MapEntry(:key, :value) in cases.entries) {
+        final store = _FakeStore()..values[dbKeyStorageName] = value;
+        await expectLater(
+          loadOrCreateDbKey(store: store),
+          throwsA(isA<DbKeyException>()),
+          reason: key,
+        );
+      }
+    });
+
+    test('a well-formed stored key still passes through unchanged', () async {
+      final stored = 'a' * 64;
+      final store = _FakeStore()..values[dbKeyStorageName] = stored;
+      expect(await loadOrCreateDbKey(store: store), stored);
+    });
   });
 }

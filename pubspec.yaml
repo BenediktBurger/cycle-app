@@ -82,6 +82,11 @@ dependencies:
   file_selector: ^1.1.0
   flutter_secure_storage: ^11.2.0
   path_provider: ^2.1.6
+  # Raw SQLite binding, needed at runtime for lib/db/cipher_setup.dart (the
+  # `PRAGMA cipher`/`PRAGMA key` steps the native opener applies) and by the
+  # migration tests (they bootstrap a real v1-era database file via the raw
+  # binding before drift's onUpgrade runs).
+  sqlite3: ^3.5.0
 
 dev_dependencies:
   flutter_test:
@@ -89,9 +94,6 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
   drift_dev: ^2.35.0
-  # Direct dependency for the migration tests: they bootstrap a real v1-era
-  # database file via the raw SQLite binding before drift's onUpgrade runs.
-  sqlite3: ^3.5.0
 
 flutter:
   uses-material-design: true

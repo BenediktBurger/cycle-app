@@ -68,3 +68,11 @@ Constraints:
   (and with it the settings) — that is the pre-release policy, not a
   property of this design. From that release on, migrations must preserve
   data; `app_settings` itself is version-stable and needs none.
+
+## Update 2026-09-21: encryption wording
+
+The consequence above references ADR-0005's "SQLCipher-later /
+web-no-encryption split"; native encryption has since landed pre-release
+via SQLite3MultipleCiphers, always-on (see the amendment in
+[ADR-0005](0005-storage-and-encryption.md)). The settings decisions in
+this ADR are unaffected.

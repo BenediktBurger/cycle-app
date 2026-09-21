@@ -14,8 +14,9 @@
 //    package's bundled SQLite engine, and the native `setup` below applies
 //    the key from flutter_secure_storage (lib/db/db_key.dart) via
 //    `PRAGMA key` before drift touches the database. There is no settings
-//    toggle; on debug builds the setup asserts that the cipher build is
-//    actually present (`PRAGMA cipher`). Losing the platform key store
+//    toggle; the setup verifies that the cipher build is actually present
+//    (`PRAGMA cipher`) and refuses to open otherwise — the shared steps
+//    live in lib/db/cipher_setup.dart. Losing the platform key store
 //    (e.g. a restore that copies the file without it) makes the database
 //    unreadable — the JSON export is the user-level backup (ADR-005).
 //  - Web (the iteration test target): drift's `WasmDatabase.open` — SQLite
@@ -47,6 +48,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart'
     show getApplicationDocumentsDirectory;
 
+import 'cipher_setup.dart';
 import 'cycle_database.dart';
 import 'db_key.dart';
 
@@ -54,12 +56,6 @@ import 'db_key.dart';
 /// becomes `cycle_storage.sqlite` inside the application documents
 /// directory; on web it names the OPFS/IndexedDB storage slot.
 const String databaseName = 'cycle_storage';
-
-/// Escapes a database key for inlining into the single-quoted `PRAGMA key`
-/// statement (the pragma does not take prepared statements, the docs
-/// pattern inlines it; our generated keys are hex-only, the escaping is
-/// routine robustness).
-String _pragmaKeyString(String key) => key.replaceAll("'", "''");
 
 /// Opens the platform-appropriate database.
 ///
@@ -97,13 +93,7 @@ Future<CycleDatabase> openCycleDatabase() async {
         // Same directory the (drift_flutter) native default resolved
         // before: application documents + `$databaseName.sqlite`.
         databaseDirectory: getApplicationDocumentsDirectory,
-        setup: (rawDb) {
-          // Debug-only tripwire: vanilla SQLite has no `cipher` pragma,
-          // SQLite3MultipleCiphers does. If this fires, the hook
-          // user-define in pubspec.yaml is missing from the build.
-          assert(rawDb.select('PRAGMA cipher;').isNotEmpty);
-          rawDb.execute("PRAGMA key = '${_pragmaKeyString(key)}'");
-        },
+        setup: (rawDb) => applyCipherAndKey(rawDb, key),
       ),
     ),
   );

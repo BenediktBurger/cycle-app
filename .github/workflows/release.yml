@@ -37,10 +37,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install sqlite3 (database test suite)
-        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
-
       # Full correctness gate — a release tag never ships untested code.
+      # (No system sqlite3 install needed: the database tests use the
+      # SQLite engine bundled by the sqlite3 package's build hook, see
+      # CONTRIBUTING.md, "Linux note (database tests)".)
       - name: Analyze
         run: flutter analyze
 

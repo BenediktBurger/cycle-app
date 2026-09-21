@@ -16,9 +16,11 @@
 // user-level backup path.
 //
 // Failure behavior: secure-storage errors surface loudly. If the key can
-// neither be read nor stored, opening the database must FAIL — there is
-// deliberately no silent fallback, which would quietly run an unencrypted
-// database as if it were protected.
+// neither be read nor stored — or a stored key has the wrong shape (a
+// corrupted store value; regenerating would brick the existing database) —
+// opening the database must FAIL. There is deliberately no silent
+// fallback, which would quietly run an unencrypted database as if it were
+// protected.
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -84,6 +86,16 @@ String generateDbKey({Random? random}) {
   ).join();
 }
 
+/// The shape every stored key must have: 64 lowercase hex characters
+/// (32 bytes hex-encoded), exactly what [generateDbKey] produces. A stored
+/// value outside this shape means the store is corrupted or holds a
+/// foreign value — and a malformed `PRAGMA key` would only fail later,
+/// with an unreadable database.
+final RegExp _dbKeyFormat = RegExp(r'^[0-9a-f]{64}$');
+
+/// Whether [value] has the expected stored-key format (see [_dbKeyFormat]).
+bool isWellFormedDbKey(String value) => _dbKeyFormat.hasMatch(value);
+
 /// Loads the database encryption key, on first use generating one and
 /// persisting it before returning.
 ///
@@ -92,6 +104,12 @@ String generateDbKey({Random? random}) {
 /// than run it unencrypted. A key that could be generated but not be stored
 /// is likewise fatal: an unstored-but-used key would leave the database
 /// unreadable after the next restart, so nothing is applied at all.
+///
+/// A STORED key of the wrong shape (not 64 lowercase hex characters, see
+/// [isWellFormedDbKey]) is also fatal: it cannot be the key the database
+/// was encrypted with, and silently regenerating a new one would brick the
+/// existing database — so this fails loudly like every other key-store
+/// error.
 Future<String> loadOrCreateDbKey({DbKeyStore? store}) async {
   final keyStore = store ?? const SecureStorageDbKeyStore();
 
@@ -101,7 +119,17 @@ Future<String> loadOrCreateDbKey({DbKeyStore? store}) async {
   } catch (e) {
     throw DbKeyException('could not read the database encryption key', e);
   }
-  if (stored != null && stored.isNotEmpty) return stored;
+  if (stored != null && stored.isNotEmpty) {
+    if (!isWellFormedDbKey(stored)) {
+      throw DbKeyException(
+        'the stored database encryption key has an unexpected format '
+        '(expected 64 lowercase hex characters) — the key store is '
+        'corrupted or holds a foreign value; refusing to regenerate '
+        'silently, which would make the existing database unreadable',
+      );
+    }
+    return stored;
+  }
 
   final key = generateDbKey();
   try {

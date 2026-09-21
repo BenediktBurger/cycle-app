@@ -74,8 +74,9 @@ Decision change:
 - **Native (Android/iOS): at-rest encryption is always-on.** There is no
   settings toggle and no opt-out. `lib/db/database_opener.dart` applies the
   key via `PRAGMA key` in the native database's `setup`, before drift
-  issues any statement, and asserts the cipher build's presence in debug
-  runs (`PRAGMA cipher`).
+  issues any statement, and verifies the cipher build's presence on every
+  open (`PRAGMA cipher` empty → the open fails loudly, since the key would
+  silently no-op on a SQLite build without cipher support).
 - **Key: a random 32-byte value** (hex-encoded) stored in the platform's
   protected store via `flutter_secure_storage` (Android Keystore-backed
   storage / iOS Keychain) — see `lib/db/db_key.dart`. There is **no user

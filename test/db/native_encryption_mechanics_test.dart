@@ -6,7 +6,9 @@
 //
 // These tests run against the SAME sqlite3 binding the app's
 // NativeDatabase uses, so they double as a host-side tripwire for the
-// hook configuration.
+// hook configuration. The setup steps under test are the production ones:
+// the shared applyCipherAndKey helper from lib/db/cipher_setup.dart is
+// exactly what the opener's native `setup` applies.
 //
 // Not covered here — deliberately: the platform key store (the
 // production flutter_secure_storage store in lib/db/db_key.dart needs
@@ -19,23 +21,9 @@ import 'package:drift/native.dart' show NativeDatabase;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'package:cycle_app/db/cipher_setup.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/db_key.dart';
-
-/// The exact steps lib/db/database_opener.dart applies in its native
-/// `setup`, minus the inlining of the loaded key — with an explicit,
-/// descriptive error instead of a debug-only assert so a missing hook
-/// configuration fails the suite loudly on every run.
-void applyCipherAndKey(Database rawDb, String key) {
-  final cipher = rawDb.select('PRAGMA cipher;');
-  if (cipher.isEmpty) {
-    throw UnsupportedError(
-      'The SQLite build behind this test run has no cipher support — the '
-      'sqlite3 hook user-define in pubspec.yaml likely did not apply.',
-    );
-  }
-  rawDb.execute("PRAGMA key = '${key.replaceAll("'", "''")}'");
-}
 
 void main() {
   late Directory tempDir;

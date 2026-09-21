@@ -44,3 +44,13 @@ everywhere.
 - Platform feature parity is asymmetric: features that work only on native
   (SQLCipher, biometric lock) are "optional/native-later" by design, not
   regressions of web.
+
+## Update 2026-09-21: native encryption split superseded
+
+The native-encryption asymmetry described above is historic: native at-rest
+encryption landed pre-release via SQLite3MultipleCiphers (not SQLCipher, no
+`sqlcipher_flutter_libs`), always-on with no settings toggle — see the
+amendment in [ADR-0005](0005-storage-and-encryption.md). The platform
+iteration decisions here (web as test target, no native-only plugins in
+core code, cheap CI web build) are unaffected. Web storage stays
+unencrypted, as decided.
