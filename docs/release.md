@@ -18,14 +18,18 @@ re-deriving the reasoning. Reasons live in the ADR; this file is the how.
 | F-Droid (official)           | intermediate, possibly permanent | Gate G2 (Phase E; G1 resolved 2026-09)             |
 | iOS (TestFlight → App Store) | deferred workstream              | macOS + Apple Developer Program (Phase G)          |
 
-Order of execution is exactly A → C → D, then (whenever gates resolve) B, E, F.
-Routine releases skip the phases entirely: they follow the
+Of the one-time setup phases, Phase A (Android toolchain) and Phase C
+(signing) are complete — git history and
+[ADR-0009](adr/0009-release-pipeline-and-signing.md) record how — and
+Phase D is ongoing discipline. One-time setup still open: the remaining
+Phase B items (launcher label, adaptive launcher icon) and Phases E, F, G
+behind the gates above. Routine releases skip the phases entirely: they
+follow the
 [per-release checklist](#per-release-checklist-every-distribution-update)
 and the
 [local release path](#local-release-path)
 (the tag-triggered CI pipeline is
-[parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-local-release-path));
-Phases A–G are one-time setup.
+[parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-local-release-path)).
 
 ## Decision gates — resolve before the first store upload
 
@@ -53,68 +57,47 @@ These are one-way doors; nothing below Phase D may start until they close.
 - **G4 — branding assets** (app name, icon, screenshots) — can be redone at
   will; not a true gate, listed here only because store listings need them.
 
-## Phase A — Android toolchain (one-time, dev machine)
-
-The setup itself — JDK 21, Android SDK, licenses, device connection —
-lives with the contributor docs:
-[CONTRIBUTING.md](../CONTRIBUTING.md), section "Android toolchain"
-(Android Studio is described there as an alternative). It is **required
-for releases**: release artifacts are built and signed locally (the
-parked CI release path would cover it too, but that is disabled — see
-"Local release path" below), and the device upgrade test (Phase D) needs
-the built release APK.
-
-Gate: `flutter build apk --release` in the repo root succeeds (debug-signed
-is fine without `key.properties`; real signing comes in Phase C).
-
-## Phase B — application identity rename (Gate G1 resolved)
+## Phase B — application identity rename (items 1–4 remaining)
 
 Preparation principle (from [ADR-0002](adr/0002-package-name-cycle-app-placeholder.md)):
 everything is coded against the placeholder `cycle_app`, so the rename is
 mechanical. Checklist, in order — run the full test gate between sensible
-stages and commit stepwise. **Items 1–3 are already done** (identifier
-per Gate G1 above; Dart package name stays `cycle_app` per ADR-0002):
+stages and commit stepwise. The first three steps are complete (git
+history): `pubspec.yaml` bumped to `version: 0.1.0+1` (the `name:` stays
+`cycle_app` per ADR-0002; keep bumping `+N` per distributed build —
+per-release checklist), `applicationId` + `namespace` set to
+`io.github.benediktburger.cycleapp` in `android/app/build.gradle.kts`, and
+`MainActivity.kt` relocated to
+`android/app/src/main/kotlin/io/github/benediktburger/cycleapp/`
+(manifest uses `.MainActivity` relative to the namespace). Remaining:
 
-1. `pubspec.yaml`: ✅ bumped to `version: 0.1.0+1` (versionCode = 1, matching
-   `fastlane/metadata/android/*/changelogs/1.txt`). Keep bumping `+N` per
-   distributed build from here (per-release checklist). The `name:` stays
-   `cycle_app` (ADR-0002 placeholder decision; rename explicitly out of
-   scope).
-2. `android/app/build.gradle.kts`: ✅ `applicationId` and `namespace` set to
-   `io.github.benediktburger.cycleapp`; template TODOs removed.
-3. ✅ `MainActivity.kt` moved to
-   `android/app/src/main/kotlin/io/github/benediktburger/cycleapp/` with
-   its `package` line updated (manifest uses `.MainActivity` relative to
-   the namespace — no manifest edit needed).
-4. Launcher label: **open** — replace `android:label="cycle_app"` with a
+1. Launcher label: **open** — replace `android:label="cycle_app"` with a
    localized resource — create `android/app/src/main/res/values{-de}/strings.xml` with
    `app_name`, manifest references `@string/app_name`.
-5. **Adaptive launcher icon** (replaces the default mipmaps): it must exist
+2. **Adaptive launcher icon** (replaces the default mipmaps): it must exist
    for any store listing; generate from a vector foreground + background
    (G4), e.g. via Android Studio once or an icon-generation tool.
-6. **Before Play upload (hard deadline):** the identifier must be final —
+3. **Before Play upload (hard deadline):** the identifier must be final —
    afterwards it is frozen (ADR-0009 §4).
-7. iOS note (Phase G): reuse the exact `applicationId` string as the iOS
+4. iOS note (Phase G): reuse the exact `applicationId` string as the iOS
    bundle identifier.
 
 Regression check after the rename: full analyze/test gate, then web build +
 release APK both build.
 
-## Phase C — signing (independent of Gate G1 — can be done early)
+## Phase C — signing (complete; custody + status notes)
 
-Create the release keystore **once**, outside the repo:
-
-```sh
-mkdir -p ~/keystores
-keytool -genkeypair -v \
-  -keystore ~/keystores/<app>-release.jks -alias <app>-release \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
-
-Use the **final project name** for the alias/keystore — Gate G1 is
-resolved, so alias `cycleapp-release`, keystore `cycleapp-release.jks`
-(the alias is internal — the key itself is what lasts; a per-app key is
-the cleaner choice per ADR-0009).
+Current state: the release keystore exists at
+`~/keystores/cycleapp-release.jks` (alias `cycleapp-release`), and the
+signing wiring is committed in `android/app/build.gradle.kts` — it reads
+the gitignored `android/key.properties` and falls back to debug signing
+when that file is absent (the per-release checklist guards against that).
+**Still outstanding before the first signed build:** fill the two literal
+`CHANGE-ME` passwords in `android/key.properties` from the password
+manager. On the first real release, the script's `--accept-fingerprint`
+flow creates and commits `tool/release_fingerprint.txt` — see
+[per-release checklist](#per-release-checklist-every-distribution-update)
+step 7.
 
 **Custody rules (ADR-0009 §2 — non-negotiable):**
 
@@ -125,64 +108,13 @@ the cleaner choice per ADR-0009).
 - password + keystore backup file(s) into the password manager, **plus two
   offline encrypted copies** on separate media;
 - a one-page "how to release from scratch on a new machine" note lives at
-  the bottom of this file (§Released-machine recovery) — this is also the
-  handover doc for a later INER takeover.
+  the bottom of this file
+  ([Fresh-machine recovery](#fresh-machine-recovery-the-handover-note)) —
+  this is also the handover doc for a later INER takeover.
 
-Wire it up:
-
-1. `android/key.properties` (gitignored):
-
-   ```properties
-   storeFile=/home/<you>/keystores/<app>-release.jks
-   storePassword=...
-   keyAlias=<app>-release
-   keyPassword=...
-   ```
-
-2. `android/app/build.gradle.kts` — replace the debug-signing release block:
-
-   ```kotlin
-   import java.util.Properties
-
-   val keystoreProperties = Properties()
-   val keystorePropertiesFile = rootProject.file("key.properties")
-   if (keystorePropertiesFile.exists()) {
-       keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
-   }
-
-   android {
-       signingConfigs {
-           create("release") {
-               keyAlias = keystoreProperties.getProperty("keyAlias")
-               keyPassword = keystoreProperties.getProperty("keyPassword")
-               storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
-               storePassword = keystoreProperties.getProperty("storePassword")
-           }
-       }
-       buildTypes {
-           release {
-               signingConfig = if (keystorePropertiesFile.exists()) {
-                   signingConfigs.getByName("release")
-               } else {
-                   // debug fallback keeps `flutter build apk --release` runnable
-                   // on machines without key.properties (CI, fresh clones)
-                   signingConfigs.getByName("debug")
-               }
-           }
-       }
-   }
-   ```
-
-   (Adapt the exact insertion points; `rootProject.file("key.properties")`
-   resolves to `android/key.properties`.)
-
-Gate: `flutter build apk --release`, then verify the signature is *not* the
-debug key:
-
-```sh
-$ANDROID_HOME/build-tools/<N>.0.0/apksigner verify --print-certs \
-  build/app/outputs/flutter-apk/app-release.apk
-```
+The original creation walk-through (keytool, `key.properties` template,
+`build.gradle.kts` wiring snippet) lives in this file's git history;
+ADR-0009 §2 covers the rationale.
 
 ## Phase D — build, install, upgrade discipline
 
@@ -276,7 +208,7 @@ app's declared signing key fingerprint.
 
 ## Phase G — iOS (deferred workstream)
 
-Do **not** start until Android went through Phases A–F at least once.
+Do **not** start until Android went through Phases B–F at least once.
 
 - Prerequisites: macOS + Xcode (this Linux machine cannot build iOS),
   Apple Developer Program (annual fee), G1 (bundle id = same string),
