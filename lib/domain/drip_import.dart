@@ -447,13 +447,22 @@ List<Map<String, Object?>> deriveDripMarks(
     if (iso == null || !seenDates.add(iso)) continue;
     final day = tryParseIsoDay(iso);
     if (day == null) continue;
-    replayed.add(DailyEntry(
-      date: day,
-      // No fallback: the shared parser maps a MISSING key (JSON null) to
-      // "no bleeding recorded" itself, and the mapper above emits only
-      // accepted levels in this field.
-      bleeding: tryParseBleeding(row['bleeding'])!,
-    ));
+    // A MISSING key (JSON null) maps to "no bleeding recorded" itself, and
+    // the mapper above emits only accepted bleeding levels in this field.
+    // A null parse result therefore means outside input (e.g. a
+    // hand-edited document: junk token, bool, double) — surfaced as an
+    // explicit argument error naming the offending value instead of an
+    // opaque null-check crash.
+    final bleedingRaw = row['bleeding'];
+    final bleeding = tryParseBleeding(bleedingRaw);
+    if (bleeding == null) {
+      throw ArgumentError.value(
+        bleedingRaw,
+        'bleeding',
+        'not an accepted bleeding level (row date: $iso)',
+      );
+    }
+    replayed.add(DailyEntry(date: day, bleeding: bleeding));
   }
   replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
 

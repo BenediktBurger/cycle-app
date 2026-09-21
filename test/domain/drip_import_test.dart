@@ -317,6 +317,25 @@ void main() {
               'suppression where the preceding day is a sparse none day)');
     });
 
+    test(
+        'deriveDripMarks turns an unparsable bleeding value into an '
+        'explicit ArgumentError', () {
+      // Only reachable from outside the mapper's contract (a hand-edited
+      // or corrupted document): junk tokens, bools and doubles parse to
+      // null in tryParseBleeding, while a missing key means "none" and
+      // legacy token strings map to members. The error must self-explain
+      // instead of dying on a bare null check.
+      final rows = [
+        {'date': '2026-06-01', 'bleeding': 'junk-token'},
+      ];
+      expect(
+        () => deriveDripMarks(rows, {}),
+        throwsA(isA<ArgumentError>()
+            .having((e) => e.toString(), 'toString', contains('junk-token'))),
+        reason: 'the error names the offending bleeding value',
+      );
+    });
+
     test('mucus: drip nfp number 0..4 decodes onto sign/quality tokens', () {
       // drip: 0=t, 1=Ø, 2=f, 3=S (bare), 4=S+ ≙ S with the sheet's best
       // quality ew. The underlying feeling/texture of a bare S is not
