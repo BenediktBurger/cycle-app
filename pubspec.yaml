@@ -94,6 +94,23 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
   drift_dev: ^2.35.0
+  # Regenerates the launcher icons (all Android/iOS mipmaps) from
+  # design/icon.png (rendered from the design/logo.svg master): run
+  # `dart run flutter_launcher_icons` after changing the source.
+  flutter_launcher_icons: ^0.14.0
+
+# Launcher-icon generation configuration (see the dev dependency above).
+# Keep in sync with the roadmap items for the app logo and the adaptive
+# launcher icon: this is the interim setup until a final logo lands.
+flutter_launcher_icons:
+  image_path: "design/icon.png"
+  android: true
+  ios: true
+  # Apple's App Store rejects icons with an alpha channel; the master SVG
+  # paints a white background, but the rendered PNG still carries the channel.
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "design/icon.png"
 
 flutter:
   uses-material-design: true
