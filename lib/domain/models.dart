@@ -27,7 +27,8 @@ enum Bleeding {
 }
 
 /// Parses an export/storage bleeding field into the enum ([Bleeding.values]
-/// vocabulary), null for anything else. SHARED by the import planner and the
+/// vocabulary), null for every invalid shape (see below). SHARED by the
+/// import planner and the
 /// db writer — the single source of truth for this field's validation, so a
 /// row a writer would drop is never counted as a write (and never vice
 /// versa). Accepts `Object?` (see tryParseBleeding's callers: export rows
@@ -45,10 +46,18 @@ enum Bleeding {
 /// documents carry tokens, v3 carries numbers — the field parser is
 /// shape-agnostic, see lib/domain/export_import.dart).
 ///
+/// A missing key or an explicit JSON `null` means "no bleeding recorded":
+/// it parses to [Bleeding.none] (the sparse document shape omits the
+/// `bleeding` key on bleeding-free days entirely). Null is the ONLY
+/// meaning-bearing shape outside the two accepted forms — every other
+/// non-int/non-string value (bool, double, junk token, nested object)
+/// stays invalid.
+///
 /// TODO(user-review): `period` means "menstruation, heaviness unknown"; it
 /// degrades to `medium` (3), the central menstruation level. INER experts
 /// may prefer a different default.
 Bleeding? tryParseBleeding(Object? raw) {
+  if (raw == null) return Bleeding.none;
   if (raw is int) {
     for (final b in Bleeding.values) {
       if (b.level == raw) return b;

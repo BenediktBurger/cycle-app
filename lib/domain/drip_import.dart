@@ -387,7 +387,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
   final blob = ExportBlob(
     entries: entries,
-    marks: _deriveMarks(entries, excludedDays),
+    marks: deriveDripMarks(entries, excludedDays),
     exportedAt: DateTime.now(),
   );
 
@@ -432,7 +432,13 @@ DripCsvImport dripCsvToExportJson(String raw) {
 ///   plan counts them;
 /// - the derived rows are ordered by day, then type (deterministic
 ///   document order; the merge is idempotent regardless of order).
-List<Map<String, Object?>> _deriveMarks(
+///
+/// Row contract: each entry map carries a parsable `date`, and its
+/// `bleeding` value (when the key is present at all) is a bleeding level
+/// the shared parser accepts — a MISSING key is "no bleeding recorded"
+/// through tryParseBleeding's null rule. [entries] are the SAME row maps
+/// the export document carries (they replay verbatim).
+List<Map<String, Object?>> deriveDripMarks(
     List<Map<String, Object?>> entries, Set<String> excludedDays) {
   final seenDates = <String>{};
   final replayed = <DailyEntry>[];
@@ -441,10 +447,22 @@ List<Map<String, Object?>> _deriveMarks(
     if (iso == null || !seenDates.add(iso)) continue;
     final day = tryParseIsoDay(iso);
     if (day == null) continue;
-    replayed.add(DailyEntry(
-      date: day,
-      bleeding: tryParseBleeding(row['bleeding']) ?? Bleeding.none,
-    ));
+    // A MISSING key (JSON null) maps to "no bleeding recorded" itself, and
+    // the mapper above emits only accepted bleeding levels in this field.
+    // A null parse result therefore means outside input (e.g. a
+    // hand-edited document: junk token, bool, double) — surfaced as an
+    // explicit argument error naming the offending value instead of an
+    // opaque null-check crash.
+    final bleedingRaw = row['bleeding'];
+    final bleeding = tryParseBleeding(bleedingRaw);
+    if (bleeding == null) {
+      throw ArgumentError.value(
+        bleedingRaw,
+        'bleeding',
+        'not an accepted bleeding level (row date: $iso)',
+      );
+    }
+    replayed.add(DailyEntry(date: day, bleeding: bleeding));
   }
   replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
 

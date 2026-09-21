@@ -1,31 +1,49 @@
 // JSON export/import for the whole local database — PURE domain layer.
 //
-// Export document shape (schema version 5, profile-free):
+// Export document shape (schema version 6, profile-free):
 //
 //   {
-//     "schema_version": 5,
+//     "schema_version": 6,
 //     "exported_at": "<ISO 8601 UTC>",
 //     "entries":  [{"date": "2026-03-01", "bbt_c": 36.6,
-//                    "measured_at_minutes": 405, (nullable; minutes
-//                    since midnight, when the temperature was measured —
-//                    only ever set together with bbt_c; the import side
-//                    drops a stray time, never the row)
-//                    "bleeding": 3, (numeric level; see the version note
-//                    below) "temp_disturbances": 5, (raw disturbance mask
-//                    0..15, v5; the analysis exclusion is NOT entry raw
-//                    data — it rides as an ignoreTemperature mark row)
-//                    "mucus_sign": "s", "mucus_quality": "ew", (both
-//                    nullable; quality only ever together with S)
-//                    "pain_breast": false, "pain_mittelschmerz": false,
-//                    "cervix_position": "high",
-//                    "cervix_opening": "open",
-//                    "cervix_firmness": "hard",
-//                    "sex_timings": 2,
-//                    ..., "notes": null}, ...],
+//                    "measured_at_minutes": 405, ...
+//
+//                    SPARSE entry rows (v6): every entry key whose value
+//                    equals the field's NEUTRAL value is omitted — no
+//                    not-recorded/not-observed field is written at all:
+//                      - `date` always;
+//                      - `bbt_c` only when a temperature exists
+//                        (`measured_at_minutes` only when it also carries a
+//                        recorded time inside 0..1439 — minutes since
+//                        midnight, when the temperature was measured; a time
+//                        never rides without its temperature, and the import
+//                        side drops a stray time, never the row);
+//                      - `bleeding` only for the non-neutral levels 1..5
+//                        (a MISSING key — or an explicit JSON null — reads
+//                        as level 0 = "no bleeding recorded");
+//                      - `temp_disturbances`, `sex_timings` only when their
+//                        masks are non-zero (`temp_disturbances` carries the
+//                        raw disturbance mask 0..15; the analysis exclusion
+//                        is NOT entry raw data — it rides as an
+//                        ignoreTemperature mark row);
+//                      - `pain_breast`, `pain_mittelschmerz` only when true;
+//                      - `mucus_sign`, `mucus_quality`,
+//                        `cervix_position`, `cervix_opening`,
+//                        `cervix_firmness`, `notes` only when non-null
+//                    ...}, ...],
 //     "marks":    [{"entry_date": "2026-03-12",
 //                   "mark_type": "ignoreTemperature",
 //                   "author": "user"}, ...]
 //   }
+//
+// Marks rows are NOT sparse: all three keys are carried always.
+//
+// An EMPTY-STRING `notes` is non-null and thus KEPT — only null is omitted.
+// The reader accepts FULL maps just the same: extra keys and explicit
+// neutral values (a level-0 `bleeding`, false pain flags, null fields)
+// never error, so old full-key documents and hand-built maps stay valid
+// inputs. The bleeding key carries a NUMERIC level (0=none … 5); see the
+// version note below.
 //
 // The document root is exactly schema_version / exported_at / entries /
 // marks — there are NO profile keys anywhere (the Profiles table, the
@@ -40,11 +58,19 @@
 // added `measured_at_minutes` but still carried token bleeding; v3 carries
 // the numeric bleeding level (0=none … 4=heavy); v4 replaced the generic
 // `pain` flag with the letter-coded pain options `pain_breast` (B) and
-// `pain_mittelschmerz` (M). v5 (current) aligns the data entry with the
-// NER scheme: entries drop the exclude_* booleans and the mood/desire
+// `pain_mittelschmerz` (M). v5 aligns the data entry with the NER scheme:
+// entries drop the exclude_* booleans and the mood/desire
 // flags and gain `temp_disturbances` (the raw disturbance mask 0..15,
 // sp/a/alk/kr; see models.dart); the analysis exclusion rides as the
-// ignoreTemperature MARK row. The current export scale's numeric bleeding
+// ignoreTemperature MARK row. v6 (current) makes the ENTRY rows sparse —
+// every neutral-valued key is omitted, and a missing `bleeding` key means
+// "no bleeding recorded" on the reader side (see
+// tryParseBleeding in models.dart). The version bump is a LOUD gate for old
+// readers: a ≤v5 reader treats a missing bleeding key as row-INVALID and
+// would silently drop every bleeding-free day of a sparse document
+// (temperatures included), so old apps fail visibly with "unsupported
+// schema_version" instead of losing data invisibly. The current export
+// scale's numeric bleeding
 // field spans 0=none … 5=maximum — the level-5 member was added after v5
 // was pinned, without a schema_version bump (the version-agnostic field
 // parser accepts both older and extended v5 documents; see
@@ -118,7 +144,21 @@ import 'models.dart';
 /// accepted and ignored, their exclude_* keys translate into the mask bits
 /// plus derived ignoreTemperature marks (see the header comment and
 /// lib/db/export_adapter.dart).
-const int exportSchemaVersion = 5;
+///
+/// Version 6 makes the ENTRY rows SPARSE: the writer omits every key whose
+/// value equals that field's neutral value (see the header), including the
+/// `bleeding` key of level-0/none days — the reader treats a missing
+/// `bleeding` key (and an explicit JSON null) as "no bleeding recorded".
+/// The version gates OLD readers LOUDLY instead of silently: a ≤v5 reader
+/// treats a missing `bleeding` key as row-INVALID and would invisibly DROP
+/// every bleeding-free day of a sparse document — losing their real data
+/// (temperatures) without any error. The strict forward rejection
+/// ("unsupported schema_version") is the preferred document rule, so those
+/// readers fail visibly instead. v1–v5 documents stay importable
+/// unchanged: old writers always emitted the `bleeding` key, so their rows
+/// keep parsing exactly as before (a missing key would have meant
+/// none anyway).
+const int exportSchemaVersion = 6;
 
 /// Human-readable statement of the entry merge policy (shown by UI text and
 /// documented in CONTRIBUTING; importers MUST behave exactly like this).
@@ -126,7 +166,9 @@ const String exportMergePolicy = 'overwrite';
 
 /// Row maps of the two exported tables. Values are plain JSON-decodable
 /// scalars (String / num / bool / null / nested lists/maps). There is no
-/// profiles list: the v5 document is profile-free.
+/// profiles list: the document is profile-free.
+/// [entries] may be SPARSE (see the header): rows written by the current
+/// writer carry only their non-neutral keys; full maps stay valid.
 final class ExportBlob {
   const ExportBlob({
     required this.entries,
@@ -179,15 +221,17 @@ String buildExportJson(ExportBlob blob) {
 /// Throws a [FormatException] when the input is not JSON, not an object,
 /// carries an unsupported schema version, or has a broken exported_at /
 /// table list. The accepted schema-version set is exactly
-/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3, 4, 5}) — kept
+/// `{1 .. exportSchemaVersion}` (currently {1, 2, 3, 4, 5, 6}) — kept
 /// explicit, no forward negotiation: old exports exist as real files on
 /// user devices, so every shape ever published stays importable, while
 /// anything AFTER the current version is rejected strictly (no data may be
-/// silently mis-read). The `profiles` list is NOT required (v5 documents
-/// have none; old documents' lists are tolerated and ignored — unknown
+/// silently mis-read). The `profiles` list is NOT required (current
+/// documents have none; old documents' lists are tolerated and ignored —
+/// unknown
 /// keys never error). Field semantics are lenient within the accepted
 /// set: the per-field parsers are version-agnostic (numeric and legacy
-/// token bleeding both parse, via tryParseBleeding). Unknown/extra keys
+/// token bleeding both parse; a missing/null bleeding key parses as
+/// "no bleeding recorded", via tryParseBleeding). Unknown/extra keys
 /// are ignored (forward compatibility).
 ExportBlob parseExportJson(String raw) {
   final Object? decoded;

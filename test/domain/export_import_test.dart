@@ -128,8 +128,10 @@ void main() {
         entries: const <Map<String, Object?>>[
           // Unknown vocabulary — the db writer drops this row.
           {'date': '2026-03-01', 'bleeding': 'heavy'},
-          // Missing entirely — the writer cannot produce an enum either.
-          {'date': '2026-03-02'},
+          // Out-of-range level — the db writer drops this row. (A MISSING
+          // key no longer belongs here: the sparse contract parses it as
+          // bleeding-none, see the sparse-entry tests below.)
+          {'date': '2026-03-02', 'bleeding': 6},
           {'date': '2026-03-03', 'bleeding': 'none'},
         ],
         marks: const [],
@@ -244,14 +246,91 @@ void main() {
       expect(blobFor(5).exportedAt, DateTime.utc(2026, 9, 15, 12),
           reason: 'documents since the NER alignment (temp_disturbances, '
               'exclusion as a mark, no mood/desire/exclude_* keys)');
+      expect(blobFor(6).exportedAt, DateTime.utc(2026, 9, 15, 12),
+          reason: 'documents since the sparse entry shape (neutral keys '
+              'omitted; a missing bleeding key means none)');
+      // Beyond the current version stays rejected strictly.
       expect(
-          () => parseExportJson('{"schema_version": 6, "exported_at": '
-              '"2026-09-15T12:00:00Z"}'),
+          () => parseExportJson('{"schema_version": 99, "exported_at": '
+              '"2026-09-15T12:00:00Z", "entries": [], "marks": []}'),
           throwsA(isA<FormatException>()));
     });
   });
 
+  group('sparse entry rows (schema-v6 document shape)', () {
+    test('a row without the bleeding key plans and writes as a none day', () {
+      // Planner/writer parity under the sparse contract: a MISSING bleeding
+      // key (and an explicit JSON null) means "no bleeding recorded" — it
+      // can never invalidate a row. Old (≤v5) readers rejected these rows
+      // (and would have silently dropped every bleeding-free day of a v6
+      // document, temperatures included) — that is why the version moved.
+      final doc = ExportBlob(
+        entries: const <Map<String, Object?>>[
+          {'date': '2026-03-01'},
+          {'date': '2026-03-02', 'bleeding': null},
+        ],
+        marks: const [],
+        exportedAt: DateTime.utc(2026, 9, 15),
+      );
+
+      final summary =
+          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      expect(summary.entriesInvalid, 0,
+          reason: 'a missing/null bleeding key is the neutral value');
+      expect(summary.entriesNew, 2);
+      expect(summary.entriesWritten, 2);
+
+      final first = tryDailyEntryFromExport(doc.entries.first)!;
+      expect(first.bleeding, Bleeding.none);
+      expect(first, equals(DailyEntry(date: DateTime(2026, 3, 1))),
+          reason: 'a date-only row maps to the fully neutral domain day');
+      expect(
+          tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none);
+    });
+
+    test('a hand-written sparse v6 document parses, plans and maps neutral',
+        () {
+      // Raw JSON on purpose: pins the published sparse document shape —
+      // entry rows carry only their non-neutral keys.
+      const sparseJson = '{"schema_version": 6, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"entries": ['
+          '{"date": "2026-03-01", "bbt_c": 36.6, "measured_at_minutes": 420}, '
+          '{"date": "2026-03-02"}], '
+          '"marks": []}';
+
+      final doc = parseExportJson(sparseJson);
+      final summary =
+          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      expect(summary.entriesInvalid, 0);
+      expect(summary.entriesNew, 2);
+      expect(summary.entriesWritten, 2);
+
+      final tempDay = tryDailyEntryFromExport(doc.entries.first)!;
+      expect(tempDay.bbtC, 36.6);
+      expect(tempDay.measuredAtMinutes, 420);
+      expect(tempDay.bleeding, Bleeding.none,
+          reason: 'no bleeding key = no bleeding recorded');
+      expect(tempDay.tempDisturbances, 0);
+      expect(tempDay.mucusSign, isNull);
+      expect(tempDay.painBreast, isFalse);
+      expect(tempDay.sexTimings, 0);
+      expect(tempDay.notes, isNull);
+
+      final bareDay = tryDailyEntryFromExport(doc.entries.last)!;
+      expect(bareDay, equals(DailyEntry(date: DateTime(2026, 3, 2))),
+          reason: 'a date-only row is exactly the neutral domain day');
+    });
+  });
+
   group('tryParseBleeding: dual-format bleeding parser', () {
+    test('null — a missing export key — means no bleeding recorded', () {
+      // The sparse entry shape omits the bleeding key on bleeding-free
+      // days; an explicit JSON null reads the same. Everything else (bools,
+      // out-of-range ints, junk tokens, doubles) stays invalid.
+      expect(tryParseBleeding(null), Bleeding.none);
+    });
+
     test('int 0-5 map to the six levels by their stored level', () {
       // Mapped BY the numeric level, never by declaration index: the
       // name/number pairs below hold even if the enum is ever re-declared
@@ -266,7 +345,6 @@ void main() {
 
     test('values outside the accepted shapes are invalid', () {
       const invalid = <Object?>[
-        null, // missing field
         true, // bool sneaks through as int in JS-land, not here
         false,
         -1, // below the scale
@@ -622,24 +700,31 @@ void main() {
   });
 
   group('bleeding levels in the export version boundary', () {
-    test('the writer emits the schema version with the NER alignment', () {
-      expect(exportSchemaVersion, 5,
-          reason: 'v4 was the pain-options release; v5 aligns the data '
-              'entry with the NER scheme: the entry gains the '
-              '`temp_disturbances` raw mask, drops the exclude_* booleans '
-              'and the mood/desire flags, and the analysis exclusion rides '
-              'as the ignoreTemperature mark');
+    test('the writer emits the schema version of the sparse entry shape', () {
+      expect(exportSchemaVersion, 6,
+          reason: 'v5 was the NER-alignment release; v6 makes the entry '
+              'rows SPARSE: every neutral-valued key is omitted (including '
+              'the `bleeding` key of level-0/none days). The bump gates old '
+              'readers loudly instead of silently: a ≤v5 reader treats a '
+              'missing bleeding key as row-INVALID and would invisibly DROP '
+              'every bleeding-free day of a v6 document — losing their '
+              'temperatures without any error. The reject-first rule makes '
+              'them fail with "unsupported schema_version" instead');
     });
 
     test('documents with numeric bleeding build, parse and round-trip', () {
+      // The SPARSE writer never carries `"bleeding": 0` (pinned against the
+      // database in the db-layer test suite): the level-0 day's row omits
+      // the key entirely here.
       final json = buildExportJson(ExportBlob(
         entries: const <Map<String, Object?>>[
           {'date': '2026-03-01', 'bleeding': 4},
-          {'date': '2026-03-02', 'bleeding': 0},
+          {'date': '2026-03-02'},
         ],
         marks: const [],
         exportedAt: DateTime.utc(2026, 9, 15, 12),
       ));
+      expect(json, isNot(contains('"bleeding": 0')));
 
       final decoded = jsonDecode(json) as Map<String, Object?>;
       expect(decoded['schema_version'], exportSchemaVersion,
@@ -656,8 +741,25 @@ void main() {
       expect(summary.entriesWritten, 2);
       expect(
           tryDailyEntryFromExport(doc.entries.first)!.bleeding, Bleeding.heavy);
+      expect(tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none,
+          reason: 'the row without a bleeding key imports as none');
+    });
+
+    test('a hand-written FULL-map level-0 row stays a valid input', () {
+      // Sparse shape only on the WRITER side: hand-built/full-map documents
+      // (old writers always emitted every key) keep importing unchanged —
+      // an explicit `bleeding: 0` never errors and maps to none.
+      const fullMap = '{"schema_version": 6, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"entries": [{"date": "2026-03-02", "bleeding": 0}], '
+          '"marks": []}';
+      final doc = parseExportJson(fullMap);
+      final summary =
+          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      expect(summary.entriesInvalid, 0);
+      expect(summary.entriesWritten, 1);
       expect(
-          tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none);
+          tryDailyEntryFromExport(doc.entries.single)!.bleeding, Bleeding.none);
     });
 
     test('a hand-written v3 document parses with its numeric bleeding', () {

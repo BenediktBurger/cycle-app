@@ -257,6 +257,85 @@ void main() {
       );
     });
 
+    test(
+        'replay-mark derivation over row maps that OMIT the bleeding key '
+        'behaves like bleeding-none days', () {
+      // The sparse document shape omits neutral keys; the derived marks
+      // replay EXACTLY the row maps a document carries. Deriving over maps
+      // without the `bleeding` key must not crash and must produce the
+      // SAME marks as the same rows carrying the explicit neutral level 0.
+      List<Map<String, Object?>> paddedWithNone(
+              List<Map<String, Object?>> rows) =>
+          [
+            for (final row in rows)
+              {
+                ...row,
+                if (!row.containsKey('bleeding')) 'bleeding': 0,
+              },
+          ];
+
+      // A menstruation onset mid-set (none days before, heavy after — no
+      // bleeding continuity) must still suggest its cycleStart mark from
+      // sparse rows, and the excluded day keeps its ignoreTemperature.
+      final sparseRows = <Map<String, Object?>>[
+        {'date': '2026-06-01', 'bleeding': 4},
+        {'date': '2026-06-02'}, // excluded day (temperature excluded)
+        {'date': '2026-06-03', 'bbt_c': 36.5}, // no bleeding key at all
+        {'date': '2026-06-20'}, // neutral day, key omitted
+        {'date': '2026-06-21', 'notes': 'flagged'},
+        {'date': '2026-06-22', 'bleeding': 4},
+      ];
+
+      final sparseMarks = deriveDripMarks(sparseRows, {'2026-06-02'});
+      final explicitMarks =
+          deriveDripMarks(paddedWithNone(sparseRows), {'2026-06-02'});
+
+      expect(sparseMarks, explicitMarks,
+          reason: 'an omitted bleeding key replays exactly like level 0');
+      expect(
+          sparseMarks,
+          containsAll([
+            {
+              'entry_date': '2026-06-02',
+              'mark_type': 'ignoreTemperature',
+              'author': 'import',
+            },
+            {
+              'entry_date': '2026-06-01',
+              'mark_type': 'cycleStart',
+              'author': 'import',
+            },
+            {
+              'entry_date': '2026-06-22',
+              'mark_type': 'cycleStart',
+              'author': 'import',
+            },
+          ]),
+          reason: 'the none-day semantics hold through the sparse replay: '
+              'the excluded day derives its ignoreTemperature and '
+              'menstruation onsets still suggest cycleStart (with no '
+              'suppression where the preceding day is a sparse none day)');
+    });
+
+    test(
+        'deriveDripMarks turns an unparsable bleeding value into an '
+        'explicit ArgumentError', () {
+      // Only reachable from outside the mapper's contract (a hand-edited
+      // or corrupted document): junk tokens, bools and doubles parse to
+      // null in tryParseBleeding, while a missing key means "none" and
+      // legacy token strings map to members. The error must self-explain
+      // instead of dying on a bare null check.
+      final rows = [
+        {'date': '2026-06-01', 'bleeding': 'junk-token'},
+      ];
+      expect(
+        () => deriveDripMarks(rows, {}),
+        throwsA(isA<ArgumentError>()
+            .having((e) => e.toString(), 'toString', contains('junk-token'))),
+        reason: 'the error names the offending bleeding value',
+      );
+    });
+
     test('mucus: drip nfp number 0..4 decodes onto sign/quality tokens', () {
       // drip: 0=t, 1=Ø, 2=f, 3=S (bare), 4=S+ ≙ S with the sheet's best
       // quality ew. The underlying feeling/texture of a bare S is not

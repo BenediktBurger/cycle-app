@@ -39,14 +39,8 @@ the sections above track planned work, git history keeps the record (see
 
 #### Building the app
 
-- Building the actual app — release/packaging scope has been resolved into a
-  runbook: see [`docs/release.md`](release.md) and
-  [ADR-0009](adr/0009-release-pipeline-and-signing.md); the ready items are
-  below, the blocked ones are plain bullets.
-- [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
-- [ ] Adaptive launcher icon replacing the default template mipmaps
-  (release.md Phase B)
-- License choice for the app (release.md Gate G2) — the remaining blocker
+- create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
+- final License choice for the app (release.md Gate G2) — the remaining blocker
   for the F-Droid submission; sideload APKs are not blocked. The
   application identity is resolved (`io.github.benediktburger.cycleapp`,
   release.md Gate G1), so this is the last open gate before store
@@ -91,9 +85,9 @@ the sections above track planned work, git history keeps the record (see
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
 - add descriptions (texts TBD) and tooltips, welcome page, links, help, copyright...
 - export as password protected zip
-- improve json export (currently quite verbose), better Csv or similar for the days?
 - [ ] review test suite and clean it up
 - drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
+- add (optional) reminder (e.g. every year) to do a backup of your data
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
 - The cycle-summary table's "period start" row label still says period

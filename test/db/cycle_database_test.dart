@@ -5,6 +5,7 @@
 // sqlite3 additionally needs the system sqlite library — see the apt step in
 // .github/workflows/ci.yml; macOS ships it, Linux CI/dev hosts install it).
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -1370,13 +1371,15 @@ void main() {
         ));
 
         final json = await exportDatabaseToJson(db);
-        expect(json, contains('"schema_version": 5'),
-            reason: 'v5 is the NER-alignment release; documents always '
+        expect(json, contains('"schema_version": 6'),
+            reason: 'v6 is the sparse-entry release; documents always '
                 'stamp their writing shape');
         expect(json, contains('"bleeding": 4'),
             reason: 'heavy is exported as its numeric level');
-        expect(json, contains('"bleeding": 0'),
-            reason: 'none is exported as its numeric level');
+        expect(json, isNot(contains('"bleeding": 0')),
+            reason: 'the sparse shape omits the bleeding key of none days '
+                'entirely — the reader treats a missing key as no bleeding '
+                'recorded');
         expect(json, isNot(contains('"bleeding": "')),
             reason: 'documents no longer carry bleeding string tokens');
         // The v5 document carries no profile keys at all.
@@ -1439,6 +1442,91 @@ void main() {
               reason: '${levels[i].name} must survive the round trip exactly '
                   '(no degradation to medium)');
         }
+      });
+    });
+
+    group('sparse entry rows at the export document boundary', () {
+      test(
+          'the writer omits every neutral key and the round trip is '
+          'lossless (idempotence)', () async {
+        // A fully neutral day (level-0 bleeding, no temperature, no other
+        // observation) — the sparse document carries ONLY its date.
+        await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 4, 2)));
+        // A rich day with every observation at a non-neutral value.
+        await db.entriesDao.upsertDaily(DailyEntry(
+          date: DateTime(2026, 4, 3),
+          bbtC: 36.4,
+          measuredAtMinutes: 405,
+          bleeding: Bleeding.medium,
+          tempDisturbances: TempDisturbance.kr.bit,
+          mucusSign: MucusSign.s,
+          mucusQuality: MucusQuality.ew,
+          cervixPosition: CervixPosition.veryHigh,
+          cervixOpening: CervixOpening.open,
+          cervixFirmness: CervixFirmness.soft,
+          painBreast: true,
+          painMittelschmerz: true,
+          sexTimings: SexTiming.middle.bit,
+          notes: 'rich day',
+        ));
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, isNot(contains('"bleeding": 0')),
+            reason: 'the sparse shape never writes the neutral bleeding '
+                'level — a level-0 day leaves the key out entirely');
+        expect(json, isNot(contains(': null')),
+            reason: 'entry rows carry no null-valued keys in the sparse '
+                'shape');
+
+        final decoded = jsonDecode(json) as Map<String, Object?>;
+        final rows = [
+          for (final raw in decoded['entries'] as List)
+            Map<String, Object?>.from(raw as Map),
+        ];
+        final neutral = rows.singleWhere((r) => r['date'] == '2026-04-02');
+        expect(neutral.keys, {'date'},
+            reason: 'a fully neutral day exports only its date');
+        final rich = rows.singleWhere((r) => r['date'] == '2026-04-03');
+        expect(rich.keys, {
+          'date',
+          'bbt_c',
+          'measured_at_minutes',
+          'bleeding',
+          'temp_disturbances',
+          'mucus_sign',
+          'mucus_quality',
+          'cervix_position',
+          'cervix_opening',
+          'cervix_firmness',
+          'pain_breast',
+          'pain_mittelschmerz',
+          'sex_timings',
+          'notes',
+        });
+        expect(rich.values, everyElement(isNotNull));
+
+        // Master criterion: export → parse → import → exactly the same
+        // DailyEntry set; a re-export of the imported data stays sparse
+        // with the same underlying row maps.
+        final target = CycleDatabase(NativeDatabase.memory());
+        addTearDown(target.close);
+        final summary = await importJsonToDatabase(target, json);
+        expect(summary.entriesInvalid, 0);
+        expect(summary.entriesWritten, 2);
+        expect(await target.entriesDao.allEntries(),
+            unorderedEquals(await db.entriesDao.allEntries()),
+            reason: 'import stores exactly the source day set');
+
+        Map<String, Map<String, Object?>> byDay(
+                List<Map<String, Object?>> exported) =>
+            {
+              for (final row in exported) row['date']! as String: row,
+            };
+        final firstExport = await exportDatabaseToBlob(db);
+        final reExported = await exportDatabaseToBlob(target);
+        expect(byDay(reExported.entries), byDay(firstExport.entries),
+            reason: 'a previously sparse dataset re-exports sparse');
+        expect(reExported.marks, firstExport.marks);
       });
     });
 

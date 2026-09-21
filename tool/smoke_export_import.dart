@@ -123,15 +123,18 @@ Future<void> main() async {
 
   final json = await exportDatabaseToJson(source);
   check(json.contains('"schema_version": $exportSchemaVersion'),
-      'document carries schema version 5');
-  // The document shape carries bleeding as NUMERIC levels (Bleeding.level):
-  // heavy(4) and maximum(5) from the added days, none(0) from the neutral
-  // day.
-  check(
-      json.contains('"bleeding": 4') &&
-          json.contains('"bleeding": 5') &&
-          json.contains('"bleeding": 0'),
-      'export carries bleeding as numeric levels');
+      'document stamps its writing schema version');
+  // The document shape carries bleeding as NUMERIC levels (Bleeding.level)
+  // for every observed bleeding — heavy(4) and maximum(5) from the added
+  // days — and the SPARSE shape omits the neutral level entirely: the none
+  // day (2026-03-04) leaves the `bleeding` key out, so no `"bleeding": 0`
+  // and no null-valued entry key appears at all.
+  check(json.contains('"bleeding": 4') && json.contains('"bleeding": 5'),
+      'export carries the observed bleeding levels numerically');
+  check(!json.contains('"bleeding": 0'),
+      'the sparse shape omits the level-0 bleeding key');
+  check(!json.contains(': null'),
+      'entry rows carry no null-valued keys in the sparse shape');
   check(
       json.contains('"mucus_sign": "s"') &&
           json.contains('"mucus_quality": "mi"'),
