@@ -78,12 +78,12 @@ void main() {
     // No test value to set: the dispatcher defaults to light.
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
-    // Tap scoped to the navigation bar: all tabs stay mounted (IndexedStack),
-    // so the 'Settings' label also matches the offstage screen's AppBar —
-    // and in tree order that AppBar precedes the bar, so a bare .first tap
-    // would miss.
-    await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Settings')));
+    // Tap through the shared navigation finder (nav surface, both adaptive
+    // surfaces match — see finders.dart): all tabs stay mounted
+    // (IndexedStack), so the 'Settings' label also matches the offstage
+    // screen's AppBar — and in tree order that AppBar precedes the shell's
+    // navigation surface, so a bare .first tap would miss.
+    await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
 
     // All three options are offered (the language switcher also shows a

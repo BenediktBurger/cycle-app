@@ -917,9 +917,9 @@ void main() {
     final rect = tester.getRect(find.byType(LineChart));
     await tester.tapAt(Offset(rect.center.dx, rect.center.dy));
     await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsOneWidget,
-        reason: 'a tap on the single-day chart opens the day sheet');
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget,
+        reason: 'a tap on the single-day chart opens the day options panel');
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _alignmentDay(0),
         reason: 'the single recorded day owns the whole plot');
   });
@@ -1321,8 +1321,8 @@ void main() {
     await tester.tap(chartCell(1, 'disturbance'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget);
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _disturbanceDay(1),
         reason: 'the tapped disturbance cell owns day 1');
   });
@@ -2705,8 +2705,8 @@ void main() {
     await tester.tap(chartCell(1, 'note'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget);
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _noteDay(1), reason: 'the tapped note cell owns day 1');
   });
 
@@ -2857,8 +2857,8 @@ void main() {
       await tester.tap(chartCell(4, 'mucus'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, _rowsDay(4),
           reason: 'the moved top-block mucus cell keeps its tap behavior');
     });
@@ -3093,8 +3093,8 @@ void main() {
       await tester.tap(chartCell(3, 'bleeding'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, _rowsDay(3),
           reason: 'the tapped bleeding cell owns day 3');
     });
@@ -4382,9 +4382,9 @@ void main() {
       await tester.tapAt(Offset(tapScreenX, chartTop + 100));
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget,
+      expect(cycleDayPanel(), findsOneWidget,
           reason: 'a tap in the scrolled window still opens the day sheet');
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, DateTime.utc(2026, 2, 28),
           reason: 'the tapped chart column maps to day index 58');
     });
@@ -4411,8 +4411,8 @@ void main() {
           bodyPadding + railWidth + (tapContentX - maxOffset), chartTop + 100));
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, DateTime.utc(2026, 2, 28));
     });
   });

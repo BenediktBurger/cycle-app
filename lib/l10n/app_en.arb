@@ -319,6 +319,21 @@
   "settingsRangeLower": "Lower limit",
   "settingsRangeUpper": "Upper limit",
   "settingsTemperatureRangeDefaultHint": "Default: 36–38 °C.",
+  "settingsObservedCyclesOutsideApp": "Cycles observed outside this app",
+  "@settingsObservedCyclesOutsideApp": {
+    "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."
+  },
+  "settingsObservedCyclesOutsideAppHelper": "How many cycles you observed before using this app (e.g. on paper). The cycle numbers on the cycle page only start counting after this value.",
+  "settingsObservedCyclesOutsideAppError": "Please enter a whole number ≥ 0",
+  "cycleOrdinal": "Cycle {n}",
+  "@cycleOrdinal": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
+  },
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",
@@ -397,5 +412,9 @@
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
   "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
+  "cycleDayPanelClose": "Close day options",
+  "@cycleDayPanelClose": {
+    "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
+  },
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

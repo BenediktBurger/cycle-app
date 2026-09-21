@@ -25,6 +25,97 @@ import 'file_transfer.dart';
 /// Export file name used by the save/download path.
 const String exportFileName = 'cycle_app_export.json';
 
+/// The integer field of the "cycles observed outside this app" settings
+/// card: free-text entry validated per keystroke against "whole number
+/// >= 0" — a valid entry writes through to
+/// [observedCyclesOutsideAppProvider] immediately (the same write-through
+/// wiring the switcher cards use), an invalid one shows the keyed error
+/// line and leaves the stored value untouched.
+///
+/// Manual validation instead of a digits-only input formatter on purpose:
+/// the formatter would silently swallow characters while the visible
+/// rejection states the rule. The field is an UNCONTROLLED text field: the
+/// controller initializes once and is not re-synced from the provider on
+/// rebuilds (the cursor would jump; hydration lands before any screen is
+/// reachable behind the database gate, so there is nothing to re-sync
+/// mid-edit).
+final class _NonNegativeIntegerField extends StatefulWidget {
+  const _NonNegativeIntegerField({
+    required this.initialValue,
+    required this.labelText,
+    required this.onChanged,
+  });
+
+  final int initialValue;
+  final String labelText;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_NonNegativeIntegerField> createState() =>
+      _NonNegativeIntegerFieldState();
+}
+
+final class _NonNegativeIntegerFieldState
+    extends State<_NonNegativeIntegerField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.initialValue}');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String raw) {
+    final value = int.tryParse(raw.trim());
+    final valid = value != null && value >= 0;
+    setState(() {});
+    if (valid) widget.onChanged(value);
+  }
+
+  bool get _invalid {
+    final value = int.tryParse(_controller.text.trim());
+    return value == null || value < 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          key: const ValueKey('observedCyclesOutsideAppField'),
+          controller: _controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: widget.labelText,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: _onChanged,
+        ),
+        if (_invalid)
+          Text(
+            // The rejection line, visible for every invalid intermediate
+            // state (empty text included): the validation, not a formatter.
+            l10n.settingsObservedCyclesOutsideAppError,
+            key: const ValueKey('observedCyclesOutsideAppFieldError'),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Theme.of(context).colorScheme.error),
+          ),
+      ],
+    );
+  }
+}
+
 /// The selectable half-degree steps of the temperature-range pickers,
 /// across the allowed 34.0..42.0 °C window (the temperature chart's y
 /// bounds in °C). Built from integer half-steps (k / 2) so no float drift
@@ -235,6 +326,42 @@ class EinstellungenScreen extends ConsumerWidget {
                   // half of the old note that actually informs the user
                   // — the persistence sentence is gone everywhere else).
                   Text(l10n.settingsTemperatureRangeDefaultHint,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- cycles observed outside this app ------------------------
+          // The groundwork the cycle page's "Zyklus N" ordinals count up
+          // from: a user who tracked on paper (or in another tracker)
+          // before entering her data here sets the number of those
+          // foregoing cycles, and the cycle page's numbering — the chart's
+          // boundary labels and the evaluation table's column headers
+          // alike — starts after this count instead of at 1. Free-text
+          // integer entry with keystroke validation (>= 0), write-through
+          // like every card on this pane; the helper note explains what
+          // the number moves.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsObservedCyclesOutsideApp,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  _NonNegativeIntegerField(
+                    initialValue: ref.watch(observedCyclesOutsideAppProvider),
+                    // A distinct label: the card title right above carries
+                    // the full wording, the field names the count alone.
+                    labelText: l10n.settingsObservedCyclesOutsideAppCount,
+                    onChanged: (value) => ref
+                        .read(observedCyclesOutsideAppProvider.notifier)
+                        .state = value,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(l10n.settingsObservedCyclesOutsideAppHelper,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),

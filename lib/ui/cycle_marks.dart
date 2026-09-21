@@ -41,8 +41,8 @@
 //   continuation — the user re-marks the rise, R2). Candidates beyond
 //   their kind's four-cap STAY in the sequence (R4) and render as the
 //   ordinary circle/arrow mark, just without a number — the curve never
-//   paints candidate ordinals; the sheet's circle-numbering line is the
-//   only ordinal surface (circles-only, see cycle_mark_sheet.dart).
+//   paints candidate ordinals; the day panel's circle-numbering line is
+//   the only ordinal surface (circles-only, see cycle_mark_sheet.dart).
 //   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
 //   from the temperature chart's top border by a fixed °C drop and the
 //   arrow anchors just below that border — is an owner-eyeball placement,

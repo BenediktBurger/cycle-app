@@ -175,6 +175,7 @@ Widget _tableHarness({
   required List<CycleEvaluation> evaluations,
   Locale locale = const Locale('en'),
   double width = 800,
+  int observedCyclesOutsideApp = 0,
 }) =>
     MaterialApp(
       themeMode: ThemeMode.system,
@@ -188,7 +189,10 @@ Widget _tableHarness({
         body: Center(
           child: SizedBox(
             width: width,
-            child: CycleSummaryTable(evaluations: evaluations),
+            child: CycleSummaryTable(
+              evaluations: evaluations,
+              observedCyclesOutsideApp: observedCyclesOutsideApp,
+            ),
           ),
         ),
       ),
@@ -459,6 +463,43 @@ void main() {
                   find.textContaining('The automatic evaluation has stopped')),
           findsOneWidget,
           reason: 'the status shows the localized R2 stopped note');
+    });
+  });
+
+  group('outside-app cycle ordinals (the shared ordinal rule)', () {
+    testWidgets(
+        'the outside-app count shifts every mark-opened column header '
+        '(feedback linkage to the settings card)', (tester) async {
+      await tester.pumpWidget(_tableHarness(
+        evaluations: _evaluations(_twoCycleEntries, _ruleDMarks),
+        observedCyclesOutsideApp: 2,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cycle 3'), findsOneWidget,
+          reason: 'the first mark-opened cycle is numbered 2 prior + 1');
+      expect(find.text('Cycle 4'), findsOneWidget);
+      expect(find.text('Cycle 5'), findsOneWidget);
+      expect(find.text('Cycle 1'), findsNothing);
+      expect(find.text('Cycle 2'), findsNothing);
+    });
+
+    testWidgets(
+        'the leading pre-mark group carries no ordinal also after the '
+        'shift (same rule as the chart boundary labels)', (tester) async {
+      await tester.pumpWidget(_tableHarness(
+        evaluations: _evaluations(_leadingEntries, _leadingMarks),
+        observedCyclesOutsideApp: 1,
+      ));
+      await tester.pumpAndSettle();
+
+      // The leading group keeps its Tagebuch-style label; the three
+      // mark-opened groups are numbered 2, 3, 4.
+      expect(
+          find.textContaining('Before the first cycle start'), findsOneWidget);
+      expect(find.text('Cycle 2'), findsOneWidget);
+      expect(find.text('Cycle 3'), findsOneWidget);
+      expect(find.text('Cycle 4'), findsOneWidget);
     });
   });
 

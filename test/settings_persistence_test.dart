@@ -28,6 +28,78 @@ double? _pickerValue(WidgetTester tester, ValueKey<String> key) => tester
     .value;
 
 void main() {
+  group('observed cycles outside the app', () {
+    testWidgets(
+        'a persisted outside-app count hydrates into the settings '
+        'field on start', (WidgetTester tester) async {
+      useDeviceLocales(tester, const [Locale('de')]);
+
+      Future<void> seed(CycleDatabase db) =>
+          SettingsStore(db.settingsDao).persistObservedCyclesOutsideApp(5);
+
+      await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
+      expect(field, findsOneWidget,
+          reason: 'the outside-app cycles card renders an integer field');
+      final textField = tester.widget<TextField>(field);
+      expect(textField.controller!.text, '5',
+          reason: 'the stored count of 5 must appear in the field after the '
+              'database opens');
+    });
+
+    testWidgets(
+        'entering a count writes through as an integer row, an '
+        'invalid entry does not (validation 0 <= n)',
+        (WidgetTester tester) async {
+      useDeviceLocales(tester, const [Locale('de')]);
+
+      CycleDatabase? db;
+      await tester.pumpWidget(appScope(
+          locale: const Locale('de'), onCreated: (created) => db = created));
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
+      await tester.enterText(field, '3');
+      await tester.pumpAndSettle();
+
+      final store = SettingsStore(db!.settingsDao);
+      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
+          reason: 'a valid non-negative integer is written through to '
+              'app_settings as a JSON integer');
+
+      // Invalid input: negative and non-integer entries must not write, and
+      // the field surfaces the validation error.
+      await tester.enterText(field, '-2');
+      await tester.pumpAndSettle();
+      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
+          reason: 'a negative entry is rejected and never written');
+      expect(find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
+          findsOneWidget,
+          reason: 'the validation error is visible for the rejected entry');
+
+      await tester.enterText(field, '2.5');
+      await tester.pumpAndSettle();
+      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
+          reason: 'a non-integer entry is rejected and never written');
+
+      await tester.enterText(field, '9');
+      await tester.pumpAndSettle();
+      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 9,
+          reason: 'a corrected entry writes through again');
+      expect(find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
+          findsNothing,
+          reason: 'the error clears once the entry is valid again');
+    });
+  });
+
   group('hydration', () {
     testWidgets('persisted choices are restored into the UI on start',
         (WidgetTester tester) async {

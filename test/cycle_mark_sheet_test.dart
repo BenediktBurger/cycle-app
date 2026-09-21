@@ -1,11 +1,12 @@
-// Widget tests of the mark-entry bottom sheet on the cycle tab (Mode M,
-// ADR-0001): tapping a chart day opens a modal sheet with the "edit day"
-// action, the contextual set/remove actions for the mucus peak, the first
-// higher measurement, the SUZ start and the cycle start (the authoritative
-// cycle boundary — bleeding only suggests it), and the computed info lines
-// (derived artifacts such as the baseline value, the 1-6 low numbering, the
-// difference to the baseline for marked candidates and the
-// stopped-evaluation notice).
+// Widget tests of the day options panel on the cycle tab (Mode M, ADR-0001):
+// tapping a chart day shows a NON-MODAL panel below the chart with the
+// "edit day" action, the contextual set/remove actions for the mucus peak,
+// the first higher measurement, the SUZ start and the cycle start (the
+// authoritative cycle boundary — bleeding only suggests it), and the
+// computed info lines (derived artifacts such as the baseline value, the
+// 1-6 low numbering, the difference to the baseline for marked candidates
+// and the stopped-evaluation notice). Formerly a modal bottom sheet; the
+// fixture/scenarios and all write paths are unchanged by the conversion.
 //
 // Unlike the evaluation section of test/cycle_chart_test.dart (fixed
 // marks streams), these tests write through the REAL MarksDao against an
@@ -53,13 +54,12 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
   );
 }
 
-/// Brings a sheet row into view: the toggle rows live in a scrollable
-/// column, and the bottom rows (the SUZ variants) can sit below the
-/// modal sheet's visible area once the row list grows.
+/// Brings a panel row into view: the toggle rows live in the Zyklus
+/// screen's vertical list, and the bottom rows (the SUZ variants) can sit
+/// below the viewport fold once the day options carry all rows — scrolled
+/// into view the same way the modal sheet's rows used to be.
 Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(finder, 50,
-      scrollable: find.descendant(
-          of: find.byType(BottomSheet), matching: find.byType(Scrollable)));
+  await tester.scrollUntilVisible(finder, 50, scrollable: cycleListScroller());
   await tester.pumpAndSettle();
 }
 
@@ -72,8 +72,8 @@ void main() {
 
     await tapCycleDay(tester, 4); // 9/10, a numbered low (4)
 
-    expect(find.byType(BottomSheet), findsOneWidget,
-        reason: 'the day tap opens the modal sheet');
+    expect(cycleDayPanel(), findsOneWidget,
+        reason: 'the day tap shows the non-modal day options panel');
     expect(find.text('Edit day'), findsOneWidget,
         reason: 'the form jump stays reachable via "edit day"');
     expect(find.text('Set mucus peak'), findsOneWidget,
@@ -433,8 +433,8 @@ void main() {
   group('ignoreTemperature toggle (the temperature-ignore mark)', () {
     /// The y-position of a sheet row label (visual order probe).
     double rowYOf(WidgetTester tester, String label) => tester
-        .getTopLeft(find.descendant(
-            of: find.byType(BottomSheet), matching: find.text(label)))
+        .getTopLeft(
+            find.descendant(of: cycleDayPanel(), matching: find.text(label)))
         .dy;
 
     testWidgets(
@@ -640,7 +640,7 @@ void main() {
       // entry stays in the diary) — no FilterChips anywhere in the sheet.
       expect(
           find.descendant(
-              of: find.byType(BottomSheet), matching: find.byType(FilterChip)),
+              of: cycleDayPanel(), matching: find.byType(FilterChip)),
           findsNothing);
     });
 
@@ -809,8 +809,7 @@ void main() {
               'sheet');
       expect(
           find.descendant(
-              of: find.byType(BottomSheet),
-              matching: find.textContaining('6:30')),
+              of: cycleDayPanel(), matching: find.textContaining('6:30')),
           findsOneWidget,
           reason: 'the time itself is locale-formatted into the sheet line '
               '(the chart\'s time cell may spell the same text, so the '
@@ -883,8 +882,8 @@ void main() {
       expect(await storedMarkTypes(db, scenarioDay(13)),
           contains('firstHigherMeasurement'),
           reason: 'Keep keeps the just-placed mark');
-      expect(find.byType(BottomSheet), findsOneWidget,
-          reason: 'the sheet stays open across the warning');
+      expect(cycleDayPanel(), findsOneWidget,
+          reason: 'the panel stays open across the warning');
       expect(find.text('Remove first higher measurement'), findsOneWidget,
           reason: 'the toggle flipped by the kept mark');
     });

@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/finders.dart';
 import 'support/fixtures.dart';
 import 'support/viewport.dart';
 
@@ -85,8 +86,7 @@ Widget settingsHarness() => ProviderScope(
 Future<void> pumpAndOpenDripDialogInShell(WidgetTester tester) async {
   await tester.pumpWidget(appScope(locale: const Locale('de')));
   await tester.pumpAndSettle();
-  await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('Einstellungen')));
+  await tester.tap(navLabel('Einstellungen'));
   await tester.pumpAndSettle();
 
   // Scroll the lazy settings list until the drip card is built; the finders

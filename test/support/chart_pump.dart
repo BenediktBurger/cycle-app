@@ -38,6 +38,8 @@ const chartSeedColor = Color(0xFF6750A4);
 ///    re-creates on theme changes like in the real app;
 ///  - [temperatureRange] pins the settings temperature range (the display
 ///    range / y-bounds tests); default null keeps the provider default.
+///  - [observedCyclesOutsideApp] pins the prior-cycles count setting (the
+///    cycle-page ordinal numbering tests); default 0 keeps the default.
 Widget chartHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
@@ -49,6 +51,7 @@ Widget chartHarness({
   bool scopeInsideMaterialApp = false,
   DateTime? selectedDate,
   TemperatureRange? temperatureRange,
+  int observedCyclesOutsideApp = 0,
 }) {
   final overrides = [
     dailyEntriesProvider
@@ -58,6 +61,9 @@ Widget chartHarness({
         .overrideWith((ref) => selectedDate ?? entries.first.date),
     if (temperatureRange != null)
       temperatureRangeProvider.overrideWith((ref) => temperatureRange),
+    if (observedCyclesOutsideApp != 0)
+      observedCyclesOutsideAppProvider
+          .overrideWith((ref) => observedCyclesOutsideApp),
   ];
   final screen = withScaffold
       ? const Scaffold(body: ZyklusScreen())

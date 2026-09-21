@@ -11,18 +11,30 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../l10n/app_localizations.dart';
 
 final class CycleSummaryTable extends StatelessWidget {
-  const CycleSummaryTable({super.key, required this.evaluations});
+  const CycleSummaryTable({
+    super.key,
+    required this.evaluations,
+    this.observedCyclesOutsideApp = 0,
+  });
 
   /// The per-cycle evaluations in cycle-group order, as [evaluateCycles]
   /// returns them. Each carries its cycle group (days, onset flag), so the
   /// bleeding attributes and the cycle-length arithmetic need no separate
   /// entries parameter.
   final List<CycleEvaluation> evaluations;
+
+  /// The count of cycles the user observed outside this app (the persisted
+  /// settings value, watched by the screen): it shifts every column header's
+  /// ordinal through the shared [cycleOrdinalNumber] rule. The 0 default is
+  /// the setting's default — direct constructions (widget tests) without
+  /// the setting behave exactly as before.
+  final int observedCyclesOutsideApp;
 
   /// The attribute-label column's width.
   static const double _labelWidth = 120;
@@ -134,10 +146,10 @@ final class CycleSummaryTable extends StatelessWidget {
   /// One column's derived values. The bleeding attributes follow the
   /// grouping (lib/domain/cycle_grouping.dart): the leading group (it
   /// predates the first cycleStart mark, `startsAtMenstruation == false`)
-  /// shows the dash for period start, period end and cycle length —
-  /// consistent with the cycle-counting TODO(user-review) on the chart's
-  /// day header. The evaluation attributes (peak, SUZ, status) come from
-  /// the CycleEvaluation of the group.
+  /// shows the dash for period start, period end and cycle length — it is
+  /// not a mark-opened cycle, so it carries no number on the chart's
+  /// boundary labels either. The evaluation attributes (peak, SUZ, status)
+  /// come from the CycleEvaluation of the group.
   _CycleColumn _columnFor(
     List<CycleEvaluation> evaluations,
     int index,
@@ -181,9 +193,15 @@ final class CycleSummaryTable extends StatelessWidget {
 
     return _CycleColumn(
       header: isOnsetGroup
-          ? // TODO(user-review): the "Zyklus n" label is a first draft — the
-          // experts may want a different caption (or numbering direction).
-          l10n.cycleSummaryColumn(_onsetNumber(evaluations, index))
+          ? // Current behavior: the header numbers the mark-opened cycles in
+          // observation order, shifted by the "cycles observed outside this
+          // app" setting through the shared ordinal rule
+          // (cycleOrdinalNumber) — the exact same number the chart draws at
+          // the group's boundary day. The caption WORDING ("Zyklus N" vs a
+          // different caption) stays an owner-review question, but the
+          // numbering itself is settled.
+          l10n.cycleSummaryColumn(
+              _onsetNumber(evaluations, index, observedCyclesOutsideApp))
           // The leading group predates the first cycleStart mark: it is
           // not a numbered cycle, so it keeps the Tagebuch's leading-group
           // label with its (knowable) end day.
@@ -205,14 +223,21 @@ final class CycleSummaryTable extends StatelessWidget {
     );
   }
 
-  /// The 1-based number of the onset group at [index], counting the onset
-  /// groups only (the leading group carries no cycle number).
-  int _onsetNumber(List<CycleEvaluation> evaluations, int index) {
-    var number = 0;
+  /// The shared display ordinal ("Zyklus N") of the onset group at
+  /// [index]: count the mark-opened groups up to [index] (the leading
+  /// pre-mark group is not one) and map through the shared
+  /// [cycleOrdinalNumber] rule with the outside-app count — the same
+  /// value the chart's boundary label shows for the same cycle.
+  int _onsetNumber(
+    List<CycleEvaluation> evaluations,
+    int index,
+    int observedCyclesOutsideApp,
+  ) {
+    var markOpenedIndex = -1;
     for (var i = 0; i <= index; i++) {
-      if (evaluations[i].cycle.startsAtMenstruation) number++;
+      if (evaluations[i].cycle.startsAtMenstruation) markOpenedIndex++;
     }
-    return number;
+    return cycleOrdinalNumber(markOpenedIndex, observedCyclesOutsideApp);
   }
 
   /// The localized rule-to-time phrasing of the SUZ cells: rule D begins

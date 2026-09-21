@@ -215,6 +215,21 @@
   "settingsRangeLower": "Untergrenze",
   "settingsRangeUpper": "Obergrenze",
   "settingsTemperatureRangeDefaultHint": "Standard: 36–38 °C.",
+  "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
+  "@settingsObservedCyclesOutsideApp": {
+    "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."
+  },
+  "settingsObservedCyclesOutsideAppHelper": "Wie viele Zyklen du vor dieser App beobachtet hast (z. B. auf Papier). Die Zyklus-Nummern auf der Zyklusseite fangen erst nach dieser Zahl an zu zählen.",
+  "settingsObservedCyclesOutsideAppError": "Bitte eine ganze Zahl ≥ 0 eingeben",
+  "cycleOrdinal": "Zyklus {n}",
+  "@cycleOrdinal": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
+  },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
@@ -271,5 +286,9 @@
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
   "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
+  "cycleDayPanelClose": "Tag-Optionen schließen",
+  "@cycleDayPanelClose": {
+    "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
+  },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

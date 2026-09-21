@@ -191,6 +191,44 @@ void main() {
     });
   });
 
+  group('observed cycles outside the app (int >= 0)', () {
+    test('an empty table loads to 0', () async {
+      final snapshot = await store.load();
+      expect(snapshot.observedCyclesOutsideApp, 0);
+    });
+
+    test('non-negative integers round-trip; an explicit 0 row is fine',
+        () async {
+      await store.persistObservedCyclesOutsideApp(7);
+      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 7,
+          reason: 'the value column stores the plain JSON integer');
+      expect((await store.load()).observedCyclesOutsideApp, 7);
+
+      await store.persistObservedCyclesOutsideApp(0);
+      expect((await store.load()).observedCyclesOutsideApp, 0,
+          reason: 'an explicit default row is fine — it reads back as the '
+              'default (same stance as the system theme row)');
+    });
+
+    test('non-integer, negative and corrupt rows fall back to 0', () async {
+      for (final raw in [
+        '"3"', // JSON string, not an integer
+        '2.5', // JSON double
+        '-1', // outside the allowed range (int >= 0)
+        'true', // JSON bool
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.observedCyclesOutsideApp, raw);
+        expect(
+          (await store.load()).observedCyclesOutsideApp,
+          0,
+          reason: 'corrupt/negative stored value "$raw" must not surface an '
+              'error and must not poison the count',
+        );
+      }
+    });
+  });
+
   group('generic JSON path (future settings without any code change)', () {
     test('a bool setting round-trips with no typed helper and no schema edit',
         () async {

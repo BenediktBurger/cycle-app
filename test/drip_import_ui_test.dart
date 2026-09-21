@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/finders.dart';
 
 ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
 
@@ -37,8 +38,7 @@ void main() {
     // so the 'Einstellungen' label also matches the offstage screen's AppBar
     // — and in tree order that AppBar precedes the bar, so a bare .first tap
     // would miss.
-    await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Einstellungen')));
+    await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
     // The settings list is a lazy ListView; scroll down until the drip card

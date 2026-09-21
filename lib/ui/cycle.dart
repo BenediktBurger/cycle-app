@@ -29,11 +29,12 @@
 // persisted; the SUZ arithmetic stays domain-only and a manual SUZ mark
 // never alters it (see lib/domain/evaluation.dart).
 //
-// Tapping a chart day or a signal-row cell opens the day's mark-entry
-// bottom sheet (lib/ui/cycle_mark_sheet.dart): edit day (jumps to the
-// Tagebuch form with that date pre-selected, via selectedDateProvider +
-// tabIndexProvider), the contextual mark toggles and the computed info
-// line.
+// Tapping a chart day or a signal-row cell shows the day-mark options in
+// the NON-MODAL panel the screen owns (lib/ui/cycle_mark_sheet.dart,
+// cycle_day_panel_provider): edit day (jumps to the Tagebuch form with
+// that date pre-selected, via selectedDateProvider + tabIndexProvider),
+// the contextual mark toggles and the computed info line. Tapping another
+// day retargets the panel in place; the close button clears it.
 //
 // The chart block renders a VIEWPORT-LIMITED WINDOW of days: day columns
 // keep at least a minimum usable width (see _CycleChartState's
@@ -133,6 +134,15 @@ class ZyklusScreen extends ConsumerWidget {
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
           final evaluations = evaluateCycles(entries, marks);
+          // The "cycles observed outside this app" setting: watched here so
+          // a settings change renumbers the chart's boundary ordinals and
+          // the table's column headers in the same rebuild — exactly why
+          // both surfaces take the value as constructor data.
+          final observedCyclesOutsideApp =
+              ref.watch(observedCyclesOutsideAppProvider);
+          // The tapped day whose options the screen hosts below the chart
+          // (null provider value = no panel).
+          final panelDay = ref.watch(cycleDayPanelProvider);
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
@@ -141,11 +151,27 @@ class ZyklusScreen extends ConsumerWidget {
                 marks: marks,
                 evaluations: evaluations,
                 range: temperatureRange,
+                observedCyclesOutsideApp: observedCyclesOutsideApp,
               ),
               const SizedBox(height: 12),
+              // The tapped day's options as a NON-MODAL panel in a fixed
+              // slot below the chart (never a route): a chart tap retargets
+              // it in place, the close button clears it — see
+              // cycleDayPanelProvider (null = no panel).
+              if (panelDay != null)
+                CycleDayPanel(
+                  key: const ValueKey('cycleDayPanel'),
+                  day: panelDay,
+                  onClose: () =>
+                      ref.read(cycleDayPanelProvider.notifier).state = null,
+                ),
+              if (panelDay != null) const SizedBox(height: 12),
               // The paper's bottom summary: the evaluation table, one row
               // per attribute, one column per cycle group.
-              CycleSummaryTable(evaluations: evaluations),
+              CycleSummaryTable(
+                evaluations: evaluations,
+                observedCyclesOutsideApp: observedCyclesOutsideApp,
+              ),
               const SizedBox(height: 12),
               Text(
                 l10n.cycleArithmeticNote,
@@ -161,7 +187,11 @@ class ZyklusScreen extends ConsumerWidget {
 
 /// The chart data view model for one recorded range: day index -> signal.
 final class _ChartDays {
-  _ChartDays(List<DailyEntry> entries, List<CycleMark> marks) {
+  _ChartDays(
+    List<DailyEntry> entries,
+    List<CycleMark> marks,
+    this.observedCyclesOutsideApp,
+  ) {
     final sorted = [...entries]
       ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
     firstDay = DateOnly.normalize(sorted.first.date);
@@ -193,6 +223,18 @@ final class _ChartDays {
       // (predating the first cycleStart mark) is not.
       for (final g in groups)
         if (g.startsAtMenstruation) DateOnly.normalize(g.startDate),
+    };
+    // The ordinals at the boundaries: each mark-opened group carries its
+    // number from the shared ordinal rule (cycleOrdinalNumber) — observing
+    // cycles outside this app shifts every boundary label, and the leading
+    // pre-mark group is skipped (it is not mark-opened, same rule the
+    // evaluation table's column headers follow).
+    var markOpenedIndex = 0;
+    cycleOrdinalByStart = {
+      for (final g in groups)
+        if (g.startsAtMenstruation)
+          DateOnly.normalize(g.startDate):
+              cycleOrdinalNumber(markOpenedIndex++, observedCyclesOutsideApp),
     };
     var group = 0;
     for (var i = 0; i < dayCount; i++) {
@@ -230,6 +272,14 @@ final class _ChartDays {
   /// first mark).
   late final Set<DateTime> cycleStartDates;
 
+  /// The observed-cycles count the ordinals shift by (the settings value
+  /// the screen watches; see [cycleOrdinalNumber]).
+  final int observedCyclesOutsideApp;
+
+  /// The "Zyklus N" ordinal for every mark-opened cycle start (the same
+  /// dates as [cycleStartDates], keyed by their UTC-midnight date).
+  late final Map<DateTime, int> cycleOrdinalByStart;
+
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 
   /// Whether day [index] opens a new cycle (a user-placed cycleStart mark
@@ -262,6 +312,7 @@ final class _CycleChart extends StatefulWidget {
     required this.marks,
     required this.evaluations,
     required this.range,
+    required this.observedCyclesOutsideApp,
   });
 
   final List<DailyEntry> entries;
@@ -278,6 +329,10 @@ final class _CycleChart extends StatefulWidget {
   /// y bounds (and, via the shared scale, the rail's labels); out-of-range
   /// curve values clip at the data layer into it.
   final TemperatureRange range;
+
+  /// The outside-app observed-cycles setting (watched by the screen): the
+  /// shift the boundary ordinals render with (see [cycleOrdinalNumber]).
+  final int observedCyclesOutsideApp;
 
   @override
   State<_CycleChart> createState() => _CycleChartState();
@@ -303,8 +358,15 @@ final class _CycleChartState extends State<_CycleChart> {
   /// The fixed height of the day/cycle header segment: shared between the
   /// scrolling header row's cells and the rail's prototype slot so both
   /// sides stay vertically in step (the rail's scale segment must start
-  /// exactly where the plot starts).
-  static const double dayHeaderRowHeight = 28;
+  /// exactly where the plot starts). Taller than the old two-line header:
+  /// a cycle boundary also renders its "Zyklus N" ordinal line here (both
+  /// sides share the constant, so the alignment holds).
+  static const double dayHeaderRowHeight = 40;
+
+  /// The fixed height of an ordinal line inside the header (reserved in
+  /// every cell, filled only at boundaries — the same slot rhythm the
+  /// mucus row reserves for the peak dot).
+  static const double dayHeaderOrdinalLineHeight = 12;
 
   static const Duration _scrollDuration = Duration(milliseconds: 300);
 
@@ -408,7 +470,8 @@ final class _CycleChartState extends State<_CycleChart> {
   @override
   void initState() {
     super.initState();
-    _days = _ChartDays(widget.entries, widget.marks);
+    _days = _ChartDays(
+        widget.entries, widget.marks, widget.observedCyclesOutsideApp);
     _scrollController.addListener(_onScrolled);
     // Register the AppBar's jump affordance (see [_jumpRegistration]).
     _registerJumpAffordance();
@@ -424,8 +487,10 @@ final class _CycleChartState extends State<_CycleChart> {
     // state is alive: recompute the day mapping so a changed range (or a
     // changed boundary mark) re-windows instead of rendering stale data.
     if (!identical(oldWidget.entries, widget.entries) ||
-        !identical(oldWidget.marks, widget.marks)) {
-      _days = _ChartDays(widget.entries, widget.marks);
+        !identical(oldWidget.marks, widget.marks) ||
+        oldWidget.observedCyclesOutsideApp != widget.observedCyclesOutsideApp) {
+      _days = _ChartDays(
+          widget.entries, widget.marks, widget.observedCyclesOutsideApp);
       // Only the FIRST data frame (an initial auto-scroll still pending)
       // may trigger the jump here; once it ran, a later re-emit never
       // re-jumps and the user's position survives.
@@ -444,10 +509,13 @@ final class _CycleChartState extends State<_CycleChart> {
   }
 
   void _openDaySheet(int index) {
-    // Tapping the curve, the marks row or a signal-row cell opens the
-    // day's mark-entry sheet; the form jump ("edit day") lives inside the
-    // sheet.
-    showCycleDaySheet(context, day: _days.dayAt(index));
+    // Tapping the curve, the marks row or a signal-row cell shows the
+    // day's options in the NON-MODAL panel the screen owns
+    // (cycleDayPanelProvider): retargeting on every tap, no route pushed.
+    // The form jump ("edit day") lives inside the panel.
+    ProviderScope.containerOf(context, listen: false)
+        .read(cycleDayPanelProvider.notifier)
+        .state = _days.dayAt(index);
   }
 
   /// The leftmost day with any pixel on screen (no margin): day cell i
@@ -1808,9 +1876,13 @@ String _shortMonthLabel(DateTime date, String locale) =>
     DateFormat('d', locale).dateSymbols.SHORTMONTHS[date.month - 1];
 
 /// The day/cycle header line ABOVE the chart (the paper's header row):
-/// every day column shows its day of month ("14.") on top and its day of
+/// every day column shows its day of month ("14.") on top, its day of
 /// cycle (1, 2, 3 …, counted from the cycle start in _ChartDays)
-/// underneath. On the FIRST day of a calendar month the day-of-month label
+/// underneath, and — reserved in EVERY cell so the rhythm holds — at
+/// cycle boundary days (the shared [isCycleBoundary] predicate that draws
+/// the thick separator line) the cycle's ordinal line ("Zyklus N",
+/// lib/domain/cycle_grouping.dart's shared rule with the outside-app
+/// setting). On the FIRST day of a calendar month the day-of-month label
 /// is REPLACED by the localized short month form (de "Jan." / en "Jan") —
 /// the month home the otherwise bare day numbers need. The rule is
 /// CALENDAR-based, not cycle-based: a cycle start mid-month keeps its
@@ -1841,6 +1913,7 @@ final class _DayHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toString();
+    final l10n = AppLocalizations.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1879,12 +1952,38 @@ final class _DayHeaderRow extends StatelessWidget {
                       style: const TextStyle(fontSize: 10),
                     ),
                   ),
+                  // The cycle ordinal line: empty in every non-boundary
+                  // cell, the "Zyklus N" label at the boundary the cycle
+                  // opens on (the ordinal is keyed for the widget tests).
+                  // FittedBox scales it into narrow columns like the
+                  // day-of-month label; at the minimum column width the
+                  // evaluation table's column headers carry the same
+                  // number instead.
+                  SizedBox(
+                    height: _CycleChartState.dayHeaderOrdinalLineHeight,
+                    child: Center(
+                      child: days.isCycleBoundary(i)
+                          ? FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                l10n.cycleOrdinal(
+                                    days.cycleOrdinalByStart[days.dayAt(i)]!),
+                                key: ValueKey('cycleOrdinal-$i'),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
                   // Day of cycle: subtler than the 1–6 numbering (that one
                   // is an evaluation artifact in the primary color). Long
                   // mark-driven cycles — e.g. during pregnancy, when no
-                  // cycle start is marked — produce three-digit day-of-cycle
-                  // numbers; FittedBox scales them down to fit the narrow
-                  // column, like the day-of-month label above.
+                  // cycle start is marked — produce three-digit
+                  // day-of-cycle numbers; FittedBox scales them down to fit
+                  // the narrow column, like the day-of-month label above.
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
