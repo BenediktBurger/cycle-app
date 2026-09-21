@@ -368,6 +368,20 @@ class EinstellungenScreen extends ConsumerWidget {
     );
   }
 
+  /// Closes the import dialog after a successful import — only while it is
+  /// STILL the route on top. A scrim dismissal (or the cancel button) can
+  /// close the route while the import future is still running; `mounted`
+  /// alone cannot guard the follow-up pop (the dialog's elements stay
+  /// connected until the route is finalized, so the context's ancestor walk
+  /// reaches the root navigator) and the pop would then fire on whatever
+  /// route is now on top — the home — collapsing the whole route stack.
+  void _popImportDialogWhileCurrent(BuildContext dialogContext) {
+    final route = ModalRoute.of(dialogContext);
+    if (route != null && route.isCurrent) {
+      Navigator.of(dialogContext).pop();
+    }
+  }
+
   Future<void> _applyImport(
     BuildContext dialogContext,
     BuildContext screenContext,
@@ -379,7 +393,7 @@ class EinstellungenScreen extends ConsumerWidget {
       final db = await ref.read(databaseProvider.future);
       final summary = await importJsonToDatabase(db, raw);
       if (!dialogContext.mounted) return;
-      Navigator.of(dialogContext).pop();
+      _popImportDialogWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;
       ScaffoldMessenger.of(screenContext).showSnackBar(
         SnackBar(
@@ -455,7 +469,7 @@ class EinstellungenScreen extends ConsumerWidget {
       final db = await ref.read(databaseProvider.future);
       final summary = await importJsonToDatabase(db, parsed.json);
       if (!dialogContext.mounted) return;
-      Navigator.of(dialogContext).pop();
+      _popImportDialogWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;
       ScaffoldMessenger.of(screenContext).showSnackBar(
         SnackBar(
