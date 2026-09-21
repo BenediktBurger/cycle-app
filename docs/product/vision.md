@@ -46,8 +46,9 @@ override) **and A** (automatic) are explicitly deferred.
 
 - **Local-first**: all data stays on the device — no cloud, no analytics, no
   network permissions (req. 7).
-- **Security/privacy**: password/biometric lock; on native SQLCipher-encrypted
-  storage later, PIN lock only on web (req. 6, ADR-005).
+- **Security/privacy**: password/biometric lock; native storage is already
+  always-on encrypted (SQLite3MultipleCiphers, ADR-005); PIN lock only on
+  web (req. 6).
 - **Licensing & size**: open source, eventually GPL-3-compatible (license TBD
   meanwhile), app size well below 50 MB (req. 8).
 

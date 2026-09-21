@@ -221,11 +221,13 @@ Android toolchain is green (§3 above, "Android toolchain") — the web build
 remains the primary correctness gate until then.
 
 **Linux note (database tests):** the drift tests under `test/db/` open the
-real SQLite engine through `sqlite3`'s dart:ffi bindings on the host.
-Debian/Ubuntu need the dev library once (`sudo apt-get install
-libsqlite3-dev`); CI installs it in the workflow. macOS and Windows SDK
-test runs bundle/resolve it themselves. Two host-VM smoke scripts execute
-core assertions without the test runner (useful when hunting failures):
+real SQLite engine on the host. The `hooks: user_defines: sqlite3:
+source: sqlite3mc` block in `pubspec.yaml` supplies that engine: the
+sqlite3 build hook fetches a prebuilt SQLite3MultipleCiphers library, so
+no `libsqlite3-dev` install is needed — the system SQLite (which has no
+cipher support) is not used for these runs. Two host-VM smoke scripts
+execute core assertions without the test runner (useful when hunting
+failures):
 
 ```sh
 ~/flutter/bin/dart run tool/db_smoke.dart            # schema/DAO/domain

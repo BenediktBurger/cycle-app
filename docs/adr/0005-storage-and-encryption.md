@@ -54,3 +54,50 @@ plumbing uninitialized outside our control and is out of scope).
 - Migration to SQLCipher later must include a data-remigration/story from
   unencrypted → encrypted DB (handled in the later milestone that introduces
   it, not swept under the rug).
+
+## Amendment 2026-09-21: SQLite3MultipleCiphers instead of SQLCipher, always-on
+
+**Status: Accepted (amends the encryption decision above; storage choice
+unchanged).** The original text above is kept for the record; where it
+conflicts with this amendment, the amendment governs.
+
+Since this ADR was written, the `sqlite3` package (3.x) gained build hooks:
+a pubspec-level user-define supplies **SQLite3MultipleCiphers** as the
+SQLite library drift's `NativeDatabase` uses — no `sqlcipher_flutter_libs`
+and no separate native plugin (the drift ≥ 2.32 pattern, documented at
+[drift → platforms → encryption](https://drift.simonbinder.eu/platforms/encryption/)).
+SQLCipher is no longer supported with a straightforward setup in that
+toolchain.
+
+Decision change:
+
+- **Native (Android/iOS): at-rest encryption is always-on.** There is no
+  settings toggle and no opt-out. `lib/db/database_opener.dart` applies the
+  key via `PRAGMA key` in the native database's `setup`, before drift
+  issues any statement, and asserts the cipher build's presence in debug
+  runs (`PRAGMA cipher`).
+- **Key: a random 32-byte value** (hex-encoded) stored in the platform's
+  protected store via `flutter_secure_storage` (Android Keystore-backed
+  storage / iOS Keychain) — see `lib/db/db_key.dart`. There is **no user
+  passphrase**. Key-store failures are fatal at open time (the app must
+  never fall back to an unencrypted database silently).
+- **No migration shipped.** The feature landed pre-release, so there are
+  no published devices to migrate: dev devices simply get a one-time
+  app-data wipe (the old plaintext file is discarded, not re-keyed).
+  From the first published release on, any change to the encryption setup
+  needs a real migration story, like every other schema-adjacent change
+  (see the WIP exception in the consequences above).
+- **Web: unchanged — still unencrypted**, the documented limitation above.
+  The hook user-define only affects the ffi/dart side, not the vendored
+  wasm assets.
+- **Residual risk (accepted):** the key is device-bound. A platform-level
+  restore that carries the database file to a new device without the
+  platform key makes that file permanently unreadable; losing or wiping
+  the key store while the file survives has the same effect. The mitigation
+  is the existing user-level **JSON export** (Settings), which remains the
+  backup path for such cases.
+- **Not yet verified:** the encryption feature has never run on a physical
+  Android/iOS device (no device was available when it was implemented).
+  On-device verification is pending: the key flow through the real
+  `flutter_secure_storage` (Android Keystore / iOS Keychain behavior) is
+  exercised only by host-side integration tests so far.

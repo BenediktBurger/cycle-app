@@ -218,7 +218,7 @@
   "settingsRangeUpper": "Obergrenze",
   "settingsTemperatureRangeNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt. Standard: 36–38 °C.",
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
-  "settingsPinLockNote": "Noch nicht umgesetzt: Verschlüsselung/Sperre ist in ADR-0005 geplant (native später mit SQLCipher, Web über PIN).",
+  "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument.",
   "settingsImport": "JSON-Import",

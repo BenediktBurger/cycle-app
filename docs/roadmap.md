@@ -80,7 +80,6 @@ the sections above track planned work, git history keeps the record (see
   yields one length spanning the whole pregnancy. Needs discussion how to
   treat such spans (cap, exclusion, pregnancy marker) — an expert/ADR
   question.
-- Encryption on native platforms ([ADR-005](adr/0005-storage-and-encryption.md))
 - [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
 - [ ] add the number of cycle to the cycle page somewhere to the cycle start (add a setting for numbers of observed cycles outside this app)
 - [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
@@ -94,9 +93,10 @@ the sections above track planned work, git history keeps the record (see
 
 ### Convenience
 
-- Password protection for the database — first revisit
-      [ADR-005](adr/0005-storage-and-encryption.md) (encryption stub) and
-      pin down the storage decision; implementation then follows it.
+- Password protection for the database — the storage decision is settled
+      (native files are now always-on encrypted, ADR-005); what a
+      user-facing passphrase would additionally protect, and how it
+      interacts with the device-bound key, needs discussion.
 - [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.

@@ -27,8 +27,12 @@ import 'domain/temperature_range.dart';
 /// autoDispose) keeps the instance cached; disposing the ProviderScope
 /// closes it. UI screens wait on it via the splash gate in main.dart, so
 /// everything downstream can `ref.read(databaseProvider.future)`.
-final databaseProvider = FutureProvider<CycleDatabase>((ref) {
-  final db = openCycleDatabase();
+///
+/// Opening is async since the native path first resolves the encryption
+/// key from the platform's secure storage (and fails loudly if that is
+/// impossible — lib/db/db_key.dart); the splash gate surfaces the error.
+final databaseProvider = FutureProvider<CycleDatabase>((ref) async {
+  final db = await openCycleDatabase();
   ref.onDispose(db.close);
   return db;
 });

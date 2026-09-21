@@ -7,14 +7,24 @@
 // one call:
 //
 //  - Native (Android/iOS/desktop): a background-isolate NativeDatabase over
-//    `<application documents>/<databaseName>.sqlite` (directory resolved via
-//    path_provider, which drift_flutter brings transitively). The SQLite C
-//    library comes from `sqlite3_flutter_libs` (already in pubspec).
+//    `<application documents>/<databaseName>.sqlite` (directory resolved
+//    via path_provider, now a direct dependency). The file is ALWAYS-ON
+//    ENCRYPTED: the `hooks: user_defines: sqlite3: source: sqlite3mc` block
+//    in pubspec.yaml pulls SQLite3MultipleCiphers in as the sqlite3
+//    package's bundled SQLite engine, and the native `setup` below applies
+//    the key from flutter_secure_storage (lib/db/db_key.dart) via
+//    `PRAGMA key` before drift touches the database. There is no settings
+//    toggle; on debug builds the setup asserts that the cipher build is
+//    actually present (`PRAGMA cipher`). Losing the platform key store
+//    (e.g. a restore that copies the file without it) makes the database
+//    unreadable — the JSON export is the user-level backup (ADR-005).
 //  - Web (the iteration test target): drift's `WasmDatabase.open` — SQLite
 //    compiled to WebAssembly (`web/sqlite3.wasm`) driven by the drift worker
 //    (`web/drift_worker.js`), with the storage implementation selected
 //    dynamically: OPFS when available, otherwise IndexedDB (both persist
-//    across reloads on https/localhost origins).
+//    across reloads on https/localhost origins). UNENCRYPTED — a documented
+//    limitation (ADR-005); the hook build applies to the sqlite3 ffi/dart
+//    side only, never to the web assembly assets.
 //
 // Asset maintenance: `web/sqlite3.wasm` + `web/drift_worker.js` are vendored
 // from the tag-matching drift release (currently drift 2.35.x; the pubspec
@@ -33,29 +43,68 @@
 // provider in lib/providers.dart guarantees the single instance for the app
 // lifetime.
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:path_provider/path_provider.dart'
+    show getApplicationDocumentsDirectory;
 
 import 'cycle_database.dart';
+import 'db_key.dart';
 
 /// Storage file/stream name of this app's drift database. On native this
 /// becomes `cycle_storage.sqlite` inside the application documents
 /// directory; on web it names the OPFS/IndexedDB storage slot.
 const String databaseName = 'cycle_storage';
 
+/// Escapes a database key for inlining into the single-quoted `PRAGMA key`
+/// statement (the pragma does not take prepared statements, the docs
+/// pattern inlines it; our generated keys are hex-only, the escaping is
+/// routine robustness).
+String _pragmaKeyString(String key) => key.replaceAll("'", "''");
+
 /// Opens the platform-appropriate database.
 ///
 /// Tests construct `CycleDatabase(NativeDatabase.memory())` directly and
 /// therefore never call this function; call sites use the Riverpod
 /// [databaseProvider] instead of this factory directly.
-CycleDatabase openCycleDatabase() {
+///
+/// Fails (never falls back) when the encryption key cannot be loaded from
+/// the platform's secure storage or created there on first use — see
+/// lib/db/db_key.dart.
+Future<CycleDatabase> openCycleDatabase() async {
+  // Web: the exact pre-encryption wiring, untouched. No key store access —
+  // web storage stays unencrypted.
+  if (kIsWeb) {
+    return CycleDatabase(
+      driftDatabase(
+        name: databaseName,
+        web: DriftWebOptions(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          driftWorker: Uri.parse('drift_worker.js'),
+        ),
+      ),
+    );
+  }
+
+  // Native: encrypted by default. The key is resolved up front (before the
+  // executor even exists) so a key-store failure surfaces immediately;
+  // `setup` then runs inside the database's background isolate and applies
+  // the key before drift issues any statement.
+  final key = await loadOrCreateDbKey();
   return CycleDatabase(
     driftDatabase(
       name: databaseName,
-      web: DriftWebOptions(
-        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-        driftWorker: Uri.parse('drift_worker.js'),
+      native: DriftNativeOptions(
+        // Same directory the (drift_flutter) native default resolved
+        // before: application documents + `$databaseName.sqlite`.
+        databaseDirectory: getApplicationDocumentsDirectory,
+        setup: (rawDb) {
+          // Debug-only tripwire: vanilla SQLite has no `cipher` pragma,
+          // SQLite3MultipleCiphers does. If this fires, the hook
+          // user-define in pubspec.yaml is missing from the build.
+          assert(rawDb.select('PRAGMA cipher;').isNotEmpty);
+          rawDb.execute("PRAGMA key = '${_pragmaKeyString(key)}'");
+        },
       ),
-      // Native defaults are correct for us: documents directory +
-      // background-isolate execution already provide safety + persistence.
     ),
   );
 }

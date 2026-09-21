@@ -245,8 +245,10 @@ class EinstellungenScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           // --- PIN lock stub -------------------------------------------
           // Disabled ON PURPOSE: flipping it on would falsely signal that a
-          // protection exists. The lock story (native SQLCipher later, web
-          // PIN limitations) is set out in ADR-0005.
+          // lock exists. At-rest encryption of the database is already
+          // always-on on native (ADR-005, SQLite3MultipleCiphers + key in
+          // secure storage); what remains open is the user-facing lock
+          // story (PIN/biometric on native, PIN limitations on web).
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),

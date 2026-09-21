@@ -322,7 +322,7 @@
   "settingsRangeUpper": "Upper limit",
   "settingsTemperatureRangeNote": "Saved in the app's local storage — restored on the next app start. Default: 36–38 °C.",
   "settingsPinLock": "PIN lock (placeholder)",
-  "settingsPinLockNote": "Not implemented yet: encryption/lock is planned in ADR-0005 (native later via SQLCipher, web via PIN).",
+  "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",
   "settingsExportNote": "All entries and marks as one JSON document.",
   "settingsImport": "JSON import",

@@ -10,6 +10,15 @@ version: 0.1.0+1
 environment:
   sdk: ">=3.5.0 <4.0.0"
 
+# Build-hook configuration: use SQLite3MultipleCiphers as the SQLite engine
+# bundled by the sqlite3 package (the hook fetches the prebuilt mc library
+# for each platform) — this is what makes native database encryption work
+# (ADR-005; drift ≥2.32 pattern, see lib/db/database_opener.dart).
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
+
 # Version notes — all ranges float within their major/minor line so pub picks
 # a version compatible with the installed SDK (resolved on Flutter 3.47.4 /
 # Dart 3.13.3, 2026-09-15):
@@ -25,14 +34,19 @@ environment:
 #   works out of the box (referenced via sqlite3's ffi backend underneath
 #   drift; drift_flutter brings it transitively too — kept as an explicit
 #   dependency since ADR-0005 names it).
-# drift_flutter: ^0.3.0. The drift-recommended `driftDatabase()` factory:
-#   one line wires native (LazyDatabase over path_provider's application-
-#   support directory + sqlite3_flutter_libs) AND web (drift WasmDatabase +
-#   OPFS/IndexedDB probing) without hand-written conditional imports.
-#   0.3.x requires the sqlite3 3.x line (matches drift 2.35); 0.2.x would
-#   silently downgrade drift below 2.32. Justified further in
-#   lib/db/database_opener.dart (openCycleDatabase).
+# drift_flutter: ^0.3.0. The drift-recommended `driftDatabase()` factory,
+#   now only used for the web path (drift WasmDatabase + OPFS/IndexedDB
+#   probing): native opening is hand-rolled in lib/db/database_opener.dart
+#   because it must apply the encryption key before use. 0.3.x requires the
+#   sqlite3 3.x line (matches drift 2.35); 0.2.x would silently downgrade
+#   drift below 2.32.
 # fl_chart: ^1.0.0. Temperature curve on the Zyklus screen.
+# flutter_secure_storage: ^11.2.0. Holds the native database encryption key
+#   in the platform-protected store (Android Keystore / iOS Keychain) —
+#   native only, web stays unencrypted (ADR-005).
+# path_provider: ^2.1.6. Resolves the native database directory in
+#   lib/db/database_opener.dart; transitive via drift_flutter before it
+#   became a direct dependency of that opener.
 # intl: any — flutter_localizations pins `intl` to the version matching the
 #   installed Flutter SDK; `any` defers to that pin. This deliberately avoids a
 #   hard failure when the SDK pins a different intl than a guessed caret range.
@@ -42,8 +56,10 @@ environment:
 # below); the web target keeps its own file input, exotic targets fall back
 # to the paste-only stub (see lib/ui/file_transfer.dart).
 #
-# Deliberately NOT here: sqlcipher_flutter_libs (ADR-005 — only when encryption
-# is wired, later milestone), pdf/printing (deferred past M1), and no
+# Native at-rest encryption is always-on: SQLite3MultipleCiphers is supplied
+# as the sqlite3 engine via the build-hook user-define above and keyed in
+# lib/db/db_key.dart (ADR-005) — no sqlcipher_flutter_libs involved.
+# Deliberately NOT here: pdf/printing (deferred past M1), and no
 # Android-only plugins (ADR-003). ERROR
 # NOTE: if this file ever reverts to "A new Flutter project" defaults, a
 # `flutter create` run has clobbered it — restore from git history.
@@ -64,6 +80,8 @@ dependencies:
   # File picker for the import dialogs on the native targets (SAF-backed on
   # Android); web keeps its own file input, the stub covers exotic targets.
   file_selector: ^1.1.0
+  flutter_secure_storage: ^11.2.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
