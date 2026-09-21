@@ -37,8 +37,8 @@ override) **and A** (automatic) are explicitly deferred.
    limitations, `flutter_secure_storage` on native later).
 7. **Local-first, no cloud, no analytics**; JSON export/import in Settings
    from M1.
-8. **Open source**, eventually GPL-3-acceptable, license TBD for now; app size
-   well below 50 MB.
+8. **Open source** under Apache-2.0 (chosen 2026-09; final confirmation
+   before first publishing still open); app size well below 50 MB.
 9. **i18n**: German default + full English from day one via `flutter gen-l10n`
    (ARB template = de, plus en); Polish/Italian prepared-for only.
 
@@ -49,8 +49,9 @@ override) **and A** (automatic) are explicitly deferred.
 - **Security/privacy**: password/biometric lock; native storage is already
   always-on encrypted (SQLite3MultipleCiphers, ADR-005); PIN lock only on
   web (req. 6).
-- **Licensing & size**: open source, eventually GPL-3-compatible (license TBD
-  meanwhile), app size well below 50 MB (req. 8).
+- **Licensing & size**: open source under Apache-2.0 (chosen 2026-09; final
+  confirmation before first publishing still open), app size well below 50 MB
+  (req. 8).
 
 ## Evaluation-mode table
 

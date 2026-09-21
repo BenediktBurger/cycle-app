@@ -25,8 +25,7 @@ What makes this app what it is:
   of disturbed days.
 • JSON export and JSON import in the settings — your data always remain
   your own.
-• Open source; the final license is not yet decided, GPL-3 compatibility
-  is intended.
+• Open source; licensed under Apache-2.0.
 
 Note: "NER Cycle App" is a working title; the final name has not been chosen
 yet.

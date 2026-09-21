@@ -43,5 +43,7 @@ F-Droid `metadata/<applicationId>.yml` draft pending the fdroiddata MR.
 - Commissioning / endorsement wording constraints come from
   `docs/product/vision.md`: describe the method as "per NER rules (Rötzer),
   in the spirit of INER" — **never claim INER endorsement**.
-- The F-Droid submission itself is **blocked by Gate G2** (license still
-  TBD) — `docs/fdroid-metadata-draft.yml` is a draft, never submitted.
+- The F-Droid submission itself is **blocked by Gate G2** — only by the
+  final Apache-2.0 (chosen 2026-09) confirmation before the first store
+  upload; the license choice itself is made. `docs/fdroid-metadata-draft.yml`
+  is a draft, never submitted as-is.

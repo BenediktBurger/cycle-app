@@ -37,4 +37,5 @@ test users (Gate G4 placeholder), recorded as such in `docs/release.md`;
 the package name `cycle_app` remains an internal placeholder (ADR-0002).
 
 German (`../de-DE/`) is the first-class locale; this English mirror follows
-its wording. No INER-endorsement claims, license remains TBD.
+its wording. No INER-endorsement claims, the license is Apache-2.0
+(chosen 2026-09).

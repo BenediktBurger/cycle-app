@@ -53,8 +53,11 @@ These are one-way doors; nothing below Phase D may start until they close.
     users during testing). Do not treat the identifier as naming the
     product: the package name `cycle_app` remains an internal placeholder
     (ADR-0002) and does not affect the shown name.
-- **G2 — license.** Pick and commit the `LICENSE` file (README signals
-  GPL-3-compatible intent). Blocks F-Droid only, but blocks it hard.
+- **G2 — license.** Chosen (owner decision, 2026-09): **Apache-2.0** — the
+  `LICENSE` file at the repo root carries the full text. **Final
+  confirmation before the first store upload is still open**; until then
+  the gate blocks F-Droid only for that confirmation, not for the choice
+  (Apache-2.0 is F-Droid-acceptable — a free-software license).
 - **G3 — publisher/account shape.** Individual Play account first (ADR-0009
   §3). Open sub-question: EU DSA **trader status** for both stores (INER
   endorsement may make "trader" mandatory) and whether/when INER itself
@@ -167,12 +170,13 @@ Expectation management: the inclusion queue takes weeks to months; the app
 can meanwhile distribute as APKs. F-Droid builds **from source** with the
 app's declared signing key fingerprint.
 
-1. Preconditions: `LICENSE` committed (G2), final applicationId (G1),
-   universal-APK build reproducible locally, no non-free deps (already
-   satisfied — drift/sqlite/fl_chart are clean), no AntiFeatures expected.
+1. Preconditions: `LICENSE` committed; license Apache-2.0 confirmed final
+   (G2), final applicationId (G1), universal-APK build reproducible locally,
+   no non-free deps (already satisfied — drift/sqlite/fl_chart are clean),
+   no AntiFeatures expected.
 2. Fork <https://gitlab.com/fdroid/fdroiddata>, add
    `metadata/<applicationId>.yml` from their template:
-   `License:` (must match the chosen license), `AuthorName`, githash/tag
+   `License: Apache-2.0`, `AuthorName`, githash/tag
    `UpdateCheckMode`, `CurrentVersion`, and the `Builds:` entry with
    `versionCode` + commit + recipe.
 3. **Build recipe:** pin the exact Flutter version (`flutter --version`
