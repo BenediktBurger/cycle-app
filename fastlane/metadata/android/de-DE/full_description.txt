@@ -27,8 +27,7 @@ Funktionen:
   Kalenderregel, Ausschluss von Störungstagen.
 • JSON-Export und JSON-Import über die Einstellungen — die Daten bleiben
   jederzeit Ihre eigenen.
-• Offene Quelle (Open Source); die endgültige Lizenz ist noch nicht
-  festgelegt, eine GPL-3-Verträglichkeit ist beabsichtigt.
+• Offene Quelle (Open Source); lizenziert unter Apache-2.0.
 
 Hinweis: „NER Cycle App“ ist ein Arbeitstitel; der endgültige Name steht noch
 nicht fest.

@@ -40,12 +40,9 @@ the sections above track planned work, git history keeps the record (see
 #### Building the app
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
-- final License choice for the app (release.md Gate G2) — the remaining blocker
-  for the F-Droid submission; sideload APKs are not blocked. The
-  application identity is resolved (`io.github.benediktburger.cycleapp`,
-  release.md Gate G1), so this is the last open gate before store
-  submissions; needs an owner decision (GPL-3-compatible intent per
-  README).
+- confirm Apache-2.0 (chosen 2026-09) as the final license before the
+  first store submission — release.md Gate G2; sideload APKs are not
+  affected.
 
 #### Domain / UI
 

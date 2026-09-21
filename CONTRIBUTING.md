@@ -30,7 +30,10 @@ Setup path and daily commands below; open work is tracked in
 [`docs/adr/`](docs/adr/README.md). Release and publishing (local APKs,
 F-Droid, Google Play) follow the runbook in
 [`docs/release.md`](docs/release.md), with the decisions recorded in
-[ADR-0009](docs/adr/0009-release-pipeline-and-signing.md).
+[ADR-0009](docs/adr/0009-release-pipeline-and-signing.md). The app is under
+Apache-2.0 (chosen 2026-09; final confirmation before publishing still open
+— see the [`LICENSE`](LICENSE) file); contributions are offered under that
+license only.
 
 ## 1. Install the Flutter SDK (stable channel)
 

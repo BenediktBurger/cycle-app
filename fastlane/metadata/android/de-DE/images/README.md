@@ -37,4 +37,4 @@ test users (Gate G4 placeholder), recorded as such in `docs/release.md`;
 the package name `cycle_app` remains an internal placeholder (ADR-0002).
 
 See `docs/product/vision.md` for wording constraints: no INER-endorsement
-claims, license remains TBD.
+claims, the license is Apache-2.0 (chosen 2026-09).

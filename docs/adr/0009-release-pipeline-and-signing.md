@@ -22,8 +22,11 @@ starting state:
   [ADR-0002](0002-package-name-cycle-app-placeholder.md) placeholder
   `com.example.cycle_app` — already replaced by the Gate G1 decision below
   (see the resolved open question).
-- No license has been chosen yet (README `license-tbd`) — a hard blocker for
-  F-Droid, not for local APK testing or Play development.
+- License: none was chosen yet when this ADR was written (README flagged
+  the choice as still open) — a hard blocker for F-Droid, not for local
+  APK testing or Play development; Apache-2.0 has since been chosen
+  (owner decision, 2026-09, final confirmation before the first store
+  upload still open — see the open-questions entry below).
 - The collaboration with INER (iner.org): an endorsement is likely (logo on
   the listing), INER may eventually assume publishing — but INER is not
   technical, so day-to-day release operations stay with the project owner.
@@ -124,9 +127,12 @@ sideload/F-Droid, so key custody is a governance question in itself.
   Applied to `android/app/build.gradle.kts` (`applicationId` + `namespace`)
   and the relocated `MainActivity.kt` package; the Dart package name stays
   `cycle_app` per [ADR-0002](0002-package-name-cycle-app-placeholder.md).
-- `TODO(user-review)`: license choice (Gate G2) — blocks F-Droid metadata
-  (F-Droid requires a free-software license); README signals
-  GPL-3-compatible intent.
+- **RESOLVED (owner decision, 2026-09):** license choice (Gate G2) is
+  **Apache-2.0** — the `LICENSE` file at the repo root carries the full
+  text; F-Droid accepts it as a free-software license, and the F-Droid
+  metadata `License:` value follows it. Residual
+  `TODO(user-review)`: the final confirmation of Apache-2.0 before the
+  first store upload (Gate G2) is still open.
 - `TODO(user-review)`: whether INER becomes the Play/Apple publisher of
   record — determines D-U-N-S timing and the EU DSA **trader status** of the
   developer accounts on both stores (also relevant for a solo individual

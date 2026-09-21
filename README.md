@@ -23,9 +23,11 @@ decision-maker.
 
 - **Package name `cycle_app`** is an explicit **PLACEHOLDER** (ADR-0002) —
   rename is a one-line `pubspec.yaml` change later.
-- **⚠️ license-tbd**: No license yet — license is TBD, will likely be
-  GPL-3-compatible eventually. Do not treat the tree as licensed until one is
-  chosen.
+- **⚠️ license — chosen, final confirmation open**: the license has been
+  chosen (2026-09): **Apache-2.0** — full text in the
+  [`LICENSE`](LICENSE) file at the repo root. The tree is distributed under
+  Apache-2.0; the final confirmation before the first published release is
+  still open.
 - Local-first: no cloud, no analytics; data stays on the device
   (drift/SQLite, encrypted on native platforms later — ADR-0005).
 
@@ -151,5 +153,6 @@ they are also marked `TODO(user-review)` in the code:
 
 ## License
 
-**TBD** — no license has been chosen yet; it will likely be GPL-3-compatible
-eventually. Do not treat the tree as licensed until one is chosen.
+**Apache-2.0** — chosen (owner decision, 2026-09); the full text is in the
+[`LICENSE`](LICENSE) file at the repo root. The final confirmation before the
+first published release is still open.
