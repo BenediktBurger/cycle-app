@@ -28,5 +28,5 @@ What makes this app what it is:
 • Open source; the final license is not yet decided, GPL-3 compatibility
   is intended.
 
-Note: "Cycle App" is a working title; the final name has not been chosen
+Note: "NER Cycle App" is a working title; the final name has not been chosen
 yet.
