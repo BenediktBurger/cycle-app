@@ -25,9 +25,15 @@ the sections above track planned work, git history keeps the record (see
 
 #### Android
 
-- [ ] does not show a file picker option to load csv files for drip ("bottom overflowed by 79 pixels"). Clicking somewhere else raises an error
-- [ ] error on framework.dart: failed assertion line 6281 pos 12: _dependents.isEmpty is not True
-- [ ] selected mucus sign show some reflow error (only partially visible), probably due to size constraints. on f/S it is too small and reflows -> two rows, everything gets higher
+- The entry-form date row in `lib/ui/diary.dart` overflows at narrow widths
+  (about 70–110 px at 320–360 dp under widget-test fallback font metrics; the
+  new narrow-viewport tests waive it with a documented justification) —
+  verify on a real device and at large system font scales before treating it
+  as a real defect and fixing it.
+- Confirm on device that the `_dependents.isEmpty` framework assertion no
+  longer occurs: the underlying import-dialog dismissal race is fixed and
+  guarded by widget tests, but the literal assertion text could not be
+  byte-reproduced under test conditions.
 
 ### Necessary
 
