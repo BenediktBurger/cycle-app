@@ -54,12 +54,7 @@ the sections above track planned work, git history keeps the record (see
   yields one length spanning the whole pregnancy. Needs discussion how to
   treat such spans (cap, exclusion, pregnancy marker) — an expert/ADR
   question.
-- [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
 - [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
-- [ ] add necessary DSVGO notice
-- [ ] mention backup / data migration / data recovery (only via export, not copying the data base) - readme, and also in the app?
-- [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
-- [ ] add option to delete data (with confirmation!)
 - should we add the birth bleeding (Wochenbett, marked as ~)?
 - show cycle start mark on journal like temp?
 - render observations above temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?

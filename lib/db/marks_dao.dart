@@ -116,4 +116,8 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
               t.markType.equals(markType)))
         .go();
   }
+
+  /// Deletes EVERY mark row (the settings pane's wipe calls this inside the
+  /// database-level transaction). Returns the number of removed rows.
+  Future<int> deleteAll() => delete(userMarks).go();
 }

@@ -15,6 +15,7 @@ import 'db/settings_store.dart';
 import 'domain/temperature_range.dart';
 import 'l10n/app_localizations.dart';
 import 'providers.dart';
+import 'ui/about.dart';
 import 'ui/cycle.dart';
 import 'ui/diary.dart';
 import 'ui/settings.dart';
@@ -77,6 +78,13 @@ class _CycleAppState extends ConsumerState<CycleApp> {
         ref.read(observedCyclesOutsideAppProvider.notifier).state =
             snapshot.observedCyclesOutsideApp;
       }
+      // One-directional by nature: the onboarding flag can only flip
+      // not-completed → completed, and hydration applies only that flip (a
+      // persisted completion must never be re-set to false).
+      final onboarded = ref.read(onboardingCompletedProvider);
+      if (!onboarded && snapshot.onboardingCompleted) {
+        ref.read(onboardingCompletedProvider.notifier).state = true;
+      }
     });
   }
 
@@ -101,6 +109,10 @@ class _CycleAppState extends ConsumerState<CycleApp> {
     ref.listen<int>(observedCyclesOutsideAppProvider, (previous, current) {
       _persistSetting(
           ref, (store) => store.persistObservedCyclesOutsideApp(current));
+    });
+    ref.listen<bool>(onboardingCompletedProvider, (previous, current) {
+      _persistSetting(
+          ref, (store) => store.persistOnboardingCompleted(current));
     });
 
     // null (the localeProvider default) = follow the system language: the
@@ -197,7 +209,7 @@ class _DatabaseGate extends ConsumerWidget {
           error: error,
           retry: () => ref.invalidate(databaseProvider),
         ),
-        data: (CycleDatabase db) => _HomeShell(),
+        data: (CycleDatabase db) => const _HomeGate(),
       ),
     );
   }
@@ -249,6 +261,20 @@ class _DatabaseError extends StatelessWidget {
 /// the "see more of the cycle in landscape" win. Desktop-class narrow
 /// windows under 720 keep the bar.
 const _railBreakpointWidth = 720.0;
+
+/// The surface behind the database gate: the shared about-content page in
+/// its onboarding variant until the persisted onboarding flag flips, then
+/// the navigation shell forever. Hydrated flag → no onboarding at all (a
+/// returning start shows nothing), so the page plays exactly once.
+class _HomeGate extends ConsumerWidget {
+  const _HomeGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboarded = ref.watch(onboardingCompletedProvider);
+    return onboarded ? const _HomeShell() : const AboutPage(onboarding: true);
+  }
+}
 
 class _HomeShell extends ConsumerWidget {
   const _HomeShell();

@@ -20,6 +20,7 @@ import '../domain/export_import.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'about.dart';
 import 'file_transfer.dart';
 
 /// Export file name used by the save/download path.
@@ -401,6 +402,36 @@ class EinstellungenScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // --- about -----------------------------------------------------
+          // Plays the SAME content page the first-start onboarding shows
+          // (lib/ui/about.dart) — one content source, opened here on demand.
+          // No setting is touched by opening it: the onboarding flag stays
+          // whatever it is.
+          Card(
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const AboutPage(),
+                ),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(l10n.aboutTitle,
+                          style: Theme.of(context).textTheme.titleSmall),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // --- JSON export / import ------------------------------------
           Card(
             child: Padding(
@@ -436,6 +467,27 @@ class EinstellungenScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // --- privacy / GDPR notice -----------------------------------
+          // The same string the about/onboarding page shows (one source,
+          // lib/ui/about.dart): the app's data-control reality in plain
+          // German-first prose — no servers, nothing ever sent, GDPR rights
+          // exercisable directly via the export/delete/import actions.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.aboutPrivacyHeading,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(l10n.aboutPrivacyBody,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // --- drip CSV import ------------------------------------------
           // Drip (sibling project) exports calendar days as a CSV; the
           // mapper produces a normal export document, so the merge policy,
@@ -461,7 +513,110 @@ class EinstellungenScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // --- delete data (danger) -------------------------------------
+          // The tracked-data reset: every diary entry and every mark, in
+          // one transactional wipe (settings + onboarding flag survive).
+          // Danger-tinted everywhere, an explicit confirm with cancel as
+          // the DEFAULT action, and an export-first recommendation — a
+          // wipe without the export earlier is irrecoverable.
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.settingsDeleteData,
+                      style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onErrorContainer)),
+                  const SizedBox(height: 4),
+                  Text(l10n.settingsDeleteDataNote,
+                      style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onErrorContainer)),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    key: const ValueKey('settingsDeleteDataButton'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                    onPressed: () => _confirmDeleteData(context, ref),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: Text(l10n.settingsDeleteDataButton),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- feedback note -------------------------------------------
+          // The pane's compact closing line (the about page carries the
+          // same stance as its footer): the app does not send anything,
+          // so errors/suggestions go to the GitHub issue tracker or mail.
+          Text(l10n.settingsFeedbackNotice,
+              style: Theme.of(context).textTheme.bodySmall),
         ],
+      ),
+    );
+  }
+
+  /// The delete-data flow: opens the confirmation dialog (counts of what
+  /// will go, cancel as the DEFAULT action), then — only on an explicit
+  /// confirm — runs the transactional wipe and reports the removed counts.
+  /// The dialog's counts are a pre-read; the actual counts come from the
+  /// wipe itself (a write racing between the two is possible in theory).
+  Future<void> _confirmDeleteData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final db = await ref.read(databaseProvider.future);
+    final entries = await db.entriesDao.allEntries();
+    final marks = await db.marksDao.allMarks();
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.deleteDataDialogTitle),
+        content: Text(
+          l10n.deleteDataDialogBody(entries.length, marks.length),
+        ),
+        actions: [
+          TextButton(
+            // The DEFAULT action: focus lands here, Enter cancels. The
+            // risky path always needs an explicit extra tap on the button
+            // that names the consequence ("Löschen").
+            key: const ValueKey('deleteDataCancel'),
+            autofocus: true,
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child:
+                Text(MaterialLocalizations.of(dialogContext).cancelButtonLabel),
+          ),
+          FilledButton(
+            key: const ValueKey('deleteDataConfirm'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.deleteDataConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final counts = await db.deleteAllTrackedData();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          l10n.deleteDataDone(counts.entries, counts.marks),
+        ),
       ),
     );
   }

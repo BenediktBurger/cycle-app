@@ -208,10 +208,76 @@
     },
     "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
   },
+  "aboutTitle": "Über die App",
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "aboutWarningTitle": "Wichtig: Beobachtung und Deutung der Körperzeichen",
+  "aboutWarningBody": "Zuverlässiges Zyklustracking setzt die getreue Beobachtung und Deutung der Körperzeichen voraus (Temperatur, Schleim). Die dafür nötigen Fähigkeiten vermittelt der Leitfaden von Prof. Rötzer oder ein Kurs (siehe INER). Bei Fragen wende dich an INER.",
+  "@aboutWarningBody": {
+    "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. No URL is embedded on purpose — none is settled yet."
+  },
+  "aboutPosture": "Die App unterstützt — sie entscheidet nie: Sie rechnet und zeigt an, gibt aber keine Fruchtbarkeitsaussage; die Auswertung liegt bei dir.",
+  "aboutPrivacyHeading": "Datenschutz",
+  "@aboutPrivacyHeading": {
+    "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
+  },
+  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät (verschlüsselte Datenbank). Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
+  "@aboutPrivacyBody": {
+    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+  },
+  "aboutContinue": "Weiter",
+  "aboutBackupHint": "Sicherung, Umzug auf ein anderes Gerät und Wiederherstellung laufen nur über den JSON-Export/-Import in den Einstellungen — die Datenbankdatei selbst kann nicht kopiert werden, weil ihr Schlüssel an dieses Gerät gebunden ist.",
+  "@aboutBackupHint": {
+    "description": "One-sentence backup hint on the about/onboarding page, referencing the export card's backup role (settingsExportNote): export/import is the only backup/migration/recovery path; copying the encrypted, device-bound database file is never usable (ADR-0005)."
+  },
+  "aboutFeedbackNotice": "Diese App sendet nichts — nicht einmal bei einem Absturz oder Fehler. Wende dich mit Fehlern oder Verbesserungsvorschlägen an die Issues der GitHub-Projektseite (github.com/BenediktBurger/cycle-app/issues) oder per E-Mail.",
+  "@aboutFeedbackNotice": {
+    "description": "Feedback notice, footer of the about/onboarding page: the app does not send anything ever, not even at a crash; errors/suggestions go to the GitHub issue tracker (the factual project URL from the README) or per mail — the mail phrasing stays generic because no address is committed anywhere."
+  },
+  "settingsFeedbackNotice": "Diese App sendet nichts — auch nicht bei einem Absturz oder Fehler. Melde Probleme oder Vorschläge per GitHub-Issue (github.com/BenediktBurger/cycle-app/issues) oder E-Mail.",
+  "@settingsFeedbackNotice": {
+    "description": "Compact feedback line at the end of the settings pane (same stance as aboutFeedbackNotice)."
+  },
+  "settingsDeleteData": "Daten löschen",
+  "@settingsDeleteData": {
+    "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks) after an explicit confirmation; settings and the onboarding flag survive by design."
+  },
+  "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge und Markierungen. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe JSON-Export).",
+  "settingsDeleteDataButton": "Alle Daten löschen …",
+  "deleteDataDialogTitle": "Daten löschen?",
+  "deleteDataDialogBody": "Es werden {entries} Tagebucheinträge und {marks} Markierungen gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe JSON-Export).",
+  "@deleteDataDialogBody": {
+    "placeholders": {
+      "entries": {
+        "type": "int"
+      },
+      "marks": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteDataConfirm": "Löschen",
+  "deleteDataDone": "{entries} Tagebucheinträge und {marks} Markierungen gelöscht.",
+  "@deleteDataDone": {
+    "placeholders": {
+      "entries": {
+        "type": "int"
+      },
+      "marks": {
+        "type": "int"
+      }
+    }
+  },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
-  "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument.",
+  "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
   "settingsImport": "JSON-Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
   "exportTitle": "JSON-Vorschau",

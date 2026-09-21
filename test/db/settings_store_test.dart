@@ -229,6 +229,45 @@ void main() {
     });
   });
 
+  group('onboarding completion flag (first-start gate)', () {
+    test('an empty table loads to not completed', () async {
+      final snapshot = await store.load();
+      expect(snapshot.onboardingCompleted, false,
+          reason: 'an absent row means the welcome page has not been seen '
+              'yet — it must be shown once');
+    });
+
+    test('true round-trips; an explicit false row is kept', () async {
+      await store.persistOnboardingCompleted(true);
+      expect(await store.readSetting(SettingKeys.onboardingCompleted), true,
+          reason: 'the value column stores the plain JSON boolean');
+      expect((await store.load()).onboardingCompleted, true);
+
+      // An explicit false row is only written by a deliberate store user;
+      // it must read back the same as the absence of a row.
+      await store.persistOnboardingCompleted(false);
+      expect((await store.load()).onboardingCompleted, false);
+      expect(await db.select(db.appSettings).get(), hasLength(1),
+          reason: 'the persisted row is stored, one row per key');
+    });
+
+    test('corrupt rows fall back to not completed', () async {
+      for (final raw in [
+        '"true"', // JSON string, not a boolean
+        '1', // JSON number
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.onboardingCompleted, raw);
+        expect(
+          (await store.load()).onboardingCompleted,
+          false,
+          reason: 'corrupt stored value "$raw" must not surface an error '
+              'and must replay the welcome page rather than skip it',
+        );
+      }
+    });
+  });
+
   group('generic JSON path (future settings without any code change)', () {
     test('a bool setting round-trips with no typed helper and no schema edit',
         () async {

@@ -66,9 +66,19 @@ Override inMemoryDatabase({
 ///    the cycle chart listen at the same time).
 ///
 /// [seed] and [onCreated] reach the database override ([inMemoryDatabase]).
+///
+/// The onboarding gate is part of the app surface the harness pumps, so the
+/// harness simulates an ALREADY-ONBOARDED install (`onboardingCompleted ??
+/// true`): the shell tests that predate the first-start page keep hitting
+/// the navigation shell directly. The onboarding/gate tests pass an
+/// explicit pin — `false` for a first start, `false` + a seeded
+/// onboardingCompleted row to exercise the hydration flip. The few tests
+/// that pump CycleApp directly (without [appScope]) override the provider
+/// themselves.
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
+  bool? onboardingCompleted,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
   DateTime Function()? now,
@@ -80,6 +90,8 @@ ProviderScope appScope({
       inMemoryDatabase(seed: seed, onCreated: onCreated),
       if (locale != null) localeProvider.overrideWith((ref) => locale),
       if (themeMode != null) themeModeProvider.overrideWith((ref) => themeMode),
+      onboardingCompletedProvider
+          .overrideWith((ref) => onboardingCompleted ?? true),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null)
         selectedDateProvider.overrideWith((ref) => selectedDay),

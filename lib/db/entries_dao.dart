@@ -110,4 +110,8 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
           ..where((t) => t.date.equalsValue(_normalize(date))))
         .go();
   }
+
+  /// Deletes EVERY entry row (the settings pane's wipe calls this inside
+  /// the database-level transaction). Returns the number of removed rows.
+  Future<int> deleteAll() => delete(cycleEntries).go();
 }

@@ -123,6 +123,17 @@ final temperatureRangeProvider =
 /// on every change (main.CycleApp).
 final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 
+/// Whether the onboarding page has been completed ("Weiter" tapped). The
+/// default false shows the shared about-content page full-page once the
+/// database is open; the continue action flips it to true, and the shell
+/// takes over (main._HomeGate reads this provider).
+///
+/// Persisted, mirroring the other general settings: hydrated from the local
+/// app_settings table once the database opens (absent row = not completed,
+/// for existing installs too, so the welcome page shows once after the
+/// update) and written through on every change (main.CycleApp).
+final onboardingCompletedProvider = StateProvider<bool>((ref) => false);
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// main.CycleApp's hydration listener applies each snapshot into

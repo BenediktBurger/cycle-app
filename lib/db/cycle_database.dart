@@ -37,6 +37,22 @@ class CycleDatabase extends _$CycleDatabase {
   // native/wasm executor.
   CycleDatabase(super.executor);
 
+  /// A UI-level reset (the settings pane's danger card): deletes everything
+  /// from the TRACKED data tables — cycle_entries and user_marks, both
+  /// inside ONE transaction (all-or-nothing) — and reports the removed row
+  /// counts. It is deliberately NOT part of the domain export/import module
+  /// (that one transfers data; this wipes it) and it deliberately touches
+  /// NO app_settings row: settings are user choices (language, theme,
+  /// temperature range…), and the onboarding flag must stay so the
+  /// completed welcome page does not replay after a data wipe.
+  Future<({int entries, int marks})> deleteAllTrackedData() {
+    return transaction(() async {
+      final entries = await entriesDao.deleteAll();
+      final marks = await marksDao.deleteAll();
+      return (entries: entries, marks: marks);
+    });
+  }
+
   @override
   int get schemaVersion => 11;
 
