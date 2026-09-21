@@ -4,7 +4,8 @@ locale, shared with F-Droid via the fastlane triple-T structure (see the
 
 Layout and file set the stores expect:
 
-- `title.txt` — "Cycle App", **≤ 30 characters**
+- `title.txt` — "NER Cycle App" (13 characters, well within the limit),
+  **≤ 30 characters**
 - `short_description.txt` — **≤ 80 characters**
 - `full_description.txt` — **≤ 4000 characters**
 - `changelogs/<versionCode>.txt` (one file per versionCode)
@@ -30,10 +31,10 @@ exists:
   high-resolution asset)
 - `featureGraphic.png` (1024×500)
 
-These two do not exist yet. Do **not** mistake "Cycle App" for a decided
-product name: it
-is a clearly-marked **working title** (Gate G4 placeholder), recorded as
-such in `docs/release.md`.
+These two do not exist yet. Do **not** mistake "NER Cycle App" for a
+decided product name: it is a clearly-marked **working title** shown to
+test users (Gate G4 placeholder), recorded as such in `docs/release.md`;
+the package name `cycle_app` remains an internal placeholder (ADR-0002).
 
 See `docs/product/vision.md` for wording constraints: no INER-endorsement
 claims, license remains TBD.

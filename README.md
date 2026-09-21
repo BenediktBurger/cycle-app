@@ -1,4 +1,4 @@
-# Zyklus-App (Arbeitstitel) / Cycle App
+# NER Cycle App (Arbeitstitel)
 
 [![CI](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml/badge.svg)](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml)
 

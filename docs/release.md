@@ -26,7 +26,7 @@ Of the one-time setup phases, Phase A (Android toolchain) and Phase C
 (signing) are complete — git history and
 [ADR-0009](adr/0009-release-pipeline-and-signing.md) record how — and
 Phase D is ongoing discipline. One-time setup still open: the remaining
-Phase B items (launcher label, adaptive launcher icon) and Phases E, F, G
+Phase B item (adaptive launcher icon) and Phases E, F, G
 behind the gates above. Routine releases skip the phases entirely: they
 follow the
 [per-release checklist](#per-release-checklist-every-distribution-update)
@@ -49,8 +49,10 @@ These are one-way doors; nothing below Phase D may start until they close.
   if INER ever formally takes over publishing. See ADR-0009 §4.
   - Related: the app **display name** (what users see) is free to change at
     any time — it is explicitly **not decided** yet (working title
-    "Cycle App" in store metadata); do not treat the identifier as
-    naming the product.
+    "NER Cycle App" in the store metadata `title.txt` etc., shown to test
+    users during testing). Do not treat the identifier as naming the
+    product: the package name `cycle_app` remains an internal placeholder
+    (ADR-0002) and does not affect the shown name.
 - **G2 — license.** Pick and commit the `LICENSE` file (README signals
   GPL-3-compatible intent). Blocks F-Droid only, but blocks it hard.
 - **G3 — publisher/account shape.** Individual Play account first (ADR-0009
@@ -62,23 +64,26 @@ These are one-way doors; nothing below Phase D may start until they close.
 - **G4 — branding assets** (app name, icon, screenshots) — can be redone at
   will; not a true gate, listed here only because store listings need them.
 
-### Phase B — application identity rename (items 1–4 remaining)
+### Phase B — application identity rename (items 2–4 remaining)
 
 Preparation principle (from [ADR-0002](adr/0002-package-name-cycle-app-placeholder.md)):
 everything is coded against the placeholder `cycle_app`, so the rename is
 mechanical. Checklist, in order — run the full test gate between sensible
-stages and commit stepwise. The first three steps are complete (git
+stages and commit stepwise. The first four steps are complete (git
 history): `pubspec.yaml` bumped to `version: 0.1.0+1` (the `name:` stays
 `cycle_app` per ADR-0002; keep bumping `+N` per distributed build —
 per-release checklist), `applicationId` + `namespace` set to
-`io.github.benediktburger.cycleapp` in `android/app/build.gradle.kts`, and
+`io.github.benediktburger.cycleapp` in `android/app/build.gradle.kts`,
 `MainActivity.kt` relocated to
 `android/app/src/main/kotlin/io/github/benediktburger/cycleapp/`
-(manifest uses `.MainActivity` relative to the namespace). Remaining:
+(manifest uses `.MainActivity` relative to the namespace), and the
+launcher label set (2026-09) to the working title "NER Cycle App"
+(currently shown to test users) as a direct string in the manifest. Remaining:
 
-1. Launcher label: **open** — replace `android:label="cycle_app"` with a
-   localized resource — create `android/app/src/main/res/values{-de}/strings.xml` with
-   `app_name`, manifest references `@string/app_name`.
+1. Launcher label: **done (2026-09)** — the manifest label is the direct
+   string `android:label="NER Cycle App"`
+   (`android/app/src/main/AndroidManifest.xml`); no localized
+   `strings.xml` resource was introduced.
 2. **Adaptive launcher icon** (replaces the default mipmaps): it must exist
    for any store listing; generate from a vector foreground + background
    (G4), e.g. via Android Studio once or an icon-generation tool.

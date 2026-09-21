@@ -19,16 +19,19 @@ English — mirroring the app's own language policy.
 
 The applicationId used by the stores is
 `io.github.benediktburger.cycleapp` (ADR/companion: `docs/release.md`);
-the future `docs/fdroid-metadata-draft.yml` file in the repo holds the
+the `docs/fdroid-metadata-draft.yml` file in the repo holds the
 F-Droid `metadata/<applicationId>.yml` draft pending the fdroiddata MR.
 
-## Status — working title and placeholder assets
+## Status — working title, placeholder assets
 
-- **"Cycle App" is a working title, not a decided name** (display name is
-  explicitly undecided; see release.md Gate G1/G4 notes). The store text
-  files must stay usable as-is (stores parse `title.txt` etc. literally,
-  ≤ 30 characters), so the placeholder caveat lives here and in each
-  locale's `images/README.md`.
+- **"NER Cycle App" is a working title, not a decided name** — the shown
+  name for test users during testing (store `title.txt` etc. already show
+  it; display name explicitly still undecided, see release.md Gate G1/G4
+  notes). The package name `cycle_app` remains a clearly-marked
+  **internal placeholder** (ADR-0002) and does not affect the shown name
+  (the same caveat lives in each locale's `images/README.md`). The store
+  text files must stay usable as-is (stores parse `title.txt` etc.
+  literally, ≤ 30 characters).
 - **Images: partially done** — `phoneScreenshots/` exists for both locales
   (2 PNG shots each, English UI, shared by `de-DE` and `en-US`); `icon.png`
   and `featureGraphic.png` remain pending Gate G4 and do not exist yet.
