@@ -43,9 +43,7 @@ the sections above track planned work, git history keeps the record (see
   runbook: see [`docs/release.md`](release.md) and
   [ADR-0009](adr/0009-release-pipeline-and-signing.md); the ready items are
   below, the blocked ones are plain bullets.
-- [ ] Create the release keystore outside the repo, fill the gitignored
-  `key.properties` (the gradle signing wiring is already in place),
-  verify the signed release APK with `apksigner` (release.md Phase C)
+- [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
 - [ ] Adaptive launcher icon replacing the default template mipmaps
   (release.md Phase B)
 - License choice for the app (release.md Gate G2) — the remaining blocker
@@ -54,11 +52,6 @@ the sections above track planned work, git history keeps the record (see
   release.md Gate G1), so this is the last open gate before store
   submissions; needs an owner decision (GPL-3-compatible intent per
   README).
-- [ ] Sideload APK + device upgrade test (old release with data → install
-  new release → migrations preserve cycle data) as repeatable discipline
-  (release.md Phase D, per-release checklist)
-- [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
-- choose and set a license
 
 #### Domain / UI
 
@@ -80,8 +73,9 @@ the sections above track planned work, git history keeps the record (see
 - [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
 - [ ] cycle: make it possible to click another day without deselecting the first one (maybe add a button to close day options)
 - [ ] add necessary DSVGO notice
+- [ ] mention backup / data migration / data recovery (only via export, not copying the data base) - readme, and also in the app?
 - [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
-- [ ] add option to delete data
+- [ ] add option to delete data (with confirmation!)
 - should we add the birth bleeding (Wochenbett, marked as ~)?
 - show cycle start mark on journal like temp?
 - render observations above temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
