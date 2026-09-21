@@ -98,12 +98,14 @@ losing persistence. The persistence medium is picked per browser (OPFS when
 supported, else IndexedDB) — data survives a normal page reload, but
 clearing site data/private windows do not (expected browser behaviour).
 
-### Android toolchain (optional — device iteration and local builds)
+### Android toolchain (required for releases — also for device iteration and local builds)
 
-Only needed for running the app on an Android device or emulator and for
-building APKs locally. Neither web iteration (§3 above) nor release builds
-require it: releases are built and signed in CI (see
-[`docs/release.md`](docs/release.md), CI release path).
+Only needed for running the app on an Android device or emulator — and
+for building APKs locally, which includes the release builds themselves:
+releases are built and signed on this machine (local build + sign; see
+[`docs/release.md`](docs/release.md), "Local release path"), so the
+toolchain is **required for releases**. It stays optional for web-only
+iteration (§3 above).
 
 Android Studio is a valid alternative: it bundles its own JDK and installs
 the Android SDK through its setup wizard (Settings → Languages &

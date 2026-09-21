@@ -2,6 +2,9 @@
 
 - **Date:** 2026-09-18
 - **Status:** Accepted
+  (amended in place, 2026-09: releases are built and signed locally and
+  published manually; the tag-triggered CI release pipeline is parked —
+  see decision #6)
 
 ## Context
 
@@ -79,6 +82,19 @@ sideload/F-Droid, so key custody is a governance question in itself.
    (Supersedes the earlier "CI stays web-only" clause —
    [ADR-0006](0006-ci.md) itself now also compiles the Android target in
    debug mode as a correctness gate.)
+
+   **Amended in place (2026-09):** release builds and signing are performed
+   **locally** by the release operator; GitHub Releases are created manually
+   (`gh release create` with the `vX.Y.Z` tag and the signed APK). Signing
+   secrets never enter GitHub. The tag-triggered workflow above is **parked,
+   not deleted** (kept with `workflow_dispatch` as its only trigger) for a
+   possible later re-enable; the keystore-as-GPG-secrets provisioning scheme
+   stays documented in [`docs/release.md`](../release.md) ("Parked CI release
+   path"). Reason: a minimal custody surface until F-Droid distribution is
+   running. This amendment supersedes the tag-triggered clause above; the
+   documentation split itself is unchanged, and decision #5's device
+   upgrade test is unaffected — under the local path it runs *before*
+   publishing, which the parked CI flow could not guarantee.
 
 ## Consequences
 

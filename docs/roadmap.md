@@ -57,12 +57,6 @@ the sections above track planned work, git history keeps the record (see
 - [ ] Sideload APK + device upgrade test (old release with data → install
   new release → migrations preserve cycle data) as repeatable discipline
   (release.md Phase D, per-release checklist)
-- [ ] Release workflow pre-flight: assert the tag name matches the pubspec
-  version (`v` + `pubspec.yaml` `version:` without its `+N` build part
-  equals `${GITHUB_REF_NAME}`); refuse to build on mismatch. The APK
-  embeds the pubspec version regardless of the tag, so a mismatch would
-  silently ship a wrong versionName/versionCode (release.md, per-release
-  checklist step 5)
 - [ ] create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
 - choose and set a license
 
@@ -70,6 +64,7 @@ the sections above track planned work, git history keeps the record (see
 
 - [ ] make the journals save button always visible (top bar?) such that you can save wherever you changed something, not only at the bottom
 - [ ] remove stale text line "von der Auswertung ausgeschlossen" from the add mark sheet
+- [ ] remove superfluous note on settings pane that the settings are stored (users expect settings to be stored)
 - [ ] make sure that it works also in horizontal view (especially for the cycle, to see more of the cycle better)
 - [ ] diary: make it compacter (temperature and time on the same line?)
 - Cycle-length statistics during a very long mark-driven cycle: during

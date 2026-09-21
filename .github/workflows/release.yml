@@ -1,22 +1,27 @@
 name: Release
 
-# Tag-triggered signed-release pipeline per ADR-0009 (amended): a `vX.Y.Z`
-# tag push builds signed Android artifacts in CI. Full runbook: the
-# "CI release path" section of docs/release.md.
+# PARKED release pipeline per ADR-0009 (amended 2026-09): release artifacts
+# are built and signed locally and attached to GitHub Releases manually —
+# the authoritative flow is docs/release.md, "Local release path". This
+# workflow is kept for a possible later re-enable; the tag trigger is
+# removed, so it only runs via manual workflow_dispatch (a dry run that
+# exercises the full build-and-sign path on a clean machine).
 #
-# PREREQUISITE: the five repository secrets below must exist BEFORE the
-# first tag push, else the pre-flight below aborts — Gradle would silently
-# fall back to the debug signing config and a debug-signed APK would end
-# up attached to a public Release:
+# RE-ENABLING: (1) set the five repository secrets listed in
+# docs/release.md, "Parked CI release path" (how to produce the keystore
+# payload is documented there too), (2) restore the
+# `push: tags: ["v*.*.*"]` trigger below, (3) validate signing with a
+# workflow_dispatch dry run first.
+#
+# PREREQUISITE (when re-enabled): the five repository secrets below must
+# exist BEFORE the first tag push, else the pre-flight below aborts —
+# Gradle would silently fall back to the debug signing config and a
+# debug-signed APK would end up attached to a public Release:
 #   RELEASE_KEYSTORE_GPG_BASE64, RELEASE_KEYSTORE_PASSPHRASE,
 #   RELEASE_KEYSTORE_KEY_ALIAS, RELEASE_KEYSTORE_KEY_PASSWORD,
 #   RELEASE_KEYSTORE_STORE_PASSWORD
-#
-# Dry runs: trigger manually via workflow_dispatch.
 
 on:
-  push:
-    tags: ["v*.*.*"]
   workflow_dispatch:
 
 permissions:
@@ -53,7 +58,7 @@ jobs:
       # Pre-flight: refuse to run without the secrets. Without this check,
       # Gradle would silently fall back to the debug signing config and a
       # debug-signed APK would end up attached to a public Release
-      # (docs/release.md, "CI release path").
+      # (docs/release.md, "Parked CI release path").
       - name: Pre-flight — all release secrets must be set
         run: |
           required=(

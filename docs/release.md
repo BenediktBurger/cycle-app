@@ -11,18 +11,20 @@ re-deriving the reasoning. Reasons live in the ADR; this file is the how.
 
 ## Where we stand
 
-| Channel                      | Role                             | Blocked by                                |
-|------------------------------|----------------------------------|-------------------------------------------|
-| Sideload APK                 | development/testing, demo builds | nothing (Phase D discipline; APK from CI) |
-| Google Play                  | primary store                    | Gate G3 (Phase F; G1 resolved 2026-09)    |
-| F-Droid (official)           | intermediate, possibly permanent | Gate G2 (Phase E; G1 resolved 2026-09)    |
-| iOS (TestFlight → App Store) | deferred workstream              | macOS + Apple Developer Program (Phase G) |
+| Channel                      | Role                             | Blocked by                                         |
+|------------------------------|----------------------------------|----------------------------------------------------|
+| Sideload APK                 | development/testing, demo builds | nothing (Phase D discipline; APK built + signed locally, released manually) |
+| Google Play                  | primary store                    | Gate G3 (Phase F; G1 resolved 2026-09)             |
+| F-Droid (official)           | intermediate, possibly permanent | Gate G2 (Phase E; G1 resolved 2026-09)             |
+| iOS (TestFlight → App Store) | deferred workstream              | macOS + Apple Developer Program (Phase G)          |
 
 Order of execution is exactly A → C → D, then (whenever gates resolve) B, E, F.
 Routine releases skip the phases entirely: they follow the
 [per-release checklist](#per-release-checklist-every-distribution-update)
 and the
-[CI release path](#ci-release-path-tag-triggered-adr-0009-amended);
+[local release path](#local-release-path)
+(the tag-triggered CI pipeline is
+[parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-local-release-path));
 Phases A–G are one-time setup.
 
 ## Decision gates — resolve before the first store upload
@@ -56,9 +58,11 @@ These are one-way doors; nothing below Phase D may start until they close.
 The setup itself — JDK 21, Android SDK, licenses, device connection —
 lives with the contributor docs:
 [CONTRIBUTING.md](../CONTRIBUTING.md), section "Android toolchain"
-(Android Studio is described there as an alternative). It is **optional**
-for releases: the CI release path builds and signs the artifacts, and the
-device upgrade test (Phase D) needs only the downloaded APK.
+(Android Studio is described there as an alternative). It is **required
+for releases**: release artifacts are built and signed locally (the
+parked CI release path would cover it too, but that is disabled — see
+"Local release path" below), and the device upgrade test (Phase D) needs
+the built release APK.
 
 Gate: `flutter build apk --release` in the repo root succeeds (debug-signed
 is fine without `key.properties`; real signing comes in Phase C).
@@ -293,50 +297,125 @@ Do **not** start until Android went through Phases A–F at least once.
    [ADR-0006](adr/0006-ci.md) conventions).
 3. Fastlane changelog file for the new versionCode (F-Droid) + Play release
    notes draft (DE/EN).
-4. Optional pre-tag sanity: `flutter build apk --release` locally and
-   install it to eyeball the build. With `key.properties` present this APK
-   is release-signed and can be updated in place later by the CI APK (and
-   vice versa); it does not replace the step-7 upgrade test.
-5. Tag the release commit and push it — the tag push is what triggers
-   `.github/workflows/release.yml`:
+4. Build the release artifact itself:
+   `flutter build apk --release` (universal APK). With the local
+   `key.properties` present this is release-signed via the Phase C wiring;
+   if the file is missing, Gradle silently falls back to **debug** signing —
+   the `apksigner verify` step below is the guard against that, never skip
+   it. (Detail: [local release path](#local-release-path).)
+5. Verify the signature — this is both the trust-anchor source and the
+   debug-fallback guard:
 
    ```sh
-   git tag vX.Y.Z && git push origin vX.Y.Z
+   $ANDROID_HOME/build-tools/<N>.0.0/apksigner verify --print-certs \
+     build/app/outputs/flutter-apk/app-release.apk
    ```
 
-   The tag must sit on the commit containing the pubspec bump: the APK's
-   version comes from `pubspec.yaml`, not from the tag name, and nothing
-   cross-checks the two (see the backlog item for a workflow pre-flight).
+   The certificate must be the release key, not the debug key.
+6. **Upgrade test on the real device** (Phase D) with **this exact APK** —
+   non-negotiable, and it happens **before** publishing: the locally built
+   APK *is* the artifact users install (byte-identical), so install it over
+   the previous release and verify the cycle data survives before anything
+   is public.
+7. Sanity-check the version/tag, then tag and publish:
+
+   ```sh
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   gh release create vX.Y.Z \
+     build/app/outputs/flutter-apk/app-release.apk \
+     --generate-notes \
+     --notes "SHA-256 certificate fingerprint: <from the apksigner output above>"
+   ```
+
+   The APK embeds the `version:` from `pubspec.yaml` at the tagged commit —
+   the tag must sit on the commit containing the pubspec bump, and the tag
+   name must match that versionName; nothing cross-checks the two on the
+   local path. The fingerprint goes into the release notes body as the
+   trust anchor (F-Droid metadata later cross-checks against the same
+   fingerprint). Only point testers at the release once it is visible.
    (Git history is the release diary; the roadmap stays a queue.)
-6. Wait for the release workflow to finish green; the signed APK then
-   appears on the repo's GitHub Releases page. If the run fails, no
-   release is created — but the tag exists. Investigate, fix, then re-tag
-   (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`, tag the
-   fixed commit, push again). Only point testers at the release once it
-   is visible.
-7. **Upgrade test on the real device** (Phase D) with the **downloaded CI
-   APK** — non-negotiable. The CI artifact is what users install, so it is
-   the artifact that gets tested: install it over the previous release and
-   verify the cycle data survives. When Play is involved, also download
-   the AAB from the workflow artifacts for the upload.
 8. Upload/distribute (sideload → testers; Play internal track; F-Droid MR
-   or automatic build on their side).
+   or automatic build on their side). When Play is involved, the AAB is
+   also built locally (`flutter build appbundle --release`); there is no
+   automated Play upload.
 9. Confirm the store dashboards show the intended version; observe crash
    reports (Play) / F-Droid comments in the days after.
 
-## CI release path (tag-triggered, ADR-0009 amended)
+## Local release path
 
-`.github/workflows/release.yml` automates the build-and-sign step once a
-release tag `vX.Y.Z` is pushed. It runs the full gate (analyze, format,
-test), then provisions the keystore and builds.
+Until F-Droid distribution is running, signing secrets never enter
+GitHub: release builds and signing happen on the release machine, and the
+GitHub Release is created manually with the locally built APK
+([ADR-0009](adr/0009-release-pipeline-and-signing.md), amended 2026-09 —
+decision #6's tag-triggered CI flow is
+[parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-local-release-path),
+not deleted).
 
-Dry runs work without a tag: trigger manually via **workflow_dispatch**
-(GitHub → Actions → Release → Run workflow) — useful to validate the
-secrets, signing, and the build before pushing a real tag.
+The sequence aligns with the per-release checklist above (where items 4–7
+carry the exact commands):
+
+1. Build the artifact: `flutter build apk --release` — signed via the
+   local `android/key.properties` (Phase C wiring). **Debug-signing
+   fallback risk:** when that file is absent, Gradle silently signs with
+   the debug key; the `apksigner verify` step below is the local
+   equivalent of the parked workflow's pre-flight and is the proof this
+   did not happen. (The old CI flow's re-tag salvage step is gone: the
+   artifact already exists before any tag is pushed, so the gate ordering
+   is build → verify → upgrade test → *then* tag + publish.)
+2. Verify the signature and note the SHA-256 certificate fingerprint:
+   the cert must be the release key, and the fingerprint doubles as the
+   trust anchor for the release notes.
+3. **Device upgrade test with this exact APK** (Phase D) — non-negotiable.
+   Because the build *is* the release artifact, the test happens before
+   publishing: the APK users install is byte-identical to the tested one —
+   strictly better than the parked CI flow, which had to test after
+   publishing (Tag → CI build → download → test → distribute).
+4. Version/tag sanity: the APK embeds the `version:` from `pubspec.yaml`
+   at the tagged commit; before creating the release, confirm the tag
+   name matches the versionName (one-line eyeball check — nothing
+   cross-checks automatically on the local path).
+5. Tag `vX.Y.Z` on the commit containing the pubspec bump — the tag is
+   created with `git tag`/`git push` beforehand, which fixes the one
+   consistent way this runbook does it — and then create the GitHub
+   Release with `gh release create` + the same APK.
+   `--generate-notes` builds the changelog from the commit log; GitHub
+   appends it to the `--notes` content, so the pasted SHA-256 certificate
+   fingerprint ends up in the release notes body as the trust anchor —
+   same practice the CI workflow had, and what F-Droid metadata later
+   cross-checks.
+6. Distribute (checklist steps 8–9).
+
+AAB note: when Play distribution starts, the bundle is built locally too
+(`flutter build appbundle --release`); there is no automated Play upload.
+
+## Parked CI release path (ADR-0009 amended 2026-09, superseded by the local release path)
+
+`.github/workflows/release.yml` — the tag-triggered build-and-sign
+pipeline — is **parked, not deleted**: releases are made locally
+([local release path](#local-release-path)). The workflow is kept with
+**`workflow_dispatch` as its only trigger** — pushing a `vX.Y.Z` tag no
+longer runs it — and stays useful as a manual dry run on a clean machine.
+
+**Re-enable checklist** (returning to the old tag-push flow):
+
+1. Set the five secrets below (they may also be set while parked).
+2. Restore `push: tags: ["v*.*.*"]` in `.github/workflows/release.yml`.
+3. Dry-run via **workflow_dispatch** (GitHub → Actions → Release → Run
+   workflow) to validate secrets, signing, and the build.
+4. Then follow the old flow again: push the `vX.Y.Z` tag (the tag push
+   triggers the workflow), wait for it to finish green, download the
+   signed APK, run the device upgrade test, then distribute. The
+   workflow's outputs are unchanged: a signed universal release APK
+   attached to a GitHub Release with automatically generated notes (the
+   workflow prints the signing certificate fingerprint in its log — copy
+   it into the release notes as the trust anchor; F-Droid metadata later
+   cross-checks it), plus an AAB uploaded as a workflow **artifact** for
+   the manual Play upload (no Play API integration exists).
 
 Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
 tagged commit; the tag name itself is only the trigger and trust anchor.
-Keep the two in sync (per-release checklist step 5) — nothing in the
+Keep the two in sync (per-release checklist step 7) — nothing in the
 workflow verifies them against each other.
 
 **Required repository secrets (GitHub Settings → Secrets → Actions), all
@@ -371,22 +450,9 @@ a generated, gitignored `android/key.properties` pointing there; nothing
 keystore-shaped is committed or leaves `$RUNNER_TEMP`. The local keystore
 and its offline backups remain authoritative.
 
-**A `vX.Y.Z` tag produces:**
-
-- A **signed universal release APK** attached to a GitHub Release with
-  automatically generated notes (use the notes as the changelog; the
-  workflow prints the signing certificate fingerprint in its log — copy it
-  into the release notes as the trust anchor; F-Droid metadata later
-  cross-checks against the same fingerprint).
-- An **AAB** uploaded as a workflow **artifact** for the manual Play upload
-  (no Play API integration exists; upload from CI is not planned yet).
-
-The workflow itself does **not** make a release count as "shipped": the
-**device upgrade test (upgrade-test discipline, Phase D) remains a
-mandatory manual step** before announcing the release — run it with the
-**downloaded CI APK**, since that is the artifact users will install (see
-step 7 of the per-release checklist). Tag → CI build → download APK →
-upgrade test → then distribute.
+When the parked path is re-enabled, the workflow again does **not** make a
+release count as "shipped": the device upgrade test remains a mandatory
+manual step before announcing the release (re-enable checklist item 4).
 
 ## Fresh-machine recovery (the handover note)
 
@@ -395,7 +461,9 @@ machine:
 
 1. Flutter SDK + Android toolchain per
    [CONTRIBUTING.md](../CONTRIBUTING.md) (§1 and its "Android toolchain"
-   section) — only needed for local builds; CI covers release artifacts.
+   section) — required: releases are built and signed locally, so releases
+   cannot be made without the full Android toolchain (the parked CI path
+   would be the alternative if re-enabled).
 2. Restore the **keystore** from the offline backup (custody rules, Phase C)
    — without the `.jks` no update can be signed for the installed base.
 3. Recreate `android/key.properties` from the password-manager record.
