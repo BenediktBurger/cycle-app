@@ -17,6 +17,14 @@
 //    back to debug signing when `android/key.properties` is missing, and a
 //    debug-signed APK must never be attached to a public release.
 //
+// The installed Flutter SDK version is checked against tool/flutter-version
+// the same way: that file is what the F-Droid build recipe parses from each
+// tag, so the pin and the locally used SDK must not drift. First-run pin
+// staging mirrors the fingerprint pin: --accept-flutter-version writes the
+// installed version and stops; commit and rerun. On an installed-vs-pinned
+// mismatch the same flag is the explicit (operator-decision) bypass to run
+// with the committed pin — CI still fails the tag until they match.
+//
 // Linux-release-machine note: by design this tool targets the project's
 // Linux release machine — it shells out to `sha256sum`, `git`, `gh`, and the
 // Android SDK build-tools binaries (`apksigner`, `aapt`; resolved under
@@ -32,11 +40,17 @@ import 'dart:math' as math;
 /// anchor; F-Droid metadata later cross-checks against the same value).
 const String pinFilePath = 'tool/release_fingerprint.txt';
 
+/// Committed file pinning the Flutter SDK version used for a release.
+/// The F-Droid build recipe parses this file from the tagged commit, so
+/// the release SDK is pinned exactly here.
+const String flutterPinFilePath = 'tool/flutter-version';
+
 /// Release artifact built by checklist step 4 (`flutter build apk --release`).
 const String defaultApkPath = 'build/app/outputs/flutter-apk/app-release.apk';
 
 const String usage = 'usage: dart run tool/make_release.dart vX.Y.Z '
-    '[--accept-fingerprint] [--dry-run] [--tested]';
+    '[--accept-fingerprint] [--accept-flutter-version] [--dry-run] '
+    '[--tested]';
 
 /// Failure of a script stage — always loud, always exit 1.
 class ReleaseException implements Exception {
@@ -58,6 +72,7 @@ class Options {
   const Options({
     required this.tag,
     required this.acceptFingerprint,
+    required this.acceptFlutterVersion,
     required this.dryRun,
     required this.tested,
   });
@@ -71,6 +86,15 @@ class Options {
   /// rerun matches the APK against the pin and proceeds).
   final bool acceptFingerprint;
 
+  /// First-run behavior for the Flutter SDK version: stage the pin file
+  /// ([flutterPinFilePath]) with the installed SDK's version and stop the
+  /// run there, so the operator commits it and reruns (the F-Droid recipe
+  /// parses that file from the tagged commit). On an installed-vs-pinned
+  /// MISMATCH this flag is the explicit bypass: the run proceeds with the
+  /// committed pin, nothing is written. A dry run only prints and
+  /// continues in both cases.
+  final bool acceptFlutterVersion;
+
   /// Check-only mode: no tag, no push, no release, no prompts.
   final bool dryRun;
 
@@ -83,6 +107,14 @@ class Options {
   /// fresh pin leaves the tree dirty, and tag/push must only happen on a
   /// clean tree. A dry run only prints the would-be pin and continues.
   bool get stopsAfterWritingPin => acceptFingerprint && !dryRun;
+
+  /// Consulted when the pin file is missing: the run on which
+  /// `--accept-flutter-version` is honored writes the installed SDK's
+  /// version into the pin file and then stops — the fresh pin leaves the
+  /// tree dirty, and tag/push must only happen on a clean tree. A dry run
+  /// only prints the would-be pin and continues. On an installed-vs-pinned
+  /// mismatch the flag is a plain bypass: nothing is written either way.
+  bool get stopsAfterWritingFlutterPin => acceptFlutterVersion && !dryRun;
 
   /// Whether the script interactively asks for the upgrade-test
   /// confirmation (checklist step 6). A dry run performs checks only and
@@ -115,6 +147,7 @@ class ApkVersionInfo {
 Options parseArguments(List<String> arguments) {
   String? tag;
   var acceptFingerprint = false;
+  var acceptFlutterVersion = false;
   var dryRun = false;
   var tested = false;
 
@@ -122,6 +155,8 @@ Options parseArguments(List<String> arguments) {
     switch (argument) {
       case '--accept-fingerprint':
         acceptFingerprint = true;
+      case '--accept-flutter-version':
+        acceptFlutterVersion = true;
       case '--dry-run':
         dryRun = true;
       case '--tested':
@@ -148,6 +183,7 @@ Options parseArguments(List<String> arguments) {
   return Options(
     tag: tag,
     acceptFingerprint: acceptFingerprint,
+    acceptFlutterVersion: acceptFlutterVersion,
     dryRun: dryRun,
     tested: tested,
   );
@@ -244,6 +280,50 @@ String formatPinFile(String fingerprint) {
       '# the same value — see docs/release.md). Written by\n'
       '# `dart run tool/make_release.dart --accept-fingerprint`.\n'
       '$hex\n';
+}
+
+/// Whether `value` is a bare `X.Y.Z` version string (`^\d+\.\d+\.\d+$`).
+bool isValidFlutterVersion(String value) =>
+    RegExp(r'^\d+\.\d+\.\d+$').hasMatch(value);
+
+/// Extracts the installed SDK version from `flutter --version` output
+/// (`Flutter X.Y.Z • channel …`). Null when no version is found or the
+/// found value is not a valid `X.Y.Z` string.
+String? parseInstalledFlutterVersion(String flutterVersionOutput) {
+  final version = RegExp(r'Flutter (\d+\.\d+\.\d+)')
+      .firstMatch(flutterVersionOutput)
+      ?.group(1);
+  if (version == null) return null;
+  return isValidFlutterVersion(version) ? version : null;
+}
+
+/// Reads the pinned Flutter version ([flutterPinFilePath] content): skips
+/// comment (`#`) and blank lines and takes the LAST remaining line — the
+/// same semantics as the CI check's `grep -v '^#' … | tail -n 1`. Validated
+/// against [isValidFlutterVersion]; null when nothing valid remains.
+String? parseFlutterPinFile(String pinFileContent) {
+  String? last;
+  for (final rawLine in pinFileContent.split('\n')) {
+    final line = rawLine.trim();
+    if (line.isEmpty || line.startsWith('#')) continue;
+    last = line;
+  }
+  if (last == null) return null;
+  return isValidFlutterVersion(last) ? last : null;
+}
+
+/// Formats the committed Flutter pin file: a documented comment header plus
+/// the bare version line. Same shape as [formatPinFile].
+String formatFlutterPinFile(String version) {
+  return '# Pinned Flutter SDK version for the local release path '
+      '(ADR-0009) and CI —\n'
+      '# must match the installed `flutter --version` (enforced by CI and '
+      'by\n'
+      '# tool/make_release.dart). On a bump, no fdroiddata edit is needed: '
+      'the\n'
+      '# F-Droid recipe parses this file from the tagged commit\n'
+      '# (metadata/io.github.benediktburger.cycleapp.yml).\n'
+      '$version\n';
 }
 
 /// Framework-free equivalent of the parked CI flow's
@@ -377,7 +457,90 @@ Future<void> runRelease(List<String> arguments) async {
         'bump publishes wrong-version APKs — fix pubspec.yaml or the tag.');
   }
 
-  // --- 2. clean tree ------------------------------------------------------
+  // --- 2. Flutter SDK pin (tool/flutter-version vs installed SDK) ---------
+  // tool/flutter-version is what the F-Droid build recipe parses from the
+  // tagged commit, so a pin that has drifted from the actually used SDK
+  // would silently publish a different Flutter build than the one tested
+  // locally. No `git` involvement here: the pin compares against the
+  // installed binary, not the tag history.
+  final flutterPinFile = File(flutterPinFilePath);
+  final pinFileExists = flutterPinFile.existsSync();
+  final pinnedFlutter = pinFileExists
+      ? parseFlutterPinFile(await flutterPinFile.readAsString())
+      : null;
+  final flutterProbe = await Process.run('flutter', ['--version']);
+  if (flutterProbe.exitCode != 0) {
+    _fail('flutter --version failed (exit ${flutterProbe.exitCode}): '
+        '${flutterProbe.stderr}\nCannot compare the installed SDK against '
+        '$flutterPinFilePath.');
+  }
+  final installedFlutter =
+      parseInstalledFlutterVersion(flutterProbe.stdout as String);
+  if (installedFlutter == null) {
+    _fail('could not parse an X.Y.Z version from `flutter --version` '
+        'output:\n${flutterProbe.stdout}');
+  }
+
+  if (pinFileExists && pinnedFlutter == null) {
+    _fail('pin file $flutterPinFilePath exists but contains no '
+        'X.Y.Z version line — fix it by hand (`#` comments allowed) '
+        'or delete it and rerun with --accept-flutter-version to pin '
+        'the installed SDK ($installedFlutter).');
+  }
+  if (!pinFileExists) {
+    print('NO FLUTTER VERSION PIN YET — the installed SDK is:');
+    print('  Flutter SDK: $installedFlutter');
+    if (options.stopsAfterWritingFlutterPin) {
+      await flutterPinFile
+          .writeAsString(formatFlutterPinFile(installedFlutter));
+      _fail('Wrote and pinned the installed SDK version above in '
+          '$flutterPinFilePath. The run stops here — commit '
+          'tool/flutter-version and rerun: the F-Droid recipe parses this '
+          'file from the tagged commit, so the committed pin is what a '
+          'Flutter-version bump publishes.\n'
+          '  git add $flutterPinFilePath && git commit -m "pin Flutter '
+          'SDK version"\n'
+          'On the rerun the pin matches the installed SDK and the run '
+          'proceeds. Stopping keeps the tree clean — tag and push must '
+          'not run with a fresh, uncommitted pin.');
+    }
+    if (!options.dryRun || !options.acceptFlutterVersion) {
+      _fail('no pin file at $flutterPinFilePath and no '
+          '--accept-flutter-version given — the pinned SDK version is '
+          'required (an un-pinned SDK lets a Flutter upgrade silently '
+          'change the release build). Make sure the installed SDK above '
+          'is the one to release with, then rerun with '
+          '--accept-flutter-version to pin it.');
+    }
+    print('dry-run note: outside a dry run, --accept-flutter-version '
+        'would now write $flutterPinFilePath with:');
+    print(formatFlutterPinFile(installedFlutter));
+  } else {
+    print('Flutter SDK: $installedFlutter; pinned in '
+        '$flutterPinFilePath: $pinnedFlutter.');
+    if (installedFlutter != pinnedFlutter) {
+      if (options.acceptFlutterVersion) {
+        // Explicit bypass: the operator overrides the pin-vs-installed
+        // drift — the run proceeds with the committed pin unperturbed.
+        // Nothing is written; CI still enforces the match on the tag.
+        print('FLUTTER VERSION MISMATCH ACCEPTED via '
+            '--accept-flutter-version: installed SDK $installedFlutter, '
+            'pinned $pinnedFlutter in $flutterPinFilePath — continuing '
+            'with the pinned value. Remind yourself that CI fails the '
+            'tag until they match again.');
+      } else {
+        _fail('FLUTTER VERSION MISMATCH: installed SDK '
+            '$installedFlutter, pinned $pinnedFlutter in '
+            '$flutterPinFilePath. The pin file is what the F-Droid '
+            "recipe parses from the tagged commit (nothing outside this "
+            'one file needs an fdroiddata edit on a Flutter bump) — bump '
+            'it to the installed SDK and commit, or pass '
+            '--accept-flutter-version to bypass this check for this run.');
+      }
+    }
+  }
+
+  // --- 3. clean tree ------------------------------------------------------
   final status = await Process.run('git', [
     'status',
     '--porcelain',
@@ -392,7 +555,7 @@ Future<void> runRelease(List<String> arguments) async {
         '$uncommitted');
   }
 
-  // --- 3. tag must not exist ---------------------------------------------
+  // --- 4. tag must not exist ---------------------------------------------
   final existingTag = await Process.run('git', [
     'rev-parse',
     '-q',
@@ -408,7 +571,7 @@ Future<void> runRelease(List<String> arguments) async {
         'an operator decision — make it explicitly.');
   }
 
-  // --- 4. the APK exists (built earlier, checklist step 4) ----------------
+  // --- 5. the APK exists (built earlier, checklist step 4) ----------------
   final apk = File(defaultApkPath);
   if (!apk.existsSync()) {
     _fail('no release APK at $defaultApkPath — build it first (checklist '
@@ -419,7 +582,7 @@ Future<void> runRelease(List<String> arguments) async {
         'step 4).');
   }
 
-  // --- 5. signature pin (debug-fallback / wrong-key guard) ----------------
+  // --- 6. signature pin (debug-fallback / wrong-key guard) ----------------
   final buildTools = _resolveNewestBuildTools(_resolveAndroidHome());
   print('build-tools: $buildTools');
 
@@ -485,7 +648,7 @@ Future<void> runRelease(List<String> arguments) async {
         '  SHA-256 certificate fingerprint: $fingerprint');
   }
 
-  // --- 6. embedded version check (best effort, via aapt) ------------------
+  // --- 7. embedded version check (best effort, via aapt) ------------------
   final aapt = '$buildTools/aapt';
   if (!File(aapt).existsSync()) {
     print('aapt not found at $aapt — embedded version check skipped '
@@ -519,12 +682,12 @@ Future<void> runRelease(List<String> arguments) async {
     }
   }
 
-  // --- 7. checksum --------------------------------------------------------
+  // --- 8. checksum --------------------------------------------------------
   final apkSha = await _sha256sumOfApk();
   print('APK: $defaultApkPath');
   print('APK SHA-256: $apkSha');
 
-  // --- 8. upgrade-test gate ------------------------------------------------
+  // --- 9. upgrade-test gate ------------------------------------------------
   // A dry run never reaches the question: it performs checks only and has
   // no publishing side effects to gate — it prints a note instead.
   if (options.promptsForUpgradeTest) {
@@ -553,7 +716,7 @@ Future<void> runRelease(List<String> arguments) async {
     apkSha256: apkSha,
   );
 
-  // --- 9. dry run ----------------------------------------------------------
+  // --- 10. dry run ----------------------------------------------------------
   if (options.dryRun) {
     print('');
     print('dry run — would publish with these values:');
@@ -570,7 +733,7 @@ Future<void> runRelease(List<String> arguments) async {
     return;
   }
 
-  // --- 10. publish ---------------------------------------------------------
+  // --- 11. publish ---------------------------------------------------------
   Future<void> git(List<String> args) async {
     final result = await Process.run('git', args);
     if (result.exitCode != 0) {

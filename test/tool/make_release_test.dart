@@ -23,14 +23,21 @@ void main() {
       expect(options.tag, 'v1.2.3');
       expect(options.dryRun, isTrue);
       expect(options.acceptFingerprint, isFalse);
+      expect(options.acceptFlutterVersion, isFalse);
       expect(options.tested, isFalse);
     });
 
     test('parses every flag independently', () {
-      final options = parseArguments(
-          ['--tested', 'v0.1.0', '--accept-fingerprint', '--dry-run']);
+      final options = parseArguments([
+        '--tested',
+        'v0.1.0',
+        '--accept-fingerprint',
+        '--accept-flutter-version',
+        '--dry-run',
+      ]);
       expect(options.tag, 'v0.1.0');
       expect(options.acceptFingerprint, isTrue);
+      expect(options.acceptFlutterVersion, isTrue);
       expect(options.dryRun, isTrue);
       expect(options.tested, isTrue);
     });
@@ -73,6 +80,7 @@ void main() {
     const accept = Options(
       tag: 'v0.1.0',
       acceptFingerprint: true,
+      acceptFlutterVersion: false,
       dryRun: false,
       tested: false,
     );
@@ -88,6 +96,7 @@ void main() {
       const dryAccept = Options(
         tag: 'v0.1.0',
         acceptFingerprint: true,
+        acceptFlutterVersion: false,
         dryRun: true,
         tested: false,
       );
@@ -98,6 +107,7 @@ void main() {
       const plain = Options(
         tag: 'v0.1.0',
         acceptFingerprint: false,
+        acceptFlutterVersion: false,
         dryRun: false,
         tested: false,
       );
@@ -107,11 +117,62 @@ void main() {
     });
   });
 
+  group('flutter-pin first-run staging (write pin, stop, rerun)', () {
+    const accept = Options(
+      tag: 'v0.1.0',
+      acceptFingerprint: false,
+      acceptFlutterVersion: true,
+      dryRun: false,
+      tested: false,
+    );
+
+    test('a real run with --accept-flutter-version stops after writing the pin',
+        () {
+      expect(accept.stopsAfterWritingFlutterPin, isTrue,
+          reason: 'the fresh pin leaves the tree dirty — tag/push must not '
+              'run with an uncommitted pin file');
+    });
+
+    test('a dry run only prints the pin and continues', () {
+      const dryAccept = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        acceptFlutterVersion: true,
+        dryRun: true,
+        tested: false,
+      );
+      expect(dryAccept.stopsAfterWritingFlutterPin, isFalse);
+    });
+
+    test('runs without --accept-flutter-version never take the write-pin path',
+        () {
+      const plain = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        acceptFlutterVersion: false,
+        dryRun: false,
+        tested: false,
+      );
+      const dryOnly = Options(
+        tag: 'v0.1.0',
+        acceptFingerprint: false,
+        acceptFlutterVersion: false,
+        dryRun: true,
+        tested: false,
+      );
+      expect(plain.stopsAfterWritingFlutterPin, isFalse,
+          reason: 'a version mismatch without the flag aborts without '
+              'writing anything');
+      expect(dryOnly.stopsAfterWritingFlutterPin, isFalse);
+    });
+  });
+
   group('upgrade-test confirmation gating', () {
     test('a real run prompts unless --tested is given', () {
       const realRun = Options(
         tag: 'v0.1.0',
         acceptFingerprint: false,
+        acceptFlutterVersion: false,
         dryRun: false,
         tested: false,
       );
@@ -119,6 +180,7 @@ void main() {
       const scripted = Options(
         tag: 'v0.1.0',
         acceptFingerprint: false,
+        acceptFlutterVersion: false,
         dryRun: false,
         tested: true,
       );
@@ -129,6 +191,7 @@ void main() {
       const dry = Options(
         tag: 'v0.1.0',
         acceptFingerprint: true,
+        acceptFlutterVersion: false,
         dryRun: true,
         tested: false,
       );
@@ -136,10 +199,76 @@ void main() {
       const dryTested = Options(
         tag: 'v0.1.0',
         acceptFingerprint: false,
+        acceptFlutterVersion: false,
         dryRun: true,
         tested: true,
       );
       expect(dryTested.promptsForUpgradeTest, isFalse);
+    });
+  });
+
+  group('flutter version pin helpers (tool/flutter-version)', () {
+    const installedOutput = '''
+Flutter 3.47.4 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 9584c6713b (vor 11 Tagen) • 2026-09-10 15:25:10 -0700
+Engine • hash 0e228ec8c8d2abc9fcf1d053e8a40665bb859ec7 (revision 06a2e2a110)
+Tools • Dart 3.13.3 • DevTools 2.60.0
+''';
+
+    test('version validation is strict X.Y.Z', () {
+      expect(isValidFlutterVersion('3.47.4'), isTrue);
+      expect(isValidFlutterVersion('10.0.0'), isTrue);
+      expect(isValidFlutterVersion('3.47'), isFalse);
+      expect(isValidFlutterVersion('v3.47.4'), isFalse);
+      expect(isValidFlutterVersion('3.47.4+1'), isFalse);
+      expect(isValidFlutterVersion(''), isFalse);
+      expect(isValidFlutterVersion('3.47.4 '), isFalse);
+    });
+
+    test('extracts the version from `flutter --version` output', () {
+      expect(parseInstalledFlutterVersion(installedOutput), '3.47.4');
+    });
+
+    test('returns null for output without a version line', () {
+      expect(parseInstalledFlutterVersion(''), isNull);
+      expect(parseInstalledFlutterVersion('Tools • Dart 3.13.3\n'), isNull);
+      expect(
+        parseInstalledFlutterVersion(
+            'Flutter not.a.version • channel stable\n'),
+        isNull,
+      );
+    });
+
+    test('round-trips a formatted pin file (header comment + version line)',
+        () {
+      final text = formatFlutterPinFile('3.47.4');
+      expect(parseFlutterPinFile(text), '3.47.4');
+    });
+
+    test('pin parser takes the last non-comment line (CI grep semantics)', () {
+      expect(
+        parseFlutterPinFile('# old note\n3.46.0\n3.47.4\n'),
+        '3.47.4',
+      );
+      // The CI check greps non-comment lines and takes the tail: a comment
+      // appended after the value line does not hide the value.
+      expect(
+        parseFlutterPinFile('# pinned below\n3.47.4\n# lifted comment\n'),
+        '3.47.4',
+      );
+      expect(parseFlutterPinFile('3.46.0\n3.47.4'), '3.47.4');
+    });
+
+    test('pin parser rejects comment-only, empty, and malformed files', () {
+      expect(parseFlutterPinFile('# only a comment\n'), isNull);
+      expect(parseFlutterPinFile(''), isNull);
+      expect(parseFlutterPinFile('3.47\n'), isNull);
+      expect(parseFlutterPinFile('v3.47.4\n'), isNull);
+      expect(parseFlutterPinFile('not-a-version\n'), isNull);
+    });
+
+    test('pin parser tolerates whitespace padding', () {
+      expect(parseFlutterPinFile('  3.47.4  \n'), '3.47.4');
     });
   });
 

@@ -184,6 +184,10 @@ app's declared signing key fingerprint.
    define recipes in `fdroiddata` *at submission time* (conventions move;
    find a recent Flutter app's yaml as the blueprint — do not copy a stale
    one from memory). Decide there between universal APK and ABI splits.
+   The exact pin lives in `tool/flutter-version`, enforced by CI and by
+   `tool/make_release.dart`; the recipe parses that file from the tagged
+   commit, so a Flutter bump after the first parsed recipe needs no
+   `fdroiddata` edit.
 4. Store-facing metadata follows the fastlane/triple-T structure under
    `fastlane/metadata/android/<locale>/`: full/short description, changelogs
    per versionCode, text+image assets. German-first with English mirrored,

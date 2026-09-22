@@ -1,0 +1,6 @@
+# Pinned Flutter SDK version for the local release path (ADR-0009) and CI —
+# must match the installed `flutter --version` (enforced by CI and by
+# tool/make_release.dart). On a bump, no fdroiddata edit is needed: the
+# F-Droid recipe parses this file from the tagged commit
+# (metadata/io.github.benediktburger.cycleapp.yml).
+3.47.4
