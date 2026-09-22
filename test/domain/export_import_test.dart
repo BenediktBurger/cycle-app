@@ -11,6 +11,7 @@
 // are accepted and IGNORED (verified in the old-document group below).
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/domain/cervix.dart';
@@ -20,6 +21,12 @@ import 'package:cycle_app/domain/mucus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // A real-world export (from the actual app, bleeding values 4/3 and all)
+  // must keep loading through the whole evolution — canary, not coverage.
+  final exampleCycleRaw = File(
+    'test/fixtures/example-cycle.json',
+  ).readAsStringSync();
+
   group('export/import JSON codec', () {
     test('buildExportJson assembles the schema-version document', () {
       final json = buildExportJson(
@@ -1282,6 +1289,39 @@ void main() {
       );
       expect(summary.entriesNew, 1);
       expect(summary.marksNew, 1);
+    });
+  });
+
+  group('example-cycle.json fixture', () {
+    test('the real export parses with its pinned row counts', () {
+      final blob = parseExportJson(exampleCycleRaw);
+      expect(blob.entries, hasLength(27));
+      expect(blob.marks, hasLength(7));
+      expect(blob.exportedAt, DateTime.utc(2026, 9, 22, 15, 0, 0, 976));
+    });
+
+    test('the real export carries the pinned spot-check rows', () {
+      final blob = parseExportJson(exampleCycleRaw);
+
+      final measuredDay = blob.entries.singleWhere(
+        (row) => row['date'] == '2026-08-25',
+      );
+      expect(measuredDay['bbt_c'], 36.8);
+      expect(measuredDay['mucus_sign'], 't');
+      expect(measuredDay['sex_timings'], 2);
+
+      // singleWhere on the day key: a duplicated mark row trips the test.
+      final boundary = blob.marks.singleWhere(
+        (row) => row['entry_date'] == '2026-09-16',
+      );
+      expect(boundary['mark_type'], 'cycleStart');
+      expect(boundary['author'], 'import');
+
+      final peak = blob.marks.singleWhere(
+        (row) => row['entry_date'] == '2026-09-01',
+      );
+      expect(peak['mark_type'], 'mucusPeakDay');
+      expect(peak['author'], 'user');
     });
   });
 }

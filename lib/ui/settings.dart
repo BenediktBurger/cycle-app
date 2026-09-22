@@ -3,8 +3,11 @@
 // design, ADR-0005), and JSON export/import.
 //
 // Export UX: an always-available JSON text screen with a copy button on
-// every platform, plus a file save/download where the platform supports it
-// (web, desktop with a home directory). Import: paste-JSON dialog
+// every platform, a file save/download where the platform supports it
+// (web, desktop with a home directory), and a system share sheet where
+// share_plus provides one (Android/iOS, desktops — the Android route to a
+// real export file, since free-form paths do not exist there). Import:
+// paste-JSON dialog
 // everywhere, plus a file picker on web and on the native targets (the
 // file_selector plugin, SAF-backed on Android). The drip CSV import (below
 // the JSON card) reuses the same dialog widget: the mapper turns the CSV
@@ -981,7 +984,8 @@ final class _ImportDialogState extends State<_ImportDialog> {
 }
 
 /// Full-screen JSON preview: the export text with a copy button for every
-/// platform, and a file save/download where the platform supports it.
+/// platform, the system share sheet where [canShareFile] provides one,
+/// and a file save/download where the platform supports it.
 final class _ExportPreviewPage extends StatelessWidget {
   const _ExportPreviewPage({required this.json});
 
@@ -1013,6 +1017,25 @@ final class _ExportPreviewPage extends StatelessWidget {
                   icon: const Icon(Icons.copy_outlined),
                   label: Text(l10n.exportCopy),
                 ),
+                if (canShareFile)
+                  FilledButton.tonalIcon(
+                    // Same contract as the save button: the boolean result
+                    // becomes a confirm/failure snackbar; the share sheet
+                    // being dismissed is a hand-off (true), not a failure.
+                    onPressed: () async {
+                      final ok = await shareFile(exportFileName, json);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok ? l10n.exportShared : l10n.exportShareFailed,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.share_outlined),
+                    label: Text(l10n.exportShare),
+                  ),
                 if (canSaveFile)
                   FilledButton.icon(
                     onPressed: () async {
@@ -1029,8 +1052,11 @@ final class _ExportPreviewPage extends StatelessWidget {
                     icon: const Icon(Icons.save_outlined),
                     label: Text(l10n.exportSaveFile),
                   )
-                else
+                else if (!canShareFile)
                   Text(
+                    // Targets with neither save nor share (paste-only
+                    // stubs): the copy button above stays the route — the
+                    // hint only says so, promising nothing further.
                     l10n.exportNativeHint,
                     style: Theme.of(context).textTheme.bodySmall,
                     textAlign: TextAlign.center,

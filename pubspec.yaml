@@ -70,6 +70,13 @@ hooks:
 # below); the web target keeps its own file input, exotic targets fall back
 # to the paste-only stub (see lib/ui/file_transfer.dart).
 #
+# share_plus: ^13.3.0. The system share sheet for the JSON export — the
+#   Android/iOS route to a real export file (the preview page used to offer
+#   clipboard-only there, because free-form paths and home-directory writes
+#   do not exist on Android and file_selector's Android SAF support covers
+#   no save dialog). Only lib/ui/file_transfer_io.dart references it; web
+#   keeps the browser download, the stub target the copy button.
+#
 # Native at-rest encryption is always-on: SQLite3MultipleCiphers is supplied
 # as the sqlite3 engine via the build-hook user-define above and keyed in
 # lib/db/db_key.dart (ADR-005) — no sqlcipher_flutter_libs involved.
@@ -111,6 +118,12 @@ dependencies:
   # migration tests (they bootstrap older-version database files via the raw
   # binding before drift's upgrade runs on them).
   sqlite3: ^3.5.0
+  # System share sheet for the JSON export on Android/iOS (file_selector's
+  # Android implementation has no save dialog, so the share sheet is the
+  # only Android route to a real export file — the copy button alone stays
+  # the always-available fallback). Referenced only from
+  # lib/ui/file_transfer_io.dart; the web target keeps its browser download.
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:
