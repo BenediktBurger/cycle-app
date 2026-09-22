@@ -84,8 +84,8 @@ dependencies:
   path_provider: ^2.1.6
   # Raw SQLite binding, needed at runtime for lib/db/cipher_setup.dart (the
   # `PRAGMA cipher`/`PRAGMA key` steps the native opener applies) and by the
-  # migration tests (they bootstrap a real v1-era database file via the raw
-  # binding before drift's onUpgrade runs).
+  # migration tests (they bootstrap older-version database files via the raw
+  # binding before drift's upgrade runs on them).
   sqlite3: ^3.5.0
 
 dev_dependencies:
