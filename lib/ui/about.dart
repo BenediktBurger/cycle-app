@@ -1,8 +1,9 @@
 // The shared about/onboarding content page: ONE content source, shown
 // full-page on the first start ([AboutPage.onboarding]) and from the
 // settings pane's about entry afterwards. Carries the fertility-tracking
-// warning (Mode-M posture: the app supports, it never decides), the privacy
-// notice, the backup hint, and the feedback note.
+// warning (Mode-M posture: the app supports, it never decides), the
+// license/copyright section, the privacy notice, the backup hint, and the
+// feedback note.
 //
 // Flutter's showAboutDialog is deliberately NOT used: it hard-wires the
 // license-chapter surface and can host neither the German-first warning
@@ -12,10 +13,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import '../version.dart';
 
-/// Human-facing app version. Adapted per release; version-bump discipline
-/// stays a release-notes concern (pubspec.yaml carries the same number).
-const aboutAppVersion = '0.1.0';
+/// The displayed app version: the pubspec mirror ([appVersion]) WITHOUT its
+/// build suffix — the `+n` part is a build-farm artifact, not user
+/// information. lib/version.dart keeps the exact pubspec mirror (its sync
+/// test pins the whole string); only the display strips the suffix here.
+final String displayedAppVersion = appVersion.split('+').first;
 
 /// The onboarding page's continue action: flips the (hydratable, persisted)
 /// onboarding flag; the write-through listener and the [_HomeGate] rebuild
@@ -45,7 +49,7 @@ class AboutPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('${l10n.appTitle} · ${l10n.aboutVersion(aboutAppVersion)}',
+          Text('${l10n.appTitle} · ${l10n.aboutVersion(displayedAppVersion)}',
               style: theme.textTheme.titleSmall),
           const SizedBox(height: 16),
           // The method warning first: it is the reason this page exists at
@@ -70,7 +74,10 @@ class AboutPage extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(l10n.aboutWarningBody,
+                  // The warning body carries the INER website — SELECTABLE
+                  // so the URL stays copyable as plain text (no link
+                  // plugin; the app's offline-only posture).
+                  SelectableText(l10n.aboutWarningBody,
                       style: theme.textTheme.bodyMedium!.copyWith(
                           color: theme.colorScheme.onSecondaryContainer)),
                 ],
@@ -82,6 +89,16 @@ class AboutPage extends ConsumerWidget {
           // the Mode-M posture, here stated in the same breath as the
           // warning it tempers.
           Text(l10n.aboutPosture, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 24),
+          // The license/copyright section: Apache-2.0 with its copyright
+          // holder — the full license text lives in the repository's
+          // LICENSE file, so the section points there instead of
+          // reproducing it. SELECTABLE: the embedded repository URL is
+          // copyable.
+          Text(l10n.aboutLicenseHeading, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SelectableText(l10n.aboutLicenseBody,
+              style: theme.textTheme.bodyMedium),
           const SizedBox(height: 24),
           // The privacy/DSGVO notice — the same string the settings pane's
           // "Datenschutz" card shows (shared string source, no drift).
@@ -106,8 +123,10 @@ class AboutPage extends ConsumerWidget {
           const SizedBox(height: 32),
           // The feedback footer — the last thing on the page: nothing is
           // sent by the app itself, so problems and suggestions belong to
-          // the GitHub issue tracker (or mail).
-          Text(l10n.aboutFeedbackNotice, style: theme.textTheme.bodySmall),
+          // the GitHub issue tracker (or mail). SELECTABLE: the embedded
+          // issue-tracker URL is copyable text.
+          SelectableText(l10n.aboutFeedbackNotice,
+              style: theme.textTheme.bodySmall),
         ],
       ),
     );

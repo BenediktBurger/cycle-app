@@ -409,6 +409,9 @@ class EinstellungenScreen extends ConsumerWidget {
           // whatever it is.
           Card(
             child: InkWell(
+              // Keyed for test targeting (the pane carries several
+              // similarly-worded cards).
+              key: const ValueKey('aboutEntry'),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (context) => const AboutPage(),

@@ -70,7 +70,6 @@ the sections above track planned work, git history keeps the record (see
 - [ ] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
-- add descriptions (texts TBD) and tooltips, welcome page, links, help, copyright...
 - export as password protected zip
 - drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 - add (optional) reminder (e.g. every year) to do a backup of your data

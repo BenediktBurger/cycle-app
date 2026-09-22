@@ -285,9 +285,9 @@
     }
   },
   "aboutWarningTitle": "Important: observing and interpreting the body signs",
-  "aboutWarningBody": "Reliable cycle tracking depends on the faithful observation and interpretation of the body signs (temperature, mucus). The guide by Prof. Rötzer or a course (see INER) teaches the skills needed. Bring your questions to INER.",
+  "aboutWarningBody": "Reliable cycle tracking depends on the faithful observation and interpretation of the body signs (temperature, mucus). The guide by Prof. Rötzer or a course (see INER) teaches the skills needed. Bring your questions to INER (iner.org).",
   "@aboutWarningBody": {
-    "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. No URL is embedded on purpose — none is settled yet."
+    "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. INER's website (iner.org) is named as plain, copyable text — the link handling is a later concern."
   },
   "aboutPosture": "The app supports — it never decides: it computes and displays, but gives no fertility verdict; the evaluation stays with you.",
   "aboutPrivacyHeading": "Privacy",
@@ -299,6 +299,11 @@
     "description": "GDPR/privacy notice, English mirror of the German original — no servers, no transmission, crash-safe; GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Continue",
+  "aboutLicenseHeading": "License",
+  "aboutLicenseBody": "© 2026 Benedikt Burger — Apache-2.0. The license text is in the repository's LICENSE file (github.com/BenediktBurger/cycle-app).",
+  "@aboutLicenseBody": {
+    "description": "License/copyright section, English mirror of the German: the chosen license (Apache-2.0, set 2026-09) and its copyright holder, with a pointer to the LICENSE file in the repository rather than the reproduced text."
+  },
   "aboutBackupHint": "Backup, moving to another device, and recovery work only through the JSON export/import in the settings — the database file itself cannot be copied, because its key is bound to this device.",
   "@aboutBackupHint": {
     "description": "One-sentence backup hint on the about/onboarding page, English mirror of the German (settingsExportNote's backup role): export/import is the only backup/migration/recovery path; copying the encrypted, device-bound database file is never usable (ADR-0005)."
