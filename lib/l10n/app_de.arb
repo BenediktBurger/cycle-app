@@ -245,6 +245,30 @@
   "@aboutFeedbackNotice": {
     "description": "Feedback notice, footer of the about/onboarding page: the app does not send anything ever, not even at a crash; errors/suggestions go to the GitHub issue tracker (the factual project URL from the README) or via email — the mail phrasing stays generic because no address is committed anywhere."
   },
+  "aboutContactHeading": "Kontakt",
+  "@aboutContactHeading": {
+    "description": "Heading of the INER contact section on the about/onboarding page: tappable pointers to the INER website and per-intent pages. Pointer/contact section only — no endorsement wording (the app is not INER-endorsed)."
+  },
+  "aboutContactWebsite": "INER-Website",
+  "aboutContactCourses": "Kurse",
+  "aboutContactConsultation": "Beratung (Deutschland)",
+  "aboutContactBooks": "Leitfaden & Bücher",
+  "aboutContactWebsiteUrl": "https://iner.org/",
+  "aboutContactCoursesUrl": "https://iner.org/de/anwenden/kurse/kurse.html",
+  "aboutContactConsultationUrl": "https://iner.org/de/erlernen/beratungen/deutschland.html",
+  "aboutContactBooksUrl": "https://iner.org/de/anwenden/buecher-infos/buecher-literatur.html",
+  "@aboutContactWebsiteUrl": {
+    "description": "Per-locale URL binding of the about page's contact rows (the widget code reads the row's target from localization). The general INER site, identical for both locales."
+  },
+  "@aboutContactCoursesUrl": {
+    "description": "German deep link for the courses row; the English site has no courses page, so the English arb binds the general URL instead."
+  },
+  "@aboutContactConsultationUrl": {
+    "description": "German deep link (consultations in Germany) for the consultation row; the English site has no consultation page, so the English arb binds the general URL instead."
+  },
+  "@aboutContactBooksUrl": {
+    "description": "German deep link for the guide/books row; the EN counterpart page URL lives in the English arb."
+  },
   "settingsFeedbackNotice": "Diese App sendet nichts — auch nicht bei einem Absturz oder Fehler. Melde Probleme oder Vorschläge per GitHub-Issue (github.com/BenediktBurger/cycle-app/issues) oder E-Mail.",
   "@settingsFeedbackNotice": {
     "description": "Compact feedback line at the end of the settings pane (same stance as aboutFeedbackNotice)."

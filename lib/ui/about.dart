@@ -10,6 +10,7 @@
 // content nor the first-start "continue" affordance.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
@@ -26,6 +27,18 @@ final String displayedAppVersion = appVersion.split('+').first;
 /// take care of the rest — no navigation dance needed.
 void completeOnboarding(WidgetRef ref) {
   ref.read(onboardingCompletedProvider.notifier).state = true;
+}
+
+/// Tap target of the contact rows: opens the bound URL in the system
+/// browser/app. Launch failures are swallowed BY DESIGN: an offline device
+/// or a missing handler must never crash the about page — every target is
+/// also visible as row text, so the pointer stays usable either way.
+Future<void> _openContactUrl(String url) async {
+  try {
+    await launchUrl(Uri.parse(url));
+  } catch (error) {
+    // Swallowed on purpose (see the doc comment above).
+  }
 }
 
 class AboutPage extends ConsumerWidget {
@@ -110,6 +123,38 @@ class AboutPage extends ConsumerWidget {
           // backup role (settingsExportNote) — export/import only, never
           // copying the encrypted device-bound database file.
           Text(l10n.aboutBackupHint, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 24),
+          // The INER contact section: TAPPABLE, labeled rows to the INER
+          // website and the per-intent pages (courses, consultation, guide/
+          // books). Each row binds its target to the PER-LOCALE arb string —
+          // the English rows never deep-link a German-only page (the EN
+          // arb binds the general site instead; info parity keeps all four
+          // rows in both locales). Plain rows with an external-link icon;
+          // inline rich-text link spans are deliberately not used. This is
+          // a pointers/contact section only — no endorsement wording (the
+          // app is not INER-endorsed).
+          Text(l10n.aboutContactHeading, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final (String label, String url) in <(String, String)>[
+            (l10n.aboutContactWebsite, l10n.aboutContactWebsiteUrl),
+            (l10n.aboutContactCourses, l10n.aboutContactCoursesUrl),
+            (l10n.aboutContactConsultation, l10n.aboutContactConsultationUrl),
+            (l10n.aboutContactBooks, l10n.aboutContactBooksUrl),
+          ]) ...[
+            Card(
+              child: ListTile(
+                onTap: () => _openContactUrl(url),
+                title: Text(label, style: theme.textTheme.titleSmall),
+                // The target URL is also visible as row text: with only a
+                // plain Text the copy gesture would fight the row's tap
+                // gesture, so copyability is not offered here (the tappable
+                // row is the primary affordance).
+                subtitle: Text(url, style: theme.textTheme.bodySmall),
+                trailing: const Icon(Icons.open_in_new),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
           if (onboarding) ...[
             const SizedBox(height: 24),
             // The one way forward on the first start: confirm the reading

@@ -308,6 +308,30 @@
   "@aboutBackupHint": {
     "description": "One-sentence backup hint on the about/onboarding page, English mirror of the German (settingsExportNote's backup role): export/import is the only backup/migration/recovery path; copying the encrypted, device-bound database file is never usable (ADR-0005)."
   },
+  "aboutContactHeading": "Contact",
+  "@aboutContactHeading": {
+    "description": "Heading of the INER contact section on the about/onboarding page: tappable pointers to the INER website and per-intent pages. Pointer/contact section only — no endorsement wording (the app is not INER-endorsed)."
+  },
+  "aboutContactWebsite": "INER website",
+  "aboutContactCourses": "Courses",
+  "aboutContactConsultation": "Consultation (Germany)",
+  "aboutContactBooks": "Guide & books",
+  "aboutContactWebsiteUrl": "https://iner.org/",
+  "aboutContactCoursesUrl": "https://iner.org/",
+  "aboutContactConsultationUrl": "https://iner.org/",
+  "aboutContactBooksUrl": "https://iner.org/en/to-exercise/books-informations/books-literature.html",
+  "@aboutContactWebsiteUrl": {
+    "description": "Per-locale URL binding of the about page's contact rows (the widget code reads the row's target from localization). The general INER site, identical for both locales."
+  },
+  "@aboutContactCoursesUrl": {
+    "description": "The English INER site has no courses page — the row still exists in English (info parity) but falls back to the general iner.org URL; German-only pages are deliberately never linked from English text."
+  },
+  "@aboutContactConsultationUrl": {
+    "description": "The English INER site has no consultation page — the row still exists in English (info parity) but falls back to the general iner.org URL; German-only pages are deliberately never linked from English text."
+  },
+  "@aboutContactBooksUrl": {
+    "description": "The one real EN per-intent page (books/literature); its German counterpart URL lives in the German arb."
+  },
   "aboutFeedbackNotice": "This app does not send anything — not even on a crash or an error. Report problems or suggestions to the issues of the GitHub project page (github.com/BenediktBurger/cycle-app/issues) or by email.",
   "@aboutFeedbackNotice": {
     "description": "Feedback notice, footer of the about/onboarding page: the app does not send anything ever, not even at a crash; errors/suggestions go to the GitHub issue tracker (the factual project URL from the README) or per mail — the mail phrasing stays generic because no address is committed anywhere."

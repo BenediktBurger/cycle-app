@@ -83,6 +83,11 @@ dependencies:
   # Temperature curve chart; version range chosen to stay compatible
   # with the installed Flutter/Dart (resolved against Dart 3.13 — see lock).
   fl_chart: ^1.0.0
+  # Opening the INER contact links on the about/onboarding page in the
+  # system browser/app; the only plugin dependency — the offline tracking
+  # paths never touch it (tests fake the platform interface to stay
+  # offline-safe).
+  url_launcher: ^6.3.0
   # File picker for the import dialogs on the native targets (SAF-backed on
   # Android); web keeps its own file input, the stub covers exotic targets.
   file_selector: ^1.1.0
@@ -100,6 +105,10 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
   drift_dev: ^2.35.0
+  # Test-only: the recording fake in test/about_page_test.dart overrides
+  # url_launcher's platform interface to keep the widget suite offline-safe;
+  # the package itself arrives transitively with url_launcher.
+  url_launcher_platform_interface: ^2.3.2
   # Regenerates the launcher icons (all Android/iOS mipmaps) from
   # design/icon.png (rendered from the design/logo.svg master): run
   # `dart run flutter_launcher_icons` after changing the source.
