@@ -3,7 +3,10 @@ arb-dir: lib/l10n
 # from a locale's ARB with the template's text, so the untranslated-term
 # fallback language is English (never German; see docs/adr/0007-language-policy.md).
 # New keys therefore land in app_en.arb first and are translated from there
-# (currently de is the only other locale).
+# (currently de is the only other locale) — but that English-first entry is a
+# mechanical necessity of the template, not a wording verdict: once a German
+# translation exists, the German wording is authoritative and English mirrors
+# it (see docs/adr/0007-language-policy.md).
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 nullable-getter: false
