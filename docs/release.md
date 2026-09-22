@@ -281,7 +281,10 @@ Do **not** start until Android went through Phases B–F at least once.
      against the `pubspec.yaml` version (the parked workflow's missing
      pre-flight, performed locally), requires a clean tree, refuses when
      `vX.Y.Z` already exists as a tag, and requires the step-4 APK to
-     exist.
+     exist. The run also requires the installed SDK to match
+     `tool/flutter-version` — a mismatch fails;
+     `--accept-flutter-version` writes the pin and stops for commit +
+     rerun (first pin), or bypasses a deliberate mismatch for the run.
    - **Signature pin:** the `apksigner verify --print-certs` SHA-256
      certificate fingerprint must match the pin in
      `tool/release_fingerprint.txt` — a mismatch means the wrong key or

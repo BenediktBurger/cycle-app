@@ -532,7 +532,7 @@ Future<void> runRelease(List<String> arguments) async {
         _fail('FLUTTER VERSION MISMATCH: installed SDK '
             '$installedFlutter, pinned $pinnedFlutter in '
             '$flutterPinFilePath. The pin file is what the F-Droid '
-            "recipe parses from the tagged commit (nothing outside this "
+            'recipe parses from the tagged commit (nothing outside this '
             'one file needs an fdroiddata edit on a Flutter bump) — bump '
             'it to the installed SDK and commit, or pass '
             '--accept-flutter-version to bypass this check for this run.');
