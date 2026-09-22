@@ -423,11 +423,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                               const Icon(Icons.schedule_outlined),
                               const SizedBox(width: 4),
                               if (showTimeLabel) ...[
-                                // Flex-wrapped: never overflows its
-                                // share — at squeezed widths it degrades
-                                // to a wrapped label instead of an
-                                // overflow error.
-                                Flexible(child: Text(l10n.measuredTime)),
+                                Text(l10n.measuredTime),
                                 const SizedBox(width: 4),
                               ],
                               OutlinedButton(

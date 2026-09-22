@@ -13,7 +13,9 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
+import 'package:cycle_app/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
@@ -97,6 +99,39 @@ void main() {
       expect(find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
           findsNothing,
           reason: 'the error clears once the entry is valid again');
+    });
+
+    testWidgets(
+        'an external value change resyncs the untouched field and stops '
+        'resyncing once the user has typed', (WidgetTester tester) async {
+      useDeviceLocales(tester, const [Locale('de')]);
+
+      await tester.pumpWidget(appScope(locale: const Locale('de')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
+      final container = ProviderScope.containerOf(tester.element(field));
+      expect(tester.widget<TextField>(field).controller!.text, '0',
+          reason: 'the field starts at the provider default');
+
+      // A write from outside the field itself changes the provider state
+      // while the field has not been touched: the visible text follows.
+      container.read(observedCyclesOutsideAppProvider.notifier).state = 7;
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, '7',
+          reason: 'an external change must appear in the untouched field');
+
+      // After the user types, the visible text belongs to the user: an
+      // external change must not clobber mid-entry.
+      await tester.enterText(field, '3');
+      await tester.pumpAndSettle();
+      container.read(observedCyclesOutsideAppProvider.notifier).state = 11;
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, '3',
+          reason: 'an external change must not overwrite an edited field');
     });
   });
 

@@ -34,11 +34,10 @@ const String exportFileName = 'cycle_app_export.json';
 ///
 /// Manual validation instead of a digits-only input formatter on purpose:
 /// the formatter would silently swallow characters while the visible
-/// rejection states the rule. The field is an UNCONTROLLED text field: the
-/// controller initializes once and is not re-synced from the provider on
-/// rebuilds (the cursor would jump; hydration lands before any screen is
-/// reachable behind the database gate, so there is nothing to re-sync
-/// mid-edit).
+/// rejection states the rule. The field follows its [initialValue] until
+/// the user types: an external change to the initial value resyncs the
+/// controller while the field is untouched, afterwards the visible text
+/// belongs to the user and is not clobbered from outside mid-entry.
 final class _NonNegativeIntegerField extends StatefulWidget {
   const _NonNegativeIntegerField({
     required this.initialValue,
@@ -58,11 +57,20 @@ final class _NonNegativeIntegerField extends StatefulWidget {
 final class _NonNegativeIntegerFieldState
     extends State<_NonNegativeIntegerField> {
   late final TextEditingController _controller;
+  bool _userEdited = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: '${widget.initialValue}');
+  }
+
+  @override
+  void didUpdateWidget(_NonNegativeIntegerField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue && !_userEdited) {
+      _controller.text = '${widget.initialValue}';
+    }
   }
 
   @override
@@ -72,6 +80,7 @@ final class _NonNegativeIntegerFieldState
   }
 
   void _onChanged(String raw) {
+    _userEdited = true;
     final value = int.tryParse(raw.trim());
     final valid = value != null && value >= 0;
     setState(() {});
