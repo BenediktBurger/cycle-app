@@ -81,7 +81,3 @@ the sections above track planned work, git history keeps the record (see
 - add (optional) reminder (e.g. every year) to do a backup of your data
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
-- The cycle-summary table's "period start" row label still says period
-  start, while the marked cycle start may sit on a bleeding-free day —
-  wording follow-up; the new label wording should be settled first with the
-  ADR-0008 open question (c) expert review (needs expert wording).

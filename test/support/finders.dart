@@ -23,24 +23,19 @@ Finder navLabel(String label) => find.descendant(
 /// below the chart while a tapped day's options are showing.
 Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 
-/// The Zyklus screen's vertical list scroller (the horizontal chart and
-/// summary scrollers are excluded by direction). Offstage tabs are skipped
+/// The Zyklus screen's vertical list scroller (the horizontal chart
+/// scroller is excluded by direction). Offstage tabs are skipped
 /// by default, so in the full-app scope this still matches once — if a
 /// tree carries more than one vertical scroller in view, scope the finder
 /// to the screen's descendant.
 Finder cycleListScroller() => find.byWidgetPredicate(
     (w) => w is Scrollable && w.axisDirection == AxisDirection.down);
 
-/// The horizontal scroll view that carries the chart block. The evaluation
-/// table below the chart block has its own horizontal scroller (key
-/// `cycleSummaryScroll`) — it is not the chart block, so it is excluded by
-/// that key here. Callers that share the tree with other screens (the tab
-/// shell keeps every tab mounted) wrap this in a ZyklusScreen-scoped
-/// descendant finder.
-Finder chartScrollView() => find.byWidgetPredicate((w) =>
-    w is SingleChildScrollView &&
-    w.scrollDirection == Axis.horizontal &&
-    w.key != const ValueKey('cycleSummaryScroll'));
+/// The horizontal scroll view that carries the chart block. Callers that
+/// share the tree with other screens (the tab shell keeps every tab
+/// mounted) wrap this in a ZyklusScreen-scoped descendant finder.
+Finder chartScrollView() => find.byWidgetPredicate(
+    (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
 
 /// A chart-block recording-row cell: [row] = signal key (e.g. `bleeding`,
 /// `cervix`, `disturbance`), [index] = the day column.

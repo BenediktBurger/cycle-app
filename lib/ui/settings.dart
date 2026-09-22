@@ -353,9 +353,9 @@ class EinstellungenScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _NonNegativeIntegerField(
                     initialValue: ref.watch(observedCyclesOutsideAppProvider),
-                    // A distinct label: the card title right above carries
-                    // the full wording, the field names the count alone.
-                    labelText: l10n.settingsObservedCyclesOutsideAppCount,
+                    // A plain label: the field names the count with the
+                    // card title's wording.
+                    labelText: l10n.settingsObservedCyclesOutsideApp,
                     onChanged: (value) => ref
                         .read(observedCyclesOutsideAppProvider.notifier)
                         .state = value,

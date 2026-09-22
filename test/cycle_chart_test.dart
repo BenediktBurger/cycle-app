@@ -36,7 +36,6 @@ import 'package:cycle_app/ui/bleeding_symbol.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
-import 'package:cycle_app/ui/cycle_summary.dart';
 import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
@@ -460,20 +459,6 @@ Widget _helpSheetHarness({
 }) =>
     chartHarness(entries: entries, locale: locale, withScaffold: false);
 
-/// The glossary [finder]'s matches that do NOT sit inside the evaluation
-/// table: the table legitimately renders its own localized row labels (its
-/// "Mucus peak" row is a table attribute, not a glossary entry), so the
-/// glossary-absence check filters those matches out.
-Iterable<Element> outsideTable(Finder finder) =>
-    finder.evaluate().where((element) {
-      var insideTable = false;
-      element.visitAncestorElements((ancestor) {
-        if (ancestor.widget is CycleSummaryTable) insideTable = true;
-        return !insideTable;
-      });
-      return !insideTable;
-    });
-
 // Widget tests of the cycle chart's frozen left rail: the paper sheet's
 // fixed left margin lives OUTSIDE the horizontal scroll, so it stays
 // readable while the day columns slide — the owner-reported defect was the
@@ -823,9 +808,6 @@ Finder _marksCell(int index) => find.byKey(ValueKey('marksCell-$index'));
 const _columnWidth = 24.0;
 
 /// The finder for the horizontal scroll view that carries the chart block.
-/// The evaluation table below the chart block has its own horizontal
-/// scroller (key `cycleSummaryScroll`) — it is not the chart block, so it
-/// is excluded by that key here.
 Widget _windowingHarness({
   required List<DailyEntry> entries,
   Stream<List<DailyEntry>>? entriesStream,
@@ -1981,6 +1963,35 @@ void main() {
     });
   });
 
+// ═══════════ summary table absence ═══════════
+// new screen-level test from the summary-table removal (no former file;
+// see the file header note on the other sections' merge mechanics)
+
+  // The cycle tab renders NO evaluation summary table anymore: the chart
+  // block (with its evaluation overlay) is the only evaluation surface on
+  // the screen — the numbers live on the separate statistics tab. The
+  // absence is keyed on the `cycleSummary*` keys the table's scroller,
+  // cells and headers rendered with, so a re-introduction under a new
+  // class name is caught too.
+  testWidgets('the Zyklus screen renders no evaluation summary table',
+      (tester) async {
+    // A tall surface: the table would sit below the default test
+    // viewport's fold, and the Zyklus list is lazy — below the fold it is
+    // not even built, so a short surface could miss it and pass vacuously.
+    useTallSurface(tester);
+    await tester.pumpWidget(chartHarness(entries: _alignmentEntries(5)));
+    await tester.pumpAndSettle();
+
+    expect(find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          (key.value == 'cycleSummaryScroll' ||
+              key.value.startsWith('cycleSummaryCell-') ||
+              key.value.startsWith('cycleSummaryHeader-'));
+    }), findsNothing,
+        reason: 'no cycleSummary* scroller/cell/header keys render anymore');
+  });
+
 // ═══════════ grid lines ═══════════
 // former test/cycle_chart_grid_lines_test.dart (bodies concatenated verbatim; see
 // the file header for the merge mechanics)
@@ -2248,12 +2259,9 @@ void main() {
           reason: 'the action carries its localized tooltip');
 
       // The legend is gone from the screen: no glossary text renders
-      // outside the sheet. The evaluation table below the chart card
-      // legitimately renders its own localized row labels (its "Mucus
-      // peak" row is a table attribute, not a glossary entry), so the
-      // table's subtree is excluded from this absence check.
+      // outside the sheet anywhere on the cycle tab.
       for (final entry in _glossaryEn) {
-        expect(outsideTable(find.text(entry)), isEmpty,
+        expect(find.text(entry), findsNothing,
             reason: '"$entry" no longer sits on the screen');
       }
     });
@@ -2273,13 +2281,7 @@ void main() {
       expect(find.text('Symbol glossary'), findsOneWidget,
           reason: 'the sheet is titled');
       for (final entry in _glossaryEn) {
-        // Scoped to the sheet: the evaluation table renders its own row
-        // labels behind the sheet (the "Mucus peak" attribute row).
-        expect(
-            find.descendant(
-                of: find.byKey(const ValueKey('cycleHelpSheet')),
-                matching: find.text(entry)),
-            findsOneWidget,
+        expect(find.text(entry), findsOneWidget,
             reason: 'the glossary explains "$entry"');
       }
       // The sheet also carries the evaluation-arithmetic note (which stays
@@ -2339,14 +2341,7 @@ void main() {
 
       expect(find.text('Zeichenerklärung'), findsOneWidget);
       for (final entry in _glossaryDe) {
-        // Scoped to the sheet: the evaluation table renders its own row
-        // labels behind the sheet (the "Schleimhöhepunkt" attribute row).
-        expect(
-            find.descendant(
-                of: find.byKey(const ValueKey('cycleHelpSheet')),
-                matching: find.text(entry)),
-            findsOneWidget,
-            reason: 'de: "$entry"');
+        expect(find.text(entry), findsOneWidget, reason: 'de: "$entry"');
       }
       expect(
           find.descendant(

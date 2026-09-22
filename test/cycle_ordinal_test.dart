@@ -3,8 +3,7 @@
 // separator line) renders the "Cycle N" ordinal in the day header, with N
 // shifted by the persisted "cycles observed outside this app" setting. The
 // leading pre-mark group carries no ordinal (the shared ordinal rule,
-// lib/domain/cycle_grouping.dart — the evaluation table numbers through the
-// same helper so the two surfaces cannot drift).
+// lib/domain/cycle_grouping.dart).
 //
 // Harness: the shared chart pump (chart_pump.dart) with the
 // observedCyclesOutsideApp provider pinned per test; nothing is written to

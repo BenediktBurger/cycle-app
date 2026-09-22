@@ -32,7 +32,7 @@ import 'support/viewport.dart';
 /// A tall-enough test surface for every pump: the Zyklus list is lazy and
 /// the panel sits BELOW the chart block, so the default viewport would
 /// leave most panel rows unbuilt below the fold. A tall surface lays the
-/// chart, the open panel and the evaluation table out at once (the modal
+/// chart and the open panel out at once (the modal
 /// sheet of the old layout always fit the viewport on its own — the panel
 /// replaced that self-scroll with the owning list, see the panel comment).
 /// The scenario constants and the write-through harness live once in

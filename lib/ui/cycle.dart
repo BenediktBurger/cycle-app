@@ -70,7 +70,6 @@ import 'cycle_curve.dart';
 import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';
 import 'cycle_marks.dart';
-import 'cycle_summary.dart';
 import 'mucus_symbol.dart';
 
 class ZyklusScreen extends ConsumerWidget {
@@ -119,13 +118,12 @@ class ZyklusScreen extends ConsumerWidget {
               ),
             );
           }
-          // The evaluation table's input, like the chart overlay's: the
-          // entries plus the user-placed marks, evaluated at render time
-          // (ADR-0001). Watching the marks stream here makes a mark change
-          // rebuild the whole screen — the table recomputes, nothing is
-          // persisted. This is the screen's ONLY marks watch: the
-          // evaluations and the raw marks are computed once and handed to
-          // both the chart overlay and the table below.
+          // The chart overlay's input: the entries plus the user-placed
+          // marks, evaluated at render time (ADR-0001). Watching the marks
+          // stream here makes a mark change rebuild the whole screen — the
+          // overlay recomputes, nothing is persisted. This is the screen's
+          // ONLY marks watch: the evaluations and the raw marks are
+          // computed once and handed to the chart overlay.
           // The temperature display range ("Temperaturbereich" settings
           // card): watched here so a settings change rebuilds the chart
           // with the new fixed bounds — constructor data like
@@ -135,9 +133,9 @@ class ZyklusScreen extends ConsumerWidget {
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
           final evaluations = evaluateCycles(entries, marks);
           // The "cycles observed outside this app" setting: watched here so
-          // a settings change renumbers the chart's boundary ordinals and
-          // the table's column headers in the same rebuild — exactly why
-          // both surfaces take the value as constructor data.
+          // a settings change renumbers the chart's boundary ordinals in
+          // the same rebuild — exactly why the chart takes the value as
+          // constructor data.
           final observedCyclesOutsideApp =
               ref.watch(observedCyclesOutsideAppProvider);
           // The tapped day whose options the screen hosts below the chart
@@ -166,13 +164,6 @@ class ZyklusScreen extends ConsumerWidget {
                       ref.read(cycleDayPanelProvider.notifier).state = null,
                 ),
               if (panelDay != null) const SizedBox(height: 12),
-              // The paper's bottom summary: the evaluation table, one row
-              // per attribute, one column per cycle group.
-              CycleSummaryTable(
-                evaluations: evaluations,
-                observedCyclesOutsideApp: observedCyclesOutsideApp,
-              ),
-              const SizedBox(height: 12),
               Text(
                 l10n.cycleArithmeticNote,
                 style: Theme.of(context).textTheme.bodySmall,
@@ -227,8 +218,7 @@ final class _ChartDays {
     // The ordinals at the boundaries: each mark-opened group carries its
     // number from the shared ordinal rule (cycleOrdinalNumber) — observing
     // cycles outside this app shifts every boundary label, and the leading
-    // pre-mark group is skipped (it is not mark-opened, same rule the
-    // evaluation table's column headers follow).
+    // pre-mark group is skipped (it is not mark-opened).
     var markOpenedIndex = 0;
     cycleOrdinalByStart = {
       for (final g in groups)
@@ -318,7 +308,7 @@ final class _CycleChart extends StatefulWidget {
   final List<DailyEntry> entries;
 
   /// The user-placed marks, evaluated with [evaluations] by the screen (at
-  /// render time, ADR-0001) and shared here with the summary table.
+  /// render time, ADR-0001).
   final List<CycleMark> marks;
 
   /// The per-cycle evaluations the overlay draws its artifacts from —
@@ -659,8 +649,8 @@ final class _CycleChartState extends State<_CycleChart> {
     // arrow-up, 1–6 numbering, baseline) are computed at render time from
     // the entries plus the user-placed marks — never persisted, so a mark
     // change live-updates the whole overlay (ADR-0001). The marks stream is
-    // watched once in the screen, which also derives the evaluations the
-    // summary table shows; both arrive as widget fields, so the curve
+    // watched once in the screen, which derives the evaluations drawn
+    // by the overlay; they arrive as widget fields, so the curve
     // itself still never depends on a mark change beyond a screen rebuild.
     final overlay = buildEvaluationOverlay(
       evaluations: widget.evaluations,
@@ -1956,9 +1946,7 @@ final class _DayHeaderRow extends StatelessWidget {
                   // cell, the "Zyklus N" label at the boundary the cycle
                   // opens on (the ordinal is keyed for the widget tests).
                   // FittedBox scales it into narrow columns like the
-                  // day-of-month label; at the minimum column width the
-                  // evaluation table's column headers carry the same
-                  // number instead.
+                  // day-of-month label.
                   SizedBox(
                     height: _CycleChartState.dayHeaderOrdinalLineHeight,
                     child: Center(

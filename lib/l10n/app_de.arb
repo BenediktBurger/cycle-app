@@ -177,16 +177,6 @@
       }
     }
   },
-  "cycleSummaryCycleLength": "Zykluslänge",
-  "cycleSummaryPeriodStart": "Mensbeginn",
-  "cycleSummaryPeriodEnd": "Mensende",
-  "cycleSummaryPeak": "Schleimhöhepunkt",
-  "cycleSummarySuz": "SUZ-Beginn",
-  "cycleSummaryStatus": "Auswertung",
-  "cycleSummaryColumn": "Zyklus {n}",
-  "cycleSummarySuzEvening": "Regel D (gegen Abend)",
-  "cycleSummarySuzMorning": "Regel E (am Morgen)",
-  "cycleSummarySuzFrom": "SUZ ab {day}",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen) — keine Bewertung oder Aussagen über Fruchtbarkeit. Eine gesetzte Zyklusbeginn-Markierung gilt unabhängig vom Bleedingsmuster; Störungen verschieben sie nicht.",
   "statisticsNoData": "Sobald zwei Zyklusbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",

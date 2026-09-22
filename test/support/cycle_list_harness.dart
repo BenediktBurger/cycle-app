@@ -1,5 +1,5 @@
 // Shared harness for the widget tests that pump the ZyklusScreen list
-// (chart, non-modal day-options panel, evaluation table) directly and write
+// (chart, non-modal day-options panel) directly and write
 // through the REAL MarksDao so every write surfaces in the streams that
 // re-render the panel and the chart. Used by test/cycle_mark_sheet_test.dart
 // and test/cycle_day_panel_test.dart (the same harness both kept two copies
@@ -34,8 +34,8 @@ final List<DailyEntry> scenarioEntries = evaluationScenarioEntries();
 final CycleMark scenarioPeakMark = evaluationScenarioMarks()[0];
 final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
 
-/// The cycle screen's list (chart, non-modal day-options panel,
-/// evaluation table) pumped over an in-memory database whose real MarksDao
+/// The cycle screen's list (chart, non-modal day-options panel)
+/// pumped over an in-memory database whose real MarksDao
 /// carries every seeded and test-written mark.
 ///
 /// [seedMarks] are written through `marksDao.addMark` inside the database

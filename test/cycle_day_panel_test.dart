@@ -22,10 +22,10 @@ void main() {
   testWidgets(
       'tapping a chart day shows the day options in a NON-MODAL panel '
       'below the chart', (tester) async {
-    // A taller surface: the chart block plus the open panel plus the
-    // evaluation table should ALL be laid out visibly here (the Zyklus
-    // list is lazy; at the default test viewport the table would sit below
-    // the fold and never build).
+    // A taller surface: the chart block plus the open panel should both
+    // be laid out visibly here (the Zyklus list is lazy; at the default
+    // test viewport the panel below the chart would sit below the fold
+    // and never build).
     useTallSurface(tester, height: 2000);
     final (_, _) = await pumpCycleList(tester,
         entries: scenarioEntries,
@@ -43,9 +43,10 @@ void main() {
         reason: 'the form jump stays reachable via "edit day"');
     expect(find.text('Low measurement 4'), findsOneWidget,
         reason: "A's options carry the day's computed info line");
-    // Non-modal: the evaluation table below is still laid out (the panel
-    // renders between chart and table, not as an overlay).
-    expect(find.byKey(const ValueKey('cycleSummaryScroll')), findsOneWidget);
+    // Non-modal: the chart below stays laid out (the panel renders in the
+    // owning list's flow, not as an overlay), and the evaluation summary
+    // table that used to sit under the chart is gone.
+    expect(find.byKey(const ValueKey('cycleSummaryScroll')), findsNothing);
     expect(find.byType(LineChart), findsOneWidget);
   });
 
