@@ -1,9 +1,11 @@
 // Widget tests of the cycle ordinal on the cycle chart: every cycle
 // boundary day (the same isCycleBoundary predicate that draws the thick
-// separator line) renders the "Cycle N" ordinal in the day header, with N
-// shifted by the persisted "cycles observed outside this app" setting. The
-// leading pre-mark group carries no ordinal (the shared ordinal rule,
-// lib/domain/cycle_grouping.dart).
+// separator line) renders the "Cycle N" ordinal as a badge at the top of
+// the plot INSIDE the temperature block, pinned to the cycle's first
+// column, with N shifted by the persisted "cycles observed outside this
+// app" setting. The leading pre-mark group carries no ordinal (the shared
+// ordinal rule, lib/domain/cycle_grouping.dart — the evaluation table
+// numbers through the same helper so the two surfaces cannot drift).
 //
 // Harness: the shared chart pump (chart_pump.dart) with the
 // observedCyclesOutsideApp provider pinned per test; nothing is written to
@@ -42,8 +44,8 @@ void main() {
 
     final ordinal = find.byKey(const ValueKey('cycleOrdinal-9'));
     expect(ordinal, findsOneWidget,
-        reason: 'the boundary day renders its ordinal label in the day '
-            'header');
+        reason: 'the boundary day renders its ordinal label at the top of '
+            'the plot inside the temperature block');
     expect(ordinalText(tester, 9), 'Cycle 1',
         reason: 'the first mark-opened cycle is "Cycle 1"');
     // The leading pre-mark group carries no ordinal.
@@ -87,7 +89,7 @@ void main() {
   });
 
   testWidgets(
-      'the ordinal label stays inside the header cell in German '
+      'the ordinal label renders at the top of the plot in German '
       '(the l10n key mirrors the evaluation-table wording)', (tester) async {
     await tester.pumpWidget(chartHarness(
       entries: _entries,

@@ -2142,6 +2142,188 @@ void main() {
           reason: 'the group opened across the untracked gap days draws '
               'its separator across the gap');
     });
+
+    testWidgets(
+        'the in-plot ordinal badge pins its left edge to the boundary '
+        'column (the pixel the separator is drawn through)', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      // The badge chip renders inside the temperature plot, and its LEFT
+      // edge pins to the boundary day's column start — pixel i · cellWidth
+      // measured from the plot's left edge (a small inset tolerated), the
+      // same pixel the thick separator's chart-domain x = i − 0.5 maps to.
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / _twoCycleEntries.length;
+      for (final i in [5, 9]) {
+        final chipRect =
+            tester.getRect(find.byKey(ValueKey('cycleOrdinalChip-$i')));
+        expect(chipRect.left, closeTo(plot.left + i * colW, 2.5),
+            reason: 'day-index $i: the badge\'s left edge pins to its '
+                'cycle\'s first column inside the plot');
+      }
+    });
+
+    testWidgets(
+        'the in-plot ordinal badge shrink-wraps its background to the '
+        'label: no full band across the cycle\'s own columns', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / _twoCycleEntries.length;
+      // The first boundary (day 5) opens a cycle running columns 5..8 — a
+      // 4-column span the chip must NOT paint across: its background hugs
+      // the localized wording instead (text + a small horizontal padding).
+      final firstTextNatural =
+          tester.getSize(find.byKey(const ValueKey('cycleOrdinal-5'))).width;
+      final first =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinalChip-5')));
+      final firstSpan = (9 - 5) * colW;
+      expect(first.width, lessThan(firstSpan / 2),
+          reason: 'day-index 5: the chip\'s background hugs the label '
+              'instead of spanning the cycle\'s own columns');
+      expect(first.width, greaterThan(firstTextNatural),
+          reason: 'day-index 5: the shrink-wrapped background still '
+              'includes its horizontal padding around the text');
+
+      // The text sits inside the hugging background.
+      final firstText =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinal-5')));
+      expect(firstText.left, greaterThanOrEqualTo(first.left),
+          reason: 'the label starts inside the hugging background');
+      expect(firstText.right, lessThanOrEqualTo(first.right),
+          reason: 'the label ends inside the hugging background');
+
+      // The last cycle ran columns 9..11 before: with the shrink-wrap the
+      // chip no longer runs to the plot's right edge either.
+      final last =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinalChip-9')));
+      expect(last.right, lessThan(plot.right),
+          reason: 'day-index 9: the last cycle\'s chip hugs its label, it '
+              'no longer runs to the plot\'s right edge');
+    });
+
+    testWidgets(
+        'the in-plot ordinal badge clamps at the built window\'s right '
+        'edge: a boundary whose cycle runs past the window squeezes the '
+        'label into the windowed span instead of overflowing the plot',
+        (tester) async {
+      // A 150-day range with a sole cycleStart mark at day index 62: the
+      // mark's cycle's own columns would run all the way to the range's
+      // end — far past the built window once the block scrolled away from
+      // the newest days. After dragging to the content's start the parked
+      // window's last built index is 62 (observed below), so the clamp
+      // leaves the chip a SINGLE day column — narrower than the natural
+      // label, i.e. the clamp really bites.
+      const boundaryIndex = 62;
+      final entries = longRangeEntries(150);
+      final marks = [
+        CycleMark(
+            date: longRangeDay(boundaryIndex), type: CycleMarkTypes.cycleStart)
+      ];
+      await tester
+          .pumpWidget(_gridLinesHarness(entries: entries, marks: marks));
+      await tester.pumpAndSettle();
+      // Drag back to the earliest days (the drag exceeds the range's whole
+      // scroll extent, so it settles at the content's start) and let the
+      // window re-park well inside the range.
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
+      await tester.pumpAndSettle();
+
+      // The built window's right edge, observed like every windowed row:
+      // the day-label cells render exactly for the window's indexes. The
+      // fixture above depends on the boundary sitting AT that edge.
+      var windowEnd = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (tester.any(_dayLabel(i))) windowEnd = i;
+      }
+      expect(windowEnd, boundaryIndex,
+          reason: 'the fixture pins the boundary to the parked window\'s '
+              'last built index, so the windowed clamp is what limits '
+              'the chip');
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / entries.length;
+      // The windowed clamp: the cycle's available span is clamped to the
+      // window's right edge (one past the last built index), minus the two
+      // column insets. The natural label is WIDER than that span, so the
+      // clamp genuinely bites instead of the chip merely hugging the text.
+      final maxWidth = (windowEnd + 1 - boundaryIndex) * colW - 4;
+      final chip = tester
+          .getRect(find.byKey(ValueKey('cycleOrdinalChip-$boundaryIndex')));
+      final natural = tester
+          .getSize(find.byKey(ValueKey('cycleOrdinal-$boundaryIndex')))
+          .width;
+      expect(natural, greaterThan(maxWidth),
+          reason: 'the localized wording is wider than the single-column '
+              'clamped span, so the window clamp — not the shrink-wrap — '
+              'limits this chip');
+
+      // The chip fills the clamped span exactly: its right edge stops at
+      // the window's right boundary instead of running toward the cycle's
+      // natural end (the range's end), never overflowing the plot.
+      expect(chip.width, closeTo(maxWidth, 0.5),
+          reason: 'day-index $boundaryIndex: the clamped span is the '
+              'chip\'s effective width');
+      expect(chip.right, closeTo(plot.left + (windowEnd + 1) * colW, 2.5),
+          reason: 'day-index $boundaryIndex: the chip clamps at the built '
+              'window\'s right edge');
+      expect(chip.right, lessThan(plot.right),
+          reason: 'the clamped chip never overflows the plot');
+    });
+
+    testWidgets(
+        'a perversely short cycle renders its chip and the FittedBox '
+        'scales the label down instead of overflowing', (tester) async {
+      // Cycle starts on directly adjacent days at the range's tail: two
+      // degenerate one-day cycles, so each chip is bounded by a single
+      // minimum-width column minus the two column insets.
+      final entries = longRangeEntries(60);
+      final marks = [
+        for (final i in [58, 59])
+          CycleMark(date: longRangeDay(i), type: CycleMarkTypes.cycleStart)
+      ];
+      await tester
+          .pumpWidget(_gridLinesHarness(entries: entries, marks: marks));
+      await tester.pumpAndSettle();
+
+      final chipFinder = find.byKey(const ValueKey('cycleOrdinalChip-59'));
+      expect(chipFinder, findsOneWidget,
+          reason: 'the one-day cycle renders its chip');
+      final chip = tester.getRect(chipFinder);
+
+      // The one-cycle column minus the two column insets is the chip's
+      // available width — and the natural label is wider, so the chip is
+      // clamped to that span (this is what forces the scale-down case).
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / entries.length;
+      final natural = tester
+          .getSize(find.descendant(of: chipFinder, matching: find.byType(Text)))
+          .width;
+      expect(natural, greaterThan(colW - 4),
+          reason: 'the localized wording is wider than the one-column '
+              'span at its natural size, so only a FittedBox scale-down '
+              'fits it');
+      expect(chip.width, closeTo(colW - 4, 0.5),
+          reason: 'the one-day cycle pins the chip to its single column '
+              '(the natural text is squeezed, not widened beyond it)');
+
+      final textFinder = find.byKey(const ValueKey('cycleOrdinal-59'));
+      final fitted = tester.widget<FittedBox>(
+          find.descendant(of: chipFinder, matching: find.byType(FittedBox)));
+      expect(fitted.fit, BoxFit.scaleDown,
+          reason: 'the chip scales the label down, never up');
+      // The VISUAL (fitted) text bounds stay inside the chip: scaled down
+      // to the chip's width, not overflowing it.
+      final visual = tester.getRect(textFinder);
+      expect(visual.right, lessThanOrEqualTo(chip.right),
+          reason: 'the scaled-down label fits inside the chip\'s width');
+      expect(visual.left, greaterThanOrEqualTo(chip.left),
+          reason: 'the scaled-down label starts inside the chip');
+    });
   });
 
   group('horizontal NER temperature grid', () {

@@ -345,18 +345,14 @@ final class _CycleChartState extends State<_CycleChart> {
   /// width.
   static const double frozenRailWidth = 44;
 
-  /// The fixed height of the day/cycle header segment: shared between the
-  /// scrolling header row's cells and the rail's prototype slot so both
-  /// sides stay vertically in step (the rail's scale segment must start
-  /// exactly where the plot starts). Taller than the old two-line header:
-  /// a cycle boundary also renders its "Zyklus N" ordinal line here (both
-  /// sides share the constant, so the alignment holds).
-  static const double dayHeaderRowHeight = 40;
-
-  /// The fixed height of an ordinal line inside the header (reserved in
-  /// every cell, filled only at boundaries — the same slot rhythm the
-  /// mucus row reserves for the peak dot).
-  static const double dayHeaderOrdinalLineHeight = 12;
+  /// The fixed height of the day/cycle header segment: two lines — day of
+  /// month above, day of cycle underneath. Shared between the scrolling
+  /// header row's cells and the rail's prototype slot so both sides stay
+  /// vertically in step (the rail's scale segment must start exactly where
+  /// the plot starts). The cycle ordinal is NOT part of the header: it
+  /// renders inside the temperature plot as a badge
+  /// (_CycleOrdinalBadges), so the header stays at its natural two lines.
+  static const double dayHeaderRowHeight = 28;
 
   static const Duration _scrollDuration = Duration(milliseconds: 300);
 
@@ -1155,6 +1151,19 @@ final class _CycleChartState extends State<_CycleChart> {
                                     ),
                                   ),
                                 ),
+                                // The in-plot cycle ordinal badges: the
+                                // "Zyklus N" chip at the top of every
+                                // mark-opened cycle's first column
+                                // (_CycleOrdinalBadges) — non-interactive
+                                // rendering pinned to this stack, below the
+                                // opaque tap overlay so the day-column
+                                // mapping stays untouched.
+                                _CycleOrdinalBadges(
+                                  days: _days,
+                                  cellWidth: colW,
+                                  windowStart: winStart,
+                                  windowEnd: winEnd,
+                                ),
                                 // The tap overlay covers the whole scroll
                                 // content: the plot spans it fully (no axis
                                 // strip left of the plot — the scale lives in
@@ -1866,19 +1875,17 @@ String _shortMonthLabel(DateTime date, String locale) =>
     DateFormat('d', locale).dateSymbols.SHORTMONTHS[date.month - 1];
 
 /// The day/cycle header line ABOVE the chart (the paper's header row):
-/// every day column shows its day of month ("14.") on top, its day of
+/// every day column shows its day of month ("14.") on top and its day of
 /// cycle (1, 2, 3 …, counted from the cycle start in _ChartDays)
-/// underneath, and — reserved in EVERY cell so the rhythm holds — at
-/// cycle boundary days (the shared [isCycleBoundary] predicate that draws
-/// the thick separator line) the cycle's ordinal line ("Zyklus N",
-/// lib/domain/cycle_grouping.dart's shared rule with the outside-app
-/// setting). On the FIRST day of a calendar month the day-of-month label
-/// is REPLACED by the localized short month form (de "Jan." / en "Jan") —
-/// the month home the otherwise bare day numbers need. The rule is
-/// CALENDAR-based, not cycle-based: a cycle start mid-month keeps its
-/// plain day number (owner decision). The two column prototypes (date
-/// sample "14.", cycle-day sample "#5") live in the frozen left rail's
-/// header slot (see _LeftRail).
+/// underneath. The cycle ordinal ("Zyklus N") is NOT part of the header:
+/// it renders inside the temperature plot as a badge at each cycle's
+/// first column (see _CycleOrdinalBadges). On the FIRST day of a calendar
+/// month the day-of-month label is REPLACED by the localized short month
+/// form (de "Jan." / en "Jan") — the month home the otherwise bare day
+/// numbers need. The rule is CALENDAR-based, not cycle-based: a cycle
+/// start mid-month keeps its plain day number (owner decision). The two
+/// column prototypes (date sample "14.", cycle-day sample "#5") live in
+/// the frozen left rail's header slot (see _LeftRail).
 /// TODO(user-review): the prototypes ("14.", "#5") are ad-hoc column
 /// samples; the experts may want different header prototypes.
 /// Mirrors the signal rows' windowed layout: the window spacer puts the
@@ -1903,7 +1910,6 @@ final class _DayHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toString();
-    final l10n = AppLocalizations.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1940,30 +1946,6 @@ final class _DayHeaderRow extends StatelessWidget {
                           ? _shortMonthLabel(days.dayAt(i), locale)
                           : '${days.dayAt(i).day}.',
                       style: const TextStyle(fontSize: 10),
-                    ),
-                  ),
-                  // The cycle ordinal line: empty in every non-boundary
-                  // cell, the "Zyklus N" label at the boundary the cycle
-                  // opens on (the ordinal is keyed for the widget tests).
-                  // FittedBox scales it into narrow columns like the
-                  // day-of-month label.
-                  SizedBox(
-                    height: _CycleChartState.dayHeaderOrdinalLineHeight,
-                    child: Center(
-                      child: days.isCycleBoundary(i)
-                          ? FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                l10n.cycleOrdinal(
-                                    days.cycleOrdinalByStart[days.dayAt(i)]!),
-                                key: ValueKey('cycleOrdinal-$i'),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            )
-                          : null,
                     ),
                   ),
                   // Day of cycle: subtler than the 1–6 numbering (that one
@@ -2013,6 +1995,118 @@ Widget _columnPrototype({
         ),
       ),
     );
+
+/// The in-plot cycle ordinal badges: at every mark-opened cycle boundary
+/// (the shared [_ChartDays.isCycleBoundary] predicate that draws the thick
+/// separator line) a small "Zyklus N" chip renders INSIDE the temperature
+/// plot, pinned to the top of the boundary day's column — the paper
+/// sheet's cycle number written at the top of each cycle section. The
+/// chips sit BELOW the tap overlay in the chart's stack and carry no
+/// gesture target of their own, so tap/long-press day-column mapping is
+/// untouched.
+///
+/// Geometry: the boundary separator is drawn at chart-domain x = i − 0.5
+/// and the x domain is half a column shifted with one column per day
+/// index (minX −0.5), so that separator's pixel is exactly
+/// i · cellWidth from the plot's left edge — where the chip's left edge
+/// pins with a small inset (the inset keeps the chip clear of the
+/// separator line it hangs from). The background shrink-wraps around the
+/// label (text + a small horizontal padding), NOT the cycle's columns.
+/// The cycle's own column span — boundary day through the day before the
+/// next boundary (or the range's last day), clamped to the built window —
+/// is only the chip's MAXIMUM width, applied with the same windowed clamp
+/// as every other row: a label wider than its cycle's span (the built
+/// window's right edge or a perversely SHORT cycle — fewer columns than
+/// the localized wording needs) scales down through the same FittedBox
+/// scale-down the header cell labels use (accepted edge case).
+///
+/// Mirrors the signal rows' windowed layout: only the built window's
+/// boundaries render. The ordinal comes from the shared rule
+/// ([_ChartDays.cycleOrdinalByStart] — lib/domain/cycle_grouping.dart's
+/// cycleOrdinalNumber with the outside-app setting), the same number the
+/// evaluation table's column headers use; the leading pre-mark group is
+/// not a boundary and carries no chip.
+///
+/// TODO(user-review): the chip's look (rounded surface-tinted container at
+/// ~0.9 opacity, 9 px primary-colored text, top-of-plot pinning, inset
+/// and hugging padding sizes) is an owner-eyeball rendering detail.
+/// TODO(user-review): known overlap — a user-placed SUZ bar on the cycle's
+/// first day hangs from the plot top (the suzBarHangSpanDegrees drop) and
+/// sits under the chip where it overlaps the label; the chip's opaque
+/// background covers it. Curve dots do not collide: cycle-start
+/// temperatures are biologically low (owner decision).
+const double _cycleBadgeColumnInset = 2;
+const double _cycleBadgeTopInset = 3;
+const double _cycleBadgeHeight = 14;
+
+final class _CycleOrdinalBadges extends StatelessWidget {
+  const _CycleOrdinalBadges({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+  });
+
+  final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final chips = <Widget>[];
+    for (var i = windowStart; i <= windowEnd; i++) {
+      if (!days.isCycleBoundary(i)) continue;
+      // The cycle's end: the next boundary's column start, or the range's
+      // end when this is the last cycle. Only boundaries inside the built
+      // window are visited, so the chip clamps at the window's right edge.
+      var nextBoundary = days.dayCount;
+      for (var j = i + 1; j < days.dayCount; j++) {
+        if (days.isCycleBoundary(j)) {
+          nextBoundary = j;
+          break;
+        }
+      }
+      final rightIndex = math.min(nextBoundary, windowEnd + 1);
+      chips.add(Positioned(
+        left: i * cellWidth + _cycleBadgeColumnInset,
+        top: _cycleBadgeTopInset,
+        height: _cycleBadgeHeight,
+        child: ConstrainedBox(
+          // The cycle's own column span (clamped to the built window like
+          // every other row) is the chip's MAX width only: the chip is
+          // free to shrink to its label, and a span narrower than the
+          // label squeezes it down through the FittedBox below.
+          constraints: BoxConstraints(
+            maxWidth: (rightIndex - i) * cellWidth - 2 * _cycleBadgeColumnInset,
+          ),
+          child: Container(
+            // The chip key exposes the badge's rect for the geometry
+            // widget tests (the Text alone keeps 'cycleOrdinal-$i').
+            key: ValueKey('cycleOrdinalChip-$i'),
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l10n.cycleOrdinal(days.cycleOrdinalByStart[days.dayAt(i)]!),
+                key: ValueKey('cycleOrdinal-$i'),
+                style: TextStyle(fontSize: 9, color: scheme.primary),
+              ),
+            ),
+          ),
+        ),
+      ));
+    }
+    return Stack(children: chips);
+  }
+}
 // --- temperature scale (chart domain + frozen-rail labels) ------------------
 
 /// The temperature scale's single source of truth: the chart's y domain
