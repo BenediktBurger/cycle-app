@@ -227,11 +227,14 @@ Android toolchain is green (§3 above, "Android toolchain") — the web build
 remains the primary correctness gate until then.
 
 **Linux note (database tests):** the drift tests under `test/db/` open the
-real SQLite engine on the host. The `hooks: user_defines: sqlite3:
-source: sqlite3mc` block in `pubspec.yaml` supplies that engine: the
-sqlite3 build hook fetches a prebuilt SQLite3MultipleCiphers library, so
-no `libsqlite3-dev` install is needed — the system SQLite (which has no
-cipher support) is not used for these runs. Two host-VM smoke scripts
+real SQLite engine on the host. The `hooks: user_defines: sqlite3`
+block in `pubspec.yaml` supplies that engine: the sqlite3 build hook
+compiles the SQLite3MultipleCiphers amalgamation vendored under
+`native/sqlite3mc/` (provenance and refresh steps in
+`native/sqlite3mc/README.md`; no network needed — nothing is fetched
+from a GitHub release at build time), so no `libsqlite3-dev` install is
+needed — the system SQLite (which has no cipher support) is not used
+for these runs. Two host-VM smoke scripts
 execute core assertions without the test runner (useful when hunting
 failures):
 

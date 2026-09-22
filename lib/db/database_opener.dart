@@ -9,9 +9,11 @@
 //  - Native (Android/iOS/desktop): a background-isolate NativeDatabase over
 //    `<application documents>/<databaseName>.sqlite` (directory resolved
 //    via path_provider, now a direct dependency). The file is ALWAYS-ON
-//    ENCRYPTED: the `hooks: user_defines: sqlite3: source: sqlite3mc` block
-//    in pubspec.yaml pulls SQLite3MultipleCiphers in as the sqlite3
-//    package's bundled SQLite engine, and the native `setup` below applies
+//    ENCRYPTED: the `hooks: user_defines: sqlite3` block in pubspec.yaml
+//    pulls SQLite3MultipleCiphers in as the sqlite3 package's bundled
+//    SQLite engine (compiled by the hook from the amalgamation vendored
+//    under native/sqlite3mc/, no build-time download), and the native
+//    `setup` below applies
 //    the key from flutter_secure_storage (lib/db/db_key.dart) via
 //    `PRAGMA key` before drift touches the database. There is no settings
 //    toggle; the setup verifies that the cipher build is actually present
