@@ -46,11 +46,6 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
-- [ ] make the journals save button always visible (top bar?) such that you can save wherever you changed something, not only at the bottom
-- [ ] remove stale text line "von der Auswertung ausgeschlossen" from the add mark sheet
-- [ ] remove superfluous note on settings pane that the settings are stored (users expect settings to be stored)
-- [ ] make sure that it works also in horizontal view (especially for the cycle, to see more of the cycle better)
-- [ ] diary: make it compacter (temperature and time on the same line?)
 - Cycle-length statistics during a very long mark-driven cycle: during
   pregnancy a cycle runs arbitrarily long (day-of-cycle > 100 on the
   chart) and skews cycle-length statistics — `cycleLengthsInDays`
@@ -60,9 +55,7 @@ the sections above track planned work, git history keeps the record (see
   treat such spans (cap, exclusion, pregnancy marker) — an expert/ADR
   question.
 - [ ] Add a welcome/warning screen for the first start that fertility tracking depends on the faithful observation and interpretation of body signs (temperature, mucus). The guide by Prof. Rötzer or courses (see INER page) teach the necessary skills. For questions don't hesitate to reach out to INER. (this should also to some about page or so, maybe show that about page at the beginning?)
-- [ ] add the number of cycle to the cycle page somewhere to the cycle start (add a setting for numbers of observed cycles outside this app)
 - [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
-- [ ] cycle: make it possible to click another day without deselecting the first one (maybe add a button to close day options)
 - [ ] add necessary DSVGO notice
 - [ ] mention backup / data migration / data recovery (only via export, not copying the data base) - readme, and also in the app?
 - [ ] add a notice that you should open a Github issue or send a mail for errors (or suggestions) as this app does not send anything ever, even on crash
@@ -88,7 +81,3 @@ the sections above track planned work, git history keeps the record (see
 - add (optional) reminder (e.g. every year) to do a backup of your data
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
-- The cycle-summary table's "period start" row label still says period
-  start, while the marked cycle start may sit on a bleeding-free day —
-  wording follow-up; the new label wording should be settled first with the
-  ADR-0008 open question (c) expert review (needs expert wording).

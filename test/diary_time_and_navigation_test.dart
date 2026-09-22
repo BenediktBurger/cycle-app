@@ -25,6 +25,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'support/diary_harness.dart';
+import 'support/viewport.dart';
+import 'support/error_collector.dart';
 
 // Widget tests for the time-of-measurement feature on the Tagebuch screen.
 //
@@ -158,6 +160,62 @@ void main() {
     expect(find.text('14:35'), findsOneWidget,
         reason: 'the picker button shows the injected current time as the '
             'prefill');
+  });
+
+  testWidgets(
+      'compact density: the temperature field and the measured-time row '
+      'share one visual line', (WidgetTester tester) async {
+    _measuredTimeHarness.tallSurface(tester);
+    await tester.pumpWidget(_measuredTimeHarness.scope());
+    await tester.pumpAndSettle();
+
+    await enterTemperature(tester, '36.5');
+
+    // The measured-time label must sit INSIDE the vertical span of the
+    // temperature field (beside it), not below it in its own row.
+    final tempField = find.byType(TextFormField).first;
+    final tempTop = tester.getTopLeft(tempField).dy;
+    final tempBottom = tester.getBottomRight(tempField).dy;
+    final timeTop = tester.getTopLeft(find.text('Gemessen um')).dy;
+    expect(timeTop, inInclusiveRange(tempTop, tempBottom),
+        reason: 'the temperature field and the measured-time row share one '
+            'visual line — the time row is not stacked below the field');
+  });
+
+  testWidgets(
+      'the one-line temperature/time row stays overflow-free at a narrow '
+      'viewport', (WidgetTester tester) async {
+    useNarrowPhoneViewport(tester);
+
+    await tester.pumpWidget(_measuredTimeHarness.scope());
+    await tester.pumpAndSettle();
+
+    // Waive the pump-time record: at this forced width, widget-test font
+    // metrics can overflow OTHER rows of the tall form once at the initial
+    // layout — e.g. the date row (a documented, still-open narrow-width
+    // defect of that row, not this one). Everything that fails from here
+    // on, during the temperature/time interaction, belongs to the one-line
+    // row and must stay silent.
+    tester.takeException();
+
+    await expectNoFrameworkErrors(tester, () async {
+      await enterTemperature(tester, '36.5');
+      // At this width the printed label drops (it is the widest part of
+      // the line); the control stays through icon, time button and the
+      // prefill.
+      expect(find.text('Gemessen um'), findsNothing,
+          reason: 'narrow-width layout drops the printed label (documented '
+              'behavior) — it is the widest part of the line');
+      expect(find.text('14:35'), findsOneWidget,
+          reason: 'the one-line row still renders the time control with the '
+              'prefilled current time at the narrow width');
+      expect(find.byIcon(Icons.schedule_outlined), findsOneWidget,
+          reason: 'the clock icon keeps carrying the meaning at narrow '
+              'widths');
+    },
+        reason: 'the compact temperature/time row must not introduce a new '
+            'RenderFlex overflow at narrow widths');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('an implausible temperature keeps the time row hidden',

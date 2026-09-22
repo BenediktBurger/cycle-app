@@ -1,20 +1,30 @@
-// Widget tests of the mark-entry bottom sheet on the cycle tab (Mode M,
-// ADR-0001): tapping a chart day opens a modal sheet with the "edit day"
-// action, the contextual set/remove actions for the mucus peak, the first
-// higher measurement, the SUZ start and the cycle start (the authoritative
-// cycle boundary — bleeding only suggests it), and the computed info lines
-// (derived artifacts such as the baseline value, the 1-6 low numbering, the
-// difference to the baseline for marked candidates and the
-// stopped-evaluation notice).
+// Widget tests of the day options panel on the cycle tab (Mode M, ADR-0001):
+// tapping a chart day shows a NON-MODAL panel below the chart with the day
+// header (the selected day's locale-formatted label next to the close
+// button), the "edit day" action, the mark toggles as Material FilterChips
+// in a two-column grid (three columns on viewports from 600 dp of grid
+// width) — each chip carries the STATIC mark-name label plus its mark
+// type's identifying leading icon and shows the mark state itself
+// (selected fill plus check mark over the scrimmed avatar, announced as
+// selected to screen readers): the mucus peak, the first higher
+// measurement, the SUZ
+// start, the cycle start (the authoritative cycle boundary — bleeding only
+// suggests it) and the temperature exclusion inside its keyed group below
+// the grid — plus the computed info lines (derived artifacts such as the
+// baseline value, the 1-6 low numbering, the difference to the baseline
+// for marked candidates and the stopped-evaluation notice). Formerly a
+// modal bottom sheet; the fixture/scenarios and all write paths are
+// unchanged by the conversion.
 //
 // Unlike the evaluation section of test/cycle_chart_test.dart (fixed
 // marks streams), these tests write through the REAL MarksDao against an
 // in-memory database — the panel must persist and the surface (chart
-// overlay, panel labels) must re-render from the marks stream after every
-// write. The harness body (scope, day taps, stored readback) and the
-// scenario constants are shared once with test/cycle_day_panel_test.dart
-// in support/cycle_list_harness.dart.
+// overlay, chip states, info lines) must re-render from the marks stream
+// after every write. The harness body (scope, day taps, stored readback)
+// and the scenario constants are shared once with
+// test/cycle_day_panel_test.dart in support/cycle_list_harness.dart.
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';
@@ -23,6 +33,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
+import 'dart:ui' show Tristate;
 
 import 'support/cycle_list_harness.dart';
 import 'support/finders.dart';
@@ -31,7 +43,7 @@ import 'support/viewport.dart';
 /// A tall-enough test surface for every pump: the Zyklus list is lazy and
 /// the panel sits BELOW the chart block, so the default viewport would
 /// leave most panel rows unbuilt below the fold. A tall surface lays the
-/// chart, the open panel and the evaluation table out at once (the modal
+/// chart and the open panel out at once (the modal
 /// sheet of the old layout always fit the viewport on its own — the panel
 /// replaced that self-scroll with the owning list, see the panel comment).
 /// The scenario constants and the write-through harness live once in
@@ -53,33 +65,81 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
   );
 }
 
-/// Brings a sheet row into view: the toggle rows live in a scrollable
-/// column, and the bottom rows (the SUZ variants) can sit below the
-/// modal sheet's visible area once the row list grows.
+/// Brings a panel row into view: the panel lives in the Zyklus screen's
+/// vertical list, and the bottom rows of the chip grid (the SUZ variants)
+/// can sit below the viewport fold once the day options carry all content —
+/// scrolled into view the same way the modal sheet's rows used to be.
 Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(finder, 50,
-      scrollable: find.descendant(
-          of: find.byType(BottomSheet), matching: find.byType(Scrollable)));
+  await tester.scrollUntilVisible(finder, 50, scrollable: cycleListScroller());
   await tester.pumpAndSettle();
 }
 
+/// [_pump] with the surface width pinned: the chip grid's column count is
+/// breakpoint-dependent (three columns from 600 dp of grid width), so the
+/// geometry tests pin a narrow or a wide surface first — [_pump] always
+/// lays the default wide surface that would collide with the pin.
+Future<(CycleDatabase, ProviderContainer)> _pumpAt(
+  WidgetTester tester, {
+  required double width,
+  required List<DailyEntry> entries,
+}) async {
+  useTallSurface(tester, width: width);
+  return pumpCycleList(tester, entries: entries);
+}
+
+/// The panel header's day label for a scenario day, computed with the same
+/// `DateFormat.yMMMEd` the header uses (English, the harness's pinned
+/// locale) instead of being hardcoded — the assertion stays independent of
+/// the concrete date formatting.
+String dayLabelOf(int day) => DateFormat.yMMMEd('en')
+    .format(DateOnly.normalize(scenarioDay(day)).toLocal());
+
+/// The day header's close button (the explicit panel close affordance).
+Finder panelCloseButton() => find.byKey(const ValueKey('cycleDayPanelClose'));
+
+/// The FilterChip inside the panel carrying one static mark [label] —
+/// panel-scoped because the screen's legend/summary texts can spell the
+/// same mark names outside the panel.
+Finder markChip(String label) => find.descendant(
+    of: cycleDayPanel(), matching: find.widgetWithText(FilterChip, label));
+
+/// The panel's keyed temperature-exclusion group (test-visible key) —
+/// used for the chip-icon scoping and the exclusion-group tests.
+final excludeGroup = find.byKey(const ValueKey('cycleSheetExcludeGroup'));
+
+/// A text inside the day options panel — the same scoping as [markChip]:
+/// bare find.text would also match the screen's summary-table row labels,
+/// the legend or a dialog title.
+Finder panelText(String label) =>
+    find.descendant(of: cycleDayPanel(), matching: find.text(label));
+
+/// Whether the chip's merged semantics node carries the selected flag —
+/// the accessibility side of the Material selected state. The M3 check
+/// mark is canvas-painted (no Icon widget), so the visible state is
+/// asserted through the chip's `selected` property and this flag.
+bool chipSelectedSemantics(WidgetTester tester, String label) =>
+    tester.getSemantics(markChip(label)).flagsCollection.isSelected ==
+    Tristate.isTrue;
+
 void main() {
-  testWidgets('tapping a chart day opens the mark-entry sheet, not the form',
-      (tester) async {
+  testWidgets(
+      'tapping a chart day opens the day options panel with the chip grid, '
+      'not the form', (tester) async {
     final (_, _) = await _pump(tester,
         entries: scenarioEntries,
         seedMarks: [scenarioPeakMark, scenarioFirstHigherMark]);
 
     await tapCycleDay(tester, 4); // 9/10, a numbered low (4)
 
-    expect(find.byType(BottomSheet), findsOneWidget,
-        reason: 'the day tap opens the modal sheet');
+    expect(cycleDayPanel(), findsOneWidget,
+        reason: 'the day tap shows the non-modal day options panel');
     expect(find.text('Edit day'), findsOneWidget,
         reason: 'the form jump stays reachable via "edit day"');
-    expect(find.text('Set mucus peak'), findsOneWidget,
-        reason: 'the day carries no peak mark -> the set action');
-    expect(find.text('Set first higher measurement'), findsOneWidget,
-        reason: 'the day carries no first-higher mark -> the set action');
+    expect(panelText('Mucus peak'), findsOneWidget,
+        reason: 'the day carries no peak mark -> the unselected chip label');
+    expect(panelText('First higher measurement'), findsOneWidget,
+        reason: 'the day carries no first-higher mark -> the unselected '
+            'chip label');
     expect(find.text('Low measurement 4'), findsOneWidget,
         reason: '9/10 is the 4th low of the six before the first higher');
     expect(find.byType(LineChart), findsOneWidget,
@@ -88,6 +148,52 @@ void main() {
     expect(
         find.byKey(const ValueKey('cycleSheetEvaluationStopped')), findsNothing,
         reason: 'the evaluation did not stop — no notice');
+  });
+
+  testWidgets(
+      'the header shows the selected day next to the close button — no '
+      'measurement-time line even when one is recorded', (tester) async {
+    // The chart's time row spells the recorded time on wide columns itself;
+    // the panel header names the DAY and no longer repeats the time.
+    final entries = [...scenarioEntries];
+    entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
+    final (_, _) = await _pump(tester, entries: entries);
+
+    await tapCycleDay(tester, 4); // 9/10
+
+    expect(
+        find.descendant(
+            of: cycleDayPanel(), matching: find.text(dayLabelOf(10))),
+        findsOneWidget,
+        reason: 'the header labels the selected day (yMMMEd, computed by '
+            'the test with the same DateFormat the header uses)');
+    expect(find.textContaining('Measurement time:'), findsNothing,
+        reason: 'the measurement-time line is gone from the panel — the '
+            'time lives in the chart row and the diary form');
+    expect(panelCloseButton(), findsOneWidget,
+        reason: 'the header keeps the explicit close affordance');
+  });
+
+  testWidgets('the header day label follows the tapped day', (tester) async {
+    final (_, _) = await _pump(tester, entries: scenarioEntries);
+
+    await tapCycleDay(tester, 4); // 9/10
+    expect(
+        find.descendant(
+            of: cycleDayPanel(), matching: find.text(dayLabelOf(10))),
+        findsOneWidget);
+
+    await tapCycleDay(tester, 6); // 9/12: the panel retargets in place
+    expect(
+        find.descendant(
+            of: cycleDayPanel(), matching: find.text(dayLabelOf(10))),
+        findsNothing,
+        reason: 'the previous day\'s label is gone');
+    expect(
+        find.descendant(
+            of: cycleDayPanel(), matching: find.text(dayLabelOf(12))),
+        findsOneWidget,
+        reason: 'the label changed with the tapped day');
   });
 
   testWidgets('the info line shows the computed baseline on the baseline day',
@@ -190,14 +296,14 @@ void main() {
         await _pump(tester, entries: scenarioEntries); // no marks yet
 
     await tapCycleDay(tester, 6); // 9/12, the day to mark
-    await tester.tap(find.text('Set mucus peak'));
+    await tester.tap(panelText('Mucus peak'));
     await tester.pumpAndSettle();
 
     expect(await storedMarkTypes(db, scenarioDay(12)), contains('mucusPeakDay'),
         reason: 'the mark is persisted through marksDao');
-    expect(find.text('Remove mucus peak'), findsOneWidget,
-        reason: 'the sheet re-renders contextually after the write');
-    expect(find.text('Set mucus peak'), findsNothing);
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isTrue,
+        reason: 'the chip re-renders selected from the marks stream after '
+            'the write');
     // R6: the peak renders as a solid dot in the SYMBOL ROW — not as a
     // ring on the temperature curve.
     expect(find.byKey(const ValueKey('peakDot-6')), findsOneWidget,
@@ -207,46 +313,70 @@ void main() {
   });
 
   testWidgets(
-      'the set-mucus-peak action shows a filled circle icon; the remove '
-      'action keeps the outline circle', (tester) async {
-    final (_, _) =
+      'the mucus-peak chip carries the mark state itself: unselected, '
+      'selected after the tap (fill and semantics), unselected again after '
+      'removing', (tester) async {
+    final (db, _) =
         await _pump(tester, entries: scenarioEntries); // no marks yet
+    // The chip's selected state rides its semantics (the M3 check mark is
+    // canvas-painted, not an Icon widget), so the screen-reader side is
+    // asserted alongside the widget state.
+    final semantics = tester.ensureSemantics();
 
     await tapCycleDay(tester, 4); // 9/10, an arbitrary day
 
-    final setTile = tester.widget<ListTile>(find.ancestor(
-        of: find.text('Set mucus peak'), matching: find.byType(ListTile)));
-    expect(setTile.leading,
-        isA<Icon>().having((icon) => icon.icon, 'icon', Icons.circle),
-        reason: 'the set action shows the filled circle — the solid dot the '
-            'chart renders for a placed peak');
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isFalse,
+        reason: 'the day carries no peak mark -> the unselected chip');
+    expect(chipSelectedSemantics(tester, 'Mucus peak'), isFalse,
+        reason: 'the unselected chip is not announced as selected');
 
-    await tester.tap(find.text('Set mucus peak'));
+    await tester.tap(panelText('Mucus peak'));
     await tester.pumpAndSettle();
 
-    final removeTile = tester.widget<ListTile>(find.ancestor(
-        of: find.text('Remove mucus peak'), matching: find.byType(ListTile)));
+    expect(await storedMarkTypes(db, scenarioDay(10)),
+        contains(CycleMarkTypes.mucusPeakDay),
+        reason: 'the tap persists the mark through the MarksDao');
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isTrue,
+        reason: 'the re-rendered chip is selected (Material selected fill)');
+    expect(chipSelectedSemantics(tester, 'Mucus peak'), isTrue,
+        reason: 'the selected chip announces itself (the built-in state '
+            'visualization: fill, check mark, semantics)');
+    // The identity icon NEVER disappears with the selection: the M3 check
+    // is canvas-painted over a scrim ON TOP of the still-present avatar
+    // (the Icon widget stays in the tree under the paint, so the finder —
+    // not a bare byIcon, but the chip-scoped one — sees it).
     expect(
-        removeTile.leading,
-        isA<Icon>()
-            .having((icon) => icon.icon, 'icon', Icons.radio_button_unchecked),
-        reason: 'the remove action keeps the outline circle');
+        find.descendant(
+            of: markChip('Mucus peak'), matching: find.byIcon(Icons.circle)),
+        findsOneWidget,
+        reason: 'the selected peak chip still carries its identifying '
+            'glyph under the scrimmed check mark');
+
+    await tester.tap(panelText('Mucus peak'));
+    await tester.pumpAndSettle();
+
+    expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
+        reason: 'the second tap removes the mark again');
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isFalse,
+        reason: 'the chip deselects after the removal');
+    semantics.dispose();
   });
 
-  testWidgets('tapping the same action again removes the mark', (tester) async {
+  testWidgets('tapping the selected chip again removes the mark',
+      (tester) async {
     final (db, _) = await _pump(tester,
         entries: scenarioEntries, seedMarks: [scenarioPeakMark]);
 
     await tapCycleDay(tester, 6);
-    expect(find.text('Remove mucus peak'), findsOneWidget,
-        reason: 'the day already carries the peak -> the remove action');
-    await tester.tap(find.text('Remove mucus peak'));
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isTrue,
+        reason: 'the day already carries the peak -> the selected chip');
+    await tester.tap(panelText('Mucus peak'));
     await tester.pumpAndSettle();
 
     expect(await storedMarkTypes(db, scenarioDay(12)), isEmpty,
         reason: 'the mark is removed from storage');
-    expect(find.text('Set mucus peak'), findsOneWidget,
-        reason: 'the label flips back to the set action');
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isFalse,
+        reason: 'the chip deselects again');
   });
 
   testWidgets('both marks on one day are two independent toggles',
@@ -256,33 +386,36 @@ void main() {
 
     await tapCycleDay(tester, 6);
     // The day already carries the peak; the first-higher mark is addable
-    // on the same day (two toggles side by side).
-    await tester.tap(find.text('Set first higher measurement'));
+    // on the same day (two independent chips).
+    await tester.tap(panelText('First higher measurement'));
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)),
         unorderedEquals(['mucusPeakDay', 'firstHigherMeasurement']),
         reason: 'both marks may live on one day');
     // The placement leaves the mark inconsistent (36.20 on 9/12 lies
     // below the baseline 36.90 of its window 9/6..9/11), so the owner
-    // warning pops; Keep keeps the mark so the toggles stay independent.
+    // warning pops; Keep keeps the mark so the chips stay independent.
     expect(find.byType(AlertDialog), findsOneWidget);
     await tester.tap(find.descendant(
         of: find.byType(AlertDialog), matching: find.text('Keep')));
     await tester.pumpAndSettle();
 
-    // Removing the second mark keeps the first one untouched. The remove
-    // row can sit below the sheet fold now that the column carries the
-    // disturbance/exclusion group too — scroll it into view first (same
-    // pattern as the SUZ rows).
-    await scrollSheetTo(tester, find.text('Remove first higher measurement'));
-    await tester.tap(find.text('Remove first higher measurement'));
+    // Removing the second mark keeps the first one untouched. The chip can
+    // sit below the panel fold once the column carries the exclusion group
+    // too — scroll it into view first (same pattern as the SUZ chips).
+    await scrollSheetTo(tester, panelText('First higher measurement'));
+    await tester.tap(panelText('First higher measurement'));
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)), ['mucusPeakDay'],
         reason: 'the two toggles are independent');
-    expect(find.text('Remove mucus peak'), findsOneWidget,
-        reason: 'the peak toggle is unaffected');
-    expect(find.text('Set first higher measurement'), findsOneWidget,
-        reason: 'the first-higher toggle flipped back');
+    expect(tester.widget<FilterChip>(markChip('Mucus peak')).selected, isTrue,
+        reason: 'the peak chip is unaffected');
+    expect(
+        tester
+            .widget<FilterChip>(markChip('First higher measurement'))
+            .selected,
+        isFalse,
+        reason: 'the first-higher chip deselected after the removal');
   });
 
   testWidgets(
@@ -388,12 +521,13 @@ void main() {
   group('cycleStart toggle (the authoritative cycle-boundary mark)', () {
     testWidgets(
         'setting the cycle start persists a user-authored cycleStart mark '
-        'and flips the action to the remove wording', (tester) async {
+        'and selects the chip with its state', (tester) async {
       final (db, _) =
           await _pump(tester, entries: scenarioEntries); // no marks yet
+      final semantics = tester.ensureSemantics();
 
       await tapCycleDay(tester, 4); // 9/10, an arbitrary day
-      await tester.tap(find.text('Set cycle start'));
+      await tester.tap(panelText('Cycle start'));
       await tester.pumpAndSettle();
 
       final stored = await db.marksDao.marksForDay(scenarioDay(10));
@@ -403,83 +537,164 @@ void main() {
       final mark =
           stored.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
       expect(mark.author, 'user',
-          reason: 'the sheet placement is user-authored');
-      expect(find.text('Remove cycle start'), findsOneWidget,
-          reason: 'the sheet re-renders contextually after the write');
-      expect(find.text('Set cycle start'), findsNothing);
+          reason: 'the chip placement is user-authored');
+      expect(
+          tester.widget<FilterChip>(markChip('Cycle start')).selected, isTrue,
+          reason: 'the chip re-renders selected after the write');
+      expect(chipSelectedSemantics(tester, 'Cycle start'), isTrue,
+          reason: 'the selected state carries fill, check mark and the '
+              'announced selection');
+      semantics.dispose();
     });
 
     testWidgets(
-        'a present cycle start shows the removal wording and '
-        'the remove action deletes it', (tester) async {
+        'a present cycle start renders the selected chip and the removal '
+        'tap deselects it and deletes the mark', (tester) async {
       final (db, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
         CycleMark(date: scenarioDay(10), type: CycleMarkTypes.cycleStart),
       ]);
+      final semantics = tester.ensureSemantics();
 
       await tapCycleDay(tester, 4); // 9/10: the marked day
-      expect(find.text('Remove cycle start'), findsOneWidget,
-          reason: 'the day already carries the mark -> the remove action');
+      expect(
+          tester.widget<FilterChip>(markChip('Cycle start')).selected, isTrue,
+          reason: 'the day already carries the mark -> the selected chip');
+      expect(chipSelectedSemantics(tester, 'Cycle start'), isTrue);
 
-      await tester.tap(find.text('Remove cycle start'));
+      await tester.tap(panelText('Cycle start'));
       await tester.pumpAndSettle();
 
       expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the cycle start is removed from storage');
-      expect(find.text('Set cycle start'), findsOneWidget,
-          reason: 'the action flips back to the set wording');
+      expect(
+          tester.widget<FilterChip>(markChip('Cycle start')).selected, isFalse,
+          reason: 'the chip deselects again');
+      expect(chipSelectedSemantics(tester, 'Cycle start'), isFalse,
+          reason: 'the deselected chip is no longer announced as selected');
+      semantics.dispose();
     });
   });
 
   group('ignoreTemperature toggle (the temperature-ignore mark)', () {
-    /// The y-position of a sheet row label (visual order probe).
-    double rowYOf(WidgetTester tester, String label) => tester
-        .getTopLeft(find.descendant(
-            of: find.byType(BottomSheet), matching: find.text(label)))
-        .dy;
-
     testWidgets(
-        'the toggle row sits BETWEEN the mucus-peak row and the '
-        'first-higher row: edit day → cycle start → mucus peak → exclude '
-        'from analysis → first higher → SUZ evening → SUZ morning',
-        (tester) async {
+        'the panel layout: the day header on top, the edit-day action above '
+        'the chip grid, the five mark chips reading in two columns, the '
+        'exclusion group below the grid', (tester) async {
+      // A narrow surface pins the grid to its phone-width two columns (the
+      // breakpoint is 600 dp of grid width — see the wide-viewport test).
       final (_, _) =
-          await _pump(tester, entries: scenarioEntries); // no marks yet
+          await _pumpAt(tester, width: 500, entries: scenarioEntries);
       await tapCycleDay(tester, 4); // 9/10, an arbitrary day
 
-      expect(find.text('Ignore temperature'), findsOneWidget,
-          reason: 'the day carries no ignore mark -> the set wording');
+      Rect chipRect(String label) => tester.getRect(markChip(label));
+      const spacing = 8.0;
 
-      // Visual order, not mere presence: each row label must render ABOVE
-      // the next one inside the sheet.
-      const order = [
-        'Edit day',
-        'Set cycle start',
-        'Set mucus peak',
-        'Ignore temperature',
-        'Set first higher measurement',
-        'SUZ from this evening',
-        'SUZ from this morning',
-      ];
-      final ys = <String, double>{
-        for (final label in order) label: rowYOf(tester, label),
-      };
-      for (var i = 0; i < order.length - 1; i++) {
-        expect(ys[order[i]]! < ys[order[i + 1]]!, isTrue,
-            reason: '"${order[i]}" sits above "${order[i + 1]}" — the '
-                'temperature-ignore toggle belongs between the mucus-peak '
-                'and the first-higher rows');
+      final headerTop = tester.getTopLeft(find.text(dayLabelOf(10))).dy;
+      final closeTop = tester
+          .getTopLeft(find.byKey(const ValueKey('cycleDayPanelClose')))
+          .dy;
+      final editTop = tester.getTopLeft(find.text('Edit day')).dy;
+      final cycleStart = chipRect('Cycle start');
+      final peak = chipRect('Mucus peak');
+      final firstHigher = chipRect('First higher measurement');
+      final suzEvening = chipRect('SUZ from this evening');
+      final suzMorn = chipRect('SUZ from this morning');
+      final ignore = chipRect('Ignore temperature');
+
+      // The header (day label + close button) precedes everything.
+      expect(headerTop < editTop && closeTop < editTop, isTrue,
+          reason: 'the day header sits above the actions');
+      // The full-width edit-day action above the grid...
+      expect(editTop < cycleStart.top, isTrue,
+          reason: '"edit day" stays the leading action above the chips');
+      // ...the grid rows in reading order: cycle start & mucus peak, then
+      // first higher & SUZ evening, then SUZ morning...
+      expect((cycleStart.top - peak.top).abs(), lessThan(4),
+          reason: 'the first grid row carries the first two chips');
+      expect(peak.left, greaterThan(cycleStart.right),
+          reason: 'the peak reads to the right of the cycle start');
+      expect((peak.left - cycleStart.right) - spacing, lessThan(4),
+          reason: 'adjacent columns separated by the wrap spacing');
+      expect((firstHigher.top - suzEvening.top).abs(), lessThan(4),
+          reason: 'the second grid row carries first higher + SUZ evening');
+      expect(suzEvening.left, greaterThan(firstHigher.right));
+      expect(suzMorn.top, greaterThan(firstHigher.bottom),
+          reason: 'the SUZ morning chip is the last, lone grid row');
+      expect(suzMorn.left, closeTo(cycleStart.left, 4),
+          reason: 'the lone last chip sits in the first column');
+      // ...and the exclusion group BELOW the whole grid.
+      for (final (name, top) in [
+        ('Cycle start', cycleStart.top),
+        ('Mucus peak', peak.top),
+        ('First higher measurement', firstHigher.top),
+        ('SUZ from this evening', suzEvening.top),
+        ('SUZ from this morning', suzMorn.top),
+      ]) {
+        expect(ignore.top, greaterThan(top),
+            reason: 'the exclusion toggle renders below the $name chip — '
+                'the two-column layout moved the exclusion group out of '
+                'the grid');
       }
     });
 
     testWidgets(
-        'tapping the toggle persists an ignoreTemperature mark through '
-        'the MarksDao and flips to the include wording; tapping again '
-        'removes it', (tester) async {
+        'on a wide viewport (grid width >= 600 dp) the chips lay out THREE '
+        'per row: the two SUZ chips end up as the lone second row',
+        (tester) async {
+      final (_, _) =
+          await _pumpAt(tester, width: 1000, entries: scenarioEntries);
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary day
+
+      Rect chipRect(String label) => tester.getRect(markChip(label));
+      final cycleStart = chipRect('Cycle start');
+      final peak = chipRect('Mucus peak');
+      final firstHigher = chipRect('First higher measurement');
+      final suzEvening = chipRect('SUZ from this evening');
+      final suzMorn = chipRect('SUZ from this morning');
+
+      expect((cycleStart.top - peak.top).abs(), lessThan(4),
+          reason: 'the first wide row carries the first three chips');
+      expect((cycleStart.top - firstHigher.top).abs(), lessThan(4));
+      expect(firstHigher.left, greaterThan(peak.right),
+          reason: 'the first-higher chip is the row\'s third column');
+      expect(suzEvening.top, greaterThan(firstHigher.bottom),
+          reason: 'the two SUZ chips wrap into the second row');
+      expect((suzEvening.top - suzMorn.top).abs(), lessThan(4));
+      expect(suzEvening.left, closeTo(cycleStart.left, 4),
+          reason: 'the second row restarts in the first column');
+      expect(suzMorn.left, closeTo(peak.left, 4));
+    });
+
+    testWidgets(
+        'each grid chip is about half the grid width: a row fits exactly '
+        'two chips', (tester) async {
+      final (_, _) =
+          await _pumpAt(tester, width: 500, entries: scenarioEntries);
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary day
+
+      final cycleStart = tester.getRect(markChip('Cycle start'));
+      final peak = tester.getRect(markChip('Mucus peak'));
+      final firstHigher = tester.getRect(markChip('First higher measurement'));
+      expect(peak.left - cycleStart.right, lessThan(12),
+          reason: 'the two chips touch within the wrap spacing — no room '
+              'for a third column');
+      expect(firstHigher.top, greaterThan(cycleStart.bottom),
+          reason: 'each chip spans about half the line — the third mark '
+              'wraps to the next row');
+    });
+
+    testWidgets(
+        'tapping the exclusion chip places the ignoreTemperature mark '
+        'through the MarksDao on ANY day; tapping again removes it',
+        (tester) async {
       final (db, _) =
           await _pump(tester, entries: scenarioEntries); // no marks yet
 
       await tapCycleDay(tester, 4); // 9/10, an arbitrary day
-      await tester.tap(find.text('Ignore temperature'));
+      expect(panelText('Ignore temperature'), findsOneWidget,
+          reason: 'the static exclusion chip label — the chip state, not '
+              'the wording, carries set/remove');
+      await tester.tap(panelText('Ignore temperature'));
       await tester.pumpAndSettle();
 
       final stored = await db.marksDao.marksForDay(scenarioDay(10));
@@ -490,42 +705,41 @@ void main() {
       final mark = stored
           .singleWhere((m) => m.markType == CycleMarkTypes.ignoreTemperature);
       expect(mark.author, 'user',
-          reason: 'the sheet placement is user-authored');
-      expect(find.text('Temperature evaluated again'), findsOneWidget,
-          reason: 'the sheet re-renders contextually after the write');
-      expect(find.text('Ignore temperature'), findsNothing);
+          reason: 'the chip placement is user-authored');
       expect(stored, hasLength(1), reason: 'exactly one mark was written');
 
-      await tester.tap(find.text('Temperature evaluated again'));
+      await tester.tap(panelText('Ignore temperature'));
       await tester.pumpAndSettle();
 
       expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the reverse toggle deletes the mark');
-      expect(find.text('Ignore temperature'), findsOneWidget,
-          reason: 'the action flips back to the ignore wording');
-      expect(find.text('Temperature evaluated again'), findsNothing);
+      expect(tester.widget<FilterChip>(markChip('Ignore temperature')).selected,
+          isFalse,
+          reason: 'the chip deselects — the label never flips wording');
     });
 
     testWidgets(
-        'a present exclusion mark shows the include wording and the '
-        'include action deletes it', (tester) async {
+        'a present exclusion mark renders the selected chip and the '
+        'removal tap deletes it', (tester) async {
       final (db, _) = await _pump(tester, entries: scenarioEntries, seedMarks: [
         CycleMark(
             date: scenarioDay(10), type: CycleMarkTypes.ignoreTemperature),
       ]);
 
       await tapCycleDay(tester, 4); // 9/10: the marked day
-      expect(find.text('Temperature evaluated again'), findsOneWidget,
-          reason: 'the day already carries the mark -> the include action');
+      expect(tester.widget<FilterChip>(markChip('Ignore temperature')).selected,
+          isTrue,
+          reason: 'the day already carries the mark -> the selected chip');
 
-      await tester.tap(find.text('Temperature evaluated again'));
+      await tester.tap(panelText('Ignore temperature'));
       await tester.pumpAndSettle();
 
       expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
           reason: 'the mark is removed from storage through the deleteMark '
               'path');
-      expect(find.text('Ignore temperature'), findsOneWidget,
-          reason: 'the action flips back to the ignore wording');
+      expect(tester.widget<FilterChip>(markChip('Ignore temperature')).selected,
+          isFalse,
+          reason: 'the chip deselects after the removal');
     });
 
     testWidgets(
@@ -543,7 +757,7 @@ void main() {
       ]);
 
       await tapCycleDay(tester, 8); // 9/14: measured above the baseline
-      await tester.tap(find.text('Set first higher measurement'));
+      await tester.tap(panelText('First higher measurement'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget,
@@ -560,10 +774,57 @@ void main() {
     });
   });
 
-  group('exclusion group (the manual temperature-exclusion toggle)', () {
-    /// The exclusion group of the sheet (test-visible key).
-    final excludeGroup = find.byKey(const ValueKey('cycleSheetExcludeGroup'));
+  group('chip icons (the per-type identification on the chips)', () {
+    /// The icon inside the panel's chip carrying [label] — panel-scoped
+    /// because `Icons.visibility_off_outlined` also renders in the chart's
+    /// temperature-exclusion badge, so a bare `find.byIcon` would match
+    /// outside the panel.
+    Finder chipIcon(String label, IconData icon) =>
+        find.descendant(of: markChip(label), matching: find.byIcon(icon));
 
+    testWidgets(
+        'every mark chip shows its mark type icon while unselected — '
+        'the six chips carry dusk, sun, dot, ring, flag and crossed-out-eye '
+        'glyphs', (tester) async {
+      final (_, _) =
+          await _pump(tester, entries: scenarioEntries); // no marks yet
+      await tapCycleDay(tester, 4); // 9/10, an arbitrary unmarked day
+
+      expect(chipIcon('Cycle start', Icons.flag_outlined), findsOneWidget,
+          reason: 'the cycle start keeps its pre-refactor boundary flag');
+      expect(chipIcon('Mucus peak', Icons.circle), findsOneWidget,
+          reason: 'the peak chip identifies the solid dot the chart '
+              'renders for a peak (R6)');
+      expect(chipIcon('First higher measurement', Icons.adjust), findsOneWidget,
+          reason: 'the first-higher chip keeps its circled-dot glyph');
+      expect(chipIcon('SUZ from this evening', Icons.nightlight_outlined),
+          findsOneWidget,
+          reason: 'the evening variant identifies itself with the dusk '
+              'glyph');
+      expect(chipIcon('SUZ from this morning', Icons.wb_sunny_outlined),
+          findsOneWidget,
+          reason: 'the morning variant identifies itself with the sun '
+              'glyph');
+      expect(
+          find.descendant(
+              of: excludeGroup,
+              matching: find.byIcon(Icons.visibility_off_outlined)),
+          findsOneWidget,
+          reason: 'the temperature-exclusion chip keeps its '
+              'crossed-out-eye glyph inside its keyed group');
+
+      // The two SUZ icons identify THEIR variant, not the pair — the
+      // glyphs never appear swapped onto the sibling variant chip.
+      expect(chipIcon('SUZ from this morning', Icons.nightlight_outlined),
+          findsNothing,
+          reason: 'the dusk glyph belongs to the evening chip alone');
+      expect(chipIcon('SUZ from this evening', Icons.wb_sunny_outlined),
+          findsNothing,
+          reason: 'the sun glyph belongs to the morning chip alone');
+    });
+  });
+
+  group('exclusion group (the manual temperature-exclusion chip)', () {
     /// [scenarioEntries] with the disturbance flags [mask] recorded on day 9/10
     /// (index 4).
     List<DailyEntry> entriesWithDay4Mask(int mask) {
@@ -574,7 +835,7 @@ void main() {
 
     testWidgets(
         'a day WITH recorded disturbance flags: the group carries only the '
-        'exclusion title and the toggle — neither flag labels nor an empty '
+        'chip — neither heading text, nor flag labels, nor an empty '
         'line (the chart row shows the letters)', (tester) async {
       final (_, _) = await _pump(tester,
           entries: entriesWithDay4Mask(
@@ -583,10 +844,11 @@ void main() {
       await tapCycleDay(tester, 4); // 9/10: flags alk + kr recorded
 
       expect(excludeGroup, findsOneWidget,
-          reason: 'the exclusion toggle lives in the keyed group '
+          reason: 'the exclusion chip lives in the keyed group '
               '(cycleSheetExcludeGroup)');
-      expect(find.text('Excluded from the evaluation'), findsOneWidget,
-          reason: 'the group is titled by the exclusion concept only');
+      expect(find.text('Excluded from the evaluation'), findsNothing,
+          reason: 'the stale exclusion-group heading is gone — the chip '
+              'label already says what it does');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Alcohol (alk)')),
@@ -603,64 +865,83 @@ void main() {
               matching: find.text('No temperature disturbance recorded')),
           findsNothing,
           reason: 'no explicit empty line — flag-less days show the same '
-              'toggle-only group');
+              'chip-only group');
+      // The group carries exactly ONE chip: the temperature exclusion,
+      // keyed by its static label.
+      expect(
+          find.descendant(of: excludeGroup, matching: find.byType(FilterChip)),
+          findsOneWidget,
+          reason: 'the group is exactly the exclusion chip — no flagged '
+              'chips for read-only disturbance facts');
       expect(
           find.descendant(
               of: excludeGroup, matching: find.text('Ignore temperature')),
           findsOneWidget,
-          reason: 'the temperature-exclusion toggle stays inside the group');
+          reason: 'the temperature-exclusion chip stays inside the group, '
+              'now BELOW the marks grid');
     });
 
     testWidgets(
-        'a day WITHOUT recorded flags shows the same toggle-only group — '
-        'no empty-state line, no editable chips', (tester) async {
+        'a day WITHOUT recorded flags shows the same chip-only group — '
+        'no empty-state line, and no disturbance-flag editing UI',
+        (tester) async {
       final (_, _) = await _pump(tester, entries: scenarioEntries);
 
       await tapCycleDay(tester, 4); // 9/10: no flags recorded
 
       expect(excludeGroup, findsOneWidget,
-          reason: 'the group renders on every day: title plus the toggle');
-      expect(find.text('Excluded from the evaluation'), findsOneWidget,
-          reason: 'the exclusion-only title, also without flags');
+          reason: 'the group renders on every day: the chip without a '
+              'heading');
+      expect(find.text('Excluded from the evaluation'), findsNothing,
+          reason: 'the stale exclusion-group heading is gone, also without '
+              'flags');
       expect(
           find.descendant(
               of: excludeGroup,
               matching: find.text('No temperature disturbance recorded')),
           findsNothing,
           reason: 'the explicit empty line is gone — nothing replaces it');
+      // Read-only concept stays: the panel never EDITS the flags (data
+      // entry stays in the diary) — the group chip is the ONLY chip in the
+      // group, and no disturbance string renders as an editable chip
+      // anywhere in the panel.
       expect(
-          find.descendant(
-              of: excludeGroup, matching: find.text('Late to bed (sp)')),
-          findsNothing,
-          reason: 'unset flags render nothing');
-      // Read-only concept stays: the sheet never EDITS the flags (data
-      // entry stays in the diary) — no FilterChips anywhere in the sheet.
-      expect(
-          find.descendant(
-              of: find.byType(BottomSheet), matching: find.byType(FilterChip)),
-          findsNothing);
+          find.descendant(of: excludeGroup, matching: find.byType(FilterChip)),
+          findsOneWidget,
+          reason: 'exactly the exclusion chip lives in the group');
+      for (final disturbance in [
+        'Alcohol (alk)',
+        'Illness (kr)',
+        'Late to bed (sp)'
+      ]) {
+        expect(
+            find.descendant(
+                of: cycleDayPanel(), matching: find.text(disturbance)),
+            findsNothing,
+            reason: '$disturbance stays a chart/diary fact, never a panel '
+                'chip');
+      }
     });
 
     testWidgets(
-        'the toggle inside the group keeps its write behavior: it places '
-        'the ignoreTemperature mark through the MarksDao and flips to the '
-        'include wording within the group', (tester) async {
+        'the exclusion chip inside the group keeps its write behavior: it '
+        'places the ignoreTemperature mark through the MarksDao and '
+        'renders selected within the group', (tester) async {
       final (db, _) = await _pump(tester,
           entries: entriesWithDay4Mask(TempDisturbance.alk.bit));
 
       await tapCycleDay(tester, 4); // 9/10
-      await tester.tap(find.text('Ignore temperature'));
+      await tester.tap(panelText('Ignore temperature'));
       await tester.pumpAndSettle();
 
       expect(await storedMarkTypes(db, scenarioDay(10)),
           contains(CycleMarkTypes.ignoreTemperature),
-          reason: 'the group toggle writes through the same mark path');
-      expect(
-          find.descendant(
-              of: excludeGroup,
-              matching: find.text('Temperature evaluated again')),
-          findsOneWidget,
-          reason: 'the flipped toggle stays visible inside the group');
+          reason: 'the group chip writes through the same mark path');
+      final groupChip =
+          find.descendant(of: excludeGroup, matching: find.byType(FilterChip));
+      expect(tester.widget<FilterChip>(groupChip).selected, isTrue,
+          reason: 'the toggled chip stays visible and selected inside the '
+              'group');
     });
   });
 
@@ -750,78 +1031,51 @@ void main() {
     });
 
     testWidgets(
-        'SUZ actions on any day: set evening, variant-switch to morning, '
+        'SUZ chips on any day: set evening, variant-switch to morning, '
         'remove', (tester) async {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
       await tapCycleDay(
-          tester, 4); // 9/10 — an arbitrary day (actions on ANY day)
+          tester, 4); // 9/10 — an arbitrary day (chips on ANY day)
 
-      // The row can sit below the sheet fold now that the column carries
-      // the disturbance/exclusion group too — scroll it into view first
+      // The chip can sit below the panel fold — scroll it into view first
       // (the helper used throughout for the bottom rows).
-      await scrollSheetTo(tester, find.text('SUZ from this evening'));
-      await tester.tap(find.text('SUZ from this evening'));
+      await scrollSheetTo(tester, panelText('SUZ from this evening'));
+      await tester.tap(panelText('SUZ from this evening'));
       await tester.pumpAndSettle();
       expect(await storedMarkTypes(db, scenarioDay(10)),
           contains(CycleMarkTypes.suzEvening),
           reason: 'the SUZ mark is persisted through the MarksDao');
-      expect(find.text('Remove SUZ from this evening'), findsOneWidget,
-          reason: 'the removal label when the variant is present');
+      expect(
+          tester.widget<FilterChip>(markChip('SUZ from this evening')).selected,
+          isTrue,
+          reason: 'the evening chip renders selected');
 
       // Variant switch: placing the other variant removes the one present
-      // (scroll it into view first — the bottom rows can sit below the
-      // sheet fold).
-      await scrollSheetTo(tester, find.text('SUZ from this morning'));
-      await tester.tap(find.text('SUZ from this morning'));
+      // (scroll it into view first — the bottom chips can sit below the
+      // panel fold).
+      await scrollSheetTo(tester, panelText('SUZ from this morning'));
+      await tester.tap(panelText('SUZ from this morning'));
       await tester.pumpAndSettle();
       expect(await storedMarkTypes(db, scenarioDay(10)),
           unorderedEquals([CycleMarkTypes.suzMorning]),
           reason: 'placing one variant removes the other');
-      expect(find.text('Remove SUZ from this morning'), findsOneWidget);
-      expect(find.text('SUZ from this evening'), findsOneWidget,
-          reason: 'the evening action flips back to its set label');
+      expect(
+          tester.widget<FilterChip>(markChip('SUZ from this morning')).selected,
+          isTrue);
+      expect(
+          tester.widget<FilterChip>(markChip('SUZ from this evening')).selected,
+          isFalse,
+          reason: 'the evening chip deselects with the removed variant — the '
+              'mutual exclusivity is visible on the chips');
 
-      await scrollSheetTo(tester, find.text('Remove SUZ from this morning'));
-      await tester.tap(find.text('Remove SUZ from this morning'));
+      await tester.tap(panelText('SUZ from this morning'));
       await tester.pumpAndSettle();
       expect(await storedMarkTypes(db, scenarioDay(10)), isEmpty,
-          reason: 'the removal action deletes the mark');
-      expect(find.text('SUZ from this morning'), findsOneWidget,
-          reason: 'the morning action flips back to its set label');
-    });
-
-    testWidgets('the sheet shows the day\'s recorded measurement time',
-        (tester) async {
-      // Wide chart columns spell the time as text in the time row, but the
-      // sheet remains where the value surfaces unconditionally (at narrow
-      // column widths the row cell stays empty).
-      final entries = [...scenarioEntries];
-      entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
-      final (_, _) = await _pump(tester, entries: entries);
-
-      await tapCycleDay(tester, 4); // 9/10
-
-      expect(find.textContaining('Measurement time:'), findsOneWidget,
-          reason: 'the recorded measurement time value is shown in the day '
-              'sheet');
+          reason: 'tapping the selected chip again deletes the mark');
       expect(
-          find.descendant(
-              of: find.byType(BottomSheet),
-              matching: find.textContaining('6:30')),
-          findsOneWidget,
-          reason: 'the time itself is locale-formatted into the sheet line '
-              '(the chart\'s time cell may spell the same text, so the '
-              'assertion is scoped to the sheet)');
-    });
-
-    testWidgets('no measurement-time line on a day without a recorded time',
-        (tester) async {
-      final (_, _) = await _pump(tester, entries: scenarioEntries);
-
-      await tapCycleDay(tester, 4); // 9/10: temperature without a recorded time
-
-      expect(find.textContaining('Measurement time:'), findsNothing,
-          reason: 'nothing is shown when no measurement time was recorded');
+          tester.widget<FilterChip>(markChip('SUZ from this morning')).selected,
+          isFalse,
+          reason: 'the morning chip deselects again');
     });
 
     testWidgets(
@@ -857,13 +1111,18 @@ void main() {
           await _pump(tester, entries: scenarioEntries); // no marks yet
 
       await tapCycleDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
-      await tester.tap(find.text('Set first higher measurement'));
+      await tester.tap(panelText('First higher measurement'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget,
           reason: 'the inconsistent placement warns immediately');
-      expect(find.text('First higher measurement'), findsOneWidget,
-          reason: 'the dialog title names the mark, never a verdict');
+      expect(
+          find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text('First higher measurement')),
+          findsOneWidget,
+          reason: 'the dialog title names the mark, never a verdict (the '
+              'chip label equals the title — scoped to the dialog)');
       expect(
           find.text(
               '36.30 °C on the marked day is not above the baseline 36.40 °C.'),
@@ -880,10 +1139,14 @@ void main() {
       expect(await storedMarkTypes(db, scenarioDay(13)),
           contains('firstHigherMeasurement'),
           reason: 'Keep keeps the just-placed mark');
-      expect(find.byType(BottomSheet), findsOneWidget,
-          reason: 'the sheet stays open across the warning');
-      expect(find.text('Remove first higher measurement'), findsOneWidget,
-          reason: 'the toggle flipped by the kept mark');
+      expect(cycleDayPanel(), findsOneWidget,
+          reason: 'the panel stays open across the warning');
+      expect(
+          tester
+              .widget<FilterChip>(markChip('First higher measurement'))
+              .selected,
+          isTrue,
+          reason: 'the chip reflects the kept mark');
     });
 
     testWidgets('the Remove choice removes the just-placed mark',
@@ -891,11 +1154,11 @@ void main() {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
 
       await tapCycleDay(tester, 7);
-      await tester.tap(find.text('Set first higher measurement'));
+      await tester.tap(panelText('First higher measurement'));
       await tester.pumpAndSettle();
 
-      // The sheet action carries the same label once the mark stands —
-      // scope the tap to the dialog's Remove choice.
+      // The dialog's Remove choice carries the only "Remove first higher
+      // measurement" wording — the chip label is the static mark name.
       await tester.tap(find.descendant(
           of: find.byType(AlertDialog),
           matching: find.text('Remove first higher measurement')));
@@ -904,15 +1167,19 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       expect(await storedMarkTypes(db, scenarioDay(13)), isEmpty,
           reason: 'Remove undoes the placement through the toggle path');
-      expect(find.text('Set first higher measurement'), findsOneWidget,
-          reason: 'the toggle flipped back after the removal');
+      expect(
+          tester
+              .widget<FilterChip>(markChip('First higher measurement'))
+              .selected,
+          isFalse,
+          reason: 'the chip deselected after the removal');
     });
 
     testWidgets('placing a consistent mark shows no dialog', (tester) async {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
 
       await tapCycleDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
-      await tester.tap(find.text('Set first higher measurement'));
+      await tester.tap(panelText('First higher measurement'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing,
@@ -933,7 +1200,7 @@ void main() {
       final (_, _) = await _pump(tester, entries: entries);
 
       await tapCycleDay(tester, 7); // 9/13: the unmeasured day (baseline 36.40)
-      await tester.tap(find.text('Set first higher measurement'));
+      await tester.tap(panelText('First higher measurement'));
       await tester.pumpAndSettle();
 
       expect(

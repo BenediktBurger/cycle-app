@@ -31,6 +31,12 @@ class TagebuchScreen extends ConsumerStatefulWidget {
 }
 
 final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
+  /// The minimum one-line width that still shows the printed time-field
+  /// label next to the temperature field; below it the label drops and the
+  /// clock icon carries the meaning (see the narrow-width comment at the
+  /// BBT/time row).
+  static const double _timeLabelMinLineWidth = 300;
+
   final _formKey = GlobalKey<FormState>();
   final _bbtController = TextEditingController();
   final _notesController = TextEditingController();
@@ -278,7 +284,22 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final marks = ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navDiary)),
+      appBar: AppBar(
+        title: Text(l10n.navDiary),
+        // The Save action lives beside the screen title, so it is reachable
+        // from anywhere in the form — not only at the bottom (where the
+        // form's bottom button stays available in addition). It calls the
+        // same handler, with identical behavior (validation, snackbar, the
+        // cycle-start prompt on a suggested menstruation day).
+        actions: [
+          IconButton(
+            key: const ValueKey('diarySaveAction'),
+            icon: const Icon(Icons.save_outlined),
+            onPressed: () => _save(l10n),
+            tooltip: l10n.save,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -341,76 +362,96 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // --- BBT -------------------------------------------------
-              TextFormField(
-                controller: _bbtController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration:
-                    InputDecoration(labelText: '${l10n.temperature} (°C)'),
-                validator: (value) {
-                  final parsed = parseDecimalInput(value ?? '');
-                  if (parsed == null) {
-                    return (value ?? '').trim().isEmpty
-                        ? null // temperature stays optional
-                        : l10n.errorTemperature;
-                  }
-                  return isWithinBbtRange(parsed)
-                      ? null
-                      : l10n.errorTemperatureRange;
+              // --- BBT + measured time (compact one-line density) --------
+              // The measurement time is metadata OF the temperature (the
+              // domain model never stores it without one — see
+              // DailyEntry.measuredAtMinutes), so the time control shares
+              // the temperature's visual line instead of stacking a second
+              // row below it. The time control still only shows while a
+              // temperature that can actually be saved is entered: the
+              // same plausibility gate the validator applies
+              // (isWithinBbtRange) — an implausible number like "999"
+              // exposes the control just as little as an unparsable one.
+              // When it shows, a fresh day is prefilled with the current
+              // time (see _applyEntry); explicit clearing sets "not
+              // recorded".
+              //
+              // Narrow content widths (small devices, wide font scaling):
+              // the printed "Gemessen um" label is the widest part of the
+              // line, so below ~300 dp of form width it drops and the
+              // clock icon carries the meaning (the value stays on the
+              // button, the clear button stays). A narrow-width test pins
+              // that this line stays overflow-free.
+              LayoutBuilder(
+                builder: (context, lineConstraints) {
+                  final showTimeLabel =
+                      lineConstraints.maxWidth >= _timeLabelMinLineWidth;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _bbtController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                              labelText: '${l10n.temperature} (°C)'),
+                          validator: (value) {
+                            final parsed = parseDecimalInput(value ?? '');
+                            if (parsed == null) {
+                              return (value ?? '').trim().isEmpty
+                                  ? null // temperature stays optional
+                                  : l10n.errorTemperature;
+                            }
+                            return isWithinBbtRange(parsed)
+                                ? null
+                                : l10n.errorTemperatureRange;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _bbtController,
+                        builder: (context, value, _) {
+                          final parsed = parseDecimalInput(value.text);
+                          if (parsed == null || !isWithinBbtRange(parsed)) {
+                            return const SizedBox.shrink();
+                          }
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.schedule_outlined),
+                              const SizedBox(width: 4),
+                              if (showTimeLabel) ...[
+                                Text(l10n.measuredTime),
+                                const SizedBox(width: 4),
+                              ],
+                              OutlinedButton(
+                                onPressed: _pickTime,
+                                child: Text(
+                                  _measuredAt == null
+                                      ? l10n.measuredTimeUnset
+                                      : MaterialLocalizations.of(
+                                          context,
+                                        ).formatTimeOfDay(_measuredAt!),
+                                ),
+                              ),
+                              if (_measuredAt != null)
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () =>
+                                      setState(() => _measuredAt = null),
+                                  tooltip: l10n.measuredTimeUnset,
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  );
                 },
               ),
               const SizedBox(height: 12),
-              // --- measured time -------------------------------------
-              // The measurement time is metadata OF the temperature (the
-              // domain model never stores it without one — see
-              // DailyEntry.measuredAtMinutes), so the row only shows while
-              // a temperature that can actually be saved is entered: the
-              // same plausibility gate the validator applies
-              // (isWithinBbtRange) — an implausible number like "999"
-              // exposes the row just as little as an unparsable one. When
-              // it shows, a fresh day is prefilled with the current time
-              // (see _applyEntry); explicit clearing sets "not recorded".
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _bbtController,
-                builder: (context, value, _) {
-                  final parsed = parseDecimalInput(value.text);
-                  return parsed == null || !isWithinBbtRange(parsed)
-                      ? const SizedBox.shrink()
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule_outlined),
-                                const SizedBox(width: 8),
-                                Text(l10n.measuredTime),
-                                const Spacer(),
-                                OutlinedButton(
-                                  onPressed: _pickTime,
-                                  child: Text(
-                                    _measuredAt == null
-                                        ? l10n.measuredTimeUnset
-                                        : MaterialLocalizations.of(
-                                            context,
-                                          ).formatTimeOfDay(_measuredAt!),
-                                  ),
-                                ),
-                                if (_measuredAt != null)
-                                  IconButton(
-                                    icon: const Icon(Icons.close),
-                                    onPressed: () =>
-                                        setState(() => _measuredAt = null),
-                                    tooltip: l10n.measuredTimeUnset,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        );
-                },
-              ),
               // --- temperature disturbance group (flags + exclude switch)
               // One labelled group, one decision (owner decision
               // 2026-09-19: the coupling between the disturbance flags and

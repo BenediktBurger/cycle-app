@@ -7,10 +7,13 @@
 // the raw tempDisturbances mask). A flagged day whose mark was removed
 // renders normally; a marked day without flags renders lighter.
 //
-// The display-range group pins the owner-decided CLIP rule: curve values
-// outside the chart's fixed settings range (default 36–38 °C) are clamped
-// to exactly the boundary at the data layer — the scale never stretches
-// to fit an outlier.
+// The visible-range groups pin the new split of responsibilities: curveRuns
+// keeps every point's RAW measured value (an out-of-range reading is NOT
+// rewritten at the data layer), while visibleCurveSegments derives the
+// drawable clipped spans the chart actually draws — a straight segment is
+// reduced to what lies inside the settings range (default 36–38 °C),
+// dropping everything outside. A measurement exactly AT a boundary counts
+// as in range.
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/ui/cycle_curve.dart';
@@ -179,72 +182,233 @@ void main() {
     });
   });
 
-  group('display-range clipping (clip, never rescale)', () {
-    const defaultRange = TemperatureRange(min: 36.0, max: 38.0);
-
-    CurvePoint pointIn(Map<int, double> temps,
-        {TemperatureRange? displayRange}) {
+  group('curveRuns — raw values', () {
+    CurvePoint probe(Map<int, double?> temps, {Set<int>? ignored}) {
       final entries = {
         for (final MapEntry(:key, :value) in temps.entries)
           key: _entry(key, bbt: value),
       };
-      final runs = curveRuns(entries, displayRange: displayRange);
+      final runs = curveRuns(entries, ignoredDayIndexes: ignored ?? const {});
       return [
         for (final run in runs)
           for (final point in run.points) point,
       ].single;
     }
 
-    test('a temperature above the range clips to exactly the upper boundary',
-        () {
-      final point = pointIn({0: 39.5}, displayRange: defaultRange);
-      expect(point.bbtC, 38.0,
-          reason: 'a fever value renders AT maxY, not beyond the plot');
+    test('an in-range value passes through untouched', () {
+      final point = probe({0: 36.5});
+      expect(point.bbtC, 36.5, reason: 'runs carry the measured value');
     });
 
-    test('a temperature below the range clips to exactly the lower boundary',
-        () {
-      final point = pointIn({0: 35.2}, displayRange: defaultRange);
-      expect(point.bbtC, 36.0, reason: 'a low value renders AT minY');
+    test('a value above the range stays raw', () {
+      final point = probe({0: 39.5});
+      expect(point.bbtC, 39.5,
+          reason: 'curveRuns never rewrites values — visibility is '
+              ' decided later, by the clip helper');
+    });
+
+    test('a value below the range stays raw', () {
+      final point = probe({0: 35.2});
+      expect(point.bbtC, 35.2,
+          reason: 'curveRuns never rewrites values — visibility is '
+              ' decided later, by the clip helper');
     });
 
     test('a value exactly at a boundary passes through unchanged', () {
-      expect(pointIn({0: 38.0}, displayRange: defaultRange).bbtC, 38.0,
-          reason: 'clamp at the boundary must return the value itself');
-      expect(pointIn({0: 36.0}, displayRange: defaultRange).bbtC, 36.0,
-          reason: 'clamp at the lower boundary must return the value itself');
-    });
-
-    test('in-range values pass through unchanged', () {
-      expect(pointIn({0: 36.5}, displayRange: defaultRange).bbtC, 36.5);
-      expect(pointIn({0: 37.85}, displayRange: defaultRange).bbtC, 37.85);
+      expect(probe({0: 38.0}).bbtC, 38.0);
+      expect(probe({0: 36.0}).bbtC, 36.0);
     });
 
     test(
-        'a run with an out-of-range day stays connected (clipping does '
-        'not break adjacency)', () {
-      final runs = curveRuns(
-        {
-          0: _entry(0, bbt: 36.5),
-          1: _entry(1, bbt: 40.1),
-          2: _entry(2, bbt: 36.7),
-        },
-        displayRange: defaultRange,
+        'a run with an out-of-range day stays connected and keeps the raw '
+        'value', () {
+      final runs = curveRuns({
+        0: _entry(0, bbt: 36.5),
+        1: _entry(1, bbt: 40.1),
+        2: _entry(2, bbt: 36.7),
+      });
+      expect(runs, hasLength(1),
+          reason: 'connectivity is decided before any range knowledge');
+      expect([for (final p in runs.single.points) p.bbtC], [36.5, 40.1, 36.7],
+          reason: 'the out-of-range day keeps its raw value in the run');
+    });
+
+    test(
+        'an isolated out-of-range day still forms a single-point run '
+        'with its raw value', () {
+      // No adjacent measured days — a segment-less run; the chart skips
+      // it entirely when every measurement is out of range.
+      final runs = curveRuns({
+        5: _entry(5, bbt: 39.5),
+      });
+      expect(runs, hasLength(1),
+          reason: 'curveRuns is range-blind: the run survives even though '
+              'nothing can be drawn from it');
+      final point = runs.single.points.single;
+      expect(point.dayIndex, 5);
+      expect(point.bbtC, 39.5,
+          reason: 'the out-of-range value is kept raw, not rewritten');
+    });
+
+    test('an ignored out-of-range day is flagged anyway (raw value kept)', () {
+      final point = probe({0: 40.1}, ignored: {0});
+      expect(point.excluded, isTrue);
+      expect(point.bbtC, 40.1);
+    });
+  });
+
+  group('visibleCurveSegments — clipping to the visible value range', () {
+    const defaultRange = TemperatureRange(min: 36.0, max: 38.0);
+
+    CurveSegment segment(double ax, double ay, double bx, double by,
+            {bool excludedA = false, bool excludedB = false}) =>
+        CurveSegment(
+          CurvePoint(dayIndex: ax.toInt(), bbtC: ay, excluded: excludedA),
+          CurvePoint(dayIndex: bx.toInt(), bbtC: by, excluded: excludedB),
+        );
+
+    test('both endpoints in range: one span identical to the segment', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 37.0, 1, 37.5)],
+        defaultRange,
       );
-      expect(runs, hasLength(1), reason: 'adjacency is untouched by the clip');
-      expect([for (final p in runs.single.points) p.bbtC], [36.5, 38.0, 36.7]);
+      expect(spans, hasLength(1));
+      expect(spans.single.startX, 0);
+      expect(spans.single.startY, 37.0);
+      expect(spans.single.endX, 1);
+      expect(spans.single.endY, 37.5,
+          reason: 'integer day endpoints, raw y values');
     });
 
-    test('the pure helper clamps independently of runs', () {
-      expect(clampBbtC(39.5, defaultRange), 38.0);
-      expect(clampBbtC(35.4, defaultRange), 36.0);
-      expect(clampBbtC(36.8, defaultRange), 36.8);
+    test('in-range to above-range: the span ends at the boundary crossing', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 37.0, 1, 39.0)],
+        defaultRange,
+      );
+      expect(spans, hasLength(1));
+      expect(spans.single.startX, 0);
+      expect(spans.single.startY, 37.0);
+      expect(spans.single.endX, 0.5,
+          reason: 'the line crosses 38.0 halfway between the days');
+      expect(spans.single.endY, 38.0);
+    });
+
+    test('in-range to below-range: the span ends at the boundary crossing', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 37.0, 1, 35.0)],
+        defaultRange,
+      );
+      expect(spans, hasLength(1));
+      expect(spans.single.startX, 0);
+      expect(spans.single.startY, 37.0);
+      expect(spans.single.endX, 0.5);
+      expect(spans.single.endY, 36.0);
+    });
+
+    test('above-range to in-range: the span starts at the boundary crossing',
+        () {
+      final spans = visibleCurveSegments(
+        [segment(0, 39.0, 1, 37.0)],
+        defaultRange,
+      );
+      expect(spans, hasLength(1));
+      expect(spans.single.startX, 0.5);
+      expect(spans.single.startY, 38.0);
+      expect(spans.single.endX, 1);
+      expect(spans.single.endY, 37.0);
+    });
+
+    test('below-range to in-range: the span starts at the boundary crossing',
+        () {
+      final spans = visibleCurveSegments(
+        [segment(0, 35.0, 1, 37.0)],
+        defaultRange,
+      );
+      expect(spans, hasLength(1));
+      expect(spans.single.startX, 0.5);
+      expect(spans.single.startY, 36.0);
+      expect(spans.single.endX, 1);
+      expect(spans.single.endY, 37.0);
+    });
+
+    test('both endpoints above the range: no span at all', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 39.0, 1, 40.0)],
+        defaultRange,
+      );
+      expect(spans, isEmpty);
+    });
+
+    test('both endpoints below the range: no span at all', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 35.0, 1, 34.0)],
+        defaultRange,
+      );
+      expect(spans, isEmpty);
     });
 
     test(
-        'without a display range the raw values pass through (the chart '
-        'always passes one — the default keeps historical callers honest)', () {
-      expect(pointIn({0: 39.5}).bbtC, 39.5);
+        'below-range to above-range across the window: ONE span riding '
+        'both boundary crossings', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 35.0, 1, 39.0)],
+        defaultRange,
+      );
+      expect(spans, hasLength(1));
+      // 35→39 crosses 36.0 at x = 0.25 and 38.0 at x = 0.75.
+      expect(spans.single.startX, 0.25);
+      expect(spans.single.startY, 36.0);
+      expect(spans.single.endX, 0.75);
+      expect(spans.single.endY, 38.0);
+    });
+
+    test(
+        'a segment starting exactly at the upper boundary and leaving '
+        'upward: no drawable span (only the degenerate boundary point is '
+        'in range) — but the boundary value itself classifies as in range', () {
+      final spans = visibleCurveSegments(
+        [segment(0, 38.0, 1, 39.0)],
+        defaultRange,
+      );
+      expect(spans, isEmpty,
+          reason: 't=0 is the only in-range point — a zero-length span '
+              'is dropped');
+      expect(isBbtCInRange(38.0, defaultRange), isTrue,
+          reason: 'the boundary dot itself renders (the dot filter uses the '
+              'same predicate)');
+      expect(isBbtCInRange(36.0, defaultRange), isTrue,
+          reason: 'the lower boundary is inclusive as well');
+      expect(isBbtCInRange(38.5, defaultRange), isFalse);
+      expect(isBbtCInRange(35.5, defaultRange), isFalse);
+    });
+
+    test(
+        'a crossing that lands exactly on an integer day: the single-point '
+        'span is dropped', () {
+      // 40→38 over two days touches the upper boundary exactly at day 2.
+      final spans = visibleCurveSegments(
+        [segment(0, 40.0, 2, 38.0)],
+        defaultRange,
+      );
+      expect(spans, isEmpty);
+    });
+
+    test('a span whose source segment touches an interrupted day is lighter',
+        () {
+      final spans = visibleCurveSegments(
+        [
+          segment(0, 37.0, 1, 39.0, excludedA: true),
+          segment(0, 37.0, 1, 39.0, excludedB: true),
+          segment(0, 37.0, 1, 39.0),
+        ],
+        defaultRange,
+      );
+      expect(spans, hasLength(3));
+      expect(spans[0].lighter, isTrue,
+          reason: 'the interrupted endpoint carries the lighter bit');
+      expect(spans[1].lighter, isTrue,
+          reason: 'either endpoint being interrupted makes the span lighter');
+      expect(spans[2].lighter, isFalse);
     });
   });
 }

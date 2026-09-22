@@ -4,8 +4,10 @@
 ///
 /// Plain Dart value type (no Flutter) so the curve helpers
 /// (lib/ui/cycle_curve.dart) and their tests can consume it headless.
-/// Out-of-range temperatures CLIP at the boundary (owner decision: clip,
-/// never rescale — the scale never stretches to fit an outlier).
+/// Out-of-range temperatures are not rendered: their dots are skipped and
+/// the curve's drawable line pieces clip at the boundary crossings
+/// (lib/ui/cycle_curve.dart) — owner decision: clip the DRAWING to the
+/// window, never rescale (the scale never stretches to fit an outlier).
 ///
 /// Fahrenheit stays out of scope: the value, its bounds and every seam
 /// built on it (label formatter, settings step units) live in °C domain

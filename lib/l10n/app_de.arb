@@ -107,9 +107,11 @@
   "cycleJumpToDate": "Zum Datum springen",
   "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
-  "cycleSheetSetMucusPeak": "Schleimhöhepunkt setzen",
-  "cycleSheetRemoveMucusPeak": "Schleimhöhepunkt entfernen",
-  "cycleSheetSetFirstHigher": "Erste höhere Messung setzen",
+  "cycleSheetCycleStartLabel": "Zyklusbeginn",
+  "cycleSheetMucusPeakLabel": "Schleimhöhepunkt",
+  "cycleSheetFirstHigherLabel": "Erste höhere Messung",
+  "cycleSheetSuzEveningLabel": "SUZ ab diesem Abend",
+  "cycleSheetSuzMorningLabel": "SUZ ab diesem Morgen",
   "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
   "cycleSheetBaselineInfo": "Basislinie: {value}",
   "@cycleSheetBaselineInfo": {
@@ -151,12 +153,6 @@
   "cycleSheetRiseConsistencyKeep": "Behalten",
   "cycleSheetRiseInconsistent": "Am markierten Tag liegt keine Messung über der Basislinie {value} °C.",
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
-  "cycleSheetSetSuzEvening": "SUZ ab heute Abend",
-  "cycleSheetRemoveSuzEvening": "SUZ ab heute Abend entfernen",
-  "cycleSheetSetSuzMorning": "SUZ ab heute Morgen",
-  "cycleSheetRemoveSuzMorning": "SUZ ab heute Morgen entfernen",
-  "cycleSheetSetCycleStart": "Zyklusbeginn setzen",
-  "cycleSheetRemoveCycleStart": "Zyklusbeginn entfernen",
   "diaryCycleStartPromptTitle": "Neuen Zyklus beginnen?",
   "diaryCycleStartPromptBody": "Die Blutung an diesem Tag deutet darauf hin, dass hier ein neuer Zyklus beginnt. Soll an diesem Tag eine Zyklusbeginn-Markierung gesetzt werden?",
   "diaryCycleStartPromptConfirm": "Zyklusbeginn setzen",
@@ -169,24 +165,6 @@
   "cycleLegendMittelschmerz": "Mittelschmerz (M)",
   "cycleLegendDisturbance": "Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
-  "cycleSheetMeasuredAt": "Messzeitpunkt: {time}",
-  "@cycleSheetMeasuredAt": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
-  "cycleSummaryCycleLength": "Zykluslänge",
-  "cycleSummaryPeriodStart": "Mensbeginn",
-  "cycleSummaryPeriodEnd": "Mensende",
-  "cycleSummaryPeak": "Schleimhöhepunkt",
-  "cycleSummarySuz": "SUZ-Beginn",
-  "cycleSummaryStatus": "Auswertung",
-  "cycleSummaryColumn": "Zyklus {n}",
-  "cycleSummarySuzEvening": "Regel D (gegen Abend)",
-  "cycleSummarySuzMorning": "Regel E (am Morgen)",
-  "cycleSummarySuzFrom": "SUZ ab {day}",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen) — keine Bewertung oder Aussagen über Fruchtbarkeit. Eine gesetzte Zyklusbeginn-Markierung gilt unabhängig vom Bleedingsmuster; Störungen verschieben sie nicht.",
   "statisticsNoData": "Sobald zwei Zyklusbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",
@@ -204,19 +182,32 @@
     }
   },
   "settingsLanguage": "Sprache",
-  "settingsLanguageNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt.",
   "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsThemeMode": "Design",
-  "settingsThemeModeNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt.",
   "themeSystem": "System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
   "settingsTemperatureRange": "Temperaturbereich",
   "settingsRangeLower": "Untergrenze",
   "settingsRangeUpper": "Obergrenze",
-  "settingsTemperatureRangeNote": "Wird im lokalen Speicher der App gesichert — beim nächsten App-Start wiederhergestellt. Standard: 36–38 °C.",
+  "settingsTemperatureRangeDefaultHint": "Standard: 36–38 °C.",
+  "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
+  "@settingsObservedCyclesOutsideApp": {
+    "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."
+  },
+  "settingsObservedCyclesOutsideAppHelper": "Wie viele Zyklen du vor dieser App beobachtet hast (z. B. auf Papier). Die Zyklus-Nummern auf der Zyklusseite fangen erst nach dieser Zahl an zu zählen.",
+  "settingsObservedCyclesOutsideAppError": "Bitte eine ganze Zahl ≥ 0 eingeben",
+  "cycleOrdinal": "Zyklus {n}",
+  "@cycleOrdinal": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
+  },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
@@ -272,7 +263,9 @@
   "disturbanceAlcohol": "Alkohol (alk)",
   "disturbanceIllness": "Krank (kr)",
   "cycleSheetSetIgnoreTemperature": "Temperatur ignorieren",
-  "cycleSheetRemoveIgnoreTemperature": "Temperatur wieder auswerten",
-  "cycleSheetExcludeGroupTitle": "Von der Auswertung ausgeschlossen",
+  "cycleDayPanelClose": "Tag-Optionen schließen",
+  "@cycleDayPanelClose": {
+    "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
+  },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
 }

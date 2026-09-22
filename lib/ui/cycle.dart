@@ -29,11 +29,12 @@
 // persisted; the SUZ arithmetic stays domain-only and a manual SUZ mark
 // never alters it (see lib/domain/evaluation.dart).
 //
-// Tapping a chart day or a signal-row cell opens the day's mark-entry
-// bottom sheet (lib/ui/cycle_mark_sheet.dart): edit day (jumps to the
-// Tagebuch form with that date pre-selected, via selectedDateProvider +
-// tabIndexProvider), the contextual mark toggles and the computed info
-// line.
+// Tapping a chart day or a signal-row cell shows the day-mark options in
+// the NON-MODAL panel the screen owns (lib/ui/cycle_mark_sheet.dart,
+// cycle_day_panel_provider): edit day (jumps to the Tagebuch form with
+// that date pre-selected, via selectedDateProvider + tabIndexProvider),
+// the contextual mark toggles and the computed info line. Tapping another
+// day retargets the panel in place; the close button clears it.
 //
 // The chart block renders a VIEWPORT-LIMITED WINDOW of days: day columns
 // keep at least a minimum usable width (see _CycleChartState's
@@ -69,7 +70,6 @@ import 'cycle_curve.dart';
 import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';
 import 'cycle_marks.dart';
-import 'cycle_summary.dart';
 import 'mucus_symbol.dart';
 
 class ZyklusScreen extends ConsumerWidget {
@@ -118,13 +118,12 @@ class ZyklusScreen extends ConsumerWidget {
               ),
             );
           }
-          // The evaluation table's input, like the chart overlay's: the
-          // entries plus the user-placed marks, evaluated at render time
-          // (ADR-0001). Watching the marks stream here makes a mark change
-          // rebuild the whole screen — the table recomputes, nothing is
-          // persisted. This is the screen's ONLY marks watch: the
-          // evaluations and the raw marks are computed once and handed to
-          // both the chart overlay and the table below.
+          // The chart overlay's input: the entries plus the user-placed
+          // marks, evaluated at render time (ADR-0001). Watching the marks
+          // stream here makes a mark change rebuild the whole screen — the
+          // overlay recomputes, nothing is persisted. This is the screen's
+          // ONLY marks watch: the evaluations and the raw marks are
+          // computed once and handed to the chart overlay.
           // The temperature display range ("Temperaturbereich" settings
           // card): watched here so a settings change rebuilds the chart
           // with the new fixed bounds — constructor data like
@@ -133,6 +132,15 @@ class ZyklusScreen extends ConsumerWidget {
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
           final evaluations = evaluateCycles(entries, marks);
+          // The "cycles observed outside this app" setting: watched here so
+          // a settings change renumbers the chart's boundary ordinals in
+          // the same rebuild — exactly why the chart takes the value as
+          // constructor data.
+          final observedCyclesOutsideApp =
+              ref.watch(observedCyclesOutsideAppProvider);
+          // The tapped day whose options the screen hosts below the chart
+          // (null provider value = no panel).
+          final panelDay = ref.watch(cycleDayPanelProvider);
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
@@ -141,12 +149,21 @@ class ZyklusScreen extends ConsumerWidget {
                 marks: marks,
                 evaluations: evaluations,
                 range: temperatureRange,
+                observedCyclesOutsideApp: observedCyclesOutsideApp,
               ),
               const SizedBox(height: 12),
-              // The paper's bottom summary: the evaluation table, one row
-              // per attribute, one column per cycle group.
-              CycleSummaryTable(evaluations: evaluations),
-              const SizedBox(height: 12),
+              // The tapped day's options as a NON-MODAL panel in a fixed
+              // slot below the chart (never a route): a chart tap retargets
+              // it in place, the close button clears it — see
+              // cycleDayPanelProvider (null = no panel).
+              if (panelDay != null)
+                CycleDayPanel(
+                  key: const ValueKey('cycleDayPanel'),
+                  day: panelDay,
+                  onClose: () =>
+                      ref.read(cycleDayPanelProvider.notifier).state = null,
+                ),
+              if (panelDay != null) const SizedBox(height: 12),
               Text(
                 l10n.cycleArithmeticNote,
                 style: Theme.of(context).textTheme.bodySmall,
@@ -161,7 +178,11 @@ class ZyklusScreen extends ConsumerWidget {
 
 /// The chart data view model for one recorded range: day index -> signal.
 final class _ChartDays {
-  _ChartDays(List<DailyEntry> entries, List<CycleMark> marks) {
+  _ChartDays(
+    List<DailyEntry> entries,
+    List<CycleMark> marks,
+    this.observedCyclesOutsideApp,
+  ) {
     final sorted = [...entries]
       ..sort((a, b) => DateOnly.daysBetween(a.date, b.date));
     firstDay = DateOnly.normalize(sorted.first.date);
@@ -193,6 +214,17 @@ final class _ChartDays {
       // (predating the first cycleStart mark) is not.
       for (final g in groups)
         if (g.startsAtMenstruation) DateOnly.normalize(g.startDate),
+    };
+    // The ordinals at the boundaries: each mark-opened group carries its
+    // number from the shared ordinal rule (cycleOrdinalNumber) — observing
+    // cycles outside this app shifts every boundary label, and the leading
+    // pre-mark group is skipped (it is not mark-opened).
+    var markOpenedIndex = 0;
+    cycleOrdinalByStart = {
+      for (final g in groups)
+        if (g.startsAtMenstruation)
+          DateOnly.normalize(g.startDate):
+              cycleOrdinalNumber(markOpenedIndex++, observedCyclesOutsideApp),
     };
     var group = 0;
     for (var i = 0; i < dayCount; i++) {
@@ -230,6 +262,14 @@ final class _ChartDays {
   /// first mark).
   late final Set<DateTime> cycleStartDates;
 
+  /// The observed-cycles count the ordinals shift by (the settings value
+  /// the screen watches; see [cycleOrdinalNumber]).
+  final int observedCyclesOutsideApp;
+
+  /// The "Zyklus N" ordinal for every mark-opened cycle start (the same
+  /// dates as [cycleStartDates], keyed by their UTC-midnight date).
+  late final Map<DateTime, int> cycleOrdinalByStart;
+
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 
   /// Whether day [index] opens a new cycle (a user-placed cycleStart mark
@@ -262,12 +302,13 @@ final class _CycleChart extends StatefulWidget {
     required this.marks,
     required this.evaluations,
     required this.range,
+    required this.observedCyclesOutsideApp,
   });
 
   final List<DailyEntry> entries;
 
   /// The user-placed marks, evaluated with [evaluations] by the screen (at
-  /// render time, ADR-0001) and shared here with the summary table.
+  /// render time, ADR-0001).
   final List<CycleMark> marks;
 
   /// The per-cycle evaluations the overlay draws its artifacts from —
@@ -278,6 +319,10 @@ final class _CycleChart extends StatefulWidget {
   /// y bounds (and, via the shared scale, the rail's labels); out-of-range
   /// curve values clip at the data layer into it.
   final TemperatureRange range;
+
+  /// The outside-app observed-cycles setting (watched by the screen): the
+  /// shift the boundary ordinals render with (see [cycleOrdinalNumber]).
+  final int observedCyclesOutsideApp;
 
   @override
   State<_CycleChart> createState() => _CycleChartState();
@@ -300,10 +345,13 @@ final class _CycleChartState extends State<_CycleChart> {
   /// width.
   static const double frozenRailWidth = 44;
 
-  /// The fixed height of the day/cycle header segment: shared between the
-  /// scrolling header row's cells and the rail's prototype slot so both
-  /// sides stay vertically in step (the rail's scale segment must start
-  /// exactly where the plot starts).
+  /// The fixed height of the day/cycle header segment: two lines — day of
+  /// month above, day of cycle underneath. Shared between the scrolling
+  /// header row's cells and the rail's prototype slot so both sides stay
+  /// vertically in step (the rail's scale segment must start exactly where
+  /// the plot starts). The cycle ordinal is NOT part of the header: it
+  /// renders inside the temperature plot as a badge
+  /// (_CycleOrdinalBadges), so the header stays at its natural two lines.
   static const double dayHeaderRowHeight = 28;
 
   static const Duration _scrollDuration = Duration(milliseconds: 300);
@@ -408,7 +456,8 @@ final class _CycleChartState extends State<_CycleChart> {
   @override
   void initState() {
     super.initState();
-    _days = _ChartDays(widget.entries, widget.marks);
+    _days = _ChartDays(
+        widget.entries, widget.marks, widget.observedCyclesOutsideApp);
     _scrollController.addListener(_onScrolled);
     // Register the AppBar's jump affordance (see [_jumpRegistration]).
     _registerJumpAffordance();
@@ -424,8 +473,10 @@ final class _CycleChartState extends State<_CycleChart> {
     // state is alive: recompute the day mapping so a changed range (or a
     // changed boundary mark) re-windows instead of rendering stale data.
     if (!identical(oldWidget.entries, widget.entries) ||
-        !identical(oldWidget.marks, widget.marks)) {
-      _days = _ChartDays(widget.entries, widget.marks);
+        !identical(oldWidget.marks, widget.marks) ||
+        oldWidget.observedCyclesOutsideApp != widget.observedCyclesOutsideApp) {
+      _days = _ChartDays(
+          widget.entries, widget.marks, widget.observedCyclesOutsideApp);
       // Only the FIRST data frame (an initial auto-scroll still pending)
       // may trigger the jump here; once it ran, a later re-emit never
       // re-jumps and the user's position survives.
@@ -444,10 +495,13 @@ final class _CycleChartState extends State<_CycleChart> {
   }
 
   void _openDaySheet(int index) {
-    // Tapping the curve, the marks row or a signal-row cell opens the
-    // day's mark-entry sheet; the form jump ("edit day") lives inside the
-    // sheet.
-    showCycleDaySheet(context, day: _days.dayAt(index));
+    // Tapping the curve, the marks row or a signal-row cell shows the
+    // day's options in the NON-MODAL panel the screen owns
+    // (cycleDayPanelProvider): retargeting on every tap, no route pushed.
+    // The form jump ("edit day") lives inside the panel.
+    ProviderScope.containerOf(context, listen: false)
+        .read(cycleDayPanelProvider.notifier)
+        .state = _days.dayAt(index);
   }
 
   /// The leftmost day with any pixel on screen (no margin): day cell i
@@ -591,8 +645,8 @@ final class _CycleChartState extends State<_CycleChart> {
     // arrow-up, 1–6 numbering, baseline) are computed at render time from
     // the entries plus the user-placed marks — never persisted, so a mark
     // change live-updates the whole overlay (ADR-0001). The marks stream is
-    // watched once in the screen, which also derives the evaluations the
-    // summary table shows; both arrive as widget fields, so the curve
+    // watched once in the screen, which derives the evaluations drawn
+    // by the overlay; they arrive as widget fields, so the curve
     // itself still never depends on a mark change beyond a screen rebuild.
     final overlay = buildEvaluationOverlay(
       evaluations: widget.evaluations,
@@ -604,13 +658,14 @@ final class _CycleChartState extends State<_CycleChart> {
     // The curve is split into runs of adjacent measured days (curve helpers,
     // lib/ui/cycle_curve.dart): the line connects two temperatures only when
     // their calendar days are adjacent, so a day without a temperature
-    // (missing entry or entry without bbtC) breaks the line. The runs also
-    // CLIP every temperature into the fixed settings range at the data
-    // layer. The static structure feeds the emptiness check; the y bounds
-    // themselves come from the settings range and never depend on the data,
-    // so the scale never rescales while scrolling.
-    final runs = curveRuns(_days.byIndex,
-        ignoredDayIndexes: _days.ignoredDayIndexes, displayRange: widget.range);
+    // (missing entry or entry without bbtC) breaks the line. The points
+    // keep the RAW measured temperatures — whether a dot or a line piece
+    // becomes drawable inside the fixed settings range is decided in the
+    // chart config below. The static structure feeds the emptiness check;
+    // the y bounds themselves come from the settings range and never
+    // depend on the data, so the scale never rescales while scrolling.
+    final runs =
+        curveRuns(_days.byIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -622,9 +677,10 @@ final class _CycleChartState extends State<_CycleChart> {
 
     // The y bounds are the SETTINGS-selected display range (the persisted
     // temperatureRangeProvider, default 36–38 °C): a fixed scale, not the
-    // old data-adaptive ±0.4 rounding anymore. Curve
-    // values outside the range already clipped in the runs above — dots
-    // and segments ride the boundary instead of stretching the scale.
+    // old data-adaptive ±0.4 rounding anymore. Values outside the range
+    // are simply not rendered — the point filter and the segment clipper
+    // below keep dots and line pieces inside the visible window (pieces
+    // may touch a boundary, where a boundary measurement still sits).
     // No degenerate-span guard is needed: the settings card enforces
     // min < max by construction.
     final yMin = widget.range.min;
@@ -657,9 +713,9 @@ final class _CycleChartState extends State<_CycleChart> {
     // band), so the whole glyph sits below the sex row above the plot.
     // TODO(user-review): both values are owner-eyeball rendering details,
     // not settled rules. TODO(user-review): top-border collision — a
-    // temperature dot near the scale top (especially a CLIPPED dot, which
-    // stops exactly AT the boundary yMax) can visually meet the top
-    // arrow; accepted for now, no avoidance logic.
+    // temperature dot near the scale top (especially a dot exactly AT the
+    // boundary yMax) can visually meet the top arrow; accepted for now, no
+    // avoidance logic.
     const suzBarHangSpanDegrees = 0.5;
     const suzArrowTopInsetDegrees = 0.25;
 
@@ -714,9 +770,8 @@ final class _CycleChartState extends State<_CycleChart> {
             if (entry.key >= winStart && entry.key <= winEnd)
               entry.key: entry.value,
         };
-        final winRuns = curveRuns(winByIndex,
-            ignoredDayIndexes: _days.ignoredDayIndexes,
-            displayRange: widget.range);
+        final winRuns =
+            curveRuns(winByIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{
           for (final run in winRuns)
@@ -819,27 +874,28 @@ final class _CycleChartState extends State<_CycleChart> {
                                 LineChart(
                                   LineChartData(
                                     lineBarsData: [
-                                      // The line: one two-spot bar per
-                                      // adjacent-day pair, so a segment touching
-                                      // an interrupted (excluded) day can render
-                                      // lighter while the others keep the
-                                      // full-strength color. Dots are painted
-                                      // afterwards by the dot bars below. Only
-                                      // the window's segments are carried — the
-                                      // x positions stay global.
-                                      for (final segment in winSegments)
+                                      // The line: one two-spot bar per CLIPPED
+                                      // span of a segment (visibleCurveSegments
+                                      // clips each straight segment to the
+                                      // visible value range — the crossings may
+                                      // sit at fractional day indexes), so a
+                                      // span touching an interrupted (excluded)
+                                      // day can render lighter while the
+                                      // others keep the full-strength color.
+                                      // Dots are painted afterwards by the dot
+                                      // bars below. Only the window's segments
+                                      // are clipped and carried — the x
+                                      // positions stay global.
+                                      for (final span in visibleCurveSegments(
+                                          winSegments, widget.range))
                                         LineChartBarData(
                                           spots: [
-                                            FlSpot(
-                                                segment.a.dayIndex.toDouble(),
-                                                segment.a.bbtC),
-                                            FlSpot(
-                                                segment.b.dayIndex.toDouble(),
-                                                segment.b.bbtC),
+                                            FlSpot(span.startX, span.startY),
+                                            FlSpot(span.endX, span.endY),
                                           ],
                                           isCurved: false,
                                           barWidth: 1.6,
-                                          color: segment.lighter
+                                          color: span.lighter
                                               ? interruptedColor
                                               : temperatureColor,
                                           dotData: const FlDotData(show: false),
@@ -848,31 +904,42 @@ final class _CycleChartState extends State<_CycleChart> {
                                       // color) holding each run's spots, so the
                                       // per-spot dot painter can render an
                                       // interrupted day's dot lighter than the
-                                      // others.
+                                      // others. Only IN-RANGE points get a
+                                      // spot: skipping the spot skips the whole
+                                      // painter (dot, circled-higher ring,
+                                      // arrow-up glyph) of an out-of-range
+                                      // measurement.
                                       for (final run in winRuns)
-                                        LineChartBarData(
-                                          spots: [
-                                            for (final point in run.points)
-                                              FlSpot(point.dayIndex.toDouble(),
-                                                  point.bbtC),
-                                          ],
-                                          color: Colors.transparent,
-                                          dotData: FlDotData(
-                                            show: true,
-                                            getDotPainter: (spot, _, bar, __) =>
-                                                dotPainterForDay(
-                                              dayIndex: spot.x.round(),
-                                              dotColor: interruptedByIndex[
-                                                          spot.x.round()] ??
-                                                      false
-                                                  ? interruptedColor
-                                                  : temperatureColor,
-                                              colorScheme:
-                                                  Theme.of(context).colorScheme,
-                                              overlay: overlay,
+                                        if (run.points.any((point) =>
+                                            isBbtCInRange(
+                                                point.bbtC, widget.range)))
+                                          LineChartBarData(
+                                            spots: [
+                                              for (final point in run.points)
+                                                if (isBbtCInRange(
+                                                    point.bbtC, widget.range))
+                                                  FlSpot(
+                                                      point.dayIndex.toDouble(),
+                                                      point.bbtC),
+                                            ],
+                                            color: Colors.transparent,
+                                            dotData: FlDotData(
+                                              show: true,
+                                              getDotPainter:
+                                                  (spot, _, bar, __) =>
+                                                      dotPainterForDay(
+                                                dayIndex: spot.x.round(),
+                                                dotColor: interruptedByIndex[
+                                                            spot.x.round()] ??
+                                                        false
+                                                    ? interruptedColor
+                                                    : temperatureColor,
+                                                colorScheme: Theme.of(context)
+                                                    .colorScheme,
+                                                overlay: overlay,
+                                              ),
                                             ),
                                           ),
-                                        ),
                                       // The baseline segments (R10): one dashed
                                       // two-spot bar per evaluated cycle, drawn
                                       // LAST so it paints above the curve and the
@@ -1096,6 +1163,19 @@ final class _CycleChartState extends State<_CycleChart> {
                                       handleBuiltInTouches: false,
                                     ),
                                   ),
+                                ),
+                                // The in-plot cycle ordinal badges: the
+                                // "Zyklus N" chip at the top of every
+                                // mark-opened cycle's first column
+                                // (_CycleOrdinalBadges) — non-interactive
+                                // rendering pinned to this stack, below the
+                                // opaque tap overlay so the day-column
+                                // mapping stays untouched.
+                                _CycleOrdinalBadges(
+                                  days: _days,
+                                  cellWidth: colW,
+                                  windowStart: winStart,
+                                  windowEnd: winEnd,
                                 ),
                                 // The tap overlay covers the whole scroll
                                 // content: the plot spans it fully (no axis
@@ -1810,13 +1890,15 @@ String _shortMonthLabel(DateTime date, String locale) =>
 /// The day/cycle header line ABOVE the chart (the paper's header row):
 /// every day column shows its day of month ("14.") on top and its day of
 /// cycle (1, 2, 3 …, counted from the cycle start in _ChartDays)
-/// underneath. On the FIRST day of a calendar month the day-of-month label
-/// is REPLACED by the localized short month form (de "Jan." / en "Jan") —
-/// the month home the otherwise bare day numbers need. The rule is
-/// CALENDAR-based, not cycle-based: a cycle start mid-month keeps its
-/// plain day number (owner decision). The two column prototypes (date
-/// sample "14.", cycle-day sample "#5") live in the frozen left rail's
-/// header slot (see _LeftRail).
+/// underneath. The cycle ordinal ("Zyklus N") is NOT part of the header:
+/// it renders inside the temperature plot as a badge at each cycle's
+/// first column (see _CycleOrdinalBadges). On the FIRST day of a calendar
+/// month the day-of-month label is REPLACED by the localized short month
+/// form (de "Jan." / en "Jan") — the month home the otherwise bare day
+/// numbers need. The rule is CALENDAR-based, not cycle-based: a cycle
+/// start mid-month keeps its plain day number (owner decision). The two
+/// column prototypes (date sample "14.", cycle-day sample "#5") live in
+/// the frozen left rail's header slot (see _LeftRail).
 /// TODO(user-review): the prototypes ("14.", "#5") are ad-hoc column
 /// samples; the experts may want different header prototypes.
 /// Mirrors the signal rows' windowed layout: the window spacer puts the
@@ -1882,9 +1964,9 @@ final class _DayHeaderRow extends StatelessWidget {
                   // Day of cycle: subtler than the 1–6 numbering (that one
                   // is an evaluation artifact in the primary color). Long
                   // mark-driven cycles — e.g. during pregnancy, when no
-                  // cycle start is marked — produce three-digit day-of-cycle
-                  // numbers; FittedBox scales them down to fit the narrow
-                  // column, like the day-of-month label above.
+                  // cycle start is marked — produce three-digit
+                  // day-of-cycle numbers; FittedBox scales them down to fit
+                  // the narrow column, like the day-of-month label above.
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
@@ -1926,6 +2008,118 @@ Widget _columnPrototype({
         ),
       ),
     );
+
+/// The in-plot cycle ordinal badges: at every mark-opened cycle boundary
+/// (the shared [_ChartDays.isCycleBoundary] predicate that draws the thick
+/// separator line) a small "Zyklus N" chip renders INSIDE the temperature
+/// plot, pinned to the top of the boundary day's column — the paper
+/// sheet's cycle number written at the top of each cycle section. The
+/// chips sit BELOW the tap overlay in the chart's stack and carry no
+/// gesture target of their own, so tap/long-press day-column mapping is
+/// untouched.
+///
+/// Geometry: the boundary separator is drawn at chart-domain x = i − 0.5
+/// and the x domain is half a column shifted with one column per day
+/// index (minX −0.5), so that separator's pixel is exactly
+/// i · cellWidth from the plot's left edge — where the chip's left edge
+/// pins with a small inset (the inset keeps the chip clear of the
+/// separator line it hangs from). The background shrink-wraps around the
+/// label (text + a small horizontal padding), NOT the cycle's columns.
+/// The cycle's own column span — boundary day through the day before the
+/// next boundary (or the range's last day), clamped to the built window —
+/// is only the chip's MAXIMUM width, applied with the same windowed clamp
+/// as every other row: a label wider than its cycle's span (the built
+/// window's right edge or a perversely SHORT cycle — fewer columns than
+/// the localized wording needs) scales down through the same FittedBox
+/// scale-down the header cell labels use (accepted edge case).
+///
+/// Mirrors the signal rows' windowed layout: only the built window's
+/// boundaries render. The ordinal comes from the shared rule
+/// ([_ChartDays.cycleOrdinalByStart] — lib/domain/cycle_grouping.dart's
+/// cycleOrdinalNumber with the outside-app setting), the same number the
+/// evaluation table's column headers use; the leading pre-mark group is
+/// not a boundary and carries no chip.
+///
+/// TODO(user-review): the chip's look (rounded surface-tinted container at
+/// ~0.9 opacity, 9 px primary-colored text, top-of-plot pinning, inset
+/// and hugging padding sizes) is an owner-eyeball rendering detail.
+/// TODO(user-review): known overlap — a user-placed SUZ bar on the cycle's
+/// first day hangs from the plot top (the suzBarHangSpanDegrees drop) and
+/// sits under the chip where it overlaps the label; the chip's opaque
+/// background covers it. Curve dots do not collide: cycle-start
+/// temperatures are biologically low (owner decision).
+const double _cycleBadgeColumnInset = 2;
+const double _cycleBadgeTopInset = 3;
+const double _cycleBadgeHeight = 14;
+
+final class _CycleOrdinalBadges extends StatelessWidget {
+  const _CycleOrdinalBadges({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+  });
+
+  final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final chips = <Widget>[];
+    for (var i = windowStart; i <= windowEnd; i++) {
+      if (!days.isCycleBoundary(i)) continue;
+      // The cycle's end: the next boundary's column start, or the range's
+      // end when this is the last cycle. Only boundaries inside the built
+      // window are visited, so the chip clamps at the window's right edge.
+      var nextBoundary = days.dayCount;
+      for (var j = i + 1; j < days.dayCount; j++) {
+        if (days.isCycleBoundary(j)) {
+          nextBoundary = j;
+          break;
+        }
+      }
+      final rightIndex = math.min(nextBoundary, windowEnd + 1);
+      chips.add(Positioned(
+        left: i * cellWidth + _cycleBadgeColumnInset,
+        top: _cycleBadgeTopInset,
+        height: _cycleBadgeHeight,
+        child: ConstrainedBox(
+          // The cycle's own column span (clamped to the built window like
+          // every other row) is the chip's MAX width only: the chip is
+          // free to shrink to its label, and a span narrower than the
+          // label squeezes it down through the FittedBox below.
+          constraints: BoxConstraints(
+            maxWidth: (rightIndex - i) * cellWidth - 2 * _cycleBadgeColumnInset,
+          ),
+          child: Container(
+            // The chip key exposes the badge's rect for the geometry
+            // widget tests (the Text alone keeps 'cycleOrdinal-$i').
+            key: ValueKey('cycleOrdinalChip-$i'),
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l10n.cycleOrdinal(days.cycleOrdinalByStart[days.dayAt(i)]!),
+                key: ValueKey('cycleOrdinal-$i'),
+                style: TextStyle(fontSize: 9, color: scheme.primary),
+              ),
+            ),
+          ),
+        ),
+      ));
+    }
+    return Stack(children: chips);
+  }
+}
 // --- temperature scale (chart domain + frozen-rail labels) ------------------
 
 /// The temperature scale's single source of truth: the chart's y domain

@@ -1,6 +1,7 @@
 // The typed settings layer over the raw key-value DAO (settings_dao.dart):
-// named keys, generic JSON encode/decode and typed helpers for the three
-// persisted general settings (language, theme mode, temperature range).
+// named keys, generic JSON encode/decode and typed helpers for the
+// persisted general settings (language, theme mode, temperature range,
+// outside-app cycle count).
 //
 // Adding a future setting (e.g. a PDF export option) is deliberately boring:
 // a new constant in [SettingKeys] plus one typed helper — no schema change,
@@ -35,6 +36,12 @@ abstract final class SettingKeys {
   /// The temperature display range as a {"min":..,"max":..} JSON map
   /// (TemperatureRange.toJson).
   static const temperatureRange = 'temperatureRange';
+
+  /// The count of cycles the user observed OUTSIDE this app (e.g. on paper
+  /// or in a previous tracker), as a plain JSON integer >= 0. Nothing stored
+  /// (or a corrupt row) means 0 — the cycle ordinals on the cycle page then
+  /// count only the mark-opened cycles recorded in this database.
+  static const observedCyclesOutsideApp = 'observedCyclesOutsideApp';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -46,6 +53,7 @@ final class PersistedSettings {
     this.locale,
     this.themeMode = ThemeMode.system,
     this.temperatureRange = TemperatureRange.defaults,
+    this.observedCyclesOutsideApp = 0,
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -60,15 +68,20 @@ final class PersistedSettings {
   /// The stored temperature display range.
   final TemperatureRange temperatureRange;
 
+  /// The stored count of cycles observed outside this app (>= 0).
+  final int observedCyclesOutsideApp;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
       other.locale == locale &&
       other.themeMode == themeMode &&
-      other.temperatureRange == temperatureRange;
+      other.temperatureRange == temperatureRange &&
+      other.observedCyclesOutsideApp == observedCyclesOutsideApp;
 
   @override
-  int get hashCode => Object.hash(locale, themeMode, temperatureRange);
+  int get hashCode => Object.hash(
+      locale, themeMode, temperatureRange, observedCyclesOutsideApp);
 }
 
 /// Stateless typed wrapper over one database's [SettingsDao]. Cheap enough
@@ -90,6 +103,7 @@ final class SettingsStore {
     Locale? locale;
     var themeMode = ThemeMode.system;
     var temperatureRange = TemperatureRange.defaults;
+    var observedCyclesOutsideApp = 0;
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -106,6 +120,8 @@ final class SettingsStore {
               // that rejection keeps the default below.
               temperatureRange = TemperatureRange.fromJson(decoded);
             }
+          case SettingKeys.observedCyclesOutsideApp:
+            observedCyclesOutsideApp = _observedCyclesFromStored(decoded);
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -116,6 +132,7 @@ final class SettingsStore {
       locale: locale,
       themeMode: themeMode,
       temperatureRange: temperatureRange,
+      observedCyclesOutsideApp: observedCyclesOutsideApp,
     );
   }
 
@@ -161,6 +178,18 @@ final class SettingsStore {
     }
     return writeSetting(SettingKeys.temperatureRange, range.toJson());
   }
+
+  /// Persists the count of cycles observed outside this app as a plain JSON
+  /// integer; an explicit 0 row is kept (an absent row and a 0 row read the
+  /// same, but the user's deliberate zeroing survives as a row). Negative
+  /// counts are rejected with [ArgumentError] — the settings field lets no
+  /// such value through, and the in-memory provider clamps anyway.
+  Future<void> persistObservedCyclesOutsideApp(int cycles) {
+    if (cycles < 0) {
+      throw ArgumentError.value(cycles, 'cycles', 'must be >= 0');
+    }
+    return writeSetting(SettingKeys.observedCyclesOutsideApp, cycles);
+  }
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code
@@ -178,3 +207,9 @@ ThemeMode _themeModeFromStored(Object? decoded) {
   }
   return ThemeMode.system;
 }
+
+/// Observed-cycles decode: non-negative integers only. Non-integers
+/// (strings, doubles, bools, null) and negative values decode to 0 — a
+/// corrupt or hostile row keeps the default, never an error.
+int _observedCyclesFromStored(Object? decoded) =>
+    decoded is int && decoded >= 0 ? decoded : 0;

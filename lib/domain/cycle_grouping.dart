@@ -147,6 +147,17 @@ List<Cycle> groupIntoCycles(
   return cycles;
 }
 
+/// The shared display ordinal of a mark-opened cycle ("Zyklus N"): cycles
+/// observed OUTSIDE the app (settings key `observedCyclesOutsideApp`,
+/// default 0) shift every number by their count, so a user who tracked on
+/// paper first continues her numbering seamlessly. Input is the 0-based
+/// index of the mark-opened cycle in observation order (the leading
+/// pre-mark group carries no ordinal — it is not mark-opened, so it shifts
+/// nothing). ONE shared rule so the chart's boundary labels and the
+/// evaluation table's column headers cannot drift.
+int cycleOrdinalNumber(int markOpenedIndex, int observedCyclesOutsideApp) =>
+    observedCyclesOutsideApp + markOpenedIndex + 1;
+
 /// The bleeding SUGGESTION predicate (the demoted former boundary rule):
 /// a day with menstruation-level bleeding (`level >= 2`) suggests starting
 /// a new cycle unless the immediately preceding CALENDAR day is also a

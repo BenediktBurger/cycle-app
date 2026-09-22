@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/finders.dart';
 
 ProviderScope _appScope() => appScope();
 
@@ -32,8 +33,7 @@ Future<void> _openSettings(WidgetTester tester) async {
   // so the 'Settings' label also matches the offstage screen's AppBar —
   // and in tree order that AppBar precedes the bar, so a bare .first tap
   // would miss.
-  await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('Settings')));
+  await tester.tap(navLabel('Settings'));
   await tester.pumpAndSettle();
 }
 

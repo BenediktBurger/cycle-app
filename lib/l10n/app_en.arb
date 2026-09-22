@@ -131,9 +131,17 @@
   "cycleJumpToDate": "Jump to date",
   "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
-  "cycleSheetSetMucusPeak": "Set mucus peak",
-  "cycleSheetRemoveMucusPeak": "Remove mucus peak",
-  "cycleSheetSetFirstHigher": "Set first higher measurement",
+  "cycleSheetCycleStartLabel": "Cycle start",
+  "cycleSheetMucusPeakLabel": "Mucus peak",
+  "cycleSheetFirstHigherLabel": "First higher measurement",
+  "cycleSheetSuzEveningLabel": "SUZ from this evening",
+  "@cycleSheetSuzEveningLabel": {
+    "description": "Static label of the SUZ-evening chip (the chip state, not the label, carries set/remove). TODO(user-review): the wording replaces the old set/remove labels that said \"today\" (heute) while the panel opens for an arbitrary selected day — pending the expert review."
+  },
+  "cycleSheetSuzMorningLabel": "SUZ from this morning",
+  "@cycleSheetSuzMorningLabel": {
+    "description": "Static label of the SUZ-morning chip (the chip state, not the label, carries set/remove). TODO(user-review): see the evening label — the wording is pending the expert review."
+  },
   "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
   "cycleSheetBaselineInfo": "Baseline: {value}",
   "@cycleSheetBaselineInfo": {
@@ -197,15 +205,6 @@
     "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
   },
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
-  "cycleSheetSetSuzEvening": "SUZ from this evening",
-  "cycleSheetRemoveSuzEvening": "Remove SUZ from this evening",
-  "cycleSheetSetSuzMorning": "SUZ from this morning",
-  "cycleSheetRemoveSuzMorning": "Remove SUZ from this morning",
-  "cycleSheetSetCycleStart": "Set cycle start",
-  "@cycleSheetSetCycleStart": {
-    "description": "Mark-sheet action placing the cycleStart mark — the authoritative cycle boundary; bleeding only suggests it, bleeding never creates a boundary by itself."
-  },
-  "cycleSheetRemoveCycleStart": "Remove cycle start",
   "diaryCycleStartPromptTitle": "Start new cycle?",
   "@diaryCycleStartPromptTitle": {
     "description": "Confirmation prompt after the diary saves a day whose menstruation-level bleeding SUGGESTS a new cycle start (not a continuation of the previous day's bleeding)."
@@ -230,64 +229,6 @@
   "@cycleLegendNote": {
     "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
   },
-  "cycleSheetMeasuredAt": "Measurement time: {time}",
-  "@cycleSheetMeasuredAt": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
-  "cycleSummaryCycleLength": "Cycle length",
-  "@cycleSummaryCycleLength": {
-    "description": "Row label of the cycle screen's evaluation table: the days between consecutive cycle starts (the user-placed cycleStart marks that open a cycle group)."
-  },
-  "cycleSummaryPeriodStart": "Period start",
-  "@cycleSummaryPeriodStart": {
-    "description": "Row label of the cycle screen's evaluation table: the cycle's first menstruation-level bleeding day."
-  },
-  "cycleSummaryPeriodEnd": "Period end",
-  "@cycleSummaryPeriodEnd": {
-    "description": "Row label of the cycle screen's evaluation table: the cycle's last menstruation-level bleeding day."
-  },
-  "cycleSummaryPeak": "Mucus peak",
-  "@cycleSummaryPeak": {
-    "description": "Row label of the cycle screen's evaluation table: the user-placed mucus-peak day."
-  },
-  "cycleSummarySuz": "SUZ start",
-  "@cycleSummarySuz": {
-    "description": "Row label of the cycle screen's evaluation table: the computed start of the sicher unfruchtbare Zeit with its rule (D/E)."
-  },
-  "cycleSummaryStatus": "Evaluation",
-  "@cycleSummaryStatus": {
-    "description": "Row label of the cycle screen's evaluation table's status row: the SUZ day with its rule once determined, the stopped note while the automatic evaluation is broken, or the missing marker."
-  },
-  "cycleSummaryColumn": "Cycle {n}",
-  "@cycleSummaryColumn": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    },
-    "description": "Column header of the evaluation table's per-cycle columns, numbered over the recorded cycle starts (the user-placed cycleStart marks that open a cycle group)."
-  },
-  "cycleSummarySuzEvening": "rule D (in the evening)",
-  "@cycleSummarySuzEvening": {
-    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule D begins the SUZ in the evening of the trigger day."
-  },
-  "cycleSummarySuzMorning": "rule E (in the morning)",
-  "@cycleSummarySuzMorning": {
-    "description": "Rule-to-time phrasing of the evaluation table's SUZ cells: rule E begins the SUZ in the morning of the trigger day."
-  },
-  "cycleSummarySuzFrom": "SUZ from {day}",
-  "@cycleSummarySuzFrom": {
-    "placeholders": {
-      "day": {
-        "type": "String"
-      }
-    },
-    "description": "Status-row text for a determined SUZ: the begin day (pre-formatted) followed by the rule."
-  },
   "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
   "statisticsNoData": "Cycle lengths appear once two cycle starts are recorded.",
   "statisticsCycles": "Cycle lengths",
@@ -308,19 +249,32 @@
     }
   },
   "settingsLanguage": "Language",
-  "settingsLanguageNote": "Saved in the app's local storage — restored on the next app start.",
   "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsThemeMode": "Theme",
-  "settingsThemeModeNote": "Saved in the app's local storage — restored on the next app start.",
   "themeSystem": "System",
   "themeLight": "Light",
   "themeDark": "Dark",
   "settingsTemperatureRange": "Temperature range",
   "settingsRangeLower": "Lower limit",
   "settingsRangeUpper": "Upper limit",
-  "settingsTemperatureRangeNote": "Saved in the app's local storage — restored on the next app start. Default: 36–38 °C.",
+  "settingsTemperatureRangeDefaultHint": "Default: 36–38 °C.",
+  "settingsObservedCyclesOutsideApp": "Cycles observed outside this app",
+  "@settingsObservedCyclesOutsideApp": {
+    "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."
+  },
+  "settingsObservedCyclesOutsideAppHelper": "How many cycles you observed before using this app (e.g. on paper). The cycle numbers on the cycle page only start counting after this value.",
+  "settingsObservedCyclesOutsideAppError": "Please enter a whole number ≥ 0",
+  "cycleOrdinal": "Cycle {n}",
+  "@cycleOrdinal": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
+  },
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",
@@ -398,7 +352,9 @@
     }
   },
   "cycleSheetSetIgnoreTemperature": "Ignore temperature",
-  "cycleSheetRemoveIgnoreTemperature": "Temperature evaluated again",
-  "cycleSheetExcludeGroupTitle": "Excluded from the evaluation",
+  "cycleDayPanelClose": "Close day options",
+  "@cycleDayPanelClose": {
+    "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
+  },
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
 }

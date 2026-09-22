@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/finders.dart';
 import 'support/viewport.dart';
 
 /// App scope for the language tests. A null [locale] means: leave the
@@ -89,13 +90,11 @@ void main() {
 
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
-      // Tap scoped to the navigation bar: all tabs stay mounted (IndexedStack),
-      // so the 'Einstellungen' label also matches the offstage screen's AppBar
-      // — and in tree order that AppBar precedes the bar, so a bare .first tap
-      // would miss.
-      await tester.tap(find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text('Einstellungen')));
+      // Tap through the shared navigation finder: all tabs stay mounted
+      // (IndexedStack), so the 'Einstellungen' label also matches the
+      // offstage screen's AppBar — and in tree order that AppBar precedes
+      // the shell's navigation surface, so a bare .first tap would miss.
+      await tester.tap(navLabel('Einstellungen'));
       await tester.pumpAndSettle();
 
       // Scope to the language switcher: the settings screen now also carries a

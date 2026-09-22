@@ -1,8 +1,9 @@
 // Root widget: Material app, German-first localization whose language
 // follows the system until overridden in the settings screen, a theme mode
 // that likewise follows the device brightness until overridden, the
-// database gating shell, and the persistence wiring for the three general
-// settings (hydration from / write-through to the app_settings table).
+// database gating shell, and the persistence wiring for the persisted
+// general settings (hydration from / write-through to the app_settings
+// table).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,11 +42,11 @@ class _CycleAppState extends ConsumerState<CycleApp> {
     super.initState();
     // Hydration: every persisted snapshot (loaded by
     // persistedSettingsProvider the moment the database opens) is applied
-    // into the three settings providers. Fill-if-untouched — only a
-    // provider still holding its default takes the snapshot value, so a
-    // live choice (made in between, or coming from a test override) is
-    // never clobbered, and snapshot defaults are skipped as no-ops. The
-    // snapshot lands shortly after the first frame: the MaterialApp
+    // into the settings providers. Fill-if-untouched — only a provider
+    // still holding its default takes the snapshot value, so a live choice
+    // (made in between, or coming from a test override) is never clobbered,
+    // and snapshot defaults are skipped as no-ops. The snapshot lands
+    // shortly after the first frame: the MaterialApp
     // skeleton renders one frame in defaults until then — accepted
     // trade-off, the database gate keeps every screen behind the open
     // database, so nothing can write a contradicting choice in between.
@@ -71,6 +72,11 @@ class _CycleAppState extends ConsumerState<CycleApp> {
         ref.read(temperatureRangeProvider.notifier).state =
             snapshot.temperatureRange;
       }
+      final observedCycles = ref.read(observedCyclesOutsideAppProvider);
+      if (observedCycles == 0 && snapshot.observedCyclesOutsideApp != 0) {
+        ref.read(observedCyclesOutsideAppProvider.notifier).state =
+            snapshot.observedCyclesOutsideApp;
+      }
     });
   }
 
@@ -91,6 +97,10 @@ class _CycleAppState extends ConsumerState<CycleApp> {
     });
     ref.listen<TemperatureRange>(temperatureRangeProvider, (previous, current) {
       _persistSetting(ref, (store) => store.persistTemperatureRange(current));
+    });
+    ref.listen<int>(observedCyclesOutsideAppProvider, (previous, current) {
+      _persistSetting(
+          ref, (store) => store.persistObservedCyclesOutsideApp(current));
     });
 
     // null (the localeProvider default) = follow the system language: the
@@ -232,6 +242,14 @@ class _DatabaseError extends StatelessWidget {
   }
 }
 
+/// Width breakpoint that promotes the shell's bottom NavigationBar to a
+/// side NavigationRail: below it (phone portrait) the bottom bar stays,
+/// at/above it (landscape phones, wide windows/tabs) the rail frees the
+/// bottom edge and puts almost the full width on the screen body — exactly
+/// the "see more of the cycle in landscape" win. Desktop-class narrow
+/// windows under 720 keep the bar.
+const _railBreakpointWidth = 720.0;
+
 class _HomeShell extends ConsumerWidget {
   const _HomeShell();
 
@@ -246,15 +264,74 @@ class _HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final index = ref.watch(tabIndexProvider);
-    return Scaffold(
-      // All tabs stay mounted in an IndexedStack: switching away and back
-      // preserves each screen's widget state (e.g. the cycle chart's scroll
-      // window survives the Tagebuch→Zyklus roundtrip), and the offstage
-      // screens keep watching their providers so they are up to date when
-      // shown. Offstage children are built and laid out but neither painted
-      // nor hit-testable.
-      body: IndexedStack(index: index, children: _screens),
-      bottomNavigationBar: NavigationBar(
+    // The IndexedStack stays mounted through both shell surfaces (all tabs
+    // alive and watching their providers).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _railBreakpointWidth;
+        final indexedStack = IndexedStack(index: index, children: _screens);
+        return Scaffold(
+          body: wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // The rail reuses the bottom bar's icons and the same
+                    // `nav…` l10n labels — one navigation vocabulary, two
+                    // surfaces. Labeled on every destination, so the tests
+                    // (and the tab tap targets) stay independent of the
+                    // selection state.
+                    NavigationRail(
+                      selectedIndex: index,
+                      onDestinationSelected: (int newIndex) =>
+                          ref.read(tabIndexProvider.notifier).state = newIndex,
+                      labelType: NavigationRailLabelType.all,
+                      destinations: [
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.event_outlined),
+                          selectedIcon: const Icon(Icons.event),
+                          label: Text(l10n.navDiary),
+                        ),
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.loop_outlined),
+                          selectedIcon: const Icon(Icons.loop),
+                          label: Text(l10n.navCycle),
+                        ),
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.bar_chart_outlined),
+                          selectedIcon: const Icon(Icons.bar_chart),
+                          label: Text(l10n.navStatistics),
+                        ),
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.settings_outlined),
+                          selectedIcon: const Icon(Icons.settings),
+                          label: Text(l10n.navSettings),
+                        ),
+                      ],
+                    ),
+                    Expanded(child: indexedStack),
+                  ],
+                )
+              : indexedStack,
+          // All tabs stay mounted in an IndexedStack: switching away and
+          // back preserves each screen's widget state (e.g. the cycle
+          // chart's scroll window survives the Tagebuch→Zyklus roundtrip),
+          // and the offstage screens keep watching their providers so they
+          // are up to date when shown. Offstage children are built and laid
+          // out but neither painted nor hit-testable.
+          bottomNavigationBar:
+              wide ? null : _bottomNavigationBar(context, ref, index, l10n),
+        );
+      },
+    );
+  }
+
+  NavigationBar _bottomNavigationBar(
+    BuildContext context,
+    WidgetRef ref,
+    int index,
+    AppLocalizations l10n,
+  ) =>
+      NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (int newIndex) =>
             ref.read(tabIndexProvider.notifier).state = newIndex,
@@ -280,7 +357,5 @@ class _HomeShell extends ConsumerWidget {
             label: l10n.navSettings,
           ),
         ],
-      ),
-    );
-  }
+      );
 }

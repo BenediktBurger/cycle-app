@@ -1,7 +1,7 @@
 // The cycle-window attribution shared by the cycle chart's overlay
-// (cycle_marks.dart) and the mark sheet (cycle_mark_sheet.dart): which
-// cycle's artifacts a mark belongs to. Kept in its own small file so both
-// consumers can reach it without pulling in each other's widget/graph
+// (cycle_marks.dart) and the day options panel (cycle_mark_sheet.dart):
+// which cycle's artifacts a mark belongs to. Kept in its own small file so
+// both consumers can reach it without pulling in each other's widget/graph
 // dependencies.
 
 import '../domain/date_only.dart';

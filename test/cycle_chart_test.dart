@@ -36,7 +36,6 @@ import 'package:cycle_app/ui/bleeding_symbol.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_mark_sheet.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
-import 'package:cycle_app/ui/cycle_summary.dart';
 import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
@@ -460,20 +459,6 @@ Widget _helpSheetHarness({
 }) =>
     chartHarness(entries: entries, locale: locale, withScaffold: false);
 
-/// The glossary [finder]'s matches that do NOT sit inside the evaluation
-/// table: the table legitimately renders its own localized row labels (its
-/// "Mucus peak" row is a table attribute, not a glossary entry), so the
-/// glossary-absence check filters those matches out.
-Iterable<Element> outsideTable(Finder finder) =>
-    finder.evaluate().where((element) {
-      var insideTable = false;
-      element.visitAncestorElements((ancestor) {
-        if (ancestor.widget is CycleSummaryTable) insideTable = true;
-        return !insideTable;
-      });
-      return !insideTable;
-    });
-
 // Widget tests of the cycle chart's frozen left rail: the paper sheet's
 // fixed left margin lives OUTSIDE the horizontal scroll, so it stays
 // readable while the day columns slide — the owner-reported defect was the
@@ -823,9 +808,6 @@ Finder _marksCell(int index) => find.byKey(ValueKey('marksCell-$index'));
 const _columnWidth = 24.0;
 
 /// The finder for the horizontal scroll view that carries the chart block.
-/// The evaluation table below the chart block has its own horizontal
-/// scroller (key `cycleSummaryScroll`) — it is not the chart block, so it
-/// is excluded by that key here.
 Widget _windowingHarness({
   required List<DailyEntry> entries,
   Stream<List<DailyEntry>>? entriesStream,
@@ -917,9 +899,9 @@ void main() {
     final rect = tester.getRect(find.byType(LineChart));
     await tester.tapAt(Offset(rect.center.dx, rect.center.dy));
     await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsOneWidget,
-        reason: 'a tap on the single-day chart opens the day sheet');
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget,
+        reason: 'a tap on the single-day chart opens the day options panel');
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _alignmentDay(0),
         reason: 'the single recorded day owns the whole plot');
   });
@@ -1321,8 +1303,8 @@ void main() {
     await tester.tap(chartCell(1, 'disturbance'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget);
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _disturbanceDay(1),
         reason: 'the tapped disturbance cell owns day 1');
   });
@@ -1981,6 +1963,35 @@ void main() {
     });
   });
 
+// ═══════════ summary table absence ═══════════
+// new screen-level test from the summary-table removal (no former file;
+// see the file header note on the other sections' merge mechanics)
+
+  // The cycle tab renders NO evaluation summary table anymore: the chart
+  // block (with its evaluation overlay) is the only evaluation surface on
+  // the screen — the numbers live on the separate statistics tab. The
+  // absence is keyed on the `cycleSummary*` keys the table's scroller,
+  // cells and headers rendered with, so a re-introduction under a new
+  // class name is caught too.
+  testWidgets('the Zyklus screen renders no evaluation summary table',
+      (tester) async {
+    // A tall surface: the table would sit below the default test
+    // viewport's fold, and the Zyklus list is lazy — below the fold it is
+    // not even built, so a short surface could miss it and pass vacuously.
+    useTallSurface(tester);
+    await tester.pumpWidget(chartHarness(entries: _alignmentEntries(5)));
+    await tester.pumpAndSettle();
+
+    expect(find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          (key.value == 'cycleSummaryScroll' ||
+              key.value.startsWith('cycleSummaryCell-') ||
+              key.value.startsWith('cycleSummaryHeader-'));
+    }), findsNothing,
+        reason: 'no cycleSummary* scroller/cell/header keys render anymore');
+  });
+
 // ═══════════ grid lines ═══════════
 // former test/cycle_chart_grid_lines_test.dart (bodies concatenated verbatim; see
 // the file header for the merge mechanics)
@@ -2131,6 +2142,188 @@ void main() {
           reason: 'the group opened across the untracked gap days draws '
               'its separator across the gap');
     });
+
+    testWidgets(
+        'the in-plot ordinal badge pins its left edge to the boundary '
+        'column (the pixel the separator is drawn through)', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      // The badge chip renders inside the temperature plot, and its LEFT
+      // edge pins to the boundary day's column start — pixel i · cellWidth
+      // measured from the plot's left edge (a small inset tolerated), the
+      // same pixel the thick separator's chart-domain x = i − 0.5 maps to.
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / _twoCycleEntries.length;
+      for (final i in [5, 9]) {
+        final chipRect =
+            tester.getRect(find.byKey(ValueKey('cycleOrdinalChip-$i')));
+        expect(chipRect.left, closeTo(plot.left + i * colW, 2.5),
+            reason: 'day-index $i: the badge\'s left edge pins to its '
+                'cycle\'s first column inside the plot');
+      }
+    });
+
+    testWidgets(
+        'the in-plot ordinal badge shrink-wraps its background to the '
+        'label: no full band across the cycle\'s own columns', (tester) async {
+      await tester.pumpWidget(
+          _gridLinesHarness(entries: _twoCycleEntries, marks: _twoCycleMarks));
+      await tester.pumpAndSettle();
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / _twoCycleEntries.length;
+      // The first boundary (day 5) opens a cycle running columns 5..8 — a
+      // 4-column span the chip must NOT paint across: its background hugs
+      // the localized wording instead (text + a small horizontal padding).
+      final firstTextNatural =
+          tester.getSize(find.byKey(const ValueKey('cycleOrdinal-5'))).width;
+      final first =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinalChip-5')));
+      final firstSpan = (9 - 5) * colW;
+      expect(first.width, lessThan(firstSpan / 2),
+          reason: 'day-index 5: the chip\'s background hugs the label '
+              'instead of spanning the cycle\'s own columns');
+      expect(first.width, greaterThan(firstTextNatural),
+          reason: 'day-index 5: the shrink-wrapped background still '
+              'includes its horizontal padding around the text');
+
+      // The text sits inside the hugging background.
+      final firstText =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinal-5')));
+      expect(firstText.left, greaterThanOrEqualTo(first.left),
+          reason: 'the label starts inside the hugging background');
+      expect(firstText.right, lessThanOrEqualTo(first.right),
+          reason: 'the label ends inside the hugging background');
+
+      // The last cycle ran columns 9..11 before: with the shrink-wrap the
+      // chip no longer runs to the plot's right edge either.
+      final last =
+          tester.getRect(find.byKey(const ValueKey('cycleOrdinalChip-9')));
+      expect(last.right, lessThan(plot.right),
+          reason: 'day-index 9: the last cycle\'s chip hugs its label, it '
+              'no longer runs to the plot\'s right edge');
+    });
+
+    testWidgets(
+        'the in-plot ordinal badge clamps at the built window\'s right '
+        'edge: a boundary whose cycle runs past the window squeezes the '
+        'label into the windowed span instead of overflowing the plot',
+        (tester) async {
+      // A 150-day range with a sole cycleStart mark at day index 62: the
+      // mark's cycle's own columns would run all the way to the range's
+      // end — far past the built window once the block scrolled away from
+      // the newest days. After dragging to the content's start the parked
+      // window's last built index is 62 (observed below), so the clamp
+      // leaves the chip a SINGLE day column — narrower than the natural
+      // label, i.e. the clamp really bites.
+      const boundaryIndex = 62;
+      final entries = longRangeEntries(150);
+      final marks = [
+        CycleMark(
+            date: longRangeDay(boundaryIndex), type: CycleMarkTypes.cycleStart)
+      ];
+      await tester
+          .pumpWidget(_gridLinesHarness(entries: entries, marks: marks));
+      await tester.pumpAndSettle();
+      // Drag back to the earliest days (the drag exceeds the range's whole
+      // scroll extent, so it settles at the content's start) and let the
+      // window re-park well inside the range.
+      await tester.drag(chartScrollView(), const Offset(3000, 0));
+      await tester.pumpAndSettle();
+
+      // The built window's right edge, observed like every windowed row:
+      // the day-label cells render exactly for the window's indexes. The
+      // fixture above depends on the boundary sitting AT that edge.
+      var windowEnd = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (tester.any(_dayLabel(i))) windowEnd = i;
+      }
+      expect(windowEnd, boundaryIndex,
+          reason: 'the fixture pins the boundary to the parked window\'s '
+              'last built index, so the windowed clamp is what limits '
+              'the chip');
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / entries.length;
+      // The windowed clamp: the cycle's available span is clamped to the
+      // window's right edge (one past the last built index), minus the two
+      // column insets. The natural label is WIDER than that span, so the
+      // clamp genuinely bites instead of the chip merely hugging the text.
+      final maxWidth = (windowEnd + 1 - boundaryIndex) * colW - 4;
+      final chip = tester
+          .getRect(find.byKey(ValueKey('cycleOrdinalChip-$boundaryIndex')));
+      final natural = tester
+          .getSize(find.byKey(ValueKey('cycleOrdinal-$boundaryIndex')))
+          .width;
+      expect(natural, greaterThan(maxWidth),
+          reason: 'the localized wording is wider than the single-column '
+              'clamped span, so the window clamp — not the shrink-wrap — '
+              'limits this chip');
+
+      // The chip fills the clamped span exactly: its right edge stops at
+      // the window's right boundary instead of running toward the cycle's
+      // natural end (the range's end), never overflowing the plot.
+      expect(chip.width, closeTo(maxWidth, 0.5),
+          reason: 'day-index $boundaryIndex: the clamped span is the '
+              'chip\'s effective width');
+      expect(chip.right, closeTo(plot.left + (windowEnd + 1) * colW, 2.5),
+          reason: 'day-index $boundaryIndex: the chip clamps at the built '
+              'window\'s right edge');
+      expect(chip.right, lessThan(plot.right),
+          reason: 'the clamped chip never overflows the plot');
+    });
+
+    testWidgets(
+        'a perversely short cycle renders its chip and the FittedBox '
+        'scales the label down instead of overflowing', (tester) async {
+      // Cycle starts on directly adjacent days at the range's tail: two
+      // degenerate one-day cycles, so each chip is bounded by a single
+      // minimum-width column minus the two column insets.
+      final entries = longRangeEntries(60);
+      final marks = [
+        for (final i in [58, 59])
+          CycleMark(date: longRangeDay(i), type: CycleMarkTypes.cycleStart)
+      ];
+      await tester
+          .pumpWidget(_gridLinesHarness(entries: entries, marks: marks));
+      await tester.pumpAndSettle();
+
+      final chipFinder = find.byKey(const ValueKey('cycleOrdinalChip-59'));
+      expect(chipFinder, findsOneWidget,
+          reason: 'the one-day cycle renders its chip');
+      final chip = tester.getRect(chipFinder);
+
+      // The one-cycle column minus the two column insets is the chip's
+      // available width — and the natural label is wider, so the chip is
+      // clamped to that span (this is what forces the scale-down case).
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / entries.length;
+      final natural = tester
+          .getSize(find.descendant(of: chipFinder, matching: find.byType(Text)))
+          .width;
+      expect(natural, greaterThan(colW - 4),
+          reason: 'the localized wording is wider than the one-column '
+              'span at its natural size, so only a FittedBox scale-down '
+              'fits it');
+      expect(chip.width, closeTo(colW - 4, 0.5),
+          reason: 'the one-day cycle pins the chip to its single column '
+              '(the natural text is squeezed, not widened beyond it)');
+
+      final textFinder = find.byKey(const ValueKey('cycleOrdinal-59'));
+      final fitted = tester.widget<FittedBox>(
+          find.descendant(of: chipFinder, matching: find.byType(FittedBox)));
+      expect(fitted.fit, BoxFit.scaleDown,
+          reason: 'the chip scales the label down, never up');
+      // The VISUAL (fitted) text bounds stay inside the chip: scaled down
+      // to the chip's width, not overflowing it.
+      final visual = tester.getRect(textFinder);
+      expect(visual.right, lessThanOrEqualTo(chip.right),
+          reason: 'the scaled-down label fits inside the chip\'s width');
+      expect(visual.left, greaterThanOrEqualTo(chip.left),
+          reason: 'the scaled-down label starts inside the chip');
+    });
   });
 
   group('horizontal NER temperature grid', () {
@@ -2248,12 +2441,9 @@ void main() {
           reason: 'the action carries its localized tooltip');
 
       // The legend is gone from the screen: no glossary text renders
-      // outside the sheet. The evaluation table below the chart card
-      // legitimately renders its own localized row labels (its "Mucus
-      // peak" row is a table attribute, not a glossary entry), so the
-      // table's subtree is excluded from this absence check.
+      // outside the sheet anywhere on the cycle tab.
       for (final entry in _glossaryEn) {
-        expect(outsideTable(find.text(entry)), isEmpty,
+        expect(find.text(entry), findsNothing,
             reason: '"$entry" no longer sits on the screen');
       }
     });
@@ -2273,13 +2463,7 @@ void main() {
       expect(find.text('Symbol glossary'), findsOneWidget,
           reason: 'the sheet is titled');
       for (final entry in _glossaryEn) {
-        // Scoped to the sheet: the evaluation table renders its own row
-        // labels behind the sheet (the "Mucus peak" attribute row).
-        expect(
-            find.descendant(
-                of: find.byKey(const ValueKey('cycleHelpSheet')),
-                matching: find.text(entry)),
-            findsOneWidget,
+        expect(find.text(entry), findsOneWidget,
             reason: 'the glossary explains "$entry"');
       }
       // The sheet also carries the evaluation-arithmetic note (which stays
@@ -2339,14 +2523,7 @@ void main() {
 
       expect(find.text('Zeichenerklärung'), findsOneWidget);
       for (final entry in _glossaryDe) {
-        // Scoped to the sheet: the evaluation table renders its own row
-        // labels behind the sheet (the "Schleimhöhepunkt" attribute row).
-        expect(
-            find.descendant(
-                of: find.byKey(const ValueKey('cycleHelpSheet')),
-                matching: find.text(entry)),
-            findsOneWidget,
-            reason: 'de: "$entry"');
+        expect(find.text(entry), findsOneWidget, reason: 'de: "$entry"');
       }
       expect(
           find.descendant(
@@ -2705,8 +2882,8 @@ void main() {
     await tester.tap(chartCell(1, 'note'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
-    final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+    expect(cycleDayPanel(), findsOneWidget);
+    final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
     expect(sheet.day, _noteDay(1), reason: 'the tapped note cell owns day 1');
   });
 
@@ -2857,8 +3034,8 @@ void main() {
       await tester.tap(chartCell(4, 'mucus'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, _rowsDay(4),
           reason: 'the moved top-block mucus cell keeps its tap behavior');
     });
@@ -3093,8 +3270,8 @@ void main() {
       await tester.tap(chartCell(3, 'bleeding'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, _rowsDay(3),
           reason: 'the tapped bleeding cell owns day 3');
     });
@@ -3594,21 +3771,9 @@ void main() {
     });
   });
 
-  group('fixed display range and boundary clipping', () {
+  group('fixed display-range bounds', () {
     LineChartData data(WidgetTester tester) =>
         tester.widget<LineChart>(find.byType(LineChart)).data;
-
-    /// The segment bar connecting day indexes [a] and [b].
-    LineChartBarData segmentBar(WidgetTester tester, int a, int b) => tester
-        .widget<LineChart>(find.byType(LineChart))
-        .data
-        .lineBarsData
-        .firstWhere((bar) =>
-            bar.spots.length == 2 &&
-            bar.spots[0].x == a.toDouble() &&
-            bar.spots[1].x == b.toDouble() &&
-            bar.color != null &&
-            bar.color!.a > 0);
 
     testWidgets(
         'the y bounds are the provider\'s range (default 36.0..38.0), '
@@ -3617,7 +3782,9 @@ void main() {
       // vs 36.0) — under the old data-adaptive bounds such a low value
       // dragged the lower edge to the half degree below (35.5 here), so
       // this is where the old rounding would have moved the axis; the
-      // settings range pins the bounds 36..38 regardless.
+      // settings range pins the bounds 36..38 regardless. Out-of-range
+      // readings are simply not rendered (see the next section) — they
+      // never move the bounds either way.
       await tester.pumpWidget(_temperatureHarness(entries: [
         DailyEntry(date: _temperatureThu, bbtC: 36.5),
         DailyEntry(date: _temperatureFri, bbtC: 37.0),
@@ -3630,59 +3797,166 @@ void main() {
       expect(data(tester).maxY, 38.0,
           reason: 'the default range\'s upper bound is the fixed maxY');
     });
+  });
 
-    testWidgets(
-        'a fever above the range renders its curve VALUE clamped to '
-        'exactly the upper boundary — the bounds never move', (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.5),
-          DailyEntry(date: _temperatureFri, bbtC: 39.5),
-        ],
-      ));
+// ═══════════ temperature visible range ═══════════
+// Widget tests of temperatures OUTSIDE the chart's visible value range
+// (the settings-selected display range, default 36–38 °C): such a
+// measurement is NOT rendered at all — its whole per-day dot painter
+// (dot, circled-higher ring, arrow-up glyph) is skipped with its spot.
+// The polyline still connects the adjacent days but is CLIPPED to the
+// value range: the drawable piece runs to the boundary crossing (at a
+// possibly fractional day index BETWEEN the days), so a line running to
+// or along the plot's top/bottom edge tells the reader data lie beyond
+// the visible range. In-range rendering is pixel-for-pixel unchanged, a
+// value exactly AT a boundary counts as in range (its dot renders and its
+// segments pass through raw), and when EVERY measurement is out of range
+// the paper grid renders with no curve (the "no temperature" placeholder
+// still does NOT show — the days carry measurements). Fixture shape and
+// helpers are shared with the temperature-connectivity section above.
+
+  /// A measured-day strip on the temperature section's Thu..Sat calendar
+  /// block: day index = list position, temperatures = the given values.
+  List<DailyEntry> rangeEntries(List<double> temps) => [
+        for (var i = 0; i < temps.length; i++)
+          DailyEntry(
+              date: _temperatureThu.add(Duration(days: i)), bbtC: temps[i]),
+      ];
+
+  /// The visible polyline's drawable spans as (start, end) spot pairs —
+  /// one pair per visible two-spot line bar (the curve draws one bar per
+  /// clipped span).
+  List<(FlSpot, FlSpot)> visibleSpans(WidgetTester tester) => [
+        for (final bar in _segmentBars(tester))
+          if (bar.spots.length == 2) (bar.spots.first, bar.spots.last),
+      ];
+
+  /// The (x, y) pair list of [visibleSpans], for exact endpoint comparison.
+  List<(double, double, double, double)> spanEndpoints(WidgetTester tester) => [
+        for (final (start, end) in visibleSpans(tester))
+          (start.x, start.y, end.x, end.y),
+      ];
+
+  /// True when some dot-only bar carries a spot at [dayIndex] (day indexes
+  /// sit at integral x positions).
+  bool hasDotSpot(WidgetTester tester, int dayIndex) => dotBars(tester)
+      .any((bar) => bar.spots.any((spot) => spot.x.round() == dayIndex));
+
+  group('a temperature above the range does not render (37 / 39 / 37)', () {
+    // The default range is 36–38 °C, so Friday's 39.0 lies above it while
+    // its neighbors stay in range.
+    List<DailyEntry> entries() => rangeEntries([37.0, 39.0, 37.0]);
+
+    testWidgets('the out-of-range day\'s dot is not rendered', (tester) async {
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[1].y, 38.0,
-          reason: 'the clipped temperature stops AT the boundary 38.0');
-      expect(segment.spots[0].y, 36.5,
-          reason: 'the in-range neighbor keeps its raw value');
-
-      // Axis bounds and (per the rail tests) the rail labels never move.
-      expect(data(tester).minY, 36.0);
-      expect(data(tester).maxY, 38.0);
+      expect(dotPainterOrNull(tester, 1), isNull,
+          reason: 'the middle day\'s measurement is above the visible '
+              'range — no dot (and no ring or arrow anchored to it) '
+              'renders');
+      expect(hasDotSpot(tester, 1), isFalse,
+          reason: 'the dot bars carry in-range spots only — no spot maps '
+              'to the out-of-range day');
     });
 
-    testWidgets('a below-range value clamps to exactly the lower boundary',
+    testWidgets('the polyline still draws, clipped at the boundary crossings',
         (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.5),
-          DailyEntry(date: _temperatureFri, bbtC: 35.0),
-        ],
-      ));
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[1].y, 36.0,
-          reason: 'the clipped temperature stops AT the lower boundary 36.0');
-      expect(data(tester).minY, 36.0, reason: 'the bounds never move');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 0.5, 38.0),
+            (1.5, 38.0, 2.0, 37.0),
+          ],
+          reason: 'the line to and from the above-range day is clipped at '
+              'the upper boundary 38.0, crossing midway between the days');
     });
 
-    testWidgets(
-        'values exactly at the boundaries render unchanged (clamp '
-        'passthrough)', (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.0),
-          DailyEntry(date: _temperatureFri, bbtC: 38.0),
-        ],
-      ));
+    testWidgets('the in-range days render dot and endpoints unchanged',
+        (tester) async {
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[0].y, 36.0);
-      expect(segment.spots[1].y, 38.0);
+      expect(dotPainterOrNull(tester, 0), isNotNull,
+          reason: 'the in-range left day keeps its dot painter');
+      expect(dotPainterOrNull(tester, 2), isNotNull,
+          reason: 'the in-range right day keeps its dot painter');
+      final spans = visibleSpans(tester);
+      expect(spans, hasLength(2),
+          reason: 'the only visible bars are the two clipped spans');
+      expect((spans[0].$1.x, spans[0].$1.y), (0.0, 37.0),
+          reason: 'the left bar starts at day 0\'s raw in-range value');
+      expect((spans[1].$2.x, spans[1].$2.y), (2.0, 37.0),
+          reason: 'the right bar ends at day 2\'s raw in-range value');
+    });
+  });
+
+  group('a temperature exactly at the boundary renders (37 / 38 / 37)', () {
+    testWidgets(
+        'the boundary-value day keeps its dot and its segments pass '
+        'through raw', (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([37.0, 38.0, 37.0])));
+      await tester.pumpAndSettle();
+
+      expect(dotPainterOrNull(tester, 1), isNotNull,
+          reason: 'a value exactly AT the boundary counts as in range — '
+              'its dot renders unchanged');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 1.0, 38.0),
+            (1.0, 38.0, 2.0, 37.0),
+          ],
+          reason: 'the boundary value lies inside the window, so the '
+              'segments keep their raw endpoints (no clipping)');
+    });
+  });
+
+  group('a temperature below the range does not render (37 / 35 / 37)', () {
+    testWidgets(
+        'the below-range day\'s dot is absent and the polyline clips at '
+        'the lower boundary', (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([37.0, 35.0, 37.0])));
+      await tester.pumpAndSettle();
+
+      expect(dotPainterOrNull(tester, 1), isNull,
+          reason: 'the middle day\'s measurement is below the visible '
+              'range — its dot does not render');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 0.5, 36.0),
+            (1.5, 36.0, 2.0, 37.0),
+          ],
+          reason: 'the line to and from the below-range day is clipped at '
+              'the lower boundary 36.0, crossing midway between the days');
+    });
+  });
+
+  group('every measurement out of range', () {
+    testWidgets('the curve vanishes but the chart still mounts',
+        (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([39.0, 39.2, 39.0])));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        expect(dotPainterOrNull(tester, i), isNull,
+            reason: 'day $i is out of range — its dot does not render');
+      }
+      expect(_segmentBars(tester), isEmpty,
+          reason: 'no piece of the polyline passes through the visible '
+              'range — nothing drawable at all');
+      expect(find.byType(LineChart), findsOneWidget,
+          reason: 'the chart still mounts with its paper grid');
+      expect(find.textContaining('temperature curve appears'), findsNothing,
+          reason: 'the "no temperature" placeholder does not show — the '
+              'days carry measurements');
     });
   });
 
@@ -4382,9 +4656,9 @@ void main() {
       await tester.tapAt(Offset(tapScreenX, chartTop + 100));
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget,
+      expect(cycleDayPanel(), findsOneWidget,
           reason: 'a tap in the scrolled window still opens the day sheet');
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, DateTime.utc(2026, 2, 28),
           reason: 'the tapped chart column maps to day index 58');
     });
@@ -4411,8 +4685,8 @@ void main() {
           bodyPadding + railWidth + (tapContentX - maxOffset), chartTop + 100));
       await tester.pumpAndSettle();
 
-      expect(find.byType(BottomSheet), findsOneWidget);
-      final sheet = tester.widget<CycleDaySheet>(find.byType(CycleDaySheet));
+      expect(cycleDayPanel(), findsOneWidget);
+      final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
       expect(sheet.day, DateTime.utc(2026, 2, 28));
     });
   });

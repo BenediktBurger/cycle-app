@@ -2,13 +2,13 @@
 // entry streams and cross-screen selection state (tab index, locale, the
 // date pre-selected in the entry form).
 //
-// The three general settings (locale, theme mode, temperature range) are
-// persisted in the app_settings key-value table of the drift database:
-// they load into the StateProviders below right after the database opens
-// ([persistedSettingsProvider], hydration wiring in main.CycleApp) and
-// every change is written back through to that table (also main.CycleApp).
-// The providers stay plain in-memory StateProviders — all overrides and
-// call sites keep working unchanged.
+// The persisted general settings (locale, theme mode, temperature range,
+// the outside-app cycle count) are persisted in the app_settings key-value
+// table of the drift database: they load into the StateProviders below
+// right after the database opens ([persistedSettingsProvider], hydration
+// wiring in main.CycleApp) and every change is written back through to
+// that table (also main.CycleApp). The providers stay plain in-memory
+// StateProviders — all overrides and call sites keep working unchanged.
 //
 // The PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
@@ -99,10 +99,10 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// The cycle chart's temperature display range ("Temperaturbereich"
 /// settings card): the FIXED y bounds the chart's plot and the frozen
-/// rail's scale share — settings-selectable, default 36–38 °C. Curve
-/// values outside the range CLIP at the boundary (pure helper
-/// [clampBbtC] in lib/ui/cycle_curve.dart); the scale never stretches to
-/// fit an outlier.
+/// rail's scale share — settings-selectable, default 36–38 °C. Readings
+/// outside the range are not rendered: their dots are skipped and the
+/// curve's drawable line pieces clip at the boundary crossings (see
+/// lib/ui/cycle_curve.dart); the scale never stretches to fit an outlier.
 ///
 /// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
 /// the local app_settings table once the database opens and written through
@@ -110,6 +110,18 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 /// a later Fahrenheit display conversion would happen above this provider.
 final temperatureRangeProvider =
     StateProvider<TemperatureRange>((ref) => TemperatureRange.defaults);
+
+/// The count of cycles the user observed OUTSIDE this app (set in the
+/// settings pane's integer field). The cycle page's "Zyklus N" ordinals —
+/// the chart's boundary labels AND the evaluation table's column headers —
+/// add this count on top of the mark-opened cycles recorded in the
+/// database, so numbering continues seamlessly across the migration
+/// (lib/domain/cycle_grouping.dart's shared ordinal rule).
+///
+/// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
+/// the local app_settings table once the database opens and written through
+/// on every change (main.CycleApp).
+final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
@@ -139,3 +151,13 @@ final selectedDateProvider =
 /// the button then, exactly like the old in-chart row never rendered there.
 final cycleChartJumpProvider =
     StateProvider<void Function(BuildContext context)?>((ref) => null);
+
+/// The day whose options panel is shown on the Zyklus screen (null = no
+/// panel). Chart taps (the curve, the marks row, the signal-row cells)
+/// write here instead of pushing a modal route, so tapping ANOTHER day
+/// retargets the panel in place — the first day's marks are never
+/// deselected by a dismissal — and the panel's close button clears it.
+/// UTC-midnight normalized on write (DateOnly convention, checked nowhere:
+/// every writer is a chart day mapping). In-memory only: the panel is a
+/// view-mode, not data.
+final cycleDayPanelProvider = StateProvider<DateTime?>((ref) => null);
