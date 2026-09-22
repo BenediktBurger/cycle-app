@@ -90,7 +90,8 @@ void main() {
         reason: 'the shell is the first surface on a returning start');
   });
 
-  testWidgets('the settings pane opens an about entry with the same content',
+  testWidgets(
+      'the settings pane app bar opens the about page with the SAME content',
       (WidgetTester tester) async {
     useDeviceLocales(tester, const [Locale('de')]);
 
@@ -103,13 +104,10 @@ void main() {
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
-    // The about entry is intentionally forwardable without the first-start
-    // flag: opening it does not need to persist anything. It sits below the
-    // fold on the settings pane, so scroll it into view first.
-    await tester.dragUntilVisible(find.text('Über die App'),
-        find.byType(ListView), const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Über die App'));
+    // The about page is intentionally forwardable without the first-start
+    // flag: opening it does not need to persist anything. It opens from the
+    // settings pane's app bar info action.
+    await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('getreue Beobachtung'), findsOneWidget,

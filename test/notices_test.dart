@@ -30,13 +30,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Scrolls the about card into view on the settings pane and opens the
-  /// shared content page from it.
+  /// Opens the shared content page from the settings pane's app bar info
+  /// action.
   Future<void> openAboutPage(WidgetTester tester) async {
-    await tester.dragUntilVisible(find.text('Über die App'),
-        find.byType(ListView), const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Über die App'));
+    await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
   }
 

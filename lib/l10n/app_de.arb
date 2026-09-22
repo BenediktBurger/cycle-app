@@ -209,6 +209,7 @@
     "description": "The cycle ordinal label rendered at a cycle boundary day on the cycle chart (the same number the evaluation table's column headers use)."
   },
   "aboutTitle": "Über die App",
+  "aboutShow": "Über die App anzeigen",
   "aboutVersion": "Version {version}",
   "@aboutVersion": {
     "placeholders": {

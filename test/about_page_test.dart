@@ -47,7 +47,7 @@ class RecordingLauncher extends UrlLauncherPlatform {
 void main() {
   /// Opens the app on the settings pane (German device locale, seeded
   /// onboarding flag — same pattern as notices_test.dart) and pushes the
-  /// about page via the settings entry.
+  /// about page from the settings pane's app bar info action.
   Future<void> openGermanAboutPage(WidgetTester tester) async {
     useDeviceLocales(tester, const [Locale('de')]);
     await tester.pumpWidget(appScope(locale: const Locale('de')));
@@ -56,10 +56,7 @@ void main() {
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(find.text('Über die App'),
-        find.byType(ListView), const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Über die App'));
+    await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
   }
 
@@ -143,11 +140,7 @@ void main() {
 
     await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
-
-    await tester.dragUntilVisible(find.text('About the app'),
-        find.byType(ListView), const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('About the app'));
+    await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
     expect(
@@ -259,10 +252,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
-    await tester.dragUntilVisible(find.text('About the app'),
-        find.byType(ListView), const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('About the app'));
+    await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
     await tester.dragUntilVisible(find.text(l10n.aboutContactBooks),

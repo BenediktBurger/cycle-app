@@ -148,7 +148,26 @@ class EinstellungenScreen extends ConsumerWidget {
     final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navSettings)),
+      // The about entry lives in the app bar (like the cycle tab's glossary
+      // info action) instead of a buried card, so it is reachable without
+      // scrolling. It plays the SAME content page the first-start
+      // onboarding shows (lib/ui/about.dart) — one content source, opened
+      // here on demand; no setting is touched by opening it.
+      appBar: AppBar(
+        title: Text(l10n.navSettings),
+        actions: [
+          IconButton(
+            key: const ValueKey('aboutAction'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: l10n.aboutShow,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const AboutPage(),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -398,39 +417,6 @@ class EinstellungenScreen extends ConsumerWidget {
                   Text(l10n.settingsPinLockNote,
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // --- about -----------------------------------------------------
-          // Plays the SAME content page the first-start onboarding shows
-          // (lib/ui/about.dart) — one content source, opened here on demand.
-          // No setting is touched by opening it: the onboarding flag stays
-          // whatever it is.
-          Card(
-            child: InkWell(
-              // Keyed for test targeting (the pane carries several
-              // similarly-worded cards).
-              key: const ValueKey('aboutEntry'),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => const AboutPage(),
-                ),
-              ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(l10n.aboutTitle,
-                          style: Theme.of(context).textTheme.titleSmall),
-                    ),
-                    const Icon(Icons.chevron_right),
-                  ],
-                ),
               ),
             ),
           ),
