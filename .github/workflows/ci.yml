@@ -32,6 +32,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Feature parity of the vendored sqlite3mc amalgamation (compiled by
+      # the build hook) with what the `sqlite3` package pins in its own
+      # tooling at the lockfile version — drift here silently changes every
+      # bundled cipher. Needs network (plain dart:io HTTP) and the .dart_tool
+      # download cache created by pub get above. Developer-repo check only:
+      # it is NOT part of the F-Droid buildserver recipe (docs/release.md
+      # Phase E), where builds stay network-free.
+      - name: sqlite3mc vendoring check
+        run: dart run tool/sqlite3mc.dart check
+
       - name: Analyze
         run: flutter analyze
 

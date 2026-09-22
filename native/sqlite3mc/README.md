@@ -14,10 +14,11 @@ requirement, docs/release.md Phase E).
   https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v2.5.0/sqlite3mc-2.5.0-sqlite-3.53.4-amalgamation.zip
   (from the tooling the `sqlite3` package itself pins in
   `tool/download_sqlite.dart` at tag `sqlite3-3.5.2`)
-- Content: SQLite3MultipleCiphers 2.5.0 built on SQLite 3.53.4,
-  release date 2026-08-02. Only `sqlite3mc_amalgamation.c` and
-  `sqlite3mc_amalgamation.h` from the archive are vendored here (the
-  same two files the `sqlite3` project's download script copies).
+- Content: SQLite3MultipleCiphers 2.5.0 built on SQLite 3.53.4.
+  Only `sqlite3mc_amalgamation.c` and `sqlite3mc_amalgamation.h` from the
+  archive are vendored here (the same two files the `sqlite3` project's
+  download script copies).
+- Vendored on 2026-09-22 by `dart run tool/sqlite3mc.dart update`.
 - SHA-256:
   - `sqlite3mc_amalgamation.c`
     d28339d7a56f3b465720aa9c729f3ca9d429705ea8fda45bb8d034536cecd579
@@ -33,6 +34,13 @@ libraries beyond `libm` (linked by the hook on Android) and no OpenSSL
 (that is only needed when compiling the SQLCipher fork).
 
 ## Refreshing
+
+The automated alternative to the manual procedure below:
+
+```
+dart run tool/sqlite3mc.dart check    # integrity + upstream drift (also in CI)
+dart run tool/sqlite3mc.dart update   # refresh vendored files + this block
+```
 
 1. Check which amalgamation the current `sqlite3` package release pins
    (`tool/download_sqlite.dart` at the corresponding
