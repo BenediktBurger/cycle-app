@@ -1,8 +1,10 @@
 // Pure curve-structure helpers for the Zyklus temperature chart: which
 // days form drawable line runs (adjacent-day connectivity), which
-// segments are interrupted (ignored) and must render lighter, and how a
-// measured temperature clips into the chart's fixed display range
-// ([clampBbtC] — clip, never rescale). No Flutter or chart types here —
+// segments are interrupted (ignored) and must render lighter, and which
+// portions of a segment lie inside the chart's visible value range.
+// CurvePoints keep the RAW measured temperature: whether a point or a
+// piece of a line is visible is decided by the value-range helpers below,
+// never by rewriting the measured value. No Flutter or chart types here —
 // the widget layer (lib/ui/cycle.dart) maps these onto fl_chart bars;
 // tests assert the rule set directly.
 import '../domain/models.dart';
@@ -61,19 +63,116 @@ final class CurveSegment {
   bool get lighter => a.excluded || b.excluded;
 }
 
-/// Clips a measured temperature into the chart's fixed display range
-/// (owner decision: clip, never rescale — the scale's bounds come from
-/// the settings, so an out-of-range reading renders AT the boundary
-/// value, its dot riding the plot edge; no axis label moves for it).
-/// A value exactly at a boundary passes through unchanged (clamp returns
-/// the value itself).
-///
-/// TODO(user-review): a separate LONG-LIVED marker for clipped days was
-/// decided against for now — the dot riding the boundary IS the signal,
-/// and any cap glyph would collide with the SUZ arrow at the top border.
-/// Revisit at the expert review.
-double clampBbtC(double value, TemperatureRange displayRange) =>
-    value.clamp(displayRange.min, displayRange.max).toDouble();
+/// One drawable line span of the temperature curve: a piece of a
+/// [CurveSegment] that lies inside the chart's visible value range.
+/// The line coordinates carry the day index as x (fractional where the
+/// straight segment crosses a range boundary) and the °C temperature as
+/// y — in-range data keeps its raw values, only boundary crossings land
+/// exactly on a bound.
+final class VisibleCurveSegment {
+  const VisibleCurveSegment._(
+    this.startX,
+    this.startY,
+    this.endX,
+    this.endY,
+    this.source,
+  );
+
+  /// x (day index) of the span's first drawn point.
+  final double startX;
+
+  /// y (°C) of the span's first drawn point.
+  final double startY;
+
+  /// x (day index) of the span's last drawn point.
+  final double endX;
+
+  /// y (°C) of the span's last drawn point.
+  final double endY;
+
+  /// The parent segment the span was clipped from (a [CurveSegment]
+  /// between two adjacent measured days).
+  final CurveSegment source;
+
+  /// A span derived from a segment touching an interrupted (ignored) day
+  /// must render lighter, like its parent segment.
+  bool get lighter => source.lighter;
+}
+
+/// Whether a measured temperature lies inside the chart's visible value
+/// range. The bounds are INCLUSIVE: a value exactly at the bottom or top
+/// boundary counts as visible, so a boundary measurement keeps drawing its
+/// dot without being half-cut. This predicate is the single visibility
+/// rule — the segment clipper and the dot filter both consult it.
+bool isBbtCInRange(double value, TemperatureRange displayRange) =>
+    value >= displayRange.min && value <= displayRange.max;
+
+/// Clips each segment's straight line against the visible value range and
+/// returns the drawable spans. A segment is visible wherever its linear
+/// interpolation between the two raw endpoint values stays inside
+/// [displayRange] — the segment shortens at the boundary crossings (the
+/// x position there is fractional: the crossing sits BETWEEN the days).
+/// Something is drawable only when the line actually passes through the
+/// value window: segments entirely outside produce nothing, and a segment
+/// that merely TOUCHES a boundary in one point produces no line either
+/// (its boundary measurement is still drawn as a dot — see
+/// [isBbtCInRange]). Spans inherit [CurveSegment.lighter] from their
+/// parent segment.
+List<VisibleCurveSegment> visibleCurveSegments(
+  List<CurveSegment> segments,
+  TemperatureRange displayRange,
+) {
+  final spans = <VisibleCurveSegment>[];
+  for (final segment in segments) {
+    // (x, y) move linearly with t ∈ [0, 1] from a to b. Clip t against
+    // both value bounds; empty or single-point intersections drop out.
+    var tStart = 0.0;
+    var tEnd = 1.0;
+    var visible = true;
+
+    void constrainTo(double boundary, {required bool keepAbove}) {
+      if (!visible) return;
+      final y0 = segment.a.bbtC;
+      final dy = segment.b.bbtC - y0;
+      if (dy == 0.0) {
+        // Flat line: inside the window everywhere or nowhere.
+        final inside = keepAbove ? y0 >= boundary : y0 <= boundary;
+        if (!inside) visible = false;
+        return;
+      }
+      final t = (boundary - y0) / dy;
+      // The side of t where y satisfies the bound: increasing towards the
+      // bound's inside means t >= crossing, decreasing means t <= crossing.
+      final boundIsLower = keepAbove == (dy > 0.0);
+      if (boundIsLower) {
+        if (t > tStart) tStart = t;
+      } else {
+        if (t < tEnd) tEnd = t;
+      }
+    }
+
+    constrainTo(displayRange.min, keepAbove: true);
+    constrainTo(displayRange.max, keepAbove: false);
+
+    if (!visible || tStart > tEnd) continue;
+
+    final startX = _xAt(segment, tStart);
+    final startY = _yAt(segment, tStart);
+    final endX = _xAt(segment, tEnd);
+    final endY = _yAt(segment, tEnd);
+    // A touching point (start == end) is not a drawable line.
+    if (startX == endX && startY == endY) continue;
+
+    spans.add(VisibleCurveSegment._(startX, startY, endX, endY, segment));
+  }
+  return spans;
+}
+
+double _xAt(CurveSegment segment, double t) =>
+    segment.a.dayIndex + t * (segment.b.dayIndex - segment.a.dayIndex);
+
+double _yAt(CurveSegment segment, double t) =>
+    segment.a.bbtC + t * (segment.b.bbtC - segment.a.bbtC);
 
 /// Splits the recorded days into maximal runs of adjacent-day measurements.
 ///
@@ -89,24 +188,20 @@ double clampBbtC(double value, TemperatureRange displayRange) =>
 /// renders normally (the mask is the diary badge's input, not the
 /// curve's).
 ///
-/// [displayRange] clips every point's temperature into the chart's fixed
-/// settings range ([clampBbtC]) — the chart always passes its range, so
-/// an out-of-range reading renders at the boundary instead of sitting
-/// beyond the plot. Connectivity (adjacency) is decided BEFORE the clip,
-/// so a clipped day still joins its neighbors into one run.
+/// Every point keeps its RAW measured value — an out-of-range reading is
+/// not rewritten here. Connectivity (adjacency) is decided by the calendar
+/// days alone, so such a day still joins its neighbors into one run; what
+/// becomes drawable of it is decided later by [visibleCurveSegments].
 List<CurveRun> curveRuns(
   Map<int, DailyEntry> entriesByDayIndex, {
   Set<int> ignoredDayIndexes = const {},
-  TemperatureRange? displayRange,
 }) {
   final measured = <CurvePoint>[
     for (final MapEntry(:key, value: entry) in entriesByDayIndex.entries)
       if (entry.bbtC != null)
         CurvePoint(
           dayIndex: key,
-          bbtC: displayRange == null
-              ? entry.bbtC!
-              : clampBbtC(entry.bbtC!, displayRange),
+          bbtC: entry.bbtC!,
           excluded: ignoredDayIndexes.contains(key),
         ),
   ]..sort((a, b) => a.dayIndex.compareTo(b.dayIndex));

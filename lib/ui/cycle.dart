@@ -658,13 +658,14 @@ final class _CycleChartState extends State<_CycleChart> {
     // The curve is split into runs of adjacent measured days (curve helpers,
     // lib/ui/cycle_curve.dart): the line connects two temperatures only when
     // their calendar days are adjacent, so a day without a temperature
-    // (missing entry or entry without bbtC) breaks the line. The runs also
-    // CLIP every temperature into the fixed settings range at the data
-    // layer. The static structure feeds the emptiness check; the y bounds
-    // themselves come from the settings range and never depend on the data,
-    // so the scale never rescales while scrolling.
-    final runs = curveRuns(_days.byIndex,
-        ignoredDayIndexes: _days.ignoredDayIndexes, displayRange: widget.range);
+    // (missing entry or entry without bbtC) breaks the line. The points
+    // keep the RAW measured temperatures — whether a dot or a line piece
+    // becomes drawable inside the fixed settings range is decided in the
+    // chart config below. The static structure feeds the emptiness check;
+    // the y bounds themselves come from the settings range and never
+    // depend on the data, so the scale never rescales while scrolling.
+    final runs =
+        curveRuns(_days.byIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -676,9 +677,10 @@ final class _CycleChartState extends State<_CycleChart> {
 
     // The y bounds are the SETTINGS-selected display range (the persisted
     // temperatureRangeProvider, default 36–38 °C): a fixed scale, not the
-    // old data-adaptive ±0.4 rounding anymore. Curve
-    // values outside the range already clipped in the runs above — dots
-    // and segments ride the boundary instead of stretching the scale.
+    // old data-adaptive ±0.4 rounding anymore. Values outside the range
+    // are simply not rendered — the point filter and the segment clipper
+    // below keep dots and line pieces inside the visible window (pieces
+    // may touch a boundary, where a boundary measurement still sits).
     // No degenerate-span guard is needed: the settings card enforces
     // min < max by construction.
     final yMin = widget.range.min;
@@ -711,9 +713,9 @@ final class _CycleChartState extends State<_CycleChart> {
     // band), so the whole glyph sits below the sex row above the plot.
     // TODO(user-review): both values are owner-eyeball rendering details,
     // not settled rules. TODO(user-review): top-border collision — a
-    // temperature dot near the scale top (especially a CLIPPED dot, which
-    // stops exactly AT the boundary yMax) can visually meet the top
-    // arrow; accepted for now, no avoidance logic.
+    // temperature dot near the scale top (especially a dot exactly AT the
+    // boundary yMax) can visually meet the top arrow; accepted for now, no
+    // avoidance logic.
     const suzBarHangSpanDegrees = 0.5;
     const suzArrowTopInsetDegrees = 0.25;
 
@@ -768,9 +770,8 @@ final class _CycleChartState extends State<_CycleChart> {
             if (entry.key >= winStart && entry.key <= winEnd)
               entry.key: entry.value,
         };
-        final winRuns = curveRuns(winByIndex,
-            ignoredDayIndexes: _days.ignoredDayIndexes,
-            displayRange: widget.range);
+        final winRuns =
+            curveRuns(winByIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{
           for (final run in winRuns)
@@ -873,27 +874,28 @@ final class _CycleChartState extends State<_CycleChart> {
                                 LineChart(
                                   LineChartData(
                                     lineBarsData: [
-                                      // The line: one two-spot bar per
-                                      // adjacent-day pair, so a segment touching
-                                      // an interrupted (excluded) day can render
-                                      // lighter while the others keep the
-                                      // full-strength color. Dots are painted
-                                      // afterwards by the dot bars below. Only
-                                      // the window's segments are carried — the
-                                      // x positions stay global.
-                                      for (final segment in winSegments)
+                                      // The line: one two-spot bar per CLIPPED
+                                      // span of a segment (visibleCurveSegments
+                                      // clips each straight segment to the
+                                      // visible value range — the crossings may
+                                      // sit at fractional day indexes), so a
+                                      // span touching an interrupted (excluded)
+                                      // day can render lighter while the
+                                      // others keep the full-strength color.
+                                      // Dots are painted afterwards by the dot
+                                      // bars below. Only the window's segments
+                                      // are clipped and carried — the x
+                                      // positions stay global.
+                                      for (final span in visibleCurveSegments(
+                                          winSegments, widget.range))
                                         LineChartBarData(
                                           spots: [
-                                            FlSpot(
-                                                segment.a.dayIndex.toDouble(),
-                                                segment.a.bbtC),
-                                            FlSpot(
-                                                segment.b.dayIndex.toDouble(),
-                                                segment.b.bbtC),
+                                            FlSpot(span.startX, span.startY),
+                                            FlSpot(span.endX, span.endY),
                                           ],
                                           isCurved: false,
                                           barWidth: 1.6,
-                                          color: segment.lighter
+                                          color: span.lighter
                                               ? interruptedColor
                                               : temperatureColor,
                                           dotData: const FlDotData(show: false),
@@ -902,31 +904,42 @@ final class _CycleChartState extends State<_CycleChart> {
                                       // color) holding each run's spots, so the
                                       // per-spot dot painter can render an
                                       // interrupted day's dot lighter than the
-                                      // others.
+                                      // others. Only IN-RANGE points get a
+                                      // spot: skipping the spot skips the whole
+                                      // painter (dot, circled-higher ring,
+                                      // arrow-up glyph) of an out-of-range
+                                      // measurement.
                                       for (final run in winRuns)
-                                        LineChartBarData(
-                                          spots: [
-                                            for (final point in run.points)
-                                              FlSpot(point.dayIndex.toDouble(),
-                                                  point.bbtC),
-                                          ],
-                                          color: Colors.transparent,
-                                          dotData: FlDotData(
-                                            show: true,
-                                            getDotPainter: (spot, _, bar, __) =>
-                                                dotPainterForDay(
-                                              dayIndex: spot.x.round(),
-                                              dotColor: interruptedByIndex[
-                                                          spot.x.round()] ??
-                                                      false
-                                                  ? interruptedColor
-                                                  : temperatureColor,
-                                              colorScheme:
-                                                  Theme.of(context).colorScheme,
-                                              overlay: overlay,
+                                        if (run.points.any((point) =>
+                                            isBbtCInRange(
+                                                point.bbtC, widget.range)))
+                                          LineChartBarData(
+                                            spots: [
+                                              for (final point in run.points)
+                                                if (isBbtCInRange(
+                                                    point.bbtC, widget.range))
+                                                  FlSpot(
+                                                      point.dayIndex.toDouble(),
+                                                      point.bbtC),
+                                            ],
+                                            color: Colors.transparent,
+                                            dotData: FlDotData(
+                                              show: true,
+                                              getDotPainter:
+                                                  (spot, _, bar, __) =>
+                                                      dotPainterForDay(
+                                                dayIndex: spot.x.round(),
+                                                dotColor: interruptedByIndex[
+                                                            spot.x.round()] ??
+                                                        false
+                                                    ? interruptedColor
+                                                    : temperatureColor,
+                                                colorScheme: Theme.of(context)
+                                                    .colorScheme,
+                                                overlay: overlay,
+                                              ),
                                             ),
                                           ),
-                                        ),
                                       // The baseline segments (R10): one dashed
                                       // two-spot bar per evaluated cycle, drawn
                                       // LAST so it paints above the curve and the

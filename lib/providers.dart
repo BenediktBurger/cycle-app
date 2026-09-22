@@ -99,10 +99,10 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// The cycle chart's temperature display range ("Temperaturbereich"
 /// settings card): the FIXED y bounds the chart's plot and the frozen
-/// rail's scale share — settings-selectable, default 36–38 °C. Curve
-/// values outside the range CLIP at the boundary (pure helper
-/// [clampBbtC] in lib/ui/cycle_curve.dart); the scale never stretches to
-/// fit an outlier.
+/// rail's scale share — settings-selectable, default 36–38 °C. Readings
+/// outside the range are not rendered: their dots are skipped and the
+/// curve's drawable line pieces clip at the boundary crossings (see
+/// lib/ui/cycle_curve.dart); the scale never stretches to fit an outlier.
 ///
 /// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
 /// the local app_settings table once the database opens and written through

@@ -3771,21 +3771,9 @@ void main() {
     });
   });
 
-  group('fixed display range and boundary clipping', () {
+  group('fixed display-range bounds', () {
     LineChartData data(WidgetTester tester) =>
         tester.widget<LineChart>(find.byType(LineChart)).data;
-
-    /// The segment bar connecting day indexes [a] and [b].
-    LineChartBarData segmentBar(WidgetTester tester, int a, int b) => tester
-        .widget<LineChart>(find.byType(LineChart))
-        .data
-        .lineBarsData
-        .firstWhere((bar) =>
-            bar.spots.length == 2 &&
-            bar.spots[0].x == a.toDouble() &&
-            bar.spots[1].x == b.toDouble() &&
-            bar.color != null &&
-            bar.color!.a > 0);
 
     testWidgets(
         'the y bounds are the provider\'s range (default 36.0..38.0), '
@@ -3794,7 +3782,9 @@ void main() {
       // vs 36.0) — under the old data-adaptive bounds such a low value
       // dragged the lower edge to the half degree below (35.5 here), so
       // this is where the old rounding would have moved the axis; the
-      // settings range pins the bounds 36..38 regardless.
+      // settings range pins the bounds 36..38 regardless. Out-of-range
+      // readings are simply not rendered (see the next section) — they
+      // never move the bounds either way.
       await tester.pumpWidget(_temperatureHarness(entries: [
         DailyEntry(date: _temperatureThu, bbtC: 36.5),
         DailyEntry(date: _temperatureFri, bbtC: 37.0),
@@ -3807,59 +3797,166 @@ void main() {
       expect(data(tester).maxY, 38.0,
           reason: 'the default range\'s upper bound is the fixed maxY');
     });
+  });
 
-    testWidgets(
-        'a fever above the range renders its curve VALUE clamped to '
-        'exactly the upper boundary — the bounds never move', (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.5),
-          DailyEntry(date: _temperatureFri, bbtC: 39.5),
-        ],
-      ));
+// ═══════════ temperature visible range ═══════════
+// Widget tests of temperatures OUTSIDE the chart's visible value range
+// (the settings-selected display range, default 36–38 °C): such a
+// measurement is NOT rendered at all — its whole per-day dot painter
+// (dot, circled-higher ring, arrow-up glyph) is skipped with its spot.
+// The polyline still connects the adjacent days but is CLIPPED to the
+// value range: the drawable piece runs to the boundary crossing (at a
+// possibly fractional day index BETWEEN the days), so a line running to
+// or along the plot's top/bottom edge tells the reader data lie beyond
+// the visible range. In-range rendering is pixel-for-pixel unchanged, a
+// value exactly AT a boundary counts as in range (its dot renders and its
+// segments pass through raw), and when EVERY measurement is out of range
+// the paper grid renders with no curve (the "no temperature" placeholder
+// still does NOT show — the days carry measurements). Fixture shape and
+// helpers are shared with the temperature-connectivity section above.
+
+  /// A measured-day strip on the temperature section's Thu..Sat calendar
+  /// block: day index = list position, temperatures = the given values.
+  List<DailyEntry> rangeEntries(List<double> temps) => [
+        for (var i = 0; i < temps.length; i++)
+          DailyEntry(
+              date: _temperatureThu.add(Duration(days: i)), bbtC: temps[i]),
+      ];
+
+  /// The visible polyline's drawable spans as (start, end) spot pairs —
+  /// one pair per visible two-spot line bar (the curve draws one bar per
+  /// clipped span).
+  List<(FlSpot, FlSpot)> visibleSpans(WidgetTester tester) => [
+        for (final bar in _segmentBars(tester))
+          if (bar.spots.length == 2) (bar.spots.first, bar.spots.last),
+      ];
+
+  /// The (x, y) pair list of [visibleSpans], for exact endpoint comparison.
+  List<(double, double, double, double)> spanEndpoints(WidgetTester tester) => [
+        for (final (start, end) in visibleSpans(tester))
+          (start.x, start.y, end.x, end.y),
+      ];
+
+  /// True when some dot-only bar carries a spot at [dayIndex] (day indexes
+  /// sit at integral x positions).
+  bool hasDotSpot(WidgetTester tester, int dayIndex) => dotBars(tester)
+      .any((bar) => bar.spots.any((spot) => spot.x.round() == dayIndex));
+
+  group('a temperature above the range does not render (37 / 39 / 37)', () {
+    // The default range is 36–38 °C, so Friday's 39.0 lies above it while
+    // its neighbors stay in range.
+    List<DailyEntry> entries() => rangeEntries([37.0, 39.0, 37.0]);
+
+    testWidgets('the out-of-range day\'s dot is not rendered', (tester) async {
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[1].y, 38.0,
-          reason: 'the clipped temperature stops AT the boundary 38.0');
-      expect(segment.spots[0].y, 36.5,
-          reason: 'the in-range neighbor keeps its raw value');
-
-      // Axis bounds and (per the rail tests) the rail labels never move.
-      expect(data(tester).minY, 36.0);
-      expect(data(tester).maxY, 38.0);
+      expect(dotPainterOrNull(tester, 1), isNull,
+          reason: 'the middle day\'s measurement is above the visible '
+              'range — no dot (and no ring or arrow anchored to it) '
+              'renders');
+      expect(hasDotSpot(tester, 1), isFalse,
+          reason: 'the dot bars carry in-range spots only — no spot maps '
+              'to the out-of-range day');
     });
 
-    testWidgets('a below-range value clamps to exactly the lower boundary',
+    testWidgets('the polyline still draws, clipped at the boundary crossings',
         (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.5),
-          DailyEntry(date: _temperatureFri, bbtC: 35.0),
-        ],
-      ));
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[1].y, 36.0,
-          reason: 'the clipped temperature stops AT the lower boundary 36.0');
-      expect(data(tester).minY, 36.0, reason: 'the bounds never move');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 0.5, 38.0),
+            (1.5, 38.0, 2.0, 37.0),
+          ],
+          reason: 'the line to and from the above-range day is clipped at '
+              'the upper boundary 38.0, crossing midway between the days');
     });
 
-    testWidgets(
-        'values exactly at the boundaries render unchanged (clamp '
-        'passthrough)', (tester) async {
-      await tester.pumpWidget(_temperatureHarness(
-        entries: [
-          DailyEntry(date: _temperatureThu, bbtC: 36.0),
-          DailyEntry(date: _temperatureFri, bbtC: 38.0),
-        ],
-      ));
+    testWidgets('the in-range days render dot and endpoints unchanged',
+        (tester) async {
+      await tester.pumpWidget(_temperatureHarness(entries: entries()));
       await tester.pumpAndSettle();
 
-      final segment = segmentBar(tester, 0, 1);
-      expect(segment.spots[0].y, 36.0);
-      expect(segment.spots[1].y, 38.0);
+      expect(dotPainterOrNull(tester, 0), isNotNull,
+          reason: 'the in-range left day keeps its dot painter');
+      expect(dotPainterOrNull(tester, 2), isNotNull,
+          reason: 'the in-range right day keeps its dot painter');
+      final spans = visibleSpans(tester);
+      expect(spans, hasLength(2),
+          reason: 'the only visible bars are the two clipped spans');
+      expect((spans[0].$1.x, spans[0].$1.y), (0.0, 37.0),
+          reason: 'the left bar starts at day 0\'s raw in-range value');
+      expect((spans[1].$2.x, spans[1].$2.y), (2.0, 37.0),
+          reason: 'the right bar ends at day 2\'s raw in-range value');
+    });
+  });
+
+  group('a temperature exactly at the boundary renders (37 / 38 / 37)', () {
+    testWidgets(
+        'the boundary-value day keeps its dot and its segments pass '
+        'through raw', (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([37.0, 38.0, 37.0])));
+      await tester.pumpAndSettle();
+
+      expect(dotPainterOrNull(tester, 1), isNotNull,
+          reason: 'a value exactly AT the boundary counts as in range — '
+              'its dot renders unchanged');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 1.0, 38.0),
+            (1.0, 38.0, 2.0, 37.0),
+          ],
+          reason: 'the boundary value lies inside the window, so the '
+              'segments keep their raw endpoints (no clipping)');
+    });
+  });
+
+  group('a temperature below the range does not render (37 / 35 / 37)', () {
+    testWidgets(
+        'the below-range day\'s dot is absent and the polyline clips at '
+        'the lower boundary', (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([37.0, 35.0, 37.0])));
+      await tester.pumpAndSettle();
+
+      expect(dotPainterOrNull(tester, 1), isNull,
+          reason: 'the middle day\'s measurement is below the visible '
+              'range — its dot does not render');
+      expect(
+          spanEndpoints(tester),
+          [
+            (0.0, 37.0, 0.5, 36.0),
+            (1.5, 36.0, 2.0, 37.0),
+          ],
+          reason: 'the line to and from the below-range day is clipped at '
+              'the lower boundary 36.0, crossing midway between the days');
+    });
+  });
+
+  group('every measurement out of range', () {
+    testWidgets('the curve vanishes but the chart still mounts',
+        (tester) async {
+      await tester.pumpWidget(
+          _temperatureHarness(entries: rangeEntries([39.0, 39.2, 39.0])));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        expect(dotPainterOrNull(tester, i), isNull,
+            reason: 'day $i is out of range — its dot does not render');
+      }
+      expect(_segmentBars(tester), isEmpty,
+          reason: 'no piece of the polyline passes through the visible '
+              'range — nothing drawable at all');
+      expect(find.byType(LineChart), findsOneWidget,
+          reason: 'the chart still mounts with its paper grid');
+      expect(find.textContaining('temperature curve appears'), findsNothing,
+          reason: 'the "no temperature" placeholder does not show — the '
+              'days carry measurements');
     });
   });
 
