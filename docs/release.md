@@ -159,10 +159,32 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
    this; the device test is the real-environment proof).
 4. Only then ship.
 
-Numbers discipline: `version: X.Y.Z+N` in `pubspec.yaml` — bump `+N` for
-every distributed build (Play and F-Droid see the same versionCode; the ABI
-split adds its offset automatically — see the comment in
-`android/app/build.gradle.kts`).
+**Numbers discipline: `version: X.Y.Z+N` in `pubspec.yaml`** — bump `+N`
+for every distributed build (Play and F-Droid see the same versionCode).
+
+- `X.Y.Z` is the **versionName** (the user-visible version string); `N`,
+  the integer after the `+`, is the **versionCode** — the only number
+  stores, F-Droid, and fastlane changelog naming actually care about.
+- The versionCode is monotonically increasing with every published version
+  regardless the used versionName.
+- How `N` flows: pubspec `+N` → Gradle's `flutter.versionCode` → the
+  versionCode embedded in the APK (wired as `versionCode =
+  flutter.versionCode` in the `defaultConfig` of
+  `android/app/build.gradle.kts`). For the universal APK
+  (`flutter build apk --release` — the per-release checklist default) that
+  is **exactly `N`**; the offset mentioned in that file's comment (Flutter
+  adds `1000 * ABI_VERSION` for split APKs, suppressible with
+  `-P force-version-code-ignoring-abi=true`) applies **only** to
+  `--split-per-abi` builds, never to the universal APK.
+- Equalities to maintain: the F-Droid `Builds:` entry's
+  `versionCode:` (Phase E step 2) must equal `N` — F-Droid's
+  `UpdateCheckData` regex derives its candidate versionCode from the
+  pubspec `+N` at the tagged commit, so `pubspec.yaml` is the single
+  source — and the `aapt` re-check in per-release checklist step 7
+  verifies the APK's embedded versionCode matches the pubspec `+N` behind
+  the published tag.
+- The fastlane changelog filename (per-release checklist step 3) is that
+  same `N`.
 
 ### Phase E — official F-Droid inclusion (after Gates G1 + G2)
 
@@ -191,7 +213,9 @@ app's declared signing key fingerprint.
 4. Store-facing metadata follows the fastlane/triple-T structure under
    `fastlane/metadata/android/<locale>/`: full/short description, changelogs
    per versionCode, text+image assets. German-first with English mirrored,
-   matching the app's language policy.
+   matching the app's language policy. Every distributed version gets one
+   changelog file per locale at release time (naming scheme and
+   requirement: per-release checklist step 3).
 5. Submit the merge request; respond to `fdroid-bot`/reviewer comments
    (typical asks: reproducibility notes, version-code scheme explanation).
 6. After acceptance: F-Droid builds itself on their infrastructure — your
@@ -242,18 +266,30 @@ Do **not** start until Android went through Phases B–F at least once.
 
 ## Per-release checklist (every distribution update)
 
-1. `pubspec.yaml`: `version: X.Y.Z+N` (bump `+N`, note the versionName).
-2. `flutter analyze && flutter test --no-pub -r expanded` (full gate,
+1. **Change the version** in `pubspec.yaml`: `version: X.Y.Z+N`:
+   always bump the versionCode`+N`; change the versionName `X.Y.Z`, if applicable.
+2. **Run tests**: `flutter analyze && flutter test --no-pub -r expanded` (full gate,
    [ADR-0006](adr/0006-ci.md) conventions).
-3. Fastlane changelog file for the new versionCode (F-Droid) + Play release
-   notes draft (DE/EN).
-4. Build the release artifact itself:
+3. **Create fastlane changelog files** — for all locales present under
+   `fastlane/metadata/android/`: ** Create
+   `fastlane/metadata/android/<locale>/changelogs/<N>.txt` — the filename
+   is exactly the bare versionCode integer from pubspec, e.g. `2.txt` for
+   versionCode 2 (it must match pubspec's `+N` verbatim — padding only if
+   pubspec itself had it), extension `.txt`.
+   Content: a short plain-text summary of what shipped (keep
+   it ≤ 500 characters) — this file is the F-Droid store changelog and the
+   basis for the Play release notes. Skipping this step has a visible consequence:
+   the store listing for that version shows no release notes, because F-Droid
+   derives the per-version changelog its users see solely from these
+   files. Store-metadata layout context: Phase E step 4 and
+   [`fastlane/metadata/android/README.md`](../fastlane/metadata/android/README.md).
+4. **Build the release artifact** itself:
    `flutter build apk --release` (universal APK). With the local
    `key.properties` present this is release-signed via the Phase C wiring;
    if the file is missing, Gradle silently falls back to **debug** signing —
    the `apksigner verify` step below is the guard against that, never skip
    it.
-5. Verify the signature — this is both the trust-anchor source and the
+5. **Verify the signature** — this is both the trust-anchor source and the
    debug-fallback guard:
 
    ```sh
@@ -269,7 +305,7 @@ Do **not** start until Android went through Phases B–F at least once.
    is public.
    Install for example with `adb install -r build/app/outputs/flutter-apk/app-release.apk`.
 
-7. Run the release script:
+7. **Run the release script**:
 
    ```sh
    dart run tool/make_release.dart vX.Y.Z
@@ -328,7 +364,7 @@ Do **not** start until Android went through Phases B–F at least once.
 
    Only point testers at the release once it is visible. (Git history is
    the release diary; the roadmap stays a queue.)
-8. Upload/distribute (sideload → testers; Play internal track; F-Droid MR
+8. **Upload/distribute** (sideload → testers; Play internal track; F-Droid MR
    or automatic build on their side). When Play is involved, the AAB is
    also built locally (`flutter build appbundle --release`); there is no
    automated Play upload.
