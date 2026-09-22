@@ -11,13 +11,19 @@ environment:
   sdk: ">=3.5.0 <4.0.0"
 
 # Build-hook configuration: use SQLite3MultipleCiphers as the SQLite engine
-# bundled by the sqlite3 package (the hook fetches the prebuilt mc library
-# for each platform) — this is what makes native database encryption work
-# (ADR-005; drift ≥2.32 pattern, see lib/db/database_opener.dart).
+# bundled by the sqlite3 package. `source: source` makes the hook COMPILE the
+# amalgamation vendored under native/sqlite3mc/ (a package-supported mode; the
+# prebuilt library it would otherwise download from a GitHub release would be
+# the same code) — no network is needed at build time, which matters for
+# F-Droid's build-from-source recipe (docs/release.md Phase E). This is what
+# makes native database encryption work (ADR-005; drift ≥2.32 pattern, see
+# lib/db/database_opener.dart). Provenance + refresh steps:
+# native/sqlite3mc/README.md.
 hooks:
   user_defines:
     sqlite3:
-      source: sqlite3mc
+      source: source
+      path: native/sqlite3mc/sqlite3mc_amalgamation.c
 
 # Version notes — all ranges float within their major/minor line so pub picks
 # a version compatible with the installed SDK (resolved on Flutter 3.47.4 /
