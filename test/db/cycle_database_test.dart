@@ -374,8 +374,8 @@ void main() {
       final version = await db.customSelect('PRAGMA user_version').getSingle();
       expect(version.data['user_version'], 11,
           reason: 'v11 extends the bleeding scale vocabulary to level 5 '
-              '(maximum); the pre-release policy recreates the tables, so '
-              'no incremental migration is needed');
+              '(maximum); no SQL changed in that step, so no incremental '
+              'migration is needed');
     });
 
     test(
@@ -447,12 +447,15 @@ void main() {
     });
   });
 
-  group('destructive upgrade from an older schemaVersion', () {
+  group('incremental upgrade from an older schemaVersion', () {
     late Directory tempDir;
     late File dbFile;
     CycleDatabase? upgraded;
+    // The CURRENT DDL, dumped from the fresh in-memory `db` in setUp (the
+    // rows carry 'type' + 'name' + the CREATE statement).
+    List<Map<String, Object?>> currentDdl = const [];
 
-    setUp(() {
+    setUp(() async {
       tempDir = Directory.systemTemp.createTempSync('cycle_upgrade_fixt_');
       addTearDown(() => tempDir.deleteSync(recursive: true));
       dbFile = File('${tempDir.path}/old.db');
@@ -460,111 +463,155 @@ void main() {
         await upgraded?.close();
         upgraded = null;
       });
-      // The outer `db` (fresh in-memory instance, see the outer setUp) is
-      // unused here — this group works on its own file-backed database.
-      // Closing the unused one first avoids drift's multiple-databases
-      // warning (idempotent: the outer tearDown is a no-op afterwards).
-      db.close();
+      // Dump the CURRENT DDL instead of hand-writing it: the fixture
+      // executes these statements into the temp file, so it tracks the
+      // schema as it evolves. Auto-indexes (sql IS NULL) are skipped —
+      // they are created implicitly together with their tables.
+      currentDdl = [
+        for (final r in await db
+            .customSelect(
+              "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT "
+              "NULL AND tbl_name IN "
+              "('cycle_entries', 'user_marks', 'app_settings')",
+            )
+            .get())
+          {
+            'type': r.data['type']! as String,
+            'name': r.data['name']! as String,
+            'sql': r.data['sql']! as String,
+          },
+      ];
+      // The outer `db` is now unused — this group works on its own
+      // file-backed database — so close it here to avoid drift's
+      // multiple-databases warning (idempotent: the outer tearDown is a
+      // no-op afterwards).
+      await db.close();
     });
 
-    /// Builds a file whose drift user_version is stale (1) and whose
-    /// cycle_entries has an outdated shape with legacy columns and a junk
-    /// row. Not a faithful reconstruction of any historical release schema —
-    /// the pre-release upgrade policy discards everything anyway; the point
-    /// is that opening through CycleDatabase recreates from the CURRENT
-    /// schema instead of migrating.
-    Future<CycleDatabase> openThroughAppSchema() async {
+    /// Builds a temp-file database stamped with the stale [from]
+    /// user_version, whose DDL is the CURRENT schema (dumped in setUp):
+    /// per the documented history, a v9/v10-shaped file is structurally the
+    /// current DDL — v9→v10 adds only `app_settings` and v10→v11 changes no
+    /// SQL at all — so the only deltas the fixture controls are the
+    /// presence of `app_settings` and the version stamp. The seeded user
+    /// data is written with raw SQL and explicit created_at/updated_at
+    /// values so the rows are individually identifiable (a table recreated
+    /// from the current schema cannot answer them, which is what makes the
+    /// data-preservation pin meaningful).
+    Future<CycleDatabase> openMigrationFixture(
+      int from, {
+      required bool withAppSettings,
+    }) async {
+      final statements = [
+        for (final r in currentDdl)
+          if (withAppSettings || r['name'] != 'app_settings')
+            (
+              tableFirst: r['type'] == 'table' ? 0 : 1,
+              sql: r['sql']! as String,
+            ),
+      ]..sort((a, b) => a.tableFirst - b.tableFirst); // tables before indexes
       final raw = sqlite3.open(dbFile.path);
       try {
+        for (final stmt in statements) {
+          raw.execute(stmt.sql);
+        }
         raw.execute(
-          'CREATE TABLE profiles (id INTEGER PRIMARY KEY, '
-          'name TEXT NOT NULL, ordinal INTEGER NOT NULL);',
+          'INSERT INTO cycle_entries (date, temp_disturbances, bbt_c, '
+          'measured_at_minutes, bleeding, mucus_sign, mucus_quality, '
+          'cervix_position, cervix_opening, cervix_firmness, pain_breast, '
+          'pain_mittelschmerz, sex_timings, notes, created_at, updated_at) '
+          "VALUES (20000, 5, 36.55, 405, 4, 's', 'ew', 'high', 'middle', "
+          "'soft', 1, 0, 5, 'seeded row', 1767225600, 1767229200)",
         );
         raw.execute(
-          'CREATE TABLE cycle_entries (id INTEGER PRIMARY KEY, '
-          'profile_id INTEGER NOT NULL, date INTEGER NOT NULL, '
-          'mucus_feeling TEXT NULL);',
+          "INSERT INTO user_marks (entry_date, mark_type, author) "
+          "VALUES (20001, 'cycleStart', 'user')",
         );
-        raw.execute("INSERT INTO profiles VALUES (1, 'stale', 0);");
-        raw.execute("INSERT INTO cycle_entries VALUES (101, 1, 20000, 'x');");
-        raw.execute('PRAGMA user_version = 1;');
+        raw.execute('PRAGMA user_version = $from;');
       } finally {
         raw.close();
       }
       final db = CycleDatabase(NativeDatabase(dbFile));
       upgraded = db;
       // Opening a query forces the executor to open, which runs the
-      // destructive upgrade before the first statement completes.
+      // incremental upgrade before the first statement completes.
       await db.entriesDao.allEntries();
       return db;
     }
 
-    test(
-        'opening a lower-version file recreates the schema, discarding old '
-        'data', () async {
-      final db = await openThroughAppSchema();
+    Future<void> expectPreserved(CycleDatabase db) async {
+      final version = await db.customSelect('PRAGMA user_version').getSingle();
+      expect(version.data['user_version'], 11,
+          reason: 'drift records the migration run');
 
-      final userVersion =
-          await db.customSelect('PRAGMA user_version').getSingle();
-      expect(userVersion.data['user_version'], 11,
-          reason: 'drift records the upgrade run');
+      // The seeded entry row survives row-for-row, read through the normal
+      // DAO (not raw SQL): the migration must not discard user data.
+      final row = await db.entriesDao.entryFor(DateTime(2024, 10, 4));
+      expect(row, isNotNull, reason: 'day 20000 carries the seeded row');
+      expect(row!.bleeding, Bleeding.heavy, reason: 'level 4 is preserved');
+      expect(row.bbtC, 36.55);
+      expect(row.tempDisturbances, 5);
+      expect(row.measuredAtMinutes, 405);
+      expect(row.mucusSign, 's');
+      expect(row.mucusQuality, 'ew');
+      expect(row.cervixPosition, 'high');
+      expect(row.cervixOpening, 'middle');
+      expect(row.cervixFirmness, 'soft');
+      expect(row.painBreast, isTrue);
+      expect(row.painMittelschmerz, isFalse);
+      expect(row.sexTimings, 5);
+      expect(row.notes, 'seeded row');
+      expect(row.createdAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1)), isTrue,
+          reason: 'the explicit created_at survives the migration verbatim');
+      expect(
+          row.updatedAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1, 1)), isTrue,
+          reason: 'the explicit updated_at survives the migration verbatim');
 
-      // The profiles table is wiped and NOT recreated — no seeding, no
-      // profile rows anywhere.
-      final tableRows = await db
-          .customSelect("SELECT name FROM sqlite_master WHERE "
-              "type = 'table'")
-          .get();
-      final tableNames = tableRows.map((r) => r.data['name'] as String).toSet();
-      expect(tableNames.contains('profiles'), isFalse,
-          reason: 'the legacy profiles table (from the stale file) is gone '
-              'and nothing re-creates or re-seeds it');
+      // The seeded mark survives too.
+      final marks = await db.marksDao.marksForDay(DateTime(2024, 10, 5));
+      expect(marks, hasLength(1),
+          reason: 'the (entry_date, mark_type) row is preserved');
+      expect(marks.single.markType, 'cycleStart');
+      expect(marks.single.author, 'user');
 
-      // The rebuilt table has the CURRENT shape: new columns with their
-      // engine-level CHECKs, legacy columns gone.
-      final ddl = await db
-          .customSelect(
-              "SELECT sql FROM sqlite_master WHERE type = 'table' AND "
-              "name = 'cycle_entries'")
-          .getSingle();
-      final sql = ddl.data['sql']! as String;
-      expect(sql, contains('mucus_sign IS NULL OR mucus_sign IN'));
-      expect(sql, contains("'fs'"),
-          reason: 'the v9 mucus vocabulary includes the fs sign');
-      expect(sql, isNot(contains('mucus_feeling')));
-      expect(sql, contains('measured_at_minutes'),
-          reason: 'the shred-and-recreate upgrade yields the current schema, '
-              'including the newest column');
-      expect(sql, contains('cervix_position'),
-          reason: 'the current schema includes the Muttermund columns');
-      expect(sql, contains('temp_disturbances'),
-          reason: 'the current schema carries the raw disturbance mask');
-      expect(sql, isNot(contains('exclude_illness')),
-          reason: 'the old exclusion-reason booleans are gone from v9');
-      expect(sql, isNot(contains('mood')),
-          reason: 'Stimmung/Lust are gone from v9');
-      expect(sql, isNot(contains('desire')));
-      expect(sql, isNot(contains('profile_id')),
-          reason: 'the profile column (and its FK/default) is gone from v9');
-
-      // Foreign keys are enforced again (beforeOpen) and a normal DAO
-      // write works on the day-keyed schema.
+      // beforeOpen keeps foreign-keys enforcement after an upgrade.
       final foreignKeys =
           await db.customSelect('PRAGMA foreign_keys').getSingle();
       expect(foreignKeys.data['foreign_keys'], 1);
-      await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 6, 15)));
-      final row = await db.entriesDao.entryFor(DateTime(2026, 6, 15));
-      expect(row, isNotNull,
-          reason: 'the upsert lands on its day with no profile dimension');
+    }
 
-      // The v10 settings table is part of the recreated schema too: it did
-      // not exist in the stale file, and a settings write round-trips
-      // through it right after the upgrade.
-      expect(tableNames, contains('app_settings'),
-          reason: 'createAll() builds app_settings on the upgraded file');
+    test(
+        'a v10 file migrates incrementally: seeded data preserved, nothing '
+        'dropped or recreated', () async {
+      final db = await openMigrationFixture(10, withAppSettings: true);
+      await expectPreserved(db);
+    });
+
+    test(
+        'a v9 file migrates incrementally: data preserved and app_settings '
+        'added in the current shape', () async {
+      final db = await openMigrationFixture(9, withAppSettings: false);
+      await expectPreserved(db);
+
+      // The only SQL delta of the step below: app_settings now exists.
+      final columns =
+          await db.customSelect('PRAGMA table_info(app_settings)').get();
+      final byName = {
+        for (final r in columns) r.data['name']! as String: r.data,
+      };
+      expect(byName.keys, containsAll(['key', 'value']));
+      expect(byName['key']!['type'], 'TEXT');
+      expect(byName['value']!['type'], 'TEXT');
+      expect(byName['value']!['notnull'], 1,
+          reason: 'a setting row always carries a value');
+      expect(byName['key']!['pk'], 1,
+          reason: 'the key alone identifies the row');
+      expect(byName.keys, hasLength(2),
+          reason: 'the generic (key, value) pair is all there is');
+
+      // Settings storage works immediately after the upgrade.
       await db.settingsDao.writeValue('themeMode', 'dark');
-      expect(await db.settingsDao.readValue('themeMode'), 'dark',
-          reason: 'settings storage works immediately after the upgrade');
+      expect(await db.settingsDao.readValue('themeMode'), 'dark');
     });
   });
 

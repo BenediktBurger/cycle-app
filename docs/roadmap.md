@@ -37,14 +37,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- [ ] replace the destructive pre-release `onUpgrade` in
-  `lib/db/cycle_database.dart` with real drift migrations (one version step
-  at a time, data-preserving) and update the tests in
-  `test/db/cycle_database_test.dart` that pin the destructive-upgrade
-  behavior — required since the first published releases; the governing
-  amendment is ADR-0005, dated 2026-09-22. The first real case to migrate
-  incrementally is the next schema-version bump.
-
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent

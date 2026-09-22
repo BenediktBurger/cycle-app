@@ -46,34 +46,31 @@ class CycleDatabase extends _$CycleDatabase {
           await m.createAll();
         },
         onUpgrade: (m, from, to) async {
-          // Pre-release policy: the app is unpublished, no database with real
-          // data exists anywhere, so upgrades carry no compatibility
-          // obligation. Every upgrade drops the app's tables and recreates
-          // them from the current schema, which keeps schema work cheap:
-          // changing the schema is then just bumping [schemaVersion] above.
-          // `deleteTable('profiles')` stays so an old (v8) database file
-          // loses its legacy profiles table too — nothing recreates or
-          // re-seeds it (the schema is profile-free).
+          // Every upgrade is a graceful, incremental migration: one schema
+          // version step at a time, never dropping or recreating anything,
+          // so user data always survives (ADR-0005, amendment 2026-09-22 —
+          // destructive upgrades are no longer permitted).
           //
-          // v10 adds nothing to migrate incrementally: the new app_settings
-          // key-value table is created by m.createAll() like every other
-          // table (pre-release policy — an upgraded v9 file already carries
-          // no surviving data). So a v9 → v10 upgrade is just the version
-          // bump shown above; no deleteTable line for app_settings is needed
-          // since createAll() recreates (or CREATEs) it.
-          //
-          // v11 likewise changes nothing in SQL: the bleeding scale gained
-          // the level-5 vocabulary (maximum), which the bleeding column's
-          // converter interprets — the column's INTEGER DDL is unchanged, so
-          // a v10 → v11 upgrade is only the version bump (the pre-release
-          // drop-and-recreate policy handles any old file regardless).
-          //
-          // From the FIRST PUBLISHED RELEASE on this must become real one
-          // version step at a time migrations that preserve user data.
-          await m.deleteTable('cycle_entries');
-          await m.deleteTable('user_marks');
-          await m.deleteTable('profiles');
-          await m.createAll();
+          // Files OLDER than v9 have no migration promise (they are
+          // pre-release artifacts whose table layouts were never published
+          // and are not reconstructed anywhere): the supported steps below
+          // still run best-effort for them, nothing is erased, and their
+          // old-shaped/orphaned tables are simply left untouched.
+          if (from < 10) {
+            // The only SQL delta of v9 → v10: the app_settings key-value
+            // table appears (ADR-0010); no data is transformed.
+            await m.createTable(appSettings);
+          }
+          // v10 → v11 changed no SQL: the bleeding vocabulary gained its
+          // level-5 member at the converter level, and the bleeding column's
+          // INTEGER DDL is unchanged (ADR-0010) — nothing to migrate.
+
+          // Each future schema-version bump adds its own guarded block here
+          // (e.g. `if (from < 12) { ... }`), using Migrator helpers only
+          // (createTable, addColumn, customStatement, …); disruptive table
+          // shape changes copy data into the new table instead of dropping
+          // anything. Skipped steps (from several versions behind) run every
+          // missing block in order, so any distance migrates step-wise.
         },
         // SQLite only enforces FOREIGN KEY constraints when the pragma is
         // enabled for the connection; make that explicit. Idempotent if
