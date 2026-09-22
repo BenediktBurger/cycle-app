@@ -77,25 +77,19 @@ typedef MucusPair = ({MucusSign? sign, MucusQuality? quality});
 /// for any sign other than S (including no sign at all) the quality
 /// collapses to null; bare S keeps its (possibly null) quality. The import
 /// writer uses this before constructing a [MucusPair] from foreign data.
-MucusPair sanitizeMucusPair({
-  MucusSign? sign,
-  MucusQuality? quality,
-}) =>
-    (
-      sign: sign,
-      quality: sign == MucusSign.s ? quality : null,
-    );
+MucusPair sanitizeMucusPair({MucusSign? sign, MucusQuality? quality}) =>
+    (sign: sign, quality: sign == MucusSign.s ? quality : null);
 
 /// Display glyph of a sign (cheat sheet): `t`, `Ø` for `nothing`, `f`, `S`,
 /// `f/S` for `fs` ("f vor S an einem Tag"), `A` for `a` (Ausfluss).
 String mucusSignSymbol(MucusSign sign) => switch (sign) {
-      MucusSign.t => 't',
-      MucusSign.nothing => 'Ø',
-      MucusSign.f => 'f',
-      MucusSign.s => 'S',
-      MucusSign.fs => 'f/S',
-      MucusSign.a => 'A',
-    };
+  MucusSign.t => 't',
+  MucusSign.nothing => 'Ø',
+  MucusSign.f => 'f',
+  MucusSign.s => 'S',
+  MucusSign.fs => 'f/S',
+  MucusSign.a => 'A',
+};
 
 /// Display token of a quality (cheat sheet): everything keeps its token
 /// letter-case except `ew`, which the sheet writes as uppercase `EW`.
@@ -114,9 +108,11 @@ typedef MucusDisplay = ({String? symbol, String? superscript});
 /// superscript on a non-S glyph.
 MucusDisplay mucusDisplay({MucusSign? sign, MucusQuality? quality}) {
   final sanitized = sanitizeMucusPair(sign: sign, quality: quality);
-  final symbol =
-      sanitized.sign == null ? null : mucusSignSymbol(sanitized.sign!);
-  final superscript =
-      sanitized.quality == null ? null : mucusQualityToken(sanitized.quality!);
+  final symbol = sanitized.sign == null
+      ? null
+      : mucusSignSymbol(sanitized.sign!);
+  final superscript = sanitized.quality == null
+      ? null
+      : mucusQualityToken(sanitized.quality!);
   return (symbol: symbol, superscript: superscript);
 }

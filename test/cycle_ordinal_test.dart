@@ -33,73 +33,100 @@ void main() {
   String ordinalText(WidgetTester tester, int index) =>
       tester.widget<Text>(find.byKey(ValueKey('cycleOrdinal-$index'))).data!;
 
-  testWidgets(
-      'the first cycle boundary carries the ordinal 1 without any '
+  testWidgets('the first cycle boundary carries the ordinal 1 without any '
       'outside-app cycles', (tester) async {
-    await tester.pumpWidget(chartHarness(
-      entries: _entries,
-      marks: [_cycleStartAt(9)],
-    ));
+    await tester.pumpWidget(
+      chartHarness(entries: _entries, marks: [_cycleStartAt(9)]),
+    );
     await tester.pumpAndSettle();
 
     final ordinal = find.byKey(const ValueKey('cycleOrdinal-9'));
-    expect(ordinal, findsOneWidget,
-        reason: 'the boundary day renders its ordinal label at the top of '
-            'the plot inside the temperature block');
-    expect(ordinalText(tester, 9), 'Cycle 1',
-        reason: 'the first mark-opened cycle is "Cycle 1"');
+    expect(
+      ordinal,
+      findsOneWidget,
+      reason:
+          'the boundary day renders its ordinal label at the top of '
+          'the plot inside the temperature block',
+    );
+    expect(
+      ordinalText(tester, 9),
+      'Cycle 1',
+      reason: 'the first mark-opened cycle is "Cycle 1"',
+    );
     // The leading pre-mark group carries no ordinal.
     expect(
-        find.byWidgetPredicate((w) =>
+      find.byWidgetPredicate(
+        (w) =>
             w.key is ValueKey<String> &&
-            (w.key as ValueKey<String>).value.startsWith('cycleOrdinal-')),
-        findsOneWidget,
-        reason: 'no ordinal anywhere before the first cycleStart mark');
+            (w.key as ValueKey<String>).value.startsWith('cycleOrdinal-'),
+      ),
+      findsOneWidget,
+      reason: 'no ordinal anywhere before the first cycleStart mark',
+    );
   });
 
   testWidgets(
-      'the ordinal shifts by the persisted outside-app count: the first '
-      'boundary after 2 prior cycles reads "Cycle 3"', (tester) async {
-    await tester.pumpWidget(chartHarness(
-      entries: _entries,
-      marks: [_cycleStartAt(9)],
-      observedCyclesOutsideApp: 2,
-    ));
-    await tester.pumpAndSettle();
+    'the ordinal shifts by the persisted outside-app count: the first '
+    'boundary after 2 prior cycles reads "Cycle 3"',
+    (tester) async {
+      await tester.pumpWidget(
+        chartHarness(
+          entries: _entries,
+          marks: [_cycleStartAt(9)],
+          observedCyclesOutsideApp: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(ordinalText(tester, 9), 'Cycle 3',
-        reason: 'outside-app cycles shift every ordinal: prior count 2 '
-            'makes the first boundary "Cycle 3"');
-  });
+      expect(
+        ordinalText(tester, 9),
+        'Cycle 3',
+        reason:
+            'outside-app cycles shift every ordinal: prior count 2 '
+            'makes the first boundary "Cycle 3"',
+      );
+    },
+  );
 
-  testWidgets(
-      'a second boundary is numbered one higher than the first '
+  testWidgets('a second boundary is numbered one higher than the first '
       '(1, 2, …)', (tester) async {
-    await tester.pumpWidget(chartHarness(
-      entries: _entries,
-      marks: [_cycleStartAt(9), _cycleStartAt(18)],
-      observedCyclesOutsideApp: 1,
-    ));
+    await tester.pumpWidget(
+      chartHarness(
+        entries: _entries,
+        marks: [_cycleStartAt(9), _cycleStartAt(18)],
+        observedCyclesOutsideApp: 1,
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(ordinalText(tester, 9), 'Cycle 2',
-        reason: 'first boundary: prior count 1 + 1');
-    expect(ordinalText(tester, 18), 'Cycle 3',
-        reason: 'second boundary: prior count 1 + 2');
+    expect(
+      ordinalText(tester, 9),
+      'Cycle 2',
+      reason: 'first boundary: prior count 1 + 1',
+    );
+    expect(
+      ordinalText(tester, 18),
+      'Cycle 3',
+      reason: 'second boundary: prior count 1 + 2',
+    );
   });
 
-  testWidgets(
-      'the ordinal label renders at the top of the plot in German '
+  testWidgets('the ordinal label renders at the top of the plot in German '
       '(the l10n key mirrors the evaluation-table wording)', (tester) async {
-    await tester.pumpWidget(chartHarness(
-      entries: _entries,
-      marks: [_cycleStartAt(9)],
-      observedCyclesOutsideApp: 2,
-      locale: const Locale('de'),
-    ));
+    await tester.pumpWidget(
+      chartHarness(
+        entries: _entries,
+        marks: [_cycleStartAt(9)],
+        observedCyclesOutsideApp: 2,
+        locale: const Locale('de'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(ordinalText(tester, 9), 'Zyklus 3',
-        reason: 'the German ordinal wording renders on the chart');
+    expect(
+      ordinalText(tester, 9),
+      'Zyklus 3',
+      reason: 'the German ordinal wording renders on the chart',
+    );
   });
 }

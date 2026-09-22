@@ -74,12 +74,13 @@ import 'support/error_collector.dart';
 // support/diary_harness.dart; German labels are pinned (locale de).
 
 void main() {
-// ═══════════ bleeding selector ═══════════
-// former test/diary_bleeding_selector_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ bleeding selector ═══════════
+  // former test/diary_bleeding_selector_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
-  testWidgets('bleeding selector offers all six levels and stores heavy',
-      (WidgetTester tester) async {
+  testWidgets('bleeding selector offers all six levels and stores heavy', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -127,8 +128,9 @@ void main() {
     );
   });
 
-  testWidgets('selecting the top bleeding level persists maximum (level 5)',
-      (WidgetTester tester) async {
+  testWidgets('selecting the top bleeding level persists maximum (level 5)', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -149,17 +151,19 @@ void main() {
     expect(
       row!.bleeding,
       Bleeding.maximum,
-      reason: 'Selecting "sehr stark" (maximum) and saving must persist '
+      reason:
+          'Selecting "sehr stark" (maximum) and saving must persist '
           'level 5',
     );
   });
 
-// ═══════════ cervix position and opening ═══════════
-// former test/diary_cervix_selector_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ cervix position and opening ═══════════
+  // former test/diary_cervix_selector_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
-  testWidgets('Muttermund position and opening are offered and persist',
-      (WidgetTester tester) async {
+  testWidgets('Muttermund position and opening are offered and persist', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -167,12 +171,18 @@ void main() {
     // NB "mittel" (position AND opening BOTH say it) is NOT asserted here
     // because it is ambiguous against the bleeding chip "mittel" on the
     // same form.
-    expect(find.text('tief'), findsOneWidget,
-        reason: 'the position options must be selectable');
+    expect(
+      find.text('tief'),
+      findsOneWidget,
+      reason: 'the position options must be selectable',
+    );
     expect(find.text('sehr hoch'), findsOneWidget);
     expect(find.text('unerreichbar'), findsOneWidget);
-    expect(find.text('geschlossen'), findsOneWidget,
-        reason: 'the opening options must be selectable');
+    expect(
+      find.text('geschlossen'),
+      findsOneWidget,
+      reason: 'the opening options must be selectable',
+    );
     expect(find.text('offen'), findsOneWidget);
 
     // Select a disambiguating combination: position tief, opening offen.
@@ -193,27 +203,40 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.cervixPosition, CervixPosition.low.name,
-        reason: 'the selected position (tief) must persist');
-    expect(row.cervixOpening, CervixOpening.open.name,
-        reason: 'the selected opening (offen) must persist');
+    expect(
+      row!.cervixPosition,
+      CervixPosition.low.name,
+      reason: 'the selected position (tief) must persist',
+    );
+    expect(
+      row.cervixOpening,
+      CervixOpening.open.name,
+      reason: 'the selected opening (offen) must persist',
+    );
   });
 
-// ═══════════ pain options (B, M) ═══════════
-// former test/diary_pain_selector_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ pain options (B, M) ═══════════
+  // former test/diary_pain_selector_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
-  testWidgets('pain options B and M are offered and survive the save path',
-      (WidgetTester tester) async {
+  testWidgets('pain options B and M are offered and survive the save path', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // Both options offered on the entry form (German labels, per the
     // pinned locale), each carrying its letter code.
-    expect(find.text('Brustschmerzen (B)'), findsOneWidget,
-        reason: 'the breast-pain (B) option must be selectable');
-    expect(find.text('Mittelschmerz (M)'), findsOneWidget,
-        reason: 'the Mittelschmerz (M) option must be selectable');
+    expect(
+      find.text('Brustschmerzen (B)'),
+      findsOneWidget,
+      reason: 'the breast-pain (B) option must be selectable',
+    );
+    expect(
+      find.text('Mittelschmerz (M)'),
+      findsOneWidget,
+      reason: 'the Mittelschmerz (M) option must be selectable',
+    );
 
     // Select breast and Mittelschmerz together, then breast only.
     await tester.ensureVisible(find.text('Brustschmerzen (B)'));
@@ -237,30 +260,41 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.painMittelschmerz, isTrue,
-        reason: 'the selected M option must persist');
-    expect(row.painBreast, isFalse,
-        reason: 'deselecting B must clear it independently of M');
+    expect(
+      row!.painMittelschmerz,
+      isTrue,
+      reason: 'the selected M option must persist',
+    );
+    expect(
+      row.painBreast,
+      isFalse,
+      reason: 'deselecting B must clear it independently of M',
+    );
   });
 
-// ═══════════ firmness and sex timing ═══════════
-// former test/diary_firmness_sex_timing_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ firmness and sex timing ═══════════
+  // former test/diary_firmness_sex_timing_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
-  testWidgets('the mucus sign picker offers the A (Ausfluss) segment',
-      (WidgetTester tester) async {
+  testWidgets('the mucus sign picker offers the A (Ausfluss) segment', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The sign chips show the cheat-sheet glyphs themselves; the A
     // (Ausfluss) sign joined the vocabulary, so its chip must be
     // offered on the shared form.
-    expect(find.text('A'), findsOneWidget,
-        reason: 'the Ausfluss sign (A) must be selectable on the form');
+    expect(
+      find.text('A'),
+      findsOneWidget,
+      reason: 'the Ausfluss sign (A) must be selectable on the form',
+    );
   });
 
-  testWidgets('firmness options are offered and a selection persists',
-      (WidgetTester tester) async {
+  testWidgets('firmness options are offered and a selection persists', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -268,12 +302,21 @@ void main() {
     // labels, pinned German locale). NB the unset chip "—" is NOT asserted
     // here: the mucus/position/opening pickers use the same label, so it is
     // ambiguous on this form.
-    expect(find.text('hart'), findsOneWidget,
-        reason: 'the firmness option hart must be selectable');
-    expect(find.text('h-w'), findsOneWidget,
-        reason: 'the firmness option h-w must be selectable');
-    expect(find.text('weich'), findsOneWidget,
-        reason: 'the firmness option weich must be selectable');
+    expect(
+      find.text('hart'),
+      findsOneWidget,
+      reason: 'the firmness option hart must be selectable',
+    );
+    expect(
+      find.text('h-w'),
+      findsOneWidget,
+      reason: 'the firmness option h-w must be selectable',
+    );
+    expect(
+      find.text('weich'),
+      findsOneWidget,
+      reason: 'the firmness option weich must be selectable',
+    );
 
     await tester.ensureVisible(find.text('weich'));
     await tester.pumpAndSettle();
@@ -290,12 +333,16 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.cervixFirmness, 'soft',
-        reason: 'the selected firmness (weich) must persist as its token');
+    expect(
+      row!.cervixFirmness,
+      'soft',
+      reason: 'the selected firmness (weich) must persist as its token',
+    );
   });
 
-  testWidgets('tapping the selected firmness again deselects it',
-      (WidgetTester tester) async {
+  testWidgets('tapping the selected firmness again deselects it', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -315,23 +362,34 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.cervixFirmness, isNull,
-        reason: 'a deselected firmness must persist as no observation');
+    expect(
+      row!.cervixFirmness,
+      isNull,
+      reason: 'a deselected firmness must persist as no observation',
+    );
   });
 
-  testWidgets(
-      'sex time slots are a multi-select: several chips persist as '
+  testWidgets('sex time slots are a multi-select: several chips persist as '
       'the OR of their bits', (WidgetTester tester) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
     // The three time slots (pinned German locale).
-    expect(find.text('Anfang'), findsOneWidget,
-        reason: 'the start slot must be offered');
-    expect(find.text('Mitte'), findsOneWidget,
-        reason: 'the middle slot must be offered');
-    expect(find.text('Ende'), findsOneWidget,
-        reason: 'the end slot must be offered');
+    expect(
+      find.text('Anfang'),
+      findsOneWidget,
+      reason: 'the start slot must be offered',
+    );
+    expect(
+      find.text('Mitte'),
+      findsOneWidget,
+      reason: 'the middle slot must be offered',
+    );
+    expect(
+      find.text('Ende'),
+      findsOneWidget,
+      reason: 'the end slot must be offered',
+    );
 
     // Select TWO slots at once — the old single bool is gone.
     await tester.ensureVisible(find.text('Anfang'));
@@ -349,12 +407,16 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.sexTimings, 1 | 4,
-        reason: 'Anfang (bit 1) + Ende (bit 4) must persist as mask 5');
+    expect(
+      row!.sexTimings,
+      1 | 4,
+      reason: 'Anfang (bit 1) + Ende (bit 4) must persist as mask 5',
+    );
   });
 
-  testWidgets('tapping a selected sex slot again clears its bit',
-      (WidgetTester tester) async {
+  testWidgets('tapping a selected sex slot again clears its bit', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -375,51 +437,54 @@ void main() {
     final (:db, :date) = await savedDayOf(tester);
     final row = await db.entriesDao.entryFor(date);
     expect(row, isNotNull, reason: 'The saved day must exist in the database');
-    expect(row!.sexTimings, 4,
-        reason: 'the re-tapped middle slot must be cleared; Ende (bit 4) '
-            'stays');
+    expect(
+      row!.sexTimings,
+      4,
+      reason:
+          'the re-tapped middle slot must be cleared; Ende (bit 4) '
+          'stays',
+    );
   });
 
-// ═══════════ mucus sign row at a narrow viewport ═══════════
-// Device-field reports show the sign row growing taller and painting a
-// partially visible overflow band on narrow Android widths: the row
-// divides the width evenly across all of its options, so the two-glyph
-// f/S label reflows to two lines. The repro pumps the whole app shell at
-// a 320 x 800 dp viewport (physical = 960 x 2400 px, devicePixelRatio 3)
-// and walks every sign option — start width 320 dp, not decremented: the
-// error reproduces deterministically here.
-//
-// The framework error collector is installed only after the shell has
-// pumped and the form is scrolled to the sign row: the other shell tabs
-// stay mounted and laid out (IndexedStack), so anything overflowing
-// elsewhere must not be attributed to this row.
+  // ═══════════ mucus sign row at a narrow viewport ═══════════
+  // Device-field reports show the sign row growing taller and painting a
+  // partially visible overflow band on narrow Android widths: the row
+  // divides the width evenly across all of its options, so the two-glyph
+  // f/S label reflows to two lines. The repro pumps the whole app shell at
+  // a 320 x 800 dp viewport (physical = 960 x 2400 px, devicePixelRatio 3)
+  // and walks every sign option — start width 320 dp, not decremented: the
+  // error reproduces deterministically here.
+  //
+  // The framework error collector is installed only after the shell has
+  // pumped and the form is scrolled to the sign row: the other shell tabs
+  // stay mounted and laid out (IndexedStack), so anything overflowing
+  // elsewhere must not be attributed to this row.
 
   testWidgets(
-      'the mucus sign row renders every sign without overflow at a narrow '
-      'width and stores an f/S day', (WidgetTester tester) async {
-    useNarrowPhoneViewport(tester);
+    'the mucus sign row renders every sign without overflow at a narrow '
+    'width and stores an f/S day',
+    (WidgetTester tester) async {
+      useNarrowPhoneViewport(tester);
 
-    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+      await tester.pumpAndSettle();
 
-    final caption = find.text('Zeichen der Fruchtbarkeit');
-    await tester.ensureVisible(caption);
-    await tester.pumpAndSettle();
+      final caption = find.text('Zeichen der Fruchtbarkeit');
+      await tester.ensureVisible(caption);
+      await tester.pumpAndSettle();
 
-    // Waive the pump-time record: at this forced width, widget-test font
-    // metrics (square fallback glyphs, wider than device fonts) can
-    // overflow OTHER rows of the tall form once at the initial layout —
-    // e.g. the date row. That single pump-time pass is not what this test
-    // measures; everything that fails from here on, on any interaction
-    // with the sign row, belongs to the row and must stay silent.
-    // (Take the record, not assert on it: render details of OTHER rows
-    // are irrelevant to this repro; any row failure during the taps below
-    // is still collected and fails the test.)
-    tester.takeException();
+      // Waive the pump-time record: at this forced width, widget-test font
+      // metrics (square fallback glyphs, wider than device fonts) can
+      // overflow OTHER rows of the tall form once at the initial layout —
+      // e.g. the date row. That single pump-time pass is not what this test
+      // measures; everything that fails from here on, on any interaction
+      // with the sign row, belongs to the row and must stay silent.
+      // (Take the record, not assert on it: render details of OTHER rows
+      // are irrelevant to this repro; any row failure during the taps below
+      // is still collected and fails the test.)
+      tester.takeException();
 
-    await expectNoFrameworkErrors(
-      tester,
-      () async {
+      await expectNoFrameworkErrors(tester, () async {
         // Walk every option of the row, including the two-glyph f/S: the
         // single-glyph options around it leave the row narrow, f/S forces
         // the reflow. Tapping S first brings up the quality row (its rule
@@ -467,27 +532,28 @@ void main() {
           'fs',
           reason: 'the selected f/S sign must persist with its stored token',
         );
-        expect(row.mucusQuality, isNull,
-            reason: 'f/S carries no quality qualifier');
-      },
-      reason: 'narrow-width sign-row interaction must not overflow the row',
-    );
-    expect(tester.takeException(), isNull);
-  });
+        expect(
+          row.mucusQuality,
+          isNull,
+          reason: 'f/S carries no quality qualifier',
+        );
+      }, reason: 'narrow-width sign-row interaction must not overflow the row');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-// ═══════════ diary day tile at a narrow viewport ═══════════
-// The sign row was one of several surfaces rendering the two-glyph f/S
-// token; the Tagebuch list's day tile renders a recorded observation as a
-// trailing chip whose row also holds the temperature and the measured
-// time. At a narrow width that trailing content is the tile's widest
-// part, so this check pumps the shell at the same 320 x 800 dp viewport
-// as the sign-row repro above and walks the recorded tiles with the
-// framework error collector installed: any overflow here would be a real
-// tile defect, not one of the entry form. (Pump-time noise from the
-// other shell tabs is waived the same way the sign-row repro waives it.)
+  // ═══════════ diary day tile at a narrow viewport ═══════════
+  // The sign row was one of several surfaces rendering the two-glyph f/S
+  // token; the Tagebuch list's day tile renders a recorded observation as a
+  // trailing chip whose row also holds the temperature and the measured
+  // time. At a narrow width that trailing content is the tile's widest
+  // part, so this check pumps the shell at the same 320 x 800 dp viewport
+  // as the sign-row repro above and walks the recorded tiles with the
+  // framework error collector installed: any overflow here would be a real
+  // tile defect, not one of the entry form. (Pump-time noise from the
+  // other shell tabs is waived the same way the sign-row repro waives it.)
 
-  testWidgets(
-      'the day tile renders its mucus chip beside temperature and time '
+  testWidgets('the day tile renders its mucus chip beside temperature and time '
       'without overflow at a narrow width', (WidgetTester tester) async {
     useNarrowPhoneViewport(tester);
 
@@ -498,21 +564,29 @@ void main() {
     // can hold. The recorded days stay before the pinned "now" so the
     // cycle-group list offers them as recorded days.
     final tileHarness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
-    await tester.pumpWidget(tileHarness.scope(seed: (db) async {
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: DateTime(2026, 9, 14),
-        bbtC: 36.4,
-        measuredAtMinutes: 407, // 06:47
-        bleeding: Bleeding.heavy,
-        mucusSign: MucusSign.fs,
-      ));
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: DateTime(2026, 9, 15),
-        bbtC: 36.9,
-        mucusSign: MucusSign.s,
-        mucusQuality: MucusQuality.ew,
-      ));
-    }));
+    await tester.pumpWidget(
+      tileHarness.scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: DateTime(2026, 9, 14),
+              bbtC: 36.4,
+              measuredAtMinutes: 407, // 06:47
+              bleeding: Bleeding.heavy,
+              mucusSign: MucusSign.fs,
+            ),
+          );
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: DateTime(2026, 9, 15),
+              bbtC: 36.9,
+              mucusSign: MucusSign.s,
+              mucusQuality: MucusQuality.ew,
+            ),
+          );
+        },
+      ),
+    );
     await tester.pumpAndSettle();
 
     // Waive the pump-time record: at this forced width, widget-test font
@@ -530,12 +604,14 @@ void main() {
         // headers only exist once the scroll reaches them.
         final listView = find
             .descendant(
-                of: find.byType(TagebuchScreen),
-                matching: find.byType(ListView))
+              of: find.byType(TagebuchScreen),
+              matching: find.byType(ListView),
+            )
             .first;
         final groupTiles = find.descendant(
-            of: find.byType(TagebuchScreen),
-            matching: find.byType(ExpansionTile));
+          of: find.byType(TagebuchScreen),
+          matching: find.byType(ExpansionTile),
+        );
         for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
           await tester.drag(listView, const Offset(0, -200));
           await tester.pump(const Duration(milliseconds: 50));
@@ -556,19 +632,27 @@ void main() {
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('36,90 °C'));
         await tester.pumpAndSettle();
-        expect(find.text('36,40 °C'), findsOneWidget,
-            reason: 'the f/S day tile shows its temperature');
-        expect(find.text('06:47'), findsOneWidget,
-            reason: 'the f/S day tile shows its measured time');
+        expect(
+          find.text('36,40 °C'),
+          findsOneWidget,
+          reason: 'the f/S day tile shows its temperature',
+        );
+        expect(
+          find.text('06:47'),
+          findsOneWidget,
+          reason: 'the f/S day tile shows its measured time',
+        );
         expect(
           find.descendant(
-              of: find.byType(TagebuchScreen),
-              matching: find.byType(MucusSymbolText)),
+            of: find.byType(TagebuchScreen),
+            matching: find.byType(MucusSymbolText),
+          ),
           findsNWidgets(2),
           reason: 'both recorded days render their mucus chip on the tile',
         );
       },
-      reason: 'narrow-width day tiles must not overflow their trailing '
+      reason:
+          'narrow-width day tiles must not overflow their trailing '
           'chip row',
     );
     expect(tester.takeException(), isNull);

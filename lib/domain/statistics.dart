@@ -17,10 +17,7 @@ import 'models.dart';
 /// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
 /// group at every user-placed cycleStart mark). A trailing cycle start with
 /// no known follow-up contributes no length.
-List<int> cycleLengthsInDays(
-  List<DailyEntry> entries,
-  List<CycleMark> marks,
-) {
+List<int> cycleLengthsInDays(List<DailyEntry> entries, List<CycleMark> marks) {
   final onsets = menstruationOnsetDates(entries, marks);
   final lengths = <int>[];
   for (var i = 0; i + 1 < onsets.length; i++) {
@@ -99,7 +96,7 @@ final class CycleLengthBucket {
 // directly keeps the loop below free of destructured-but-unused variables,
 // which the analyzer would otherwise flag per field.
 const List<({String label, int minInclusive, int maxExclusive})>
-    _defaultBucketEdges = [
+_defaultBucketEdges = [
   (label: '<=20', minInclusive: -0x7FFFFFFF, maxExclusive: 21), // < 21 days
   (label: '21-25', minInclusive: 21, maxExclusive: 26),
   (label: '26-30', minInclusive: 26, maxExclusive: 31),

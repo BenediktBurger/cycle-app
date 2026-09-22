@@ -361,8 +361,9 @@ ImportSummary planMerge(
     // after the planner counted the row as a write. The writer's remaining
     // field handling (bbt/flags defaults, mucus/mask coercion to 0/null)
     // never drops a row, so no further planner gate exists.
-    final day =
-        row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
+    final day = row['date'] is String
+        ? tryParseIsoDay(row['date'] as String)
+        : null;
     final bleeding = tryParseBleeding(row['bleeding']);
     if (day == null || bleeding == null) {
       entriesInvalid++;

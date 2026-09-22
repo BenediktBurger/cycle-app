@@ -43,12 +43,12 @@ Finder _maxField() => find.byKey(const ValueKey('temperatureRangeMax'));
 /// The picker widget itself (the form field wraps a DropdownButton that
 /// carries value + items).
 DropdownButton<double> _picker(WidgetTester tester, Finder field) =>
-    tester.widget<DropdownButton<double>>(find.descendant(
-        of: field, matching: find.byType(DropdownButton<double>)));
+    tester.widget<DropdownButton<double>>(
+      find.descendant(of: field, matching: find.byType(DropdownButton<double>)),
+    );
 
 void main() {
-  testWidgets(
-      'with no override the provider defaults to 36.0..38.0 °C and the '
+  testWidgets('with no override the provider defaults to 36.0..38.0 °C and the '
       'card renders the two pickers on it', (WidgetTester tester) async {
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
@@ -59,37 +59,51 @@ void main() {
 
     await _openSettings(tester);
 
-    expect(find.text('Temperature range'), findsOneWidget,
-        reason: 'the card offers the chart\'s y range');
-    expect(_picker(tester, _minField()).value, 36.0,
-        reason: 'the lower-limit picker shows the current range min');
-    expect(_picker(tester, _maxField()).value, 38.0,
-        reason: 'the upper-limit picker shows the current range max');
+    expect(
+      find.text('Temperature range'),
+      findsOneWidget,
+      reason: 'the card offers the chart\'s y range',
+    );
+    expect(
+      _picker(tester, _minField()).value,
+      36.0,
+      reason: 'the lower-limit picker shows the current range min',
+    );
+    expect(
+      _picker(tester, _maxField()).value,
+      38.0,
+      reason: 'the upper-limit picker shows the current range max',
+    );
   });
 
   testWidgets(
-      'changing the lower limit updates the provider immediately and the '
-      'picker shows the half-degree steps', (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope());
-    await tester.pumpAndSettle();
-    await _openSettings(tester);
+    'changing the lower limit updates the provider immediately and the '
+    'picker shows the half-degree steps',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_appScope());
+      await tester.pumpAndSettle();
+      await _openSettings(tester);
 
-    await tester.tap(_minField());
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('35.0 °C').last);
-    await tester.pumpAndSettle();
+      await tester.tap(_minField());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('35.0 °C').last);
+      await tester.pumpAndSettle();
 
-    final range = _container(tester).read(temperatureRangeProvider);
-    expect(range.min, 35.0,
-        reason: 'selecting a half-degree step writes the provider at once');
-    expect(range.max, 38.0, reason: 'the upper limit stays untouched');
-    expect(_picker(tester, _minField()).value, 35.0);
-  });
+      final range = _container(tester).read(temperatureRangeProvider);
+      expect(
+        range.min,
+        35.0,
+        reason: 'selecting a half-degree step writes the provider at once',
+      );
+      expect(range.max, 38.0, reason: 'the upper limit stays untouched');
+      expect(_picker(tester, _minField()).value, 35.0);
+    },
+  );
 
-  testWidgets(
-      'min < max is enforced by construction: each picker only offers '
-      'values strictly on its side of the other bound',
-      (WidgetTester tester) async {
+  testWidgets('min < max is enforced by construction: each picker only offers '
+      'values strictly on its side of the other bound', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
     await _openSettings(tester);
@@ -97,14 +111,22 @@ void main() {
     final minDrop = _picker(tester, _minField());
     final maxDrop = _picker(tester, _maxField());
     for (final item in minDrop.items!) {
-      expect(item.value! < maxDrop.value!, isTrue,
-          reason: 'the min picker never offers ${item.value} '
-              '(the max is ${maxDrop.value})');
+      expect(
+        item.value! < maxDrop.value!,
+        isTrue,
+        reason:
+            'the min picker never offers ${item.value} '
+            '(the max is ${maxDrop.value})',
+      );
     }
     for (final item in maxDrop.items!) {
-      expect(item.value! > minDrop.value!, isTrue,
-          reason: 'the max picker never offers ${item.value} '
-              '(the min is ${minDrop.value})');
+      expect(
+        item.value! > minDrop.value!,
+        isTrue,
+        reason:
+            'the max picker never offers ${item.value} '
+            '(the min is ${minDrop.value})',
+      );
     }
 
     // Tighten the lower limit to 37.5: the max picker must then start at
@@ -116,7 +138,10 @@ void main() {
 
     final maxAfter = _picker(tester, _maxField());
     final offeredMax = [for (final item in maxAfter.items!) item.value!];
-    expect(offeredMax.first, 38.0,
-        reason: 'with min 37.5 the max picker starts at 38.0 (min < max)');
+    expect(
+      offeredMax.first,
+      38.0,
+      reason: 'with min 37.5 the max picker starts at 38.0 (min < max)',
+    );
   });
 }

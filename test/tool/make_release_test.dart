@@ -69,16 +69,22 @@ void main() {
     });
 
     test('rejects unknown flags', () {
-      expect(() => parseArguments(['--unknown', 'v1.2.3']),
-          throwsA(isA<UsageException>()));
-      expect(() => parseArguments(['-f', 'v1.2.3']),
-          throwsA(isA<UsageException>()));
+      expect(
+        () => parseArguments(['--unknown', 'v1.2.3']),
+        throwsA(isA<UsageException>()),
+      );
+      expect(
+        () => parseArguments(['-f', 'v1.2.3']),
+        throwsA(isA<UsageException>()),
+      );
     });
 
     test('rejects missing and extra positional arguments', () {
       expect(() => parseArguments(const []), throwsA(isA<UsageException>()));
-      expect(() => parseArguments(['v1.2.3', 'v2.0.0']),
-          throwsA(isA<UsageException>()));
+      expect(
+        () => parseArguments(['v1.2.3', 'v2.0.0']),
+        throwsA(isA<UsageException>()),
+      );
     });
   });
 
@@ -91,12 +97,18 @@ void main() {
       tested: false,
     );
 
-    test('a real run with --accept-fingerprint stops after writing the pin',
-        () {
-      expect(accept.stopsAfterWritingPin, isTrue,
-          reason: 'the fresh pin leaves the tree dirty — tag/push must not '
-              'run with an uncommitted pin file');
-    });
+    test(
+      'a real run with --accept-fingerprint stops after writing the pin',
+      () {
+        expect(
+          accept.stopsAfterWritingPin,
+          isTrue,
+          reason:
+              'the fresh pin leaves the tree dirty — tag/push must not '
+              'run with an uncommitted pin file',
+        );
+      },
+    );
 
     test('a dry run only prints the pin and continues', () {
       const dryAccept = Options(
@@ -117,9 +129,13 @@ void main() {
         dryRun: false,
         tested: false,
       );
-      expect(plain.stopsAfterWritingPin, isFalse,
-          reason: 'missing pin without --accept-fingerprint aborts without '
-              'writing anything');
+      expect(
+        plain.stopsAfterWritingPin,
+        isFalse,
+        reason:
+            'missing pin without --accept-fingerprint aborts without '
+            'writing anything',
+      );
     });
   });
 
@@ -132,12 +148,18 @@ void main() {
       tested: false,
     );
 
-    test('a real run with --accept-flutter-version stops after writing the pin',
-        () {
-      expect(accept.stopsAfterWritingFlutterPin, isTrue,
-          reason: 'the fresh pin leaves the tree dirty — tag/push must not '
-              'run with an uncommitted pin file');
-    });
+    test(
+      'a real run with --accept-flutter-version stops after writing the pin',
+      () {
+        expect(
+          accept.stopsAfterWritingFlutterPin,
+          isTrue,
+          reason:
+              'the fresh pin leaves the tree dirty — tag/push must not '
+              'run with an uncommitted pin file',
+        );
+      },
+    );
 
     test('a dry run only prints the pin and continues', () {
       const dryAccept = Options(
@@ -150,27 +172,33 @@ void main() {
       expect(dryAccept.stopsAfterWritingFlutterPin, isFalse);
     });
 
-    test('runs without --accept-flutter-version never take the write-pin path',
-        () {
-      const plain = Options(
-        tag: 'v0.1.0',
-        acceptFingerprint: false,
-        acceptFlutterVersion: false,
-        dryRun: false,
-        tested: false,
-      );
-      const dryOnly = Options(
-        tag: 'v0.1.0',
-        acceptFingerprint: false,
-        acceptFlutterVersion: false,
-        dryRun: true,
-        tested: false,
-      );
-      expect(plain.stopsAfterWritingFlutterPin, isFalse,
-          reason: 'without the flag the run always fails loudly instead '
-              'of staging a pin — the match check is never bypassable');
-      expect(dryOnly.stopsAfterWritingFlutterPin, isFalse);
-    });
+    test(
+      'runs without --accept-flutter-version never take the write-pin path',
+      () {
+        const plain = Options(
+          tag: 'v0.1.0',
+          acceptFingerprint: false,
+          acceptFlutterVersion: false,
+          dryRun: false,
+          tested: false,
+        );
+        const dryOnly = Options(
+          tag: 'v0.1.0',
+          acceptFingerprint: false,
+          acceptFlutterVersion: false,
+          dryRun: true,
+          tested: false,
+        );
+        expect(
+          plain.stopsAfterWritingFlutterPin,
+          isFalse,
+          reason:
+              'without the flag the run always fails loudly instead '
+              'of staging a pin — the match check is never bypassable',
+        );
+        expect(dryOnly.stopsAfterWritingFlutterPin, isFalse);
+      },
+    );
   });
 
   group('flutter pin mismatch remediation messages', () {
@@ -315,7 +343,9 @@ jobs:
 
     test('returns null when no matchable line exists', () {
       expect(
-          updateWorkflowFlutterVersion('channel: stable\n', '3.48.1'), isNull);
+        updateWorkflowFlutterVersion('channel: stable\n', '3.48.1'),
+        isNull,
+      );
       expect(
         updateWorkflowFlutterVersion('# flutter-version: 3.47.4\n', '3.48.1'),
         isNull,
@@ -323,18 +353,22 @@ jobs:
       );
     });
 
-    test('a value-less flutter-version: line is not rewritten across lines',
-        () {
-      // A multi-line match (via \s* after the colon) would swallow the
-      // indented next line and the channel input with it.
-      const valueless = '  with:\n    flutter-version:\n    channel: stable\n';
-      expect(
-        updateWorkflowFlutterVersion(valueless, '3.48.1'),
-        anyOf(isNull, contains('channel: stable')),
-        reason: 'the rewrite must never span from the flutter-version: line '
-            'into the following line',
-      );
-    });
+    test(
+      'a value-less flutter-version: line is not rewritten across lines',
+      () {
+        // A multi-line match (via \s* after the colon) would swallow the
+        // indented next line and the channel input with it.
+        const valueless =
+            '  with:\n    flutter-version:\n    channel: stable\n';
+        expect(
+          updateWorkflowFlutterVersion(valueless, '3.48.1'),
+          anyOf(isNull, contains('channel: stable')),
+          reason:
+              'the rewrite must never span from the flutter-version: line '
+              'into the following line',
+        );
+      },
+    );
 
     test('is idempotent: re-applying the current version is a no-op', () {
       final once = updateWorkflowFlutterVersion(original, '3.48.1')!;
@@ -342,8 +376,7 @@ jobs:
     });
   });
 
-  group(
-      'flutter pin staging + workflow sync orchestration (temp-dir '
+  group('flutter pin staging + workflow sync orchestration (temp-dir '
       'exception)', () {
     late Directory root;
 
@@ -381,8 +414,7 @@ jobs:
       await file.writeAsString(content);
     }
 
-    test(
-        'flag + real run: pin file and both workflow files are updated, '
+    test('flag + real run: pin file and both workflow files are updated, '
         'then the run stops', () async {
       await writeFile(ciWorkflowPath, workflowPinned);
       await writeFile(releaseWorkflowPath, workflowPinned);
@@ -392,9 +424,13 @@ jobs:
       );
       expect(await pinFile().readAsString(), formatFlutterPinFile('3.48.1'));
       expect(
-          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowSynced);
-      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
-          workflowSynced);
+        await fileUnderRoot(ciWorkflowPath).readAsString(),
+        workflowSynced,
+      );
+      expect(
+        await fileUnderRoot(releaseWorkflowPath).readAsString(),
+        workflowSynced,
+      );
     });
 
     test('dry run: reports the would-be changes and writes nothing', () async {
@@ -408,23 +444,31 @@ jobs:
         reason: 'a dry run never stages the pin',
       );
       expect(
-          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowPinned);
-      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
-          workflowPinned);
+        await fileUnderRoot(ciWorkflowPath).readAsString(),
+        workflowPinned,
+      );
+      expect(
+        await fileUnderRoot(releaseWorkflowPath).readAsString(),
+        workflowPinned,
+      );
     });
 
-    test('missing release.yml: skipped, ci.yml still updated, run stops',
-        () async {
-      await writeFile(ciWorkflowPath, workflowPinned);
-      await expectLater(
-        writeFlutterPinAndStop(root: root, version: '3.48.1'),
-        throwsA(isA<ReleaseException>()),
-      );
-      expect(await pinFile().readAsString(), formatFlutterPinFile('3.48.1'));
-      expect(
-          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowSynced);
-      expect(fileUnderRoot(releaseWorkflowPath).existsSync(), isFalse);
-    });
+    test(
+      'missing release.yml: skipped, ci.yml still updated, run stops',
+      () async {
+        await writeFile(ciWorkflowPath, workflowPinned);
+        await expectLater(
+          writeFlutterPinAndStop(root: root, version: '3.48.1'),
+          throwsA(isA<ReleaseException>()),
+        );
+        expect(await pinFile().readAsString(), formatFlutterPinFile('3.48.1'));
+        expect(
+          await fileUnderRoot(ciWorkflowPath).readAsString(),
+          workflowSynced,
+        );
+        expect(fileUnderRoot(releaseWorkflowPath).existsSync(), isFalse);
+      },
+    );
 
     test('missing ci.yml: run aborts before anything is written', () async {
       await writeFile(releaseWorkflowPath, workflowPinned);
@@ -435,43 +479,48 @@ jobs:
       expect(
         pinFile().existsSync(),
         isFalse,
-        reason: 'ci.yml is the pin-cross-checking gate — its absence must '
+        reason:
+            'ci.yml is the pin-cross-checking gate — its absence must '
             'hard-fail before any write',
       );
-      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
-          workflowPinned);
+      expect(
+        await fileUnderRoot(releaseWorkflowPath).readAsString(),
+        workflowPinned,
+      );
     });
 
-    test(
-        'workflow without a matchable flutter-version line: run aborts '
+    test('workflow without a matchable flutter-version line: run aborts '
         'naming the file, pin NOT written (validate before write)', () async {
       await writeFile(ciWorkflowPath, malformedWorkflow);
       await writeFile(releaseWorkflowPath, workflowPinned);
       await expectLater(
         writeFlutterPinAndStop(root: root, version: '3.48.1'),
-        throwsA(isA<ReleaseException>().having(
-          (error) => error.message,
-          'message',
-          allOf(
-            contains(ciWorkflowPath),
-            contains('flutter-version: X.Y.Z'),
+        throwsA(
+          isA<ReleaseException>().having(
+            (error) => error.message,
+            'message',
+            allOf(contains(ciWorkflowPath), contains('flutter-version: X.Y.Z')),
           ),
-        )),
+        ),
       );
       expect(
         pinFile().existsSync(),
         isFalse,
-        reason: 'validation must happen before any write — no half-updated '
+        reason:
+            'validation must happen before any write — no half-updated '
             'pin + workflow combination',
       );
-      expect(await fileUnderRoot(ciWorkflowPath).readAsString(),
-          malformedWorkflow);
-      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
-          workflowPinned);
+      expect(
+        await fileUnderRoot(ciWorkflowPath).readAsString(),
+        malformedWorkflow,
+      );
+      expect(
+        await fileUnderRoot(releaseWorkflowPath).readAsString(),
+        workflowPinned,
+      );
     });
 
-    test(
-        'a second stop run rewrites nothing (only content changes are '
+    test('a second stop run rewrites nothing (only content changes are '
         'written)', () async {
       await writeFile(ciWorkflowPath, workflowPinned);
       await writeFile(releaseWorkflowPath, workflowPinned);
@@ -480,15 +529,18 @@ jobs:
         throwsA(isA<ReleaseException>()),
       );
       final ciAfterFirst = await fileUnderRoot(ciWorkflowPath).readAsString();
-      final releaseAfterFirst =
-          await fileUnderRoot(releaseWorkflowPath).readAsString();
+      final releaseAfterFirst = await fileUnderRoot(
+        releaseWorkflowPath,
+      ).readAsString();
       await expectLater(
         writeFlutterPinAndStop(root: root, version: '3.48.1'),
         throwsA(isA<ReleaseException>()),
       );
       expect(await fileUnderRoot(ciWorkflowPath).readAsString(), ciAfterFirst);
-      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
-          releaseAfterFirst);
+      expect(
+        await fileUnderRoot(releaseWorkflowPath).readAsString(),
+        releaseAfterFirst,
+      );
     });
   });
 
@@ -559,22 +611,22 @@ Tools • Dart 3.13.3 • DevTools 2.60.0
       expect(parseInstalledFlutterVersion('Tools • Dart 3.13.3\n'), isNull);
       expect(
         parseInstalledFlutterVersion(
-            'Flutter not.a.version • channel stable\n'),
+          'Flutter not.a.version • channel stable\n',
+        ),
         isNull,
       );
     });
 
-    test('round-trips a formatted pin file (header comment + version line)',
-        () {
-      final text = formatFlutterPinFile('3.47.4');
-      expect(parseFlutterPinFile(text), '3.47.4');
-    });
+    test(
+      'round-trips a formatted pin file (header comment + version line)',
+      () {
+        final text = formatFlutterPinFile('3.47.4');
+        expect(parseFlutterPinFile(text), '3.47.4');
+      },
+    );
 
     test('pin parser takes the last non-comment line (CI grep semantics)', () {
-      expect(
-        parseFlutterPinFile('# old note\n3.46.0\n3.47.4\n'),
-        '3.47.4',
-      );
+      expect(parseFlutterPinFile('# old note\n3.46.0\n3.47.4\n'), '3.47.4');
       // The CI check greps non-comment lines and takes the tail: a comment
       // appended after the value line does not hide the value.
       expect(
@@ -649,7 +701,8 @@ Signer #1 certificate: [Retrieved from store as "PKCS7"]
     });
 
     test('tolerates colon-separated uppercase digest bytes', () {
-      const colonOutput = 'Signer #1 certificate SHA-256 digest: '
+      const colonOutput =
+          'Signer #1 certificate SHA-256 digest: '
           '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09:'
           '1A:2B:3C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09';
       expect(
@@ -661,7 +714,8 @@ Signer #1 certificate: [Retrieved from store as "PKCS7"]
     test('returns null when no SHA-256 digest line exists', () {
       expect(
         parseCertificateFingerprint(
-            'Signer #1 certificate SHA-1 digest: deadbeef\n'),
+          'Signer #1 certificate SHA-1 digest: deadbeef\n',
+        ),
         isNull,
       );
       expect(parseCertificateFingerprint(''), isNull);
@@ -704,7 +758,8 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
       // The pin file layout is "comment header + bare hex fingerprint"
       // (formatPinFile), but the reader tolerates a hand-edited variant:
       // colon-separated, uppercase, padded with whitespace.
-      final colonized = '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09:'
+      final colonized =
+          '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09:'
           '1A:2B:3C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09\n';
       expect(parsePinFile(colonized), fingerprint);
       expect(parsePinFile('  ${fingerprint.toUpperCase()}  \n'), fingerprint);
@@ -719,22 +774,28 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
     test('fingerprint comparison is case/colon insensitive', () {
       expect(fingerprintsMatch('6A:1F:AA:BB', '6a1faabb'), isTrue);
       expect(fingerprintsMatch(fingerprint, fingerprint.toUpperCase()), isTrue);
-      expect(fingerprintsMatch(fingerprint, 'ff${fingerprint.substring(2)}'),
-          isFalse);
+      expect(
+        fingerprintsMatch(fingerprint, 'ff${fingerprint.substring(2)}'),
+        isFalse,
+      );
     });
   });
 
   group('newest build-tools resolution (sort -V equivalent)', () {
     test('picks the numerically highest version directory', () {
-      expect(newestBuildToolsDirectory(const ['33.0.2', '34.0.0', '35.0.1']),
-          '35.0.1');
+      expect(
+        newestBuildToolsDirectory(const ['33.0.2', '34.0.0', '35.0.1']),
+        '35.0.1',
+      );
       expect(newestBuildToolsDirectory(const ['9.0.0', '10.0.0']), '10.0.0');
       expect(newestBuildToolsDirectory(const ['35.0.1', '34.0.0']), '35.0.1');
     });
 
     test('ignores non-version entries and handles empty input', () {
-      expect(newestBuildToolsDirectory(const ['source.properties', '34.0.0']),
-          '34.0.0');
+      expect(
+        newestBuildToolsDirectory(const ['source.properties', '34.0.0']),
+        '34.0.0',
+      );
       expect(newestBuildToolsDirectory(const []), isNull);
       expect(newestBuildToolsDirectory(const ['not-a-version']), isNull);
     });
@@ -750,20 +811,20 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         apkSha256:
             'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef',
       );
+      expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
       expect(
         body,
-        contains('SHA-256 certificate fingerprint: $fingerprint'),
-      );
-      expect(
-        body,
-        contains('APK SHA-256: '
-            'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef'),
+        contains(
+          'APK SHA-256: '
+          'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef',
+        ),
       );
     });
 
     test('normalizes a colonized certificate fingerprint in the notes', () {
       final body = buildNotesBody(
-        certificateFingerprint: '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:'
+        certificateFingerprint:
+            '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:'
             'F8:09:1A:2B:3C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09',
         apkSha256: 'ff' * 32,
       );

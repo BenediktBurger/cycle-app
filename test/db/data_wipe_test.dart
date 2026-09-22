@@ -21,59 +21,95 @@ void main() {
   });
 
   Future<void> seedTrackedData() async {
-    await db.entriesDao.upsertDaily(DailyEntry(
-        date: DateTime.utc(2026, 9, 6), bbtC: 36.4, bleeding: Bleeding.light));
-    await db.entriesDao
-        .upsertDaily(DailyEntry(date: DateTime.utc(2026, 9, 7), bbtC: 36.5));
-    await db.marksDao
-        .addMark(DateTime.utc(2026, 9, 6), CycleMarkTypes.cycleStart);
-    await db.marksDao
-        .addMark(DateTime.utc(2026, 9, 12), CycleMarkTypes.mucusPeakDay);
+    await db.entriesDao.upsertDaily(
+      DailyEntry(
+        date: DateTime.utc(2026, 9, 6),
+        bbtC: 36.4,
+        bleeding: Bleeding.light,
+      ),
+    );
+    await db.entriesDao.upsertDaily(
+      DailyEntry(date: DateTime.utc(2026, 9, 7), bbtC: 36.5),
+    );
+    await db.marksDao.addMark(
+      DateTime.utc(2026, 9, 6),
+      CycleMarkTypes.cycleStart,
+    );
+    await db.marksDao.addMark(
+      DateTime.utc(2026, 9, 12),
+      CycleMarkTypes.mucusPeakDay,
+    );
   }
 
   group('deleteAllTrackedData (entries + marks tables, settings survive)', () {
-    test('empties the entries and marks tables and reports the counts',
-        () async {
-      await seedTrackedData();
-      expect(await db.entriesDao.allEntries(), hasLength(2));
-      expect(await db.marksDao.allMarks(), hasLength(2));
+    test(
+      'empties the entries and marks tables and reports the counts',
+      () async {
+        await seedTrackedData();
+        expect(await db.entriesDao.allEntries(), hasLength(2));
+        expect(await db.marksDao.allMarks(), hasLength(2));
 
-      final counts = await db.deleteAllTrackedData();
-      expect(counts.entries, 2,
-          reason: 'the reported count is the number '
-              'of REMOVED entry rows');
-      expect(counts.marks, 2);
-      expect(await db.entriesDao.allEntries(), isEmpty,
-          reason: 'after the wipe the entries table is empty');
-      expect(await db.marksDao.allMarks(), isEmpty,
-          reason: 'after the wipe the marks table is empty');
-    });
+        final counts = await db.deleteAllTrackedData();
+        expect(
+          counts.entries,
+          2,
+          reason:
+              'the reported count is the number '
+              'of REMOVED entry rows',
+        );
+        expect(counts.marks, 2);
+        expect(
+          await db.entriesDao.allEntries(),
+          isEmpty,
+          reason: 'after the wipe the entries table is empty',
+        );
+        expect(
+          await db.marksDao.allMarks(),
+          isEmpty,
+          reason: 'after the wipe the marks table is empty',
+        );
+      },
+    );
 
-    test('app_settings rows survive the wipe (onboarding flag included)',
-        () async {
-      await seedTrackedData();
-      await db.settingsDao.writeValue(SettingKeys.onboardingCompleted, 'true');
-      await db.settingsDao.writeValue('locale', '"de"');
-
-      await db.deleteAllTrackedData();
-
-      expect(await db.settingsDao.readValue(SettingKeys.onboardingCompleted),
+    test(
+      'app_settings rows survive the wipe (onboarding flag included)',
+      () async {
+        await seedTrackedData();
+        await db.settingsDao.writeValue(
+          SettingKeys.onboardingCompleted,
           'true',
-          reason: 'the onboarding flag is a settings row, NOT tracked data: '
-              'it must stay so the welcome page does not replay after a '
-              'data wipe');
-      expect(await db.settingsDao.readValue('locale'), '"de"',
-          reason: 'settings are user choices — the data wipe only resets '
-              'the diary of observations, never the preferences');
-    });
+        );
+        await db.settingsDao.writeValue('locale', '"de"');
 
-    test('an empty database wipes without error and reports empty counts',
-        () async {
-      final counts = await db.deleteAllTrackedData();
-      expect(counts.entries, 0);
-      expect(counts.marks, 0);
-      expect(await db.entriesDao.allEntries(), isEmpty);
-      expect(await db.marksDao.allMarks(), isEmpty);
-    });
+        await db.deleteAllTrackedData();
+
+        expect(
+          await db.settingsDao.readValue(SettingKeys.onboardingCompleted),
+          'true',
+          reason:
+              'the onboarding flag is a settings row, NOT tracked data: '
+              'it must stay so the welcome page does not replay after a '
+              'data wipe',
+        );
+        expect(
+          await db.settingsDao.readValue('locale'),
+          '"de"',
+          reason:
+              'settings are user choices — the data wipe only resets '
+              'the diary of observations, never the preferences',
+        );
+      },
+    );
+
+    test(
+      'an empty database wipes without error and reports empty counts',
+      () async {
+        final counts = await db.deleteAllTrackedData();
+        expect(counts.entries, 0);
+        expect(counts.marks, 0);
+        expect(await db.entriesDao.allEntries(), isEmpty);
+        expect(await db.marksDao.allMarks(), isEmpty);
+      },
+    );
   });
 }

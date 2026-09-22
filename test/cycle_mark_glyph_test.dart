@@ -16,13 +16,23 @@ void main() {
       const center = Offset(100, 200);
       final tip = arrowUpTipFor(center, radius: 3);
 
-      expect(tip.dy, greaterThan(center.dy),
-          reason: 'the glyph tip sits below the dot center');
-      expect(tip.dx, center.dx,
-          reason: 'the glyph stays centered on the day column');
-      expect(tip.dy, 200 + 3,
-          reason: 'the glyph hangs flush from the dot\'s bottom edge, the '
-              'way it used to hang flush from the top edge');
+      expect(
+        tip.dy,
+        greaterThan(center.dy),
+        reason: 'the glyph tip sits below the dot center',
+      );
+      expect(
+        tip.dx,
+        center.dx,
+        reason: 'the glyph stays centered on the day column',
+      );
+      expect(
+        tip.dy,
+        200 + 3,
+        reason:
+            'the glyph hangs flush from the dot\'s bottom edge, the '
+            'way it used to hang flush from the top edge',
+      );
     });
   });
 
@@ -38,36 +48,56 @@ void main() {
       const painter = SuzArrowDotPainter(color: Color(0xFF000000));
       final size = painter.getSize(const FlSpot(0, 0));
 
-      expect(size.width, greaterThanOrEqualTo(oldPaintedSize.width * 1.5),
-          reason: 'the glyph got long enough to read at day-column scale');
-      expect(size.height, greaterThanOrEqualTo(oldPaintedSize.height * 1.5),
-          reason: 'the glyph got tall enough to read at day-column scale');
+      expect(
+        size.width,
+        greaterThanOrEqualTo(oldPaintedSize.width * 1.5),
+        reason: 'the glyph got long enough to read at day-column scale',
+      );
+      expect(
+        size.height,
+        greaterThanOrEqualTo(oldPaintedSize.height * 1.5),
+        reason: 'the glyph got tall enough to read at day-column scale',
+      );
     });
 
-    testWidgets('the legend sample scales with the chart glyph',
-        (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SuzArrowGlyph(color: const Color(0xFF000000)),
+    testWidgets('the legend sample scales with the chart glyph', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: SuzArrowGlyph(color: const Color(0xFF000000))),
         ),
-      ));
+      );
 
-      final sample = tester.widget<CustomPaint>(find.descendant(
-          of: find.byType(SuzArrowGlyph), matching: find.byType(CustomPaint)));
+      final sample = tester.widget<CustomPaint>(
+        find.descendant(
+          of: find.byType(SuzArrowGlyph),
+          matching: find.byType(CustomPaint),
+        ),
+      );
       // The sample box must carry the chart glyph's ENLARGED footprint —
       // the very Size the chart painter reports — next to its companion
       // bar: the 2 px bar sits at the 0.5 px left inset (see
       // _SuzArrowGlyphPainter), so the box is at least bar + inset + glyph
       // wide, and at least the glyph tall. Stated as proportions of the
       // chart glyph's size, not as bare absolutes.
-      final glyphSize = SuzArrowDotPainter(color: const Color(0xFF000000))
-          .getSize(const FlSpot(0, 0));
-      expect(sample.size.width, greaterThanOrEqualTo(glyphSize.width + 2.5),
-          reason: 'the bar (2 px) plus its 0.5 px inset precede the glyph — '
-              'the sample grew with the enlarged chart glyph');
-      expect(sample.size.height, greaterThanOrEqualTo(glyphSize.height),
-          reason: 'the sample is at least as tall as the enlarged glyph '
-              '(the bar spans the box\'s full height)');
+      final glyphSize = SuzArrowDotPainter(
+        color: const Color(0xFF000000),
+      ).getSize(const FlSpot(0, 0));
+      expect(
+        sample.size.width,
+        greaterThanOrEqualTo(glyphSize.width + 2.5),
+        reason:
+            'the bar (2 px) plus its 0.5 px inset precede the glyph — '
+            'the sample grew with the enlarged chart glyph',
+      );
+      expect(
+        sample.size.height,
+        greaterThanOrEqualTo(glyphSize.height),
+        reason:
+            'the sample is at least as tall as the enlarged glyph '
+            '(the bar spans the box\'s full height)',
+      );
     });
   });
 }

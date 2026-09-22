@@ -23,8 +23,9 @@ class SettingsDao extends DatabaseAccessor<CycleDatabase>
     if (key.isEmpty) {
       throw ArgumentError.value(key, 'key', 'must not be empty');
     }
-    final row = await (select(appSettings)..where((t) => t.key.equals(key)))
-        .getSingleOrNull();
+    final row = await (select(
+      appSettings,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
     return row?.value;
   }
 

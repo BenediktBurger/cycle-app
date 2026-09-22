@@ -31,50 +31,71 @@ Future<void> main() async {
   // --- pure logic ----------------------------------------------------------
   check(parseDecimalInput('36,6') == 36.6, 'decimal comma parses');
   check(parseDecimalInput('36.65') == 36.65, 'decimal dot parses');
-  check(parseDecimalInput('36,654') == null,
-      'more than two fraction digits rejected');
+  check(
+    parseDecimalInput('36,654') == null,
+    'more than two fraction digits rejected',
+  );
   check(parseDecimalInput('fünf') == null, 'letters rejected');
   check(!isWithinBbtRange(51.0), 'BBT range gate upper bound');
   check(isWithinBbtRange(36.5), 'BBT range gate accepts normal value');
 
-  check(tryParseMucusSign('s') == MucusSign.s,
-      'fertility sign parses by stable token');
-  check(tryParseMucusSign('a') == MucusSign.a,
-      'the Ausfluss sign parses by its stable token');
-  check(tryParseMucusSign('fs') == MucusSign.fs,
-      "the f/S sign parses by its stable token ('fs')");
+  check(
+    tryParseMucusSign('s') == MucusSign.s,
+    'fertility sign parses by stable token',
+  );
+  check(
+    tryParseMucusSign('a') == MucusSign.a,
+    'the Ausfluss sign parses by its stable token',
+  );
+  check(
+    tryParseMucusSign('fs') == MucusSign.fs,
+    "the f/S sign parses by its stable token ('fs')",
+  );
   check(tryParseMucusSign('wet') == null, 'out-of-vocabulary sign is null');
   check(
-      tryParseMucusQuality('gl') == MucusQuality.gl &&
-          tryParseMucusQuality('glb') == MucusQuality.glb &&
-          MucusQuality.gl != MucusQuality.glb,
-      'glasig (gl) and gelblich (glb) are distinct qualities');
+    tryParseMucusQuality('gl') == MucusQuality.gl &&
+        tryParseMucusQuality('glb') == MucusQuality.glb &&
+        MucusQuality.gl != MucusQuality.glb,
+    'glasig (gl) and gelblich (glb) are distinct qualities',
+  );
   check(
-      sanitizeMucusPair(sign: MucusSign.f, quality: MucusQuality.w).quality ==
-          null,
-      'quality collapses without the S sign');
+    sanitizeMucusPair(sign: MucusSign.f, quality: MucusQuality.w).quality ==
+        null,
+    'quality collapses without the S sign',
+  );
   check(
-      sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew).quality ==
-          null,
-      "quality collapses for the 'fs' sign too");
+    sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew).quality ==
+        null,
+    "quality collapses for the 'fs' sign too",
+  );
   check(
-      mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew).superscript ==
-          'EW',
-      'S with EW quality renders the uppercase superscript token');
-  check(mucusSignSymbol(MucusSign.fs) == 'f/S',
-      "the 'fs' sign renders as the f/S glyph");
+    mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew).superscript ==
+        'EW',
+    'S with EW quality renders the uppercase superscript token',
+  );
+  check(
+    mucusSignSymbol(MucusSign.fs) == 'f/S',
+    "the 'fs' sign renders as the f/S glyph",
+  );
 
-  check(tryParseTempDisturbances(15) == 15,
-      'the temp_disturbances mask parses verbatim inside 0..15');
-  check(tryParseTempDisturbances(999) == 0,
-      'an out-of-range mask collapses to 0 (never a row killer)');
+  check(
+    tryParseTempDisturbances(15) == 15,
+    'the temp_disturbances mask parses verbatim inside 0..15',
+  );
+  check(
+    tryParseTempDisturbances(999) == 0,
+    'an out-of-range mask collapses to 0 (never a row killer)',
+  );
 
-  check(formatIsoDay(DateTime(2026, 3, 5)) == '2026-03-05',
-      'ISO day formatting padded');
+  check(
+    formatIsoDay(DateTime(2026, 3, 5)) == '2026-03-05',
+    'ISO day formatting padded',
+  );
   final parsedBack = tryParseIsoDay('2026-03-05');
   check(
-      parsedBack != null && DateOnly.sameDay(parsedBack, DateTime(2026, 3, 5)),
-      'ISO day parses');
+    parsedBack != null && DateOnly.sameDay(parsedBack, DateTime(2026, 3, 5)),
+    'ISO day parses',
+  );
   check(tryParseIsoDay('2026-02-30') == null, 'impossible dates rejected');
 
   // --- round trip over the REAL engine -------------------------------------
@@ -115,42 +136,61 @@ Future<void> main() async {
       bleeding: Bleeding.maximum,
     ),
   );
-  await source.marksDao
-      .addMark(DateTime(2026, 3, 12), CycleMarkTypes.ignoreTemperature);
+  await source.marksDao.addMark(
+    DateTime(2026, 3, 12),
+    CycleMarkTypes.ignoreTemperature,
+  );
   await source.entriesDao.upsertDaily(
     DailyEntry(date: DateTime(2026, 3, 4), bleeding: Bleeding.none),
   );
 
   final json = await exportDatabaseToJson(source);
-  check(json.contains('"schema_version": $exportSchemaVersion'),
-      'document stamps its writing schema version');
+  check(
+    json.contains('"schema_version": $exportSchemaVersion'),
+    'document stamps its writing schema version',
+  );
   // The document shape carries bleeding as NUMERIC levels (Bleeding.level)
   // for every observed bleeding — heavy(4) and maximum(5) from the added
   // days — and the SPARSE shape omits the neutral level entirely: the none
   // day (2026-03-04) leaves the `bleeding` key out, so no `"bleeding": 0`
   // and no null-valued entry key appears at all.
-  check(json.contains('"bleeding": 4') && json.contains('"bleeding": 5'),
-      'export carries the observed bleeding levels numerically');
-  check(!json.contains('"bleeding": 0'),
-      'the sparse shape omits the level-0 bleeding key');
-  check(!json.contains(': null'),
-      'entry rows carry no null-valued keys in the sparse shape');
   check(
-      json.contains('"mucus_sign": "s"') &&
-          json.contains('"mucus_quality": "mi"'),
-      'export carries the fertility-sign tokens');
-  check(json.contains('"mucus_sign": "a"'),
-      'export carries the Ausfluss sign token');
+    json.contains('"bleeding": 4') && json.contains('"bleeding": 5'),
+    'export carries the observed bleeding levels numerically',
+  );
   check(
-      json.contains('"cervix_firmness": "hard"') &&
-          json.contains(
-              '"sex_timings": ${SexTiming.start.bit | SexTiming.end.bit}'),
-      'export carries the redefined-v4 keys (cervix_firmness, sex_timings)');
-  check(json.contains('"temp_disturbances": 1'),
-      'export carries the raw disturbance mask');
+    !json.contains('"bleeding": 0'),
+    'the sparse shape omits the level-0 bleeding key',
+  );
+  check(
+    !json.contains(': null'),
+    'entry rows carry no null-valued keys in the sparse shape',
+  );
+  check(
+    json.contains('"mucus_sign": "s"') &&
+        json.contains('"mucus_quality": "mi"'),
+    'export carries the fertility-sign tokens',
+  );
+  check(
+    json.contains('"mucus_sign": "a"'),
+    'export carries the Ausfluss sign token',
+  );
+  check(
+    json.contains('"cervix_firmness": "hard"') &&
+        json.contains(
+          '"sex_timings": ${SexTiming.start.bit | SexTiming.end.bit}',
+        ),
+    'export carries the redefined-v4 keys (cervix_firmness, sex_timings)',
+  );
+  check(
+    json.contains('"temp_disturbances": 1'),
+    'export carries the raw disturbance mask',
+  );
   // Profile-free document: no profile keys anywhere.
-  check(!json.contains('profile_id') && !json.contains('"profiles"'),
-      'the export document is profile-free');
+  check(
+    !json.contains('profile_id') && !json.contains('"profiles"'),
+    'the export document is profile-free',
+  );
 
   // Malformed documents must be rejected BEFORE any write.
   var rejected = false;
@@ -177,58 +217,86 @@ Future<void> main() async {
     ),
   );
   final plan2 = await planDatabaseImport(target, json);
-  check(plan2.entriesOverwritten == 1 && plan2.entriesNew == 4,
-      'plan flips the pre-existing day to overwrite ($plan2)');
+  check(
+    plan2.entriesOverwritten == 1 && plan2.entriesNew == 4,
+    'plan flips the pre-existing day to overwrite ($plan2)',
+  );
 
   final summary = await importJsonToDatabase(target, json);
   check(
-      summary.entriesNew == 4 &&
-          summary.entriesOverwritten == 1 &&
-          summary.marksNew == 1,
-      'executed counts match the plan: $summary');
+    summary.entriesNew == 4 &&
+        summary.entriesOverwritten == 1 &&
+        summary.marksNew == 1,
+    'executed counts match the plan: $summary',
+  );
   final migrated = await target.entriesDao.allEntries();
   check(migrated.length == 5, 'import wrote 5 entry rows total');
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
-  check(day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
-      'import OVERWROTE the existing day with document content');
+  check(
+    day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
+    'import OVERWROTE the existing day with document content',
+  );
   // CycleEntry exposes bleeding as the mapped enum (int storage, converter
   // in the db layer) and the mucus signs as raw TEXT tokens (mapping in the
   // mapper layer); check that both survived the round trip.
-  check(day2.mucusSign == 's' && day2.mucusQuality == 'mi',
-      'mucus fertility-sign tokens survive the round trip');
-  final heavyRow = migrated
-      .firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 5)));
-  check(heavyRow.bleeding == Bleeding.heavy,
-      'the heavy level survives the export/import round trip');
-  final maxRow = migrated
-      .firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 6)));
-  check(maxRow.bleeding == Bleeding.maximum,
-      'the maximum level survives the export/import round trip');
+  check(
+    day2.mucusSign == 's' && day2.mucusQuality == 'mi',
+    'mucus fertility-sign tokens survive the round trip',
+  );
+  final heavyRow = migrated.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 5)),
+  );
+  check(
+    heavyRow.bleeding == Bleeding.heavy,
+    'the heavy level survives the export/import round trip',
+  );
+  final maxRow = migrated.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 6)),
+  );
+  check(
+    maxRow.bleeding == Bleeding.maximum,
+    'the maximum level survives the export/import round trip',
+  );
   // The current document fields: CycleEntry carries the firmness as the raw
   // TEXT token, the sex times as the raw INTEGER mask, and the raw
   // disturbance mask verbatim — check that all of it survived.
-  check(heavyRow.mucusSign == 'a',
-      'the Ausfluss sign survives the export/import round trip');
-  check(heavyRow.cervixFirmness == 'hard',
-      'the firmness token survives the export/import round trip');
-  check(heavyRow.sexTimings == SexTiming.start.bit | SexTiming.end.bit,
-      'the sex-timings mask survives the export/import round trip');
-  final flaggedRow = migrated
-      .firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 2)));
-  check(flaggedRow.tempDisturbances == TempDisturbance.sp.bit,
-      'the raw disturbance mask survives the round trip verbatim');
-  check((await target.marksDao.marksForDay(DateTime(2026, 3, 12))).length == 1,
-      'mark imported idempotently on day 12');
+  check(
+    heavyRow.mucusSign == 'a',
+    'the Ausfluss sign survives the export/import round trip',
+  );
+  check(
+    heavyRow.cervixFirmness == 'hard',
+    'the firmness token survives the export/import round trip',
+  );
+  check(
+    heavyRow.sexTimings == SexTiming.start.bit | SexTiming.end.bit,
+    'the sex-timings mask survives the export/import round trip',
+  );
+  final flaggedRow = migrated.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 3, 2)),
+  );
+  check(
+    flaggedRow.tempDisturbances == TempDisturbance.sp.bit,
+    'the raw disturbance mask survives the round trip verbatim',
+  );
+  check(
+    (await target.marksDao.marksForDay(DateTime(2026, 3, 12))).length == 1,
+    'mark imported idempotently on day 12',
+  );
 
   // Re-import of the SAME document: everything is now idempotent/skipped.
   final second = await importJsonToDatabase(target, json);
-  check(second.entriesOverwritten == 5 && second.marksSkipped == 1,
-      're-import overwrites all days and skips no marks: $second');
+  check(
+    second.entriesOverwritten == 5 && second.marksSkipped == 1,
+    're-import overwrites all days and skips no marks: $second',
+  );
   final afterSecond = await target.entriesDao.allEntries();
   check(afterSecond.length == 5, 're-import keeps exactly 5 rows');
 
-  check((await source.entriesDao.allEntries()).length == 5,
-      'source untouched by import');
+  check(
+    (await source.entriesDao.allEntries()).length == 5,
+    'source untouched by import',
+  );
 
   // --- old-document translation (v1–4) -------------------------------------
   // Old documents carry profile keys (accepted and IGNORED) and the legacy
@@ -237,7 +305,8 @@ Future<void> main() async {
   // 'import') inside the import transaction — the interrupted-day analysis
   // semantics survive the shape change.
   final oldDocTarget = CycleDatabase(NativeDatabase.memory());
-  const oldDocJson = '{"schema_version": 3, '
+  const oldDocJson =
+      '{"schema_version": 3, '
       '"exported_at": "2026-04-01T00:00:00Z", '
       '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
       '"entries": ['
@@ -249,38 +318,51 @@ Future<void> main() async {
       '"exclude_travel": true, "mood": true, "desire": true}], '
       '"marks": []}';
   final oldSummary = await importJsonToDatabase(oldDocTarget, oldDocJson);
-  check(oldSummary.entriesNew == 3,
-      'old-document rows import (profile keys ignored): $oldSummary');
-  final oldRows = await oldDocTarget.entriesDao.allEntries();
-  final illnessDay =
-      oldRows.firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 2)));
-  check(illnessDay.tempDisturbances == TempDisturbance.kr.bit,
-      'exclude_illness translates into the kr mask bit');
-  final alcoholDay =
-      oldRows.firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 3)));
-  check(alcoholDay.tempDisturbances == TempDisturbance.alk.bit,
-      'exclude_alcohol translates into the alk mask bit');
-  final travelDay =
-      oldRows.firstWhere((e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 4)));
-  check(travelDay.tempDisturbances == 0,
-      'exclude_travel leaves no mask bit (travel has no flag any more)');
-  final exclusionMarks = (await oldDocTarget.marksDao.allMarks())
-      .where((m) => m.markType == CycleMarkTypes.ignoreTemperature)
-      .toList()
-    ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
   check(
-      exclusionMarks.length == 3 &&
-          exclusionMarks.every((m) => m.author == 'import') &&
-          DateOnly.sameDay(
-              exclusionMarks.first.entryDate, DateTime(2026, 4, 2)),
-      'every old excluded day derives an ignoreTemperature mark '
-      "(author 'import') — the analysis semantics survive");
+    oldSummary.entriesNew == 3,
+    'old-document rows import (profile keys ignored): $oldSummary',
+  );
+  final oldRows = await oldDocTarget.entriesDao.allEntries();
+  final illnessDay = oldRows.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 2)),
+  );
+  check(
+    illnessDay.tempDisturbances == TempDisturbance.kr.bit,
+    'exclude_illness translates into the kr mask bit',
+  );
+  final alcoholDay = oldRows.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 3)),
+  );
+  check(
+    alcoholDay.tempDisturbances == TempDisturbance.alk.bit,
+    'exclude_alcohol translates into the alk mask bit',
+  );
+  final travelDay = oldRows.firstWhere(
+    (e) => DateOnly.sameDay(e.date, DateTime(2026, 4, 4)),
+  );
+  check(
+    travelDay.tempDisturbances == 0,
+    'exclude_travel leaves no mask bit (travel has no flag any more)',
+  );
+  final exclusionMarks =
+      (await oldDocTarget.marksDao.allMarks())
+          .where((m) => m.markType == CycleMarkTypes.ignoreTemperature)
+          .toList()
+        ..sort((a, b) => a.entryDate.compareTo(b.entryDate));
+  check(
+    exclusionMarks.length == 3 &&
+        exclusionMarks.every((m) => m.author == 'import') &&
+        DateOnly.sameDay(exclusionMarks.first.entryDate, DateTime(2026, 4, 2)),
+    'every old excluded day derives an ignoreTemperature mark '
+    "(author 'import') — the analysis semantics survive",
+  );
   // Re-import: the derived marks are idempotent (no duplicates).
   final oldSecond = await importJsonToDatabase(oldDocTarget, oldDocJson);
   check(
-      (await oldDocTarget.marksDao.allMarks()).length == 3,
-      'derived marks are idempotent on re-import (${oldSecond.marksSkipped} '
-      'skipped)');
+    (await oldDocTarget.marksDao.allMarks()).length == 3,
+    'derived marks are idempotent on re-import (${oldSecond.marksSkipped} '
+    'skipped)',
+  );
 
   // --- invalid bleeding vocabulary: plan counts only writable rows ---------
   // tryDailyEntryFromExport drops rows whose bleeding value the shared
@@ -288,30 +370,43 @@ Future<void> main() async {
   // planner must count such rows in the invalid bucket instead of as writes
   // (counted == written).
   final invalidBleedingTarget = CycleDatabase(NativeDatabase.memory());
-  final invalidBleedingDoc = buildExportJson(ExportBlob(
-    exportedAt: DateTime(2026, 4, 1),
-    entries: [
-      {'date': '2026-04-05', 'bleeding': 'monsoon'},
-      {'date': '2026-04-06', 'bleeding': 3},
-    ],
-    marks: const [],
-  ));
-  final invalidPlan =
-      await planDatabaseImport(invalidBleedingTarget, invalidBleedingDoc);
+  final invalidBleedingDoc = buildExportJson(
+    ExportBlob(
+      exportedAt: DateTime(2026, 4, 1),
+      entries: [
+        {'date': '2026-04-05', 'bleeding': 'monsoon'},
+        {'date': '2026-04-06', 'bleeding': 3},
+      ],
+      marks: const [],
+    ),
+  );
+  final invalidPlan = await planDatabaseImport(
+    invalidBleedingTarget,
+    invalidBleedingDoc,
+  );
   check(
-      invalidPlan.entriesInvalid == 1 &&
-          invalidPlan.entriesNew == 1 &&
-          invalidPlan.entriesOverwritten == 0,
-      'plan buckets the unparsable-bleeding row as invalid ($invalidPlan)');
-  final invalidSummary =
-      await importJsonToDatabase(invalidBleedingTarget, invalidBleedingDoc);
-  check(invalidSummary.entriesInvalid == 1 && invalidSummary.entriesNew == 1,
-      'invalid-bleeding row reported invalid, not written: $invalidSummary');
+    invalidPlan.entriesInvalid == 1 &&
+        invalidPlan.entriesNew == 1 &&
+        invalidPlan.entriesOverwritten == 0,
+    'plan buckets the unparsable-bleeding row as invalid ($invalidPlan)',
+  );
+  final invalidSummary = await importJsonToDatabase(
+    invalidBleedingTarget,
+    invalidBleedingDoc,
+  );
+  check(
+    invalidSummary.entriesInvalid == 1 && invalidSummary.entriesNew == 1,
+    'invalid-bleeding row reported invalid, not written: $invalidSummary',
+  );
   final validOnlyRows = await invalidBleedingTarget.entriesDao.allEntries();
-  check(validOnlyRows.length == 1,
-      'only the valid-bleeding row reached the database');
-  check(validOnlyRows.single.bleeding == Bleeding.medium,
-      'the valid numeric level (3) read back as medium');
+  check(
+    validOnlyRows.length == 1,
+    'only the valid-bleeding row reached the database',
+  );
+  check(
+    validOnlyRows.single.bleeding == Bleeding.medium,
+    'the valid numeric level (3) read back as medium',
+  );
   await invalidBleedingTarget.close();
   await oldDocTarget.close();
 
@@ -329,8 +424,10 @@ Future<void> main() async {
 
   // --- DAO facade additions work on the real schema ------------------------
   final marks = await source.marksDao.allMarks();
-  check(marks.length == 1 && marks.single.markType == 'ignoreTemperature',
-      'allMarks facade');
+  check(
+    marks.length == 1 && marks.single.markType == 'ignoreTemperature',
+    'allMarks facade',
+  );
 
   await source.close();
   print('\nAll export/import runtime smoke checks passed.');

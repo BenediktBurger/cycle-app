@@ -5,6 +5,7 @@
 // model and drift rows in lib/db/mappers.dart, the ONLY drift<->domain
 // boundary.
 import 'date_only.dart';
+
 //
 // The stored mark type is an OPEN TEXT vocabulary (lib/db/tables.dart): the
 // table deliberately admits unknown future tokens so new marking tools need
@@ -95,11 +96,7 @@ final class CycleMark {
   }
 
   @override
-  int get hashCode => Object.hash(
-        DateOnly.normalize(date),
-        type,
-        author,
-      );
+  int get hashCode => Object.hash(DateOnly.normalize(date), type, author);
 
   @override
   String toString() =>

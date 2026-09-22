@@ -58,42 +58,42 @@ class CycleDatabase extends _$CycleDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-        onUpgrade: (m, from, to) async {
-          // Every upgrade is a graceful, incremental migration: one schema
-          // version step at a time, never dropping or recreating anything,
-          // so user data always survives (ADR-0005, amendment 2026-09-22 —
-          // destructive upgrades are no longer permitted).
-          //
-          // Files OLDER than v9 have no migration promise (they are
-          // pre-release artifacts whose table layouts were never published
-          // and are not reconstructed anywhere): the supported steps below
-          // still run best-effort for them, nothing is erased, and their
-          // old-shaped/orphaned tables are simply left untouched.
-          if (from < 10) {
-            // The only SQL delta of v9 → v10: the app_settings key-value
-            // table appears (ADR-0010); no data is transformed.
-            await m.createTable(appSettings);
-          }
-          // v10 → v11 changed no SQL: the bleeding vocabulary gained its
-          // level-5 member at the converter level, and the bleeding column's
-          // INTEGER DDL is unchanged (ADR-0010) — nothing to migrate.
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      // Every upgrade is a graceful, incremental migration: one schema
+      // version step at a time, never dropping or recreating anything,
+      // so user data always survives (ADR-0005, amendment 2026-09-22 —
+      // destructive upgrades are no longer permitted).
+      //
+      // Files OLDER than v9 have no migration promise (they are
+      // pre-release artifacts whose table layouts were never published
+      // and are not reconstructed anywhere): the supported steps below
+      // still run best-effort for them, nothing is erased, and their
+      // old-shaped/orphaned tables are simply left untouched.
+      if (from < 10) {
+        // The only SQL delta of v9 → v10: the app_settings key-value
+        // table appears (ADR-0010); no data is transformed.
+        await m.createTable(appSettings);
+      }
+      // v10 → v11 changed no SQL: the bleeding vocabulary gained its
+      // level-5 member at the converter level, and the bleeding column's
+      // INTEGER DDL is unchanged (ADR-0010) — nothing to migrate.
 
-          // Each future schema-version bump adds its own guarded block here
-          // (e.g. `if (from < 12) { ... }`), using Migrator helpers only
-          // (createTable, addColumn, customStatement, …); disruptive table
-          // shape changes copy data into the new table instead of dropping
-          // anything. Skipped steps (from several versions behind) run every
-          // missing block in order, so any distance migrates step-wise.
-        },
-        // SQLite only enforces FOREIGN KEY constraints when the pragma is
-        // enabled for the connection; make that explicit. Idempotent if
-        // drift's defaults already set it. (There are no foreign keys left
-        // in the profile-free schema; the pragma costs nothing.)
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON;');
-        },
-      );
+      // Each future schema-version bump adds its own guarded block here
+      // (e.g. `if (from < 12) { ... }`), using Migrator helpers only
+      // (createTable, addColumn, customStatement, …); disruptive table
+      // shape changes copy data into the new table instead of dropping
+      // anything. Skipped steps (from several versions behind) run every
+      // missing block in order, so any distance migrates step-wise.
+    },
+    // SQLite only enforces FOREIGN KEY constraints when the pragma is
+    // enabled for the connection; make that explicit. Idempotent if
+    // drift's defaults already set it. (There are no foreign keys left
+    // in the profile-free schema; the pragma costs nothing.)
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    },
+  );
 }

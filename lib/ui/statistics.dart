@@ -126,9 +126,10 @@ class StatistikScreen extends ConsumerWidget {
                             children: [
                               SizedBox(
                                 width: 64,
-                                child: Text(bucket.label,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall),
+                                child: Text(
+                                  bucket.label,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -136,17 +137,22 @@ class StatistikScreen extends ConsumerWidget {
                                   value: bucket.count == 0
                                       ? 0
                                       : bucket.count /
-                                          buckets.map((b) => b.count).fold<int>(
-                                              0, (a, b) => a > b ? a : b),
+                                            buckets
+                                                .map((b) => b.count)
+                                                .fold<int>(
+                                                  0,
+                                                  (a, b) => a > b ? a : b,
+                                                ),
                                   minHeight: 8,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               SizedBox(
                                 width: 24,
-                                child: Text('${bucket.count}',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall),
+                                child: Text(
+                                  '${bucket.count}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                               ),
                             ],
                           ),

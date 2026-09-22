@@ -17,7 +17,7 @@ Future<void> expectNoFrameworkErrors(
   Future<void> Function() body, {
   String reason =
       'no framework exception (RenderFlex overflow) during the interactions '
-          'under test',
+      'under test',
 }) async {
   final errors = <FlutterErrorDetails>[];
   final originalOnError = FlutterError.onError;

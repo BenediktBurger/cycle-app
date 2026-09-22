@@ -75,9 +75,10 @@ class AboutPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                      '${l10n.appTitle} · '
-                      '${l10n.aboutVersion(snapshot.data!.version)}',
-                      style: theme.textTheme.titleSmall),
+                    '${l10n.appTitle} · '
+                    '${l10n.aboutVersion(snapshot.data!.version)}',
+                    style: theme.textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 16),
                 ],
               );
@@ -94,13 +95,18 @@ class AboutPage extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: theme.colorScheme.onSecondaryContainer),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(l10n.aboutWarningTitle,
-                            style: theme.textTheme.titleSmall!.copyWith(
-                                color: theme.colorScheme.onSecondaryContainer)),
+                        child: Text(
+                          l10n.aboutWarningTitle,
+                          style: theme.textTheme.titleSmall!.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -108,9 +114,12 @@ class AboutPage extends ConsumerWidget {
                   // The warning body carries the INER website — SELECTABLE
                   // so the URL stays copyable as plain text (no link
                   // plugin; the app's offline-only posture).
-                  SelectableText(l10n.aboutWarningBody,
-                      style: theme.textTheme.bodyMedium!.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer)),
+                  SelectableText(
+                    l10n.aboutWarningBody,
+                    style: theme.textTheme.bodyMedium!.copyWith(
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -128,8 +137,10 @@ class AboutPage extends ConsumerWidget {
           // copyable.
           Text(l10n.aboutLicenseHeading, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          SelectableText(l10n.aboutLicenseBody,
-              style: theme.textTheme.bodyMedium),
+          SelectableText(
+            l10n.aboutLicenseBody,
+            style: theme.textTheme.bodyMedium,
+          ),
           const SizedBox(height: 24),
           // The privacy/DSGVO notice — the same string the settings pane's
           // "Datenschutz" card shows (shared string source, no drift).
@@ -192,8 +203,10 @@ class AboutPage extends ConsumerWidget {
           // sent by the app itself, so problems and suggestions belong to
           // the GitHub issue tracker (or mail). SELECTABLE: the embedded
           // issue-tracker URL is copyable text.
-          SelectableText(l10n.aboutFeedbackNotice,
-              style: theme.textTheme.bodySmall),
+          SelectableText(
+            l10n.aboutFeedbackNotice,
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
     );

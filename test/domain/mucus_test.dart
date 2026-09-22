@@ -18,12 +18,19 @@ void main() {
     });
 
     test('fs (f vor S an einem Tag) keeps its exact storage token', () {
-      expect(MucusSign.fs.name, 'fs',
-          reason: 'the token is pinned by the storage format — a rename is '
-              'a data migration, never a refactor');
+      expect(
+        MucusSign.fs.name,
+        'fs',
+        reason:
+            'the token is pinned by the storage format — a rename is '
+            'a data migration, never a refactor',
+      );
       expect(tryParseMucusSign('fs'), MucusSign.fs);
-      expect(MucusSign.fs.name, isNot(contains('/')),
-          reason: 'the storage token is the enum name, not the glyph');
+      expect(
+        MucusSign.fs.name,
+        isNot(contains('/')),
+        reason: 'the storage token is the enum name, not the glyph',
+      );
     });
 
     test('fs displays as f/S and carries no quality', () {
@@ -31,11 +38,10 @@ void main() {
       // quality qualifier of its own — like every non-S sign the quality
       // must never survive alongside it.
       expect(mucusSignSymbol(MucusSign.fs), 'f/S');
-      expect(
-        sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew),
-        (sign: MucusSign.fs, quality: null),
-        reason: 'the quality collapses — fs is not the S sign',
-      );
+      expect(sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew), (
+        sign: MucusSign.fs,
+        quality: null,
+      ), reason: 'the quality collapses — fs is not the S sign');
       expect(
         () => DailyEntry(
           date: DateTime(2026, 6, 15),
@@ -45,19 +51,19 @@ void main() {
         throwsA(isA<AssertionError>()),
         reason: 'the constructor mirrors the sanitize rule',
       );
-      expect(
-        mucusDisplay(sign: MucusSign.fs, quality: MucusQuality.ew),
-        (symbol: 'f/S', superscript: null),
-      );
+      expect(mucusDisplay(sign: MucusSign.fs, quality: MucusQuality.ew), (
+        symbol: 'f/S',
+        superscript: null,
+      ));
     });
 
     test('a (Ausfluss) carries no quality — quality stays S-only', () {
       // 'A' is a discharge observation, not the mucus sign S; like every
       // non-S sign it must never carry a quality qualifier.
-      expect(
-        sanitizeMucusPair(sign: MucusSign.a, quality: MucusQuality.ew),
-        (sign: MucusSign.a, quality: null),
-      );
+      expect(sanitizeMucusPair(sign: MucusSign.a, quality: MucusQuality.ew), (
+        sign: MucusSign.a,
+        quality: null,
+      ));
       expect(
         () => DailyEntry(
           date: DateTime(2026, 6, 15),
@@ -66,10 +72,10 @@ void main() {
         ),
         throwsA(isA<AssertionError>()),
       );
-      expect(
-        mucusDisplay(sign: MucusSign.a, quality: MucusQuality.ew),
-        (symbol: 'A', superscript: null),
-      );
+      expect(mucusDisplay(sign: MucusSign.a, quality: MucusQuality.ew), (
+        symbol: 'A',
+        superscript: null,
+      ));
     });
 
     test('tryParseMucusSign round-trips every token', () {
@@ -126,8 +132,11 @@ void main() {
 
     test('tryParseMucusQuality rejects unknown and non-string input', () {
       expect(tryParseMucusQuality('milky'), isNull);
-      expect(tryParseMucusQuality('EW'), isNull,
-          reason: 'tokens are lowercase');
+      expect(
+        tryParseMucusQuality('EW'),
+        isNull,
+        reason: 'tokens are lowercase',
+      );
       expect(tryParseMucusQuality(null), isNull);
       expect(tryParseMucusQuality(2), isNull);
       expect(tryParseMucusQuality(3.5), isNull);
@@ -212,24 +221,28 @@ void main() {
       );
     });
 
-    test('quality can be set and cleared via copyWith (sentinel semantics)',
-        () {
-      final bare = DailyEntry(date: day(DateTime(2026, 6, 15)));
-      expect(bare.copyWith(mucusSign: MucusSign.s).mucusSign, MucusSign.s);
-      final withQuality =
-          bare.copyWith(mucusSign: MucusSign.s, mucusQuality: MucusQuality.gl);
-      expect(withQuality.mucusQuality, MucusQuality.gl);
-      expect(
-        withQuality.copyWith(mucusQuality: null).mucusQuality,
-        isNull,
-        reason: 'explicit null clears the quality',
-      );
-      expect(
-        withQuality.copyWith().mucusQuality,
-        MucusQuality.gl,
-        reason: 'absent argument keeps the quality',
-      );
-    });
+    test(
+      'quality can be set and cleared via copyWith (sentinel semantics)',
+      () {
+        final bare = DailyEntry(date: day(DateTime(2026, 6, 15)));
+        expect(bare.copyWith(mucusSign: MucusSign.s).mucusSign, MucusSign.s);
+        final withQuality = bare.copyWith(
+          mucusSign: MucusSign.s,
+          mucusQuality: MucusQuality.gl,
+        );
+        expect(withQuality.mucusQuality, MucusQuality.gl);
+        expect(
+          withQuality.copyWith(mucusQuality: null).mucusQuality,
+          isNull,
+          reason: 'explicit null clears the quality',
+        );
+        expect(
+          withQuality.copyWith().mucusQuality,
+          MucusQuality.gl,
+          reason: 'absent argument keeps the quality',
+        );
+      },
+    );
   });
 
   group('display symbols', () {
@@ -238,8 +251,11 @@ void main() {
       expect(mucusSignSymbol(MucusSign.nothing), 'Ø');
       expect(mucusSignSymbol(MucusSign.f), 'f');
       expect(mucusSignSymbol(MucusSign.s), 'S');
-      expect(mucusSignSymbol(MucusSign.fs), 'f/S',
-          reason: '"f vor S an einem Tag" renders as the composite glyph');
+      expect(
+        mucusSignSymbol(MucusSign.fs),
+        'f/S',
+        reason: '"f vor S an einem Tag" renders as the composite glyph',
+      );
       expect(mucusSignSymbol(MucusSign.a), 'A');
     });
 
@@ -254,43 +270,31 @@ void main() {
 
     test('display helper pairs the base sign with the superscript quality', () {
       // S with quality: superscript token.
-      expect(
-        mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew),
-        (symbol: 'S', superscript: 'EW'),
-      );
-      expect(
-        mucusDisplay(sign: MucusSign.s, quality: MucusQuality.gl),
-        (symbol: 'S', superscript: 'gl'),
-      );
+      expect(mucusDisplay(sign: MucusSign.s, quality: MucusQuality.ew), (
+        symbol: 'S',
+        superscript: 'EW',
+      ));
+      expect(mucusDisplay(sign: MucusSign.s, quality: MucusQuality.gl), (
+        symbol: 'S',
+        superscript: 'gl',
+      ));
       // Bare S: no superscript.
-      expect(
-        mucusDisplay(sign: MucusSign.s),
-        (symbol: 'S', superscript: null),
-      );
+      expect(mucusDisplay(sign: MucusSign.s), (symbol: 'S', superscript: null));
       // Non-sign observations: no superscript either (not recordable there).
-      expect(
-        mucusDisplay(sign: MucusSign.t),
-        (symbol: 't', superscript: null),
-      );
-      expect(
-        mucusDisplay(sign: MucusSign.f),
-        (symbol: 'f', superscript: null),
-      );
+      expect(mucusDisplay(sign: MucusSign.t), (symbol: 't', superscript: null));
+      expect(mucusDisplay(sign: MucusSign.f), (symbol: 'f', superscript: null));
       // Nothing recorded at all: empty cell.
       expect(mucusDisplay(), (symbol: null, superscript: null));
       // "Nothing seen/felt" has its own glyph.
-      expect(
-        mucusDisplay(sign: MucusSign.nothing),
-        (symbol: 'Ø', superscript: null),
-      );
+      expect(mucusDisplay(sign: MucusSign.nothing), (
+        symbol: 'Ø',
+        superscript: null,
+      ));
     });
 
     test('display helper never renders a quality on a non-s sign', () {
       // Defense in depth: even a mismatched input pair is displayed sanely.
-      final display = mucusDisplay(
-        sign: MucusSign.t,
-        quality: MucusQuality.ew,
-      );
+      final display = mucusDisplay(sign: MucusSign.t, quality: MucusQuality.ew);
       expect(display, (symbol: 't', superscript: null));
     });
   });

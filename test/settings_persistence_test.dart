@@ -25,14 +25,17 @@ import 'support/viewport.dart';
 /// The currently picked value of one of the range pickers (the form field
 /// wraps a DropdownButton that carries the value).
 double? _pickerValue(WidgetTester tester, ValueKey<String> key) => tester
-    .widget<DropdownButton<double>>(find.descendant(
-        of: find.byKey(key), matching: find.byType(DropdownButton<double>)))
+    .widget<DropdownButton<double>>(
+      find.descendant(
+        of: find.byKey(key),
+        matching: find.byType(DropdownButton<double>),
+      ),
+    )
     .value;
 
 void main() {
   group('observed cycles outside the app', () {
-    testWidgets(
-        'a persisted outside-app count hydrates into the settings '
+    testWidgets('a persisted outside-app count hydrates into the settings '
         'field on start', (WidgetTester tester) async {
       useDeviceLocales(tester, const [Locale('de')]);
 
@@ -46,23 +49,34 @@ void main() {
       await tester.pumpAndSettle();
 
       final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
-      expect(field, findsOneWidget,
-          reason: 'the outside-app cycles card renders an integer field');
+      expect(
+        field,
+        findsOneWidget,
+        reason: 'the outside-app cycles card renders an integer field',
+      );
       final textField = tester.widget<TextField>(field);
-      expect(textField.controller!.text, '5',
-          reason: 'the stored count of 5 must appear in the field after the '
-              'database opens');
+      expect(
+        textField.controller!.text,
+        '5',
+        reason:
+            'the stored count of 5 must appear in the field after the '
+            'database opens',
+      );
     });
 
-    testWidgets(
-        'entering a count writes through as an integer row, an '
-        'invalid entry does not (validation 0 <= n)',
-        (WidgetTester tester) async {
+    testWidgets('entering a count writes through as an integer row, an '
+        'invalid entry does not (validation 0 <= n)', (
+      WidgetTester tester,
+    ) async {
       useDeviceLocales(tester, const [Locale('de')]);
 
       CycleDatabase? db;
-      await tester.pumpWidget(appScope(
-          locale: const Locale('de'), onCreated: (created) => db = created));
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          onCreated: (created) => db = created,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(navLabel('Einstellungen'));
@@ -73,71 +87,102 @@ void main() {
       await tester.pumpAndSettle();
 
       final store = SettingsStore(db!.settingsDao);
-      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
-          reason: 'a valid non-negative integer is written through to '
-              'app_settings as a JSON integer');
+      expect(
+        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
+        3,
+        reason:
+            'a valid non-negative integer is written through to '
+            'app_settings as a JSON integer',
+      );
 
       // Invalid input: negative and non-integer entries must not write, and
       // the field surfaces the validation error.
       await tester.enterText(field, '-2');
       await tester.pumpAndSettle();
-      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
-          reason: 'a negative entry is rejected and never written');
-      expect(find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
-          findsOneWidget,
-          reason: 'the validation error is visible for the rejected entry');
+      expect(
+        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
+        3,
+        reason: 'a negative entry is rejected and never written',
+      );
+      expect(
+        find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
+        findsOneWidget,
+        reason: 'the validation error is visible for the rejected entry',
+      );
 
       await tester.enterText(field, '2.5');
       await tester.pumpAndSettle();
-      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 3,
-          reason: 'a non-integer entry is rejected and never written');
+      expect(
+        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
+        3,
+        reason: 'a non-integer entry is rejected and never written',
+      );
 
       await tester.enterText(field, '9');
       await tester.pumpAndSettle();
-      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 9,
-          reason: 'a corrected entry writes through again');
-      expect(find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
-          findsNothing,
-          reason: 'the error clears once the entry is valid again');
+      expect(
+        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
+        9,
+        reason: 'a corrected entry writes through again',
+      );
+      expect(
+        find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
+        findsNothing,
+        reason: 'the error clears once the entry is valid again',
+      );
     });
 
     testWidgets(
-        'an external value change resyncs the untouched field and stops '
-        'resyncing once the user has typed', (WidgetTester tester) async {
-      useDeviceLocales(tester, const [Locale('de')]);
+      'an external value change resyncs the untouched field and stops '
+      'resyncing once the user has typed',
+      (WidgetTester tester) async {
+        useDeviceLocales(tester, const [Locale('de')]);
 
-      await tester.pumpWidget(appScope(locale: const Locale('de')));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(appScope(locale: const Locale('de')));
+        await tester.pumpAndSettle();
 
-      await tester.tap(navLabel('Einstellungen'));
-      await tester.pumpAndSettle();
+        await tester.tap(navLabel('Einstellungen'));
+        await tester.pumpAndSettle();
 
-      final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
-      final container = ProviderScope.containerOf(tester.element(field));
-      expect(tester.widget<TextField>(field).controller!.text, '0',
-          reason: 'the field starts at the provider default');
+        final field = find.byKey(
+          const ValueKey('observedCyclesOutsideAppField'),
+        );
+        final container = ProviderScope.containerOf(tester.element(field));
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          '0',
+          reason: 'the field starts at the provider default',
+        );
 
-      // A write from outside the field itself changes the provider state
-      // while the field has not been touched: the visible text follows.
-      container.read(observedCyclesOutsideAppProvider.notifier).state = 7;
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(field).controller!.text, '7',
-          reason: 'an external change must appear in the untouched field');
+        // A write from outside the field itself changes the provider state
+        // while the field has not been touched: the visible text follows.
+        container.read(observedCyclesOutsideAppProvider.notifier).state = 7;
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          '7',
+          reason: 'an external change must appear in the untouched field',
+        );
 
-      // After the user types, the visible text belongs to the user: an
-      // external change must not clobber mid-entry.
-      await tester.enterText(field, '3');
-      await tester.pumpAndSettle();
-      container.read(observedCyclesOutsideAppProvider.notifier).state = 11;
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(field).controller!.text, '3',
-          reason: 'an external change must not overwrite an edited field');
-    });
+        // After the user types, the visible text belongs to the user: an
+        // external change must not clobber mid-entry.
+        await tester.enterText(field, '3');
+        await tester.pumpAndSettle();
+        container.read(observedCyclesOutsideAppProvider.notifier).state = 11;
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          '3',
+          reason: 'an external change must not overwrite an edited field',
+        );
+      },
+    );
   });
 
   group('hydration', () {
-    testWidgets('persisted choices are restored into the UI on start',
-        (WidgetTester tester) async {
+    testWidgets('persisted choices are restored into the UI on start', (
+      WidgetTester tester,
+    ) async {
       // An English device on purpose: the stored non-default choices must
       // beat the device defaults, not merely repeat them.
       useDeviceLocales(tester, const [Locale('en')]);
@@ -147,19 +192,28 @@ void main() {
         await store.persistLocale(const Locale('de'));
         await store.persistThemeMode(ThemeMode.dark);
         await store.persistTemperatureRange(
-            const TemperatureRange(min: 35.0, max: 39.0));
+          const TemperatureRange(min: 35.0, max: 39.0),
+        );
       }
 
       await tester.pumpWidget(appScope(seed: seed));
       await tester.pumpAndSettle();
 
-      expect(find.text('Tagebuch'), findsWidgets,
-          reason: 'the stored German choice must apply over the English '
-              'device locale');
+      expect(
+        find.text('Tagebuch'),
+        findsWidgets,
+        reason:
+            'the stored German choice must apply over the English '
+            'device locale',
+      );
       expect(find.text('Diary'), findsNothing);
-      expect(materializedBrightness(tester), Brightness.dark,
-          reason: 'the stored dark choice must apply over the light test '
-              'surface');
+      expect(
+        materializedBrightness(tester),
+        Brightness.dark,
+        reason:
+            'the stored dark choice must apply over the light test '
+            'surface',
+      );
 
       await tester.tap(navLabel('Einstellungen'));
       await tester.pumpAndSettle();
@@ -188,8 +242,9 @@ void main() {
       );
     });
 
-    testWidgets('a live explicit choice is not clobbered by hydration',
-        (WidgetTester tester) async {
+    testWidgets('a live explicit choice is not clobbered by hydration', (
+      WidgetTester tester,
+    ) async {
       useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) =>
@@ -201,16 +256,21 @@ void main() {
       await tester.pumpWidget(appScope(locale: const Locale('en'), seed: seed));
       await tester.pumpAndSettle();
 
-      expect(find.text('Diary'), findsWidgets,
-          reason: 'an already-set choice must never be overwritten by the '
-              'hydrated snapshot');
+      expect(
+        find.text('Diary'),
+        findsWidgets,
+        reason:
+            'an already-set choice must never be overwritten by the '
+            'hydrated snapshot',
+      );
       expect(find.text('Tagebuch'), findsNothing);
     });
   });
 
   group('write-through', () {
-    testWidgets('settings-screen choices land in app_settings as JSON rows',
-        (WidgetTester tester) async {
+    testWidgets('settings-screen choices land in app_settings as JSON rows', (
+      WidgetTester tester,
+    ) async {
       // A German device on purpose: switching to English is then a real
       // change away from the system default (and the starting UI is
       // German, which decides the labels used below).
@@ -225,15 +285,21 @@ void main() {
 
       // Switch language to English (the UI rebuilds under our fingers —
       // the subsequent lookups use the English labels).
-      await tester.tap(find.descendant(
+      await tester.tap(
+        find.descendant(
           of: find.byType(SegmentedButton<String>),
-          matching: find.text('English')));
+          matching: find.text('English'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Theme to Dark.
-      await tester.tap(find.descendant(
+      await tester.tap(
+        find.descendant(
           of: find.byType(SegmentedButton<ThemeMode>),
-          matching: find.text('Dark')));
+          matching: find.text('Dark'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Range to 35–39 °C: lower picker first, then the upper one (the
@@ -252,14 +318,22 @@ void main() {
       // The moment the rows get written is not the UI's business: read
       // back through the typed store on the very handle the app opened.
       final store = SettingsStore(db!.settingsDao);
-      expect(await store.readSetting(SettingKeys.locale), 'en',
-          reason: 'the language choice must persist as a JSON-encoded '
-              'language code');
-      expect(await store.readSetting(SettingKeys.themeMode), 'dark',
-          reason: 'the theme choice must persist as the enum-name token');
-      expect(await store.readSetting(SettingKeys.temperatureRange),
-          {'min': 35.0, 'max': 39.0},
-          reason: 'the range choice must persist as its JSON map');
+      expect(
+        await store.readSetting(SettingKeys.locale),
+        'en',
+        reason:
+            'the language choice must persist as a JSON-encoded '
+            'language code',
+      );
+      expect(
+        await store.readSetting(SettingKeys.themeMode),
+        'dark',
+        reason: 'the theme choice must persist as the enum-name token',
+      );
+      expect(await store.readSetting(SettingKeys.temperatureRange), {
+        'min': 35.0,
+        'max': 39.0,
+      }, reason: 'the range choice must persist as its JSON map');
     });
   });
 }

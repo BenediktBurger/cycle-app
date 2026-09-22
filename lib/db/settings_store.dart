@@ -95,8 +95,13 @@ final class PersistedSettings {
       other.onboardingCompleted == onboardingCompleted;
 
   @override
-  int get hashCode => Object.hash(locale, themeMode, temperatureRange,
-      observedCyclesOutsideApp, onboardingCompleted);
+  int get hashCode => Object.hash(
+    locale,
+    themeMode,
+    temperatureRange,
+    observedCyclesOutsideApp,
+    onboardingCompleted,
+  );
 }
 
 /// Stateless typed wrapper over one database's [SettingsDao]. Cheap enough

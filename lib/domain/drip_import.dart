@@ -71,7 +71,7 @@ List<List<String>> splitDripCsv(String raw) {
   while (i < chars.length) {
     final c = chars[i];
     if (inQuotes) {
-      if (c == 0x22 /* " */) {
+      if (c == 0x22 /* " */ ) {
         if (i + 1 < chars.length && chars[i + 1] == 0x22) {
           field.writeCharCode(c); // escaped inner quote
           i += 2;
@@ -85,17 +85,17 @@ List<List<String>> splitDripCsv(String raw) {
       i++;
       continue;
     }
-    if (c == 0x2C /* , */) {
+    if (c == 0x2C /* , */ ) {
       endField();
       i++;
       continue;
     }
-    if (c == 0x0A /* newline */) {
+    if (c == 0x0A /* newline */ ) {
       endRow();
       i++;
       continue;
     }
-    if (c == 0x0D /* carriage return */) {
+    if (c == 0x0D /* carriage return */ ) {
       // Tolerate \r\n; a lone \r also ends the row.
       endRow();
       i++;
@@ -125,7 +125,8 @@ List<List<String>> parseDripCsv(String raw) {
   final hasDate = rows.isNotEmpty && rows.first.contains('date');
   if (!hasDate) {
     throw const FormatException(
-        'not a drip CSV export: no "date" column in the header row');
+      'not a drip CSV export: no "date" column in the header row',
+    );
   }
   return rows;
 }
@@ -154,7 +155,8 @@ final class DripCsvStats {
   final int rowsInvalid;
 
   @override
-  String toString() => 'DripCsvStats(rowsTotal: $rowsTotal, '
+  String toString() =>
+      'DripCsvStats(rowsTotal: $rowsTotal, '
       'rowsImported: $rowsImported, rowsSkippedEmpty: $rowsSkippedEmpty, '
       'rowsInvalid: $rowsInvalid)';
 }
@@ -329,7 +331,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // position/opening index is skipped as well — such an index decodes to
     // no stored observation (the clamp word the old free-text helper
     // fabricated was noise).
-    final hasData = bbtC != null ||
+    final hasData =
+        bbtC != null ||
         excluded ||
         bleeding != null ||
         mucus != null ||
@@ -439,7 +442,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
 /// through tryParseBleeding's null rule. [entries] are the SAME row maps
 /// the export document carries (they replay verbatim).
 List<Map<String, Object?>> deriveDripMarks(
-    List<Map<String, Object?>> entries, Set<String> excludedDays) {
+  List<Map<String, Object?>> entries,
+  Set<String> excludedDays,
+) {
   final seenDates = <String>{};
   final replayed = <DailyEntry>[];
   for (final row in entries) {
@@ -491,8 +496,9 @@ List<Map<String, Object?>> deriveDripMarks(
     }
   }
   marks.sort((a, b) {
-    final byDay =
-        (a['entry_date']! as String).compareTo(b['entry_date']! as String);
+    final byDay = (a['entry_date']! as String).compareTo(
+      b['entry_date']! as String,
+    );
     if (byDay != 0) return byDay;
     return (a['mark_type']! as String).compareTo(b['mark_type']! as String);
   });
@@ -516,9 +522,9 @@ double? _parseBbtC(String? raw) => raw == null ? null : double.tryParse(raw);
 /// tolerant-parse pattern of [tryParseMeasuredAtMinutes] (lib/domain/
 /// models.dart), which the db writer re-runs on the produced document.
 int? _parseDripTimeMinutes(String? raw) {
-  final m = RegExp(r'^\s*(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*$').firstMatch(
-    raw ?? '',
-  );
+  final m = RegExp(
+    r'^\s*(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*$',
+  ).firstMatch(raw ?? '');
   if (m == null) return null;
   final hour = int.parse(m.group(1)!);
   final minute = int.parse(m.group(2)!);
@@ -616,7 +622,7 @@ int? _resolveNfp({
 /// clamping asymmetry is acceptable (position/opening null, firmness
 /// clamped).
 ({CervixPosition? position, CervixOpening? opening, CervixFirmness? firmness})?
-    _cervixObservation({
+_cervixObservation({
   required String? opening,
   required String? firmness,
   required String? position,
@@ -646,6 +652,6 @@ int? _resolveNfp({
   return (
     position: mappedPosition,
     opening: mappedOpening,
-    firmness: mappedFirmness
+    firmness: mappedFirmness,
   );
 }

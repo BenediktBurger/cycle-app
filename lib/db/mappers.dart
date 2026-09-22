@@ -81,17 +81,14 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
 /// storage, so no sanitizing gate applies: an unknown token must survive
 /// the round trip verbatim (future tools write them; the schema is the
 /// vocabulary authority, not the mapper).
-CycleMark cycleMarkFromDrift(UserMark m) => CycleMark(
-      date: m.entryDate,
-      type: m.markType,
-      author: m.author,
-    );
+CycleMark cycleMarkFromDrift(UserMark m) =>
+    CycleMark(date: m.entryDate, type: m.markType, author: m.author);
 
 /// Domain model -> companion. Marks are add/remove events (toggle semantics
 /// in the DAO), never partial patches, so every field is written explicitly
 /// — a companion built from a [CycleMark] is a complete replacement row.
 UserMarksCompanion cycleMarkToCompanion(CycleMark mark) => UserMarksCompanion(
-      entryDate: Value(DateOnly.normalize(mark.date)),
-      markType: Value(mark.type),
-      author: Value(mark.author),
-    );
+  entryDate: Value(DateOnly.normalize(mark.date)),
+  markType: Value(mark.type),
+  author: Value(mark.author),
+);

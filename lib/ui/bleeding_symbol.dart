@@ -88,8 +88,9 @@ final class BleedingSymbol extends StatelessWidget {
           alignment: Alignment.bottomCenter,
           child: FractionallySizedBox(
             widthFactor: 1,
-            heightFactor:
-                bleeding.level == 1 ? 1 / 4 : (bleeding.level - 1) / 4,
+            heightFactor: bleeding.level == 1
+                ? 1 / 4
+                : (bleeding.level - 1) / 4,
             child: band,
           ),
         );

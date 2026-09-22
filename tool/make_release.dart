@@ -59,7 +59,8 @@ const String releaseWorkflowPath = '.github/workflows/release.yml';
 /// Release artifact built by checklist step 4 (`flutter build apk --release`).
 const String defaultApkPath = 'build/app/outputs/flutter-apk/app-release.apk';
 
-const String usage = 'usage: dart run tool/make_release.dart vX.Y.Z '
+const String usage =
+    'usage: dart run tool/make_release.dart vX.Y.Z '
     '[--accept-fingerprint] [--accept-flutter-version] [--dry-run] '
     '[--tested]';
 
@@ -183,8 +184,10 @@ Options parseArguments(List<String> arguments) {
           throw UsageException('unknown flag: $argument');
         }
         if (tag != null) {
-          throw UsageException('exactly one tag argument expected '
-              '(got "$tag" and "$argument")');
+          throw UsageException(
+            'exactly one tag argument expected '
+            '(got "$tag" and "$argument")',
+          );
         }
         tag = argument;
     }
@@ -194,8 +197,9 @@ Options parseArguments(List<String> arguments) {
   }
   if (!isValidReleaseTag(tag)) {
     throw UsageException(
-        'tag must have the form vX.Y.Z (got "$tag") — the tag name is the '
-        'release identity the script pins to pubspec.yaml');
+      'tag must have the form vX.Y.Z (got "$tag") — the tag name is the '
+      'release identity the script pins to pubspec.yaml',
+    );
   }
   return Options(
     tag: tag,
@@ -262,10 +266,12 @@ String? parseCertificateFingerprint(String apksignerOutput) {
 /// (first `package:` line). Lenient about attribute order; null when either
 /// value is missing.
 ApkVersionInfo? parseAaptBadging(String badgingOutput) {
-  final versionCode =
-      RegExp(r"versionCode='(\d+)'").firstMatch(badgingOutput)?.group(1);
-  final versionName =
-      RegExp(r"versionName='([^']*)'").firstMatch(badgingOutput)?.group(1);
+  final versionCode = RegExp(
+    r"versionCode='(\d+)'",
+  ).firstMatch(badgingOutput)?.group(1);
+  final versionName = RegExp(
+    r"versionName='([^']*)'",
+  ).firstMatch(badgingOutput)?.group(1);
   if (versionCode == null || versionName == null) return null;
   return ApkVersionInfo(
     versionName: versionName,
@@ -307,9 +313,9 @@ bool isValidFlutterVersion(String value) =>
 /// (`Flutter X.Y.Z • channel …`). Null when no version is found or the
 /// found value is not a valid `X.Y.Z` string.
 String? parseInstalledFlutterVersion(String flutterVersionOutput) {
-  final version = RegExp(r'Flutter (\d+\.\d+\.\d+)')
-      .firstMatch(flutterVersionOutput)
-      ?.group(1);
+  final version = RegExp(
+    r'Flutter (\d+\.\d+\.\d+)',
+  ).firstMatch(flutterVersionOutput)?.group(1);
   if (version == null) return null;
   return isValidFlutterVersion(version) ? version : null;
 }
@@ -353,11 +359,15 @@ String? updateWorkflowFlutterVersion(String workflowSource, String version) {
   // [ \t]* (not \s*) after the colon keeps the match on one line: \s* could
   // span a newline when a value-less `flutter-version:` line is followed by
   // an indented line, and the rewrite would swallow that line.
-  final pattern =
-      RegExp(r'^([ \t]*)flutter-version:[ \t]*.*$', multiLine: true);
+  final pattern = RegExp(
+    r'^([ \t]*)flutter-version:[ \t]*.*$',
+    multiLine: true,
+  );
   if (!pattern.hasMatch(workflowSource)) return null;
   return workflowSource.replaceAllMapped(
-      pattern, (match) => '${match.group(1)}flutter-version: $version');
+    pattern,
+    (match) => '${match.group(1)}flutter-version: $version',
+  );
 }
 
 /// One workflow file's validated sync plan: [originalSource] as read from
@@ -382,10 +392,7 @@ class WorkflowFileUpdate {
 /// The validated workflow sync: files to (possibly) write plus the paths
 /// that were skipped because the file is not present.
 class WorkflowSyncPlan {
-  const WorkflowSyncPlan({
-    required this.updates,
-    required this.skippedMissing,
-  });
+  const WorkflowSyncPlan({required this.updates, required this.skippedMissing});
 
   final List<WorkflowFileUpdate> updates;
   final List<String> skippedMissing;
@@ -412,10 +419,12 @@ Future<WorkflowSyncPlan> planFlutterWorkflowSync({
     final file = File('${root.path}/$path');
     if (!file.existsSync()) {
       if (path == ciWorkflowPath) {
-        _fail('$ciWorkflowPath not found — that workflow is the gate that '
-            'cross-checks the $flutterPinFilePath pin, so it must exist. '
-            'Without it the pin/workflow-input sync cannot be verified and '
-            'the pin invariant stands unenforced. Nothing was written.');
+        _fail(
+          '$ciWorkflowPath not found — that workflow is the gate that '
+          'cross-checks the $flutterPinFilePath pin, so it must exist. '
+          'Without it the pin/workflow-input sync cannot be verified and '
+          'the pin invariant stands unenforced. Nothing was written.',
+        );
       }
       skippedMissing.add(path);
       continue;
@@ -423,17 +432,21 @@ Future<WorkflowSyncPlan> planFlutterWorkflowSync({
     final source = await file.readAsString();
     final updated = updateWorkflowFlutterVersion(source, version);
     if (updated == null) {
-      _fail('cannot sync the flutter-version: input in $path — the file '
-          'contains no matchable `flutter-version: X.Y.Z` line (expected on '
-          'its own line, as the input of the subosito/flutter-action step). '
-          'The workflow must expose that line again before the pin can be '
-          'rewritten; the tree was left untouched.');
+      _fail(
+        'cannot sync the flutter-version: input in $path — the file '
+        'contains no matchable `flutter-version: X.Y.Z` line (expected on '
+        'its own line, as the input of the subosito/flutter-action step). '
+        'The workflow must expose that line again before the pin can be '
+        'rewritten; the tree was left untouched.',
+      );
     }
-    updates.add(WorkflowFileUpdate(
-      path: path,
-      originalSource: source,
-      updatedSource: updated,
-    ));
+    updates.add(
+      WorkflowFileUpdate(
+        path: path,
+        originalSource: source,
+        updatedSource: updated,
+      ),
+    );
   }
   return WorkflowSyncPlan(updates: updates, skippedMissing: skippedMissing);
 }
@@ -454,12 +467,15 @@ Future<Never> writeFlutterPinAndStop({
   await pinFile.writeAsString(formatFlutterPinFile(version));
   for (final update in plan.updates) {
     if (!update.changed) {
-      print('${update.path} already pins flutter-version: $version — '
-          'left unchanged.');
+      print(
+        '${update.path} already pins flutter-version: $version — '
+        'left unchanged.',
+      );
       continue;
     }
-    await File('${root.path}/${update.path}')
-        .writeAsString(update.updatedSource);
+    await File(
+      '${root.path}/${update.path}',
+    ).writeAsString(update.updatedSource);
     print('Set the flutter-version: input to $version in ${update.path}.');
   }
   for (final skipped in plan.skippedMissing) {
@@ -477,16 +493,20 @@ Future<void> printFlutterPinSyncDryRunNote({
   required String version,
 }) async {
   final plan = await planFlutterWorkflowSync(root: root, version: version);
-  print('dry-run note: outside a dry run, --accept-flutter-version would '
-      'now write $flutterPinFilePath with:');
+  print(
+    'dry-run note: outside a dry run, --accept-flutter-version would '
+    'now write $flutterPinFilePath with:',
+  );
   print(formatFlutterPinFile(version));
   print('dry-run note: and set the flutter-version: input:');
   for (final update in plan.updates) {
     if (update.changed) {
       print('  ${update.path} — set to flutter-version: $version');
     } else {
-      print('  ${update.path} — already flutter-version: $version '
-          '(would be left unchanged)');
+      print(
+        '  ${update.path} — already flutter-version: $version '
+        '(would be left unchanged)',
+      );
     }
   }
   for (final skipped in plan.skippedMissing) {
@@ -599,9 +619,11 @@ Never _fail(String message) => throw ReleaseException(message);
 Future<String> _sha256sumOfApk() async {
   final result = await Process.run('sha256sum', [defaultApkPath]);
   if (result.exitCode != 0) {
-    _fail('sha256sum failed (exit ${result.exitCode}): '
-        '${result.stderr}\n'
-        'This tool targets the Linux release machine by design.');
+    _fail(
+      'sha256sum failed (exit ${result.exitCode}): '
+      '${result.stderr}\n'
+      'This tool targets the Linux release machine by design.',
+    );
   }
   return (result.stdout as String).trim().split(RegExp(r'\s+')).first;
 }
@@ -610,8 +632,10 @@ String _resolveAndroidHome() {
   final environment = Platform.environment;
   final home = environment['ANDROID_HOME'] ?? environment['ANDROID_SDK_ROOT'];
   if (home == null || home.isEmpty) {
-    _fail('ANDROID_HOME is not set — cannot locate the Android SDK '
-        'build-tools (apksigner/aapt).');
+    _fail(
+      'ANDROID_HOME is not set — cannot locate the Android SDK '
+      'build-tools (apksigner/aapt).',
+    );
   }
   return home;
 }
@@ -621,20 +645,26 @@ String _resolveAndroidHome() {
 String _resolveNewestBuildTools(String androidHome) {
   final buildToolsRoot = Directory('$androidHome/build-tools');
   if (!buildToolsRoot.existsSync()) {
-    _fail('no build-tools under $androidHome — install the Android SDK '
-        'build-tools (checklist step 4 already built the APK, so the SDK '
-        'must exist somewhere; check ANDROID_HOME).');
+    _fail(
+      'no build-tools under $androidHome — install the Android SDK '
+      'build-tools (checklist step 4 already built the APK, so the SDK '
+      'must exist somewhere; check ANDROID_HOME).',
+    );
   }
   final names = buildToolsRoot
       .listSync()
       .whereType<Directory>()
-      .map((directory) =>
-          directory.path.substring(directory.path.lastIndexOf('/') + 1))
+      .map(
+        (directory) =>
+            directory.path.substring(directory.path.lastIndexOf('/') + 1),
+      )
       .toList();
   final newest = newestBuildToolsDirectory(names);
   if (newest == null) {
-    _fail('could not resolve a build-tools version directory under '
-        '$androidHome/build-tools.');
+    _fail(
+      'could not resolve a build-tools version directory under '
+      '$androidHome/build-tools.',
+    );
   }
   return '${buildToolsRoot.path}/$newest';
 }
@@ -653,8 +683,10 @@ Future<void> runRelease(List<String> arguments) async {
   final tag = options.tag;
   final versionName = tagToVersion(tag);
 
-  print('Release script — per-release checklist step 7 of docs/release.md '
-      'for $tag.');
+  print(
+    'Release script — per-release checklist step 7 of docs/release.md '
+    'for $tag.',
+  );
 
   // --- 1. version sanity (pubspec vs tag) --------------------------------
   final pubspecFile = File('pubspec.yaml');
@@ -663,14 +695,18 @@ Future<void> runRelease(List<String> arguments) async {
   }
   final version = parsePubspecVersion(await pubspecFile.readAsString());
   if (version == null) {
-    _fail('pubspec.yaml has no `version: X.Y.Z+N` line — fix the version '
-        'bump before releasing.');
+    _fail(
+      'pubspec.yaml has no `version: X.Y.Z+N` line — fix the version '
+      'bump before releasing.',
+    );
   }
   print('pubspec version: ${version.name}+${version.build}; tag: $tag');
   if (!tagMatchesVersion(tag, version.name)) {
-    _fail('TAG/VERSION MISMATCH: tag $tag (versionName ${tagToVersion(tag)}) '
-        'does not match pubspec.yaml (${version.name}). A half-committed '
-        'bump publishes wrong-version APKs — fix pubspec.yaml or the tag.');
+    _fail(
+      'TAG/VERSION MISMATCH: tag $tag (versionName ${tagToVersion(tag)}) '
+      'does not match pubspec.yaml (${version.name}). A half-committed '
+      'bump publishes wrong-version APKs — fix pubspec.yaml or the tag.',
+    );
   }
 
   // --- 2. Flutter SDK pin (tool/flutter-version vs installed SDK) ---------
@@ -686,22 +722,29 @@ Future<void> runRelease(List<String> arguments) async {
       : null;
   final flutterProbe = await Process.run('flutter', ['--version']);
   if (flutterProbe.exitCode != 0) {
-    _fail('flutter --version failed (exit ${flutterProbe.exitCode}): '
-        '${flutterProbe.stderr}\nCannot compare the installed SDK against '
-        '$flutterPinFilePath.');
+    _fail(
+      'flutter --version failed (exit ${flutterProbe.exitCode}): '
+      '${flutterProbe.stderr}\nCannot compare the installed SDK against '
+      '$flutterPinFilePath.',
+    );
   }
-  final installedFlutter =
-      parseInstalledFlutterVersion(flutterProbe.stdout as String);
+  final installedFlutter = parseInstalledFlutterVersion(
+    flutterProbe.stdout as String,
+  );
   if (installedFlutter == null) {
-    _fail('could not parse an X.Y.Z version from `flutter --version` '
-        'output:\n${flutterProbe.stdout}');
+    _fail(
+      'could not parse an X.Y.Z version from `flutter --version` '
+      'output:\n${flutterProbe.stdout}',
+    );
   }
 
   if (pinFileExists && pinnedFlutter == null) {
-    _fail('pin file $flutterPinFilePath exists but contains no '
-        'X.Y.Z version line — fix it by hand (`#` comments allowed) '
-        'or delete it and rerun with --accept-flutter-version to pin '
-        'the installed SDK ($installedFlutter).');
+    _fail(
+      'pin file $flutterPinFilePath exists but contains no '
+      'X.Y.Z version line — fix it by hand (`#` comments allowed) '
+      'or delete it and rerun with --accept-flutter-version to pin '
+      'the installed SDK ($installedFlutter).',
+    );
   }
   if (!pinFileExists) {
     print('NO FLUTTER VERSION PIN YET — the installed SDK is:');
@@ -713,20 +756,24 @@ Future<void> runRelease(List<String> arguments) async {
       );
     }
     if (!options.dryRun || !options.acceptFlutterVersion) {
-      _fail('no pin file at $flutterPinFilePath and no '
-          '--accept-flutter-version given — the pinned SDK version is '
-          'required (an un-pinned SDK lets a Flutter upgrade silently '
-          'change the release build). Make sure the installed SDK above '
-          'is the one to release with, then rerun with '
-          '--accept-flutter-version to pin it.');
+      _fail(
+        'no pin file at $flutterPinFilePath and no '
+        '--accept-flutter-version given — the pinned SDK version is '
+        'required (an un-pinned SDK lets a Flutter upgrade silently '
+        'change the release build). Make sure the installed SDK above '
+        'is the one to release with, then rerun with '
+        '--accept-flutter-version to pin it.',
+      );
     }
     await printFlutterPinSyncDryRunNote(
       root: Directory.current,
       version: installedFlutter,
     );
   } else {
-    print('Flutter SDK: $installedFlutter; pinned in '
-        '$flutterPinFilePath: $pinnedFlutter.');
+    print(
+      'Flutter SDK: $installedFlutter; pinned in '
+      '$flutterPinFilePath: $pinnedFlutter.',
+    );
     if (installedFlutter != pinnedFlutter) {
       // A drifted pin never lets the run continue (no bypass). The flag
       // doubles as the re-pin mechanism: as on the first-run path, it
@@ -745,29 +792,30 @@ Future<void> runRelease(List<String> arguments) async {
           version: installedFlutter,
         );
       } else {
-        _fail(flutterPinMismatchMessage(
-          installed: installedFlutter,
-          // Non-null here: the guard above fails the run on an unparsable
-          // pin file before this branch is ever reached.
-          pinned: pinnedFlutter!,
-        ));
+        _fail(
+          flutterPinMismatchMessage(
+            installed: installedFlutter,
+            // Non-null here: the guard above fails the run on an unparsable
+            // pin file before this branch is ever reached.
+            pinned: pinnedFlutter!,
+          ),
+        );
       }
     }
   }
 
   // --- 3. clean tree ------------------------------------------------------
-  final status = await Process.run('git', [
-    'status',
-    '--porcelain',
-  ]);
+  final status = await Process.run('git', ['status', '--porcelain']);
   if (status.exitCode != 0) {
     _fail('git status failed (exit ${status.exitCode}): ${status.stderr}');
   }
   final uncommitted = (status.stdout as String).trim();
   if (uncommitted.isNotEmpty) {
-    _fail('dirty working tree — commit or stash everything before tagging. '
-        'A half-committed version bump is how wrong-version APKs happen:\n'
-        '$uncommitted');
+    _fail(
+      'dirty working tree — commit or stash everything before tagging. '
+      'A half-committed version bump is how wrong-version APKs happen:\n'
+      '$uncommitted',
+    );
   }
 
   // --- 4. tag must not exist ---------------------------------------------
@@ -778,23 +826,29 @@ Future<void> runRelease(List<String> arguments) async {
     'refs/tags/$tag',
   ]);
   if (existingTag.exitCode == 0) {
-    _fail('tag $tag already exists locally (docs/release.md re-tag salvage '
-        'pointer — note the runbook\'s parked-CI salvage flow does not map '
-        '1:1 here because the artifact already exists). The right remedy: '
-        '`git tag -d $tag` to remove the local tag; if it was already '
-        'pushed: `git push origin :refs/tags/$tag`. Deleting a pushed tag is '
-        'an operator decision — make it explicitly.');
+    _fail(
+      'tag $tag already exists locally (docs/release.md re-tag salvage '
+      'pointer — note the runbook\'s parked-CI salvage flow does not map '
+      '1:1 here because the artifact already exists). The right remedy: '
+      '`git tag -d $tag` to remove the local tag; if it was already '
+      'pushed: `git push origin :refs/tags/$tag`. Deleting a pushed tag is '
+      'an operator decision — make it explicitly.',
+    );
   }
 
   // --- 5. the APK exists (built earlier, checklist step 4) ----------------
   final apk = File(defaultApkPath);
   if (!apk.existsSync()) {
-    _fail('no release APK at $defaultApkPath — build it first (checklist '
-        'step 4: `flutter build apk --release`). This script does not build.');
+    _fail(
+      'no release APK at $defaultApkPath — build it first (checklist '
+      'step 4: `flutter build apk --release`). This script does not build.',
+    );
   }
   if (apk.lengthSync() == 0) {
-    _fail('release APK at $defaultApkPath is empty — rebuild (checklist '
-        'step 4).');
+    _fail(
+      'release APK at $defaultApkPath is empty — rebuild (checklist '
+      'step 4).',
+    );
   }
 
   // --- 6. signature pin (debug-fallback / wrong-key guard) ----------------
@@ -811,13 +865,17 @@ Future<void> runRelease(List<String> arguments) async {
     defaultApkPath,
   ]);
   if (certs.exitCode != 0) {
-    _fail('apksigner verify failed (exit ${certs.exitCode}): '
-        '${certs.stderr}');
+    _fail(
+      'apksigner verify failed (exit ${certs.exitCode}): '
+      '${certs.stderr}',
+    );
   }
   final actualFingerprint = parseCertificateFingerprint(certs.stdout as String);
   if (actualFingerprint == null) {
-    _fail('could not parse the SHA-256 certificate digest from apksigner '
-        'output:\n${certs.stdout}');
+    _fail(
+      'could not parse the SHA-256 certificate digest from apksigner '
+      'output:\n${certs.stdout}',
+    );
   }
 
   final pinFile = File(pinFilePath);
@@ -825,49 +883,63 @@ Future<void> runRelease(List<String> arguments) async {
   if (pinFile.existsSync()) {
     final pinned = parsePinFile(await pinFile.readAsString());
     if (pinned == null) {
-      _fail('pin file $pinFilePath exists but contains no fingerprint line '
-          '— fix it by hand (bare hex, lowercase; `#` comments allowed).');
+      _fail(
+        'pin file $pinFilePath exists but contains no fingerprint line '
+        '— fix it by hand (bare hex, lowercase; `#` comments allowed).',
+      );
     }
     if (!fingerprintsMatch(pinned, actualFingerprint)) {
-      _fail('SIGNATURE MISMATCH: the APK certificate fingerprint is '
-          '$actualFingerprint, the pin file $pinFilePath expects $pinned. '
-          'Wrong key or the debug-signing fallback — never publish. '
-          '(Unexpectedly rekeyed? Correct the pin file after checking the '
-          'new certificate; do not bypass this check.)');
+      _fail(
+        'SIGNATURE MISMATCH: the APK certificate fingerprint is '
+        '$actualFingerprint, the pin file $pinFilePath expects $pinned. '
+        'Wrong key or the debug-signing fallback — never publish. '
+        '(Unexpectedly rekeyed? Correct the pin file after checking the '
+        'new certificate; do not bypass this check.)',
+      );
     }
-    print('certificate fingerprint matches pinned release key: '
-        '$fingerprint');
+    print(
+      'certificate fingerprint matches pinned release key: '
+      '$fingerprint',
+    );
   } else if (options.acceptFingerprint) {
     print('NO PIN FILE YET — the APK certificate fingerprint is:');
     print('  SHA-256 certificate fingerprint: $fingerprint');
     if (options.stopsAfterWritingPin) {
       await pinFile.writeAsString(formatPinFile(fingerprint));
-      _fail('Wrote and pinned the fingerprint above in $pinFilePath. The '
-          'run stops here — commit the pin, then rerun the script: the '
-          'rerun matches the APK against the pin and proceeds.\n'
-          '  git add $pinFilePath && git commit -m "pin release '
-          'certificate fingerprint"\n'
-          '(the fingerprint is public — it goes into the release notes '
-          'anyway). Stopping keeps the tree clean — tag and push must not '
-          'run with a fresh, uncommitted pin.');
+      _fail(
+        'Wrote and pinned the fingerprint above in $pinFilePath. The '
+        'run stops here — commit the pin, then rerun the script: the '
+        'rerun matches the APK against the pin and proceeds.\n'
+        '  git add $pinFilePath && git commit -m "pin release '
+        'certificate fingerprint"\n'
+        '(the fingerprint is public — it goes into the release notes '
+        'anyway). Stopping keeps the tree clean — tag and push must not '
+        'run with a fresh, uncommitted pin.',
+      );
     }
-    print('dry-run note: outside a dry run, --accept-fingerprint would '
-        'now write $pinFilePath and stop; the pin would be committed '
-        'before the rerun proceeds.');
+    print(
+      'dry-run note: outside a dry run, --accept-fingerprint would '
+      'now write $pinFilePath and stop; the pin would be committed '
+      'before the rerun proceeds.',
+    );
   } else {
-    _fail('no pin file at $pinFilePath and no --accept-fingerprint given. '
-        'Check that the APK certificate fingerprint below is your RELEASE '
-        'key (a debug fingerprint means the key.properties debug-signing '
-        'fallback struck — do NOT pin it), then rerun with '
-        '--accept-fingerprint to pin it:\n'
-        '  SHA-256 certificate fingerprint: $fingerprint');
+    _fail(
+      'no pin file at $pinFilePath and no --accept-fingerprint given. '
+      'Check that the APK certificate fingerprint below is your RELEASE '
+      'key (a debug fingerprint means the key.properties debug-signing '
+      'fallback struck — do NOT pin it), then rerun with '
+      '--accept-fingerprint to pin it:\n'
+      '  SHA-256 certificate fingerprint: $fingerprint',
+    );
   }
 
   // --- 7. embedded version check (best effort, via aapt) ------------------
   final aapt = '$buildTools/aapt';
   if (!File(aapt).existsSync()) {
-    print('aapt not found at $aapt — embedded version check skipped '
-        '(best-effort check).');
+    print(
+      'aapt not found at $aapt — embedded version check skipped '
+      '(best-effort check).',
+    );
   } else {
     final badging = await Process.run(aapt, [
       'dump',
@@ -878,21 +950,29 @@ Future<void> runRelease(List<String> arguments) async {
         ? parseAaptBadging(badging.stdout as String)
         : null;
     if (info == null) {
-      print('WARNING: aapt output could not be parsed — embedded version '
-          'check skipped.');
+      print(
+        'WARNING: aapt output could not be parsed — embedded version '
+        'check skipped.',
+      );
     } else {
-      print('embedded APK version: versionName=${info.versionName} '
-          'versionCode=${info.versionCode}');
+      print(
+        'embedded APK version: versionName=${info.versionName} '
+        'versionCode=${info.versionCode}',
+      );
       if (info.versionName != versionName) {
-        _fail('STALE APK: embedded versionName "${info.versionName}" != '
-            '$versionName — rebuild (checklist step 4) before publishing.');
+        _fail(
+          'STALE APK: embedded versionName "${info.versionName}" != '
+          '$versionName — rebuild (checklist step 4) before publishing.',
+        );
       }
       if (info.versionCode != version.build) {
-        print('WARNING: embedded versionCode ${info.versionCode} != pubspec '
-            'build number ${version.build}. Equal is expected for the '
-            'universal APK (ABI splits offset the code — see '
-            'android/app/build.gradle.kts); not a hard abort, but '
-            'double-check you are publishing the right artifact.');
+        print(
+          'WARNING: embedded versionCode ${info.versionCode} != pubspec '
+          'build number ${version.build}. Equal is expected for the '
+          'universal APK (ABI splits offset the code — see '
+          'android/app/build.gradle.kts); not a hard abort, but '
+          'double-check you are publishing the right artifact.',
+        );
       }
     }
   }
@@ -907,21 +987,28 @@ Future<void> runRelease(List<String> arguments) async {
   // no publishing side effects to gate — it prints a note instead.
   if (options.promptsForUpgradeTest) {
     stdout.writeln(
-        'Publishing NOW: tag $tag, push to origin, and create the GitHub '
-        'release.');
-    stdout.write('Has the device upgrade test (checklist step 6) been '
-        'completed with THIS exact APK? Type "yes" to continue: ');
+      'Publishing NOW: tag $tag, push to origin, and create the GitHub '
+      'release.',
+    );
+    stdout.write(
+      'Has the device upgrade test (checklist step 6) been '
+      'completed with THIS exact APK? Type "yes" to continue: ',
+    );
     final answer = stdin.readLineSync()?.trim().toLowerCase() ?? '';
     if (answer != 'yes') {
-      _fail('upgrade-test confirmation not given — nothing was published. '
-          'Complete the device upgrade test first (checklist step 6). '
-          '--tested exists for scripted use and must never be used to skip '
-          'the real test.');
+      _fail(
+        'upgrade-test confirmation not given — nothing was published. '
+        'Complete the device upgrade test first (checklist step 6). '
+        '--tested exists for scripted use and must never be used to skip '
+        'the real test.',
+      );
     }
   } else if (options.dryRun) {
-    print('dry-run note: on a real run without --tested, the script here '
-        'asks for confirmation that the device upgrade test (checklist '
-        'step 6) was done with this exact APK before publishing.');
+    print(
+      'dry-run note: on a real run without --tested, the script here '
+      'asks for confirmation that the device upgrade test (checklist '
+      'step 6) was done with this exact APK before publishing.',
+    );
   } else {
     print('upgrade test: asserted done via --tested.');
   }
@@ -941,9 +1028,11 @@ Future<void> runRelease(List<String> arguments) async {
     print('  fingerprint:    $fingerprint');
     print('  APK path:       $defaultApkPath');
     print('  APK SHA-256:    $apkSha');
-    print('  gh command:     gh release create $tag $defaultApkPath '
-        '--generate-notes --notes '
-        '"${notesBody.trim().replaceAll('\n', '\\n')}"');
+    print(
+      '  gh command:     gh release create $tag $defaultApkPath '
+      '--generate-notes --notes '
+      '"${notesBody.trim().replaceAll('\n', '\\n')}"',
+    );
     print('nothing was tagged, pushed, or released.');
     return;
   }
@@ -952,8 +1041,10 @@ Future<void> runRelease(List<String> arguments) async {
   Future<void> git(List<String> args) async {
     final result = await Process.run('git', args);
     if (result.exitCode != 0) {
-      _fail('git ${args.join(' ')} failed (exit ${result.exitCode}): '
-          '${result.stderr}');
+      _fail(
+        'git ${args.join(' ')} failed (exit ${result.exitCode}): '
+        '${result.stderr}',
+      );
     }
   }
 
@@ -972,16 +1063,20 @@ Future<void> runRelease(List<String> arguments) async {
     notesBody,
   ]);
   if (release.exitCode != 0) {
-    _fail('gh release create failed (exit ${release.exitCode}): '
-        '${release.stderr}\nThe tag is already pushed; the release may not '
-        "exist yet — retry `gh release create $tag $defaultApkPath "
-        '--generate-notes --notes <body>` or inspect first (see '
-        'docs/release.md).');
+    _fail(
+      'gh release create failed (exit ${release.exitCode}): '
+      '${release.stderr}\nThe tag is already pushed; the release may not '
+      "exist yet — retry `gh release create $tag $defaultApkPath "
+      '--generate-notes --notes <body>` or inspect first (see '
+      'docs/release.md).',
+    );
   }
 
   print('');
   print('Release published: ${release.stdout.trim()}');
-  print('Next: checklist steps 8–9 of docs/release.md — distribute '
-      '(sideload → testers, Play internal track, F-Droid MR) and watch the '
-      'store dashboards.');
+  print(
+    'Next: checklist steps 8–9 of docs/release.md — distribute '
+    '(sideload → testers, Play internal track, F-Droid MR) and watch the '
+    'store dashboards.',
+  );
 }

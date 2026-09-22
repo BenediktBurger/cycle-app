@@ -93,12 +93,12 @@ CervixFirmness? tryParseCervixFirmness(Object? raw) {
 /// (neutral on-surface vs. the tertiary mucus color). INER experts may want
 /// different symbols.
 String cervixPositionSymbol(CervixPosition position) => switch (position) {
-      CervixPosition.low => 't',
-      CervixPosition.medium => 'm',
-      CervixPosition.high => 'h',
-      CervixPosition.veryHigh => 'sh',
-      CervixPosition.unreachable => 'u',
-    };
+  CervixPosition.low => 't',
+  CervixPosition.medium => 'm',
+  CervixPosition.high => 'h',
+  CervixPosition.veryHigh => 'sh',
+  CervixPosition.unreachable => 'u',
+};
 
 /// Chart glyph of a firmness for the cycle-tab symbol row: the paper
 /// shorthand — `h` hard, `h-w` halfSoft (the paper's h/w rendered with an
@@ -110,7 +110,7 @@ String cervixPositionSymbol(CervixPosition position) => switch (position) {
 /// visually equals the position `high` glyph; INER experts may want
 /// different symbols.
 String cervixFirmnessSymbol(CervixFirmness firmness) => switch (firmness) {
-      CervixFirmness.hard => 'h',
-      CervixFirmness.halfSoft => 'h-w',
-      CervixFirmness.soft => 'w',
-    };
+  CervixFirmness.hard => 'h',
+  CervixFirmness.halfSoft => 'h-w',
+  CervixFirmness.soft => 'w',
+};

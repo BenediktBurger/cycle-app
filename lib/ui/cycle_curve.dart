@@ -221,7 +221,7 @@ List<CurveRun> curveRuns(
 
 /// All line segments to draw: consecutive point pairs within each run.
 List<CurveSegment> curveSegments(List<CurveRun> runs) => [
-      for (final run in runs)
-        for (var i = 0; i < run.points.length - 1; i++)
-          CurveSegment(run.points[i], run.points[i + 1]),
-    ];
+  for (final run in runs)
+    for (var i = 0; i < run.points.length - 1; i++)
+      CurveSegment(run.points[i], run.points[i + 1]),
+];

@@ -8,13 +8,13 @@ import 'package:cycle_app/domain/marks.dart';
 /// cycle boundary (see lib/domain/cycle_grouping.dart: grouping is
 /// mark-driven; bleeding only suggests).
 CycleMark start(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.cycleStart,
-    );
+  date: DateTime(year, month, day),
+  type: CycleMarkTypes.cycleStart,
+);
 
 /// The analysis-exclusion mark on (year, month, day): the ONLY exclusion
 /// signal the evaluation consumes. Raw disturbance flags never exclude.
 CycleMark excludedDay(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.ignoreTemperature,
-    );
+  date: DateTime(year, month, day),
+  type: CycleMarkTypes.ignoreTemperature,
+);

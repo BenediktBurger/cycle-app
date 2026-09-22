@@ -78,12 +78,15 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // disturbance mask): an externally placed ignoreTemperature mark —
     // day sheet, imports — shows up as "excluded" in the form.
     final dayMarks = await db.marksDao.marksForDay(date);
-    final excludeMarked =
-        dayMarks.any((m) => m.markType == CycleMarkTypes.ignoreTemperature);
+    final excludeMarked = dayMarks.any(
+      (m) => m.markType == CycleMarkTypes.ignoreTemperature,
+    );
     if (!mounted) return;
     setState(() {
-      _applyEntry(existing == null ? null : dailyEntryFromDrift(existing),
-          excludeMarked);
+      _applyEntry(
+        existing == null ? null : dailyEntryFromDrift(existing),
+        excludeMarked,
+      );
     });
   }
 
@@ -134,8 +137,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   /// that reload (the form only persists on the explicit save button),
   /// matching the established semantics of every other day change here.
   void _moveDay(int delta) {
-    ref.read(selectedDateProvider.notifier).state =
-        DateOnly.addDays(ref.read(selectedDateProvider), delta);
+    ref.read(selectedDateProvider.notifier).state = DateOnly.addDays(
+      ref.read(selectedDateProvider),
+      delta,
+    );
   }
 
   /// Material time picker dialog. Initial value: the stored (or prefilled)
@@ -172,8 +177,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       // DailyEntry.measuredAtMinutes) — the picker row above is only
       // reachable while a temperature is entered, and a temperature that
       // was cleared before saving takes the time with it.
-      measuredAtMinutes:
-          _measuredAt == null ? null : _timeToMinutes(_measuredAt!),
+      measuredAtMinutes: _measuredAt == null
+          ? null
+          : _timeToMinutes(_measuredAt!),
       bleeding: _bleeding,
       tempDisturbances: _tempDisturbances,
       mucusSign: sign,
@@ -210,8 +216,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l10n.saved)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.saved)));
     // Bleeding only SUGGESTS a cycle start (the user places the mark, the
     // authoritative cycleStart one): after saving a menstruation-level day
     // that the shared suggestion predicate flags, the app ASKS before
@@ -224,14 +231,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // prompt (owner decision 2026-09-18 — the mark is
     // temperature-evaluation-scoped).
     if (entry.bleeding.level < 2) return;
-    final previousRow =
-        await db.entriesDao.entryFor(DateOnly.addDays(date, -1));
-    final previous =
-        previousRow == null ? null : dailyEntryFromDrift(previousRow);
+    final previousRow = await db.entriesDao.entryFor(
+      DateOnly.addDays(date, -1),
+    );
+    final previous = previousRow == null
+        ? null
+        : dailyEntryFromDrift(previousRow);
     if (!isSuggestedCycleStart(entry, previous)) return;
     final existingMarks = await db.marksDao.marksForDay(date);
-    if (existingMarks
-        .any((mark) => mark.markType == CycleMarkTypes.cycleStart)) {
+    if (existingMarks.any(
+      (mark) => mark.markType == CycleMarkTypes.cycleStart,
+    )) {
       return;
     }
     if (!mounted) return;
@@ -311,11 +321,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
   }
 
-  Widget _buildForm(
-    AppLocalizations l10n,
-    String locale,
-    DateTime selected,
-  ) {
+  Widget _buildForm(AppLocalizations l10n, String locale, DateTime selected) {
     // The navigation window matches the date picker's (see _pickDate):
     // nothing before 2000, nothing beyond tomorrow ("measured just after
     // midnight") — no unbounded future. "Now" comes from nowProvider so
@@ -395,7 +401,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                             decimal: true,
                           ),
                           decoration: InputDecoration(
-                              labelText: '${l10n.temperature} (°C)'),
+                            labelText: '${l10n.temperature} (°C)',
+                          ),
                           validator: (value) {
                             final parsed = parseDecimalInput(value ?? '');
                             if (parsed == null) {
@@ -470,14 +477,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.disturbancesCaption,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      l10n.disturbancesCaption,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
@@ -524,16 +534,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 children: [
                   for (final bleeding in Bleeding.values)
                     ChoiceChip(
-                      label: Text(
-                        switch (bleeding) {
-                          Bleeding.none => l10n.bleedingNone,
-                          Bleeding.spotting => l10n.bleedingSpotting,
-                          Bleeding.light => l10n.bleedingLight,
-                          Bleeding.medium => l10n.bleedingMedium,
-                          Bleeding.heavy => l10n.bleedingHeavy,
-                          Bleeding.maximum => l10n.bleedingMaximum,
-                        },
-                      ),
+                      label: Text(switch (bleeding) {
+                        Bleeding.none => l10n.bleedingNone,
+                        Bleeding.spotting => l10n.bleedingSpotting,
+                        Bleeding.light => l10n.bleedingLight,
+                        Bleeding.medium => l10n.bleedingMedium,
+                        Bleeding.heavy => l10n.bleedingHeavy,
+                        Bleeding.maximum => l10n.bleedingMaximum,
+                      }),
                       selected: _bleeding == bleeding,
                       onSelected: (selected) => setState(() {
                         // Tapping the selected chip falls back to none,
@@ -616,17 +624,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final position in CervixPosition.values)
                     ChoiceChip(
-                      label: Text(
-                        switch (position) {
-                          CervixPosition.low => l10n.cervixPositionLow,
-                          CervixPosition.medium => l10n.cervixPositionMedium,
-                          CervixPosition.high => l10n.cervixPositionHigh,
-                          CervixPosition.veryHigh =>
-                            l10n.cervixPositionVeryHigh,
-                          CervixPosition.unreachable =>
-                            l10n.cervixPositionUnreachable,
-                        },
-                      ),
+                      label: Text(switch (position) {
+                        CervixPosition.low => l10n.cervixPositionLow,
+                        CervixPosition.medium => l10n.cervixPositionMedium,
+                        CervixPosition.high => l10n.cervixPositionHigh,
+                        CervixPosition.veryHigh => l10n.cervixPositionVeryHigh,
+                        CervixPosition.unreachable =>
+                          l10n.cervixPositionUnreachable,
+                      }),
                       selected: _cervixPosition == position,
                       onSelected: (selected) => setState(() {
                         _cervixPosition = selected ? position : null;
@@ -648,13 +653,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final opening in CervixOpening.values)
                     ChoiceChip(
-                      label: Text(
-                        switch (opening) {
-                          CervixOpening.closed => l10n.cervixOpeningClosed,
-                          CervixOpening.middle => l10n.cervixOpeningMiddle,
-                          CervixOpening.open => l10n.cervixOpeningOpen,
-                        },
-                      ),
+                      label: Text(switch (opening) {
+                        CervixOpening.closed => l10n.cervixOpeningClosed,
+                        CervixOpening.middle => l10n.cervixOpeningMiddle,
+                        CervixOpening.open => l10n.cervixOpeningOpen,
+                      }),
                       selected: _cervixOpening == opening,
                       onSelected: (selected) => setState(() {
                         _cervixOpening = selected ? opening : null;
@@ -676,14 +679,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final firmness in CervixFirmness.values)
                     ChoiceChip(
-                      label: Text(
-                        switch (firmness) {
-                          CervixFirmness.hard => l10n.cervixFirmnessHard,
-                          CervixFirmness.halfSoft =>
-                            l10n.cervixFirmnessHalfSoft,
-                          CervixFirmness.soft => l10n.cervixFirmnessSoft,
-                        },
-                      ),
+                      label: Text(switch (firmness) {
+                        CervixFirmness.hard => l10n.cervixFirmnessHard,
+                        CervixFirmness.halfSoft => l10n.cervixFirmnessHalfSoft,
+                        CervixFirmness.soft => l10n.cervixFirmnessSoft,
+                      }),
                       selected: _cervixFirmness == firmness,
                       onSelected: (selected) => setState(() {
                         _cervixFirmness = selected ? firmness : null;
@@ -707,13 +707,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 children: [
                   for (final timing in SexTiming.values)
                     FilterChip(
-                      label: Text(
-                        switch (timing) {
-                          SexTiming.start => l10n.sexTimingStart,
-                          SexTiming.middle => l10n.sexTimingMiddle,
-                          SexTiming.end => l10n.sexTimingEnd,
-                        },
-                      ),
+                      label: Text(switch (timing) {
+                        SexTiming.start => l10n.sexTimingStart,
+                        SexTiming.middle => l10n.sexTimingMiddle,
+                        SexTiming.end => l10n.sexTimingEnd,
+                      }),
                       selected: _sexTimings & timing.bit != 0,
                       onSelected: (selected) => setState(() {
                         _sexTimings = selected
@@ -775,8 +773,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           return [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(l10n.noEntriesYet,
-                  style: Theme.of(context).textTheme.bodyMedium),
+              child: Text(
+                l10n.noEntriesYet,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ];
         }
@@ -807,8 +807,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(l10n.cycleTapToEdit,
-              style: Theme.of(context).textTheme.bodySmall),
+          child: Text(
+            l10n.cycleTapToEdit,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
         for (final day in cycle.days.reversed) _dayTile(day),
       ],
@@ -835,9 +837,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           if (day.measuredAtMinutes != null) ...[
             const SizedBox(width: 8),
             Text(
-              MaterialLocalizations.of(context).formatTimeOfDay(
-                _minutesToTime(day.measuredAtMinutes!)!,
-              ),
+              MaterialLocalizations.of(
+                context,
+              ).formatTimeOfDay(_minutesToTime(day.measuredAtMinutes!)!),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -861,15 +863,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         ],
       ),
       subtitle: day.notes != null
-          ? Text(
-              day.notes!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
+          ? Text(day.notes!, maxLines: 1, overflow: TextOverflow.ellipsis)
           : null,
       onTap: () {
-        ref.read(selectedDateProvider.notifier).state =
-            DateOnly.normalize(day.date);
+        ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(
+          day.date,
+        );
       },
     );
   }
@@ -885,7 +884,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             width: 18,
             height: 18,
             decoration: BoxDecoration(
-                color: scheme.outlineVariant, shape: BoxShape.circle),
+              color: scheme.outlineVariant,
+              shape: BoxShape.circle,
+            ),
           )
         : SizedBox(
             width: 18,
@@ -907,8 +908,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           Positioned(
             right: -6,
             top: -6,
-            child: Icon(Icons.warning_amber,
-                size: 14, color: Theme.of(context).colorScheme.secondary),
+            child: Icon(
+              Icons.warning_amber,
+              size: 14,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
           ),
       ],
     );

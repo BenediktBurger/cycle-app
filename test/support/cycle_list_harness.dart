@@ -53,32 +53,40 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
 }) async {
   final initialSelected = DateOnly.normalize(selectedDate ?? scenarioDay(1));
   CycleDatabase? db;
-  final container = ProviderContainer(overrides: [
-    inMemoryDatabase(
-      seed: (db) async {
-        for (final mark in seedMarks) {
-          await db.marksDao.addMark(mark.date, mark.type, author: mark.author);
-        }
-      },
-      onCreated: (created) => db = created,
-    ),
-    dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-    selectedDateProvider.overrideWith((ref) => initialSelected),
-    tabIndexProvider.overrideWith((ref) => initialTab),
-  ]);
-  addTearDown(container.dispose);
-  await tester.pumpWidget(UncontrolledProviderScope(
-    container: container,
-    child: MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
+  final container = ProviderContainer(
+    overrides: [
+      inMemoryDatabase(
+        seed: (db) async {
+          for (final mark in seedMarks) {
+            await db.marksDao.addMark(
+              mark.date,
+              mark.type,
+              author: mark.author,
+            );
+          }
+        },
+        onCreated: (created) => db = created,
       ),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('en'),
-      home: const Scaffold(body: ZyklusScreen()),
+      dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
+      selectedDateProvider.overrideWith((ref) => initialSelected),
+      tabIndexProvider.overrideWith((ref) => initialTab),
+    ],
+  );
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
+        ),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
+        home: const Scaffold(body: ZyklusScreen()),
+      ),
     ),
-  ));
+  );
   await tester.pumpAndSettle();
   return (db!, container);
 }
@@ -89,8 +97,10 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
 /// Center-with-null-child slot (no number rendered), which does not absorb
 /// hits itself — the enclosing InkWell's pointer listener still receives it.
 Future<void> tapCycleDay(WidgetTester tester, int index) async {
-  await tester.tap(find.byKey(ValueKey('marksCell-$index')),
-      warnIfMissed: false);
+  await tester.tap(
+    find.byKey(ValueKey('marksCell-$index')),
+    warnIfMissed: false,
+  );
   await tester.pumpAndSettle();
 }
 

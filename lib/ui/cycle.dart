@@ -136,8 +136,9 @@ class ZyklusScreen extends ConsumerWidget {
           // a settings change renumbers the chart's boundary ordinals in
           // the same rebuild — exactly why the chart takes the value as
           // constructor data.
-          final observedCyclesOutsideApp =
-              ref.watch(observedCyclesOutsideAppProvider);
+          final observedCyclesOutsideApp = ref.watch(
+            observedCyclesOutsideAppProvider,
+          );
           // The tapped day whose options the screen hosts below the chart
           // (null provider value = no panel).
           final panelDay = ref.watch(cycleDayPanelProvider);
@@ -188,7 +189,7 @@ final class _ChartDays {
     firstDay = DateOnly.normalize(sorted.first.date);
     dayCount =
         DateOnly.daysBetween(DateOnly.normalize(sorted.last.date), firstDay) +
-            1;
+        1;
     for (final e in sorted) {
       byIndex[DateOnly.daysBetween(DateOnly.normalize(e.date), firstDay)] = e;
     }
@@ -223,8 +224,10 @@ final class _ChartDays {
     cycleOrdinalByStart = {
       for (final g in groups)
         if (g.startsAtMenstruation)
-          DateOnly.normalize(g.startDate):
-              cycleOrdinalNumber(markOpenedIndex++, observedCyclesOutsideApp),
+          DateOnly.normalize(g.startDate): cycleOrdinalNumber(
+            markOpenedIndex++,
+            observedCyclesOutsideApp,
+          ),
     };
     var group = 0;
     for (var i = 0; i < dayCount; i++) {
@@ -402,8 +405,10 @@ final class _CycleChartState extends State<_CycleChart> {
   void _registerJumpAffordance() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final registration = ProviderScope.containerOf(context, listen: false)
-          .read(cycleChartJumpProvider.notifier);
+      final registration = ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(cycleChartJumpProvider.notifier);
       registration.state = _jumpToDate;
       _jumpRegistration = registration;
     });
@@ -457,7 +462,10 @@ final class _CycleChartState extends State<_CycleChart> {
   void initState() {
     super.initState();
     _days = _ChartDays(
-        widget.entries, widget.marks, widget.observedCyclesOutsideApp);
+      widget.entries,
+      widget.marks,
+      widget.observedCyclesOutsideApp,
+    );
     _scrollController.addListener(_onScrolled);
     // Register the AppBar's jump affordance (see [_jumpRegistration]).
     _registerJumpAffordance();
@@ -476,7 +484,10 @@ final class _CycleChartState extends State<_CycleChart> {
         !identical(oldWidget.marks, widget.marks) ||
         oldWidget.observedCyclesOutsideApp != widget.observedCyclesOutsideApp) {
       _days = _ChartDays(
-          widget.entries, widget.marks, widget.observedCyclesOutsideApp);
+        widget.entries,
+        widget.marks,
+        widget.observedCyclesOutsideApp,
+      );
       // Only the FIRST data frame (an initial auto-scroll still pending)
       // may trigger the jump here; once it ran, a later re-emit never
       // re-jumps and the user's position survives.
@@ -499,9 +510,12 @@ final class _CycleChartState extends State<_CycleChart> {
     // day's options in the NON-MODAL panel the screen owns
     // (cycleDayPanelProvider): retargeting on every tap, no route pushed.
     // The form jump ("edit day") lives inside the panel.
-    ProviderScope.containerOf(context, listen: false)
-        .read(cycleDayPanelProvider.notifier)
-        .state = _days.dayAt(index);
+    ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(cycleDayPanelProvider.notifier).state = _days.dayAt(
+      index,
+    );
   }
 
   /// The leftmost day with any pixel on screen (no margin): day cell i
@@ -509,8 +523,9 @@ final class _CycleChartState extends State<_CycleChart> {
   /// the offset maps straight onto the column grid.
   int _firstVisibleDay(int dayCount) {
     final colW = _columnWidth ?? minDayColumnWidth;
-    final offset =
-        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final offset = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
     return (offset / colW).floor().clamp(0, dayCount - 1);
   }
 
@@ -532,16 +547,19 @@ final class _CycleChartState extends State<_CycleChart> {
   (int, int) _windowFor(int dayCount) {
     final viewport = _viewportWidth ?? 0;
     final colW = _columnWidth ?? minDayColumnWidth;
-    final offset =
-        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final offset = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
     final firstVisible = _firstVisibleDay(dayCount);
     // The last column with any pixel on screen: day i's column START is
     // left of the viewport's right edge — i.e. i < (offset + viewport) /
     // colW, so the largest such i is one below that quotient's ceil (a
     // quotient landing exactly on an integer excludes the column starting
     // exactly at the right edge — nothing of it is visible).
-    final lastVisible = (((offset + viewport) / colW).ceil() - 1)
-        .clamp(firstVisible, dayCount - 1);
+    final lastVisible = (((offset + viewport) / colW).ceil() - 1).clamp(
+      firstVisible,
+      dayCount - 1,
+    );
     final parkedStart = math.min(_windowStart, dayCount - 1);
     final parkedEnd = math.min(_windowEnd, dayCount - 1);
     // Still sufficient? The parked window must cover the visible range
@@ -623,14 +641,18 @@ final class _CycleChartState extends State<_CycleChart> {
       lastDate: lastDay,
     );
     if (picked == null) return;
-    final index = DateOnly.daysBetween(DateOnly.normalize(picked), firstDay)
-        .clamp(0, _days.dayCount - 1);
+    final index = DateOnly.daysBetween(
+      DateOnly.normalize(picked),
+      firstDay,
+    ).clamp(0, _days.dayCount - 1);
     if (!_scrollController.hasClients) return;
     // Center the picked day's column: its center sits at
     // (index + 0.5) * colW in the stripless scroll content, and centering
     // places it at the viewport's middle.
-    final target = ((index + 0.5) * colW - viewport / 2)
-        .clamp(0.0, _scrollController.position.maxScrollExtent);
+    final target = ((index + 0.5) * colW - viewport / 2).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
     await _scrollController.animateTo(
       target,
       duration: _scrollDuration,
@@ -664,8 +686,10 @@ final class _CycleChartState extends State<_CycleChart> {
     // chart config below. The static structure feeds the emptiness check;
     // the y bounds themselves come from the settings range and never
     // depend on the data, so the scale never rescales while scrolling.
-    final runs =
-        curveRuns(_days.byIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
+    final runs = curveRuns(
+      _days.byIndex,
+      ignoredDayIndexes: _days.ignoredDayIndexes,
+    );
     final points = [for (final run in runs) ...run.points];
 
     if (points.isEmpty) {
@@ -703,8 +727,11 @@ final class _CycleChartState extends State<_CycleChart> {
     // One source of truth for the temperature scale: the chart's y domain
     // over the plot height feeds BOTH the chart config and the frozen
     // rail's scale labels (see _TemperatureScale).
-    final scale =
-        _TemperatureScale(min: yMin, max: yMax, plotHeight: chartHeight);
+    final scale = _TemperatureScale(
+      min: yMin,
+      max: yMax,
+      plotHeight: chartHeight,
+    );
 
     // The SUZ glyph's top anchoring (°C value units — independent of the
     // plot's pixel height): the SUZ bar hangs DOWN from the chart's top
@@ -726,8 +753,9 @@ final class _CycleChartState extends State<_CycleChart> {
     // the dimmed tint still keeps darkness-readable contrast (asserted by
     // the dark-mode chart tests).
     final temperatureColor = Theme.of(context).colorScheme.primary;
-    final interruptedColor =
-        temperatureColor.withValues(alpha: ignoredTemperatureAlpha);
+    final interruptedColor = temperatureColor.withValues(
+      alpha: ignoredTemperatureAlpha,
+    );
     // The evaluation-artifact accent is theme-derived too (secondary: the
     // one scheme color the temperature/bleeding/mucus rendering does not
     // use — see the help sheet's glossary in cycle_help_sheet.dart). It
@@ -770,8 +798,10 @@ final class _CycleChartState extends State<_CycleChart> {
             if (entry.key >= winStart && entry.key <= winEnd)
               entry.key: entry.value,
         };
-        final winRuns =
-            curveRuns(winByIndex, ignoredDayIndexes: _days.ignoredDayIndexes);
+        final winRuns = curveRuns(
+          winByIndex,
+          ignoredDayIndexes: _days.ignoredDayIndexes,
+        );
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{
           for (final run in winRuns)
@@ -786,8 +816,9 @@ final class _CycleChartState extends State<_CycleChart> {
         // grid, line and dots — the lightest-touch approach. The tint is
         // the theme's on-color at a whisper of opacity, so it works on the
         // light as well as the dark surface (dark: light overlay).
-        final weekendBandColor =
-            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07);
+        final weekendBandColor = Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: 0.07);
         // The chart's x domain spans one column per day, half a column
         // SHIFTED so day i's dot lands on its column center: the domain
         // runs from minX −0.5 to maxX dayCount − 0.5 (day i's column is
@@ -887,7 +918,9 @@ final class _CycleChartState extends State<_CycleChart> {
                                       // are clipped and carried — the x
                                       // positions stay global.
                                       for (final span in visibleCurveSegments(
-                                          winSegments, widget.range))
+                                        winSegments,
+                                        widget.range,
+                                      ))
                                         LineChartBarData(
                                           spots: [
                                             FlSpot(span.startX, span.startY),
@@ -910,34 +943,47 @@ final class _CycleChartState extends State<_CycleChart> {
                                       // arrow-up glyph) of an out-of-range
                                       // measurement.
                                       for (final run in winRuns)
-                                        if (run.points.any((point) =>
-                                            isBbtCInRange(
-                                                point.bbtC, widget.range)))
+                                        if (run.points.any(
+                                          (point) => isBbtCInRange(
+                                            point.bbtC,
+                                            widget.range,
+                                          ),
+                                        ))
                                           LineChartBarData(
                                             spots: [
                                               for (final point in run.points)
                                                 if (isBbtCInRange(
-                                                    point.bbtC, widget.range))
+                                                  point.bbtC,
+                                                  widget.range,
+                                                ))
                                                   FlSpot(
-                                                      point.dayIndex.toDouble(),
-                                                      point.bbtC),
+                                                    point.dayIndex.toDouble(),
+                                                    point.bbtC,
+                                                  ),
                                             ],
                                             color: Colors.transparent,
                                             dotData: FlDotData(
                                               show: true,
                                               getDotPainter:
-                                                  (spot, _, bar, __) =>
-                                                      dotPainterForDay(
-                                                dayIndex: spot.x.round(),
-                                                dotColor: interruptedByIndex[
-                                                            spot.x.round()] ??
-                                                        false
-                                                    ? interruptedColor
-                                                    : temperatureColor,
-                                                colorScheme: Theme.of(context)
-                                                    .colorScheme,
-                                                overlay: overlay,
-                                              ),
+                                                  (
+                                                    spot,
+                                                    _,
+                                                    bar,
+                                                    __,
+                                                  ) => dotPainterForDay(
+                                                    dayIndex: spot.x.round(),
+                                                    dotColor:
+                                                        interruptedByIndex[spot
+                                                                .x
+                                                                .round()] ??
+                                                            false
+                                                        ? interruptedColor
+                                                        : temperatureColor,
+                                                    colorScheme: Theme.of(
+                                                      context,
+                                                    ).colorScheme,
+                                                    overlay: overlay,
+                                                  ),
                                             ),
                                           ),
                                       // The baseline segments (R10): one dashed
@@ -959,13 +1005,19 @@ final class _CycleChartState extends State<_CycleChart> {
                                         LineChartBarData(
                                           spots: [
                                             FlSpot(
-                                                math.max(-0.5,
-                                                    segment.startIndex - 0.5),
-                                                segment.value),
+                                              math.max(
+                                                -0.5,
+                                                segment.startIndex - 0.5,
+                                              ),
+                                              segment.value,
+                                            ),
                                             FlSpot(
-                                                math.min(lastX,
-                                                    segment.endIndex + 0.5),
-                                                segment.value),
+                                              math.min(
+                                                lastX,
+                                                segment.endIndex + 0.5,
+                                              ),
+                                              segment.value,
+                                            ),
                                           ],
                                           isCurved: false,
                                           barWidth: 1,
@@ -999,10 +1051,14 @@ final class _CycleChartState extends State<_CycleChart> {
                                             // edge columns keep their full width).
                                             // Top at the plot's upper border,
                                             // bottom at the fixed hang drop.
-                                            FlSpot(suz.barX.clamp(-0.5, lastX),
-                                                yMax),
-                                            FlSpot(suz.barX.clamp(-0.5, lastX),
-                                                yMax - suzBarHangSpanDegrees),
+                                            FlSpot(
+                                              suz.barX.clamp(-0.5, lastX),
+                                              yMax,
+                                            ),
+                                            FlSpot(
+                                              suz.barX.clamp(-0.5, lastX),
+                                              yMax - suzBarHangSpanDegrees,
+                                            ),
                                           ],
                                           isCurved: false,
                                           barWidth: 2,
@@ -1017,15 +1073,18 @@ final class _CycleChartState extends State<_CycleChart> {
                                         // live above).
                                         LineChartBarData(
                                           spots: [
-                                            FlSpot(suz.barX.clamp(-0.5, lastX),
-                                                yMax - suzArrowTopInsetDegrees),
+                                            FlSpot(
+                                              suz.barX.clamp(-0.5, lastX),
+                                              yMax - suzArrowTopInsetDegrees,
+                                            ),
                                           ],
                                           color: Colors.transparent,
                                           dotData: FlDotData(
                                             show: true,
                                             getDotPainter: (_, __, ___, ____) =>
                                                 SuzArrowDotPainter(
-                                                    color: evaluationColor),
+                                                  color: evaluationColor,
+                                                ),
                                           ),
                                         ),
                                       ],
@@ -1079,9 +1138,9 @@ final class _CycleChartState extends State<_CycleChart> {
                                             .colorScheme
                                             .onSurface
                                             .withValues(alpha: 0.45);
-                                        final onSurface = Theme.of(context)
-                                            .colorScheme
-                                            .onSurface;
+                                        final onSurface = Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface;
                                         if (tenths % 10 == 0) {
                                           return FlLine(
                                             color: emphasized,
@@ -1096,8 +1155,9 @@ final class _CycleChartState extends State<_CycleChart> {
                                           );
                                         }
                                         return FlLine(
-                                          color:
-                                              onSurface.withValues(alpha: 0.12),
+                                          color: onSurface.withValues(
+                                            alpha: 0.12,
+                                          ),
                                           strokeWidth: 0.5,
                                         );
                                       },
@@ -1120,9 +1180,9 @@ final class _CycleChartState extends State<_CycleChart> {
                                           if (_days.isCycleBoundary(i))
                                             VerticalLine(
                                               x: i - 0.5,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
                                               strokeWidth: 2,
                                             ),
                                       ],
@@ -1189,11 +1249,14 @@ final class _CycleChartState extends State<_CycleChart> {
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.opaque,
                                     onTapUp: (details) => _openDayAtLocalX(
-                                        details.localPosition.dx, contentWidth),
+                                      details.localPosition.dx,
+                                      contentWidth,
+                                    ),
                                     onLongPressStart: (details) =>
                                         _openDayAtLocalX(
-                                            details.localPosition.dx,
-                                            contentWidth),
+                                          details.localPosition.dx,
+                                          contentWidth,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -1322,8 +1385,9 @@ final class _SignalRows extends StatelessWidget {
     final rows = [
       for (final kind in kinds)
         Padding(
-          padding:
-              EdgeInsets.only(top: kind == kinds.first ? 0 : _signalRowGap),
+          padding: EdgeInsets.only(
+            top: kind == kinds.first ? 0 : _signalRowGap,
+          ),
           child: _SignalRow(
             kind: kind,
             days: days,
@@ -1335,10 +1399,7 @@ final class _SignalRows extends StatelessWidget {
           ),
         ),
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: rows,
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
   }
 }
 
@@ -1355,10 +1416,10 @@ const double _signalRowGap = 2;
 /// row reserves the height of a VERTICALLY written HH:mm text — its width
 /// becomes the cell height when the column is narrow, see _timeContent).
 double _signalRowHeight(_SignalKind kind) => switch (kind) {
-      _SignalKind.mucus || _SignalKind.disturbance => 24,
-      _SignalKind.time => 30,
-      _ => 12,
-    };
+  _SignalKind.mucus || _SignalKind.disturbance => 24,
+  _SignalKind.time => 30,
+  _ => 12,
+};
 
 /// The vertical offset of a row's top inside its segment: the rows stack
 /// top-down with the shared gap between them (mirrors _SignalRows'
@@ -1397,30 +1458,30 @@ enum _SignalKind {
 /// Test-visible key prefix of a row's day cells: `bleedingCell-3`,
 /// `mucusCell-3`, …
 String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
-      _SignalKind.bleeding => 'bleedingCell',
-      _SignalKind.mucus => 'mucusCell',
-      _SignalKind.mittelschmerz => 'mittelschmerzCell',
-      _SignalKind.sex => 'sexCell',
-      _SignalKind.cervix => 'cervixCell',
-      _SignalKind.pain => 'painCell',
-      _SignalKind.disturbance => 'disturbanceCell',
-      _SignalKind.time => 'timeCell',
-      _SignalKind.note => 'noteCell',
-    };
+  _SignalKind.bleeding => 'bleedingCell',
+  _SignalKind.mucus => 'mucusCell',
+  _SignalKind.mittelschmerz => 'mittelschmerzCell',
+  _SignalKind.sex => 'sexCell',
+  _SignalKind.cervix => 'cervixCell',
+  _SignalKind.pain => 'painCell',
+  _SignalKind.disturbance => 'disturbanceCell',
+  _SignalKind.time => 'timeCell',
+  _SignalKind.note => 'noteCell',
+};
 
 /// Test-visible key prefix of a row's 44 px corner slot: `bleedingCorner`,
 /// `mucusCorner`, …
 String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
-      _SignalKind.bleeding => 'bleedingCorner',
-      _SignalKind.mucus => 'mucusCorner',
-      _SignalKind.mittelschmerz => 'mittelschmerzCorner',
-      _SignalKind.sex => 'sexCorner',
-      _SignalKind.cervix => 'cervixCorner',
-      _SignalKind.pain => 'painCorner',
-      _SignalKind.disturbance => 'disturbanceCorner',
-      _SignalKind.time => 'timeCorner',
-      _SignalKind.note => 'noteCorner',
-    };
+  _SignalKind.bleeding => 'bleedingCorner',
+  _SignalKind.mucus => 'mucusCorner',
+  _SignalKind.mittelschmerz => 'mittelschmerzCorner',
+  _SignalKind.sex => 'sexCorner',
+  _SignalKind.cervix => 'cervixCorner',
+  _SignalKind.pain => 'painCorner',
+  _SignalKind.disturbance => 'disturbanceCorner',
+  _SignalKind.time => 'timeCorner',
+  _SignalKind.note => 'noteCorner',
+};
 
 /// The localized row name for a signal (the corner tooltip/semantics
 /// label).
@@ -1448,56 +1509,56 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
     // mode — the level least like a plain fill, rendered exactly like a
     // recorded spotting day's cell (bleeding_symbol.dart).
     _SignalKind.bleeding => SizedBox(
-        width: 10,
-        height: 10,
-        child: BleedingSymbol(
-          bleeding: Bleeding.spotting,
-          color: scheme.error,
-          borderColor: scheme.error,
-        ),
+      width: 10,
+      height: 10,
+      child: BleedingSymbol(
+        bleeding: Bleeding.spotting,
+        color: scheme.error,
+        borderColor: scheme.error,
       ),
+    ),
     // Sample glyph: plain S, matching the sign glyph a recorded mucus day
     // renders (no quality qualifier).
     _SignalKind.mucus => MucusSymbolText(
-        display: mucusDisplay(sign: MucusSign.s),
-        fontSize: 10,
-        color: scheme.tertiary,
-      ),
+      display: mucusDisplay(sign: MucusSign.s),
+      fontSize: 10,
+      color: scheme.tertiary,
+    ),
     // Sample Muttermund glyph: the "medium" letter, exactly how a
     // recorded cervix day renders in the row's cells.
     _SignalKind.cervix => Text(
-        cervixPositionSymbol(CervixPosition.medium),
-        style: TextStyle(fontSize: 10, color: scheme.onSurface),
-      ),
+      cervixPositionSymbol(CervixPosition.medium),
+      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    ),
     _SignalKind.mittelschmerz => Text(
-        'M',
-        style: TextStyle(fontSize: 10, color: scheme.onSurface),
-      ),
+      'M',
+      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    ),
     _SignalKind.sex => Text(
-        'X',
-        style: TextStyle(fontSize: 10, color: scheme.onSurface),
-      ),
+      'X',
+      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    ),
     _SignalKind.pain => Text(
-        'B',
-        style: TextStyle(fontSize: 10, color: scheme.onSurface),
-      ),
+      'B',
+      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    ),
     // Sample disturbance glyph: the first letter code of today's
     // vocabulary (disturbanceLetters below) — the per-day cells stack one
     // code per set temperature-disturbance flag (diary-entered).
     _SignalKind.disturbance => Text(
-        'kr',
-        style: TextStyle(fontSize: 10, color: scheme.onSurface),
-      ),
+      'kr',
+      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    ),
     // The rail keeps a clock icon sample; the per-day cells show the
     // recorded time as text (wide columns) or vertically (narrow ones).
     _SignalKind.time => Icon(Icons.schedule, size: 12, color: scheme.onSurface),
     // Sample note glyph: the same sticky-note icon a noted day renders in
     // its cell.
     _SignalKind.note => Icon(
-        Icons.sticky_note_2_outlined,
-        size: 12,
-        color: scheme.onSurface,
-      ),
+      Icons.sticky_note_2_outlined,
+      size: 12,
+      color: scheme.onSurface,
+    ),
   };
 }
 
@@ -1577,8 +1638,10 @@ final class _SignalRow extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border(
-                    right: cycleDayCellBorderSide(context,
-                        isCycleBoundary: days.isCycleBoundary(i + 1)),
+                    right: cycleDayCellBorderSide(
+                      context,
+                      isCycleBoundary: days.isCycleBoundary(i + 1),
+                    ),
                   ),
                 ),
                 child: _cell(context, i),
@@ -1680,13 +1743,13 @@ final class _SignalRow extends StatelessWidget {
     if (day == null) return const SizedBox.shrink();
     final List<String>? cervixLine =
         day.cervixPosition == null && day.cervixFirmness == null
-            ? null
-            : [
-                if (day.cervixPosition case final position?)
-                  cervixPositionSymbol(position),
-                if (day.cervixFirmness case final firmness?)
-                  cervixFirmnessSymbol(firmness),
-              ];
+        ? null
+        : [
+            if (day.cervixPosition case final position?)
+              cervixPositionSymbol(position),
+            if (day.cervixFirmness case final firmness?)
+              cervixFirmnessSymbol(firmness),
+          ];
     if (cervixLine == null) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1872,10 +1935,10 @@ final class _SignalRow extends StatelessWidget {
 /// recorded slot still shows WHERE in the day it happened, and several
 /// slots never overlap.
 Alignment _sexTimingAlignment(SexTiming timing) => switch (timing) {
-      SexTiming.start => const Alignment(-2 / 3, 0),
-      SexTiming.middle => Alignment.center,
-      SexTiming.end => const Alignment(2 / 3, 0),
-    };
+  SexTiming.start => const Alignment(-2 / 3, 0),
+  SexTiming.middle => Alignment.center,
+  SexTiming.end => const Alignment(2 / 3, 0),
+};
 
 /// The localized short month name for [date]'s calendar month, in the same
 /// abbreviated month form intl's date formats spell (en "Jan" / de "Jan." —
@@ -1941,8 +2004,10 @@ final class _DayHeaderRow extends StatelessWidget {
               // (the vertical lines run through the whole card).
               decoration: BoxDecoration(
                 border: Border(
-                  right: cycleDayCellBorderSide(context,
-                      isCycleBoundary: days.isCycleBoundary(i + 1)),
+                  right: cycleDayCellBorderSide(
+                    context,
+                    isCycleBoundary: days.isCycleBoundary(i + 1),
+                  ),
                 ),
               ),
               child: Column(
@@ -1988,10 +2053,7 @@ final class _DayHeaderRow extends StatelessWidget {
 
 /// One prototype cell in the frozen rail's header slot: the sample glyph
 /// with its tooltip (long-press) and its semantics label.
-Widget _columnPrototype({
-  required String prototype,
-  required String label,
-}) =>
+Widget _columnPrototype({required String prototype, required String label}) =>
     Semantics(
       label: label,
       child: Tooltip(
@@ -2000,10 +2062,7 @@ Widget _columnPrototype({
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
-              prototype,
-              style: const TextStyle(fontSize: 10),
-            ),
+            child: Text(prototype, style: const TextStyle(fontSize: 10)),
           ),
         ),
       ),
@@ -2083,39 +2142,42 @@ final class _CycleOrdinalBadges extends StatelessWidget {
         }
       }
       final rightIndex = math.min(nextBoundary, windowEnd + 1);
-      chips.add(Positioned(
-        left: i * cellWidth + _cycleBadgeColumnInset,
-        top: _cycleBadgeTopInset,
-        height: _cycleBadgeHeight,
-        child: ConstrainedBox(
-          // The cycle's own column span (clamped to the built window like
-          // every other row) is the chip's MAX width only: the chip is
-          // free to shrink to its label, and a span narrower than the
-          // label squeezes it down through the FittedBox below.
-          constraints: BoxConstraints(
-            maxWidth: (rightIndex - i) * cellWidth - 2 * _cycleBadgeColumnInset,
-          ),
-          child: Container(
-            // The chip key exposes the badge's rect for the geometry
-            // widget tests (the Text alone keeps 'cycleOrdinal-$i').
-            key: ValueKey('cycleOrdinalChip-$i'),
-            decoration: BoxDecoration(
-              color: scheme.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(4),
+      chips.add(
+        Positioned(
+          left: i * cellWidth + _cycleBadgeColumnInset,
+          top: _cycleBadgeTopInset,
+          height: _cycleBadgeHeight,
+          child: ConstrainedBox(
+            // The cycle's own column span (clamped to the built window like
+            // every other row) is the chip's MAX width only: the chip is
+            // free to shrink to its label, and a span narrower than the
+            // label squeezes it down through the FittedBox below.
+            constraints: BoxConstraints(
+              maxWidth:
+                  (rightIndex - i) * cellWidth - 2 * _cycleBadgeColumnInset,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                l10n.cycleOrdinal(days.cycleOrdinalByStart[days.dayAt(i)]!),
-                key: ValueKey('cycleOrdinal-$i'),
-                style: TextStyle(fontSize: 9, color: scheme.primary),
+            child: Container(
+              // The chip key exposes the badge's rect for the geometry
+              // widget tests (the Text alone keeps 'cycleOrdinal-$i').
+              key: ValueKey('cycleOrdinalChip-$i'),
+              decoration: BoxDecoration(
+                color: scheme.surface.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  l10n.cycleOrdinal(days.cycleOrdinalByStart[days.dayAt(i)]!),
+                  key: ValueKey('cycleOrdinal-$i'),
+                  style: TextStyle(fontSize: 9, color: scheme.primary),
+                ),
               ),
             ),
           ),
         ),
-      ));
+      );
     }
     return Stack(children: chips);
   }
@@ -2156,8 +2218,9 @@ final class _TemperatureScale {
   /// The scale's tick values: every half degree across the domain (the
   /// settings UI's step granularity keeps both bounds half-degree-aligned,
   /// so the step count is exact; the card enforces min < max).
-  List<double> get ticks =>
-      [for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5];
+  List<double> get ticks => [
+    for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5,
+  ];
 
   /// The two-scale label for a tick: integers plain ("37"), halves with one
   /// decimal ("36.5") — the numbering the chart's own axis titles used.
@@ -2200,10 +2263,9 @@ final class _LeftRail extends StatelessWidget {
           border: Border(
             right: BorderSide(
               width: 0.5,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.12),
             ),
           ),
         ),
@@ -2221,9 +2283,13 @@ final class _LeftRail extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _columnPrototype(
-                      prototype: '14.', label: l10n.cycleColumnDate),
+                    prototype: '14.',
+                    label: l10n.cycleColumnDate,
+                  ),
                   _columnPrototype(
-                      prototype: '#5', label: l10n.cycleColumnCycleDay),
+                    prototype: '#5',
+                    label: l10n.cycleColumnCycleDay,
+                  ),
                 ],
               ),
             ),
@@ -2259,7 +2325,8 @@ final class _LeftRail extends StatelessWidget {
                           child: Text(
                             scale.labelFor(value),
                             key: ValueKey(
-                                'railScaleLabel-${scale.labelFor(value)}'),
+                              'railScaleLabel-${scale.labelFor(value)}',
+                            ),
                             style: const TextStyle(fontSize: 10),
                           ),
                         ),
@@ -2290,7 +2357,10 @@ final class _LeftRail extends StatelessWidget {
   /// each vertically centered on the row's slot (shared row heights, same
   /// offsets the scrolling rows stack with).
   Widget _railSignalSegment(
-      BuildContext context, AppLocalizations l10n, List<_SignalKind> kinds) {
+    BuildContext context,
+    AppLocalizations l10n,
+    List<_SignalKind> kinds,
+  ) {
     return SizedBox(
       height: _signalSegmentHeight(kinds),
       child: Stack(
@@ -2307,9 +2377,7 @@ final class _LeftRail extends StatelessWidget {
                   label: _signalRowName(kind, l10n),
                   child: Tooltip(
                     message: _signalRowName(kind, l10n),
-                    child: Center(
-                      child: _signalCornerSample(context, kind),
-                    ),
+                    child: Center(child: _signalCornerSample(context, kind)),
                   ),
                 ),
               ),
