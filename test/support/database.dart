@@ -13,6 +13,7 @@ import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
 ///
@@ -75,6 +76,16 @@ Override inMemoryDatabase({
 /// onboardingCompleted row to exercise the hydration flip. The few tests
 /// that pump CycleApp directly (without [appScope]) override the provider
 /// themselves.
+///
+/// The harness also seeds the PackageInfo mock values BEFORE pumping: the
+/// about/onboarding page reads the app version from the installed binary via
+/// package_info_plus, and the metadata plugin call must be answered in the
+/// test binding or the version line hides (its designed failure path). The
+/// values mirror a real 0.1.0+1 device install: version without the build
+/// suffix, buildNumber without the `+`. NOTE: PackageInfo caches these
+/// values in one static that nothing can clear again — the failure-path run
+/// that needs the plugin call to fail must not go through this harness (and
+/// must run before any harness-pumping test in its file).
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
@@ -85,6 +96,13 @@ ProviderScope appScope({
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
 }) {
+  PackageInfo.setMockInitialValues(
+    appName: '',
+    packageName: '',
+    version: '0.1.0',
+    buildNumber: '1',
+    buildSignature: '',
+  );
   return ProviderScope(
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated),

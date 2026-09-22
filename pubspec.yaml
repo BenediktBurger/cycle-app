@@ -84,10 +84,15 @@ dependencies:
   # with the installed Flutter/Dart (resolved against Dart 3.13 — see lock).
   fl_chart: ^1.0.0
   # Opening the INER contact links on the about/onboarding page in the
-  # system browser/app; the only plugin dependency — the offline tracking
-  # paths never touch it (tests fake the platform interface to stay
-  # offline-safe).
+  # system browser/app; used together with package_info_plus below it is
+  # one of the two plugin dependencies — the offline tracking paths never
+  # touch either (tests fake/stub the platform calls to stay offline-safe).
   url_launcher: ^6.3.0
+  # The app version for the about/onboarding page's version line: read from
+  # the installed binary (the pubspec-mirror constant approach is deleted);
+  # metadata-only plugin — it brings no network permissions, so the
+  # offline-only posture holds.
+  package_info_plus: ^10.1.0
   # File picker for the import dialogs on the native targets (SAF-backed on
   # Android); web keeps its own file input, the stub covers exotic targets.
   file_selector: ^1.1.0

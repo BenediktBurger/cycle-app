@@ -2,25 +2,19 @@
 // full-page on the first start ([AboutPage.onboarding]) and from the
 // settings pane's about entry afterwards. Carries the fertility-tracking
 // warning (Mode-M posture: the app supports, it never decides), the
-// license/copyright section, the privacy notice, the backup hint, and the
-// feedback note.
+// license/copyright section, the privacy notice, the backup hint, the
+// version line, and the feedback note.
 //
 // Flutter's showAboutDialog is deliberately NOT used: it hard-wires the
 // license-chapter surface and can host neither the German-first warning
 // content nor the first-start "continue" affordance.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
-import '../version.dart';
-
-/// The displayed app version: the pubspec mirror ([appVersion]) WITHOUT its
-/// build suffix — the `+n` part is a build-farm artifact, not user
-/// information. lib/version.dart keeps the exact pubspec mirror (its sync
-/// test pins the whole string); only the display strips the suffix here.
-final String displayedAppVersion = appVersion.split('+').first;
 
 /// The onboarding page's continue action: flips the (hydratable, persisted)
 /// onboarding flag; the write-through listener and the [_HomeGate] rebuild
@@ -62,9 +56,33 @@ class AboutPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('${l10n.appTitle} · ${l10n.aboutVersion(displayedAppVersion)}',
-              style: theme.textTheme.titleSmall),
-          const SizedBox(height: 16),
+          // The version line: the app title plus the version the INSTALLED
+          // binary reports via package_info_plus — no pubspec-mirror
+          // constant that a sync test has to pin. On a lookup failure the
+          // WHOLE line (with its spacing) hides: no placeholder, no
+          // fallback version — a missing version must never resurrect the
+          // deleted pubspec mirror.
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                // Lookup failed or still in flight: no version line at all
+                // (swallowed like the contact-row launch failures — the
+                // about page must never crash over metadata).
+                return const SizedBox.shrink();
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      '${l10n.appTitle} · '
+                      '${l10n.aboutVersion(snapshot.data!.version)}',
+                      style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 16),
+                ],
+              );
+            },
+          ),
           // The method warning first: it is the reason this page exists at
           // all. A tinted card sets it apart from the rest of the prose.
           Card(

@@ -1,10 +1,11 @@
 // The About page as reached from the settings pane ("Einstellungen › Über
 // die App"): the shared content page (lib/ui/about.dart) must render its
-// full content — the version line (mirrored from pubspec via
-// lib/version.dart), the method warning (with the INER website as visible
-// text), the privacy/DSGVO notice, the license/copyright section, the
-// tappable INER contact rows, and the feedback footer whose URLs are
-// selectable text; popping the page returns to the settings pane.
+// full content — the version line (read from the installed binary via
+// package_info_plus, mocked by the shared harness), the method warning (with
+// the INER website as visible text), the privacy/DSGVO notice, the
+// license/copyright section, the tappable INER contact rows, and the
+// feedback footer whose URLs are selectable text; popping the page returns
+// to the settings pane.
 //
 // German and English device locales receive one case each; both mirror the
 // app's German-first posture and the ADR-0007 English fallback.
@@ -18,8 +19,10 @@
 // contact channel, next to the INER method-contact rows): its URL is an
 // app-fact, not an INER fact, so it is identical in every locale.
 import 'package:cycle_app/l10n/app_localizations.dart';
-import 'package:cycle_app/version.dart';
+import 'package:cycle_app/main.dart';
+import 'package:cycle_app/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
@@ -48,6 +51,38 @@ class RecordingLauncher extends UrlLauncherPlatform {
 }
 
 void main() {
+  // MUST stay the FIRST test of this file — see the comment below — and it
+  // deliberately bypasses the shared harness.
+  testWidgets('the version line hides when the package-info lookup fails',
+      (WidgetTester tester) async {
+    // The harness (appScope) seeds PackageInfo mock values in ONE static
+    // that nothing can clear again, and the mock must be answered for every
+    // harness-pumping test. This failure path needs the plugin call to
+    // ERROR like on a broken/unanswerable device install, so this case
+    // pumps the app directly (no harness) — and since the harness's mock
+    // cannot be undone, it must run before any other test of this file
+    // touches the harness.
+    useDeviceLocales(tester, const [Locale('de')]);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        inMemoryDatabase(),
+        onboardingCompletedProvider.overrideWith((ref) => false),
+      ],
+      child: const CycleApp(),
+    ));
+    await tester.pumpAndSettle();
+
+    // Sanity: the first-start page itself rendered — the missing package
+    // info must not take the whole page down.
+    expect(find.textContaining('getreue Beobachtung'), findsOneWidget,
+        reason: 'an unanswerable package-info plugin call stays contained: '
+            'the rest of the about/onboarding content still renders');
+    expect(find.textContaining('0.1.0'), findsNothing,
+        reason: 'a failing package-info lookup HIDES the version line '
+            'instead of showing a placeholder — no fallback may ever '
+            'resurrect the deleted pubspec-mirror constant');
+  });
+
   /// Opens the app on the settings pane (German device locale, seeded
   /// onboarding flag — same pattern as notices_test.dart) and pushes the
   /// about page from the settings pane's app bar info action.
@@ -70,18 +105,16 @@ void main() {
     final l10n = lookupAppLocalizations(const Locale('de'));
     await openGermanAboutPage(tester);
 
-    // The version line: the app title plus the mirrored pubspec version —
-    // asserted as the whole composed line, pinned to the appVersion
-    // constant (not a find-by-number of the version substring alone). The
-    // BUILD SUFFIX is stripped for display (about.dart shows the version
-    // without `+n`), so the expected line composes only the first part.
-    expect(
-        find.text('${l10n.appTitle} · '
-            '${l10n.aboutVersion(appVersion.split('+').first)}'),
+    // The version line: the app title plus the version the running binary
+    // reports via package_info_plus (harness-mocked to '0.1.0' for a real
+    // 0.1.0+1 install). Asserted as the whole composed line. The BUILD
+    // SUFFIX is never part of the reported version (about.dart shows the
+    // version without `+n` — it simply does not exist in PackageInfo).
+    expect(find.text('${l10n.appTitle} · ${l10n.aboutVersion('0.1.0')}'),
         findsOneWidget,
-        reason: 'the about page shows the app version mirrored from '
-            'pubspec.yaml (lib/version.dart corresponds to the version '
-            'entry), without the internal build suffix');
+        reason: 'the about page shows the app version from the installed '
+            'binary (the PackageInfo mock the harness seeds) — the '
+            'constant mirror and its sync test are gone');
 
     // The method warning carries the INER website as visible text.
     expect(find.textContaining('getreue Beobachtung'), findsOneWidget,
@@ -150,12 +183,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
-    expect(
-        find.text('${l10n.appTitle} · '
-            '${l10n.aboutVersion(appVersion.split('+').first)}'),
+    expect(find.text('${l10n.appTitle} · ${l10n.aboutVersion('0.1.0')}'),
         findsOneWidget,
-        reason: 'the version line mirrors pubspec.yaml (build suffix '
-            'stripped for display) in English too');
+        reason: 'the version line comes from the installed binary '
+            '(harness-mocked PackageInfo) in English too');
 
     expect(find.textContaining('faithful observation'), findsOneWidget,
         reason: 'the English warning is the translated'
