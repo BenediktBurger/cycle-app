@@ -19,11 +19,14 @@
 //
 // The installed Flutter SDK version is checked against tool/flutter-version
 // the same way: that file is what the F-Droid build recipe parses from each
-// tag, so the pin and the locally used SDK must not drift. First-run pin
-// staging mirrors the fingerprint pin: --accept-flutter-version writes the
-// installed version and stops; commit and rerun. On an installed-vs-pinned
-// mismatch the same flag is the explicit (operator-decision) bypass to run
-// with the committed pin — CI still fails the tag until they match.
+// tag, so the pin and the locally used SDK must not drift. A mismatch
+// ALWAYS fails the run — there is no bypass. --accept-flutter-version is
+// only the re-pin mechanism (also used for first-run staging): it rewrites
+// the pin file from the installed SDK AND updates the flutter-version:
+// inputs in .github/workflows/ci.yml (and .github/workflows/release.yml when
+// present) to the same version, then stops; one commit collects the changed
+// files, then rebuild the release APK and rerun. CI cross-checks the
+// workflow input against the same pin.
 //
 // Linux-release-machine note: by design this tool targets the project's
 // Linux release machine — it shells out to `sha256sum`, `git`, `gh`, and the
@@ -44,6 +47,14 @@ const String pinFilePath = 'tool/release_fingerprint.txt';
 /// The F-Droid build recipe parses this file from the tagged commit, so
 /// the release SDK is pinned exactly here.
 const String flutterPinFilePath = 'tool/flutter-version';
+
+/// Workflow files whose `flutter-version:` input must follow the pin:
+/// [ciWorkflowPath] is the CI gate that cross-checks the pin (must exist),
+/// [releaseWorkflowPath] is the parked release pipeline (skipped when
+/// absent). Both are written by the script's pin-staging paths; their
+/// committed content is otherwise untouched.
+const String ciWorkflowPath = '.github/workflows/ci.yml';
+const String releaseWorkflowPath = '.github/workflows/release.yml';
 
 /// Release artifact built by checklist step 4 (`flutter build apk --release`).
 const String defaultApkPath = 'build/app/outputs/flutter-apk/app-release.apk';
@@ -86,13 +97,17 @@ class Options {
   /// rerun matches the APK against the pin and proceeds).
   final bool acceptFingerprint;
 
-  /// First-run behavior for the Flutter SDK version: stage the pin file
-  /// ([flutterPinFilePath]) with the installed SDK's version and stop the
-  /// run there, so the operator commits it and reruns (the F-Droid recipe
-  /// parses that file from the tagged commit). On an installed-vs-pinned
-  /// MISMATCH this flag is the explicit bypass: the run proceeds with the
-  /// committed pin, nothing is written. A dry run only prints and
-  /// continues in both cases.
+  /// First-run and re-pin behavior for the Flutter SDK version: stage the
+  /// pin file ([flutterPinFilePath]) with the installed SDK's version and
+  /// sync the `flutter-version:` inputs in the CI workflows
+  /// ([ciWorkflowPath], and [releaseWorkflowPath] when present) to the same
+  /// version, then stop the run — the operator commits the changed files
+  /// (the pin and the workflows) and reruns (the F-Droid recipe parses the
+  /// pin file from the tagged commit). This covers both the first-ever pin
+  /// (file missing) and a re-pin when the installed SDK has drifted from
+  /// the committed pin — a mismatch NEVER lets a run continue, with or
+  /// without this flag. A dry run only prints the would-be pin and the
+  /// would-be workflow updates and continues.
   final bool acceptFlutterVersion;
 
   /// Check-only mode: no tag, no push, no release, no prompts.
@@ -108,12 +123,14 @@ class Options {
   /// clean tree. A dry run only prints the would-be pin and continues.
   bool get stopsAfterWritingPin => acceptFingerprint && !dryRun;
 
-  /// Consulted when the pin file is missing: the run on which
-  /// `--accept-flutter-version` is honored writes the installed SDK's
-  /// version into the pin file and then stops — the fresh pin leaves the
-  /// tree dirty, and tag/push must only happen on a clean tree. A dry run
-  /// only prints the would-be pin and continues. On an installed-vs-pinned
-  /// mismatch the flag is a plain bypass: nothing is written either way.
+  /// Consulted both for first-run staging (pin file missing) and for a
+  /// re-pin (installed SDK drifted from the committed pin): the run on
+  /// which `--accept-flutter-version` is honored rewrites the pin file with
+  /// the installed SDK's version, syncs the workflow `flutter-version:`
+  /// inputs to it, and then stops — the changed files leave the tree dirty,
+  /// and tag/push must only happen on a clean tree. A dry run only prints
+  /// the would-be changes and continues. Without the flag a mismatch (or a
+  /// missing pin) always fails — there is no bypass.
   bool get stopsAfterWritingFlutterPin => acceptFlutterVersion && !dryRun;
 
   /// Whether the script interactively asks for the upgrade-test
@@ -326,6 +343,205 @@ String formatFlutterPinFile(String version) {
       '$version\n';
 }
 
+/// Replaces every `flutter-version: …` line in [workflowSource] with
+/// `[indent]flutter-version: [version]` (leading whitespace preserved) and
+/// returns the rewritten source; null when no such line matches. Comment
+/// lines (`# flutter-version: …`) never match — the `#` prefix keeps them
+/// out of the anchored pattern. Write-only-when-changed on top of this
+/// transform gives idempotency for free.
+String? updateWorkflowFlutterVersion(String workflowSource, String version) {
+  // [ \t]* (not \s*) after the colon keeps the match on one line: \s* could
+  // span a newline when a value-less `flutter-version:` line is followed by
+  // an indented line, and the rewrite would swallow that line.
+  final pattern =
+      RegExp(r'^([ \t]*)flutter-version:[ \t]*.*$', multiLine: true);
+  if (!pattern.hasMatch(workflowSource)) return null;
+  return workflowSource.replaceAllMapped(
+      pattern, (match) => '${match.group(1)}flutter-version: $version');
+}
+
+/// One workflow file's validated sync plan: [originalSource] as read from
+/// disk, [updatedSource] as [updateWorkflowFlutterVersion] rewrote it.
+class WorkflowFileUpdate {
+  const WorkflowFileUpdate({
+    required this.path,
+    required this.originalSource,
+    required this.updatedSource,
+  });
+
+  /// Path relative to the repository root (e.g. `.github/workflows/ci.yml`).
+  final String path;
+  final String originalSource;
+  final String updatedSource;
+
+  /// False when the rewritten content equals what is on disk — nothing to
+  /// write (idempotency).
+  bool get changed => originalSource != updatedSource;
+}
+
+/// The validated workflow sync: files to (possibly) write plus the paths
+/// that were skipped because the file is not present.
+class WorkflowSyncPlan {
+  const WorkflowSyncPlan({
+    required this.updates,
+    required this.skippedMissing,
+  });
+
+  final List<WorkflowFileUpdate> updates;
+  final List<String> skippedMissing;
+}
+
+/// Reads and validates the workflow files under [root] BEFORE any write:
+/// - [ciWorkflowPath] missing → [ReleaseException] (broken repo state: the
+///   CI workflow is the gate that cross-checks the pin; a silent skip would
+///   strip the sync protection while looking successful);
+/// - an existing workflow file whose source exposes no matchable
+///   `flutter-version:` line → [ReleaseException] naming the exact file and
+///   the expected line shape (a merely logged skip would recreate the very
+///   pin/input drift this sync exists to prevent);
+/// - [releaseWorkflowPath] missing → listed in [WorkflowSyncPlan
+///   .skippedMissing] (parked workflow; the pin invariant is enforced by
+///   [ciWorkflowPath] alone).
+Future<WorkflowSyncPlan> planFlutterWorkflowSync({
+  required Directory root,
+  required String version,
+}) async {
+  final updates = <WorkflowFileUpdate>[];
+  final skippedMissing = <String>[];
+  for (final path in const [ciWorkflowPath, releaseWorkflowPath]) {
+    final file = File('${root.path}/$path');
+    if (!file.existsSync()) {
+      if (path == ciWorkflowPath) {
+        _fail('$ciWorkflowPath not found — that workflow is the gate that '
+            'cross-checks the $flutterPinFilePath pin, so it must exist. '
+            'Without it the pin/workflow-input sync cannot be verified and '
+            'the pin invariant stands unenforced. Nothing was written.');
+      }
+      skippedMissing.add(path);
+      continue;
+    }
+    final source = await file.readAsString();
+    final updated = updateWorkflowFlutterVersion(source, version);
+    if (updated == null) {
+      _fail('cannot sync the flutter-version: input in $path — the file '
+          'contains no matchable `flutter-version: X.Y.Z` line (expected on '
+          'its own line, as the input of the subosito/flutter-action step). '
+          'The workflow must expose that line again before the pin can be '
+          'rewritten; the tree was left untouched.');
+    }
+    updates.add(WorkflowFileUpdate(
+      path: path,
+      originalSource: source,
+      updatedSource: updated,
+    ));
+  }
+  return WorkflowSyncPlan(updates: updates, skippedMissing: skippedMissing);
+}
+
+/// The shared stop path of both pin-staging routes (first-ever pin and
+/// re-pin on mismatch): validate the workflow sync FIRST, then write the
+/// pin file, then update each workflow file whose content actually changes
+/// (skipping unchanged ones — idempotent), then stop the run via
+/// [flutterPinWriteStopMessage]. A malformed workflow therefore never
+/// leaves behind a half-updated pin + workflow combination.
+Future<Never> writeFlutterPinAndStop({
+  required Directory root,
+  required String version,
+}) async {
+  final plan = await planFlutterWorkflowSync(root: root, version: version);
+  final pinFile = File('${root.path}/$flutterPinFilePath');
+  await pinFile.parent.create(recursive: true);
+  await pinFile.writeAsString(formatFlutterPinFile(version));
+  for (final update in plan.updates) {
+    if (!update.changed) {
+      print('${update.path} already pins flutter-version: $version — '
+          'left unchanged.');
+      continue;
+    }
+    await File('${root.path}/${update.path}')
+        .writeAsString(update.updatedSource);
+    print('Set the flutter-version: input to $version in ${update.path}.');
+  }
+  for (final skipped in plan.skippedMissing) {
+    print('$skipped is not present — skipped.');
+  }
+  _fail(flutterPinWriteStopMessage(version));
+}
+
+/// Dry-run note for both pin-staging routes: validates the workflow sync
+/// (a dry run performs checks and may fail — that failure happens now,
+/// before the real pin staging later), prints the would-be pin file content
+/// and the would-be-updated workflow files, and writes nothing.
+Future<void> printFlutterPinSyncDryRunNote({
+  required Directory root,
+  required String version,
+}) async {
+  final plan = await planFlutterWorkflowSync(root: root, version: version);
+  print('dry-run note: outside a dry run, --accept-flutter-version would '
+      'now write $flutterPinFilePath with:');
+  print(formatFlutterPinFile(version));
+  print('dry-run note: and set the flutter-version: input:');
+  for (final update in plan.updates) {
+    if (update.changed) {
+      print('  ${update.path} — set to flutter-version: $version');
+    } else {
+      print('  ${update.path} — already flutter-version: $version '
+          '(would be left unchanged)');
+    }
+  }
+  for (final skipped in plan.skippedMissing) {
+    print('dry-run note: $skipped is not present — skipped.');
+  }
+  print('dry-run note: continuing with the checks only, nothing written.');
+}
+
+/// Failure message for an installed-vs-pinned Flutter version mismatch
+/// without `--accept-flutter-version`. A mismatch always fails the run —
+/// this message is the remediation: switch the installed SDK to the pinned
+/// version, or re-pin the installed version with the flag — that run
+/// rewrites the pin and syncs the workflow inputs itself, so one commit
+/// then collects all changed files, followed by rebuild and rerun.
+String flutterPinMismatchMessage({
+  required String installed,
+  required String pinned,
+}) {
+  return 'FLUTTER VERSION MISMATCH: installed SDK $installed, pinned '
+      '$pinned in $flutterPinFilePath. The run cannot continue — the pin '
+      'file is what the F-Droid recipe parses from the tagged commit, and '
+      'CI fails the tag when it has drifted from the used SDK. Fix it by '
+      'either\n'
+      '  (a) switching the installed Flutter SDK to the pinned version '
+      '($pinned), or\n'
+      '  (b) making $installed the new pin: rerun with '
+      '--accept-flutter-version — that run rewrites $flutterPinFilePath '
+      'and updates the flutter-version: input in the CI workflows '
+      '(.github/workflows/ci.yml, and .github/workflows/release.yml when '
+      'present) itself, then stops.\n'
+      'Either way: commit all changed files (the pin and the workflow '
+      'files), rebuild the release APK on that SDK (checklist step 4: '
+      '`flutter build apk --release`), and rerun this script.';
+}
+
+/// Stop message after a successful re-pin (also the first-run staging
+/// path): the pin file was rewritten with `version` and the workflow
+/// `flutter-version:` inputs were synced to it; the run stops so the
+/// operator commits all changed files, rebuilds, and reruns.
+String flutterPinWriteStopMessage(String version) {
+  return 'Wrote and pinned the installed SDK version $version in '
+      '$flutterPinFilePath, and updated the flutter-version: input in '
+      '.github/workflows/ci.yml (and in .github/workflows/release.yml when '
+      'present) to $version. The run stops here — commit the pin and the '
+      'updated workflow files:\n'
+      '  git add $flutterPinFilePath .github/workflows/* && git commit '
+      '-m "pin Flutter SDK version"\n'
+      'Then rebuild the release APK on that SDK (checklist step 4: '
+      '`flutter build apk --release`) and rerun this script: the F-Droid '
+      'recipe parses the committed pin from the tagged commit, so the '
+      'committed pin is what a Flutter-version bump publishes.\n'
+      'Stopping keeps the tree clean — tag and push must not run with a '
+      'fresh, uncommitted pin.';
+}
+
 /// Framework-free equivalent of the parked CI flow's
 /// `ls build-tools/*/apksigner | sort -V | tail -1`: picks the numerically
 /// newest build-tools directory name. Non-version entries are ignored; null
@@ -491,18 +707,10 @@ Future<void> runRelease(List<String> arguments) async {
     print('NO FLUTTER VERSION PIN YET — the installed SDK is:');
     print('  Flutter SDK: $installedFlutter');
     if (options.stopsAfterWritingFlutterPin) {
-      await flutterPinFile
-          .writeAsString(formatFlutterPinFile(installedFlutter));
-      _fail('Wrote and pinned the installed SDK version above in '
-          '$flutterPinFilePath. The run stops here — commit '
-          'tool/flutter-version and rerun: the F-Droid recipe parses this '
-          'file from the tagged commit, so the committed pin is what a '
-          'Flutter-version bump publishes.\n'
-          '  git add $flutterPinFilePath && git commit -m "pin Flutter '
-          'SDK version"\n'
-          'On the rerun the pin matches the installed SDK and the run '
-          'proceeds. Stopping keeps the tree clean — tag and push must '
-          'not run with a fresh, uncommitted pin.');
+      await writeFlutterPinAndStop(
+        root: Directory.current,
+        version: installedFlutter,
+      );
     }
     if (!options.dryRun || !options.acceptFlutterVersion) {
       _fail('no pin file at $flutterPinFilePath and no '
@@ -512,30 +720,37 @@ Future<void> runRelease(List<String> arguments) async {
           'is the one to release with, then rerun with '
           '--accept-flutter-version to pin it.');
     }
-    print('dry-run note: outside a dry run, --accept-flutter-version '
-        'would now write $flutterPinFilePath with:');
-    print(formatFlutterPinFile(installedFlutter));
+    await printFlutterPinSyncDryRunNote(
+      root: Directory.current,
+      version: installedFlutter,
+    );
   } else {
     print('Flutter SDK: $installedFlutter; pinned in '
         '$flutterPinFilePath: $pinnedFlutter.');
     if (installedFlutter != pinnedFlutter) {
-      if (options.acceptFlutterVersion) {
-        // Explicit bypass: the operator overrides the pin-vs-installed
-        // drift — the run proceeds with the committed pin unperturbed.
-        // Nothing is written; CI still enforces the match on the tag.
-        print('FLUTTER VERSION MISMATCH ACCEPTED via '
-            '--accept-flutter-version: installed SDK $installedFlutter, '
-            'pinned $pinnedFlutter in $flutterPinFilePath — continuing '
-            'with the pinned value. Remind yourself that CI fails the '
-            'tag until they match again.');
+      // A drifted pin never lets the run continue (no bypass). The flag
+      // doubles as the re-pin mechanism: as on the first-run path, it
+      // rewrites the pin from the installed SDK, syncs the workflow
+      // inputs, and stops for commit + rebuild + rerun; a dry run only
+      // prints the would-be changes.
+      if (options.stopsAfterWritingFlutterPin) {
+        await writeFlutterPinAndStop(
+          root: Directory.current,
+          version: installedFlutter,
+        );
+      }
+      if (options.acceptFlutterVersion && options.dryRun) {
+        await printFlutterPinSyncDryRunNote(
+          root: Directory.current,
+          version: installedFlutter,
+        );
       } else {
-        _fail('FLUTTER VERSION MISMATCH: installed SDK '
-            '$installedFlutter, pinned $pinnedFlutter in '
-            '$flutterPinFilePath. The pin file is what the F-Droid '
-            'recipe parses from the tagged commit (nothing outside this '
-            'one file needs an fdroiddata edit on a Flutter bump) — bump '
-            'it to the installed SDK and commit, or pass '
-            '--accept-flutter-version to bypass this check for this run.');
+        _fail(flutterPinMismatchMessage(
+          installed: installedFlutter,
+          // Non-null here: the guard above fails the run on an unparsable
+          // pin file before this branch is ever reached.
+          pinned: pinnedFlutter!,
+        ));
       }
     }
   }

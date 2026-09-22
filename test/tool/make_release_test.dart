@@ -10,8 +10,14 @@
 // nothing touches the repository state (no tags are created,
 // tool/release_fingerprint.txt is never written) — the process layer of the
 // script stays outside this suite by design.
+// One documented exception: the "flutter pin staging + workflow sync
+// orchestration" group below spins up a Directory.systemTemp sandbox to
+// exercise the file-write ordering (pin + workflow files) — it touches
+// nothing in the repository itself.
 // Relative import on purpose: tool/ scripts live outside lib/ and are not
 // addressable through `package:cycle_app/`.
+import 'dart:io';
+
 import '../../tool/make_release.dart';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -161,9 +167,328 @@ void main() {
         tested: false,
       );
       expect(plain.stopsAfterWritingFlutterPin, isFalse,
-          reason: 'a version mismatch without the flag aborts without '
-              'writing anything');
+          reason: 'without the flag the run always fails loudly instead '
+              'of staging a pin — the match check is never bypassable');
       expect(dryOnly.stopsAfterWritingFlutterPin, isFalse);
+    });
+  });
+
+  group('flutter pin mismatch remediation messages', () {
+    test('the no-flag mismatch failure lists every remediation element', () {
+      final message = flutterPinMismatchMessage(
+        installed: '3.48.1',
+        pinned: '3.47.4',
+      );
+      expect(message, contains('FLUTTER VERSION MISMATCH'));
+      expect(message, contains('3.48.1'));
+      expect(message, contains('3.47.4'));
+      expect(message, contains('tool/flutter-version'));
+      expect(message, contains('--accept-flutter-version'));
+      expect(message, contains('.github/workflows/ci.yml'));
+      expect(message, contains('flutter-version:'));
+      expect(message, contains('commit'));
+      expect(message, contains('flutter build apk --release'));
+      expect(message, contains('rerun'));
+    });
+
+    test('the no-flag mismatch failure offers both remediation directions', () {
+      final message = flutterPinMismatchMessage(
+        installed: '3.48.1',
+        pinned: '3.47.4',
+      );
+      expect(message, contains('rewrites $flutterPinFilePath'));
+    });
+
+    test('the stop-after-rewrite message lists every follow-up step', () {
+      final message = flutterPinWriteStopMessage('3.48.1');
+      expect(message, contains('3.48.1'));
+      expect(message, contains('tool/flutter-version'));
+      expect(message, contains('git add'));
+      expect(message, contains('commit'));
+      expect(message, contains('.github/workflows/ci.yml'));
+      expect(message, contains('flutter-version:'));
+      expect(message, contains('flutter build apk --release'));
+      expect(message, contains('rerun'));
+    });
+
+    test('both messages state that the script syncs the workflow inputs', () {
+      final mismatch = flutterPinMismatchMessage(
+        installed: '3.48.1',
+        pinned: '3.47.4',
+      );
+      expect(
+        mismatch,
+        contains('updates the flutter-version: input'),
+        reason: 'the re-pin run updates the workflow inputs itself',
+      );
+      final stop = flutterPinWriteStopMessage('3.48.1');
+      expect(
+        stop,
+        contains('updated the flutter-version: input'),
+        reason: 'the staging run updates the workflow inputs itself',
+      );
+      expect(
+        stop,
+        contains('git add $flutterPinFilePath .github/workflows/*'),
+        reason: 'one commit collects the pin and the workflow files',
+      );
+      expect(
+        mismatch,
+        contains('commit all changed files'),
+        reason: 'one commit collects the pin and the workflow files',
+      );
+    });
+
+    test('neither message instructs a hand edit of the workflow input', () {
+      final mismatch = flutterPinMismatchMessage(
+        installed: '3.48.1',
+        pinned: '3.47.4',
+      );
+      final stop = flutterPinWriteStopMessage('3.48.1');
+      for (final message in [mismatch, stop]) {
+        expect(message, isNot(contains('update the flutter-version')));
+        expect(message, isNot(contains('Update the flutter-version')));
+        expect(message, isNot(contains('and commit that too')));
+        expect(message, isNot(contains('by hand')));
+      }
+    });
+  });
+
+  group('updateWorkflowFlutterVersion (workflow input sync transform)', () {
+    // Minimal ci.yml-style fixture: a `uses:` block with an indented
+    // flutter-version input, matching .github/workflows/ci.yml's shape.
+    const original = '''
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+''';
+    const updatedFor3481 = '''
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.48.1
+''';
+
+    test('rewrites the flutter-version: input and changes nothing else', () {
+      expect(updateWorkflowFlutterVersion(original, '3.48.1'), updatedFor3481);
+    });
+
+    test('preserves the leading whitespace of the replaced line', () {
+      expect(
+        updateWorkflowFlutterVersion('  flutter-version: 3.47.4\n', '3.48.1'),
+        '  flutter-version: 3.48.1\n',
+      );
+      expect(
+        updateWorkflowFlutterVersion('\tflutter-version: 3.47.4\n', '3.48.1'),
+        '\tflutter-version: 3.48.1\n',
+      );
+    });
+
+    test('leaves commented flutter-version lines untouched', () {
+      const commented =
+          '  # flutter-version: 3.47.4\nflutter-version: 3.47.4\n';
+      expect(
+        updateWorkflowFlutterVersion(commented, '3.48.1'),
+        '  # flutter-version: 3.47.4\nflutter-version: 3.48.1\n',
+      );
+    });
+
+    test('replaces every matchable line at once', () {
+      const doubled =
+          'flutter-version: 3.47.4\nother: value\n  flutter-version: 3.47.4\n';
+      expect(
+        updateWorkflowFlutterVersion(doubled, '3.48.1'),
+        'flutter-version: 3.48.1\nother: value\n  flutter-version: 3.48.1\n',
+      );
+    });
+
+    test('returns null when no matchable line exists', () {
+      expect(
+          updateWorkflowFlutterVersion('channel: stable\n', '3.48.1'), isNull);
+      expect(
+        updateWorkflowFlutterVersion('# flutter-version: 3.47.4\n', '3.48.1'),
+        isNull,
+        reason: 'a commented line must not count as a matchable input',
+      );
+    });
+
+    test('a value-less flutter-version: line is not rewritten across lines',
+        () {
+      // A multi-line match (via \s* after the colon) would swallow the
+      // indented next line and the channel input with it.
+      const valueless = '  with:\n    flutter-version:\n    channel: stable\n';
+      expect(
+        updateWorkflowFlutterVersion(valueless, '3.48.1'),
+        anyOf(isNull, contains('channel: stable')),
+        reason: 'the rewrite must never span from the flutter-version: line '
+            'into the following line',
+      );
+    });
+
+    test('is idempotent: re-applying the current version is a no-op', () {
+      final once = updateWorkflowFlutterVersion(original, '3.48.1')!;
+      expect(updateWorkflowFlutterVersion(once, '3.48.1'), once);
+    });
+  });
+
+  group(
+      'flutter pin staging + workflow sync orchestration (temp-dir '
+      'exception)', () {
+    late Directory root;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('make_release_sync_test');
+    });
+
+    tearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    const workflowPinned = '''
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+''';
+    const workflowSynced = '''
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.48.1
+''';
+    const malformedWorkflow = 'steps:\n  - run: make\n';
+
+    File fileUnderRoot(String relativePath) =>
+        File('${root.path}/$relativePath');
+    File pinFile() => fileUnderRoot(flutterPinFilePath);
+
+    Future<void> writeFile(String relativePath, String content) async {
+      final file = File('${root.path}/$relativePath');
+      await file.parent.create(recursive: true);
+      await file.writeAsString(content);
+    }
+
+    test(
+        'flag + real run: pin file and both workflow files are updated, '
+        'then the run stops', () async {
+      await writeFile(ciWorkflowPath, workflowPinned);
+      await writeFile(releaseWorkflowPath, workflowPinned);
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>()),
+      );
+      expect(await pinFile().readAsString(), formatFlutterPinFile('3.48.1'));
+      expect(
+          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowSynced);
+      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
+          workflowSynced);
+    });
+
+    test('dry run: reports the would-be changes and writes nothing', () async {
+      await writeFile(flutterPinFilePath, '# pin\n3.47.4\n');
+      await writeFile(ciWorkflowPath, workflowPinned);
+      await writeFile(releaseWorkflowPath, workflowPinned);
+      await printFlutterPinSyncDryRunNote(root: root, version: '3.48.1');
+      expect(
+        await pinFile().readAsString(),
+        '# pin\n3.47.4\n',
+        reason: 'a dry run never stages the pin',
+      );
+      expect(
+          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowPinned);
+      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
+          workflowPinned);
+    });
+
+    test('missing release.yml: skipped, ci.yml still updated, run stops',
+        () async {
+      await writeFile(ciWorkflowPath, workflowPinned);
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>()),
+      );
+      expect(await pinFile().readAsString(), formatFlutterPinFile('3.48.1'));
+      expect(
+          await fileUnderRoot(ciWorkflowPath).readAsString(), workflowSynced);
+      expect(fileUnderRoot(releaseWorkflowPath).existsSync(), isFalse);
+    });
+
+    test('missing ci.yml: run aborts before anything is written', () async {
+      await writeFile(releaseWorkflowPath, workflowPinned);
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>()),
+      );
+      expect(
+        pinFile().existsSync(),
+        isFalse,
+        reason: 'ci.yml is the pin-cross-checking gate — its absence must '
+            'hard-fail before any write',
+      );
+      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
+          workflowPinned);
+    });
+
+    test(
+        'workflow without a matchable flutter-version line: run aborts '
+        'naming the file, pin NOT written (validate before write)', () async {
+      await writeFile(ciWorkflowPath, malformedWorkflow);
+      await writeFile(releaseWorkflowPath, workflowPinned);
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>().having(
+          (error) => error.message,
+          'message',
+          allOf(
+            contains(ciWorkflowPath),
+            contains('flutter-version: X.Y.Z'),
+          ),
+        )),
+      );
+      expect(
+        pinFile().existsSync(),
+        isFalse,
+        reason: 'validation must happen before any write — no half-updated '
+            'pin + workflow combination',
+      );
+      expect(await fileUnderRoot(ciWorkflowPath).readAsString(),
+          malformedWorkflow);
+      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
+          workflowPinned);
+    });
+
+    test(
+        'a second stop run rewrites nothing (only content changes are '
+        'written)', () async {
+      await writeFile(ciWorkflowPath, workflowPinned);
+      await writeFile(releaseWorkflowPath, workflowPinned);
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>()),
+      );
+      final ciAfterFirst = await fileUnderRoot(ciWorkflowPath).readAsString();
+      final releaseAfterFirst =
+          await fileUnderRoot(releaseWorkflowPath).readAsString();
+      await expectLater(
+        writeFlutterPinAndStop(root: root, version: '3.48.1'),
+        throwsA(isA<ReleaseException>()),
+      );
+      expect(await fileUnderRoot(ciWorkflowPath).readAsString(), ciAfterFirst);
+      expect(await fileUnderRoot(releaseWorkflowPath).readAsString(),
+          releaseAfterFirst);
     });
   });
 

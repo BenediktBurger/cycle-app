@@ -313,14 +313,19 @@ Do **not** start until Android went through Phases B–F at least once.
    # first release ever: --accept-fingerprint (see below)
    ```
 
-   - **Checks (refuse to publish on any failure):** cross-checks the tag
-     against the `pubspec.yaml` version (the parked workflow's missing
-     pre-flight, performed locally), requires a clean tree, refuses when
-     `vX.Y.Z` already exists as a tag, and requires the step-4 APK to
-     exist. The run also requires the installed SDK to match
-     `tool/flutter-version` — a mismatch fails;
-     `--accept-flutter-version` writes the pin and stops for commit +
-     rerun (first pin), or bypasses a deliberate mismatch for the run.
+   - **Checks (refuse to publish on any failure):**
+     - requires a clean working tree.
+     - requires the step-4 APK to exist.
+     - cross-checks the tag against the `pubspec.yaml` version and refuses
+       when `vX.Y.Z` already exists as a tag.
+     - requires the installed SDK to match `tool/flutter-version`.
+       To resolve a mismatch, either switch the installed Flutter SDK to
+       the pinned version, or rerun with `--accept-flutter-version`; the
+       run rewrites the pin to the installed SDK and updates the
+       `flutter-version:` inputs in `.github/workflows/ci.yml` and in
+       `.github/workflows/release.yml` (when that workflow is present)
+       itself, then stops there. Then commit all changed files (pin +
+       workflows), rebuild the APK (step 4), and rerun the script.
    - **Signature pin:** the `apksigner verify --print-certs` SHA-256
      certificate fingerprint must match the pin in
      `tool/release_fingerprint.txt` — a mismatch means the wrong key or
