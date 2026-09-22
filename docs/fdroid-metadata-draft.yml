@@ -69,6 +69,11 @@ CurrentVersionCode: 1
 # Skeleton only — build recipes (gradle flavor structure, `flutter` arg,
 # `sudo`/`rm` lines if any) MUST be checked against recent Flutter apps in
 # fdroiddata at submission time; do not copy this skeleton unchecked.
+#
+# No `rm:`/ScanIgnore lines are expected for the SQLite engine: the sqlite3
+# build hook compiles the amalgamation vendored under native/sqlite3mc/
+# (pubspec.yaml hooks.user_defines), so no prebuilt libsqlite3mc.so is
+# downloaded from GitHub at build time.
 # Builds:
 #   - versionName: 0.1.0
 #     versionCode: 1

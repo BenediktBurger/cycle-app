@@ -120,3 +120,14 @@ preserving user data. Dropping and recreating tables / erasing the
 database on upgrade is no longer an acceptable way to land schema changes,
 regardless of the change's size or the schema-version distance it would
 skip.
+
+### Implementation note (same amendment): the mc engine is compiled, not downloaded
+
+The user-define is realized as `source: source` with the
+SQLite3MultipleCiphers amalgamation vendored under `native/sqlite3mc/`
+(the package's default `sqlite3mc` source would download a prebuilt
+library from a GitHub release at build time). The vendored build is
+network-free and self-contained (no extra libraries), which also keeps
+an F-Droid build-from-source recipe free of scanignore carve-outs
+(docs/release.md Phase E). Provenance, licensing, and refresh steps:
+`native/sqlite3mc/README.md`.
