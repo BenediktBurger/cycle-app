@@ -15,6 +15,9 @@ import 'dart:convert';
 import 'dart:html' as html;
 
 bool get canSaveFile => true;
+// No system share sheet on web — the browser download above carries the
+// export file, so the share button stays hidden here.
+bool get canShareFile => false;
 const bool canPickFile = true;
 
 /// Triggers a browser download of [content] as [filename] (anchor + Blob).
@@ -33,6 +36,11 @@ Future<bool> saveFile(String filename, String content) async {
   html.Url.revokeObjectUrl(url);
   return true;
 }
+
+// Never called in production ([canShareFile] is false keeps the button
+// hidden); it exists only so every implementation of the conditional
+// export compiles with the same surface.
+Future<bool> shareFile(String filename, String content) async => false;
 
 /// Opens a file picker filtered by [accept] (an HTML accept list such as
 /// `application/json,.json` or `.csv,text/csv`) and reads the chosen file's
