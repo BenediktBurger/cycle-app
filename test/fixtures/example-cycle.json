@@ -1,0 +1,201 @@
+{
+  "schema_version": 6,
+  "exported_at": "2026-09-22T15:00:00.976Z",
+  "entries": [
+    {
+      "date": "2026-08-20",
+      "bleeding": 4
+    },
+    {
+      "date": "2026-08-21",
+      "bleeding": 4
+    },
+    {
+      "date": "2026-08-22",
+      "bleeding": 4
+    },
+    {
+      "date": "2026-08-23",
+      "bleeding": 3
+    },
+    {
+      "date": "2026-08-24",
+      "bleeding": 3,
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-08-25",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 510,
+      "mucus_sign": "t",
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-08-26",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 423,
+      "temp_disturbances": 5,
+      "mucus_sign": "nothing",
+      "notes": "[temp] alk, sp"
+    },
+    {
+      "date": "2026-08-27",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 423,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2026-08-28",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 423,
+      "mucus_sign": "f"
+    },
+    {
+      "date": "2026-08-29",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 423,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2026-08-30",
+      "bbt_c": 36.55,
+      "measured_at_minutes": 423,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2026-08-31",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 430,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "pain_mittelschmerz": true
+    },
+    {
+      "date": "2026-09-01",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 425,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2026-09-02",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 435,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2026-09-03",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 450,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2026-09-04",
+      "bbt_c": 37,
+      "measured_at_minutes": 430,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2026-09-05",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 460
+    },
+    {
+      "date": "2026-09-06",
+      "bbt_c": 37,
+      "measured_at_minutes": 440,
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-09-07",
+      "bbt_c": 37.2,
+      "measured_at_minutes": 459,
+      "temp_disturbances": 5,
+      "notes": "[temp] alk, sp"
+    },
+    {
+      "date": "2026-09-08",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 435,
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-09-09",
+      "bbt_c": 37,
+      "measured_at_minutes": 423
+    },
+    {
+      "date": "2026-09-10",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 436
+    },
+    {
+      "date": "2026-09-12",
+      "bbt_c": 37,
+      "measured_at_minutes": 423
+    },
+    {
+      "date": "2026-09-13",
+      "bbt_c": 37.1,
+      "measured_at_minutes": 455
+    },
+    {
+      "date": "2026-09-14",
+      "bbt_c": 37,
+      "measured_at_minutes": 844,
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-09-15",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 843,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "sex_timings": 2
+    },
+    {
+      "date": "2026-09-16",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 420,
+      "bleeding": 4
+    }
+  ],
+  "marks": [
+    {
+      "entry_date": "2026-08-20",
+      "mark_type": "cycleStart",
+      "author": "import"
+    },
+    {
+      "entry_date": "2026-08-26",
+      "mark_type": "ignoreTemperature",
+      "author": "import"
+    },
+    {
+      "entry_date": "2026-09-01",
+      "mark_type": "mucusPeakDay",
+      "author": "user"
+    },
+    {
+      "entry_date": "2026-09-02",
+      "mark_type": "firstHigherMeasurement",
+      "author": "user"
+    },
+    {
+      "entry_date": "2026-09-04",
+      "mark_type": "suzEvening",
+      "author": "user"
+    },
+    {
+      "entry_date": "2026-09-07",
+      "mark_type": "ignoreTemperature",
+      "author": "import"
+    },
+    {
+      "entry_date": "2026-09-16",
+      "mark_type": "cycleStart",
+      "author": "import"
+    }
+  ]
+}
