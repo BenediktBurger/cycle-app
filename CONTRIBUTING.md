@@ -273,7 +273,12 @@ report the full analyzer/test output back so issues can be fixed promptly.
   status vocabulary (Accepted / Hypothesis / Proposed) is defined there.
 - **Localization** is German-first via `flutter gen-l10n` (`l10n.yaml`,
   `lib/l10n/`), with English mirrored. Add new UI strings to both
-  `.arb` files.
+  `.arb` files: new keys start in `app_en.arb` (it is the gen-l10n
+  template, so the fallback language is English), but the German wording
+  is authoritative once translated — when the two languages diverge, fix
+  German first and mirror the correction into English (see
+  [ADR-0007](docs/adr/0007-language-policy.md) for the wording-authority
+  clarification).
 - **Package name** `cycle_app` is a placeholder ([ADR-0002](docs/adr/0002-package-name-cycle-app-placeholder.md));
   do not rely on it in code
 - **Unresolved working assumptions** are marked in code and docs — in

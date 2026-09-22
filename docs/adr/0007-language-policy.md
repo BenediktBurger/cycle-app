@@ -1,6 +1,7 @@
 # ADR-0007: Language policy — English code, multilingual app
 
 - **Date:** 2026-09-15
+- **Clarified:** 2026-09-22
 - **Status:** Accepted
 
 ## Context
@@ -32,6 +33,15 @@ the product language is German.
 - Existing German-named files were a historical exception and have been
   **mechanically renamed to English identifiers**; the rename carried no
   behavior change.
+- **German wording is authoritative for everything**: when the German and
+  English translations of a string (or a store-listing text) diverge, the
+  German wording wins and the English text is corrected to mirror it — the
+  NER/Rötzer terminology is German in origin
+  ([ADR-0002](0002-package-name-cycle-app-placeholder.md)).
+- **English's first position is purely mechanical**: `app_en.arb` must stay
+  the gen-l10n template (see `l10n.yaml`) so untranslated terms fall back
+  to English — never German. New keys therefore *start* in English, but
+  that does not make the English wording authoritative.
 
 ## Consequences
 
@@ -43,3 +53,11 @@ the product language is German.
 - New files start with English names from now on, so the renamed set was
   finite; there is no renumbering
   or archive step for historical commits that used the German names.
+- The wording-authority rule resolves into two workflows by mechanism:
+  store metadata is drafted German-first and mirrored in English
+  (`fastlane/metadata/android/README.md`), while ARB keys are entered
+  English-first only because of the template mechanism (`l10n.yaml`).
+  In practice: a new key is drafted in `app_en.arb`, the German
+  translation is added in `app_de.arb`, and afterwards the German text is
+  the proofread authority — any English deviation is corrected to mirror
+  the German wording.

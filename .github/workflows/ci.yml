@@ -22,12 +22,27 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Pinned to match the dev machine's stable Flutter (currently
-      # 3.47.4 / Dart 3.13.3); update this together with the local SDK.
+      # Keep equal to tool/flutter-version (single source of truth, enforced
+      # by the gate below); shell expansion is not possible in action inputs.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: 3.47.4
+
+      # The pinned Flutter version lives in tool/flutter-version (one bare
+      # version line under comments) — the file the F-Droid build recipe
+      # parses from each tagged commit. Fail the run loudly when the
+      # workflow's Flutter above and that pin drift apart.
+      - name: Flutter version matches tool/flutter-version
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          installed="$(flutter --version | sed -n 's/^Flutter \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
+          if [ "$installed" != "$pinned" ]; then
+            echo "Flutter version mismatch: installed $installed, but tool/flutter-version pins $pinned."
+            echo "Update tool/flutter-version (together with this workflow's flutter-version input) —"
+            echo "the F-Droid recipe reads tool/flutter-version from the tagged release."
+            exit 1
+          fi
 
       - name: Install dependencies
         run: flutter pub get
