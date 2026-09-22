@@ -76,3 +76,18 @@ web-no-encryption split"; native encryption has since landed pre-release
 via SQLite3MultipleCiphers, always-on (see the amendment in
 [ADR-0005](0005-storage-and-encryption.md)). The settings decisions in
 this ADR are unaffected.
+
+## Update 2026-09-22: upgrade-policy wording
+
+The decision bullet and the consequence paragraph above that reference
+ADR-0005's destructive-upgrade policy described the pre-release state:
+while the app was unpublished, upgrades dropped and recreated all tables.
+That policy has ended with the first published GitHub releases — the
+governing amendment is in [ADR-0005](0005-storage-and-encryption.md),
+dated 2026-09-22. From now on, every schema upgrade of the shared
+database is a graceful, incremental migration that preserves user data.
+
+The unaffected part stays true, restated positively: `app_settings` is
+version-stable (schema-stable key-based future-proofing), so it itself
+needs no incremental migration; future schema changes follow the
+graceful-migration rule of ADR-0005.

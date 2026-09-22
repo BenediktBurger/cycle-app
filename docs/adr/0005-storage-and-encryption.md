@@ -102,3 +102,21 @@ Decision change:
   On-device verification is pending: the key flow through the real
   `flutter_secure_storage` (Android Keystore / iOS Keychain behavior) is
   exercised only by host-side integration tests so far.
+
+## Amendment 2026-09-22: first releases published — destructive upgrades no longer permitted
+
+**Status: Accepted (amends the storage decisions above, including the
+"WIP exception" paragraph in the consequences and the "No migration
+shipped" paragraph of the 2026-09-21 amendment; encryption decisions
+unchanged).** The original and amended text above is kept for the record;
+where it conflicts with this amendment, the amendment governs.
+
+The pre-release WIP exception has run out: the first versions of the app
+are now published on GitHub, so real users' databases carry personal data.
+
+Operative rule from now on: every schema upgrade (drift `onUpgrade`) is a
+graceful, incremental migration — one schema-version step at a time,
+preserving user data. Dropping and recreating tables / erasing the
+database on upgrade is no longer an acceptable way to land schema changes,
+regardless of the change's size or the schema-version distance it would
+skip.
