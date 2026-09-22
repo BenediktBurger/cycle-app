@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
+import 'support/viewport.dart';
 
 /// The currently picked value of one of the range pickers (the form field
 /// wraps a DropdownButton that carries the value).
@@ -32,8 +33,7 @@ void main() {
         (WidgetTester tester) async {
       // An English device on purpose: the stored non-default choices must
       // beat the device defaults, not merely repeat them.
-      tester.platformDispatcher.localesTestValue = const [Locale('en')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('en')]);
 
       Future<void> seed(CycleDatabase db) async {
         final store = SettingsStore(db.settingsDao);
@@ -83,8 +83,7 @@ void main() {
 
     testWidgets('a live explicit choice is not clobbered by hydration',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistLocale(const Locale('de'));
@@ -108,8 +107,7 @@ void main() {
       // A German device on purpose: switching to English is then a real
       // change away from the system default (and the starting UI is
       // German, which decides the labels used below).
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('de')]);
 
       CycleDatabase? db;
       await tester.pumpWidget(appScope(onCreated: (created) => db = created));

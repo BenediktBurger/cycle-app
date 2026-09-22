@@ -25,13 +25,12 @@ import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/database.dart';
+import 'support/viewport.dart';
 
 final _fixedNow = DateTime(2026, 4, 10, 14, 35);
 final _selectedDay = DateOnly.normalize(_fixedNow);
@@ -47,37 +46,20 @@ Finder get _excludeSwitch =>
 bool _switchValue(WidgetTester tester) =>
     tester.widget<SwitchListTile>(_excludeSwitch).value;
 
+/// German locale, pinned "now" and selected day over the shared appScope
+/// harness — the pins this file's German assertions need, without the
+/// per-file scope copy.
 ProviderScope _scope({Future<void> Function(CycleDatabase db)? seed}) {
-  return ProviderScope(
-    overrides: [
-      databaseProvider.overrideWith((ref) async {
-        final db = CycleDatabase(
-          DatabaseConnection(
-            NativeDatabase.memory(),
-            closeStreamsSynchronously: true,
-          ),
-        );
-        _db = db;
-        ref.onDispose(db.close);
-        await seed?.call(db);
-        return db;
-      }),
-      nowProvider.overrideWith((ref) => () => _fixedNow),
-      selectedDateProvider.overrideWith((ref) => _selectedDay),
-      localeProvider.overrideWith((ref) => const Locale('de')),
-    ],
-    child: const CycleApp(),
+  return appScope(
+    now: () => _fixedNow,
+    selectedDay: _selectedDay,
+    locale: const Locale('de'),
+    onCreated: (db) => _db = db,
+    seed: seed,
   );
 }
 
 void main() {
-  void tallSurface(WidgetTester tester, {double height = 2400}) {
-    tester.view.physicalSize = Size(800, height);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-  }
-
   /// Selects the disturbance chip [label] (German: the pinned locale) —
   /// the disturbance options are FilterChips (independent toggles).
   Future<void> toggleDisturbanceChip(
@@ -101,7 +83,7 @@ void main() {
       'saving a flagged day WITHOUT the exclude switch does NOT create '
       'the ignoreTemperature mark (no auto-set in any direction)',
       (tester) async {
-    tallSurface(tester);
+    useTallSurface(tester);
     await tester.pumpWidget(_scope());
     await tester.pumpAndSettle();
 
@@ -123,7 +105,7 @@ void main() {
       'the exclude switch inside the disturbance group writes the '
       'ignoreTemperature mark on save — even without any flag, and '
       'idempotently', (tester) async {
-    tallSurface(tester);
+    useTallSurface(tester);
     await tester.pumpWidget(_scope());
     await tester.pumpAndSettle();
 
@@ -153,7 +135,7 @@ void main() {
   testWidgets(
       'the switch seeds from the day\'s existing mark; switching it off '
       'and saving REMOVES the mark', (tester) async {
-    tallSurface(tester);
+    useTallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
     }));
@@ -176,7 +158,7 @@ void main() {
       'a flagged save keeps an externally placed mark intact (the switch '
       'seeds on, so the save re-affirms instead of auto-deciding)',
       (tester) async {
-    tallSurface(tester);
+    useTallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
     }));
@@ -198,7 +180,7 @@ void main() {
   testWidgets(
       'removing the disturbance flags never auto-clears a present mark '
       '(the switch drives the mark, not the mask)', (tester) async {
-    tallSurface(tester);
+    useTallSurface(tester);
     await tester.pumpWidget(_scope(seed: (db) async {
       await db.entriesDao.upsertDaily(DailyEntry(
         date: _selectedDay,

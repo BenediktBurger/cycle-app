@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/finders.dart';
 
 import 'support/database.dart';
+import 'support/viewport.dart';
 
 /// App scope for the theme-mode tests. A null [themeMode] means: leave the
 /// provider at its real default (the "System" option); anything else is an
@@ -41,8 +42,7 @@ void main() {
 
   testWidgets('system default follows the device brightness (dark device)',
       (WidgetTester tester) async {
-    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    useDarkDeviceBrightness(tester);
 
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
@@ -63,8 +63,7 @@ void main() {
 
   testWidgets('explicit light choice wins over a dark device',
       (WidgetTester tester) async {
-    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    useDarkDeviceBrightness(tester);
 
     await tester.pumpWidget(_appScope(themeMode: ThemeMode.light));
     await tester.pumpAndSettle();

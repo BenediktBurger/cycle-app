@@ -14,30 +14,14 @@
 //
 // An in-memory drift database override, no platform channels (same
 // pattern as theme_mode_setting_test.dart).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ProviderScope _appScope() => ProviderScope(
-      overrides: [
-        databaseProvider.overrideWith((ref) {
-          final db = CycleDatabase(
-            DatabaseConnection(
-              NativeDatabase.memory(),
-              closeStreamsSynchronously: true,
-            ),
-          );
-          ref.onDispose(db.close);
-          return db;
-        }),
-      ],
-      child: const CycleApp(),
-    );
+import 'support/database.dart';
+
+ProviderScope _appScope() => appScope();
 
 /// The running app's ProviderScope container (for direct provider reads).
 ProviderContainer _container(WidgetTester tester) =>

@@ -46,6 +46,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/chart_pump.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
+import 'support/viewport.dart';
 
 // Widget tests of the cycle chart's grid alignment invariant: day i's
 // temperature dot lands exactly at the horizontal CENTER of its day column
@@ -297,20 +298,6 @@ List<LineChartBarData> _suzBars(WidgetTester tester) => chartData(tester)
     }
   }
   return null;
-}
-
-/// The dot painter the chart would use for the temperature dot of [dayIndex]
-/// (fails when that day has no temperature point on the chart).
-FlDotPainter _dotPainter(WidgetTester tester, int dayIndex) {
-  for (final bar in dotBars(tester)) {
-    for (var i = 0; i < bar.spots.length; i++) {
-      final spot = bar.spots[i];
-      if (spot.x.round() == dayIndex) {
-        return bar.dotData.getDotPainter(spot, 0, bar, i);
-      }
-    }
-  }
-  fail('no temperature dot at day index $dayIndex');
 }
 
 /// The number shown in the marks row under [dayIndex], or null when none.
@@ -1426,7 +1413,7 @@ void main() {
       // 9/12 (idx 6) carries the mucus-peak mark: the curve dot there is
       // an ORDINARY temperature dot — the ring painter is gone from the
       // peak day (R6).
-      final painter = _dotPainter(tester, 6);
+      final painter = dotPainter(tester, 6);
       expect(painter, isNot(isA<RingDotPainter>()),
           reason: 'the peak ring was removed from the temperature curve');
       expect(painter, isNot(isA<ArrowUpDotPainter>()));
@@ -1452,7 +1439,7 @@ void main() {
       expect(ringIndexes, {8, 9, 10},
           reason: 'rings wrap only the circled candidates (R6/R1)');
       for (final index in ringIndexes) {
-        final painter = _dotPainter(tester, index) as RingDotPainter;
+        final painter = dotPainter(tester, index) as RingDotPainter;
         expect(painter.ringColor, chartScheme(tester).primary,
             reason: 'circled candidates are temperature-family');
       }
@@ -1529,7 +1516,7 @@ void main() {
 
       // The candidates (idx 8..10) render circled ...
       for (final index in [8, 9, 10]) {
-        final painter = _dotPainter(tester, index);
+        final painter = dotPainter(tester, index);
         expect(painter, isA<RingDotPainter>(),
             reason: 'circled higher measurement at day index $index');
         expect(
@@ -1538,8 +1525,8 @@ void main() {
       }
       // ... the pre-rise rise (idx 0, 36.9 above the baseline 36.4) is NOT
       // a candidate (R3) — an ordinary dot.
-      expect(_dotPainter(tester, 0), isNot(isA<RingDotPainter>()));
-      expect(_dotPainter(tester, 0), isNot(isA<ArrowUpDotPainter>()));
+      expect(dotPainter(tester, 0), isNot(isA<RingDotPainter>()));
+      expect(dotPainter(tester, 0), isNot(isA<ArrowUpDotPainter>()));
     });
 
     testWidgets(
@@ -1561,7 +1548,7 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final index in [8, 9, 10, 11, 12]) {
-        expect(_dotPainter(tester, index), isA<ArrowUpDotPainter>(),
+        expect(dotPainter(tester, index), isA<ArrowUpDotPainter>(),
             reason: 'no peak -> arrow at $index (R4; the '
                 'beyond-cap candidate renders unnumbered)');
       }
@@ -1593,11 +1580,11 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final index in [8, 9, 10, 11]) {
-        expect(_dotPainter(tester, index), isA<RingDotPainter>(),
+        expect(dotPainter(tester, index), isA<RingDotPainter>(),
             reason: 'the 4th circled candidate exists under rule E');
       }
       expect(dotPainterOrNull(tester, 12), isNotNull);
-      expect(_dotPainter(tester, 12), isNot(isA<RingDotPainter>()),
+      expect(dotPainter(tester, 12), isNot(isA<RingDotPainter>()),
           reason: 'the sequence ended at the rule-E trigger');
     });
 
@@ -1984,13 +1971,13 @@ void main() {
               'low #1) leaves 9/16 as the only candidate');
       // The earlier rise mark's day (9/14, idx 8) renders no candidate —
       // it sits at the new baseline as a low.
-      expect(_dotPainter(tester, 8), isNot(isA<RingDotPainter>()),
+      expect(dotPainter(tester, 8), isNot(isA<RingDotPainter>()),
           reason: 'the earlier rise mark renders no candidate');
-      expect(_dotPainter(tester, 8), isNot(isA<ArrowUpDotPainter>()));
+      expect(dotPainter(tester, 8), isNot(isA<ArrowUpDotPainter>()));
       // And the marked rise day itself (9/15) sits at the re-derived
       // baseline: no candidate there either.
-      expect(_dotPainter(tester, 9), isNot(isA<RingDotPainter>()));
-      expect(_dotPainter(tester, 9), isNot(isA<ArrowUpDotPainter>()));
+      expect(dotPainter(tester, 9), isNot(isA<RingDotPainter>()));
+      expect(dotPainter(tester, 9), isNot(isA<ArrowUpDotPainter>()));
     });
   });
 
@@ -3199,10 +3186,7 @@ void main() {
     testWidgets(
         'the mucus glyph renders at the minimum column width without a '
         'framework exception', (tester) async {
-      tester.view.devicePixelRatio = 3.0;
-      tester.view.physicalSize = const Size(320 * 3, 800 * 3);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetPhysicalSize);
+      useNarrowPhoneViewport(tester);
 
       final entries = [
         for (var i = 0; i < 12; i++)
@@ -3538,8 +3522,7 @@ void main() {
     });
 
     testWidgets('ignored-temp segments stay dark in dark mode', (tester) async {
-      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-      addTearDown(tester.platformDispatcher.clearAllTestValues);
+      useDarkDeviceBrightness(tester);
 
       await tester.pumpWidget(
           _temperatureHarness(entries: ignoredMiddle, marks: [friMark]));
@@ -4071,8 +4054,7 @@ void main() {
   // mid-test dispatcher change does not rebuild the theme in the test env).
   testWidgets('dark mode: the band tint is a light overlay on the dark scheme',
       (WidgetTester tester) async {
-    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    useDarkDeviceBrightness(tester);
 
     await tester.pumpWidget(_weekendHarness());
     await tester.pumpAndSettle();

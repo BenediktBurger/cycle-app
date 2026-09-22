@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/viewport.dart';
 
 /// App scope for the language tests. A null [locale] means: leave the
 /// provider at its real default (the "System" option); anything else is an
@@ -31,8 +32,7 @@ void main() {
   group('default-locale resolution', () {
     testWidgets('system-default on a German device resolves to German UI',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('de')]);
 
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
@@ -47,8 +47,7 @@ void main() {
 
     testWidgets('system-default on a French device resolves to English UI',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('fr')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('fr')]);
 
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
@@ -61,8 +60,7 @@ void main() {
 
     testWidgets('explicit German choice wins over a French device locale',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('fr')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('fr')]);
 
       await tester.pumpWidget(_appScope(locale: const Locale('de')));
       await tester.pumpAndSettle();
@@ -74,8 +72,7 @@ void main() {
 
     testWidgets('explicit English choice wins over a German device locale',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('de')]);
 
       await tester.pumpWidget(_appScope(locale: const Locale('en')));
       await tester.pumpAndSettle();
@@ -88,8 +85,7 @@ void main() {
     testWidgets(
         'settings switcher renders System/Deutsch/English and switches between them',
         (WidgetTester tester) async {
-      tester.platformDispatcher.localesTestValue = const [Locale('de')];
-      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      useDeviceLocales(tester, const [Locale('de')]);
 
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();

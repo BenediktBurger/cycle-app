@@ -5,19 +5,16 @@
 // `flutter test` runs gen-l10n automatically (l10n.yaml), so the generated
 // AppLocalizations import resolves on first run.
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/database.dart';
 import 'support/finders.dart';
 
-import 'support/database.dart';
-
-/// [locale] pins an explicit app language for the duration of the test: the
-/// app's real default is the system language (nullable localeProvider), and
-/// unpinned the test runner exposes an English device — so the German-string
-/// assertions below have to request German explicitly (the system-follow
-/// default itself is covered by the locale tests, test/locale_test.dart).
-ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
+/// The tests pin the German language explicitly: the app's real default is
+/// the system language (nullable localeProvider) and the test runner
+/// exposes an English device — so the German-string assertions below have
+/// to manage German explicitly (how the locale travels — system device vs.
+/// switcher choice — is covered by the locale tests, test/locale_test.dart).
 
 void main() {
   testWidgets('app shell shows the four navigation destinations (German)', (
@@ -26,7 +23,7 @@ void main() {
     // Explicit German pin so the German labels below hold; how German is
     // *reached* (system device vs. switcher choice) is tested in
     // test/locale_test.dart.
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     // Let the gated shell resolve the (already-synchronous-ish) database
     // future, then settle screens and any transcription animations.
     await tester.pumpAndSettle();
@@ -56,7 +53,7 @@ void main() {
 
   testWidgets('mucus form: sign picker with conditional quality picker',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Tagebuch'));
     await tester.pumpAndSettle();
@@ -117,7 +114,7 @@ void main() {
       (WidgetTester tester) async {
     // The stub must be visibly NOT interactive (onChanged: null) — flipping
     // it would falsely signal an existing protection (ADR-0005).
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();

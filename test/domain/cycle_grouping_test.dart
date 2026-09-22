@@ -22,6 +22,8 @@ import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 
+import 'mark_fixtures.dart';
+
 DailyEntry d(
   int year,
   int month,
@@ -36,12 +38,7 @@ DailyEntry d(
   );
 }
 
-/// A user-placed cycleStart mark on (year, month, day); a CycleMark carries
-/// no profile dimension any more (v9 profile-free model).
-CycleMark start(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.cycleStart,
-    );
+// start: the shared domain mark fixture (mark_fixtures.dart).
 
 /// A temperature-ignore mark on (year, month, day) — the ONLY analysis
 /// signal the temperature evaluation consumes (raw disturbance flags are
