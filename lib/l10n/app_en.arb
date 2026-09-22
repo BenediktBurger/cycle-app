@@ -336,6 +336,14 @@
   "@aboutContactBooksUrl": {
     "description": "The one real EN per-intent page (books/literature); its German counterpart URL lives in the German arb."
   },
+  "aboutContactIssues": "Issues & suggestions",
+  "aboutContactIssuesUrl": "https://github.com/BenediktBurger/cycle-app/issues",
+  "@aboutContactIssues": {
+    "description": "Label of the issue-tracker row in the about page's contact section: the technical contact channel for app bugs/suggestions (the INER rows are the METHOD contact; nothing app-related belongs to them). Purposeful overlap with the footer feedback notice — the row is one tap, the footer is prose."
+  },
+  "@aboutContactIssuesUrl": {
+    "description": "The one DELIBERATELY locale-independent contact-row URL binding: identical value in every arb, because the GitHub issue tracker is an app fact, not an INER fact that could be per-locale."
+  },
   "aboutFeedbackNotice": "This app does not send anything — not even on a crash or an error. Report problems or suggestions to the issues of the GitHub project page (github.com/BenediktBurger/cycle-app/issues) or by email.",
   "@aboutFeedbackNotice": {
     "description": "Feedback notice, footer of the about/onboarding page: the app does not send anything ever, not even at a crash; errors/suggestions go to the GitHub issue tracker (the factual project URL from the README) or per mail — the mail phrasing stays generic because no address is committed anywhere."

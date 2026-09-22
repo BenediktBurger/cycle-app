@@ -124,12 +124,15 @@ class AboutPage extends ConsumerWidget {
           // copying the encrypted device-bound database file.
           Text(l10n.aboutBackupHint, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 24),
-          // The INER contact section: TAPPABLE, labeled rows to the INER
+          // The contact section: TAPPABLE, labeled rows to the INER
           // website and the per-intent pages (courses, consultation, guide/
-          // books). Each row binds its target to the PER-LOCALE arb string —
-          // the English rows never deep-link a German-only page (the EN
-          // arb binds the general site instead; info parity keeps all four
-          // rows in both locales). Plain rows with an external-link icon;
+          // books) plus the app's TECHNICAL contact row (the GitHub issue
+          // tracker). Each row binds its target to the per-locale arb
+          // string — the English rows never deep-link a German-only page
+          // (the EN arb binds the general site instead; info parity keeps
+          // all rows in both locales) — with ONE deliberate exception: the
+          // issue-tracker URL is an app fact, not an INER fact, so it is
+          // locale-independent. Plain rows with an external-link icon;
           // inline rich-text link spans are deliberately not used. This is
           // a pointers/contact section only — no endorsement wording (the
           // app is not INER-endorsed).
@@ -140,6 +143,7 @@ class AboutPage extends ConsumerWidget {
             (l10n.aboutContactCourses, l10n.aboutContactCoursesUrl),
             (l10n.aboutContactConsultation, l10n.aboutContactConsultationUrl),
             (l10n.aboutContactBooks, l10n.aboutContactBooksUrl),
+            (l10n.aboutContactIssues, l10n.aboutContactIssuesUrl),
           ]) ...[
             Card(
               child: ListTile(

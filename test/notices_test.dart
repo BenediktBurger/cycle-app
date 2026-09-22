@@ -130,7 +130,10 @@ void main() {
       expect(find.textContaining('sendet nichts'), findsOneWidget,
           reason: 'the notice must state that the app does not send '
               'anything ever, not even at a crash');
-      expect(find.textContaining('cycle-app/issues'), findsOneWidget,
+      // The footer's issue-tracker address also appears as the tappable
+      // contact row's plain URL text one section above; the parenthesized
+      // form here is footer text only (the row text has no closing paren).
+      expect(find.textContaining('cycle-app/issues)'), findsOneWidget,
           reason: 'the factual GitHub issue-tracker link (the README\'s '
               'project URL) belongs to the note');
       expect(find.textContaining('E-Mail'), findsOneWidget,

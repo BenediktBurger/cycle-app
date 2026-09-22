@@ -14,6 +14,9 @@
 // per-locale arb string, and the English site has no courses/consultation
 // page, so those two intents fall back to the general iner.org URL from
 // English instead of ever linking a German-only page from English text.
+// The ONE exception is the GitHub issue-tracker row (the app's technical
+// contact channel, next to the INER method-contact rows): its URL is an
+// app-fact, not an INER fact, so it is identical in every locale.
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/version.dart';
 import 'package:flutter/material.dart';
@@ -108,14 +111,18 @@ void main() {
         reason: 'the copyright holder (LICENSE line)');
 
     // The feedback footer: send-nothing stance plus the issue tracker,
-    // rendered as SELECTABLE text so the URL can be copied. The
-    // crash/Privacy-layers overlap (the privacy body carries the same
-    // crash clause), so these assertions use footer-unique substrings —
-    // after the footer has been dragged into the lazily built range.
-    await tester.dragUntilVisible(find.textContaining('cycle-app/issues'),
+    // rendered as SELECTABLE text so the URL can be copied. The footer's
+    // address now has a TAPPABLE sibling row showing the same URL as
+    // plain row text, so the URL assertion uses the footer text's
+    // parenthesized form (… cycle-app/issues) — the row's plain URL text
+    // does not match it. The crash/Privacy-layers overlap (the privacy
+    // body carries the same crash clause), so these assertions use
+    // footer-unique substrings — after the footer has been dragged into
+    // the lazily built range.
+    await tester.dragUntilVisible(find.textContaining('Melde Fehler'),
         find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
-    expect(find.textContaining('cycle-app/issues'), findsOneWidget,
+    expect(find.textContaining('cycle-app/issues)'), findsOneWidget,
         reason: 'the feedback footer with the issue-tracker URL sits at '
             'the end of the page');
     expect(find.textContaining('Melde Fehler'), findsOneWidget,
@@ -168,13 +175,18 @@ void main() {
     expect(find.textContaining('© 2026'), findsOneWidget);
     expect(find.textContaining('Benedikt Burger'), findsOneWidget);
 
-    await tester.dragUntilVisible(find.textContaining('cycle-app/issues'),
-        find.byType(ListView), const Offset(0, -200));
+    // (Same duplication rule as the German case: the footer-unique
+    // parenthesized URL substring, because the tappable issue row now
+    // shows the same address as plain row text.)
+    await tester.dragUntilVisible(
+        find.textContaining('Report problems or suggestions'),
+        find.byType(ListView),
+        const Offset(0, -200));
     await tester.pumpAndSettle();
     expect(
         find.textContaining('Report problems or suggestions'), findsOneWidget,
         reason: 'the footer tells the user where to report errors');
-    expect(find.textContaining('cycle-app/issues'), findsOneWidget);
+    expect(find.textContaining('cycle-app/issues)'), findsOneWidget);
 
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
@@ -193,12 +205,12 @@ void main() {
     await openGermanAboutPage(tester);
 
     // The contact section sits below the backup hint; bring the LAST row
-    // into the built range so all four rows are visible at once.
-    await tester.dragUntilVisible(find.text(l10n.aboutContactBooks),
+    // into the built range so all five rows are visible at once.
+    await tester.dragUntilVisible(find.text(l10n.aboutContactIssues),
         find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
 
-    // All four labeled rows render with their target URL as visible text —
+    // All five labeled rows render with their target URL as visible text —
     // German pages for the German locale, per-intent arb bindings.
     expect(find.text(l10n.aboutContactHeading), findsOneWidget);
     expect(find.text(l10n.aboutContactWebsite), findsOneWidget);
@@ -216,6 +228,15 @@ void main() {
         find.text(
             'https://iner.org/de/anwenden/buecher-infos/buecher-literatur.html'),
         findsOneWidget);
+    // The technical contact channel: the GitHub issue tracker, identical
+    // in every locale (an app-fact URL, not a per-locale INER one).
+    expect(find.text(l10n.aboutContactIssues), findsOneWidget,
+        reason: 'the issue-tracker row is the technical contact channel '
+            'next to the INER method-contact rows');
+    expect(find.text('https://github.com/BenediktBurger/cycle-app/issues'),
+        findsOneWidget,
+        reason: 'the German and English rows bind the SAME app-issues '
+            'URL — deliberately locale-independent');
 
     // Tapping a row launches its per-locale URL through the (recorded)
     // platform interface — never a real browser.
@@ -227,6 +248,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactBooks));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactIssues));
+    await tester.pumpAndSettle();
 
     expect(
         launcher.launched,
@@ -235,6 +258,7 @@ void main() {
           'https://iner.org/de/anwenden/kurse/kurse.html',
           'https://iner.org/de/erlernen/beratungen/deutschland.html',
           'https://iner.org/de/anwenden/buecher-infos/buecher-literatur.html',
+          'https://github.com/BenediktBurger/cycle-app/issues',
         ]));
   });
 
@@ -255,11 +279,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
-    await tester.dragUntilVisible(find.text(l10n.aboutContactBooks),
+    // The contact section sits below the backup hint; bring the LAST row
+    // into the built range so all five rows are visible at once.
+    await tester.dragUntilVisible(find.text(l10n.aboutContactIssues),
         find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
 
-    // Info parity: all four intents render in English too.
+    // Info parity: all five intents render in English too.
     expect(find.text(l10n.aboutContactHeading), findsOneWidget);
     expect(find.text(l10n.aboutContactWebsite), findsOneWidget);
     expect(find.text(l10n.aboutContactCourses), findsOneWidget);
@@ -278,6 +304,15 @@ void main() {
         reason: 'website, courses and consultation rows all show/hit the '
             'general INER URL from English — no German-only deep links '
             'from English text');
+    // The technical contact channel: the GitHub issue tracker, identical
+    // in every locale (an app-fact URL, not a per-locale INER one).
+    expect(find.text(l10n.aboutContactIssues), findsOneWidget,
+        reason: 'the issue-tracker row is the technical contact channel '
+            'next to the INER method-contact rows');
+    expect(find.text('https://github.com/BenediktBurger/cycle-app/issues'),
+        findsOneWidget,
+        reason: 'the same URL as the German row — deliberately '
+            'locale-independent');
 
     await tester.tap(find.text(l10n.aboutContactWebsite));
     await tester.pumpAndSettle();
@@ -287,6 +322,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactBooks));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactIssues));
+    await tester.pumpAndSettle();
 
     expect(
         launcher.launched,
@@ -295,6 +332,7 @@ void main() {
           'https://iner.org/',
           'https://iner.org/',
           'https://iner.org/en/to-exercise/books-informations/books-literature.html',
+          'https://github.com/BenediktBurger/cycle-app/issues',
         ]));
   });
 }

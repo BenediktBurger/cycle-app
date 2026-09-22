@@ -270,6 +270,14 @@
   "@aboutContactBooksUrl": {
     "description": "German deep link for the guide/books row; the EN counterpart page URL lives in the English arb."
   },
+  "aboutContactIssues": "Fehler & Vorschläge",
+  "aboutContactIssuesUrl": "https://github.com/BenediktBurger/cycle-app/issues",
+  "@aboutContactIssues": {
+    "description": "Label der Issue-Tracker-Zeile im Kontakt-Abschnitt der About-Seite: der technische Kontaktweg für App-Fehler/Vorschläge (die INER-Zeilen sind der METHODEN-Kontakt, dort gehört nichts App-Bezogenes hin). Bewusste Überschneidung mit dem Feedback-Hinweis im Fuß — die Zeile ist ein Tipp, der Hinweis ist Fließtext."
+  },
+  "@aboutContactIssuesUrl": {
+    "description": "Die einzige bewusst SPRACHUNABHÄNGIGE Zeilen-URL-Bindung: identischer Wert in jedem arb, denn der GitHub-Issue-Tracker ist eine App-Tatsache, kein INER-Fakt mit Länder-Sprachseiten (identische URL wie in app_en.arb)."
+  },
   "settingsFeedbackNotice": "Diese App sendet nichts — auch nicht bei einem Absturz oder Fehler. Melde Probleme oder Vorschläge per GitHub-Issue (github.com/BenediktBurger/cycle-app/issues) oder E-Mail.",
   "@settingsFeedbackNotice": {
     "description": "Compact feedback line at the end of the settings pane (same stance as aboutFeedbackNotice)."
