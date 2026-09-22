@@ -15,6 +15,7 @@ import 'db/settings_store.dart';
 import 'domain/temperature_range.dart';
 import 'l10n/app_localizations.dart';
 import 'providers.dart';
+import 'ui/about.dart';
 import 'ui/cycle.dart';
 import 'ui/diary.dart';
 import 'ui/settings.dart';
@@ -53,9 +54,15 @@ class _CycleAppState extends ConsumerState<CycleApp> {
     // fireImmediately covers the (unlikely) case of the snapshot being
     // ready before this root widget mounts; normally the callback only
     // fires on the loading→data transition.
-    ref.listenManual(persistedSettingsProvider, fireImmediately: true,
-        (previous, next) {
-      final snapshot = next.value; // stays null while loading/in error
+    ref.listenManual(persistedSettingsProvider, fireImmediately: true, (
+      previous,
+      next,
+    ) {
+      // valueOrNull (not .value): a broken settings read must surface as
+      // "no snapshot" here — .value rethrows the read error and would
+      // crash the start through this listener, defeating the gate's
+      // fail-open to the shell below.
+      final snapshot = next.valueOrNull; // null while loading/in error
       if (snapshot == null) return;
       final locale = ref.read(localeProvider);
       if (locale == null && snapshot.locale != null) {
@@ -76,6 +83,13 @@ class _CycleAppState extends ConsumerState<CycleApp> {
       if (observedCycles == 0 && snapshot.observedCyclesOutsideApp != 0) {
         ref.read(observedCyclesOutsideAppProvider.notifier).state =
             snapshot.observedCyclesOutsideApp;
+      }
+      // One-directional by nature: the onboarding flag can only flip
+      // not-completed → completed, and hydration applies only that flip (a
+      // persisted completion must never be re-set to false).
+      final onboarded = ref.read(onboardingCompletedProvider);
+      if (!onboarded && snapshot.onboardingCompleted) {
+        ref.read(onboardingCompletedProvider.notifier).state = true;
       }
     });
   }
@@ -100,7 +114,15 @@ class _CycleAppState extends ConsumerState<CycleApp> {
     });
     ref.listen<int>(observedCyclesOutsideAppProvider, (previous, current) {
       _persistSetting(
-          ref, (store) => store.persistObservedCyclesOutsideApp(current));
+        ref,
+        (store) => store.persistObservedCyclesOutsideApp(current),
+      );
+    });
+    ref.listen<bool>(onboardingCompletedProvider, (previous, current) {
+      _persistSetting(
+        ref,
+        (store) => store.persistOnboardingCompleted(current),
+      );
     });
 
     // null (the localeProvider default) = follow the system language: the
@@ -126,7 +148,9 @@ class _CycleAppState extends ConsumerState<CycleApp> {
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-            seedColor: _themeSeedColor, brightness: Brightness.dark),
+          seedColor: _themeSeedColor,
+          brightness: Brightness.dark,
+        ),
       ),
       locale: explicitLocale,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
@@ -171,33 +195,66 @@ void _persistSetting(
   }());
 }
 
-/// Gates the navigation shell behind the database opening: a simple loading
-/// splash while the (possibly wasm/OPFS-side) open is in flight, and a
-/// retrying error screen so users can recover from, e.g., an OPFS hiccup.
+/// Gates the navigation shell behind the database opening AND the first
+/// settings hydration: a simple loading splash while the (possibly
+/// wasm/OPFS-side) open is in flight — kept up while the persisted-settings
+/// snapshot loads from the freshly opened database — and a retrying error
+/// screen so users can recover from, e.g., an OPFS hiccup.
 class _DatabaseGate extends ConsumerWidget {
   const _DatabaseGate();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
     final dbAsync = ref.watch(databaseProvider);
     return Scaffold(
       body: dbAsync.when(
-        loading: () => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(l10n.splashLoadingDatabase),
-            ],
-          ),
-        ),
+        loading: () => const _SplashLoading(),
         error: (error, stackTrace) => _DatabaseError(
           error: error,
           retry: () => ref.invalidate(databaseProvider),
         ),
-        data: (CycleDatabase db) => _HomeShell(),
+        data: (CycleDatabase db) {
+          // The shell opens on the persisted-settings snapshot, not on the
+          // bare database: hydration (CycleApp.initState) applies the
+          // snapshot into the settings providers — the onboarding-completed
+          // flag among them — the moment this value arrives, so waiting
+          // here lets a returning user's hydrated state drive the first
+          // shell frame instead of flashing the first-start page while the
+          // settings are still in flight.
+          final settingsAsync = ref.watch(persistedSettingsProvider);
+          return settingsAsync.when(
+            loading: () => const _SplashLoading(),
+            // Fail-open: a broken settings read renders the shell so a
+            // faulty settings source never bricks the app. Effectively a
+            // db-level path only — SettingsStore.load() already degrades
+            // corrupt per-key values (catch-per-row).
+            error: (error, stackTrace) => const _HomeGate(),
+            data: (_) => const _HomeGate(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The shared database-open splash: the plain spinner-plus-label column
+/// used BOTH while the database opens and afterwards while the persisted
+/// settings are read from it — one surface for the whole open+warm-up
+/// sequence, so the wait never jumps between looks.
+class _SplashLoading extends StatelessWidget {
+  const _SplashLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(l10n.splashLoadingDatabase),
+        ],
       ),
     );
   }
@@ -218,17 +275,24 @@ class _DatabaseError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline,
-                size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(height: 12),
-            Text(l10n.dbErrorTitle,
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l10n.dbErrorTitle,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(l10n.dbErrorHint, textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text('$error',
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center),
+            Text(
+              '$error',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: retry,
@@ -249,6 +313,22 @@ class _DatabaseError extends StatelessWidget {
 /// the "see more of the cycle in landscape" win. Desktop-class narrow
 /// windows under 720 keep the bar.
 const _railBreakpointWidth = 720.0;
+
+/// The surface behind the database gate — reached only after the gate has
+/// seen both the open database and the persisted-settings snapshot
+/// ([_DatabaseGate]): the shared about-content page in its onboarding
+/// variant until the persisted onboarding flag flips, then the navigation
+/// shell forever. Hydrated flag → no onboarding at all (a returning start
+/// shows nothing), so the page plays exactly once.
+class _HomeGate extends ConsumerWidget {
+  const _HomeGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboarded = ref.watch(onboardingCompletedProvider);
+    return onboarded ? const _HomeShell() : const AboutPage(onboarding: true);
+  }
+}
 
 class _HomeShell extends ConsumerWidget {
   const _HomeShell();
@@ -318,8 +398,9 @@ class _HomeShell extends ConsumerWidget {
           // and the offstage screens keep watching their providers so they
           // are up to date when shown. Offstage children are built and laid
           // out but neither painted nor hit-testable.
-          bottomNavigationBar:
-              wide ? null : _bottomNavigationBar(context, ref, index, l10n),
+          bottomNavigationBar: wide
+              ? null
+              : _bottomNavigationBar(context, ref, index, l10n),
         );
       },
     );
@@ -330,32 +411,31 @@ class _HomeShell extends ConsumerWidget {
     WidgetRef ref,
     int index,
     AppLocalizations l10n,
-  ) =>
-      NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (int newIndex) =>
-            ref.read(tabIndexProvider.notifier).state = newIndex,
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.event_outlined),
-            selectedIcon: const Icon(Icons.event),
-            label: l10n.navDiary,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.loop_outlined),
-            selectedIcon: const Icon(Icons.loop),
-            label: l10n.navCycle,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.bar_chart_outlined),
-            selectedIcon: const Icon(Icons.bar_chart),
-            label: l10n.navStatistics,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: const Icon(Icons.settings),
-            label: l10n.navSettings,
-          ),
-        ],
-      );
+  ) => NavigationBar(
+    selectedIndex: index,
+    onDestinationSelected: (int newIndex) =>
+        ref.read(tabIndexProvider.notifier).state = newIndex,
+    destinations: [
+      NavigationDestination(
+        icon: const Icon(Icons.event_outlined),
+        selectedIcon: const Icon(Icons.event),
+        label: l10n.navDiary,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.loop_outlined),
+        selectedIcon: const Icon(Icons.loop),
+        label: l10n.navCycle,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.bar_chart_outlined),
+        selectedIcon: const Icon(Icons.bar_chart),
+        label: l10n.navStatistics,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.settings_outlined),
+        selectedIcon: const Icon(Icons.settings),
+        label: l10n.navSettings,
+      ),
+    ],
+  );
 }

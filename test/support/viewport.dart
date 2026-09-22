@@ -39,8 +39,11 @@ void useNarrowPhoneViewport(WidgetTester tester) {
 /// finders miss it (the entry form's save button, the diary day tiles, the
 /// cycle screen's day-options panel). The previous
 /// surface is restored at test end.
-void useTallSurface(WidgetTester tester,
-    {double width = 800, double height = 2400}) {
+void useTallSurface(
+  WidgetTester tester, {
+  double width = 800,
+  double height = 2400,
+}) {
   useViewportSize(tester, Size(width, height));
 }
 

@@ -63,7 +63,9 @@ void main() {
   /// Selects the disturbance chip [label] (German: the pinned locale) —
   /// the disturbance options are FilterChips (independent toggles).
   Future<void> toggleDisturbanceChip(
-      WidgetTester tester, String chipLabel) async {
+    WidgetTester tester,
+    String chipLabel,
+  ) async {
     await tester.tap(find.widgetWithText(FilterChip, chipLabel));
     await tester.pumpAndSettle();
   }
@@ -75,34 +77,43 @@ void main() {
 
   /// The stored mark types for the selected day (from the real database).
   Future<List<String>> storedMarkTypes() async =>
-      (await _db!.marksDao.marksForDay(_selectedDay))
-          .map((m) => m.markType)
-          .toList();
+      (await _db!.marksDao.marksForDay(
+        _selectedDay,
+      )).map((m) => m.markType).toList();
 
-  testWidgets(
-      'saving a flagged day WITHOUT the exclude switch does NOT create '
-      'the ignoreTemperature mark (no auto-set in any direction)',
-      (tester) async {
+  testWidgets('saving a flagged day WITHOUT the exclude switch does NOT create '
+      'the ignoreTemperature mark (no auto-set in any direction)', (
+    tester,
+  ) async {
     useTallSurface(tester);
     await tester.pumpWidget(_scope());
     await tester.pumpAndSettle();
 
-    expect(await storedMarkTypes(), isEmpty,
-        reason: 'guard: a fresh day carries no marks');
+    expect(
+      await storedMarkTypes(),
+      isEmpty,
+      reason: 'guard: a fresh day carries no marks',
+    );
 
     await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
     await save(tester);
 
-    expect(await storedMarkTypes(), isEmpty,
-        reason: 'a disturbance flag alone never excludes the day from the '
-            'analysis — the explicit exclude switch decides');
+    expect(
+      await storedMarkTypes(),
+      isEmpty,
+      reason:
+          'a disturbance flag alone never excludes the day from the '
+          'analysis — the explicit exclude switch decides',
+    );
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
-    expect(entry!.tempDisturbances, TempDisturbance.sp.bit,
-        reason: 'the raw mask is still stored on the entry as entered');
+    expect(
+      entry!.tempDisturbances,
+      TempDisturbance.sp.bit,
+      reason: 'the raw mask is still stored on the entry as entered',
+    );
   });
 
-  testWidgets(
-      'the exclude switch inside the disturbance group writes the '
+  testWidgets('the exclude switch inside the disturbance group writes the '
       'ignoreTemperature mark on save — even without any flag, and '
       'idempotently', (tester) async {
     useTallSurface(tester);
@@ -114,80 +125,137 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
-        reason: 'the manual switch is the diary-side writer of the '
-            'analysis-exclusion mark (exactly one, no flag needed)');
-    expect(marks.single.author, 'user',
-        reason: 'the diary save is user-placed data — the mark is '
-            'user-authored like every sheet toggle');
+    expect(
+      marks.map((m) => m.markType),
+      [CycleMarkTypes.ignoreTemperature],
+      reason:
+          'the manual switch is the diary-side writer of the '
+          'analysis-exclusion mark (exactly one, no flag needed)',
+    );
+    expect(
+      marks.single.author,
+      'user',
+      reason:
+          'the diary save is user-placed data — the mark is '
+          'user-authored like every sheet toggle',
+    );
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
-    expect(entry!.tempDisturbances, 0,
-        reason: 'the switch is independent of the raw mask: excluding '
-            'without flags is representable');
+    expect(
+      entry!.tempDisturbances,
+      0,
+      reason:
+          'the switch is independent of the raw mask: excluding '
+          'without flags is representable',
+    );
 
     // Re-save with the switch untouched: addMark is idempotent.
     await save(tester);
-    expect((await _db!.marksDao.marksForDay(_selectedDay)), hasLength(1),
-        reason: 'repeated saves with the switch on stay at one mark '
-            '(idempotent)');
+    expect(
+      (await _db!.marksDao.marksForDay(_selectedDay)),
+      hasLength(1),
+      reason:
+          'repeated saves with the switch on stay at one mark '
+          '(idempotent)',
+    );
   });
 
   testWidgets(
-      'the switch seeds from the day\'s existing mark; switching it off '
-      'and saving REMOVES the mark', (tester) async {
-    useTallSurface(tester);
-    await tester.pumpWidget(_scope(seed: (db) async {
-      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
-    }));
-    await tester.pumpAndSettle();
+    'the switch seeds from the day\'s existing mark; switching it off '
+    'and saving REMOVES the mark',
+    (tester) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        _scope(
+          seed: (db) async {
+            await db.marksDao.addMark(
+              _selectedDay,
+              CycleMarkTypes.ignoreTemperature,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(_switchValue(tester), isTrue,
-        reason: 'the switch is wired to the mark\'s actual present state, '
-            'not to the disturbance mask');
+      expect(
+        _switchValue(tester),
+        isTrue,
+        reason:
+            'the switch is wired to the mark\'s actual present state, '
+            'not to the disturbance mask',
+      );
 
-    await tester.tap(_excludeSwitch);
-    await tester.pumpAndSettle();
-    await save(tester);
+      await tester.tap(_excludeSwitch);
+      await tester.pumpAndSettle();
+      await save(tester);
 
-    expect(await storedMarkTypes(), isEmpty,
-        reason: 'the switch off -> save removes the pre-existing mark '
-            '(the explicit manual removal)');
-  });
-
-  testWidgets(
-      'a flagged save keeps an externally placed mark intact (the switch '
-      'seeds on, so the save re-affirms instead of auto-deciding)',
-      (tester) async {
-    useTallSurface(tester);
-    await tester.pumpWidget(_scope(seed: (db) async {
-      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
-    }));
-    await tester.pumpAndSettle();
-
-    expect(_switchValue(tester), isTrue,
-        reason: 'the seed: the switch mirrors the mark\'s present state');
-
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
-    await save(tester);
-
-    final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
-        reason: 'the flagged save neither removes nor duplicates the '
-            'pre-existing mark — no auto behavior in either direction');
-    expect(marks.single.author, 'user');
-  });
+      expect(
+        await storedMarkTypes(),
+        isEmpty,
+        reason:
+            'the switch off -> save removes the pre-existing mark '
+            '(the explicit manual removal)',
+      );
+    },
+  );
 
   testWidgets(
-      'removing the disturbance flags never auto-clears a present mark '
+    'a flagged save keeps an externally placed mark intact (the switch '
+    'seeds on, so the save re-affirms instead of auto-deciding)',
+    (tester) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        _scope(
+          seed: (db) async {
+            await db.marksDao.addMark(
+              _selectedDay,
+              CycleMarkTypes.ignoreTemperature,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _switchValue(tester),
+        isTrue,
+        reason: 'the seed: the switch mirrors the mark\'s present state',
+      );
+
+      await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
+      await save(tester);
+
+      final marks = await _db!.marksDao.marksForDay(_selectedDay);
+      expect(
+        marks.map((m) => m.markType),
+        [CycleMarkTypes.ignoreTemperature],
+        reason:
+            'the flagged save neither removes nor duplicates the '
+            'pre-existing mark — no auto behavior in either direction',
+      );
+      expect(marks.single.author, 'user');
+    },
+  );
+
+  testWidgets('removing the disturbance flags never auto-clears a present mark '
       '(the switch drives the mark, not the mask)', (tester) async {
     useTallSurface(tester);
-    await tester.pumpWidget(_scope(seed: (db) async {
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: _selectedDay,
-        tempDisturbances: TempDisturbance.sp.bit | TempDisturbance.alk.bit,
-      ));
-      await db.marksDao.addMark(_selectedDay, CycleMarkTypes.ignoreTemperature);
-    }));
+    await tester.pumpWidget(
+      _scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: _selectedDay,
+              tempDisturbances:
+                  TempDisturbance.sp.bit | TempDisturbance.alk.bit,
+            ),
+          );
+          await db.marksDao.addMark(
+            _selectedDay,
+            CycleMarkTypes.ignoreTemperature,
+          );
+        },
+      ),
+    );
     await tester.pumpAndSettle();
 
     await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)'); // deselect
@@ -195,11 +263,18 @@ void main() {
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);
-    expect(marks.map((m) => m.markType), [CycleMarkTypes.ignoreTemperature],
-        reason: 'clearing the flags never lifts the exclusion — only the '
-            'switch does');
+    expect(
+      marks.map((m) => m.markType),
+      [CycleMarkTypes.ignoreTemperature],
+      reason:
+          'clearing the flags never lifts the exclusion — only the '
+          'switch does',
+    );
     final entry = await _db!.entriesDao.entryFor(_selectedDay);
-    expect(entry!.tempDisturbances, 0,
-        reason: 'the mask itself is fully cleared by the save');
+    expect(
+      entry!.tempDisturbances,
+      0,
+      reason: 'the mask itself is fully cleared by the save',
+    );
   });
 }

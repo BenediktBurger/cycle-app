@@ -52,9 +52,13 @@ void main() {
     });
 
     test('tryParseCervixOpening rejects unknown and non-string input', () {
-      expect(tryParseCervixOpening('medium'), isNull,
-          reason: 'a row with opening=medium cannot exist '
-              '(deliberate token distinction)');
+      expect(
+        tryParseCervixOpening('medium'),
+        isNull,
+        reason:
+            'a row with opening=medium cannot exist '
+            '(deliberate token distinction)',
+      );
       expect(tryParseCervixOpening(''), isNull);
       expect(tryParseCervixOpening(null), isNull);
       expect(tryParseCervixOpening(1), isNull);
@@ -79,10 +83,16 @@ void main() {
 
     test('tryParseCervixFirmness rejects unknown and non-string input', () {
       expect(tryParseCervixFirmness('medium'), isNull);
-      expect(tryParseCervixFirmness('half-soft'), isNull,
-          reason: 'tokens are the enum NAMES, no German or glyph variants');
-      expect(tryParseCervixFirmness('h'), isNull,
-          reason: 'h/h-w/w are display glyphs, never stored tokens');
+      expect(
+        tryParseCervixFirmness('half-soft'),
+        isNull,
+        reason: 'tokens are the enum NAMES, no German or glyph variants',
+      );
+      expect(
+        tryParseCervixFirmness('h'),
+        isNull,
+        reason: 'h/h-w/w are display glyphs, never stored tokens',
+      );
       expect(tryParseCervixFirmness(''), isNull);
       expect(tryParseCervixFirmness(null), isNull);
       expect(tryParseCervixFirmness(2), isNull);
@@ -93,10 +103,16 @@ void main() {
       final positionTokens = CervixPosition.values.map((p) => p.name).toSet();
       final openingTokens = CervixOpening.values.map((o) => o.name).toSet();
       for (final firmness in CervixFirmness.values) {
-        expect(positionTokens.contains(firmness.name), isFalse,
-            reason: '${firmness.name} must stay unambiguous per column');
-        expect(openingTokens.contains(firmness.name), isFalse,
-            reason: '${firmness.name} must stay unambiguous per column');
+        expect(
+          positionTokens.contains(firmness.name),
+          isFalse,
+          reason: '${firmness.name} must stay unambiguous per column',
+        );
+        expect(
+          openingTokens.contains(firmness.name),
+          isFalse,
+          reason: '${firmness.name} must stay unambiguous per column',
+        );
       }
     });
   });

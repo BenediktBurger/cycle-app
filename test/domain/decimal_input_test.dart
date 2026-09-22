@@ -17,12 +17,21 @@ void main() {
       expect(parseDecimalInput('fünf'), isNull);
       expect(parseDecimalInput('3,6,6'), isNull);
       expect(parseDecimalInput('36.6.1'), isNull);
-      expect(parseDecimalInput('36,65'), closeTo(36.65, 0.0001),
-          reason: 'two fraction digits are allowed');
-      expect(parseDecimalInput('36,654'), isNull,
-          reason: 'more than two fraction digits is a typo, not a value');
-      expect(parseDecimalInput('-3'), isNull,
-          reason: 'temperatures are non-negative');
+      expect(
+        parseDecimalInput('36,65'),
+        closeTo(36.65, 0.0001),
+        reason: 'two fraction digits are allowed',
+      );
+      expect(
+        parseDecimalInput('36,654'),
+        isNull,
+        reason: 'more than two fraction digits is a typo, not a value',
+      );
+      expect(
+        parseDecimalInput('-3'),
+        isNull,
+        reason: 'temperatures are non-negative',
+      );
     });
 
     test('plausible BBT range check', () {

@@ -14,9 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// (wide/landscape shell, width >= 720) — the shell test pins which one
 /// renders at which size, this finder only needs to tap through either.
 Finder navLabel(String label) => find.descendant(
-    of: find
-        .byWidgetPredicate((w) => w is NavigationBar || w is NavigationRail),
-    matching: find.text(label));
+  of: find.byWidgetPredicate((w) => w is NavigationBar || w is NavigationRail),
+  matching: find.text(label),
+);
 
 /// The non-modal day options panel on the cycle screen (the converted
 /// former modal bottom sheet): keyed wrapper the Zyklus screen renders
@@ -29,13 +29,15 @@ Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 /// tree carries more than one vertical scroller in view, scope the finder
 /// to the screen's descendant.
 Finder cycleListScroller() => find.byWidgetPredicate(
-    (w) => w is Scrollable && w.axisDirection == AxisDirection.down);
+  (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+);
 
 /// The horizontal scroll view that carries the chart block. Callers that
 /// share the tree with other screens (the tab shell keeps every tab
 /// mounted) wrap this in a ZyklusScreen-scoped descendant finder.
 Finder chartScrollView() => find.byWidgetPredicate(
-    (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal);
+  (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal,
+);
 
 /// A chart-block recording-row cell: [row] = signal key (e.g. `bleeding`,
 /// `cervix`, `disturbance`), [index] = the day column.

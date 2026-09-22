@@ -20,6 +20,7 @@ import '../domain/export_import.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'about.dart';
 import 'file_transfer.dart';
 
 /// Export file name used by the save/download path.
@@ -115,10 +116,9 @@ final class _NonNegativeIntegerFieldState
             // state (empty text included): the validation, not a formatter.
             l10n.settingsObservedCyclesOutsideAppError,
             key: const ValueKey('observedCyclesOutsideAppFieldError'),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Theme.of(context).colorScheme.error),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
       ],
     );
@@ -131,10 +131,12 @@ final class _NonNegativeIntegerFieldState
 /// creeps into the 0.5 step grid; the °C unit is the seam a later
 /// Fahrenheit conversion would hook into (see the settings card comment).
 final List<double> temperatureRangeSteps = List.unmodifiable(<double>[
-  for (var k = (TemperatureRange.windowLower / 0.5).round(),
-          upper = (TemperatureRange.windowUpper / 0.5).round();
-      k <= upper;
-      k++)
+  for (
+    var k = (TemperatureRange.windowLower / 0.5).round(),
+        upper = (TemperatureRange.windowUpper / 0.5).round();
+    k <= upper;
+    k++
+  )
     k * 0.5,
 ]);
 
@@ -147,7 +149,24 @@ class EinstellungenScreen extends ConsumerWidget {
     final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navSettings)),
+      // The about entry lives in the app bar (like the cycle tab's glossary
+      // info action) instead of a buried card, so it is reachable without
+      // scrolling. It plays the SAME content page the first-start
+      // onboarding shows (lib/ui/about.dart) — one content source, opened
+      // here on demand; no setting is touched by opening it.
+      appBar: AppBar(
+        title: Text(l10n.navSettings),
+        actions: [
+          IconButton(
+            key: const ValueKey('aboutAction'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: l10n.aboutShow,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (context) => const AboutPage()),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -158,8 +177,10 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.settingsLanguage,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsLanguage,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 8),
                   // The provider stores null for "System"; the segment
                   // model uses a string key ('system'/'de'/'en') so all
@@ -181,10 +202,11 @@ class EinstellungenScreen extends ConsumerWidget {
                     ],
                     selected: {locale == null ? 'system' : locale.languageCode},
                     onSelectionChanged: (selection) =>
-                        ref.read(localeProvider.notifier).state =
-                            selection.first == 'system'
-                                ? null
-                                : Locale(selection.first),
+                        ref
+                            .read(localeProvider.notifier)
+                            .state = selection.first == 'system'
+                        ? null
+                        : Locale(selection.first),
                   ),
                   // Persisted: the choice applies immediately and is
                   // written through to the local drift database
@@ -204,8 +226,10 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.settingsThemeMode,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsThemeMode,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 8),
                   // System follows the device brightness (the MaterialApp
                   // default); the explicit choices win over the platform
@@ -228,9 +252,9 @@ class EinstellungenScreen extends ConsumerWidget {
                       ),
                     ],
                     selected: {ref.watch(themeModeProvider)},
-                    onSelectionChanged: (selection) => ref
-                        .read(themeModeProvider.notifier)
-                        .state = selection.first,
+                    onSelectionChanged: (selection) =>
+                        ref.read(themeModeProvider.notifier).state =
+                            selection.first,
                   ),
                   // Persisted, mirroring the language switcher: the choice
                   // is written through to the local drift database
@@ -260,73 +284,83 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.settingsTemperatureRange,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsTemperatureRange,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 8),
-                  Builder(builder: (context) {
-                    final range = ref.watch(temperatureRangeProvider);
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<double>(
-                            key: const ValueKey('temperatureRangeMin'),
-                            initialValue: range.min,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsRangeLower,
-                              border: const OutlineInputBorder(),
+                  Builder(
+                    builder: (context) {
+                      final range = ref.watch(temperatureRangeProvider);
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<double>(
+                              key: const ValueKey('temperatureRangeMin'),
+                              initialValue: range.min,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: l10n.settingsRangeLower,
+                                border: const OutlineInputBorder(),
+                              ),
+                              items: [
+                                for (final step in temperatureRangeSteps.where(
+                                  (step) => step < range.max,
+                                ))
+                                  DropdownMenuItem(
+                                    value: step,
+                                    child: Text(
+                                      '${step.toStringAsFixed(1)} °C',
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                ref
+                                    .read(temperatureRangeProvider.notifier)
+                                    .state = TemperatureRange(
+                                  min: value,
+                                  max: range.max,
+                                );
+                              },
                             ),
-                            items: [
-                              for (final step in temperatureRangeSteps
-                                  .where((step) => step < range.max))
-                                DropdownMenuItem(
-                                  value: step,
-                                  child: Text('${step.toStringAsFixed(1)} °C'),
-                                ),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) return;
-                              ref
-                                  .read(temperatureRangeProvider.notifier)
-                                  .state = TemperatureRange(
-                                min: value,
-                                max: range.max,
-                              );
-                            },
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<double>(
-                            key: const ValueKey('temperatureRangeMax'),
-                            initialValue: range.max,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: l10n.settingsRangeUpper,
-                              border: const OutlineInputBorder(),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<double>(
+                              key: const ValueKey('temperatureRangeMax'),
+                              initialValue: range.max,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: l10n.settingsRangeUpper,
+                                border: const OutlineInputBorder(),
+                              ),
+                              items: [
+                                for (final step in temperatureRangeSteps.where(
+                                  (step) => step > range.min,
+                                ))
+                                  DropdownMenuItem(
+                                    value: step,
+                                    child: Text(
+                                      '${step.toStringAsFixed(1)} °C',
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                ref
+                                    .read(temperatureRangeProvider.notifier)
+                                    .state = TemperatureRange(
+                                  min: range.min,
+                                  max: value,
+                                );
+                              },
                             ),
-                            items: [
-                              for (final step in temperatureRangeSteps
-                                  .where((step) => step > range.min))
-                                DropdownMenuItem(
-                                  value: step,
-                                  child: Text('${step.toStringAsFixed(1)} °C'),
-                                ),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) return;
-                              ref
-                                  .read(temperatureRangeProvider.notifier)
-                                  .state = TemperatureRange(
-                                min: range.min,
-                                max: value,
-                              );
-                            },
                           ),
-                        ),
-                      ],
-                    );
-                  }),
+                        ],
+                      );
+                    },
+                  ),
                   const SizedBox(height: 8),
                   // Persisted: the range is written through to the local
                   // drift database (app_settings) and restored on the next
@@ -334,8 +368,10 @@ class EinstellungenScreen extends ConsumerWidget {
                   // below carries only the DEFAULT measurement (the
                   // half of the old note that actually informs the user
                   // — the persistence sentence is gone everywhere else).
-                  Text(l10n.settingsTemperatureRangeDefaultHint,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.settingsTemperatureRangeDefaultHint,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -357,21 +393,27 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.settingsObservedCyclesOutsideApp,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsObservedCyclesOutsideApp,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 8),
                   _NonNegativeIntegerField(
                     initialValue: ref.watch(observedCyclesOutsideAppProvider),
                     // A plain label: the field names the count with the
                     // card title's wording.
                     labelText: l10n.settingsObservedCyclesOutsideApp,
-                    onChanged: (value) => ref
-                        .read(observedCyclesOutsideAppProvider.notifier)
-                        .state = value,
+                    onChanged: (value) =>
+                        ref
+                                .read(observedCyclesOutsideAppProvider.notifier)
+                                .state =
+                            value,
                   ),
                   const SizedBox(height: 8),
-                  Text(l10n.settingsObservedCyclesOutsideAppHelper,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.settingsObservedCyclesOutsideAppHelper,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -394,8 +436,10 @@ class EinstellungenScreen extends ConsumerWidget {
                     onChanged: null,
                     title: Text(l10n.settingsPinLock),
                   ),
-                  Text(l10n.settingsPinLockNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.settingsPinLockNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -408,11 +452,15 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.settingsExport,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsExport,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 4),
-                  Text(l10n.settingsExportNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.settingsExportNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
                     onPressed: () => _openExport(context, ref),
@@ -420,16 +468,45 @@ class EinstellungenScreen extends ConsumerWidget {
                     label: Text(l10n.settingsExport),
                   ),
                   const SizedBox(height: 16),
-                  Text(l10n.settingsImport,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.settingsImport,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 4),
-                  Text(l10n.settingsImportNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.settingsImportNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
                     onPressed: () => _openImportDialog(context, ref),
                     icon: const Icon(Icons.upload_outlined),
                     label: Text(l10n.settingsImport),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- privacy / GDPR notice -----------------------------------
+          // The same string the about/onboarding page shows (one source,
+          // lib/ui/about.dart): the app's data-control reality in plain
+          // German-first prose — no servers, nothing ever sent, GDPR rights
+          // exercisable directly via the export/delete/import actions.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.aboutPrivacyHeading,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.aboutPrivacyBody,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -446,11 +523,15 @@ class EinstellungenScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.dripImportTitle,
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    l10n.dripImportTitle,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 4),
-                  Text(l10n.dripImportNote,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    l10n.dripImportNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
                     onPressed: () => _openDripImportDialog(context, ref),
@@ -461,9 +542,132 @@ class EinstellungenScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // --- delete data (danger) -------------------------------------
+          // The tracked-data reset: every diary entry and every mark, in
+          // one transactional wipe (settings + onboarding flag survive).
+          // Danger-tinted everywhere, an explicit confirm with cancel as
+          // the DEFAULT action, and an export-first recommendation — a
+          // wipe without the export earlier is irrecoverable.
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsDeleteData,
+                    style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.settingsDeleteDataNote,
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    key: const ValueKey('settingsDeleteDataButton'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                    onPressed: () => _confirmDeleteData(context, ref),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: Text(l10n.settingsDeleteDataButton),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- feedback note -------------------------------------------
+          // The pane's compact closing line (the about page carries the
+          // same stance as its footer): the app does not send anything,
+          // so errors/suggestions go to the GitHub issue tracker or mail.
+          Text(
+            l10n.settingsFeedbackNotice,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
+  }
+
+  /// The delete-data flow: opens the confirmation dialog (counts of what
+  /// will go, cancel as the DEFAULT action), then — only on an explicit
+  /// confirm — runs the transactional wipe and reports the removed counts.
+  /// The dialog's counts are a pre-read; the actual counts come from the
+  /// wipe itself (a write racing between the two is possible in theory).
+  ///
+  /// The WHOLE flow is guarded: opening the database, the dialog's
+  /// pre-count reads, and the wipe itself can all fail, and any of them
+  /// must surface the localized failure message instead of leaking an
+  /// unhandled async error (the wipe is one all-or-nothing transaction, so
+  /// a failure leaves the stored data untouched — say exactly that, like
+  /// the import flows do).
+  Future<void> _confirmDeleteData(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final db = await ref.read(databaseProvider.future);
+      final entries = await db.entriesDao.allEntries();
+      final marks = await db.marksDao.allMarks();
+      if (!context.mounted) return;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.deleteDataDialogTitle),
+          content: Text(
+            l10n.deleteDataDialogBody(entries.length, marks.length),
+          ),
+          actions: [
+            TextButton(
+              // The DEFAULT action: focus lands here, Enter cancels. The
+              // risky path always needs an explicit extra tap on the button
+              // that names the consequence ("Löschen").
+              key: const ValueKey('deleteDataCancel'),
+              autofocus: true,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+              ),
+            ),
+            FilledButton(
+              key: const ValueKey('deleteDataConfirm'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteDataConfirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+
+      final counts = await db.deleteAllTrackedData();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.deleteDataDone(counts.entries, counts.marks)),
+        ),
+      );
+    } catch (_) {
+      // Failure anywhere in the flow — even a pre-read before the wipe —
+      // changes nothing (the wipe is all-or-nothing and, if it failed, was
+      // never committed): report that instead of crashing, on the screen
+      // context (the dialog is user-dismissable and may already be gone).
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.deleteDataFailed)));
+    }
   }
 
   Future<void> _openExport(BuildContext context, WidgetRef ref) async {
@@ -475,8 +679,9 @@ class EinstellungenScreen extends ConsumerWidget {
     final doc = parseExportJson(json);
     if (doc.entries.isEmpty && doc.marks.isEmpty) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
       return;
     }
     if (!context.mounted) return;
@@ -552,27 +757,24 @@ class EinstellungenScreen extends ConsumerWidget {
       // The DOCUMENT is invalid (not JSON, wrong schema) — nothing was
       // written; the import dialog stays open for correcting the text.
       if (!dialogContext.mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        SnackBar(content: Text(l10n.importInvalid)),
-      );
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(SnackBar(content: Text(l10n.importInvalid)));
     } catch (_) {
       // The transaction rolled back (import is all-or-nothing): the stored
       // data is unchanged, so tell the user exactly that instead of
       // crashing (ImportFailedException and anything below it).
       if (!dialogContext.mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        SnackBar(content: Text(l10n.importFailed)),
-      );
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(SnackBar(content: Text(l10n.importFailed)));
     }
   }
 
   /// Opens the self-contained drip CSV import dialog — the same widget as
   /// the JSON import, parameterized with the drip title/hint/labels and the
   /// CSV accept list (see [_ImportDialog]).
-  Future<void> _openDripImportDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) {
+  Future<void> _openDripImportDialog(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return showDialog<void>(
       context: context,
@@ -629,17 +831,17 @@ class EinstellungenScreen extends ConsumerWidget {
       // The text is not a drip CSV export (no "date" header column);
       // nothing was written, the dialog stays open.
       if (!dialogContext.mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        SnackBar(content: Text(l10n.dripImportInvalid)),
-      );
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(SnackBar(content: Text(l10n.dripImportInvalid)));
     } catch (_) {
       // The transaction rolled back (import is all-or-nothing): the stored
       // data is unchanged, so tell the user exactly that instead of
       // crashing (ImportFailedException and anything below it).
       if (!dialogContext.mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        SnackBar(content: Text(l10n.importFailed)),
-      );
+      ScaffoldMessenger.of(
+        dialogContext,
+      ).showSnackBar(SnackBar(content: Text(l10n.importFailed)));
     }
   }
 }
@@ -804,9 +1006,9 @@ final class _ExportPreviewPage extends StatelessWidget {
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: json));
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.exportCopied)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(l10n.exportCopied)));
                   },
                   icon: const Icon(Icons.copy_outlined),
                   label: Text(l10n.exportCopy),
@@ -842,10 +1044,9 @@ final class _ExportPreviewPage extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: SelectableText(
                 json,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(fontFamily: 'monospace'),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
               ),
             ),
           ),

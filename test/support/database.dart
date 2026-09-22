@@ -13,6 +13,7 @@ import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
 ///
@@ -43,9 +44,12 @@ CycleDatabase inMemoryCycleDatabase() {
 Override inMemoryDatabase({
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
+  CycleDatabase Function()? builder,
 }) {
   return databaseProvider.overrideWith((ref) async {
-    final db = inMemoryCycleDatabase();
+    // [builder] lets a test subclass the database for fault injection; the
+    // default stays the plain in-memory instance (same constructor wiring).
+    final db = builder?.call() ?? inMemoryCycleDatabase();
     onCreated?.call(db);
     ref.onDispose(db.close);
     await seed?.call(db);
@@ -66,20 +70,51 @@ Override inMemoryDatabase({
 ///    the cycle chart listen at the same time).
 ///
 /// [seed] and [onCreated] reach the database override ([inMemoryDatabase]).
+///
+/// The onboarding gate is part of the app surface the harness pumps, so the
+/// harness simulates an ALREADY-ONBOARDED install (`onboardingCompleted ??
+/// true`): the shell tests that predate the first-start page keep hitting
+/// the navigation shell directly. The onboarding/gate tests pass an
+/// explicit pin — `false` for a first start, `false` + a seeded
+/// onboardingCompleted row to exercise the hydration flip. The few tests
+/// that pump CycleApp directly (without [appScope]) override the provider
+/// themselves.
+///
+/// The harness also seeds the PackageInfo mock values BEFORE pumping: the
+/// about/onboarding page reads the app version from the installed binary via
+/// package_info_plus, and the metadata plugin call must be answered in the
+/// test binding or the version line hides (its designed failure path). The
+/// values mirror a real 0.1.0+1 device install: version without the build
+/// suffix, buildNumber without the `+`. NOTE: PackageInfo caches these
+/// values in one static that nothing can clear again — the failure-path run
+/// that needs the plugin call to fail must not go through this harness (and
+/// must run before any harness-pumping test in its file).
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
+  bool? onboardingCompleted,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
+  CycleDatabase Function()? builder,
   DateTime Function()? now,
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
 }) {
+  PackageInfo.setMockInitialValues(
+    appName: '',
+    packageName: '',
+    version: '0.1.0',
+    buildNumber: '1',
+    buildSignature: '',
+  );
   return ProviderScope(
     overrides: [
-      inMemoryDatabase(seed: seed, onCreated: onCreated),
+      inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
       if (locale != null) localeProvider.overrideWith((ref) => locale),
       if (themeMode != null) themeModeProvider.overrideWith((ref) => themeMode),
+      onboardingCompletedProvider.overrideWith(
+        (ref) => onboardingCompleted ?? true,
+      ),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null)
         selectedDateProvider.overrideWith((ref) => selectedDay),

@@ -194,30 +194,35 @@ final class DailyEntry {
     this.painMittelschmerz = false,
     this.sexTimings = 0,
     this.notes,
-  })  : // The measurement time is metadata OF the temperature measurement:
-        // without a temperature there is no measurement to time, so the time
-        // is dropped — never stored (and never invented) on mucus-only etc.
-        // days. Enforcing this in the constructor makes every writer (db
-        // mappers, export/import, the drip importer, the entry form) inherit
-        // the rule; copyWith re-runs it through this constructor.
-        measuredAtMinutes = bbtC == null ? null : measuredAtMinutes,
-        assert(mucusQuality == null || mucusSign == MucusSign.s,
-            'mucusQuality is only valid together with mucusSign == MucusSign.s'),
-        // The mask must stay inside the TempDisturbance vocabulary: exactly
-        // the 4 bits (0..15). Anything else — negative, or a value with
-        // unknown bits — cannot round-trip through storage, so the
-        // constructor rejects it (same assert style as the mucus-quality
-        // rule).
-        assert(
-            tempDisturbances >= 0 && tempDisturbances <= 15,
-            'tempDisturbances must be a mask of TempDisturbance bits '
-            '(0..15), got $tempDisturbances'),
-        // The mask must stay inside the SexTiming vocabulary: exactly the
-        // 3 bits (0..7). Anything else — negative, or a value with unknown
-        // bits — cannot round-trip through storage, so the constructor
-        // rejects it (same assert style as the mucus-quality rule).
-        assert(sexTimings >= 0 && sexTimings <= 7,
-            'sexTimings must be a mask of SexTiming bits (0..7), got $sexTimings');
+  }) : // The measurement time is metadata OF the temperature measurement:
+       // without a temperature there is no measurement to time, so the time
+       // is dropped — never stored (and never invented) on mucus-only etc.
+       // days. Enforcing this in the constructor makes every writer (db
+       // mappers, export/import, the drip importer, the entry form) inherit
+       // the rule; copyWith re-runs it through this constructor.
+       measuredAtMinutes = bbtC == null ? null : measuredAtMinutes,
+       assert(
+         mucusQuality == null || mucusSign == MucusSign.s,
+         'mucusQuality is only valid together with mucusSign == MucusSign.s',
+       ),
+       // The mask must stay inside the TempDisturbance vocabulary: exactly
+       // the 4 bits (0..15). Anything else — negative, or a value with
+       // unknown bits — cannot round-trip through storage, so the
+       // constructor rejects it (same assert style as the mucus-quality
+       // rule).
+       assert(
+         tempDisturbances >= 0 && tempDisturbances <= 15,
+         'tempDisturbances must be a mask of TempDisturbance bits '
+         '(0..15), got $tempDisturbances',
+       ),
+       // The mask must stay inside the SexTiming vocabulary: exactly the
+       // 3 bits (0..7). Anything else — negative, or a value with unknown
+       // bits — cannot round-trip through storage, so the constructor
+       // rejects it (same assert style as the mucus-quality rule).
+       assert(
+         sexTimings >= 0 && sexTimings <= 7,
+         'sexTimings must be a mask of SexTiming bits (0..7), got $sexTimings',
+       );
 
   final DateTime date;
 
@@ -317,8 +322,9 @@ final class DailyEntry {
           : measuredAtMinutes as int?,
       bleeding: bleeding ?? this.bleeding,
       tempDisturbances: tempDisturbances ?? this.tempDisturbances,
-      mucusSign:
-          mucusSign == _sentinel ? this.mucusSign : mucusSign as MucusSign?,
+      mucusSign: mucusSign == _sentinel
+          ? this.mucusSign
+          : mucusSign as MucusSign?,
       mucusQuality: mucusQuality == _sentinel
           ? this.mucusQuality
           : mucusQuality as MucusQuality?,
@@ -362,21 +368,21 @@ final class DailyEntry {
 
   @override
   int get hashCode => Object.hash(
-        DateOnly.normalize(date),
-        bbtC,
-        measuredAtMinutes,
-        bleeding,
-        tempDisturbances,
-        mucusSign,
-        mucusQuality,
-        cervixPosition,
-        cervixOpening,
-        cervixFirmness,
-        painBreast,
-        painMittelschmerz,
-        sexTimings,
-        notes,
-      );
+    DateOnly.normalize(date),
+    bbtC,
+    measuredAtMinutes,
+    bleeding,
+    tempDisturbances,
+    mucusSign,
+    mucusQuality,
+    cervixPosition,
+    cervixOpening,
+    cervixFirmness,
+    painBreast,
+    painMittelschmerz,
+    sexTimings,
+    notes,
+  );
 
   @override
   String toString() =>

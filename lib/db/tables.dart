@@ -23,11 +23,7 @@ import 'converters.dart';
 /// One row exists per calendar day. Uniqueness is enforced by the unique
 /// index [cycleEntriesDateUnique] (@TableIndex below), which the EntriesDao
 /// upsert methods rely on.
-@TableIndex(
-  name: 'cycle_entries_date_unique',
-  columns: {#date},
-  unique: true,
-)
+@TableIndex(name: 'cycle_entries_date_unique', columns: {#date}, unique: true)
 class CycleEntries extends Table {
   IntColumn get id => integer().autoIncrement()();
 
@@ -49,9 +45,11 @@ class CycleEntries extends Table {
   /// the constraint string (a bare CHECK would silently drop both). The
   /// engine-level CHECK mirrors the domain constructor assert so foreign
   /// data cannot write an impossible mask.
-  IntColumn get tempDisturbances =>
-      integer().withDefault(const Constant(0)).customConstraint(
-          'NOT NULL DEFAULT 0 CHECK (temp_disturbances BETWEEN 0 AND 15)')();
+  IntColumn get tempDisturbances => integer()
+      .withDefault(const Constant(0))
+      .customConstraint(
+        'NOT NULL DEFAULT 0 CHECK (temp_disturbances BETWEEN 0 AND 15)',
+      )();
 
   /// Basal body temperature in degrees Celsius, when measured.
   RealColumn get bbtC => real().nullable()();
@@ -61,9 +59,9 @@ class CycleEntries extends Table {
   /// shared parse helper (lib/domain/models.dart) so foreign data (e.g. a
   /// future import path) cannot write an impossible time.
   IntColumn get measuredAtMinutes => integer().nullable().customConstraint(
-        'CHECK (measured_at_minutes IS NULL OR '
-        '(measured_at_minutes BETWEEN 0 AND 1439))',
-      )();
+    'CHECK (measured_at_minutes IS NULL OR '
+    '(measured_at_minutes BETWEEN 0 AND 1439))',
+  )();
 
   /// Bleeding intensity on the shared 6-step numeric scale, stored as the
   /// INTEGER [Bleeding.level]: none(0) / spotting(1) / light(2) / medium(3) /
@@ -85,19 +83,19 @@ class CycleEntries extends Table {
   /// NULL is written, and the check below allows exactly NULL or the
   /// vocabulary.
   TextColumn get mucusSign => text().nullable().customConstraint(
-        "CHECK (mucus_sign IS NULL OR mucus_sign IN "
-        "('t', 'nothing', 'f', 's', 'fs', 'a'))",
-      )();
+    "CHECK (mucus_sign IS NULL OR mucus_sign IN "
+    "('t', 'nothing', 'f', 's', 'fs', 'a'))",
+  )();
 
   /// Quality qualifier of the mucus sign S; NULL for every sign other than
   /// 's' and for days without a sign ('fs' deliberately carries no
   /// quality — it is not the S sign). Enforced at the engine level so
   /// broken data (e.g. from a future import path) cannot be written.
   TextColumn get mucusQuality => text().nullable().customConstraint(
-        "CHECK (mucus_quality IS NULL OR (mucus_sign = 's' AND "
-        "mucus_quality IN ('w', 'mi', 'cr', 'kl', 'glb', 'g', 'ew', 'gl', "
-        "'fl', 'ns')))",
-      )();
+    "CHECK (mucus_quality IS NULL OR (mucus_sign = 's' AND "
+    "mucus_quality IN ('w', 'mi', 'cr', 'kl', 'glb', 'g', 'ew', 'gl', "
+    "'fl', 'ns')))",
+  )();
 
   /// Muttermund (cervix) POSITION of the day, as a nullable TEXT token from
   /// the [CervixPosition] enum-name vocabulary: NULL when not observed,
@@ -107,17 +105,17 @@ class CycleEntries extends Table {
   /// position:'medium' — the OPENING column below spells its middle value
   /// 'middle'). German display labels live in the l10n arbs.
   TextColumn get cervixPosition => text().nullable().customConstraint(
-        "CHECK (cervix_position IS NULL OR cervix_position IN "
-        "('low', 'medium', 'high', 'veryHigh', 'unreachable'))",
-      )();
+    "CHECK (cervix_position IS NULL OR cervix_position IN "
+    "('low', 'medium', 'high', 'veryHigh', 'unreachable'))",
+  )();
 
   /// Muttermund (cervix) OPENING of the day, as above: NULL when not
   /// observed, else 'closed' / 'middle' / 'open' (geschlossen · mittel ·
   /// offen). Independent of cervix_position.
   TextColumn get cervixOpening => text().nullable().customConstraint(
-        "CHECK (cervix_opening IS NULL OR cervix_opening IN "
-        "('closed', 'middle', 'open'))",
-      )();
+    "CHECK (cervix_opening IS NULL OR cervix_opening IN "
+    "('closed', 'middle', 'open'))",
+  )();
 
   /// Muttermund (cervix) FIRMNESS of the day, as above: NULL when not
   /// observed, else 'hard' / 'halfSoft' / 'soft' (paper shorthand h / h/w /
@@ -126,9 +124,9 @@ class CycleEntries extends Table {
   /// never collide with a position or opening token). German display labels
   /// live in the l10n arbs.
   TextColumn get cervixFirmness => text().nullable().customConstraint(
-        "CHECK (cervix_firmness IS NULL OR cervix_firmness IN "
-        "('hard', 'halfSoft', 'soft'))",
-      )();
+    "CHECK (cervix_firmness IS NULL OR cervix_firmness IN "
+    "('hard', 'halfSoft', 'soft'))",
+  )();
 
   /// Pain options of the day, as two independent flags with the cheat
   /// sheet's letters: breast tenderness (painBreast, letter B) and
@@ -146,9 +144,11 @@ class CycleEntries extends Table {
   /// drift's own constraints, so NOT NULL and the column default 0 are
   /// written out explicitly inside the constraint string (a bare CHECK
   /// would silently drop both, leaving the column nullable).
-  IntColumn get sexTimings =>
-      integer().withDefault(const Constant(0)).customConstraint(
-          'NOT NULL DEFAULT 0 CHECK (sex_timings BETWEEN 0 AND 7)')();
+  IntColumn get sexTimings => integer()
+      .withDefault(const Constant(0))
+      .customConstraint(
+        'NOT NULL DEFAULT 0 CHECK (sex_timings BETWEEN 0 AND 7)',
+      )();
 
   TextColumn get notes => text().nullable()();
 

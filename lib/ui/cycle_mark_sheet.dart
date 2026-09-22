@@ -152,8 +152,11 @@ final class CycleDayPanel extends ConsumerWidget {
     // pattern — nothing derived from context after an async gap).
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toString();
-    await _writeMark(ref,
-        type: CycleMarkTypes.firstHigherMeasurement, remove: remove);
+    await _writeMark(
+      ref,
+      type: CycleMarkTypes.firstHigherMeasurement,
+      remove: remove,
+    );
     if (remove) return;
 
     // The mark is written; the provider stream re-emits asynchronously, so
@@ -161,10 +164,7 @@ final class CycleDayPanel extends ConsumerWidget {
     // added to the current marks) instead of racing the stream.
     final placed = [
       ...marks,
-      CycleMark(
-        date: day,
-        type: CycleMarkTypes.firstHigherMeasurement,
-      ),
+      CycleMark(date: day, type: CycleMarkTypes.firstHigherMeasurement),
     ];
     final evaluations = evaluateCycles(entries, placed);
     for (var i = 0; i < evaluations.length; i++) {
@@ -189,9 +189,11 @@ final class CycleDayPanel extends ConsumerWidget {
           break;
         }
       }
-      final dayExcluded = marks.any((m) =>
-          m.type == CycleMarkTypes.ignoreTemperature &&
-          DateOnly.sameDay(m.date, day));
+      final dayExcluded = marks.any(
+        (m) =>
+            m.type == CycleMarkTypes.ignoreTemperature &&
+            DateOnly.sameDay(m.date, day),
+      );
       String body;
       if (markedEntry == null || markedEntry.bbtC == null || dayExcluded) {
         body = l10n.cycleSheetRiseConsistencyNoValue;
@@ -216,8 +218,11 @@ final class CycleDayPanel extends ConsumerWidget {
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
                 // Remove goes through the existing mark-toggle path.
-                await _writeMark(ref,
-                    type: CycleMarkTypes.firstHigherMeasurement, remove: true);
+                await _writeMark(
+                  ref,
+                  type: CycleMarkTypes.firstHigherMeasurement,
+                  remove: true,
+                );
               },
               child: Text(l10n.cycleSheetRemoveFirstHigher),
             ),
@@ -246,7 +251,8 @@ final class CycleDayPanel extends ConsumerWidget {
     List<CycleMark> marks,
   ) {
     return marks.any((m) {
-      final isSuz = m.type == CycleMarkTypes.suzEvening ||
+      final isSuz =
+          m.type == CycleMarkTypes.suzEvening ||
           m.type == CycleMarkTypes.suzMorning;
       if (!isSuz) return false;
       return isDayInCycleWindow(evaluations, index, m.date);
@@ -297,8 +303,12 @@ final class CycleDayPanel extends ConsumerWidget {
   ///
   /// Each entry carries the line text plus an optional test-visible key
   /// (the stopped-evaluation notice and the SUZ suggestion get one).
-  List<(String, Key?)> _infoLines(BuildContext context, AppLocalizations l10n,
-      List<DailyEntry> entries, List<CycleMark> marks) {
+  List<(String, Key?)> _infoLines(
+    BuildContext context,
+    AppLocalizations l10n,
+    List<DailyEntry> entries,
+    List<CycleMark> marks,
+  ) {
     final locale = Localizations.localeOf(context).toString();
 
     final lines = <(String, Key?)>[];
@@ -314,7 +324,7 @@ final class CycleDayPanel extends ConsumerWidget {
       if (baseline != null && DateOnly.sameDay(baseline.date, day)) {
         lines.add((
           l10n.cycleSheetBaselineInfo(_formatValue(locale, baseline.value)),
-          null
+          null,
         ));
       }
       for (final higher in evaluation.higherMeasurements) {
@@ -326,13 +336,12 @@ final class CycleDayPanel extends ConsumerWidget {
         // for the difference display — the owner left the exact placement
         // open; extra placements (labels at the chart curve) remain an
         // option and would be reviewed with the experts.
-        lines.add(
-          (
-            l10n.cycleSheetDifferenceInfo(
-                _formatValue(locale, higher.differenceK)),
-            null
+        lines.add((
+          l10n.cycleSheetDifferenceInfo(
+            _formatValue(locale, higher.differenceK),
           ),
-        );
+          null,
+        ));
         if (higher.markKind == MarkKind.circle && higher.ordinal != null) {
           // Unnumbered circles (beyond the per-kind cap) stay without the
           // numbering line — the difference line above still shows. Arrow
@@ -356,10 +365,7 @@ final class CycleDayPanel extends ConsumerWidget {
           SuzRule.d => l10n.cycleSheetSuzSuggestionEvening,
           SuzRule.e => l10n.cycleSheetSuzSuggestionMorning,
         };
-        lines.add((
-          line,
-          const ValueKey('cycleSheetSuzSuggestion'),
-        ));
+        lines.add((line, const ValueKey('cycleSheetSuzSuggestion')));
       }
       if (evaluation.evaluationStopped &&
           !DateOnly.normalize(evaluation.cycle.startDate).isAfter(day) &&
@@ -383,7 +389,8 @@ final class CycleDayPanel extends ConsumerWidget {
           DateOnly.sameDay(firstHigher, day)) {
         lines.add((
           l10n.cycleSheetRiseInconsistent(
-              _formatValue(locale, evaluation.baseline!.value)),
+            _formatValue(locale, evaluation.baseline!.value),
+          ),
           const ValueKey('cycleSheetRiseConsistency'),
         ));
       }
@@ -400,8 +407,10 @@ final class CycleDayPanel extends ConsumerWidget {
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
     final hasExcluded = _hasMark(marks, CycleMarkTypes.ignoreTemperature);
-    final hasFirstHigher =
-        _hasMark(marks, CycleMarkTypes.firstHigherMeasurement);
+    final hasFirstHigher = _hasMark(
+      marks,
+      CycleMarkTypes.firstHigherMeasurement,
+    );
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
     final hasSuzMorning = _hasMark(marks, CycleMarkTypes.suzMorning);
     final hasCycleStart = _hasMark(marks, CycleMarkTypes.cycleStart);
@@ -421,17 +430,21 @@ final class CycleDayPanel extends ConsumerWidget {
     /// Space check: at the three-column (>= 600 dp) chip width even the
     /// widest German label ("Erste höhere Messung") fits beside the icon
     /// on a single line, so no width/ellipsis fallback is needed.
-    Widget gridChip(String label, bool selected, ValueChanged<bool> onSelected,
-            {required IconData icon, double? width}) =>
-        SizedBox(
-          width: width,
-          child: FilterChip(
-            label: Text(label),
-            avatar: Icon(icon),
-            selected: selected,
-            onSelected: onSelected,
-          ),
-        );
+    Widget gridChip(
+      String label,
+      bool selected,
+      ValueChanged<bool> onSelected, {
+      required IconData icon,
+      double? width,
+    }) => SizedBox(
+      width: width,
+      child: FilterChip(
+        label: Text(label),
+        avatar: Icon(icon),
+        selected: selected,
+        onSelected: onSelected,
+      ),
+    );
 
     // A non-modal CARD in the Zyklus screen's list (below the chart, above
     // the summary table): the panel's own key (set on the widget by the
@@ -455,8 +468,9 @@ final class CycleDayPanel extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    DateFormat.yMMMEd(locale)
-                        .format(DateOnly.normalize(day).toLocal()),
+                    DateFormat.yMMMEd(
+                      locale,
+                    ).format(DateOnly.normalize(day).toLocal()),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -501,68 +515,90 @@ final class CycleDayPanel extends ConsumerWidget {
           // mucus peak, first higher measurement, SUZ evening, SUZ morning.
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-            child: LayoutBuilder(builder: (context, constraints) {
-              final chipWidth = _gridChipWidth(constraints.maxWidth);
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  // The cycle start comes FIRST among the chips: it is the
-                  // authoritative cycle-boundary mark of the mark-driven
-                  // grouping (bleeding only SUGGESTS it — the diary asks on
-                  // a suggested menstruation day). Settable and removable
-                  // on ANY day, wherever the user judges the new cycle to
-                  // begin; the chart draws the boundary line where the
-                  // grouping opens the group.
-                  gridChip(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final chipWidth = _gridChipWidth(constraints.maxWidth);
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // The cycle start comes FIRST among the chips: it is the
+                    // authoritative cycle-boundary mark of the mark-driven
+                    // grouping (bleeding only SUGGESTS it — the diary asks on
+                    // a suggested menstruation day). Settable and removable
+                    // on ANY day, wherever the user judges the new cycle to
+                    // begin; the chart draws the boundary line where the
+                    // grouping opens the group.
+                    gridChip(
                       l10n.cycleSheetCycleStartLabel,
                       hasCycleStart,
                       icon: Icons.flag_outlined,
-                      (wanted) => _writeMark(ref,
-                          type: CycleMarkTypes.cycleStart, remove: !wanted),
-                      width: chipWidth),
-                  gridChip(
+                      (wanted) => _writeMark(
+                        ref,
+                        type: CycleMarkTypes.cycleStart,
+                        remove: !wanted,
+                      ),
+                      width: chipWidth,
+                    ),
+                    gridChip(
                       l10n.cycleSheetMucusPeakLabel,
                       hasPeak,
                       icon: Icons.circle,
-                      (wanted) => _writeMark(ref,
-                          type: CycleMarkTypes.mucusPeakDay, remove: !wanted),
-                      width: chipWidth),
-                  // The first-higher placement goes through the consistency
-                  // dialog check (the dialog fires on PLACEMENT only, the
-                  // unselect path removes directly).
-                  gridChip(
+                      (wanted) => _writeMark(
+                        ref,
+                        type: CycleMarkTypes.mucusPeakDay,
+                        remove: !wanted,
+                      ),
+                      width: chipWidth,
+                    ),
+                    // The first-higher placement goes through the consistency
+                    // dialog check (the dialog fires on PLACEMENT only, the
+                    // unselect path removes directly).
+                    gridChip(
                       l10n.cycleSheetFirstHigherLabel,
                       hasFirstHigher,
                       icon: Icons.adjust,
-                      (wanted) => _writeFirstHigherMark(context, ref,
-                          remove: !wanted, entries: entries, marks: marks),
-                      width: chipWidth),
-                  // The SUZ start, placeable on ANY day, from a morning or
-                  // from an evening. The two variants are mutually
-                  // exclusive per day: placing one removes the other, and
-                  // the other chip unselects on the re-render.
-                  gridChip(
+                      (wanted) => _writeFirstHigherMark(
+                        context,
+                        ref,
+                        remove: !wanted,
+                        entries: entries,
+                        marks: marks,
+                      ),
+                      width: chipWidth,
+                    ),
+                    // The SUZ start, placeable on ANY day, from a morning or
+                    // from an evening. The two variants are mutually
+                    // exclusive per day: placing one removes the other, and
+                    // the other chip unselects on the re-render.
+                    gridChip(
                       l10n.cycleSheetSuzEveningLabel,
                       hasSuzEvening,
                       icon: Icons.nightlight_outlined,
-                      (wanted) => _writeSuzMark(ref,
-                          type: CycleMarkTypes.suzEvening,
-                          otherType: CycleMarkTypes.suzMorning,
-                          remove: !wanted),
-                      width: chipWidth),
-                  gridChip(
+                      (wanted) => _writeSuzMark(
+                        ref,
+                        type: CycleMarkTypes.suzEvening,
+                        otherType: CycleMarkTypes.suzMorning,
+                        remove: !wanted,
+                      ),
+                      width: chipWidth,
+                    ),
+                    gridChip(
                       l10n.cycleSheetSuzMorningLabel,
                       hasSuzMorning,
                       icon: Icons.wb_sunny_outlined,
-                      (wanted) => _writeSuzMark(ref,
-                          type: CycleMarkTypes.suzMorning,
-                          otherType: CycleMarkTypes.suzEvening,
-                          remove: !wanted),
-                      width: chipWidth),
-                ],
-              );
-            }),
+                      (wanted) => _writeSuzMark(
+                        ref,
+                        type: CycleMarkTypes.suzMorning,
+                        otherType: CycleMarkTypes.suzEvening,
+                        remove: !wanted,
+                      ),
+                      width: chipWidth,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           // The exclusion group (owner decision 2026-09-19: manual-only
           // exclusion, made visible): the temperature-ignore chip lives in
@@ -581,24 +617,29 @@ final class CycleDayPanel extends ConsumerWidget {
           // lighter — owner decision 2026-09-19).
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: LayoutBuilder(builder: (context, constraints) {
-              final chipWidth = _gridChipWidth(constraints.maxWidth);
-              return Column(
-                key: const ValueKey('cycleSheetExcludeGroup'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  gridChip(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final chipWidth = _gridChipWidth(constraints.maxWidth);
+                return Column(
+                  key: const ValueKey('cycleSheetExcludeGroup'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    gridChip(
                       l10n.cycleSheetSetIgnoreTemperature,
                       hasExcluded,
                       icon: Icons.visibility_off_outlined,
-                      (wanted) => _writeMark(ref,
-                          type: CycleMarkTypes.ignoreTemperature,
-                          remove: !wanted),
-                      width: chipWidth),
-                ],
-              );
-            }),
+                      (wanted) => _writeMark(
+                        ref,
+                        type: CycleMarkTypes.ignoreTemperature,
+                        remove: !wanted,
+                      ),
+                      width: chipWidth,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: 8),
         ],

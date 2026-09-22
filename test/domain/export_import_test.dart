@@ -22,39 +22,49 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('export/import JSON codec', () {
     test('buildExportJson assembles the schema-version document', () {
-      final json = buildExportJson(ExportBlob(
-        entries: const [
-          {'date': '2026-03-01', 'bleeding': 'period'},
-        ],
-        marks: const [],
-        exportedAt: DateTime.utc(2026, 9, 15, 12),
-      ));
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const [
+            {'date': '2026-03-01', 'bleeding': 'period'},
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
 
       final decoded = jsonDecode(json) as Map<String, Object?>;
       expect(decoded['schema_version'], exportSchemaVersion);
       expect(
-          (decoded['exported_at'] as String).startsWith('2026-09-15'), isTrue);
+        (decoded['exported_at'] as String).startsWith('2026-09-15'),
+        isTrue,
+      );
       expect((decoded['entries'] as List).length, 1);
       expect(decoded['marks'] as List, isEmpty);
       // The document root is exactly the four keys: no profile keys anywhere.
-      expect(decoded.keys.toSet(),
-          {'schema_version', 'exported_at', 'entries', 'marks'});
+      expect(decoded.keys.toSet(), {
+        'schema_version',
+        'exported_at',
+        'entries',
+        'marks',
+      });
     });
 
     test('parseExportJson round-trips a document it built', () {
-      final json = buildExportJson(ExportBlob(
-        entries: const [
-          {'date': '2026-04-10', 'bleeding': 'spotting'},
-        ],
-        marks: const [
-          {
-            'entry_date': '2026-04-10',
-            'mark_type': 'baseline',
-            'author': 'user',
-          },
-        ],
-        exportedAt: DateTime.utc(2026, 9, 15, 12),
-      ));
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const [
+            {'date': '2026-04-10', 'bleeding': 'spotting'},
+          ],
+          marks: const [
+            {
+              'entry_date': '2026-04-10',
+              'mark_type': 'baseline',
+              'author': 'user',
+            },
+          ],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
 
       final doc = parseExportJson(json);
       expect(doc.entries.single['date'], '2026-04-10');
@@ -63,28 +73,38 @@ void main() {
 
     test('parseExportJson validates the exported-at timestamp', () {
       expect(
-          () => parseExportJson(jsonEncode(<String, Object?>{
-                'schema_version': exportSchemaVersion,
-                // exported_at is missing entirely
-                'entries': <Object?>[],
-                'marks': <Object?>[],
-              })),
-          throwsA(isA<FormatException>()));
+        () => parseExportJson(
+          jsonEncode(<String, Object?>{
+            'schema_version': exportSchemaVersion,
+            // exported_at is missing entirely
+            'entries': <Object?>[],
+            'marks': <Object?>[],
+          }),
+        ),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('parseExportJson rejects malformed documents', () {
-      expect(() => parseExportJson('not json at all'),
-          throwsA(isA<FormatException>()));
-      expect(() => parseExportJson(jsonEncode(<String, Object?>{})),
-          throwsA(isA<FormatException>()));
       expect(
-          () => parseExportJson(jsonEncode(<String, Object?>{
-                'schema_version': 99,
-                'exported_at': '2026-09-15T00:00:00Z',
-                'entries': <Object?>[],
-                'marks': <Object?>[],
-              })),
-          throwsA(isA<FormatException>()));
+        () => parseExportJson('not json at all'),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => parseExportJson(jsonEncode(<String, Object?>{})),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => parseExportJson(
+          jsonEncode(<String, Object?>{
+            'schema_version': 99,
+            'exported_at': '2026-09-15T00:00:00Z',
+            'entries': <Object?>[],
+            'marks': <Object?>[],
+          }),
+        ),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('planMerge counts new entries, overwrites and marks correctly', () {
@@ -207,14 +227,20 @@ void main() {
     test('entry/mark key helpers are day(/type)-based (no profile prefix)', () {
       expect(importEntryKey('2026-03-05'), '2026-03-05');
       expect(importMarkKey('2026-03-05', 'baseline'), '2026-03-05|baseline');
-      expect(importMarkKey('2026-03-05', 'baseline'),
-          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')),
-          reason: 'the mark key distinguishes types, nothing else');
+      expect(
+        importMarkKey('2026-03-05', 'baseline'),
+        isNot(importMarkKey('2026-03-05', 'mucusPeakDay')),
+        reason: 'the mark key distinguishes types, nothing else',
+      );
       // The open-vocabulary tokens key the same (day|type) way.
-      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
-          '2026-03-05|ignoreTemperature');
-      expect(importMarkKey('2026-03-05', 'ignoreTemperature'),
-          isNot(importMarkKey('2026-03-05', 'mucusPeakDay')));
+      expect(
+        importMarkKey('2026-03-05', 'ignoreTemperature'),
+        '2026-03-05|ignoreTemperature',
+      );
+      expect(
+        importMarkKey('2026-03-05', 'ignoreTemperature'),
+        isNot(importMarkKey('2026-03-05', 'mucusPeakDay')),
+      );
     });
 
     test('merge policy constant documents the overwrite behaviour', () {
@@ -222,38 +248,62 @@ void main() {
     });
 
     test('documents of every published schema version parse', () {
-      ExportBlob blobFor(int version) => parseExportJson(jsonEncode(
-            <String, Object?>{
-              'schema_version': version,
-              'exported_at': '2026-09-15T12:00:00Z',
-              'entries': <Object?>[],
-              'marks': <Object?>[],
-            },
-          ));
+      ExportBlob blobFor(int version) => parseExportJson(
+        jsonEncode(<String, Object?>{
+          'schema_version': version,
+          'exported_at': '2026-09-15T12:00:00Z',
+          'entries': <Object?>[],
+          'marks': <Object?>[],
+        }),
+      );
 
       // Old exports live on as real files on user devices, so every shape
       // ever published stays importable until an explicit retirement rule
       // says otherwise; anything AFTER the current version stays rejected.
-      expect(blobFor(1).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents from before the measured-time field import');
-      expect(blobFor(2).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents from the measured-time release');
-      expect(blobFor(3).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents since bleeding became a numeric level');
-      expect(blobFor(4).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents since the pain options replaced the '
-              'generic pain flag');
-      expect(blobFor(5).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents since the NER alignment (temp_disturbances, '
-              'exclusion as a mark, no mood/desire/exclude_* keys)');
-      expect(blobFor(6).exportedAt, DateTime.utc(2026, 9, 15, 12),
-          reason: 'documents since the sparse entry shape (neutral keys '
-              'omitted; a missing bleeding key means none)');
+      expect(
+        blobFor(1).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason: 'documents from before the measured-time field import',
+      );
+      expect(
+        blobFor(2).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason: 'documents from the measured-time release',
+      );
+      expect(
+        blobFor(3).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason: 'documents since bleeding became a numeric level',
+      );
+      expect(
+        blobFor(4).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason:
+            'documents since the pain options replaced the '
+            'generic pain flag',
+      );
+      expect(
+        blobFor(5).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason:
+            'documents since the NER alignment (temp_disturbances, '
+            'exclusion as a mark, no mood/desire/exclude_* keys)',
+      );
+      expect(
+        blobFor(6).exportedAt,
+        DateTime.utc(2026, 9, 15, 12),
+        reason:
+            'documents since the sparse entry shape (neutral keys '
+            'omitted; a missing bleeding key means none)',
+      );
       // Beyond the current version stays rejected strictly.
       expect(
-          () => parseExportJson('{"schema_version": 99, "exported_at": '
-              '"2026-09-15T12:00:00Z", "entries": [], "marks": []}'),
-          throwsA(isA<FormatException>()));
+        () => parseExportJson(
+          '{"schema_version": 99, "exported_at": '
+          '"2026-09-15T12:00:00Z", "entries": [], "marks": []}',
+        ),
+        throwsA(isA<FormatException>()),
+      );
     });
   });
 
@@ -273,26 +323,37 @@ void main() {
         exportedAt: DateTime.utc(2026, 9, 15),
       );
 
-      final summary =
-          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
-      expect(summary.entriesInvalid, 0,
-          reason: 'a missing/null bleeding key is the neutral value');
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'a missing/null bleeding key is the neutral value',
+      );
       expect(summary.entriesNew, 2);
       expect(summary.entriesWritten, 2);
 
       final first = tryDailyEntryFromExport(doc.entries.first)!;
       expect(first.bleeding, Bleeding.none);
-      expect(first, equals(DailyEntry(date: DateTime(2026, 3, 1))),
-          reason: 'a date-only row maps to the fully neutral domain day');
       expect(
-          tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none);
+        first,
+        equals(DailyEntry(date: DateTime(2026, 3, 1))),
+        reason: 'a date-only row maps to the fully neutral domain day',
+      );
+      expect(
+        tryDailyEntryFromExport(doc.entries.last)!.bleeding,
+        Bleeding.none,
+      );
     });
 
-    test('a hand-written sparse v6 document parses, plans and maps neutral',
-        () {
+    test('a hand-written sparse v6 document parses, plans and maps neutral', () {
       // Raw JSON on purpose: pins the published sparse document shape —
       // entry rows carry only their non-neutral keys.
-      const sparseJson = '{"schema_version": 6, '
+      const sparseJson =
+          '{"schema_version": 6, '
           '"exported_at": "2026-09-15T12:00:00Z", '
           '"entries": ['
           '{"date": "2026-03-01", "bbt_c": 36.6, "measured_at_minutes": 420}, '
@@ -300,8 +361,11 @@ void main() {
           '"marks": []}';
 
       final doc = parseExportJson(sparseJson);
-      final summary =
-          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesNew, 2);
       expect(summary.entriesWritten, 2);
@@ -309,8 +373,11 @@ void main() {
       final tempDay = tryDailyEntryFromExport(doc.entries.first)!;
       expect(tempDay.bbtC, 36.6);
       expect(tempDay.measuredAtMinutes, 420);
-      expect(tempDay.bleeding, Bleeding.none,
-          reason: 'no bleeding key = no bleeding recorded');
+      expect(
+        tempDay.bleeding,
+        Bleeding.none,
+        reason: 'no bleeding key = no bleeding recorded',
+      );
       expect(tempDay.tempDisturbances, 0);
       expect(tempDay.mucusSign, isNull);
       expect(tempDay.painBreast, isFalse);
@@ -318,8 +385,11 @@ void main() {
       expect(tempDay.notes, isNull);
 
       final bareDay = tryDailyEntryFromExport(doc.entries.last)!;
-      expect(bareDay, equals(DailyEntry(date: DateTime(2026, 3, 2))),
-          reason: 'a date-only row is exactly the neutral domain day');
+      expect(
+        bareDay,
+        equals(DailyEntry(date: DateTime(2026, 3, 2))),
+        reason: 'a date-only row is exactly the neutral domain day',
+      );
     });
   });
 
@@ -375,16 +445,12 @@ void main() {
 
   group('mucus tokens ride along as coercible fields', () {
     ExportBlob docWithMucus(Map<String, Object?> mucusFields) => ExportBlob(
-          entries: [
-            {
-              'date': '2026-03-01',
-              'bleeding': 'period',
-              ...mucusFields,
-            },
-          ],
-          marks: const [],
-          exportedAt: DateTime.utc(2026, 9, 15),
-        );
+      entries: [
+        {'date': '2026-03-01', 'bleeding': 'period', ...mucusFields},
+      ],
+      marks: const [],
+      exportedAt: DateTime.utc(2026, 9, 15),
+    );
 
     test('planner: out-of-vocabulary mucus tokens never invalidate a row', () {
       final summary = planMerge(
@@ -392,10 +458,16 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'mucus content is coerced, not gated');
-      expect(summary.entriesWritten, 1,
-          reason: 'mucus never drops an otherwise valid row');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'mucus content is coerced, not gated',
+      );
+      expect(
+        summary.entriesWritten,
+        1,
+        reason: 'mucus never drops an otherwise valid row',
+      );
     });
 
     test('writer: out-of-vocabulary mucus tokens are nulled, row is kept', () {
@@ -405,25 +477,33 @@ void main() {
         'mucus_sign': 'zzz',
         'mucus_quality': 'qqq',
       });
-      expect(entry, isNotNull,
-          reason: 'the plan counted this row, so it must be written');
+      expect(
+        entry,
+        isNotNull,
+        reason: 'the plan counted this row, so it must be written',
+      );
       expect(entry!.mucusSign, isNull);
       expect(entry.mucusQuality, isNull);
     });
 
-    test('writer: quality without an S sign is kept as a row, quality null',
-        () {
-      final entry = tryDailyEntryFromExport(<String, Object?>{
-        'date': '2026-03-01',
-        'bleeding': 'period',
-        'mucus_sign': 'f',
-        'mucus_quality': 'w',
-      });
-      expect(entry, isNotNull, reason: 'planner/writer parity: not a drop');
-      expect(entry!.mucusSign, MucusSign.f);
-      expect(entry.mucusQuality, isNull,
-          reason: 'only an S sign may carry a quality');
-    });
+    test(
+      'writer: quality without an S sign is kept as a row, quality null',
+      () {
+        final entry = tryDailyEntryFromExport(<String, Object?>{
+          'date': '2026-03-01',
+          'bleeding': 'period',
+          'mucus_sign': 'f',
+          'mucus_quality': 'w',
+        });
+        expect(entry, isNotNull, reason: 'planner/writer parity: not a drop');
+        expect(entry!.mucusSign, MucusSign.f);
+        expect(
+          entry.mucusQuality,
+          isNull,
+          reason: 'only an S sign may carry a quality',
+        );
+      },
+    );
 
     test('writer: an S sign with a quality token survives verbatim', () {
       final entry = tryDailyEntryFromExport(<String, Object?>{
@@ -454,27 +534,32 @@ void main() {
       expect(tryParseMeasuredAtMinutes(true), isNull);
     });
 
-    test('planner gates unchanged: the minutes field never invalidates a row',
-        () {
-      final summary = planMerge(
-        ExportBlob(
-          entries: const <Map<String, Object?>>[
-            {
-              'date': '2026-03-01',
-              'bleeding': 'period',
-              'measured_at_minutes': 9999,
-            },
-          ],
-          marks: const [],
-          exportedAt: DateTime.utc(2026, 9, 15),
-        ),
-        existingEntryKeys: {},
-        existingMarkKeys: {},
-      );
-      expect(summary.entriesInvalid, 0,
-          reason: 'a broken time is coerced, not gated');
-      expect(summary.entriesWritten, 1);
-    });
+    test(
+      'planner gates unchanged: the minutes field never invalidates a row',
+      () {
+        final summary = planMerge(
+          ExportBlob(
+            entries: const <Map<String, Object?>>[
+              {
+                'date': '2026-03-01',
+                'bleeding': 'period',
+                'measured_at_minutes': 9999,
+              },
+            ],
+            marks: const [],
+            exportedAt: DateTime.utc(2026, 9, 15),
+          ),
+          existingEntryKeys: {},
+          existingMarkKeys: {},
+        );
+        expect(
+          summary.entriesInvalid,
+          0,
+          reason: 'a broken time is coerced, not gated',
+        );
+        expect(summary.entriesWritten, 1);
+      },
+    );
 
     test('writer: a measured document carries the stored minutes over', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
@@ -492,12 +577,19 @@ void main() {
         'bleeding': 'period',
         'measured_at_minutes': 405,
       });
-      expect(entry, isNotNull,
-          reason: 'the time is a field, never a row killer');
-      expect(entry!.measuredAtMinutes, isNull,
-          reason: 'the app never stores a measurement time without the '
-              'temperature it belongs to; foreign/legacy documents with a '
-              'stray time normalize on import');
+      expect(
+        entry,
+        isNotNull,
+        reason: 'the time is a field, never a row killer',
+      );
+      expect(
+        entry!.measuredAtMinutes,
+        isNull,
+        reason:
+            'the app never stores a measurement time without the '
+            'temperature it belongs to; foreign/legacy documents with a '
+            'stray time normalize on import',
+      );
     });
 
     test('writer: out-of-range minutes collapse to null, row is kept', () {
@@ -506,8 +598,11 @@ void main() {
         'bleeding': 'period',
         'measured_at_minutes': 9999,
       });
-      expect(entry, isNotNull,
-          reason: 'the plan counted this row, so it must be written');
+      expect(
+        entry,
+        isNotNull,
+        reason: 'the plan counted this row, so it must be written',
+      );
       expect(entry!.measuredAtMinutes, isNull);
     });
 
@@ -516,8 +611,11 @@ void main() {
         'date': '2026-03-01',
         'bleeding': 'period',
       });
-      expect(entry!.measuredAtMinutes, isNull,
-          reason: 'older exports omit the field; that is null, not "now"');
+      expect(
+        entry!.measuredAtMinutes,
+        isNull,
+        reason: 'older exports omit the field; that is null, not "now"',
+      );
     });
   });
 
@@ -559,12 +657,21 @@ void main() {
         'bleeding': 'none',
         'pain': true,
       });
-      expect(entry, isNotNull,
-          reason: 'a legacy pain flag must not invalidate the row');
-      expect(entry!.painBreast, isFalse,
-          reason: 'the generic flag has no breast-pain identity');
-      expect(entry.painMittelschmerz, isFalse,
-          reason: 'the generic flag has no Mittelschmerz identity');
+      expect(
+        entry,
+        isNotNull,
+        reason: 'a legacy pain flag must not invalidate the row',
+      );
+      expect(
+        entry!.painBreast,
+        isFalse,
+        reason: 'the generic flag has no breast-pain identity',
+      );
+      expect(
+        entry.painMittelschmerz,
+        isFalse,
+        reason: 'the generic flag has no Mittelschmerz identity',
+      );
     });
 
     test('planner: legacy pain/unknown pain keys never invalidate a row', () {
@@ -584,151 +691,202 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'boolean pain fields are coercible, never row killers');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'boolean pain fields are coercible, never row killers',
+      );
       expect(summary.entriesWritten, 1);
     });
   });
 
-  group('sex timings / cervix firmness / mucus A in the reader (import side)',
-      () {
-    Map<String, Object?> rowWith(Map<String, Object?> fields) =>
-        <String, Object?>{
-          'date': '2026-03-01',
-          'bleeding': 'none',
-          ...fields,
-        };
-
-    test('reader: the sex_timings mask carries over verbatim within 0..7', () {
-      for (final mask in [0, 1, 2, 4, 5, 7]) {
-        final entry = tryDailyEntryFromExport(rowWith({'sex_timings': mask}));
-        expect(entry, isNotNull, reason: 'mask $mask must never kill the row');
-        expect(entry!.sexTimings, mask, reason: 'mask $mask');
-      }
-    });
-
-    test('reader: out-of-range / negative / missing sex_timings collapse to 0',
-        () {
-      for (final bad in <Object?>[8, -1, 999, '3', null]) {
-        final entry = tryDailyEntryFromExport(rowWith({'sex_timings': bad}));
-        expect(entry, isNotNull,
-            reason: 'a broken mask ($bad) is coerced, not a row killer');
-        expect(entry!.sexTimings, 0, reason: 'bad mask $bad collapses to 0');
-      }
-    });
-
-    test('reader: the old boolean `sex` flag is gone from the shape', () {
-      // v4 was redefined in place pre-release (no published v4 documents
-      // exist): `sex_timings` REPLACES `sex`. A row still carrying the old
-      // flag loses it silently — no shim, the row stays valid.
-      final entry = tryDailyEntryFromExport(rowWith({'sex': true}));
-      expect(entry, isNotNull);
-      expect(entry!.sexTimings, 0,
-          reason: 'the legacy flag has no mask identity');
-    });
-
-    test('reader: cervix_firmness tokens parse into the structured field', () {
-      final cases = <String, CervixFirmness>{
-        'hard': CervixFirmness.hard,
-        'halfSoft': CervixFirmness.halfSoft,
-        'soft': CervixFirmness.soft,
-      };
-      cases.forEach((token, expected) {
-        final entry = tryDailyEntryFromExport(rowWith({
-          'cervix_firmness': token,
-        }));
-        expect(entry!.cervixFirmness, expected, reason: 'token "$token"');
-      });
-      final clean = tryDailyEntryFromExport(rowWith({}));
-      expect(clean!.cervixFirmness, isNull,
-          reason: 'older documents simply omit the field');
-    });
-
-    test('reader: an out-of-vocabulary firmness token collapses to null', () {
-      final entry = tryDailyEntryFromExport(rowWith({
-        'cervix_firmness': 'zzz',
-      }));
-      expect(entry, isNotNull,
-          reason: 'coercible fields never drop an otherwise valid row');
-      expect(entry!.cervixFirmness, isNull);
-    });
-
-    test('planner: sex_timings / cervix_firmness never invalidate a row', () {
-      final summary = planMerge(
-        ExportBlob(
-          entries: [
-            rowWith({'sex_timings': 8, 'cervix_firmness': 'zzz'}),
-          ],
-          marks: const [],
-          exportedAt: DateTime.utc(2026, 9, 15),
-        ),
-        existingEntryKeys: {},
-        existingMarkKeys: {},
-      );
-      expect(summary.entriesInvalid, 0,
-          reason: 'both fields are coercible, never gated');
-      expect(summary.entriesWritten, 1);
-    });
-
-    test('reader: the mucus token a flows through to the A sign', () {
-      final entry = tryDailyEntryFromExport(rowWith({'mucus_sign': 'a'}));
-      expect(entry!.mucusSign, MucusSign.a);
-      expect(entry.mucusQuality, isNull, reason: 'A carries no quality');
-    });
-
-    test('round trip: a full document keeps the new fields', () {
-      final json = buildExportJson(ExportBlob(
-        entries: [
-          {
+  group(
+    'sex timings / cervix firmness / mucus A in the reader (import side)',
+    () {
+      Map<String, Object?> rowWith(Map<String, Object?> fields) =>
+          <String, Object?>{
             'date': '2026-03-01',
             'bleeding': 'none',
-            'sex_timings': 3,
-            'cervix_firmness': 'halfSoft',
-            'mucus_sign': 'a',
-          },
-        ],
-        marks: const [],
-        exportedAt: DateTime.utc(2026, 9, 15, 12),
-      ));
+            ...fields,
+          };
 
-      final doc = parseExportJson(json);
-      final entry = tryDailyEntryFromExport(doc.entries.single)!;
-      expect(entry.sexTimings, 3);
-      expect(entry.cervixFirmness, CervixFirmness.halfSoft);
-      expect(entry.mucusSign, MucusSign.a);
-    });
-  });
+      test(
+        'reader: the sex_timings mask carries over verbatim within 0..7',
+        () {
+          for (final mask in [0, 1, 2, 4, 5, 7]) {
+            final entry = tryDailyEntryFromExport(
+              rowWith({'sex_timings': mask}),
+            );
+            expect(
+              entry,
+              isNotNull,
+              reason: 'mask $mask must never kill the row',
+            );
+            expect(entry!.sexTimings, mask, reason: 'mask $mask');
+          }
+        },
+      );
+
+      test(
+        'reader: out-of-range / negative / missing sex_timings collapse to 0',
+        () {
+          for (final bad in <Object?>[8, -1, 999, '3', null]) {
+            final entry = tryDailyEntryFromExport(
+              rowWith({'sex_timings': bad}),
+            );
+            expect(
+              entry,
+              isNotNull,
+              reason: 'a broken mask ($bad) is coerced, not a row killer',
+            );
+            expect(
+              entry!.sexTimings,
+              0,
+              reason: 'bad mask $bad collapses to 0',
+            );
+          }
+        },
+      );
+
+      test('reader: the old boolean `sex` flag is gone from the shape', () {
+        // v4 was redefined in place pre-release (no published v4 documents
+        // exist): `sex_timings` REPLACES `sex`. A row still carrying the old
+        // flag loses it silently — no shim, the row stays valid.
+        final entry = tryDailyEntryFromExport(rowWith({'sex': true}));
+        expect(entry, isNotNull);
+        expect(
+          entry!.sexTimings,
+          0,
+          reason: 'the legacy flag has no mask identity',
+        );
+      });
+
+      test(
+        'reader: cervix_firmness tokens parse into the structured field',
+        () {
+          final cases = <String, CervixFirmness>{
+            'hard': CervixFirmness.hard,
+            'halfSoft': CervixFirmness.halfSoft,
+            'soft': CervixFirmness.soft,
+          };
+          cases.forEach((token, expected) {
+            final entry = tryDailyEntryFromExport(
+              rowWith({'cervix_firmness': token}),
+            );
+            expect(entry!.cervixFirmness, expected, reason: 'token "$token"');
+          });
+          final clean = tryDailyEntryFromExport(rowWith({}));
+          expect(
+            clean!.cervixFirmness,
+            isNull,
+            reason: 'older documents simply omit the field',
+          );
+        },
+      );
+
+      test('reader: an out-of-vocabulary firmness token collapses to null', () {
+        final entry = tryDailyEntryFromExport(
+          rowWith({'cervix_firmness': 'zzz'}),
+        );
+        expect(
+          entry,
+          isNotNull,
+          reason: 'coercible fields never drop an otherwise valid row',
+        );
+        expect(entry!.cervixFirmness, isNull);
+      });
+
+      test('planner: sex_timings / cervix_firmness never invalidate a row', () {
+        final summary = planMerge(
+          ExportBlob(
+            entries: [
+              rowWith({'sex_timings': 8, 'cervix_firmness': 'zzz'}),
+            ],
+            marks: const [],
+            exportedAt: DateTime.utc(2026, 9, 15),
+          ),
+          existingEntryKeys: {},
+          existingMarkKeys: {},
+        );
+        expect(
+          summary.entriesInvalid,
+          0,
+          reason: 'both fields are coercible, never gated',
+        );
+        expect(summary.entriesWritten, 1);
+      });
+
+      test('reader: the mucus token a flows through to the A sign', () {
+        final entry = tryDailyEntryFromExport(rowWith({'mucus_sign': 'a'}));
+        expect(entry!.mucusSign, MucusSign.a);
+        expect(entry.mucusQuality, isNull, reason: 'A carries no quality');
+      });
+
+      test('round trip: a full document keeps the new fields', () {
+        final json = buildExportJson(
+          ExportBlob(
+            entries: [
+              {
+                'date': '2026-03-01',
+                'bleeding': 'none',
+                'sex_timings': 3,
+                'cervix_firmness': 'halfSoft',
+                'mucus_sign': 'a',
+              },
+            ],
+            marks: const [],
+            exportedAt: DateTime.utc(2026, 9, 15, 12),
+          ),
+        );
+
+        final doc = parseExportJson(json);
+        final entry = tryDailyEntryFromExport(doc.entries.single)!;
+        expect(entry.sexTimings, 3);
+        expect(entry.cervixFirmness, CervixFirmness.halfSoft);
+        expect(entry.mucusSign, MucusSign.a);
+      });
+    },
+  );
 
   group('bleeding levels in the export version boundary', () {
     test('the writer emits the schema version of the sparse entry shape', () {
-      expect(exportSchemaVersion, 6,
-          reason: 'v5 was the NER-alignment release; v6 makes the entry '
-              'rows SPARSE: every neutral-valued key is omitted (including '
-              'the `bleeding` key of level-0/none days). The bump gates old '
-              'readers loudly instead of silently: a ≤v5 reader treats a '
-              'missing bleeding key as row-INVALID and would invisibly DROP '
-              'every bleeding-free day of a v6 document — losing their '
-              'temperatures without any error. The reject-first rule makes '
-              'them fail with "unsupported schema_version" instead');
+      expect(
+        exportSchemaVersion,
+        6,
+        reason:
+            'v5 was the NER-alignment release; v6 makes the entry '
+            'rows SPARSE: every neutral-valued key is omitted (including '
+            'the `bleeding` key of level-0/none days). The bump gates old '
+            'readers loudly instead of silently: a ≤v5 reader treats a '
+            'missing bleeding key as row-INVALID and would invisibly DROP '
+            'every bleeding-free day of a v6 document — losing their '
+            'temperatures without any error. The reject-first rule makes '
+            'them fail with "unsupported schema_version" instead',
+      );
     });
 
     test('documents with numeric bleeding build, parse and round-trip', () {
       // The SPARSE writer never carries `"bleeding": 0` (pinned against the
       // database in the db-layer test suite): the level-0 day's row omits
       // the key entirely here.
-      final json = buildExportJson(ExportBlob(
-        entries: const <Map<String, Object?>>[
-          {'date': '2026-03-01', 'bleeding': 4},
-          {'date': '2026-03-02'},
-        ],
-        marks: const [],
-        exportedAt: DateTime.utc(2026, 9, 15, 12),
-      ));
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {'date': '2026-03-01', 'bleeding': 4},
+            {'date': '2026-03-02'},
+          ],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
       expect(json, isNot(contains('"bleeding": 0')));
 
       final decoded = jsonDecode(json) as Map<String, Object?>;
-      expect(decoded['schema_version'], exportSchemaVersion,
-          reason: 'the writer stamps the current version');
+      expect(
+        decoded['schema_version'],
+        exportSchemaVersion,
+        reason: 'the writer stamps the current version',
+      );
 
       final doc = parseExportJson(json);
       final summary = planMerge(
@@ -736,47 +894,63 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'numeric levels in range are valid vocabulary');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'numeric levels in range are valid vocabulary',
+      );
       expect(summary.entriesWritten, 2);
       expect(
-          tryDailyEntryFromExport(doc.entries.first)!.bleeding, Bleeding.heavy);
-      expect(tryDailyEntryFromExport(doc.entries.last)!.bleeding, Bleeding.none,
-          reason: 'the row without a bleeding key imports as none');
+        tryDailyEntryFromExport(doc.entries.first)!.bleeding,
+        Bleeding.heavy,
+      );
+      expect(
+        tryDailyEntryFromExport(doc.entries.last)!.bleeding,
+        Bleeding.none,
+        reason: 'the row without a bleeding key imports as none',
+      );
     });
 
     test('a hand-written FULL-map level-0 row stays a valid input', () {
       // Sparse shape only on the WRITER side: hand-built/full-map documents
       // (old writers always emitted every key) keep importing unchanged —
       // an explicit `bleeding: 0` never errors and maps to none.
-      const fullMap = '{"schema_version": 6, '
+      const fullMap =
+          '{"schema_version": 6, '
           '"exported_at": "2026-09-15T12:00:00Z", '
           '"entries": [{"date": "2026-03-02", "bleeding": 0}], '
           '"marks": []}';
       final doc = parseExportJson(fullMap);
-      final summary =
-          planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+      );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesWritten, 1);
       expect(
-          tryDailyEntryFromExport(doc.entries.single)!.bleeding, Bleeding.none);
+        tryDailyEntryFromExport(doc.entries.single)!.bleeding,
+        Bleeding.none,
+      );
     });
 
     test('a hand-written v3 document parses with its numeric bleeding', () {
       // Raw JSON on purpose: pins the published document shape itself.
-      const v3Json = '{"schema_version": 3, '
+      const v3Json =
+          '{"schema_version": 3, '
           '"exported_at": "2026-09-15T12:00:00Z", '
           '"profiles": [], '
           '"entries": [{"profile_id": 1, "date": "2026-03-01", '
           '"bleeding": 2}], '
           '"marks": []}';
       final doc = parseExportJson(v3Json);
-      expect(tryDailyEntryFromExport(doc.entries.single)!.bleeding,
-          Bleeding.light);
+      expect(
+        tryDailyEntryFromExport(doc.entries.single)!.bleeding,
+        Bleeding.light,
+      );
     });
 
-    test(
-        'legacy v1 AND v2 documents carry string tokens that still plan '
+    test('legacy v1 AND v2 documents carry string tokens that still plan '
         'and count correctly', () {
       // v2 documents exported by dev builds between the measured-time
       // release and the bleeding levels carry STRING bleeding — treating
@@ -803,19 +977,33 @@ void main() {
           existingEntryKeys: {},
           existingMarkKeys: {},
         );
-        expect(summary.entriesInvalid, 1,
-            reason: 'v$version: the unknown token counts as invalid');
-        expect(summary.entriesWritten, 3,
-            reason: 'v$version: the three legacy tokens are valid writes');
+        expect(
+          summary.entriesInvalid,
+          1,
+          reason: 'v$version: the unknown token counts as invalid',
+        );
+        expect(
+          summary.entriesWritten,
+          3,
+          reason: 'v$version: the three legacy tokens are valid writes',
+        );
 
         final periodDay = tryDailyEntryFromExport(doc.entries[0])!;
-        expect(periodDay.bleeding, Bleeding.medium,
-            reason: 'v$version: period degrades to medium');
-        expect(tryDailyEntryFromExport(doc.entries[1])!.bleeding,
-            Bleeding.spotting,
-            reason: 'v$version: spotting stays spotting');
-        expect(tryDailyEntryFromExport(doc.entries[2])!.bleeding, Bleeding.none,
-            reason: 'v$version: none stays none');
+        expect(
+          periodDay.bleeding,
+          Bleeding.medium,
+          reason: 'v$version: period degrades to medium',
+        );
+        expect(
+          tryDailyEntryFromExport(doc.entries[1])!.bleeding,
+          Bleeding.spotting,
+          reason: 'v$version: spotting stays spotting',
+        );
+        expect(
+          tryDailyEntryFromExport(doc.entries[2])!.bleeding,
+          Bleeding.none,
+          reason: 'v$version: none stays none',
+        );
       }
     });
   });
@@ -839,25 +1027,23 @@ void main() {
           'author': 'user',
         },
       ];
-      final json = buildExportJson(ExportBlob(
-        entries: const <Map<String, Object?>>[
-          {'date': '2026-01-01', 'bleeding': 3},
-          {'date': '2026-02-01', 'bleeding': 3},
-        ],
-        marks: markRows,
-        exportedAt: DateTime.utc(2026, 9, 18, 12),
-      ));
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {'date': '2026-01-01', 'bleeding': 3},
+            {'date': '2026-02-01', 'bleeding': 3},
+          ],
+          marks: markRows,
+          exportedAt: DateTime.utc(2026, 9, 18, 12),
+        ),
+      );
 
       // Build → parse keeps the rows verbatim (author column included).
       final doc = parseExportJson(json);
       expect(doc.marks, markRows);
 
       // First import: both rows count as new writes.
-      final first = planMerge(
-        doc,
-        existingEntryKeys: {},
-        existingMarkKeys: {},
-      );
+      final first = planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
       expect(first.marksNew, 2);
       expect(first.marksSkipped, 0);
 
@@ -883,37 +1069,45 @@ void main() {
 
   group('v5 document shape: temp_disturbances + exclusion as a mark', () {
     test('round trip: the mask and the exclusion mark survive verbatim', () {
-      final json = buildExportJson(ExportBlob(
-        entries: const <Map<String, Object?>>[
-          {
-            'date': '2026-03-01',
-            'bleeding': 3,
-            'temp_disturbances': 15, // sp | a | alk | kr
-            'pain_breast': true,
-            'sex_timings': 1,
-          },
-        ],
-        marks: const <Map<String, Object?>>[
-          {
-            'entry_date': '2026-03-02',
-            'mark_type': 'ignoreTemperature',
-            'author': 'user',
-          },
-        ],
-        exportedAt: DateTime.utc(2026, 9, 18, 12),
-      ));
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const <Map<String, Object?>>[
+            {
+              'date': '2026-03-01',
+              'bleeding': 3,
+              'temp_disturbances': 15, // sp | a | alk | kr
+              'pain_breast': true,
+              'sex_timings': 1,
+            },
+          ],
+          marks: const <Map<String, Object?>>[
+            {
+              'entry_date': '2026-03-02',
+              'mark_type': 'ignoreTemperature',
+              'author': 'user',
+            },
+          ],
+          exportedAt: DateTime.utc(2026, 9, 18, 12),
+        ),
+      );
 
       final decoded = jsonDecode(json) as Map<String, Object?>;
       final entryRow = (decoded['entries']! as List).first as Map;
       expect(entryRow['temp_disturbances'], 15);
       // The dropped v4 keys are gone from the WRITER output:
-      expect(entryRow.containsKey('exclude_illness'), isFalse,
-          reason: 'the exclusion is a mark, not entry raw data');
+      expect(
+        entryRow.containsKey('exclude_illness'),
+        isFalse,
+        reason: 'the exclusion is a mark, not entry raw data',
+      );
       expect(entryRow.containsKey('exclude_alcohol'), isFalse);
       expect(entryRow.containsKey('exclude_travel'), isFalse);
       expect(entryRow.containsKey('exclude_other'), isFalse);
-      expect(entryRow.containsKey('mood'), isFalse,
-          reason: 'Stimmung/Lust are removed everywhere');
+      expect(
+        entryRow.containsKey('mood'),
+        isFalse,
+        reason: 'Stimmung/Lust are removed everywhere',
+      );
       expect(entryRow.containsKey('desire'), isFalse);
 
       // … and the reader consumes the mask into the domain model while the
@@ -926,12 +1120,21 @@ void main() {
       expect(doc.marks.single['author'], 'user');
       // THE profile keys are gone everywhere: entries/marks carry no
       // profile_id and the document has no profiles list at all.
-      expect(entryRow.containsKey('profile_id'), isFalse,
-          reason: 'full profiles removal — the entry carries no profile id');
-      expect(doc.marks.single.containsKey('profile_id'), isFalse,
-          reason: 'the mark row is entry_date/mark_type/author only');
-      expect(decoded.containsKey('profiles'), isFalse,
-          reason: 'the profiles list does not exist any more');
+      expect(
+        entryRow.containsKey('profile_id'),
+        isFalse,
+        reason: 'full profiles removal — the entry carries no profile id',
+      );
+      expect(
+        doc.marks.single.containsKey('profile_id'),
+        isFalse,
+        reason: 'the mark row is entry_date/mark_type/author only',
+      );
+      expect(
+        decoded.containsKey('profiles'),
+        isFalse,
+        reason: 'the profiles list does not exist any more',
+      );
     });
 
     test('planner: the temp_disturbances mask never invalidates a row', () {
@@ -952,8 +1155,11 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'a broken mask is coerced, not gated');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'a broken mask is coerced, not gated',
+      );
       expect(summary.entriesWritten, 1);
     });
 
@@ -964,16 +1170,18 @@ void main() {
           'bleeding': 'none',
           'temp_disturbances': bad,
         });
-        expect(entry, isNotNull,
-            reason: 'a broken mask ($bad) is never a row killer');
+        expect(
+          entry,
+          isNotNull,
+          reason: 'a broken mask ($bad) is never a row killer',
+        );
         expect(entry!.tempDisturbances, 0, reason: 'bad mask $bad → 0');
       }
     });
   });
 
   group('old-document translation (v1–4 documents → v5 domain shape)', () {
-    test(
-        'writer: exclude_illness → the kr bit, exclude_alcohol → the alk '
+    test('writer: exclude_illness → the kr bit, exclude_alcohol → the alk '
         'bit; travel/other leave no bit', () {
       // The old exclusion reasons lose their reason identity (Reise and
       // 'other' have no disturbance flag), but illness/alcohol keep it via
@@ -989,15 +1197,17 @@ void main() {
         'exclude_other': true,
       });
       expect(entry, isNotNull, reason: 'the raw flags never killed a row');
-      expect(entry!.tempDisturbances,
-          TempDisturbance.kr.bit | TempDisturbance.alk.bit,
-          reason: 'illness = kr (bit 8), alcohol = alk (bit 4); travel/'
-              'other contribute to the derived mark only');
+      expect(
+        entry!.tempDisturbances,
+        TempDisturbance.kr.bit | TempDisturbance.alk.bit,
+        reason:
+            'illness = kr (bit 8), alcohol = alk (bit 4); travel/'
+            'other contribute to the derived mark only',
+      );
       expect(entry.isInterrupted, isTrue);
     });
 
-    test(
-        'writer: mood/desire keys of old documents are dropped, the row '
+    test('writer: mood/desire keys of old documents are dropped, the row '
         'stays valid', () {
       final entry = tryDailyEntryFromExport(const <String, Object?>{
         'date': '2026-03-01',
@@ -1005,16 +1215,18 @@ void main() {
         'mood': true,
         'desire': true,
       });
-      expect(entry, isNotNull,
-          reason: 'Stimmung/Lust booleans are dropped, never row killers');
+      expect(
+        entry,
+        isNotNull,
+        reason: 'Stimmung/Lust booleans are dropped, never row killers',
+      );
       // The domain model has no mood/desire identity to assert against —
       // the dropped flags simply do not exist on the entry any more (they
       // are compile-time absent; the day note stays intact).
       expect(entry!.tempDisturbances, 0);
     });
 
-    test(
-        'planner: old exclude_*/mood/desire rows count exactly what the '
+    test('planner: old exclude_*/mood/desire rows count exactly what the '
         'writer writes', () {
       final summary = planMerge(
         ExportBlob(
@@ -1033,24 +1245,22 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'the old keys never gate the row (they are coercible)');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'the old keys never gate the row (they are coercible)',
+      );
       expect(summary.entriesWritten, 1);
     });
 
-    test(
-        'planner: profile_id/profiles keys of old documents never gate '
+    test('planner: profile_id/profiles keys of old documents never gate '
         'anything', () {
       // The planner ignores the profile keys entirely (they are not read);
       // only the day / (day, mark_type) gates remain.
       final summary = planMerge(
         ExportBlob(
           entries: const <Map<String, Object?>>[
-            {
-              'profile_id': 7,
-              'date': '2026-03-01',
-              'bleeding': 'none',
-            },
+            {'profile_id': 7, 'date': '2026-03-01', 'bleeding': 'none'},
           ],
           marks: const <Map<String, Object?>>[
             {
@@ -1065,8 +1275,11 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
       );
-      expect(summary.entriesInvalid, 0,
-          reason: 'the profile_id key is tolerated, never gated');
+      expect(
+        summary.entriesInvalid,
+        0,
+        reason: 'the profile_id key is tolerated, never gated',
+      );
       expect(summary.entriesNew, 1);
       expect(summary.marksNew, 1);
     });

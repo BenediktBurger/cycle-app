@@ -23,30 +23,33 @@ DailyEntry d(
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
 /// Consecutive lengths: 28, 28, 28.
 List<DailyEntry> threeCycleData() => [
-      d(2026, 3, 2, bleeding: Bleeding.medium),
-      d(2026, 3, 3, bleeding: Bleeding.medium),
-      d(2026, 3, 4),
-      d(2026, 3, 30, bleeding: Bleeding.medium),
-      d(2026, 4, 1),
-      d(2026, 4, 10, bleeding: Bleeding.spotting),
-      d(2026, 4, 27, bleeding: Bleeding.medium),
-      d(2026, 5, 1),
-      d(2026, 5, 25, bleeding: Bleeding.medium),
-      d(2026, 5, 26, bleeding: Bleeding.medium),
-    ];
+  d(2026, 3, 2, bleeding: Bleeding.medium),
+  d(2026, 3, 3, bleeding: Bleeding.medium),
+  d(2026, 3, 4),
+  d(2026, 3, 30, bleeding: Bleeding.medium),
+  d(2026, 4, 1),
+  d(2026, 4, 10, bleeding: Bleeding.spotting),
+  d(2026, 4, 27, bleeding: Bleeding.medium),
+  d(2026, 5, 1),
+  d(2026, 5, 25, bleeding: Bleeding.medium),
+  d(2026, 5, 26, bleeding: Bleeding.medium),
+];
 
 List<CycleMark> threeCycleStarts() => [
-      start(2026, 3, 2),
-      start(2026, 3, 30),
-      start(2026, 4, 27),
-      start(2026, 5, 25),
-    ];
+  start(2026, 3, 2),
+  start(2026, 3, 30),
+  start(2026, 4, 27),
+  start(2026, 5, 25),
+];
 
 void main() {
   group('cycleLengthsInDays', () {
     test('counts days between consecutive marked cycle starts', () {
-      expect(cycleLengthsInDays(threeCycleData(), threeCycleStarts()),
-          [28, 28, 28]);
+      expect(cycleLengthsInDays(threeCycleData(), threeCycleStarts()), [
+        28,
+        28,
+        28,
+      ]);
     });
 
     test('lengths are mark-driven, not bleeding-driven', () {
@@ -62,8 +65,9 @@ void main() {
       ];
       // Marks on Apr 1 and Apr 29: a single length from Apr 1 to Apr 29.
       expect(
-          cycleLengthsInDays(entries, [start(2026, 4, 1), start(2026, 4, 29)]),
-          [28]);
+        cycleLengthsInDays(entries, [start(2026, 4, 1), start(2026, 4, 29)]),
+        [28],
+      );
       // Without marks there are no boundaries and no lengths at all.
       expect(cycleLengthsInDays(entries, const []), isEmpty);
     });
@@ -94,8 +98,9 @@ void main() {
         // no known next start: cycle 2 is open-ended
       ];
       expect(
-          cycleLengthsInDays(entries, [start(2026, 1, 5), start(2026, 2, 2)]),
-          [28]);
+        cycleLengthsInDays(entries, [start(2026, 1, 5), start(2026, 2, 2)]),
+        [28],
+      );
     });
 
     test('no marks -> no lengths', () {
@@ -145,9 +150,7 @@ void main() {
         41,
         45,
       ]);
-      final byLabel = <String, int>{
-        for (final b in buckets) b.label: b.count,
-      };
+      final byLabel = <String, int>{for (final b in buckets) b.label: b.count};
       expect(byLabel['<=20'], 1); // 18
       expect(byLabel['21-25'], 2); // 21, 25
       expect(byLabel['26-30'], 2); // 26, 30

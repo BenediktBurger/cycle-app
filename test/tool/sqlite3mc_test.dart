@@ -75,8 +75,12 @@ The `sqlite3` build hook compiles this.
 void main() {
   group('argument parsing', () {
     test('accepts check with its flags', () {
-      final options = parseArguments(
-          ['check', '--offline', '--vendored-dir', 'tmp/my-vendoring']);
+      final options = parseArguments([
+        'check',
+        '--offline',
+        '--vendored-dir',
+        'tmp/my-vendoring',
+      ]);
       expect(options.check, isTrue);
       expect(options.offline, isTrue);
       expect(options.dryRun, isFalse);
@@ -101,10 +105,7 @@ void main() {
     });
 
     test('rejects an empty command line', () {
-      expect(
-        () => parseArguments(const []),
-        throwsA(isA<UsageException>()),
-      );
+      expect(() => parseArguments(const []), throwsA(isA<UsageException>()));
     });
 
     test('rejects unknown arguments', () {
@@ -134,8 +135,10 @@ void main() {
     });
 
     test('rejects a lockfile without the package', () {
-      expect(() => hostedSqlite3Version('packages:'),
-          throwsA(isA<ToolException>()));
+      expect(
+        () => hostedSqlite3Version('packages:'),
+        throwsA(isA<ToolException>()),
+      );
     });
 
     test('rejects a non-hosted sqlite3 dependency', () {
@@ -168,8 +171,10 @@ void main() {
 
   group('upstream pin parsing', () {
     test('extracts pin URL and versions from the 3.5.2 script', () {
-      final pin = parseAmalgamationPin(downloadScriptFixture,
-          vendoredDir: defaultVendoredDir);
+      final pin = parseAmalgamationPin(
+        downloadScriptFixture,
+        vendoredDir: defaultVendoredDir,
+      );
       expect(
         pin.url.toString(),
         'https://github.com/utelle/SQLite3MultipleCiphers/releases/'
@@ -177,14 +182,18 @@ void main() {
       );
       expect(pin.smmcVersion, '2.5.0');
       expect(pin.engineSqliteVersion, '3.53.4');
-      expect(pin.versionDescription,
-          'SQLite3MultipleCiphers 2.5.0 built on SQLite 3.53.4');
+      expect(
+        pin.versionDescription,
+        'SQLite3MultipleCiphers 2.5.0 built on SQLite 3.53.4',
+      );
     });
 
     test('rejects a script without an amalgamation URL', () {
       expect(
-        () => parseAmalgamationPin('const x = 1;',
-            vendoredDir: defaultVendoredDir),
+        () => parseAmalgamationPin(
+          'const x = 1;',
+          vendoredDir: defaultVendoredDir,
+        ),
         throwsA(isA<ToolException>()),
       );
     });
@@ -197,14 +206,16 @@ const b =
     'https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v2.6.0/sqlite3mc-2.6.0-sqlite-3.53.4-amalgamation.zip';
 ''';
       expect(
-          () => parseAmalgamationPin(twoUrls, vendoredDir: defaultVendoredDir),
-          throwsA(isA<ToolException>()));
+        () => parseAmalgamationPin(twoUrls, vendoredDir: defaultVendoredDir),
+        throwsA(isA<ToolException>()),
+      );
     });
 
     test('tolerates an unparsable version for the content-only parts', () {
       final pin = parseAmalgamationPin(
-          "const u = 'https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v9.9.9/amalgamation.zip';",
-          vendoredDir: defaultVendoredDir);
+        "const u = 'https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v9.9.9/amalgamation.zip';",
+        vendoredDir: defaultVendoredDir,
+      );
       expect(pin.url.path, endsWith('amalgamation.zip'));
       expect(pin.smmcVersion, isNull);
       expect(pin.engineSqliteVersion, isNull);
@@ -214,17 +225,22 @@ const b =
 
   group('vendored README provenance', () {
     test('records both hashes', () {
-      final records =
-          recordedHashes(readmeFixture, vendoredDir: defaultVendoredDir);
+      final records = recordedHashes(
+        readmeFixture,
+        vendoredDir: defaultVendoredDir,
+      );
       expect(records['sqlite3mc_amalgamation.c'], fill64('a'));
       expect(records['sqlite3mc_amalgamation.h'], fill64('b'));
     });
 
     test('rejects a README without the hash records', () {
       expect(
-          () => recordedHashes('# No records here',
-              vendoredDir: defaultVendoredDir),
-          throwsA(isA<ToolException>()));
+        () => recordedHashes(
+          '# No records here',
+          vendoredDir: defaultVendoredDir,
+        ),
+        throwsA(isA<ToolException>()),
+      );
     });
 
     test('records the source URL', () {
@@ -272,10 +288,16 @@ const b =
         ),
         vendoredDir: defaultVendoredDir,
       );
-      expect(rewritten.startsWith('# Vendored SQLite3MultipleCiphers'), isTrue,
-          reason: 'everything before the block survives');
-      expect(rewritten, contains('## Licensing'),
-          reason: 'everything after the block survives');
+      expect(
+        rewritten.startsWith('# Vendored SQLite3MultipleCiphers'),
+        isTrue,
+        reason: 'everything before the block survives',
+      );
+      expect(
+        rewritten,
+        contains('## Licensing'),
+        reason: 'everything after the block survives',
+      );
       expect(rewritten, contains('new_amalgamation.zip'));
       expect(rewritten, contains('sqlite3-4.0.0'));
       expect(rewritten, contains('2026-10-10'));
@@ -286,9 +308,13 @@ const b =
 
     test('rejects a README without the heading structure', () {
       expect(
-          () => withRewrittenProvenance('# no headings', 'x',
-              vendoredDir: defaultVendoredDir),
-          throwsA(isA<ToolException>()));
+        () => withRewrittenProvenance(
+          '# no headings',
+          'x',
+          vendoredDir: defaultVendoredDir,
+        ),
+        throwsA(isA<ToolException>()),
+      );
     });
   });
 
@@ -296,8 +322,11 @@ const b =
     test('are deterministic and URL-keyed', () {
       const url = 'https://example.com/sqlite3mc-amalgamation.zip';
       final path = cachePathFor(url, extension: '.zip');
-      expect(path, cachePathFor(url, extension: '.zip'),
-          reason: 'same URL, same cache slot');
+      expect(
+        path,
+        cachePathFor(url, extension: '.zip'),
+        reason: 'same URL, same cache slot',
+      );
       expect(path, allOf(startsWith(cacheRootDir), endsWith('.zip')));
       expect(
         cachePathFor('$url ', extension: '.zip'),

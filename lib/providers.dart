@@ -46,12 +46,13 @@ final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 /// Live stream of the tracked days (as pure domain models) — the single
 /// source of truth behind Tagebuch, Zyklus and Statistik screens. Re-emits
 /// on every write.
-final dailyEntriesProvider =
-    StreamProvider.autoDispose<List<DailyEntry>>((ref) async* {
+final dailyEntriesProvider = StreamProvider.autoDispose<List<DailyEntry>>((
+  ref,
+) async* {
   final db = await ref.watch(databaseProvider.future);
-  yield* db.entriesDao
-      .watchAll()
-      .map((rows) => rows.map(dailyEntryFromDrift).toList());
+  yield* db.entriesDao.watchAll().map(
+    (rows) => rows.map(dailyEntryFromDrift).toList(),
+  );
 });
 
 /// Live stream of the user-placed marks (as pure domain models) — the read
@@ -62,9 +63,9 @@ final dailyEntriesProvider =
 /// per ADR-0001.
 final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
   final db = await ref.watch(databaseProvider.future);
-  yield* db.marksDao
-      .watchAll()
-      .map((rows) => rows.map(cycleMarkFromDrift).toList());
+  yield* db.marksDao.watchAll().map(
+    (rows) => rows.map(cycleMarkFromDrift).toList(),
+  );
 });
 
 /// Tab index of the bottom navigation shell. Simple StateProvider: screens
@@ -108,8 +109,9 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 /// the local app_settings table once the database opens and written through
 /// on every change (main.CycleApp). The °C unit stays the unit of record —
 /// a later Fahrenheit display conversion would happen above this provider.
-final temperatureRangeProvider =
-    StateProvider<TemperatureRange>((ref) => TemperatureRange.defaults);
+final temperatureRangeProvider = StateProvider<TemperatureRange>(
+  (ref) => TemperatureRange.defaults,
+);
 
 /// The count of cycles the user observed OUTSIDE this app (set in the
 /// settings pane's integer field). The cycle page's "Zyklus N" ordinals —
@@ -123,14 +125,26 @@ final temperatureRangeProvider =
 /// on every change (main.CycleApp).
 final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 
+/// Whether the onboarding page has been completed ("Weiter" tapped). The
+/// default false shows the shared about-content page full-page once the
+/// database is open; the continue action flips it to true, and the shell
+/// takes over (main._HomeGate reads this provider).
+///
+/// Persisted, mirroring the other general settings: hydrated from the local
+/// app_settings table once the database opens (absent row = not completed,
+/// for existing installs too, so the welcome page shows once after the
+/// update) and written through on every change (main.CycleApp).
+final onboardingCompletedProvider = StateProvider<bool>((ref) => false);
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// main.CycleApp's hydration listener applies each snapshot into
 /// [localeProvider], [themeModeProvider] and [temperatureRangeProvider].
 /// Non-autoDispose like [databaseProvider] — the load keeps the database
 /// open for the app lifetime.
-final persistedSettingsProvider =
-    FutureProvider<PersistedSettings>((ref) async {
+final persistedSettingsProvider = FutureProvider<PersistedSettings>((
+  ref,
+) async {
   final db = await ref.watch(databaseProvider.future);
   return SettingsStore(db.settingsDao).load();
 });
@@ -138,8 +152,9 @@ final persistedSettingsProvider =
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when
 /// it changes. Normalized to UTC midnight on read/write (DateOnly).
-final selectedDateProvider =
-    StateProvider<DateTime>((ref) => DateOnly.normalize(DateTime.now()));
+final selectedDateProvider = StateProvider<DateTime>(
+  (ref) => DateOnly.normalize(DateTime.now()),
+);
 
 /// The cycle chart's jump-to-date affordance. The button lives in the Zyklus
 /// AppBar's actions (next to the info action — a row of its own above the

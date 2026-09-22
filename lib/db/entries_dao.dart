@@ -16,9 +16,9 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
 
   /// Reads a single day's entry; null when absent.
   Future<CycleEntry?> entryFor(DateTime date) {
-    return (select(cycleEntries)
-          ..where((t) => t.date.equalsValue(_normalize(date))))
-        .getSingleOrNull();
+    return (select(
+      cycleEntries,
+    )..where((t) => t.date.equalsValue(_normalize(date)))).getSingleOrNull();
   }
 
   /// Inserts the day entry, or FULLY replaces the row for the same day —
@@ -37,13 +37,16 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
       final existing = await entryFor(date);
       final now = DateTime.now();
       if (existing == null) {
-        final id = await into(cycleEntries).insert(entry.copyWith(
-          date: Value(date),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ));
-        return (select(cycleEntries)..where((t) => t.id.equals(id)))
-            .getSingle();
+        final id = await into(cycleEntries).insert(
+          entry.copyWith(
+            date: Value(date),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+        return (select(
+          cycleEntries,
+        )..where((t) => t.id.equals(id))).getSingle();
       }
 
       // Full replacement write: drop identity + timestamps handled below,
@@ -55,10 +58,12 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
         createdAt: const Value<DateTime>.absent(),
         updatedAt: Value(now),
       );
-      await (update(cycleEntries)..where((t) => t.id.equals(existing.id)))
-          .write(replacement);
-      return (select(cycleEntries)..where((t) => t.id.equals(existing.id)))
-          .getSingle();
+      await (update(
+        cycleEntries,
+      )..where((t) => t.id.equals(existing.id))).write(replacement);
+      return (select(
+        cycleEntries,
+      )..where((t) => t.id.equals(existing.id))).getSingle();
     });
   }
 
@@ -71,8 +76,9 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
 
   /// All entries, ordered ascending by day.
   Future<List<CycleEntry>> allEntries() {
-    return (select(cycleEntries)..orderBy([(t) => OrderingTerm.asc(t.date)]))
-        .get();
+    return (select(
+      cycleEntries,
+    )..orderBy([(t) => OrderingTerm.asc(t.date)])).get();
   }
 
   /// All entries within [from, to] inclusive, ordered asc.
@@ -80,9 +86,12 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
   /// DateTime bounds are mapped to epoch days here.
   Future<List<CycleEntry>> range(DateTime from, DateTime to) {
     return (select(cycleEntries)
-          ..where((t) => t.date.isBetweenValues(
+          ..where(
+            (t) => t.date.isBetweenValues(
               const EpochDayConverter().toSql(from),
-              const EpochDayConverter().toSql(to)))
+              const EpochDayConverter().toSql(to),
+            ),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.date)]))
         .get();
   }
@@ -90,24 +99,32 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
   /// Stream of entries within [from, to] inclusive, ordered ascending.
   Stream<List<CycleEntry>> watchRange(DateTime from, DateTime to) {
     return (select(cycleEntries)
-          ..where((t) => t.date.isBetweenValues(
+          ..where(
+            (t) => t.date.isBetweenValues(
               const EpochDayConverter().toSql(from),
-              const EpochDayConverter().toSql(to)))
+              const EpochDayConverter().toSql(to),
+            ),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.date)]))
         .watch();
   }
 
   /// Stream of all entries, ordered ascending.
   Stream<List<CycleEntry>> watchAll() {
-    return (select(cycleEntries)..orderBy([(t) => OrderingTerm.asc(t.date)]))
-        .watch();
+    return (select(
+      cycleEntries,
+    )..orderBy([(t) => OrderingTerm.asc(t.date)])).watch();
   }
 
   /// Deletes the entry stored for [date]. Returns the number of removed
   /// rows (0 or 1).
   Future<int> deleteByDate(DateTime date) {
-    return (delete(cycleEntries)
-          ..where((t) => t.date.equalsValue(_normalize(date))))
-        .go();
+    return (delete(
+      cycleEntries,
+    )..where((t) => t.date.equalsValue(_normalize(date)))).go();
   }
+
+  /// Deletes EVERY entry row (the settings pane's wipe calls this inside
+  /// the database-level transaction). Returns the number of removed rows.
+  Future<int> deleteAll() => delete(cycleEntries).go();
 }

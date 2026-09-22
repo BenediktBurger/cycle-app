@@ -123,6 +123,24 @@ fastlane store metadata:
 [02](fastlane/metadata/android/en-US/images/phoneScreenshots/02.png)
 (shown in English, matching the en-US store listing).
 
+## Backup, migration & recovery
+
+Backup, data migration to another device, and data recovery all happen
+through the **JSON export/import in the Einstellungen (settings) pane — and
+nowhere else**:
+
+- Export regularly to a file you control (Einstellungen › JSON-Export) and
+  import it on the target device to restore/re-migrate your data there.
+- **Never copy the database file itself** (Android/iOS): there the database
+  is encrypted with a device-bound key (see
+  [ADR-0005](docs/adr/0005-storage-and-encryption.md)), so a copied file is
+  unopenable data on anything else — not a backup.
+- On the **web build** the browser storage (OPFS/IndexedDB) is not encrypted
+  by the app (web stays an unencrypted development tool).
+
+JSON export/import is the only backup path on **all** platforms — web
+included.
+
 ## Import from drip
 
 The Einstellungen screen can import a **CSV export of the drip cycle

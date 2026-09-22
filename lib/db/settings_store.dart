@@ -42,6 +42,14 @@ abstract final class SettingKeys {
   /// (or a corrupt row) means 0 — the cycle ordinals on the cycle page then
   /// count only the mark-opened cycles recorded in this database.
   static const observedCyclesOutsideApp = 'observedCyclesOutsideApp';
+
+  /// First-start gate of the welcome/about page: the flag is a plain JSON
+  /// boolean. NOTHING stored (or a corrupt row) means "not completed", so
+  /// the shell shows the onboarding page next start; a stored true keeps the
+  /// shell direct. Only true is ever written in practice (the "continue"
+  /// action on the onboarding page) — an explicit false row simply reads
+  /// like the absence of one.
+  static const onboardingCompleted = 'onboardingCompleted';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -54,6 +62,7 @@ final class PersistedSettings {
     this.themeMode = ThemeMode.system,
     this.temperatureRange = TemperatureRange.defaults,
     this.observedCyclesOutsideApp = 0,
+    this.onboardingCompleted = false,
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -71,17 +80,28 @@ final class PersistedSettings {
   /// The stored count of cycles observed outside this app (>= 0).
   final int observedCyclesOutsideApp;
 
+  /// Whether the onboarding page has been confirmed ("Weiter" tapped at
+  /// least once). The absence of a row — this field's default — is also the
+  /// "not answered yet" state.
+  final bool onboardingCompleted;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
       other.locale == locale &&
       other.themeMode == themeMode &&
       other.temperatureRange == temperatureRange &&
-      other.observedCyclesOutsideApp == observedCyclesOutsideApp;
+      other.observedCyclesOutsideApp == observedCyclesOutsideApp &&
+      other.onboardingCompleted == onboardingCompleted;
 
   @override
   int get hashCode => Object.hash(
-      locale, themeMode, temperatureRange, observedCyclesOutsideApp);
+    locale,
+    themeMode,
+    temperatureRange,
+    observedCyclesOutsideApp,
+    onboardingCompleted,
+  );
 }
 
 /// Stateless typed wrapper over one database's [SettingsDao]. Cheap enough
@@ -104,6 +124,7 @@ final class SettingsStore {
     var themeMode = ThemeMode.system;
     var temperatureRange = TemperatureRange.defaults;
     var observedCyclesOutsideApp = 0;
+    var onboardingCompleted = false;
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -122,6 +143,8 @@ final class SettingsStore {
             }
           case SettingKeys.observedCyclesOutsideApp:
             observedCyclesOutsideApp = _observedCyclesFromStored(decoded);
+          case SettingKeys.onboardingCompleted:
+            onboardingCompleted = _onboardingFromStored(decoded);
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -133,6 +156,7 @@ final class SettingsStore {
       themeMode: themeMode,
       temperatureRange: temperatureRange,
       observedCyclesOutsideApp: observedCyclesOutsideApp,
+      onboardingCompleted: onboardingCompleted,
     );
   }
 
@@ -190,6 +214,12 @@ final class SettingsStore {
     }
     return writeSetting(SettingKeys.observedCyclesOutsideApp, cycles);
   }
+
+  /// Persists the onboarding completion flag as a plain JSON boolean. Only
+  /// the "continue" action writes true in practice; the absent row is the
+  /// "not completed" state, so nothing rewrites it on a plain start.
+  Future<void> persistOnboardingCompleted(bool completed) =>
+      writeSetting(SettingKeys.onboardingCompleted, completed);
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code
@@ -213,3 +243,8 @@ ThemeMode _themeModeFromStored(Object? decoded) {
 /// corrupt or hostile row keeps the default, never an error.
 int _observedCyclesFromStored(Object? decoded) =>
     decoded is int && decoded >= 0 ? decoded : 0;
+
+/// Onboarding-flag decode: explicit JSON true only. Anything else (false,
+/// null, strings, numbers) decodes to not-completed — the welcome page then
+/// replays at worst, never getting silently skipped.
+bool _onboardingFromStored(Object? decoded) => decoded is bool && decoded;

@@ -405,21 +405,25 @@ List<CycleEvaluation> evaluateCycles(
   final windows = <_LowWindow>[];
   for (var i = 0; i < cycles.length; i++) {
     windows.add(
-        _lowWindowFor(cycles[i], marks, excludedDays, _nextStart(cycles, i)));
+      _lowWindowFor(cycles[i], marks, excludedDays, _nextStart(cycles, i)),
+    );
   }
 
   final evaluations = <CycleEvaluation>[];
   for (var i = 0; i < cycles.length; i++) {
-    final nextWindowStart =
-        i + 1 < cycles.length ? windows[i + 1].startDay : null;
-    evaluations.add(_evaluateCycle(
-      cycles[i],
-      marks,
-      excludedDays,
-      windows[i],
-      _nextStart(cycles, i),
-      nextWindowStart,
-    ));
+    final nextWindowStart = i + 1 < cycles.length
+        ? windows[i + 1].startDay
+        : null;
+    evaluations.add(
+      _evaluateCycle(
+        cycles[i],
+        marks,
+        excludedDays,
+        windows[i],
+        _nextStart(cycles, i),
+        nextWindowStart,
+      ),
+    );
   }
   return evaluations;
 }
@@ -515,9 +519,7 @@ _LowWindow _lowWindowFor(
   // reaching past the group's first tracked day (rise marked within the
   // first six days of a cycle group) truncates at the group's tracked days
   // — beyond that it must not reach into the previous cycle group.
-  final byDay = {
-    for (final e in cycle.days) DateOnly.normalize(e.date): e,
-  };
+  final byDay = {for (final e in cycle.days) DateOnly.normalize(e.date): e};
   final lows = <NumberedLow>[];
   for (var offset = 1; offset <= 6; offset++) {
     final day = DateOnly.addDays(firstHigherDay, -offset);
@@ -528,11 +530,7 @@ _LowWindow _lowWindowFor(
     if (entry == null || entry.bbtC == null || excludedDays.contains(day)) {
       continue;
     }
-    lows.add(NumberedLow(
-      number: offset,
-      date: day,
-      value: entry.bbtC!,
-    ));
+    lows.add(NumberedLow(number: offset, date: day, value: entry.bbtC!));
   }
 
   BaselinePoint? baseline;
@@ -596,13 +594,12 @@ CycleEvaluation _evaluateCycle(
   // check needs the marked day's entry from the tracked days — the day
   // may carry NO entry at all (an untracked mark day), which counts as
   // inconsistent.
-  final byDay = {
-    for (final e in cycle.days) DateOnly.normalize(e.date): e,
-  };
+  final byDay = {for (final e in cycle.days) DateOnly.normalize(e.date): e};
   bool? riseMarkConsistent;
   if (firstHigherDay != null && baseline != null) {
     final markedEntry = byDay[firstHigherDay];
-    riseMarkConsistent = markedEntry == null ||
+    riseMarkConsistent =
+        markedEntry == null ||
             markedEntry.bbtC == null ||
             excludedDays.contains(firstHigherDay)
         ? false
@@ -617,9 +614,11 @@ CycleEvaluation _evaluateCycle(
     var arrowCount = 0;
     var circleCount = 0;
 
-    for (var day = firstHigherDay;
-        !day.isAfter(lastDay);
-        day = DateOnly.addDays(day, 1)) {
+    for (
+      var day = firstHigherDay;
+      !day.isAfter(lastDay);
+      day = DateOnly.addDays(day, 1)
+    ) {
       final entry = byDay[day];
 
       if (entry == null ||
@@ -650,8 +649,8 @@ CycleEvaluation _evaluateCycle(
       // a CIRCLE strictly after the peak day.
       final markKind =
           peakDay == null || DateOnly.daysBetween(peakDay, day) >= 0
-              ? MarkKind.arrow
-              : MarkKind.circle;
+          ? MarkKind.arrow
+          : MarkKind.circle;
 
       // Per-kind four-cap (R4): the ordinal counts within the candidate's
       // OWN kind; beyond the cap the candidate stays in the sequence
@@ -664,13 +663,15 @@ CycleEvaluation _evaluateCycle(
           ordinal = circleCount < _marksPerKindCap ? ++circleCount : null;
       }
 
-      higherMeasurements.add(HigherMeasurement(
-        date: day,
-        value: value,
-        markKind: markKind,
-        ordinal: ordinal,
-        differenceK: value - baseline.value,
-      ));
+      higherMeasurements.add(
+        HigherMeasurement(
+          date: day,
+          value: value,
+          markKind: markKind,
+          ordinal: ordinal,
+          differenceK: value - baseline.value,
+        ),
+      );
 
       // R5: rules D and E count CIRCLED measurements only — the circle
       // ordinal drives the trigger; arrows never start the SUZ (see the

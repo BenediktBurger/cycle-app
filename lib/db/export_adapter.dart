@@ -194,8 +194,9 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         await db.marksDao.addMark(
           day,
           type,
-          author:
-              authority is String && authority.isNotEmpty ? authority : 'user',
+          author: authority is String && authority.isNotEmpty
+              ? authority
+              : 'user',
         );
       }
 
@@ -258,8 +259,9 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 /// (the row stays valid, notes untouched) — and the `profile_id` /
 /// `profiles` keys are simply never read.
 DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
-  final day =
-      row['date'] is String ? tryParseIsoDay(row['date'] as String) : null;
+  final day = row['date'] is String
+      ? tryParseIsoDay(row['date'] as String)
+      : null;
   if (day == null) return null;
 
   // Shared vocabulary helper (models.dart) — the SAME function the planner
@@ -281,8 +283,9 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
 
   // Coercible field: broken or absent time tokens collapse to null (v1
   // documents omit the field entirely).
-  final measuredAtMinutes =
-      tryParseMeasuredAtMinutes(row['measured_at_minutes']);
+  final measuredAtMinutes = tryParseMeasuredAtMinutes(
+    row['measured_at_minutes'],
+  );
 
   // The raw disturbance mask: an int within the 0..15 TempDisturbance
   // vocabulary is taken verbatim; anything else — a missing key (older
@@ -290,7 +293,8 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   // collapses to 0 ("no disturbance"), never a row killer (same principle
   // as mucus). The old-document exclude_* keys contribute their bits on
   // top (illness → kr, alcohol → alk) — see the doc comment above.
-  final mask = tryParseTempDisturbances(row['temp_disturbances']) |
+  final mask =
+      tryParseTempDisturbances(row['temp_disturbances']) |
       (flag('exclude_illness') ? TempDisturbance.kr.bit : 0) |
       (flag('exclude_alcohol') ? TempDisturbance.alk.bit : 0);
 
@@ -300,8 +304,9 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
   // recorded"), never a row killer. The ≤(redefined-v4) boolean `sex` flag
   // is deliberately NOT read here: it has no mask identity.
   final rawTimings = row['sex_timings'];
-  final sexTimings =
-      rawTimings is int && rawTimings >= 0 && rawTimings <= 7 ? rawTimings : 0;
+  final sexTimings = rawTimings is int && rawTimings >= 0 && rawTimings <= 7
+      ? rawTimings
+      : 0;
 
   try {
     return DailyEntry(

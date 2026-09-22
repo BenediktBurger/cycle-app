@@ -44,9 +44,7 @@ Future<String?> pickFileText({String accept = 'application/json,.json'}) async {
   final override = pickFileTextOverride;
   if (override != null) return override(accept);
 
-  final file = await openFile(acceptedTypeGroups: [
-    acceptTypeGroup(accept),
-  ]);
+  final file = await openFile(acceptedTypeGroups: [acceptTypeGroup(accept)]);
   if (file == null) return null;
   try {
     return await file.readAsString();

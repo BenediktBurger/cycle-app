@@ -29,7 +29,8 @@ ProviderScope diarySelectorScope(Locale locale) => appScope(locale: locale);
 /// Reads the saved day back through the database provider — the same
 /// instance the entry form writes through, not a second connection.
 Future<({CycleDatabase db, DateTime date})> savedDayOf(
-    WidgetTester tester) async {
+  WidgetTester tester,
+) async {
   final context = tester.element(find.byType(TagebuchScreen));
   final container = ProviderScope.containerOf(context);
   final db = await container.read(databaseProvider.future);
@@ -51,22 +52,22 @@ class DiaryHarness {
   CycleDatabase? db;
 
   DiaryHarness({required this.now, DateTime? selectedDay})
-      : selectedDay = selectedDay ?? DateOnly.normalize(now);
+    : selectedDay = selectedDay ?? DateOnly.normalize(now);
 
   /// The app scope with the pinned overrides; [seed] runs inside the
   /// database future (the form, reading through databaseProvider.future,
   /// sees the seeded day); a per-call [selectedDay] overrides the harness
   /// default.
-  ProviderScope scope(
-          {Future<void> Function(CycleDatabase db)? seed,
-          DateTime? selectedDay}) =>
-      appScope(
-        seed: seed,
-        onCreated: (db) => this.db = db,
-        now: () => now,
-        selectedDay: selectedDay ?? this.selectedDay,
-        locale: const Locale('de'),
-      );
+  ProviderScope scope({
+    Future<void> Function(CycleDatabase db)? seed,
+    DateTime? selectedDay,
+  }) => appScope(
+    seed: seed,
+    onCreated: (db) => this.db = db,
+    now: () => now,
+    selectedDay: selectedDay ?? this.selectedDay,
+    locale: const Locale('de'),
+  );
 
   /// Enlarges the test surface: the form is tall, and the day tiles plus the
   /// save button sit BELOW the default 800x600 test viewport — with the

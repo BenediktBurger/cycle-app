@@ -43,49 +43,63 @@ void main() {
       expect(snapshot.temperatureRange, TemperatureRange.defaults);
     });
 
-    test('unknown keys are ignored on load (no error, no default change)',
-        () async {
-      await seedRaw('pdfExport.anonymize', 'true');
-      await seedRaw('future.thing', '"whatever"');
+    test(
+      'unknown keys are ignored on load (no error, no default change)',
+      () async {
+        await seedRaw('pdfExport.anonymize', 'true');
+        await seedRaw('future.thing', '"whatever"');
 
-      final snapshot = await store.load();
-      expect(snapshot, isA<PersistedSettings>());
-      expect(snapshot, PersistedSettings.defaults());
-    });
+        final snapshot = await store.load();
+        expect(snapshot, isA<PersistedSettings>());
+        expect(snapshot, PersistedSettings.defaults());
+      },
+    );
 
     test('round-trips all three typed settings in one snapshot', () async {
       await store.persistLocale(const Locale('de'));
       await store.persistThemeMode(ThemeMode.dark);
       await store.persistTemperatureRange(
-          const TemperatureRange(min: 35.5, max: 39.0));
+        const TemperatureRange(min: 35.5, max: 39.0),
+      );
 
       final snapshot = await store.load();
       expect(snapshot.locale, const Locale('de'));
       expect(snapshot.themeMode, ThemeMode.dark);
-      expect(snapshot.temperatureRange,
-          const TemperatureRange(min: 35.5, max: 39.0));
+      expect(
+        snapshot.temperatureRange,
+        const TemperatureRange(min: 35.5, max: 39.0),
+      );
 
       // Switching everything again must fully replace the snapshot content.
-      await store
-          .persistLocale(null); // back to system (row is gone, see below)
+      await store.persistLocale(
+        null,
+      ); // back to system (row is gone, see below)
       await store.persistThemeMode(ThemeMode.light);
       final reloaded = await store.load();
-      expect(reloaded.locale, isNull,
-          reason: 'null locale means "follow the system"');
+      expect(
+        reloaded.locale,
+        isNull,
+        reason: 'null locale means "follow the system"',
+      );
       expect(reloaded.themeMode, ThemeMode.light);
     });
   });
 
   group('locale', () {
-    test('null/system stores nothing — absent row and default read the same',
-        () async {
-      await store.persistLocale(null);
-      expect(await store.readSetting(SettingKeys.locale), isNull);
-      expect(await db.select(db.appSettings).get(), isEmpty,
-          reason: 'the system default is not persisted as a row');
-      final snapshot = await store.load();
-      expect(snapshot.locale, isNull);
-    });
+    test(
+      'null/system stores nothing — absent row and default read the same',
+      () async {
+        await store.persistLocale(null);
+        expect(await store.readSetting(SettingKeys.locale), isNull);
+        expect(
+          await db.select(db.appSettings).get(),
+          isEmpty,
+          reason: 'the system default is not persisted as a row',
+        );
+        final snapshot = await store.load();
+        expect(snapshot.locale, isNull);
+      },
+    );
 
     test('explicit de/en round-trip as Locale objects', () async {
       await store.persistLocale(const Locale('de'));
@@ -99,8 +113,7 @@ void main() {
       expect(await db.select(db.appSettings).get(), hasLength(1));
     });
 
-    test(
-        'a language code outside {de,en} is stored anyway (ADR-0007 '
+    test('a language code outside {de,en} is stored anyway (ADR-0007 '
         'resolution falls back later)', () async {
       await store.persistLocale(const Locale('fr'));
       final snapshot = await store.load();
@@ -112,8 +125,11 @@ void main() {
     test('each named token round-trips, system included', () async {
       for (final mode in ThemeMode.values) {
         await store.persistThemeMode(mode);
-        expect(await store.readSetting(SettingKeys.themeMode), mode.name,
-            reason: '${mode.name} is stored as its JSON string token');
+        expect(
+          await store.readSetting(SettingKeys.themeMode),
+          mode.name,
+          reason: '${mode.name} is stored as its JSON string token',
+        );
         expect((await store.load()).themeMode, mode);
       }
     });
@@ -130,20 +146,25 @@ void main() {
       await store.persistTemperatureRange(range);
 
       final raw = await db.settingsDao.readValue(SettingKeys.temperatureRange);
-      expect(raw, '{"min":35.5,"max":39.0}',
-          reason: 'the value column stores the JSON map, exactly');
+      expect(
+        raw,
+        '{"min":35.5,"max":39.0}',
+        reason: 'the value column stores the JSON map, exactly',
+      );
 
       final snapshot = await store.load();
       expect(snapshot.temperatureRange, isA<TemperatureRange>());
       expect(snapshot.temperatureRange, range);
     });
 
-    test('TemperatureRange.toJson/fromJson agree with the stored shape',
-        () async {
-      const range = TemperatureRange(min: 34.0, max: 42.0);
-      final restored = TemperatureRange.fromJson(range.toJson());
-      expect(restored, range);
-    });
+    test(
+      'TemperatureRange.toJson/fromJson agree with the stored shape',
+      () async {
+        const range = TemperatureRange(min: 34.0, max: 42.0);
+        final restored = TemperatureRange.fromJson(range.toJson());
+        expect(restored, range);
+      },
+    );
 
     test('wrongly ordered bounds are a store-side ArgumentError', () {
       expect(
@@ -197,18 +218,27 @@ void main() {
       expect(snapshot.observedCyclesOutsideApp, 0);
     });
 
-    test('non-negative integers round-trip; an explicit 0 row is fine',
-        () async {
-      await store.persistObservedCyclesOutsideApp(7);
-      expect(await store.readSetting(SettingKeys.observedCyclesOutsideApp), 7,
-          reason: 'the value column stores the plain JSON integer');
-      expect((await store.load()).observedCyclesOutsideApp, 7);
+    test(
+      'non-negative integers round-trip; an explicit 0 row is fine',
+      () async {
+        await store.persistObservedCyclesOutsideApp(7);
+        expect(
+          await store.readSetting(SettingKeys.observedCyclesOutsideApp),
+          7,
+          reason: 'the value column stores the plain JSON integer',
+        );
+        expect((await store.load()).observedCyclesOutsideApp, 7);
 
-      await store.persistObservedCyclesOutsideApp(0);
-      expect((await store.load()).observedCyclesOutsideApp, 0,
-          reason: 'an explicit default row is fine — it reads back as the '
-              'default (same stance as the system theme row)');
-    });
+        await store.persistObservedCyclesOutsideApp(0);
+        expect(
+          (await store.load()).observedCyclesOutsideApp,
+          0,
+          reason:
+              'an explicit default row is fine — it reads back as the '
+              'default (same stance as the system theme row)',
+        );
+      },
+    );
 
     test('non-integer, negative and corrupt rows fall back to 0', () async {
       for (final raw in [
@@ -222,39 +252,89 @@ void main() {
         expect(
           (await store.load()).observedCyclesOutsideApp,
           0,
-          reason: 'corrupt/negative stored value "$raw" must not surface an '
+          reason:
+              'corrupt/negative stored value "$raw" must not surface an '
               'error and must not poison the count',
         );
       }
     });
   });
 
-  group('generic JSON path (future settings without any code change)', () {
-    test('a bool setting round-trips with no typed helper and no schema edit',
-        () async {
-      await store.writeSetting('pdfExport.anonymize', true);
-      expect(await store.readSetting('pdfExport.anonymize'), true);
-      // With the typed layer: writeSetting writes the JSON-encoded text.
-      expect(await db.settingsDao.readValue('pdfExport.anonymize'), 'true');
+  group('onboarding completion flag (first-start gate)', () {
+    test('an empty table loads to not completed', () async {
+      final snapshot = await store.load();
+      expect(
+        snapshot.onboardingCompleted,
+        false,
+        reason:
+            'an absent row means the welcome page has not been seen '
+            'yet — it must be shown once',
+      );
     });
+
+    test('true round-trips; an explicit false row is kept', () async {
+      await store.persistOnboardingCompleted(true);
+      expect(
+        await store.readSetting(SettingKeys.onboardingCompleted),
+        true,
+        reason: 'the value column stores the plain JSON boolean',
+      );
+      expect((await store.load()).onboardingCompleted, true);
+
+      // An explicit false row is only written by a deliberate store user;
+      // it must read back the same as the absence of a row.
+      await store.persistOnboardingCompleted(false);
+      expect((await store.load()).onboardingCompleted, false);
+      expect(
+        await db.select(db.appSettings).get(),
+        hasLength(1),
+        reason: 'the persisted row is stored, one row per key',
+      );
+    });
+
+    test('corrupt rows fall back to not completed', () async {
+      for (final raw in [
+        '"true"', // JSON string, not a boolean
+        '1', // JSON number
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.onboardingCompleted, raw);
+        expect(
+          (await store.load()).onboardingCompleted,
+          false,
+          reason:
+              'corrupt stored value "$raw" must not surface an error '
+              'and must replay the welcome page rather than skip it',
+        );
+      }
+    });
+  });
+
+  group('generic JSON path (future settings without any code change)', () {
+    test(
+      'a bool setting round-trips with no typed helper and no schema edit',
+      () async {
+        await store.writeSetting('pdfExport.anonymize', true);
+        expect(await store.readSetting('pdfExport.anonymize'), true);
+        // With the typed layer: writeSetting writes the JSON-encoded text.
+        expect(await db.settingsDao.readValue('pdfExport.anonymize'), 'true');
+      },
+    );
 
     test('every JSON-native type can ride the generic path', () async {
       await store.writeSetting('pdfExport.name', 'B. Beispiel');
       await store.writeSetting('pdfExport.count', 12);
       await store.writeSetting('pdfExport.parts', {
         'name': 'x',
-        'cycles': [1, 2]
+        'cycles': [1, 2],
       });
 
       expect(await store.readSetting('pdfExport.name'), 'B. Beispiel');
       expect(await store.readSetting('pdfExport.count'), 12);
-      expect(
-        await store.readSetting('pdfExport.parts'),
-        {
-          'name': 'x',
-          'cycles': [1, 2]
-        },
-      );
+      expect(await store.readSetting('pdfExport.parts'), {
+        'name': 'x',
+        'cycles': [1, 2],
+      });
     });
 
     test('writing null deletes the row (delete-verb semantics)', () async {

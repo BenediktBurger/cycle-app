@@ -74,13 +74,14 @@ final _dayNavHarness = DiaryHarness(now: _dayNavNow);
 
 ProviderScope _dayNavScope({required DateTime selectedDay}) =>
     _dayNavHarness.scope(
-        seed: (db) async {
-          // Two adjacent days with distinct temperatures: the form must show
-          // the one belonging to the currently selected day.
-          await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
-          await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
-        },
-        selectedDay: selectedDay);
+      seed: (db) async {
+        // Two adjacent days with distinct temperatures: the form must show
+        // the one belonging to the currently selected day.
+        await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
+        await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
+      },
+      selectedDay: selectedDay,
+    );
 
 /// The BBT field is the first form field; its controller text is the
 /// round-trip signal for "which day's entry is loaded".
@@ -131,9 +132,9 @@ final _promptHarness = DiaryHarness(
 );
 
 void main() {
-// ═══════════ measured time ═══════════
-// former test/diary_measured_time_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ measured time ═══════════
+  // former test/diary_measured_time_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
   /// Types into the temperature field (the first form field) and lets the
   /// controller listener rebuild the form (the time row's visibility
@@ -143,83 +144,120 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('the time row appears only once a temperature is entered',
-      (WidgetTester tester) async {
+  testWidgets('the time row appears only once a temperature is entered', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_measuredTimeHarness.scope());
     await tester.pumpAndSettle();
 
-    expect(find.text('Gemessen um'), findsNothing,
-        reason: 'without a temperature there is no measurement time to '
-            'record — the picker row stays hidden');
+    expect(
+      find.text('Gemessen um'),
+      findsNothing,
+      reason:
+          'without a temperature there is no measurement time to '
+          'record — the picker row stays hidden',
+    );
     expect(find.text('14:35'), findsNothing);
 
     await enterTemperature(tester, '36.5');
 
-    expect(find.text('Gemessen um'), findsOneWidget,
-        reason: 'with a temperature the picker row becomes visible');
-    expect(find.text('14:35'), findsOneWidget,
-        reason: 'the picker button shows the injected current time as the '
-            'prefill');
+    expect(
+      find.text('Gemessen um'),
+      findsOneWidget,
+      reason: 'with a temperature the picker row becomes visible',
+    );
+    expect(
+      find.text('14:35'),
+      findsOneWidget,
+      reason:
+          'the picker button shows the injected current time as the '
+          'prefill',
+    );
   });
 
   testWidgets(
-      'compact density: the temperature field and the measured-time row '
-      'share one visual line', (WidgetTester tester) async {
-    _measuredTimeHarness.tallSurface(tester);
-    await tester.pumpWidget(_measuredTimeHarness.scope());
-    await tester.pumpAndSettle();
+    'compact density: the temperature field and the measured-time row '
+    'share one visual line',
+    (WidgetTester tester) async {
+      _measuredTimeHarness.tallSurface(tester);
+      await tester.pumpWidget(_measuredTimeHarness.scope());
+      await tester.pumpAndSettle();
 
-    await enterTemperature(tester, '36.5');
-
-    // The measured-time label must sit INSIDE the vertical span of the
-    // temperature field (beside it), not below it in its own row.
-    final tempField = find.byType(TextFormField).first;
-    final tempTop = tester.getTopLeft(tempField).dy;
-    final tempBottom = tester.getBottomRight(tempField).dy;
-    final timeTop = tester.getTopLeft(find.text('Gemessen um')).dy;
-    expect(timeTop, inInclusiveRange(tempTop, tempBottom),
-        reason: 'the temperature field and the measured-time row share one '
-            'visual line — the time row is not stacked below the field');
-  });
-
-  testWidgets(
-      'the one-line temperature/time row stays overflow-free at a narrow '
-      'viewport', (WidgetTester tester) async {
-    useNarrowPhoneViewport(tester);
-
-    await tester.pumpWidget(_measuredTimeHarness.scope());
-    await tester.pumpAndSettle();
-
-    // Waive the pump-time record: at this forced width, widget-test font
-    // metrics can overflow OTHER rows of the tall form once at the initial
-    // layout — e.g. the date row (a documented, still-open narrow-width
-    // defect of that row, not this one). Everything that fails from here
-    // on, during the temperature/time interaction, belongs to the one-line
-    // row and must stay silent.
-    tester.takeException();
-
-    await expectNoFrameworkErrors(tester, () async {
       await enterTemperature(tester, '36.5');
-      // At this width the printed label drops (it is the widest part of
-      // the line); the control stays through icon, time button and the
-      // prefill.
-      expect(find.text('Gemessen um'), findsNothing,
-          reason: 'narrow-width layout drops the printed label (documented '
-              'behavior) — it is the widest part of the line');
-      expect(find.text('14:35'), findsOneWidget,
-          reason: 'the one-line row still renders the time control with the '
-              'prefilled current time at the narrow width');
-      expect(find.byIcon(Icons.schedule_outlined), findsOneWidget,
-          reason: 'the clock icon keeps carrying the meaning at narrow '
-              'widths');
-    },
-        reason: 'the compact temperature/time row must not introduce a new '
-            'RenderFlex overflow at narrow widths');
-    expect(tester.takeException(), isNull);
-  });
 
-  testWidgets('an implausible temperature keeps the time row hidden',
-      (WidgetTester tester) async {
+      // The measured-time label must sit INSIDE the vertical span of the
+      // temperature field (beside it), not below it in its own row.
+      final tempField = find.byType(TextFormField).first;
+      final tempTop = tester.getTopLeft(tempField).dy;
+      final tempBottom = tester.getBottomRight(tempField).dy;
+      final timeTop = tester.getTopLeft(find.text('Gemessen um')).dy;
+      expect(
+        timeTop,
+        inInclusiveRange(tempTop, tempBottom),
+        reason:
+            'the temperature field and the measured-time row share one '
+            'visual line — the time row is not stacked below the field',
+      );
+    },
+  );
+
+  testWidgets(
+    'the one-line temperature/time row stays overflow-free at a narrow '
+    'viewport',
+    (WidgetTester tester) async {
+      useNarrowPhoneViewport(tester);
+
+      await tester.pumpWidget(_measuredTimeHarness.scope());
+      await tester.pumpAndSettle();
+
+      // Waive the pump-time record: at this forced width, widget-test font
+      // metrics can overflow OTHER rows of the tall form once at the initial
+      // layout — e.g. the date row (a documented, still-open narrow-width
+      // defect of that row, not this one). Everything that fails from here
+      // on, during the temperature/time interaction, belongs to the one-line
+      // row and must stay silent.
+      tester.takeException();
+
+      await expectNoFrameworkErrors(
+        tester,
+        () async {
+          await enterTemperature(tester, '36.5');
+          // At this width the printed label drops (it is the widest part of
+          // the line); the control stays through icon, time button and the
+          // prefill.
+          expect(
+            find.text('Gemessen um'),
+            findsNothing,
+            reason:
+                'narrow-width layout drops the printed label (documented '
+                'behavior) — it is the widest part of the line',
+          );
+          expect(
+            find.text('14:35'),
+            findsOneWidget,
+            reason:
+                'the one-line row still renders the time control with the '
+                'prefilled current time at the narrow width',
+          );
+          expect(
+            find.byIcon(Icons.schedule_outlined),
+            findsOneWidget,
+            reason:
+                'the clock icon keeps carrying the meaning at narrow '
+                'widths',
+          );
+        },
+        reason:
+            'the compact temperature/time row must not introduce a new '
+            'RenderFlex overflow at narrow widths',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('an implausible temperature keeps the time row hidden', (
+    WidgetTester tester,
+  ) async {
     // The row mirrors the validator's plausibility gate (isWithinBbtRange):
     // "999" parses as a number but can never be saved as a temperature, so
     // no measurement time may be recorded for it.
@@ -228,20 +266,31 @@ void main() {
 
     await enterTemperature(tester, '999');
 
-    expect(find.text('Gemessen um'), findsNothing,
-        reason: 'a temperature outside the BBT range can never be saved, '
-            'so there is nothing to record a measurement time for');
+    expect(
+      find.text('Gemessen um'),
+      findsNothing,
+      reason:
+          'a temperature outside the BBT range can never be saved, '
+          'so there is nothing to record a measurement time for',
+    );
   });
 
-  testWidgets('a stored time stays on re-open for editing (no re-prefill)',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_measuredTimeHarness.scope(seed: (db) async {
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: _measuredTimeHarness.selectedDay,
-        bbtC: 36.4,
-        measuredAtMinutes: 407, // 06:47 — measured in the early morning
-      ));
-    }));
+  testWidgets('a stored time stays on re-open for editing (no re-prefill)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _measuredTimeHarness.scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: _measuredTimeHarness.selectedDay,
+              bbtC: 36.4,
+              measuredAtMinutes: 407, // 06:47 — measured in the early morning
+            ),
+          );
+        },
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('06:47'), findsOneWidget);
@@ -249,16 +298,23 @@ void main() {
     expect(find.text('14:35'), findsNothing);
   });
 
-  testWidgets('clearing the time is possible and stores null',
-      (WidgetTester tester) async {
+  testWidgets('clearing the time is possible and stores null', (
+    WidgetTester tester,
+  ) async {
     _measuredTimeHarness.tallSurface(tester);
-    await tester.pumpWidget(_measuredTimeHarness.scope(seed: (db) async {
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: _measuredTimeHarness.selectedDay,
-        bbtC: 36.4,
-        measuredAtMinutes: 407,
-      ));
-    }));
+    await tester.pumpWidget(
+      _measuredTimeHarness.scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: _measuredTimeHarness.selectedDay,
+              bbtC: 36.4,
+              measuredAtMinutes: 407,
+            ),
+          );
+        },
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('06:47'), findsOneWidget);
@@ -271,15 +327,18 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao
-        .entryFor(_measuredTimeHarness.selectedDay))!;
+    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
+      _measuredTimeHarness.selectedDay,
+    ))!;
     expect(stored.bbtC, 36.4, reason: 'the temperature itself is kept');
-    expect(stored.measuredAtMinutes, isNull,
-        reason: 'a day without time entry is legal; nothing is invented');
+    expect(
+      stored.measuredAtMinutes,
+      isNull,
+      reason: 'a day without time entry is legal; nothing is invented',
+    );
   });
 
-  testWidgets(
-      'a temperature-less save stores no time, even after the '
+  testWidgets('a temperature-less save stores no time, even after the '
       'prefill was shown', (WidgetTester tester) async {
     _measuredTimeHarness.tallSurface(tester);
     await tester.pumpWidget(_measuredTimeHarness.scope());
@@ -299,17 +358,23 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao
-        .entryFor(_measuredTimeHarness.selectedDay))!;
+    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
+      _measuredTimeHarness.selectedDay,
+    ))!;
     expect(stored.bbtC, isNull);
     expect(stored.mucusSign, 's');
-    expect(stored.measuredAtMinutes, isNull,
-        reason: 'the time is only stored together with a temperature — '
-            'the prefilled current time must not leak into the row');
+    expect(
+      stored.measuredAtMinutes,
+      isNull,
+      reason:
+          'the time is only stored together with a temperature — '
+          'the prefilled current time must not leak into the row',
+    );
   });
 
-  testWidgets('saving a temperature stores the (prefilled) time with it',
-      (WidgetTester tester) async {
+  testWidgets('saving a temperature stores the (prefilled) time with it', (
+    WidgetTester tester,
+  ) async {
     _measuredTimeHarness.tallSurface(tester);
     await tester.pumpWidget(_measuredTimeHarness.scope());
     await tester.pumpAndSettle();
@@ -318,81 +383,113 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao
-        .entryFor(_measuredTimeHarness.selectedDay))!;
+    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
+      _measuredTimeHarness.selectedDay,
+    ))!;
     expect(stored.bbtC, 36.5);
-    expect(stored.measuredAtMinutes, 14 * 60 + 35, // the injected "now"
-        reason: 'a temperature with the prefilled measurement time stores '
-            'the time');
+    expect(
+      stored.measuredAtMinutes,
+      14 * 60 + 35, // the injected "now"
+      reason:
+          'a temperature with the prefilled measurement time stores '
+          'the time',
+    );
   });
 
-  testWidgets('the day tile shows the stored time',
-      (WidgetTester tester) async {
+  testWidgets('the day tile shows the stored time', (
+    WidgetTester tester,
+  ) async {
     // The time lives on a DIFFERENT day than the selected one, so the only
     // possible source of the string is the tile, not the form.
     _measuredTimeHarness.tallSurface(tester);
-    await tester.pumpWidget(_measuredTimeHarness.scope(seed: (db) async {
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: DateTime(2026, 1, 5),
-        bbtC: 36.4,
-        measuredAtMinutes: 407,
-      ));
-    }));
+    await tester.pumpWidget(
+      _measuredTimeHarness.scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: DateTime(2026, 1, 5),
+              bbtC: 36.4,
+              measuredAtMinutes: 407,
+            ),
+          );
+        },
+      ),
+    );
     await tester.pumpAndSettle();
 
     // The cycle-group tiles start collapsed; open the group first.
     await tester.tap(find.byType(ExpansionTile).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('06:47'), findsOneWidget,
-        reason: 'the measured time appears on the day tile');
+    expect(
+      find.text('06:47'),
+      findsOneWidget,
+      reason: 'the measured time appears on the day tile',
+    );
   });
 
-// ═══════════ day navigation ═══════════
-// former test/diary_day_navigation_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ day navigation ═══════════
+  // former test/diary_day_navigation_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
   testWidgets(
-      'next/previous change the loaded day and its entry, back and forth',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_dayNavScope(selectedDay: _day1));
-    await tester.pumpAndSettle();
+    'next/previous change the loaded day and its entry, back and forth',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_dayNavScope(selectedDay: _day1));
+      await tester.pumpAndSettle();
 
-    expect(_bbtText(tester), '36.4',
-        reason: 'the form opens on the seeded first day');
-    expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day1)), findsOneWidget);
+      expect(
+        _bbtText(tester),
+        '36.4',
+        reason: 'the form opens on the seeded first day',
+      );
+      expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
+        findsOneWidget,
+      );
 
-    // Next: the form moves to the adjacent day and loads ITS entry.
-    await tester.tap(find.byIcon(Icons.chevron_right));
-    await tester.pumpAndSettle();
+      // Next: the form moves to the adjacent day and loads ITS entry.
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pumpAndSettle();
 
-    final context = tester.element(find.byType(TagebuchScreen));
-    final container = ProviderScope.containerOf(context);
-    expect(container.read(selectedDateProvider), _day2,
-        reason: 'the next button moves the selection one day forward');
-    expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day2)), findsOneWidget,
-        reason: 'the date button shows the new day');
-    expect(_bbtText(tester), '36.9',
-        reason: 'the new day\'s entry is loaded into the form');
+      final context = tester.element(find.byType(TagebuchScreen));
+      final container = ProviderScope.containerOf(context);
+      expect(
+        container.read(selectedDateProvider),
+        _day2,
+        reason: 'the next button moves the selection one day forward',
+      );
+      expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day2)),
+        findsOneWidget,
+        reason: 'the date button shows the new day',
+      );
+      expect(
+        _bbtText(tester),
+        '36.9',
+        reason: 'the new day\'s entry is loaded into the form',
+      );
 
-    // Previous: back to the first day, its entry reloaded.
-    await tester.tap(find.byIcon(Icons.chevron_left));
-    await tester.pumpAndSettle();
+      // Previous: back to the first day, its entry reloaded.
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
 
-    expect(container.read(selectedDateProvider), _day1);
-    expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day1)), findsOneWidget);
-    expect(_bbtText(tester), '36.4');
+      expect(container.read(selectedDateProvider), _day1);
+      expect(
+        find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
+        findsOneWidget,
+      );
+      expect(_bbtText(tester), '36.4');
 
-    // The chevron buttons carry localized tooltips (German pinned locale).
-    expect(_chevron(tester, Icons.chevron_left).tooltip, 'Voriger Tag');
-    expect(_chevron(tester, Icons.chevron_right).tooltip, 'Nächster Tag');
-  });
+      // The chevron buttons carry localized tooltips (German pinned locale).
+      expect(_chevron(tester, Icons.chevron_left).tooltip, 'Voriger Tag');
+      expect(_chevron(tester, Icons.chevron_right).tooltip, 'Nächster Tag');
+    },
+  );
 
-  testWidgets('next is disabled at the date-picker\'s last day (tomorrow)',
-      (WidgetTester tester) async {
+  testWidgets('next is disabled at the date-picker\'s last day (tomorrow)', (
+    WidgetTester tester,
+  ) async {
     // The picker window (see _pickDate) ends at now + 1 day: selecting
     // tomorrow must not offer a next day — no unbounded future.
     final tomorrow = DateOnly.addDays(_dayNavNow, 1);
@@ -400,45 +497,63 @@ void main() {
     await tester.pumpAndSettle();
 
     final nextButton = _chevron(tester, Icons.chevron_right);
-    expect(nextButton.onPressed, isNull,
-        reason: 'beyond tomorrow the next button must be disabled');
+    expect(
+      nextButton.onPressed,
+      isNull,
+      reason: 'beyond tomorrow the next button must be disabled',
+    );
 
     final context = tester.element(find.byType(TagebuchScreen));
     final container = ProviderScope.containerOf(context);
     await tester.tap(find.byIcon(Icons.chevron_right));
     await tester.pumpAndSettle();
-    expect(container.read(selectedDateProvider), tomorrow,
-        reason: 'a disabled button must not move the selection');
-    expect(_bbtText(tester), '',
-        reason: 'tomorrow has no stored entry — the fresh day stays loaded');
+    expect(
+      container.read(selectedDateProvider),
+      tomorrow,
+      reason: 'a disabled button must not move the selection',
+    );
+    expect(
+      _bbtText(tester),
+      '',
+      reason: 'tomorrow has no stored entry — the fresh day stays loaded',
+    );
 
     // Previous stays available from there (moving back is in-window).
     expect(_chevron(tester, Icons.chevron_left).onPressed, isNotNull);
   });
 
-  testWidgets('previous is disabled at the date-picker\'s first day (2000)',
-      (WidgetTester tester) async {
+  testWidgets('previous is disabled at the date-picker\'s first day (2000)', (
+    WidgetTester tester,
+  ) async {
     final firstDay = DateOnly.normalize(DateTime(2000));
     await tester.pumpWidget(_dayNavScope(selectedDay: firstDay));
     await tester.pumpAndSettle();
 
-    expect(_chevron(tester, Icons.chevron_left).onPressed, isNull,
-        reason: 'before 2000 the previous button must be disabled, '
-            'mirroring the date picker\'s firstDate');
+    expect(
+      _chevron(tester, Icons.chevron_left).onPressed,
+      isNull,
+      reason:
+          'before 2000 the previous button must be disabled, '
+          'mirroring the date picker\'s firstDate',
+    );
 
     final context = tester.element(find.byType(TagebuchScreen));
     final container = ProviderScope.containerOf(context);
     await tester.tap(find.byIcon(Icons.chevron_left));
     await tester.pumpAndSettle();
-    expect(container.read(selectedDateProvider), firstDay,
-        reason: 'a disabled button must not move the selection');
+    expect(
+      container.read(selectedDateProvider),
+      firstDay,
+      reason: 'a disabled button must not move the selection',
+    );
 
     // Next stays available from there (moving forward is in-window).
     expect(_chevron(tester, Icons.chevron_right).onPressed, isNotNull);
   });
 
-  testWidgets('navigating away discards unsaved edits (explicit save only)',
-      (WidgetTester tester) async {
+  testWidgets('navigating away discards unsaved edits (explicit save only)', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_dayNavScope(selectedDay: _day1));
     await tester.pumpAndSettle();
 
@@ -453,28 +568,36 @@ void main() {
     // change.
     await tester.tap(find.byIcon(Icons.chevron_right));
     await tester.pumpAndSettle();
-    expect(_bbtText(tester), '36.9',
-        reason: 'the next day loads fresh, not with the unsaved edit');
+    expect(
+      _bbtText(tester),
+      '36.9',
+      reason: 'the next day loads fresh, not with the unsaved edit',
+    );
 
     // Coming back shows the STORED value, not the discarded edit.
     await tester.tap(find.byIcon(Icons.chevron_left));
     await tester.pumpAndSettle();
-    expect(_bbtText(tester), '36.4',
-        reason: 'the discarded edit never reached the database');
+    expect(
+      _bbtText(tester),
+      '36.4',
+      reason: 'the discarded edit never reached the database',
+    );
 
     final stored1 = await _dayNavHarness.db!.entriesDao.entryFor(_day1);
     final stored2 = await _dayNavHarness.db!.entriesDao.entryFor(_day2);
-    expect(stored1!.bbtC, 36.4,
-        reason: 'navigation must not write the unsaved edit');
+    expect(
+      stored1!.bbtC,
+      36.4,
+      reason: 'navigation must not write the unsaved edit',
+    );
     expect(stored2!.bbtC, 36.9);
   });
 
-// ═══════════ cycle-start prompt ═══════════
-// former test/diary_cycle_start_prompt_test.dart (bodies concatenated verbatim; see
-// the file header for the merge mechanics)
+  // ═══════════ cycle-start prompt ═══════════
+  // former test/diary_cycle_start_prompt_test.dart (bodies concatenated verbatim; see
+  // the file header for the merge mechanics)
 
-  testWidgets(
-      'a suggested menstruation-level day prompts for the cycle start; '
+  testWidgets('a suggested menstruation-level day prompts for the cycle start; '
       'confirming places the cycleStart mark', (tester) async {
     _promptHarness.tallSurface(tester);
     await tester.pumpWidget(_promptHarness.scope());
@@ -485,26 +608,47 @@ void main() {
     // start — the prompt does not wait for the central levels.
     await _promptHarness.saveWithBleeding(tester, 'leicht');
 
-    expect(find.byType(AlertDialog), findsOneWidget,
-        reason: 'a suggested menstruation-level day asks for the cycle '
-            'start instead of placing the mark silently');
-    expect(find.text('Neuen Zyklus beginnen?'), findsOneWidget,
-        reason: 'the prompt names the suggestion in the pinned locale');
-    await tester.tap(find.descendant(
+    expect(
+      find.byType(AlertDialog),
+      findsOneWidget,
+      reason:
+          'a suggested menstruation-level day asks for the cycle '
+          'start instead of placing the mark silently',
+    );
+    expect(
+      find.text('Neuen Zyklus beginnen?'),
+      findsOneWidget,
+      reason: 'the prompt names the suggestion in the pinned locale',
+    );
+    await tester.tap(
+      find.descendant(
         of: find.byType(AlertDialog),
-        matching: find.text('Zyklusbeginn setzen')));
+        matching: find.text('Zyklusbeginn setzen'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'confirming closes the prompt');
+    expect(
+      find.byType(AlertDialog),
+      findsNothing,
+      reason: 'confirming closes the prompt',
+    );
     final marks = await _promptHarness.db!.marksDao.marksForDay(_day);
-    expect(marks.map((m) => m.markType), contains(CycleMarkTypes.cycleStart),
-        reason: 'the confirmed suggestion places the authoritative '
-            'cycle-boundary mark through the MarksDao');
-    final mark =
-        marks.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
-    expect(mark.author, 'user',
-        reason: 'the confirmed placement is user-authored');
+    expect(
+      marks.map((m) => m.markType),
+      contains(CycleMarkTypes.cycleStart),
+      reason:
+          'the confirmed suggestion places the authoritative '
+          'cycle-boundary mark through the MarksDao',
+    );
+    final mark = marks.singleWhere(
+      (m) => m.markType == CycleMarkTypes.cycleStart,
+    );
+    expect(
+      mark.author,
+      'user',
+      reason: 'the confirmed placement is user-authored',
+    );
   });
 
   testWidgets('dismissing the prompt places no mark', (tester) async {
@@ -515,15 +659,26 @@ void main() {
     await _promptHarness.saveWithBleeding(tester, 'stark');
 
     expect(find.byType(AlertDialog), findsOneWidget);
-    await tester.tap(find.descendant(
-        of: find.byType(AlertDialog), matching: find.text('Nicht jetzt')));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Nicht jetzt'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'dismissing closes the prompt');
-    expect(await _promptHarness.storedMarkTypes(_day), isEmpty,
-        reason: 'dismissing must not place the mark — bleeding only '
-            'suggests, the user decides');
+    expect(
+      find.byType(AlertDialog),
+      findsNothing,
+      reason: 'dismissing closes the prompt',
+    );
+    expect(
+      await _promptHarness.storedMarkTypes(_day),
+      isEmpty,
+      reason:
+          'dismissing must not place the mark — bleeding only '
+          'suggests, the user decides',
+    );
   });
 
   testWidgets('a spotting day (level 1) shows no prompt', (tester) async {
@@ -533,102 +688,147 @@ void main() {
 
     await _promptHarness.saveWithBleeding(tester, 'Schmierblutung');
 
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'only menstruation-level bleeding (level >= 2) suggests a '
-            'cycle start — spotting does not');
-    expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
-  });
-
-  testWidgets(
-      'a menstruation-level day continuing the previous day\'s bleeding '
-      '(mid-flow) shows no prompt', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope(seed: (db) async {
-      // The previous calendar day already carries an uninterrupted
-      // menstruation-level bleeding day: the saved day is mid-flow.
-      await db.entriesDao.upsertDaily(DailyEntry(
-        date: _previousDay,
-        bleeding: Bleeding.medium,
-      ));
-    }));
-    await tester.pumpAndSettle();
-
-    await _promptHarness.saveWithBleeding(tester, 'stark');
-
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'fresh menstruation starts after a break or on the first '
-            'day — a continuous menstruation is mid-flow, not a new start');
-    expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
-  });
-
-  testWidgets(
-      'a suggested day that already carries the cycleStart mark shows no '
-      'prompt (no re-fire on re-save)', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope(seed: (db) async {
-      // The user already confirmed the cycle start on this day: re-saving
-      // the still-suggested bleeding day must not ask again — the mark is
-      // the authoritative boundary and stays untouched.
-      await db.marksDao.addMark(
-        _day,
-        CycleMarkTypes.cycleStart,
-        author: 'user',
-      );
-    }));
-    await tester.pumpAndSettle();
-
-    await _promptHarness.saveWithBleeding(tester, 'leicht');
-
-    expect(find.byType(AlertDialog), findsNothing,
-        reason: 'the cycleStart mark is already on the day — the prompt '
-            'must not re-fire on a re-save');
-    expect(await _promptHarness.storedMarkTypes(_day),
-        equals([CycleMarkTypes.cycleStart]),
-        reason: 'the pre-existing cycleStart mark stays exactly as it was');
-  });
-
-  testWidgets(
-      'an ignoreTemperature mark on the day does NOT suppress the prompt '
-      '(a marked bleeding day still suggests)', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope(seed: (db) async {
-      // The day already carries the temperature-ignore mark: that mark is
-      // scoped to the temperature evaluation and must not swallow the
-      // cycle-start suggestion — the suppression is keyed purely to
-      // bleeding continuity.
-      await db.marksDao.addMark(
-        _day,
-        CycleMarkTypes.ignoreTemperature,
-        author: 'user',
-      );
-    }));
-    await tester.pumpAndSettle();
-
-    await _promptHarness.saveWithBleeding(tester, 'leicht');
-
-    expect(find.byType(AlertDialog), findsOneWidget,
-        reason: 'the ignoreTemperature mark no longer suppresses the '
-            'suggestion — the marked bleeding day still asks');
-    await tester.tap(find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Zyklusbeginn setzen')));
-    await tester.pumpAndSettle();
-
-    final marks = await _promptHarness.db!.marksDao.marksForDay(_day);
     expect(
+      find.byType(AlertDialog),
+      findsNothing,
+      reason:
+          'only menstruation-level bleeding (level >= 2) suggests a '
+          'cycle start — spotting does not',
+    );
+    expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
+  });
+
+  testWidgets(
+    'a menstruation-level day continuing the previous day\'s bleeding '
+    '(mid-flow) shows no prompt',
+    (tester) async {
+      _promptHarness.tallSurface(tester);
+      await tester.pumpWidget(
+        _promptHarness.scope(
+          seed: (db) async {
+            // The previous calendar day already carries an uninterrupted
+            // menstruation-level bleeding day: the saved day is mid-flow.
+            await db.entriesDao.upsertDaily(
+              DailyEntry(date: _previousDay, bleeding: Bleeding.medium),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _promptHarness.saveWithBleeding(tester, 'stark');
+
+      expect(
+        find.byType(AlertDialog),
+        findsNothing,
+        reason:
+            'fresh menstruation starts after a break or on the first '
+            'day — a continuous menstruation is mid-flow, not a new start',
+      );
+      expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'a suggested day that already carries the cycleStart mark shows no '
+    'prompt (no re-fire on re-save)',
+    (tester) async {
+      _promptHarness.tallSurface(tester);
+      await tester.pumpWidget(
+        _promptHarness.scope(
+          seed: (db) async {
+            // The user already confirmed the cycle start on this day: re-saving
+            // the still-suggested bleeding day must not ask again — the mark is
+            // the authoritative boundary and stays untouched.
+            await db.marksDao.addMark(
+              _day,
+              CycleMarkTypes.cycleStart,
+              author: 'user',
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _promptHarness.saveWithBleeding(tester, 'leicht');
+
+      expect(
+        find.byType(AlertDialog),
+        findsNothing,
+        reason:
+            'the cycleStart mark is already on the day — the prompt '
+            'must not re-fire on a re-save',
+      );
+      expect(
+        await _promptHarness.storedMarkTypes(_day),
+        equals([CycleMarkTypes.cycleStart]),
+        reason: 'the pre-existing cycleStart mark stays exactly as it was',
+      );
+    },
+  );
+
+  testWidgets(
+    'an ignoreTemperature mark on the day does NOT suppress the prompt '
+    '(a marked bleeding day still suggests)',
+    (tester) async {
+      _promptHarness.tallSurface(tester);
+      await tester.pumpWidget(
+        _promptHarness.scope(
+          seed: (db) async {
+            // The day already carries the temperature-ignore mark: that mark is
+            // scoped to the temperature evaluation and must not swallow the
+            // cycle-start suggestion — the suppression is keyed purely to
+            // bleeding continuity.
+            await db.marksDao.addMark(
+              _day,
+              CycleMarkTypes.ignoreTemperature,
+              author: 'user',
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _promptHarness.saveWithBleeding(tester, 'leicht');
+
+      expect(
+        find.byType(AlertDialog),
+        findsOneWidget,
+        reason:
+            'the ignoreTemperature mark no longer suppresses the '
+            'suggestion — the marked bleeding day still asks',
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Zyklusbeginn setzen'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final marks = await _promptHarness.db!.marksDao.marksForDay(_day);
+      expect(
         marks.map((m) => m.markType),
         unorderedEquals([
           CycleMarkTypes.ignoreTemperature,
           CycleMarkTypes.cycleStart,
         ]),
-        reason: 'confirming places the cycleStart mark; the pre-existing '
+        reason:
+            'confirming places the cycleStart mark; the pre-existing '
             'ignoreTemperature mark stays untouched (the form\'s exclude '
             'switch seeds from the existing mark, so the plain save keeps '
-            'it — no auto behavior in either direction)');
-    final start =
-        marks.singleWhere((m) => m.markType == CycleMarkTypes.cycleStart);
-    expect(start.author, 'user',
-        reason: 'the confirmed placement is user-authored even on a '
-            'marked day');
-  });
+            'it — no auto behavior in either direction)',
+      );
+      final start = marks.singleWhere(
+        (m) => m.markType == CycleMarkTypes.cycleStart,
+      );
+      expect(
+        start.author,
+        'user',
+        reason:
+            'the confirmed placement is user-authored even on a '
+            'marked day',
+      );
+    },
+  );
 }

@@ -30,9 +30,13 @@ void main() {
     test('a time without a temperature is dropped by the constructor', () {
       final entry = DailyEntry(date: day, measuredAtMinutes: 407);
       expect(entry.bbtC, isNull);
-      expect(entry.measuredAtMinutes, isNull,
-          reason: 'the time belongs to the temperature; nothing is stored '
-              'for mucus-only etc. days');
+      expect(
+        entry.measuredAtMinutes,
+        isNull,
+        reason:
+            'the time belongs to the temperature; nothing is stored '
+            'for mucus-only etc. days',
+      );
     });
 
     // The constructor stays `const` (the normalization is a plain ternary
@@ -41,11 +45,7 @@ void main() {
   });
 
   group('copyWith inherits the normalization', () {
-    final measured = DailyEntry(
-      date: day,
-      bbtC: 36.5,
-      measuredAtMinutes: 407,
-    );
+    final measured = DailyEntry(date: day, bbtC: 36.5, measuredAtMinutes: 407);
 
     test('an untouched copy keeps temperature and time', () {
       final copy = measured.copyWith();
@@ -62,22 +62,26 @@ void main() {
     test('clearing the temperature drops the time', () {
       final copy = measured.copyWith(bbtC: null);
       expect(copy.bbtC, isNull);
-      expect(copy.measuredAtMinutes, isNull,
-          reason: 'a temperature-less save must not keep the old time');
+      expect(
+        copy.measuredAtMinutes,
+        isNull,
+        reason: 'a temperature-less save must not keep the old time',
+      );
     });
 
     test('setting a time on a temperature-less day stays null', () {
-      final withoutTemp =
-          DailyEntry(date: day).copyWith(measuredAtMinutes: 420);
+      final withoutTemp = DailyEntry(
+        date: day,
+      ).copyWith(measuredAtMinutes: 420);
       expect(withoutTemp.measuredAtMinutes, isNull);
 
-      final explicit = measured.copyWith(
-        bbtC: null,
-        measuredAtMinutes: 420,
-      );
+      final explicit = measured.copyWith(bbtC: null, measuredAtMinutes: 420);
       expect(explicit.bbtC, isNull);
-      expect(explicit.measuredAtMinutes, isNull,
-          reason: 'no copyWith call can construct the invalid state');
+      expect(
+        explicit.measuredAtMinutes,
+        isNull,
+        reason: 'no copyWith call can construct the invalid state',
+      );
     });
 
     test('clearing the time with a temperature present stays cleared', () {
@@ -115,8 +119,11 @@ void main() {
       for (final a in SexTiming.values) {
         for (final b in SexTiming.values) {
           if (a == b) continue;
-          expect(a.bit & b.bit, 0,
-              reason: '${a.name} and ${b.name} must be independent flags');
+          expect(
+            a.bit & b.bit,
+            0,
+            reason: '${a.name} and ${b.name} must be independent flags',
+          );
         }
       }
     });
@@ -129,16 +136,21 @@ void main() {
 
     test('single and combined bits are stored verbatim', () {
       for (final timing in SexTiming.values) {
-        expect(DailyEntry(date: day, sexTimings: timing.bit).sexTimings,
-            timing.bit,
-            reason: '${timing.name} alone is a valid mask');
+        expect(
+          DailyEntry(date: day, sexTimings: timing.bit).sexTimings,
+          timing.bit,
+          reason: '${timing.name} alone is a valid mask',
+        );
       }
       final twice = DailyEntry(
         date: day,
         sexTimings: SexTiming.start.bit | SexTiming.end.bit,
       );
-      expect(twice.sexTimings, 5,
-          reason: 'multiple bits = multiple times on the same day');
+      expect(
+        twice.sexTimings,
+        5,
+        reason: 'multiple bits = multiple times on the same day',
+      );
     });
 
     test('every mask 0..7 is representable, and only those', () {
@@ -191,8 +203,11 @@ void main() {
       for (final a in TempDisturbance.values) {
         for (final b in TempDisturbance.values) {
           if (a == b) continue;
-          expect(a.bit & b.bit, 0,
-              reason: '${a.name} and ${b.name} must be independent flags');
+          expect(
+            a.bit & b.bit,
+            0,
+            reason: '${a.name} and ${b.name} must be independent flags',
+          );
         }
       }
     });
@@ -224,21 +239,29 @@ void main() {
 
     test('single and combined bits are stored verbatim (OR semantics)', () {
       expect(
-          DailyEntry(date: day, tempDisturbances: TempDisturbance.sp.bit)
-              .tempDisturbances,
-          1);
+        DailyEntry(
+          date: day,
+          tempDisturbances: TempDisturbance.sp.bit,
+        ).tempDisturbances,
+        1,
+      );
       final twice = DailyEntry(
         date: day,
         tempDisturbances: TempDisturbance.alk.bit | TempDisturbance.kr.bit,
       );
-      expect(twice.tempDisturbances, 12,
-          reason: 'multiple bits = multiple disturbances on the same day');
+      expect(
+        twice.tempDisturbances,
+        12,
+        reason: 'multiple bits = multiple disturbances on the same day',
+      );
     });
 
     test('every mask 0..15 is representable, and only those', () {
       for (var mask = 0; mask <= 15; mask++) {
-        expect(DailyEntry(date: day, tempDisturbances: mask).tempDisturbances,
-            mask);
+        expect(
+          DailyEntry(date: day, tempDisturbances: mask).tempDisturbances,
+          mask,
+        );
       }
       expect(
         () => DailyEntry(date: day, tempDisturbances: 16),
@@ -256,8 +279,10 @@ void main() {
       expect(DailyEntry(date: day).isInterrupted, isFalse);
       for (var mask = 1; mask <= 15; mask++) {
         expect(
-            DailyEntry(date: day, tempDisturbances: mask).isInterrupted, isTrue,
-            reason: 'mask $mask carries a disturbance flag');
+          DailyEntry(date: day, tempDisturbances: mask).isInterrupted,
+          isTrue,
+          reason: 'mask $mask carries a disturbance flag',
+        );
       }
       // The mask is RAW data: it does not drive analysis exclusion (see
       // cycle_grouping/evaluation — the ignoreTemperature mark does).
@@ -267,8 +292,11 @@ void main() {
       final entry = DailyEntry(date: day, tempDisturbances: 5);
       expect(entry.copyWith().tempDisturbances, 5);
       expect(entry.copyWith(painBreast: true).tempDisturbances, 5);
-      expect(entry.copyWith(tempDisturbances: 0).tempDisturbances, 0,
-          reason: 'explicit 0 is a valid value, not an "unset" request');
+      expect(
+        entry.copyWith(tempDisturbances: 0).tempDisturbances,
+        0,
+        reason: 'explicit 0 is a valid value, not an "unset" request',
+      );
       expect(
         DailyEntry(date: day).copyWith(tempDisturbances: 15).tempDisturbances,
         15,
@@ -314,14 +342,24 @@ void main() {
         date: day,
         cervixFirmness: CervixFirmness.halfSoft,
       );
-      expect(entry.copyWith().cervixFirmness, CervixFirmness.halfSoft,
-          reason: 'an absent argument keeps the observation');
-      expect(entry.copyWith(painBreast: true).cervixFirmness,
-          CervixFirmness.halfSoft);
-      expect(entry.copyWith(cervixFirmness: CervixFirmness.soft).cervixFirmness,
-          CervixFirmness.soft);
-      expect(entry.copyWith(cervixFirmness: null).cervixFirmness, isNull,
-          reason: 'explicit null clears the observation');
+      expect(
+        entry.copyWith().cervixFirmness,
+        CervixFirmness.halfSoft,
+        reason: 'an absent argument keeps the observation',
+      );
+      expect(
+        entry.copyWith(painBreast: true).cervixFirmness,
+        CervixFirmness.halfSoft,
+      );
+      expect(
+        entry.copyWith(cervixFirmness: CervixFirmness.soft).cervixFirmness,
+        CervixFirmness.soft,
+      );
+      expect(
+        entry.copyWith(cervixFirmness: null).cervixFirmness,
+        isNull,
+        reason: 'explicit null clears the observation',
+      );
       expect(
         DailyEntry(date: day).copyWith(cervixFirmness: null).cervixFirmness,
         isNull,
@@ -335,10 +373,14 @@ void main() {
         cervixOpening: CervixOpening.open,
         cervixFirmness: CervixFirmness.soft,
       );
-      expect(entry.copyWith(cervixFirmness: null).cervixPosition,
-          CervixPosition.high);
-      expect(entry.copyWith(cervixFirmness: null).cervixOpening,
-          CervixOpening.open);
+      expect(
+        entry.copyWith(cervixFirmness: null).cervixPosition,
+        CervixPosition.high,
+      );
+      expect(
+        entry.copyWith(cervixFirmness: null).cervixOpening,
+        CervixOpening.open,
+      );
       expect(
         entry.copyWith(cervixPosition: null).cervixFirmness,
         CervixFirmness.soft,

@@ -14,10 +14,11 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
     if (markType.isEmpty) {
       throw ArgumentError.value(markType, 'markType', 'must not be empty');
     }
-    return (select(userMarks)
-          ..where((t) =>
+    return (select(userMarks)..where(
+          (t) =>
               t.entryDate.equalsValue(DateOnly.normalize(date)) &
-              t.markType.equals(markType)))
+              t.markType.equals(markType),
+        ))
         .getSingleOrNull();
   }
 
@@ -64,9 +65,12 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
   /// Marks within [from, to] inclusive, ordered by day then type.
   Future<List<UserMark>> marksInRange(DateTime from, DateTime to) {
     return (select(userMarks)
-          ..where((t) => t.entryDate.isBetweenValues(
+          ..where(
+            (t) => t.entryDate.isBetweenValues(
               const EpochDayConverter().toSql(from),
-              const EpochDayConverter().toSql(to)))
+              const EpochDayConverter().toSql(to),
+            ),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.entryDate)]))
         .get();
   }
@@ -74,9 +78,12 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
   /// Stream of marks within [from, to] inclusive, ordered by day then type.
   Stream<List<UserMark>> watchMarks(DateTime from, DateTime to) {
     return (select(userMarks)
-          ..where((t) => t.entryDate.isBetweenValues(
+          ..where(
+            (t) => t.entryDate.isBetweenValues(
               const EpochDayConverter().toSql(from),
-              const EpochDayConverter().toSql(to)))
+              const EpochDayConverter().toSql(to),
+            ),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.entryDate)]))
         .watch();
   }
@@ -87,21 +94,19 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
   /// evaluation data across cycle boundaries, so it needs every mark
   /// without knowing the ranges up front).
   Stream<List<UserMark>> watchAll() {
-    return (select(userMarks)
-          ..orderBy([
-            (t) => OrderingTerm.asc(t.entryDate),
-            (t) => OrderingTerm.asc(t.markType),
-          ]))
+    return (select(userMarks)..orderBy([
+          (t) => OrderingTerm.asc(t.entryDate),
+          (t) => OrderingTerm.asc(t.markType),
+        ]))
         .watch();
   }
 
   /// Every mark (export support), ordered by day and type.
   Future<List<UserMark>> allMarks() {
-    return (select(userMarks)
-          ..orderBy([
-            (t) => OrderingTerm.asc(t.entryDate),
-            (t) => OrderingTerm.asc(t.markType),
-          ]))
+    return (select(userMarks)..orderBy([
+          (t) => OrderingTerm.asc(t.entryDate),
+          (t) => OrderingTerm.asc(t.markType),
+        ]))
         .get();
   }
 
@@ -110,10 +115,15 @@ class MarksDao extends DatabaseAccessor<CycleDatabase> with _$MarksDaoMixin {
     if (markType.isEmpty) {
       throw ArgumentError.value(markType, 'markType', 'must not be empty');
     }
-    return (delete(userMarks)
-          ..where((t) =>
+    return (delete(userMarks)..where(
+          (t) =>
               t.entryDate.equalsValue(DateOnly.normalize(date)) &
-              t.markType.equals(markType)))
+              t.markType.equals(markType),
+        ))
         .go();
   }
+
+  /// Deletes EVERY mark row (the settings pane's wipe calls this inside the
+  /// database-level transaction). Returns the number of removed rows.
+  Future<int> deleteAll() => delete(userMarks).go();
 }

@@ -54,16 +54,19 @@ Widget chartHarness({
   int observedCyclesOutsideApp = 0,
 }) {
   final overrides = [
-    dailyEntriesProvider
-        .overrideWith((ref) => entriesStream ?? Stream.value(entries)),
+    dailyEntriesProvider.overrideWith(
+      (ref) => entriesStream ?? Stream.value(entries),
+    ),
     marksProvider.overrideWith((ref) => Stream.value(marks)),
-    selectedDateProvider
-        .overrideWith((ref) => selectedDate ?? entries.first.date),
+    selectedDateProvider.overrideWith(
+      (ref) => selectedDate ?? entries.first.date,
+    ),
     if (temperatureRange != null)
       temperatureRangeProvider.overrideWith((ref) => temperatureRange),
     if (observedCyclesOutsideApp != 0)
-      observedCyclesOutsideAppProvider
-          .overrideWith((ref) => observedCyclesOutsideApp),
+      observedCyclesOutsideAppProvider.overrideWith(
+        (ref) => observedCyclesOutsideApp,
+      ),
   ];
   final screen = withScaffold
       ? const Scaffold(body: ZyklusScreen())
@@ -72,12 +75,16 @@ Widget chartHarness({
     themeMode: themed ? ThemeMode.system : null,
     theme: themed
         ? ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: chartSeedColor))
+            colorScheme: ColorScheme.fromSeed(seedColor: chartSeedColor),
+          )
         : null,
     darkTheme: darkTheme
         ? ThemeData(
             colorScheme: ColorScheme.fromSeed(
-                seedColor: chartSeedColor, brightness: Brightness.dark))
+              seedColor: chartSeedColor,
+              brightness: Brightness.dark,
+            ),
+          )
         : null,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

@@ -45,50 +45,52 @@ void main() {
     }
   });
 
-  test('an encrypted database file is ciphertext on disk, keyed reads work',
-      () async {
-    final key = generateDbKey();
-    final file = File('${tempDir.path}/encrypted.sqlite');
+  test(
+    'an encrypted database file is ciphertext on disk, keyed reads work',
+    () async {
+      final key = generateDbKey();
+      final file = File('${tempDir.path}/encrypted.sqlite');
 
-    // Write through drift with the opener's setup applied.
-    final writer = CycleDatabase(
-      NativeDatabase(file, setup: (rawDb) => applyCipherAndKey(rawDb, key)),
-    );
-    try {
-      await writer.entriesDao.upsertByDate(
-        CycleEntriesCompanion.insert(
-          date: DateTime(2026, 9, 21),
-        ).copyWith(bbtC: const Value(36.6)),
+      // Write through drift with the opener's setup applied.
+      final writer = CycleDatabase(
+        NativeDatabase(file, setup: (rawDb) => applyCipherAndKey(rawDb, key)),
       );
-    } finally {
-      await writer.close();
-    }
+      try {
+        await writer.entriesDao.upsertByDate(
+          CycleEntriesCompanion.insert(
+            date: DateTime(2026, 9, 21),
+          ).copyWith(bbtC: const Value(36.6)),
+        );
+      } finally {
+        await writer.close();
+      }
 
-    // The file on disk carries anything but the plaintext SQLite header.
-    final header = file.readAsBytesSync().sublist(0, 15);
-    expect(
-      String.fromCharCodes(header),
-      isNot('SQLite format 3'),
-      reason: 'the database file must not be plaintext at rest',
-    );
+      // The file on disk carries anything but the plaintext SQLite header.
+      final header = file.readAsBytesSync().sublist(0, 15);
+      expect(
+        String.fromCharCodes(header),
+        isNot('SQLite format 3'),
+        reason: 'the database file must not be plaintext at rest',
+      );
 
-    // Reopen with the correct key: the data is there.
-    final reader = CycleDatabase(
-      NativeDatabase(file, setup: (rawDb) => applyCipherAndKey(rawDb, key)),
-    );
-    try {
-      final rows = await reader.entriesDao.allEntries();
-      final row = rows.single;
-      // Calendar-day identity, not wall-clock instants (the converter
-      // round-trips DateTime in UTC).
-      expect(row.date.year, 2026);
-      expect(row.date.month, 9);
-      expect(row.date.day, 21);
-      expect(row.bbtC, 36.6);
-    } finally {
-      await reader.close();
-    }
-  });
+      // Reopen with the correct key: the data is there.
+      final reader = CycleDatabase(
+        NativeDatabase(file, setup: (rawDb) => applyCipherAndKey(rawDb, key)),
+      );
+      try {
+        final rows = await reader.entriesDao.allEntries();
+        final row = rows.single;
+        // Calendar-day identity, not wall-clock instants (the converter
+        // round-trips DateTime in UTC).
+        expect(row.date.year, 2026);
+        expect(row.date.month, 9);
+        expect(row.date.day, 21);
+        expect(row.bbtC, 36.6);
+      } finally {
+        await reader.close();
+      }
+    },
+  );
 
   test('a wrong key cannot read the database', () async {
     final key = generateDbKey();

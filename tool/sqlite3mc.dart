@@ -43,10 +43,7 @@ const String defaultVendoredDir = 'native/sqlite3mc';
 /// the same the `sqlite3` project's download script copies out.
 const String amalgamationCName = 'sqlite3mc_amalgamation.c';
 const String amalgamationHName = 'sqlite3mc_amalgamation.h';
-const List<String> amalgamationNames = [
-  amalgamationCName,
-  amalgamationHName,
-];
+const List<String> amalgamationNames = [amalgamationCName, amalgamationHName];
 
 /// Suffix of all SMMC amalgamation release archives; also the URL marker
 /// the upstream pin is found by.
@@ -112,7 +109,7 @@ class UsageException extends ToolException {
 /// message wording).
 class FetchStatusException extends ToolException {
   FetchStatusException({required this.statusCode, required String url})
-      : super('HTTP $statusCode while fetching $url');
+    : super('HTTP $statusCode while fetching $url');
 
   /// The HTTP status of the failed response.
   final int statusCode;
@@ -225,7 +222,8 @@ String hostedSqlite3Version(String lockText) {
   final start = lines.indexOf('  sqlite3:');
   if (start == -1) {
     throw ToolException(
-        '$lockFilePath: no package `sqlite3` — run `flutter pub get`');
+      '$lockFilePath: no package `sqlite3` — run `flutter pub get`',
+    );
   }
 
   // The package block runs until the next 2-space-indented `name:` header
@@ -241,8 +239,9 @@ String hostedSqlite3Version(String lockText) {
   if (!block.contains('    source: hosted') ||
       !block.contains('      url: "https://pub.dev"')) {
     throw ToolException(
-        '$lockFilePath: `sqlite3` is not a hosted (pub.dev) package — '
-        'this tool only understands the hosted case');
+      '$lockFilePath: `sqlite3` is not a hosted (pub.dev) package — '
+      'this tool only understands the hosted case',
+    );
   }
 
   for (final line in block) {
@@ -275,31 +274,35 @@ AmalgamationPin parseAmalgamationPin(
       .allMatches(downloadScriptText)
       .map((match) => Uri.tryParse(match.group(0)!))
       .whereType<Uri>()
-      .where((url) =>
-          url.path.toLowerCase().endsWith(amalgamationSuffix) &&
-          url.path.toLowerCase().contains('sqlite3multiple'))
+      .where(
+        (url) =>
+            url.path.toLowerCase().endsWith(amalgamationSuffix) &&
+            url.path.toLowerCase().contains('sqlite3multiple'),
+      )
       .toSet();
   if (candidates.isEmpty) {
     throw ToolException(
-        'no SQLite3MultipleCiphers amalgamation URL found in the upstream '
-        '`tool/download_sqlite.dart` — its layout must have changed; '
-        'compare it to the provenance in '
-        '${vendoredReadmePath(vendoredDir)} and refresh manually');
+      'no SQLite3MultipleCiphers amalgamation URL found in the upstream '
+      '`tool/download_sqlite.dart` — its layout must have changed; '
+      'compare it to the provenance in '
+      '${vendoredReadmePath(vendoredDir)} and refresh manually',
+    );
   }
   if (candidates.length > 1) {
     throw ToolException(
-        'ambiguous SQLite3MultipleCiphers amalgamation URLs in the '
-        'upstream `tool/download_sqlite.dart`:\n'
-        '${candidates.join('\n')}\n'
-        'Refresh the vendoring by hand; then consider adapting '
-        'tool/sqlite3mc.dart to the new layout.');
+      'ambiguous SQLite3MultipleCiphers amalgamation URLs in the '
+      'upstream `tool/download_sqlite.dart`:\n'
+      '${candidates.join('\n')}\n'
+      'Refresh the vendoring by hand; then consider adapting '
+      'tool/sqlite3mc.dart to the new layout.',
+    );
   }
 
   final url = candidates.single;
   final versions = RegExp(
-          r'sqlite3mc-([\w.+-]+)-sqlite-([\w.+-]+)-amalgamation',
-          caseSensitive: false)
-      .firstMatch(url.path);
+    r'sqlite3mc-([\w.+-]+)-sqlite-([\w.+-]+)-amalgamation',
+    caseSensitive: false,
+  ).firstMatch(url.path);
   return AmalgamationPin(
     url: url,
     smmcVersion: versions?.group(1),
@@ -330,10 +333,10 @@ class AmalgamationPin {
 
   String get versionDescription =>
       smmcVersion != null && engineSqliteVersion != null
-          ? 'SQLite3MultipleCiphers $smmcVersion built on SQLite '
-              '$engineSqliteVersion'
-          : 'SQLite3MultipleCiphers (version not derivable from the pin '
-              'URL)';
+      ? 'SQLite3MultipleCiphers $smmcVersion built on SQLite '
+            '$engineSqliteVersion'
+      : 'SQLite3MultipleCiphers (version not derivable from the pin '
+            'URL)';
 }
 
 /// The upstream pin facts together with the already-fetched amalgamation
@@ -361,17 +364,21 @@ class UpstreamPin {
 /// SHA-256 hashes of the vendored files as recorded in the README's
 /// provenance block. Pure — throws when a hash is missing (layout drift).
 /// [vendoredDir] is the vendoring in use — error messages name its README.
-Map<String, String> recordedHashes(String readmeText,
-    {required String vendoredDir}) {
+Map<String, String> recordedHashes(
+  String readmeText, {
+  required String vendoredDir,
+}) {
   final hashes = <String, String>{};
   for (final name in amalgamationNames) {
-    final record =
-        RegExp('`$name`\\s*([0-9a-fA-F]{64})').firstMatch(readmeText);
+    final record = RegExp(
+      '`$name`\\s*([0-9a-fA-F]{64})',
+    ).firstMatch(readmeText);
     if (record == null) {
       throw ToolException(
-          '${vendoredReadmePath(vendoredDir)} does not record a '
-          'SHA-256 hash for `$name` — provenance layout drifted; restore '
-          'it from a vendoring commit and refresh manually');
+        '${vendoredReadmePath(vendoredDir)} does not record a '
+        'SHA-256 hash for `$name` — provenance layout drifted; restore '
+        'it from a vendoring commit and refresh manually',
+      );
     }
     hashes[name] = record.group(1)!;
   }
@@ -424,19 +431,27 @@ String provenanceBlock({
 /// and `## Licensing` headings) wholesale. Pure — throws when the README
 /// has lost its heading structure. [vendoredDir] is the vendoring in use —
 /// error messages name its README.
-String withRewrittenProvenance(String readmeText, String newBlock,
-    {required String vendoredDir}) {
+String withRewrittenProvenance(
+  String readmeText,
+  String newBlock, {
+  required String vendoredDir,
+}) {
   final provenanceHeading = readmeText.indexOf('## Provenance');
   final licensingHeading = readmeText.indexOf('## Licensing');
   if (provenanceHeading == -1 ||
       licensingHeading == -1 ||
       licensingHeading < provenanceHeading) {
-    throw ToolException('${vendoredReadmePath(vendoredDir)} lost its '
-        '`## Provenance` / `## Licensing` heading structure — cannot '
-        'rewrite the provenance block; restore the layout manually');
+    throw ToolException(
+      '${vendoredReadmePath(vendoredDir)} lost its '
+      '`## Provenance` / `## Licensing` heading structure — cannot '
+      'rewrite the provenance block; restore the layout manually',
+    );
   }
   return readmeText.replaceRange(
-      provenanceHeading, licensingHeading, '## Provenance\n\n$newBlock\n\n');
+    provenanceHeading,
+    licensingHeading,
+    '## Provenance\n\n$newBlock\n\n',
+  );
 }
 
 // --- networking ------------------------------------------------------------
@@ -448,16 +463,19 @@ Future<Uint8List> httpGet(String url) async {
   try {
     var current = url;
     for (var redirect = 0; redirect <= maxRedirects; redirect++) {
-      final request =
-          await client.getUrl(Uri.parse(current)).timeout(requestTimeout);
+      final request = await client
+          .getUrl(Uri.parse(current))
+          .timeout(requestTimeout);
       final response = await request.close().timeout(requestTimeout);
 
       if (response.isRedirect) {
         final location = response.headers.value(HttpHeaders.locationHeader);
         await response.drain<void>();
         if (location == null) {
-          throw ToolException('redirect without Location header fetching '
-              '$current');
+          throw ToolException(
+            'redirect without Location header fetching '
+            '$current',
+          );
         }
         current = location;
         continue;
@@ -465,7 +483,9 @@ Future<Uint8List> httpGet(String url) async {
 
       if (response.statusCode != 200) {
         throw FetchStatusException(
-            statusCode: response.statusCode, url: current);
+          statusCode: response.statusCode,
+          url: current,
+        );
       }
 
       final chunks = BytesBuilder(copy: false);
@@ -481,8 +501,10 @@ Future<Uint8List> httpGet(String url) async {
 }
 
 /// Fetch with a URL-keyed file cache under [cacheRootDir].
-Future<Uint8List> fetchWithCache(String url,
-    {required String extension}) async {
+Future<Uint8List> fetchWithCache(
+  String url, {
+  required String extension,
+}) async {
   final cacheFile = File(cachePathFor(url, extension: extension));
   if (await cacheFile.exists()) {
     print('${logPrefix}using cached download ${cacheFile.path}');
@@ -509,16 +531,18 @@ Future<UpstreamPin> fetchUpstreamPin({required String vendoredDir}) async {
   final AmalgamationPin pin;
   try {
     pin = parseAmalgamationPin(
-        utf8.decode(await fetchWithCache(scriptUrl, extension: '.dart')),
-        vendoredDir: vendoredDir);
+      utf8.decode(await fetchWithCache(scriptUrl, extension: '.dart')),
+      vendoredDir: vendoredDir,
+    );
   } on FetchStatusException catch (error) {
     if (error.statusCode == 404) {
       throw ToolException(
-          'no `tool/download_sqlite.dart` at git tag `sqlite3-$pubVersion` '
-          'in simolus3/sqlite3.dart — does that tag exist for the pub '
-          'release $pubVersion? If the tooling moved: compare the '
-          'provenance in ${vendoredReadmePath(vendoredDir)} and refresh '
-          'manually.');
+        'no `tool/download_sqlite.dart` at git tag `sqlite3-$pubVersion` '
+        'in simolus3/sqlite3.dart — does that tag exist for the pub '
+        'release $pubVersion? If the tooling moved: compare the '
+        'provenance in ${vendoredReadmePath(vendoredDir)} and refresh '
+        'manually.',
+      );
     }
     rethrow;
   }
@@ -527,16 +551,20 @@ Future<UpstreamPin> fetchUpstreamPin({required String vendoredDir}) async {
   final cacheFile = File(cachePathFor(zipUrl, extension: '.zip'));
   Map<String, Uint8List> members;
   try {
-    members = extractFromZip(await fetchWithCache(zipUrl, extension: '.zip'),
-        'the pinned amalgamation archive $zipUrl');
+    members = extractFromZip(
+      await fetchWithCache(zipUrl, extension: '.zip'),
+      'the pinned amalgamation archive $zipUrl',
+    );
   } on ToolException {
     if (!await cacheFile.exists()) rethrow;
     // Corrupt/stale cache entry (e.g. an interrupted download): drop it
     // once and refetch; a freshly downloaded broken archive still aborts.
     print('${logPrefix}cached download unreadable — refetching');
     await cacheFile.delete();
-    members = extractFromZip(await fetchWithCache(zipUrl, extension: '.zip'),
-        'the pinned amalgamation archive $zipUrl');
+    members = extractFromZip(
+      await fetchWithCache(zipUrl, extension: '.zip'),
+      'the pinned amalgamation archive $zipUrl',
+    );
   }
 
   return UpstreamPin(pubVersion: pubVersion, pin: pin, members: members);
@@ -562,15 +590,19 @@ Map<String, Uint8List> extractFromZip(Uint8List zipBytes, String sourceLabel) {
       extracted[basename] = List<int>.from(file.content as List);
     }
   }
-  final missing =
-      amalgamationNames.where((name) => !extracted.containsKey(name));
+  final missing = amalgamationNames.where(
+    (name) => !extracted.containsKey(name),
+  );
   if (missing.isNotEmpty) {
-    throw ToolException('zip archive ($sourceLabel) lacks '
-        '${missing.join(', ')} — the vendoring refresh needs exactly '
-        'those two amalgamation members');
+    throw ToolException(
+      'zip archive ($sourceLabel) lacks '
+      '${missing.join(', ')} — the vendoring refresh needs exactly '
+      'those two amalgamation members',
+    );
   }
-  return extracted
-      .map((name, bytes) => MapEntry(name, Uint8List.fromList(bytes)));
+  return extracted.map(
+    (name, bytes) => MapEntry(name, Uint8List.fromList(bytes)),
+  );
 }
 
 // --- vendored side ---------------------------------------------------------
@@ -583,8 +615,10 @@ Future<Map<String, String>> hashVendoredFiles(String vendoredDir) async {
     final path = vendoredFilePath(vendoredDir, name);
     final file = File(path);
     if (!await file.exists()) {
-      throw ToolException('vendored file missing: $path — restore it from '
-          'a vendoring commit or fix --vendored-dir');
+      throw ToolException(
+        'vendored file missing: $path — restore it from '
+        'a vendoring commit or fix --vendored-dir',
+      );
     }
     hashes[name] = sha256Hex(await file.readAsBytes());
   }
@@ -595,68 +629,88 @@ Future<Map<String, String>> hashVendoredFiles(String vendoredDir) async {
 
 Future<int> runCheck(Options options) async {
   final vendoredHashes = await hashVendoredFiles(options.vendoredDir);
-  final readmeText =
-      await File(vendoredReadmePath(options.vendoredDir)).readAsString();
+  final readmeText = await File(
+    vendoredReadmePath(options.vendoredDir),
+  ).readAsString();
   final recorded = recordedHashes(readmeText, vendoredDir: options.vendoredDir);
 
   final mismatches = <String>[];
   for (final name in amalgamationNames) {
     if (vendoredHashes[name] != recorded[name]) {
       mismatches.add(
-          '  $name: recorded ${recorded[name]}, actual ${vendoredHashes[name]}');
+        '  $name: recorded ${recorded[name]}, actual ${vendoredHashes[name]}',
+      );
     }
   }
   if (mismatches.isNotEmpty) {
     for (final line in mismatches) {
       print('${logPrefix}INTEGRITY FAILURE: $line');
     }
-    print('${logPrefix}integrity check failed — the vendored files under '
-        '${options.vendoredDir}/ no longer match the hashes recorded in '
-        'README.md; restore the vendoring (git) rather than editing the '
-        'sources');
+    print(
+      '${logPrefix}integrity check failed — the vendored files under '
+      '${options.vendoredDir}/ no longer match the hashes recorded in '
+      'README.md; restore the vendoring (git) rather than editing the '
+      'sources',
+    );
     return 1;
   }
-  print('${logPrefix}integrity ok — ${amalgamationNames.length} vendored '
-      'files match the README.md hashes');
+  print(
+    '${logPrefix}integrity ok — ${amalgamationNames.length} vendored '
+    'files match the README.md hashes',
+  );
   if (options.offline) {
-    print('${logPrefix}up-to-date check against the upstream pin skipped '
-        '(--offline)');
+    print(
+      '${logPrefix}up-to-date check against the upstream pin skipped '
+      '(--offline)',
+    );
     return 0;
   }
 
   final pinned = await fetchUpstreamPin(vendoredDir: options.vendoredDir);
   final pin = pinned.pin;
-  print('${logPrefix}comparing the vendored files against the upstream '
-      'pin (sqlite3 ${pinned.pubVersion}): ${pin.url} — '
-      '${pin.versionDescription}');
+  print(
+    '${logPrefix}comparing the vendored files against the upstream '
+    'pin (sqlite3 ${pinned.pubVersion}): ${pin.url} — '
+    '${pin.versionDescription}',
+  );
 
   final drifted = amalgamationNames
       .where((name) => vendoredHashes[name] != pinned.memberHashes[name])
       .toList();
   if (drifted.isEmpty) {
-    print('${logPrefix}up to date with sqlite3 ${pinned.pubVersion} — '
-        'the vendored sources are identical to the upstream pin');
+    print(
+      '${logPrefix}up to date with sqlite3 ${pinned.pubVersion} — '
+      'the vendored sources are identical to the upstream pin',
+    );
     final recordedUrl = recordedSourceUrl(readmeText);
     if (recordedUrl != pin.url) {
-      print('${logPrefix}provenance URL is stale though — README.md '
-          'records $recordedUrl while upstream pins ${pin.url}; '
-          'README-side refresh: dart run tool/sqlite3mc.dart update');
+      print(
+        '${logPrefix}provenance URL is stale though — README.md '
+        'records $recordedUrl while upstream pins ${pin.url}; '
+        'README-side refresh: dart run tool/sqlite3mc.dart update',
+      );
     }
     return 0;
   }
 
-  print('${logPrefix}DRIFT — the vendored amalgamation differs from what '
-      'upstream pins for sqlite3 ${pinned.pubVersion}');
-  print('${logPrefix}upstream pin URL: ${pin.url} '
-      '(${pin.versionDescription})');
+  print(
+    '${logPrefix}DRIFT — the vendored amalgamation differs from what '
+    'upstream pins for sqlite3 ${pinned.pubVersion}',
+  );
+  print(
+    '${logPrefix}upstream pin URL: ${pin.url} '
+    '(${pin.versionDescription})',
+  );
   for (final name in drifted) {
     print('$logPrefix$name:');
     print('$logPrefix  vendored: ${vendoredHashes[name]}');
     print('$logPrefix  pinned:   ${pinned.memberHashes[name]}');
   }
-  print('${logPrefix}refresh the vendoring: '
-      'dart run tool/sqlite3mc.dart update (then rebuild and run the '
-      'full test gate)');
+  print(
+    '${logPrefix}refresh the vendoring: '
+    'dart run tool/sqlite3mc.dart update (then rebuild and run the '
+    'full test gate)',
+  );
   return 1;
 }
 
@@ -678,18 +732,22 @@ Future<int> runUpdate(Options options) async {
   final finalHashes = pinned.memberHashes;
   final readmeStale =
       records[amalgamationCName] != finalHashes[amalgamationCName] ||
-          records[amalgamationHName] != finalHashes[amalgamationHName] ||
-          recordedSourceUrl(readmeText) != pin.url;
+      records[amalgamationHName] != finalHashes[amalgamationHName] ||
+      recordedSourceUrl(readmeText) != pin.url;
 
   if (contentDrift.isEmpty && !readmeStale) {
-    print('${logPrefix}already up to date with sqlite3 '
-        '${pinned.pubVersion} — nothing to do');
+    print(
+      '${logPrefix}already up to date with sqlite3 '
+      '${pinned.pubVersion} — nothing to do',
+    );
     return 0;
   }
 
-  print('${logPrefix}drift against the upstream pin '
-      '(sqlite3 ${pinned.pubVersion}): ${pin.url} — '
-      '${pin.versionDescription}');
+  print(
+    '${logPrefix}drift against the upstream pin '
+    '(sqlite3 ${pinned.pubVersion}): ${pin.url} — '
+    '${pin.versionDescription}',
+  );
   print('${logPrefix}SHA-256 of the pinned amalgamation members:');
   for (final name in amalgamationNames) {
     print('$logPrefix  $name ${finalHashes[name]}');
@@ -706,19 +764,25 @@ Future<int> runUpdate(Options options) async {
   if (options.dryRun) {
     print('${logPrefix}dry run — nothing is written');
     if (contentDrift.isEmpty) {
-      print("${logPrefix}would leave the two vendored files untouched "
-          '(they already match the pinned members)');
+      print(
+        "${logPrefix}would leave the two vendored files untouched "
+        '(they already match the pinned members)',
+      );
     } else {
       for (final name in contentDrift) {
-        print('${logPrefix}would replace '
-            '${vendoredFilePath(options.vendoredDir, name)}: '
-            'vendored ${vendoredHashes[name]} → pinned '
-            '${finalHashes[name]}');
+        print(
+          '${logPrefix}would replace '
+          '${vendoredFilePath(options.vendoredDir, name)}: '
+          'vendored ${vendoredHashes[name]} → pinned '
+          '${finalHashes[name]}',
+        );
       }
     }
     if (readmeStale) {
-      print('${logPrefix}would rewrite the provenance block in '
-          '$readmePath:');
+      print(
+        '${logPrefix}would rewrite the provenance block in '
+        '$readmePath:',
+      );
       print(newBlock);
     } else {
       print('${logPrefix}would leave README.md untouched');
@@ -733,14 +797,20 @@ Future<int> runUpdate(Options options) async {
   // idempotent to repeat afterwards).
   if (readmeStale) {
     await File(readmePath).writeAsString(
-        withRewrittenProvenance(readmeText, newBlock,
-            vendoredDir: options.vendoredDir),
-        flush: true);
+      withRewrittenProvenance(
+        readmeText,
+        newBlock,
+        vendoredDir: options.vendoredDir,
+      ),
+      flush: true,
+    );
     print('${logPrefix}rewrote the provenance block in $readmePath');
   }
   if (contentDrift.isEmpty) {
-    print('${logPrefix}vendored files already match the pinned archive — '
-        'left untouched');
+    print(
+      '${logPrefix}vendored files already match the pinned archive — '
+      'left untouched',
+    );
   } else {
     for (final name in contentDrift) {
       final path = vendoredFilePath(options.vendoredDir, name);
@@ -749,15 +819,19 @@ Future<int> runUpdate(Options options) async {
     }
   }
   if (contentDrift.isEmpty) {
-    print('${logPrefix}update complete — only the provenance block was '
-        'stale, the vendored sources are unchanged and no rebuild is '
-        'forced');
+    print(
+      '${logPrefix}update complete — only the provenance block was '
+      'stale, the vendored sources are unchanged and no rebuild is '
+      'forced',
+    );
     return 0;
   }
-  print('${logPrefix}update complete. Rebuild and run the full test gate '
-      'next — the bundled engine changed, so the cipher behaviour '
-      '(`PRAGMA cipher` over an opened database, see '
-      'lib/db/database_opener.dart) has to re-verify');
+  print(
+    '${logPrefix}update complete. Rebuild and run the full test gate '
+    'next — the bundled engine changed, so the cipher behaviour '
+    '(`PRAGMA cipher` over an opened database, see '
+    'lib/db/database_opener.dart) has to re-verify',
+  );
   return 0;
 }
 
@@ -773,8 +847,9 @@ Future<void> main(List<String> arguments) async {
 
   try {
     final options = parseArguments(arguments);
-    final exitCode =
-        await (options.check ? runCheck(options) : runUpdate(options));
+    final exitCode = await (options.check
+        ? runCheck(options)
+        : runUpdate(options));
     if (exitCode != 0) exit(exitCode);
   } on UsageException catch (error) {
     stderr.write('${error.message}\n');

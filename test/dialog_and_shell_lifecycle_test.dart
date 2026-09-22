@@ -107,15 +107,17 @@ Future<void> pumpShell(
   required Set<int> seedDays,
   int month = 9,
 }) async {
-  await tester.pumpWidget(appScope(
-    locale: const Locale('de'),
-    now: () => DateTime.utc(2026, month, 10),
-    selectedDay: DateTime.utc(2026, month, 10),
-    entriesStream: Stream.value([
-      for (final day in seedDays)
-        DailyEntry(date: DateTime.utc(2026, month, day), bbtC: 36.5),
-    ]),
-  ));
+  await tester.pumpWidget(
+    appScope(
+      locale: const Locale('de'),
+      now: () => DateTime.utc(2026, month, 10),
+      selectedDay: DateTime.utc(2026, month, 10),
+      entriesStream: Stream.value([
+        for (final day in seedDays)
+          DailyEntry(date: DateTime.utc(2026, month, day), bbtC: 36.5),
+      ]),
+    ),
+  );
   await tester.pumpAndSettle();
   tester.takeException();
 }
@@ -129,12 +131,16 @@ Future<void> openImportDialog(
   await tester.tap(navLabel('Einstellungen'));
   await tester.pumpAndSettle();
   final cardButton = find.widgetWithText(FilledButton, buttonLabel);
-  await tester.scrollUntilVisible(cardButton, 200,
-      scrollable: find
-          .descendant(
-              of: find.byType(EinstellungenScreen),
-              matching: find.byType(Scrollable))
-          .first);
+  await tester.scrollUntilVisible(
+    cardButton,
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byType(EinstellungenScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
   await tester.pumpAndSettle();
   // The card button is the only match of its label while no dialog is open
   // (the dialog's apply button carries the drip label, so once it opens the
@@ -154,173 +160,229 @@ Finder dialogChild(Finder inner) =>
 void main() {
   group('dialog and shell lifecycle', () {
     testWidgets(
-        'JSON import dialog: typed text then barrier dismissal leaks nothing '
-        'into the framework', (WidgetTester tester) async {
-      useSmallAndroidViewport(tester);
-      await pumpShell(tester, seedDays: {});
-      final errors = await collectLifecycleErrors(tester, () async {
-        await openImportDialog(tester, buttonLabel: 'JSON-Import');
-        expect(find.byType(AlertDialog), findsOneWidget,
-            reason: 'the JSON import dialog must be open before dismissal');
-        await tester.enterText(dialogChild(find.byType(TextField)),
-            '{"entries": [], "marks": []}');
-        await tester.pump();
-        // Barrier dismissal while no import runs: the dialog route
-        // finalizes with a non-empty textarea.
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsNothing);
-      });
+      'JSON import dialog: typed text then barrier dismissal leaks nothing '
+      'into the framework',
+      (WidgetTester tester) async {
+        useSmallAndroidViewport(tester);
+        await pumpShell(tester, seedDays: {});
+        final errors = await collectLifecycleErrors(tester, () async {
+          await openImportDialog(tester, buttonLabel: 'JSON-Import');
+          expect(
+            find.byType(AlertDialog),
+            findsOneWidget,
+            reason: 'the JSON import dialog must be open before dismissal',
+          );
+          await tester.enterText(
+            dialogChild(find.byType(TextField)),
+            '{"entries": [], "marks": []}',
+          );
+          await tester.pump();
+          // Barrier dismissal while no import runs: the dialog route
+          // finalizes with a non-empty textarea.
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+        });
 
-      expect(errors, isEmpty,
-          reason: 'dismissing the JSON import dialog must not surface the '
-              'inherited-element teardown assertion or any dispose error');
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          errors,
+          isEmpty,
+          reason:
+              'dismissing the JSON import dialog must not surface the '
+              'inherited-element teardown assertion or any dispose error',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
-        'drip import dismissed via the scrim while the import runs leaks '
-        'nothing into the framework', (WidgetTester tester) async {
-      useSmallAndroidViewport(tester);
-      pickFileTextOverride = (accept) async => sampleDripCsv;
-      addTearDown(() => pickFileTextOverride = null);
-      await pumpShell(tester, seedDays: {});
-      final errors = await collectLifecycleErrors(tester, () async {
-        await openImportDialog(tester, buttonLabel: 'CSV importieren');
-        expect(find.byType(AlertDialog), findsOneWidget);
-        // Pick the sample CSV through the hermetic override, then apply.
-        await tester.tap(
-            dialogChild(find.widgetWithText(OutlinedButton, 'Datei wählen')));
-        await tester.pumpAndSettle();
-        // No pump between Apply and the barrier tap: the dismissal races
-        // the running import, exactly the field scenario.
-        await tester.tap(
-            dialogChild(find.widgetWithText(FilledButton, 'CSV importieren')));
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsNothing);
-        // The import summary snackbar floats above the bottom navigation
-        // for its display duration (standard Material behavior); advance
-        // the clock past it before tapping navigation destinations.
-        await tester.pump(const Duration(seconds: 5));
-        await tester.pumpAndSettle();
-        // The shell must survive the raced dismissal: the home route with
-        // the whole IndexedStack is still intact and navigable.
+      'drip import dismissed via the scrim while the import runs leaks '
+      'nothing into the framework',
+      (WidgetTester tester) async {
+        useSmallAndroidViewport(tester);
+        pickFileTextOverride = (accept) async => sampleDripCsv;
+        addTearDown(() => pickFileTextOverride = null);
+        await pumpShell(tester, seedDays: {});
+        final errors = await collectLifecycleErrors(tester, () async {
+          await openImportDialog(tester, buttonLabel: 'CSV importieren');
+          expect(find.byType(AlertDialog), findsOneWidget);
+          // Pick the sample CSV through the hermetic override, then apply.
+          await tester.tap(
+            dialogChild(find.widgetWithText(OutlinedButton, 'Datei wählen')),
+          );
+          await tester.pumpAndSettle();
+          // No pump between Apply and the barrier tap: the dismissal races
+          // the running import, exactly the field scenario.
+          await tester.tap(
+            dialogChild(find.widgetWithText(FilledButton, 'CSV importieren')),
+          );
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+          // The import summary snackbar floats above the bottom navigation
+          // for its display duration (standard Material behavior); advance
+          // the clock past it before tapping navigation destinations.
+          await tester.pump(const Duration(seconds: 5));
+          await tester.pumpAndSettle();
+          // The shell must survive the raced dismissal: the home route with
+          // the whole IndexedStack is still intact and navigable.
+          await tester.tap(navLabel('Tagebuch'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byType(TagebuchScreen),
+            findsOneWidget,
+            reason: 'the raced dismissal must leave the home route intact',
+          );
+        });
+
+        expect(
+          errors,
+          isEmpty,
+          reason:
+              'dismissing the import route while its apply future is '
+              'still running must not produce a dispose or teardown error',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'diary form survives a date change taken offstage with selected '
+      'sign/quality while its tab is hidden',
+      (WidgetTester tester) async {
+        useSmallAndroidViewport(tester);
+        await pumpShell(tester, seedDays: {1, 5});
         await tester.tap(navLabel('Tagebuch'));
         await tester.pumpAndSettle();
-        expect(find.byType(TagebuchScreen), findsOneWidget,
-            reason: 'the raced dismissal must leave the home route intact');
-      });
 
-      expect(errors, isEmpty,
-          reason: 'dismissing the import route while its apply future is '
-              'still running must not produce a dispose or teardown error');
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-        'diary form survives a date change taken offstage with selected '
-        'sign/quality while its tab is hidden', (WidgetTester tester) async {
-      useSmallAndroidViewport(tester);
-      await pumpShell(tester, seedDays: {1, 5});
-      await tester.tap(navLabel('Tagebuch'));
-      await tester.pumpAndSettle();
-
-      Finder inDiary(Finder inner) =>
-          find.descendant(of: find.byType(TagebuchScreen), matching: inner);
-      Finder diaryScrollable() => find
-          .descendant(
+        Finder inDiary(Finder inner) =>
+            find.descendant(of: find.byType(TagebuchScreen), matching: inner);
+        Finder diaryScrollable() => find
+            .descendant(
               of: find.byType(TagebuchScreen),
-              matching: find.byType(Scrollable))
-          .first;
-      Finder dateButton(DateTime day) =>
-          inDiary(find.widgetWithText(OutlinedButton, germanDayLabel(day)));
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        Finder dateButton(DateTime day) =>
+            inDiary(find.widgetWithText(OutlinedButton, germanDayLabel(day)));
 
-      final errors = await collectLifecycleErrors(tester, () async {
-        // --- select sign S + a quality (unsaved form state) ------------
-        final sChip = inDiary(find.widgetWithText(ChoiceChip, 'S'));
-        await tester.scrollUntilVisible(sChip, 150,
-            scrollable: diaryScrollable());
-        await tester.pumpAndSettle();
-        await tester.tap(sChip.first);
-        await tester.pumpAndSettle();
-        expect(inDiary(find.text('Qualität')), findsOneWidget);
-        final ewChip = inDiary(find.widgetWithText(ChoiceChip, 'EW'));
-        await tester.scrollUntilVisible(ewChip, 150,
-            scrollable: diaryScrollable());
-        await tester.pumpAndSettle();
-        await tester.tap(ewChip.first);
-        await tester.pumpAndSettle();
+        final errors = await collectLifecycleErrors(tester, () async {
+          // --- select sign S + a quality (unsaved form state) ------------
+          final sChip = inDiary(find.widgetWithText(ChoiceChip, 'S'));
+          await tester.scrollUntilVisible(
+            sChip,
+            150,
+            scrollable: diaryScrollable(),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(sChip.first);
+          await tester.pumpAndSettle();
+          expect(inDiary(find.text('Qualität')), findsOneWidget);
+          final ewChip = inDiary(find.widgetWithText(ChoiceChip, 'EW'));
+          await tester.scrollUntilVisible(
+            ewChip,
+            150,
+            scrollable: diaryScrollable(),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(ewChip.first);
+          await tester.pumpAndSettle();
 
-        // --- offstage date change (the chart-tap provider path) --------
-        // Switch to the cycle tab: the diary stays mounted but hidden in
-        // the IndexedStack. Writing the selected date through the provider
-        // directly is exactly what a chart tap does; the diary's provider
-        // listener must reload the form there.
-        await tester.tap(navLabel('Zyklus'));
-        await tester.pumpAndSettle();
-        expect(find.byType(TagebuchScreen, skipOffstage: false), findsOneWidget,
-            reason: 'the diary stays mounted in the stack behind the cycle '
-                'tab');
-        final container = ProviderScope.containerOf(
-            tester.element(find.byType(TagebuchScreen, skipOffstage: false)));
-        container.read(selectedDateProvider.notifier).state =
-            DateOnly.normalize(DateTime.utc(2026, 9, 5));
-        await tester.pump();
-        await tester.tap(navLabel('Tagebuch'));
-        await tester.pumpAndSettle();
-        expect(dateButton(DateTime.utc(2026, 9, 5)), findsOneWidget,
-            reason: 'the offstage reload must have landed on the new day '
-                'when the tab is shown again');
-        // The reload resets the unsaved S/EW selection: the quality row is
-        // gone again.
-        expect(inDiary(find.text('Qualität')), findsNothing);
-      });
+          // --- offstage date change (the chart-tap provider path) --------
+          // Switch to the cycle tab: the diary stays mounted but hidden in
+          // the IndexedStack. Writing the selected date through the provider
+          // directly is exactly what a chart tap does; the diary's provider
+          // listener must reload the form there.
+          await tester.tap(navLabel('Zyklus'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byType(TagebuchScreen, skipOffstage: false),
+            findsOneWidget,
+            reason:
+                'the diary stays mounted in the stack behind the cycle '
+                'tab',
+          );
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(TagebuchScreen, skipOffstage: false)),
+          );
+          container.read(selectedDateProvider.notifier).state =
+              DateOnly.normalize(DateTime.utc(2026, 9, 5));
+          await tester.pump();
+          await tester.tap(navLabel('Tagebuch'));
+          await tester.pumpAndSettle();
+          expect(
+            dateButton(DateTime.utc(2026, 9, 5)),
+            findsOneWidget,
+            reason:
+                'the offstage reload must have landed on the new day '
+                'when the tab is shown again',
+          );
+          // The reload resets the unsaved S/EW selection: the quality row is
+          // gone again.
+          expect(inDiary(find.text('Qualität')), findsNothing);
+        });
 
-      expect(errors, isEmpty,
-          reason: 'listener-triggered form reloads (on-screen and offstage) '
-              'must not surface setState-during-build or teardown errors');
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          errors,
+          isEmpty,
+          reason:
+              'listener-triggered form reloads (on-screen and offstage) '
+              'must not surface setState-during-build or teardown errors',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
-        'drip import: apply, fast barrier dismissal and immediate re-open '
-        'leak nothing into the framework', (WidgetTester tester) async {
-      useSmallAndroidViewport(tester);
-      pickFileTextOverride = (accept) async => sampleDripCsv;
-      addTearDown(() => pickFileTextOverride = null);
-      await pumpShell(tester, seedDays: {});
-      final errors = await collectLifecycleErrors(tester, () async {
-        await openImportDialog(tester, buttonLabel: 'CSV importieren');
-        await tester.tap(
-            dialogChild(find.widgetWithText(OutlinedButton, 'Datei wählen')));
-        await tester.pumpAndSettle();
-        // Fast dismissal racing the apply, then re-open immediately: the
-        // dialog must come back as a fresh, working stateful widget.
-        await tester.tap(
-            dialogChild(find.widgetWithText(FilledButton, 'CSV importieren')));
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsNothing);
-        // The import summary snackbar floats above the bottom navigation
-        // for its display duration (standard Material behavior); advance
-        // the clock past it before tapping navigation destinations.
-        await tester.pump(const Duration(seconds: 5));
-        await tester.pumpAndSettle();
-        await openImportDialog(tester, buttonLabel: 'CSV importieren');
-        expect(find.byType(AlertDialog), findsOneWidget,
-            reason: 're-opening after the fast dismissal must show a fresh '
-                'dialog');
-        await tester.enterText(dialogChild(find.byType(TextField)), 'x');
-        await tester.tapAt(const Offset(10, 10));
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsNothing);
-      });
+      'drip import: apply, fast barrier dismissal and immediate re-open '
+      'leak nothing into the framework',
+      (WidgetTester tester) async {
+        useSmallAndroidViewport(tester);
+        pickFileTextOverride = (accept) async => sampleDripCsv;
+        addTearDown(() => pickFileTextOverride = null);
+        await pumpShell(tester, seedDays: {});
+        final errors = await collectLifecycleErrors(tester, () async {
+          await openImportDialog(tester, buttonLabel: 'CSV importieren');
+          await tester.tap(
+            dialogChild(find.widgetWithText(OutlinedButton, 'Datei wählen')),
+          );
+          await tester.pumpAndSettle();
+          // Fast dismissal racing the apply, then re-open immediately: the
+          // dialog must come back as a fresh, working stateful widget.
+          await tester.tap(
+            dialogChild(find.widgetWithText(FilledButton, 'CSV importieren')),
+          );
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+          // The import summary snackbar floats above the bottom navigation
+          // for its display duration (standard Material behavior); advance
+          // the clock past it before tapping navigation destinations.
+          await tester.pump(const Duration(seconds: 5));
+          await tester.pumpAndSettle();
+          await openImportDialog(tester, buttonLabel: 'CSV importieren');
+          expect(
+            find.byType(AlertDialog),
+            findsOneWidget,
+            reason:
+                're-opening after the fast dismissal must show a fresh '
+                'dialog',
+          );
+          await tester.enterText(dialogChild(find.byType(TextField)), 'x');
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+        });
 
-      expect(errors, isEmpty,
-          reason: 'the apply/dismiss/re-open cycle must not leak framework '
-              'errors from the dialog state or the routed screen callbacks');
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          errors,
+          isEmpty,
+          reason:
+              'the apply/dismiss/re-open cycle must not leak framework '
+              'errors from the dialog state or the routed screen callbacks',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

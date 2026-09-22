@@ -48,11 +48,10 @@ final class Cycle {
 List<DateTime> menstruationOnsetDates(
   List<DailyEntry> entries,
   List<CycleMark> marks,
-) =>
-    groupIntoCycles(entries, marks)
-        .where((c) => c.startsAtMenstruation)
-        .map((c) => DateOnly.normalize(c.startDate))
-        .toList();
+) => groupIntoCycles(entries, marks)
+    .where((c) => c.startsAtMenstruation)
+    .map((c) => DateOnly.normalize(c.startDate))
+    .toList();
 
 /// Groups the given (possibly unsorted) entries into cycles.
 ///
@@ -61,10 +60,7 @@ List<DateTime> menstruationOnsetDates(
 /// leading entries (before the first mark) form one leading group with
 /// `startsAtMenstruation == false`. Day-keyed: every cycleStart mark in
 /// [marks] contributes (there is no profile dimension).
-List<Cycle> groupIntoCycles(
-  List<DailyEntry> entries,
-  List<CycleMark> marks,
-) {
+List<Cycle> groupIntoCycles(List<DailyEntry> entries, List<CycleMark> marks) {
   if (entries.isEmpty) return const [];
 
   // The cycleStart mark dates (marks of other types never create
@@ -92,10 +88,12 @@ List<Cycle> groupIntoCycles(
 
   void flush() {
     if (currentDays.isEmpty) return;
-    cycles.add(Cycle(
-      days: List.unmodifiable(currentDays),
-      startsAtMenstruation: currentStartsAtMenstruation,
-    ));
+    cycles.add(
+      Cycle(
+        days: List.unmodifiable(currentDays),
+        startsAtMenstruation: currentStartsAtMenstruation,
+      ),
+    );
     currentDays = <DailyEntry>[];
   }
 
@@ -171,10 +169,7 @@ int cycleOrdinalNumber(int markOpenedIndex, int observedCyclesOutsideApp) =>
 /// previous bleeding day suppresses like any other bleeding day), and the
 /// raw disturbance flags ([DailyEntry.tempDisturbances]) are equally
 /// invisible — the predicate reads bleeding levels only.
-bool isSuggestedCycleStart(
-  DailyEntry entry,
-  DailyEntry? previous,
-) {
+bool isSuggestedCycleStart(DailyEntry entry, DailyEntry? previous) {
   if (entry.bleeding.level < 2) return false;
 
   if (previous != null &&

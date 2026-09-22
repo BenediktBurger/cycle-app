@@ -208,58 +208,58 @@ final class _HelpEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget symbol = switch (shape) {
       _HelpEntryShape.dot => Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
       // Sample bleeding glyph: the shared square box symbol in its
       // dotted spotting mode — the fill-fraction convention's least
       // plain-looking level, at a small glossary size with the box
       // outlined so the interrupted quarter band reads as such.
       _HelpEntryShape.bleeding => SizedBox(
-          width: 14,
-          height: 14,
-          child: BleedingSymbol(
-            bleeding: Bleeding.spotting,
-            color: color,
-            borderColor: color,
-          ),
-        ),
-      _HelpEntryShape.text => MucusSymbolText(
-          // Sample glyph: plain S, matching the chart legend — no quality
-          // qualifier shown.
-          display: mucusDisplay(sign: MucusSign.s),
-          fontSize: 10,
+        width: 14,
+        height: 14,
+        child: BleedingSymbol(
+          bleeding: Bleeding.spotting,
           color: color,
+          borderColor: color,
         ),
+      ),
+      _HelpEntryShape.text => MucusSymbolText(
+        // Sample glyph: plain S, matching the chart legend — no quality
+        // qualifier shown.
+        display: mucusDisplay(sign: MucusSign.s),
+        fontSize: 10,
+        color: color,
+      ),
       _HelpEntryShape.circledDot => Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(width: 1.5, color: color),
-          ),
-          alignment: Alignment.center,
-          child: Container(
-            width: 4,
-            height: 4,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-          ),
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(width: 1.5, color: color),
         ),
+        alignment: Alignment.center,
+        child: Container(
+          width: 4,
+          height: 4,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+      ),
       _HelpEntryShape.arrowUp => ArrowUpGlyph(color: color),
       // Sample Muttermund glyph: the "medium" letter, exactly how a
       // recorded cervix day renders in the cervix row.
       _HelpEntryShape.cervix => Text(
-          cervixPositionSymbol(CervixPosition.medium),
-          style: TextStyle(fontSize: 10, color: color),
-        ),
+        cervixPositionSymbol(CervixPosition.medium),
+        style: TextStyle(fontSize: 10, color: color),
+      ),
       // Sample firmness glyph: the soft shorthand 'w', exactly how a
       // recorded firmness renders beside the position letter in the cervix
       // row.
       _HelpEntryShape.firmness => Text(
-          cervixFirmnessSymbol(CervixFirmness.soft),
-          style: TextStyle(fontSize: 10, color: color),
-        ),
+        cervixFirmnessSymbol(CervixFirmness.soft),
+        style: TextStyle(fontSize: 10, color: color),
+      ),
       _HelpEntryShape.line => Container(width: 16, height: 2, color: color),
       // The SUZ glyph: the chart's vertical bar plus the right-pointing
       // arrow from it (same shapes as the chart's painter).
@@ -275,41 +275,41 @@ final class _HelpEntry extends StatelessWidget {
       // Sample sex glyph: the X, exactly how a recorded sex day renders in
       // the sex row.
       _HelpEntryShape.sex => Text(
-          'X',
-          style: TextStyle(fontSize: 10, color: color),
-        ),
+        'X',
+        style: TextStyle(fontSize: 10, color: color),
+      ),
       // Sample pain glyph: the B letter, the breast-pain option the below-
       // curve pain row renders per flag (the M letter has its own entry).
       _HelpEntryShape.pain => Text(
-          'B',
-          style: TextStyle(fontSize: 10, color: color),
-        ),
+        'B',
+        style: TextStyle(fontSize: 10, color: color),
+      ),
       // Sample Mittelschmerz glyph: the M letter, exactly how a recorded
       // Mittelschmerz day renders in its own row beneath the mucus row.
       _HelpEntryShape.mittelschmerz => Text(
-          'M',
-          style: TextStyle(fontSize: 10, color: color),
-        ),
+        'M',
+        style: TextStyle(fontSize: 10, color: color),
+      ),
       // Sample disturbance glyphs: the stacked letter codes of the
       // disturbance vocabulary (the TempDisturbance tokens that
       // disturbanceLetters in cycle.dart emits) — stacked in the same
       // render order as a real two-disturbance day (values order:
       // alk before kr).
       _HelpEntryShape.disturbance => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('alk', style: TextStyle(fontSize: 9, color: color)),
-            Text('kr', style: TextStyle(fontSize: 9, color: color)),
-          ],
-        ),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('alk', style: TextStyle(fontSize: 9, color: color)),
+          Text('kr', style: TextStyle(fontSize: 9, color: color)),
+        ],
+      ),
       // Sample note glyph: the same sticky-note icon a noted day renders
       // in its cell at the very bottom of the chart block.
       _HelpEntryShape.note => Icon(
-          Icons.sticky_note_2_outlined,
-          size: 12,
-          color: color,
-        ),
+        Icons.sticky_note_2_outlined,
+        size: 12,
+        color: color,
+      ),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

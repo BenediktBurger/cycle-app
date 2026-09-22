@@ -46,7 +46,10 @@ class BleedingLevelConverter extends TypeConverter<Bleeding, int> {
     final b = _byLevel[argFromDb];
     if (b == null) {
       throw ArgumentError.value(
-          argFromDb, 'bleeding', 'unknown stored bleeding level');
+        argFromDb,
+        'bleeding',
+        'unknown stored bleeding level',
+      );
     }
     return b;
   }

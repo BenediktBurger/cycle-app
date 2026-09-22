@@ -17,7 +17,7 @@ final class TemperatureRange {
   /// construction (each picker only offers values strictly on its side of
   /// the other bound); the assertion keeps hand-built values honest.
   const TemperatureRange({required this.min, required this.max})
-      : assert(min < max, 'temperature range needs min < max');
+    : assert(min < max, 'temperature range needs min < max');
 
   /// The lower end of the settings UI's selectable window. A chosen range
   /// cannot go below it.
@@ -28,8 +28,10 @@ final class TemperatureRange {
 
   /// The default range the provider starts with (the owner-requested
   /// 36–38 °C window).
-  static const TemperatureRange defaults =
-      TemperatureRange(min: 36.0, max: 38.0);
+  static const TemperatureRange defaults = TemperatureRange(
+    min: 36.0,
+    max: 38.0,
+  );
 
   /// The chart's lower y bound, in °C.
   final double min;
@@ -55,7 +57,10 @@ final class TemperatureRange {
     final max = json['max'];
     if (min is! num || max is! num) {
       throw ArgumentError.value(
-          json, 'json', 'needs numeric "min" and "max" bounds');
+        json,
+        'json',
+        'needs numeric "min" and "max" bounds',
+      );
     }
     if (min >= max) {
       throw ArgumentError.value(json, 'json', 'needs min < max');

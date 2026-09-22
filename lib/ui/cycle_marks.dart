@@ -97,10 +97,7 @@ final class BaselineSegment {
 /// and the morning/evening VARIANT live here — the vertical placement is
 /// the chart's top-anchored constants (see the SUZ bar code in cycle.dart).
 final class SuzOverlayMark {
-  const SuzOverlayMark({
-    required this.dayIndex,
-    required this.morning,
-  });
+  const SuzOverlayMark({required this.dayIndex, required this.morning});
 
   /// The marked day's chart index (the bar's x anchor derives from it: see
   /// [morning]).
@@ -192,17 +189,20 @@ EvaluationOverlay buildEvaluationOverlay({
     // only decides WHICH marks render — their y no longer derives from
     // the cycle's baseline.
     for (final mark in marks) {
-      final isSuz = mark.type == CycleMarkTypes.suzEvening ||
+      final isSuz =
+          mark.type == CycleMarkTypes.suzEvening ||
           mark.type == CycleMarkTypes.suzMorning;
       if (!isSuz) continue;
       if (!isDayInCycleWindow(evaluations, e, mark.date)) continue;
       final day = DateOnly.normalize(mark.date);
       final i = indexFor(day);
       if (i == null) continue;
-      suz.add(SuzOverlayMark(
-        dayIndex: i,
-        morning: mark.type == CycleMarkTypes.suzMorning,
-      ));
+      suz.add(
+        SuzOverlayMark(
+          dayIndex: i,
+          morning: mark.type == CycleMarkTypes.suzMorning,
+        ),
+      );
     }
 
     for (final low in evaluation.numberedLows) {
@@ -235,11 +235,13 @@ EvaluationOverlay buildEvaluationOverlay({
       final start = indexFor(span.startDay);
       final end = indexFor(span.endDay);
       if (start != null && end != null) {
-        segments.add(BaselineSegment(
-          startIndex: start,
-          endIndex: end,
-          value: baseline.value,
-        ));
+        segments.add(
+          BaselineSegment(
+            startIndex: start,
+            endIndex: end,
+            value: baseline.value,
+          ),
+        );
       }
     }
   }
@@ -291,12 +293,7 @@ final class RingDotPainter extends FlDotCirclePainter {
   Size getSize(FlSpot spot) => Size.fromRadius(radius + ringGap + ringWidth);
 
   @override
-  List<Object?> get props => [
-        ...super.props,
-        ringColor,
-        ringGap,
-        ringWidth,
-      ];
+  List<Object?> get props => [...super.props, ringColor, ringGap, ringWidth];
 }
 
 /// Paints the temperature dot plus an ARROW-UP glyph BELOW it: a marked
@@ -447,8 +444,10 @@ final class SuzArrowDotPainter extends FlDotPainter {
 /// new cycle's first day). Shared by every row of the card (day header,
 /// signal rows, the 1–6 numbering row) so the vertical lines run through
 /// the whole card.
-BorderSide cycleDayCellBorderSide(BuildContext context,
-    {required bool isCycleBoundary}) {
+BorderSide cycleDayCellBorderSide(
+  BuildContext context, {
+  required bool isCycleBoundary,
+}) {
   final onSurface = Theme.of(context).colorScheme.onSurface;
   return isCycleBoundary
       ? BorderSide(width: 2, color: onSurface)
@@ -512,9 +511,11 @@ final class EvaluationMarksRow extends StatelessWidget {
         // positions (mirrors the header row's and the signal rows'
         // spacers).
         if (windowStart > 0) SizedBox(width: windowStart * cellWidth),
-        for (var i = math.max(windowStart, 0);
-            i <= math.min(windowEnd, dayCount - 1);
-            i++)
+        for (
+          var i = math.max(windowStart, 0);
+          i <= math.min(windowEnd, dayCount - 1);
+          i++
+        )
           SizedBox(
             width: cellWidth,
             child: InkWell(
@@ -522,8 +523,10 @@ final class EvaluationMarksRow extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border(
-                    right: cycleDayCellBorderSide(context,
-                        isCycleBoundary: isCycleBoundary?.call(i + 1) ?? false),
+                    right: cycleDayCellBorderSide(
+                      context,
+                      isCycleBoundary: isCycleBoundary?.call(i + 1) ?? false,
+                    ),
                   ),
                 ),
                 child: _NumberCell(
@@ -632,10 +635,7 @@ class _SuzArrowGlyphPainter extends CustomPainter {
     // The vertical bar: full sample height, at the sample's left edge —
     // a shape sample of the chart's bar, which hangs down from the chart's
     // top border at the SUZ day's column.
-    canvas.drawRect(
-      Rect.fromLTWH(0.5, 0, 2, size.height),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(0.5, 0, 2, size.height), paint);
     // The arrow, base at the bar (same enlarged glyph shape as the chart's
     // painter — scaled together with it).
     paintSuzArrowGlyph(canvas, Offset(2.5, size.height / 2), color: color);
