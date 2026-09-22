@@ -228,9 +228,9 @@
   "@aboutPrivacyHeading": {
     "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
   },
-  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät (verschlüsselte Datenbank). Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
+  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät. Auf Android und iOS ist die Datenbank verschlüsselt gespeichert; der Schlüssel dazu liegt im geschützten Speicher des Systems. Der Browser-Speicher der Web-Version (OPFS/IndexedDB) wird von der App nicht verschlüsselt — die Web-Version dient nur der Entwicklung. Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
   "@aboutPrivacyBody": {
-    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. The encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web build's browser storage (OPFS/IndexedDB) is NOT encrypted by the app (web stays an unencrypted development tool). GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Weiter",
   "aboutLicenseHeading": "Lizenz",
@@ -311,6 +311,10 @@
         "type": "int"
       }
     }
+  },
+  "deleteDataFailed": "Löschen fehlgeschlagen — die Daten wurden nicht geändert.",
+  "@deleteDataFailed": {
+    "description": "Fehlermeldung für den gesamten Lösch-Ablauf: erscheint, wenn das Öffnen der Datenbank, die Vorab-Zählung für den Bestätigungsdialog oder das eigentliche Löschen fehlschlägt. Das Löschen ist eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu importFailed)."
   },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",

@@ -44,9 +44,12 @@ CycleDatabase inMemoryCycleDatabase() {
 Override inMemoryDatabase({
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
+  CycleDatabase Function()? builder,
 }) {
   return databaseProvider.overrideWith((ref) async {
-    final db = inMemoryCycleDatabase();
+    // [builder] lets a test subclass the database for fault injection; the
+    // default stays the plain in-memory instance (same constructor wiring).
+    final db = builder?.call() ?? inMemoryCycleDatabase();
     onCreated?.call(db);
     ref.onDispose(db.close);
     await seed?.call(db);
@@ -92,6 +95,7 @@ ProviderScope appScope({
   bool? onboardingCompleted,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
+  CycleDatabase Function()? builder,
   DateTime Function()? now,
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
@@ -105,11 +109,12 @@ ProviderScope appScope({
   );
   return ProviderScope(
     overrides: [
-      inMemoryDatabase(seed: seed, onCreated: onCreated),
+      inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
       if (locale != null) localeProvider.overrideWith((ref) => locale),
       if (themeMode != null) themeModeProvider.overrideWith((ref) => themeMode),
-      onboardingCompletedProvider
-          .overrideWith((ref) => onboardingCompleted ?? true),
+      onboardingCompletedProvider.overrideWith(
+        (ref) => onboardingCompleted ?? true,
+      ),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null)
         selectedDateProvider.overrideWith((ref) => selectedDay),

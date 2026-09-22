@@ -298,9 +298,9 @@
   "@aboutPrivacyHeading": {
     "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
   },
-  "aboutPrivacyBody": "This app stores all data exclusively locally on your device (encrypted database). There are no servers, no cloud, no analytics services. Your data is never sent — not even on a crash or an error. Data leaves the device only when you yourself create and share an export/backup file. No personal data is transmitted to third parties. You can exercise your GDPR rights (e.g. access, deletion) directly within the app: view via Settings › Export, deletion via Delete data, restore via Import.",
+  "aboutPrivacyBody": "This app stores all data exclusively locally on your device. On Android and iOS the database is stored encrypted; its key lives in the system's protected storage. The browser storage of the web build (OPFS/IndexedDB) is not encrypted by the app — the web build serves development only. There are no servers, no cloud, no analytics services. Your data is never sent — not even on a crash or an error. Data leaves the device only when you yourself create and share an export/backup file. No personal data is transmitted to third parties. You can exercise your GDPR rights (e.g. access, deletion) directly within the app: view via Settings › Export, deletion via Delete data, restore via Import.",
   "@aboutPrivacyBody": {
-    "description": "GDPR/privacy notice, English mirror of the German original — no servers, no transmission, crash-safe; GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+    "description": "GDPR/privacy notice, English mirror of the German original — no servers, no transmission, crash-safe; the encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web build's browser storage (OPFS/IndexedDB) is NOT encrypted by the app (web stays an unencrypted development tool). GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Continue",
   "aboutLicenseHeading": "License",
@@ -381,6 +381,10 @@
         "type": "int"
       }
     }
+  },
+  "deleteDataFailed": "Deleting failed — the data was not changed.",
+  "@deleteDataFailed": {
+    "description": "Failure message for the whole delete-data flow: shown when opening the database, the confirmation dialog's count reads, or the wipe itself fails. The wipe is one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors importFailed."
   },
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
