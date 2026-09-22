@@ -1,0 +1,1 @@
+Second test build: your data survives app upgrades (schema migration), a new onboarding page with privacy and feedback notices, a new About screen with version, license and contact details, a side-by-side layout for tablets, cycle numbers in the temperature plot, and refreshed journal and settings screens.
