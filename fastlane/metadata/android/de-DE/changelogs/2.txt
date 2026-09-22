@@ -1,0 +1,1 @@
+Zweite Testversion: Ihre Daten bleiben beim Upgrade erhalten (Schema-Migration), eine neue Willkommensseite mit Hinweisen zu Privatsphäre und Feedback, ein neuer Über-Bildschirm mit Version, Lizenz und Kontakt, ein Nebeneinander-Layout für Tablets, Zyklusnummern im Temperaturdiagramm sowie überarbeitete Tagebuch- und Einstellungsansichten.
