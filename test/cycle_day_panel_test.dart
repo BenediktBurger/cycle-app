@@ -2,7 +2,7 @@
 // converted former modal bottom sheet): tapping a chart day shows the
 // day's options in a panel below the chart, tapping ANOTHER day retargets
 // the panel without dismissing it (and without touching the marks), the
-// close button clears it, and the mark toggles write through the real
+// close button clears it, and the mark chips write through the real
 // MarksDao exactly like the former sheet did.
 //
 // Harness: both files share support/cycle_list_harness.dart (the real
@@ -92,27 +92,33 @@ void main() {
   });
 
   testWidgets(
-      'a mark toggle inside the panel writes through the MarksDao and '
-      'flips to the remove wording', (tester) async {
+      'a mark chip inside the panel writes through the MarksDao — the '
+      'first tap places the mark, the second removes it', (tester) async {
+    // The toggle rows live in the Zyklus list and can sit below the fold —
+    // a tall surface lays the whole panel out at once.
     useTallSurface(tester);
     final (db, _) =
         await pumpCycleList(tester, entries: scenarioEntries); // no marks yet
 
     await tapCycleDay(tester, 6); // 9/12, the day to mark
-    await tester.tap(find.text('Set mucus peak'));
+    final chip = find.descendant(
+        of: find.byKey(const ValueKey('cycleDayPanel')),
+        matching: find.text('Mucus peak'));
+    await tester.tap(chip);
     await tester.pumpAndSettle();
 
     expect(await storedMarkTypes(db, scenarioDay(12)), contains('mucusPeakDay'),
         reason: 'the mark is persisted through marksDao');
-    await tester.tap(find.text('Remove mucus peak'));
+    await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)), isEmpty,
-        reason: 'the toggle flips back and removes the mark');
+        reason: 'the second tap on the selected chip removes the mark');
 
     // R6: placing the peak renders the solid dot in the symbol row.
-    await tapCycleDay(tester, 6);
-    await tester.tap(find.text('Set mucus peak'));
+    await tester.tap(chip);
     await tester.pumpAndSettle();
+    expect(
+        await storedMarkTypes(db, scenarioDay(12)), contains('mucusPeakDay'));
     expect(find.byKey(const ValueKey('peakDot-6')), findsOneWidget,
         reason: 'the chart overlay re-renders from the marks stream '
             'while the panel stays open');
@@ -126,7 +132,9 @@ void main() {
 
     // Mark 9/12 with the mucus peak.
     await tapCycleDay(tester, 6);
-    await tester.tap(find.text('Set mucus peak'));
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('cycleDayPanel')),
+        matching: find.text('Mucus peak')));
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)), ['mucusPeakDay']);
 
@@ -134,7 +142,9 @@ void main() {
     // placement is INCONSISTENT there (36.30 below the baseline 36.40), so
     // the owner warning pops — Keep keeps the just-placed mark.
     await tapCycleDay(tester, 7);
-    await tester.tap(find.text('Set first higher measurement'));
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('cycleDayPanel')),
+        matching: find.text('First higher measurement')));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     await tester.tap(find.descendant(
