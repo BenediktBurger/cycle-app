@@ -1,15 +1,15 @@
 // Pure-logic tests for tool/make_release.dart — the release-publishing script
-// behind per-release checklist step 7 of docs/release.md (the script's header
-// comment carries the full context).
+// behind the per-release checklist's publish step of docs/release.md (the
+// script's header comment carries the full context).
 //
 // These tests deliberately stay on the pure seam: they exercise argument
 // parsing/validation, tag-vs-version matching, apksigner/aapt output parsing,
-// pin-file read/write normalization, release-notes assembly, and the pure
-// dry-run/first-run gating decisions (pin staging, upgrade-test prompt)
-// directly. Nothing here shells out to real git/gh/apksigner/aapt, and
-// nothing touches the repository state (no tags are created,
-// tool/release_fingerprint.txt is never written) — the process layer of the
-// script stays outside this suite by design.
+// pin-file read/write normalization, release-notes assembly, process output
+// text assembly, and the pure dry-run/first-run gating decisions (pin
+// staging, upgrade-test prompt) directly. Nothing here shells out to real
+// git/gh/apksigner/aapt, and nothing touches the repository state (no
+// tags are created, tool/release_fingerprint.txt is never written) — the
+// process layer of the script stays outside this suite by design.
 // Two documented exceptions spin up a Directory.systemTemp sandbox to
 // exercise file writes without touching the repository itself: the "flutter
 // pin staging + workflow sync orchestration" group (pin + workflow files)
@@ -683,6 +683,33 @@ jobs:
     });
   });
 
+  group('process output text assembly', () {
+    test('merges non-empty stdout and stderr into one string', () {
+      expect(
+        processOutputText(ProcessResult(0, 0, 'stdout line', 'stderr line')),
+        'stderr line stdout line',
+        reason: 'raw streams are concatenated (stderr first) and trimmed',
+      );
+    });
+
+    test('an all-blank result collapses to an empty string', () {
+      expect(processOutputText(ProcessResult(0, 0, '', '')), isEmpty);
+      expect(
+        processOutputText(ProcessResult(0, 0, '   \n', ' \n')),
+        isEmpty,
+        reason: 'the combined text is trimmed',
+      );
+    });
+
+    test('interior newlines survive the stderr-first concatenation', () {
+      expect(
+        processOutputText(ProcessResult(0, 0, 'output\n', 'error\n')),
+        'error\n output',
+        reason: 'stderr comes first and interior line breaks survive the trim',
+      );
+    });
+  });
+
   group('flutter version pin helpers (tool/flutter-version)', () {
     const installedOutput = '''
 Flutter 3.47.4 • channel stable • https://github.com/flutter/flutter.git
@@ -1200,6 +1227,108 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         apkSha256ByPath: {'x/app-release.apk': 'ff' * 32},
       );
       expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
+    });
+  });
+
+  group('post-publish branch plumbing (pure helpers)', () {
+    group('current-branch parsing (git rev-parse --abbrev-ref HEAD)', () {
+      test('reads a plain branch name, trimming command noise', () {
+        expect(parseCurrentBranch('release/v0.1.0\n'), 'release/v0.1.0');
+        expect(parseCurrentBranch('  macos-arm \n'), 'macos-arm');
+      });
+
+      test('reports a detached HEAD as null', () {
+        expect(parseCurrentBranch('HEAD\n'), isNull);
+      });
+
+      test('reports empty/blank output as null', () {
+        expect(parseCurrentBranch(''), isNull);
+        expect(parseCurrentBranch('\n'), isNull);
+        expect(parseCurrentBranch('   '), isNull);
+      });
+    });
+
+    group('plumbing skip decision', () {
+      test('applies on a release branch', () {
+        expect(plumbingApplies('release/v0.1.0'), isTrue);
+        expect(plumbingApplies('wt/some-branch'), isTrue);
+      });
+
+      test('skips on main', () {
+        expect(plumbingApplies('main'), isFalse);
+      });
+
+      test('skips on a detached HEAD (no branch)', () {
+        expect(plumbingApplies(null), isFalse);
+      });
+    });
+
+    test('branch push assembles the -u origin form', () {
+      expect(branchPushArguments('release/v0.1.0'), [
+        'push',
+        '-u',
+        'origin',
+        'release/v0.1.0',
+      ]);
+    });
+
+    test('PR create assembles base main, head branch, release title', () {
+      final arguments = prCreateArguments(
+        branch: 'release/v0.1.0',
+        tag: 'v0.1.0',
+      );
+      expect(arguments[0], 'pr');
+      expect(arguments[1], 'create');
+      expect(arguments.sublist(2, 8), [
+        '--base',
+        'main',
+        '--head',
+        'release/v0.1.0',
+        '--title',
+        'Release v0.1.0',
+      ]);
+      final bodyIndex = arguments.indexOf('--body');
+      expect(bodyIndex, 8);
+      expect(arguments.sublist(9), hasLength(1));
+      expect(arguments[9], contains('v0.1.0'));
+    });
+
+    test('auto-merge assembles the merge-commit auto flag', () {
+      expect(prAutoMergeArguments('release/v0.1.0'), [
+        'pr',
+        'merge',
+        '--merge',
+        '--auto',
+        'release/v0.1.0',
+      ]);
+    });
+
+    test('prAlreadyExists detects the existing-PR wording (rerun safety)', () {
+      expect(
+        prAlreadyExists(
+          'a pull request for branch "release/v0.1.0" already exists',
+        ),
+        isTrue,
+      );
+      expect(
+        prAlreadyExists(
+          'pull request for branch "release/v0.1.0" '
+          'Already Exists.',
+        ),
+        isTrue,
+      );
+    });
+
+    test('prAlreadyExists rejects fresh-PR output and other failures', () {
+      expect(
+        prAlreadyExists(
+          'Creating pull request for release/v0.1.0...\n'
+          'https://github.com/example/repo/pull/12',
+        ),
+        isFalse,
+      );
+      expect(prAlreadyExists('could not resolve to a PullRequest'), isFalse);
+      expect(prAlreadyExists(''), isFalse);
     });
   });
 }
