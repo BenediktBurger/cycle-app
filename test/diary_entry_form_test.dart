@@ -228,7 +228,7 @@ void main() {
     // Both options offered on the entry form (German labels, per the
     // pinned locale), each carrying its letter code.
     expect(
-      find.text('Brustschmerzen (B)'),
+      find.text('Brustschmerz (B)'),
       findsOneWidget,
       reason: 'the breast-pain (B) option must be selectable',
     );
@@ -239,15 +239,15 @@ void main() {
     );
 
     // Select breast and Mittelschmerz together, then breast only.
-    await tester.ensureVisible(find.text('Brustschmerzen (B)'));
+    await tester.ensureVisible(find.text('Brustschmerz (B)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Brustschmerzen (B)'));
+    await tester.tap(find.text('Brustschmerz (B)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mittelschmerz (M)'));
     await tester.pumpAndSettle();
     // Tapping the selected breast chip again deselects it (chip toggle,
     // same semantics as the bleeding chips).
-    await tester.tap(find.text('Brustschmerzen (B)'));
+    await tester.tap(find.text('Brustschmerz (B)'));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Speichern'));
@@ -469,7 +469,7 @@ void main() {
       await tester.pumpWidget(diarySelectorScope(const Locale('de')));
       await tester.pumpAndSettle();
 
-      final caption = find.text('Zeichen der Fruchtbarkeit');
+      final caption = find.text('Fruchtbarkeitszeichen (Zervixschleim)');
       await tester.ensureVisible(caption);
       await tester.pumpAndSettle();
 

@@ -58,7 +58,7 @@ class StatistikScreen extends ConsumerWidget {
                         ListTile(
                           dense: true,
                           leading: const Icon(Icons.loop_outlined),
-                          title: Text(l10n.statisticsDays(length)),
+                          title: Text(l10n.termCycleDays(length)),
                         ),
                     ],
                   ),

@@ -449,11 +449,11 @@ const _glossaryEn = [
 ];
 
 const _glossaryDe = [
-  'BBT (Temperatur)',
+  'Aufwachtemperatur',
   'Blutung',
-  'Zeichen der Fruchtbarkeit (Schleim)',
+  'Fruchtbarkeitszeichen (Zervixschleim)',
   'Schleimhöhepunkt',
-  'Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)',
+  'Temperatur ignoriert (heller gezeichnet)',
   'Umrandete höhere Messungen',
   'vorzeitiger Temperaturanstieg',
   'Basislinie',
@@ -3904,10 +3904,10 @@ void main() {
       final rowNames = {
         'bleeding': 'Bleeding',
         'mucus': 'Fertility sign (mucus)',
-        'mittelschmerz': 'Mittelschmerz',
+        'mittelschmerz': 'Mittelschmerz (M)',
         'cervix': 'Cervix',
         'sex': 'Sex',
-        'pain': 'Pain',
+        'pain': 'Breast pain (B)',
         'disturbance': 'Disturbed measurement',
         'time': 'Measurement time',
         'note': 'Note',
@@ -4032,11 +4032,11 @@ void main() {
 
       final rowNames = {
         'bleeding': 'Blutung',
-        'mucus': 'Fruchtbarkeitszeichen (Schleim)',
-        'mittelschmerz': 'Mittelschmerz',
+        'mucus': 'Fruchtbarkeitszeichen (Zervixschleim)',
+        'mittelschmerz': 'Mittelschmerz (M)',
         'cervix': 'Muttermund',
         'sex': 'Sex',
-        'pain': 'Schmerz',
+        'pain': 'Brustschmerz (B)',
         'disturbance': 'Messstörung',
         'time': 'Messzeitpunkt',
         'note': 'Notiz',
