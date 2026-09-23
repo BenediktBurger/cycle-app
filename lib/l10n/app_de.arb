@@ -154,12 +154,28 @@
   "cycleLegendDisturbance": "Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
-  "statisticsNoData": "Sobald zwei Zyklusbeginne erfasst sind, erscheinen Zykluslängen.",
-  "statisticsCycles": "Zykluslängen",
-  "statisticsOnsets": "Zyklusbeginne",
+  "statisticsNoData": "Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier Statistiken.",
+  "statisticsCycleCount": "Zyklen",
+  "statisticsMetricCycleLength": "Zykluslänge",
+  "statisticsBleedingDays": "Blutungstage",
+  "statisticsMetricFirstHigherUntilEnd": "Erste höhere Messung bis Zyklusende",
+  "statisticsMinimum": "Minimum",
+  "statisticsStdDev": "Streuung",
   "statisticsAverage": "Durchschnitt",
-  "statisticsShortest": "Kürzester",
-  "statisticsLongest": "Längster",
+  "statisticsMaximum": "Maximum",
+  "statisticsEarliestFirstHigher": "Früheste erste höhere Messung",
+  "statisticsFirstHigherDayOfCycle": "Zyklustag {n}",
+  "@statisticsFirstHigherDayOfCycle": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Die erste höhere Messung eines Zyklus als Zyklustag-Nummer: der früheste Schwellenwert-Eintrag unter allen Zyklen im Metrik-Kasten und die erste-höhere-Spalte in der Zyklen-Tabelle."
+  },
+  "statisticsCycleTable": "Zyklen-Tabelle",
+  "statisticsTableCycleStart": "Zyklusbeginn",
+  "statisticsTableLength": "Länge",
   "statisticsDistribution": "Verteilung",
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
