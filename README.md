@@ -42,12 +42,14 @@ exist yet.)
 Download an APK from the
 [GitHub releases page](https://github.com/BenediktBurger/cycle-app/releases).
 Each release carries three release-signed APKs — one per device
-architecture (ABI). Pick the one matching your phone:
+architecture (ABI), named `cycle-app-<version>-<abi>.apk` where `<version>`
+is the release's version number, e.g. `cycle-app-0.2.0-arm64-v8a.apk`. Pick
+the one matching your phone:
 
-- `app-arm64-v8a-release.apk` — modern phones (the right choice for most
-  devices),
-- `app-armeabi-v7a-release.apk` — older 32-bit devices,
-- `app-x86_64-release.apk` — mainly emulators.
+- `cycle-app-<version>-arm64-v8a.apk` — modern phones (the right choice for
+  most devices),
+- `cycle-app-<version>-armeabi-v7a.apk` — older 32-bit devices,
+- `cycle-app-<version>-x86_64.apk` — mainly emulators.
 
 Not sure which? Check *Settings → About phone* for the processor
 information, or — with the phone connected to a computer and

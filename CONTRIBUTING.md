@@ -197,7 +197,12 @@ adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
 Install the split APK matching your device (`arm64-v8a` for most phones;
 check with `adb shell getprop ro.product.cpu.abi`) — it is smaller, and it
-is the kind of APK that GitHub Releases attach. The version-code
+is what a release publishes: the release script copies these canonical
+build files byte-identically under the download-friendly
+`cycle-app-<version>-<abi>.apk` names before attaching them to the GitHub
+Release (phase D of
+[`docs/release.md`](docs/release.md) and its per-release checklist step 7
+have the details). The version-code
 scheme behind the splits is described in
 [`docs/release.md`](docs/release.md), Phase D "Numbers discipline".
 

@@ -185,6 +185,10 @@ for every distributed build (Play and F-Droid see the same versionCode).
   the abiCodes override (an `applicationVariants.configureEach` block) in
   `android/app/build.gradle.kts`; the universal APK has no ABI filter and
   is untouched by that block.
+- The ABI splits and the versionCode offsets distinguishing them exist on
+  request of the F-Droid maintainers — their ask for the official
+  distribution shapes this scheme, not any Play requirement; pubspec's
+  `+N` stays the single anchor for every consumer regardless.
 - Equalities to maintain: the F-Droid `Builds:` entry's
   `versionCode:` (Phase E step 2) must equal `N` — that equality anchors
   the **universal APK** (a split-based F-Droid recipe would need its own
@@ -202,7 +206,11 @@ for every distributed build (Play and F-Droid see the same versionCode).
 
 Expectation management: the inclusion queue takes weeks to months; the app
 can meanwhile distribute as APKs. F-Droid builds **from source** with the
-app's declared signing key fingerprint.
+app's declared signing key fingerprint. Because it builds from the source
+at the tagged commit, it does not consume the GitHub Release APKs — asset
+filenames, including the `cycle-app-<version>-<abi>.apk` publish names, are
+irrelevant to it. `pubspec.yaml` stays the single source of the
+versionCode.
 
 1. Preconditions: `LICENSE` committed; license Apache-2.0 confirmed final
    (G2), final applicationId (G1), universal-APK build reproducible locally,
@@ -299,7 +307,10 @@ Do **not** start until Android went through Phases B–F at least once.
    `flutter build apk --release --split-per-abi` — the three per-ABI APKs
    that get attached to the GitHub Release (`app-armeabi-v7a-release.apk`,
    `app-arm64-v8a-release.apk`, `app-x86_64-release.apk` under
-   `build/app/outputs/flutter-apk/`). With the local
+   `build/app/outputs/flutter-apk/`). Step 7 publishes these same files
+   under the download-friendly `cycle-app-<version>-<abi>.apk` names —
+   byte-identical copies, hashed once here.
+   With the local
    `key.properties` present this is release-signed via the Phase C wiring;
    if the file is missing, Gradle silently falls back to **debug** signing —
    the `apksigner verify` step below is the guard against that, never skip
@@ -319,9 +330,11 @@ Do **not** start until Android went through Phases B–F at least once.
 6. **Upgrade test on the real device** (Phase D) with **the exact APK
    matching the test device** — non-negotiable, and it happens **before**
    publishing: the locally built per-ABI APKs *are* the artifacts users
-   install (byte-identical), so install the device-matching split APK over
-   the previous release and verify the cycle data survives before anything
-   is public.
+   install — step 7 publishes them only under the
+   `cycle-app-<version>-<abi>.apk` names as byte-identical renamed copies —
+   so installing the canonical build file tests exactly what ships. Install
+   the device-matching split APK over the previous release and verify the
+   cycle data survives before anything is public.
    Install for example with
    `adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
    (on an arm64 phone).
@@ -363,29 +376,49 @@ Do **not** start until Android went through Phases B–F at least once.
    - **Confirm, then publish:** on a real run the script demands explicit
      confirmation that step 6's upgrade test was done with the
      **device-matching exact APK** (`--tested` skips the prompt for
-     scripted use — do not use it to skip the real test); then
+     scripted use — do not use it to skip the real test). It then copies
+     the three APKs byte-identically into the gitignored
+     `build/gh-release/` directory under the publish names
+     `cycle-app-<version>-<abi>.apk` (e.g.
+     `cycle-app-0.2.0-arm64-v8a.apk`) — before any tag is created, so a
+     copy failure cannot leave a pushed tag — and then runs
      `git tag vX.Y.Z` → `git push origin vX.Y.Z`
      → `gh release create vX.Y.Z <apk1> <apk2> <apk3> --generate-notes
-     --notes` attaching all three per-ABI APKs
-     with the SHA-256 certificate fingerprint and each APK's SHA-256 in the
-     notes body (GitHub appends the auto-generated changelog; the
-     fingerprint is the trust anchor F-Droid metadata later cross-checks).
+     --notes` attaching the staged copies under those publish names,
+     with the SHA-256 certificate fingerprint and each published APK's
+     SHA-256 in the notes body (GitHub appends the auto-generated
+     changelog; the fingerprint is the trust anchor F-Droid metadata later
+     cross-checks).
    - **Not covered:** steps 4–6 — it never builds, never tests, never
      touches the device; step 5's trust decision stays with the operator
      at the first pin.
-   - **Manual fallback** (script unusable on some machine):
+   - **Manual fallback** (script unusable on some machine). Stage the
+     publish copies by hand with plain `mkdir`/`cp` first (same publish
+     names as the script, same byte-identical copies), then tag, push, and
+     attach the copies — `<version>` is the release's versionName `X.Y.Z`
+     without the build number:
 
      ```sh
+     mkdir -p build/gh-release
+     for abi in armeabi-v7a arm64-v8a x86_64; do
+       cp "build/app/outputs/flutter-apk/app-$abi-release.apk" \
+         "build/gh-release/cycle-app-<version>-$abi.apk"
+     done
      git tag vX.Y.Z
      git push origin vX.Y.Z
      gh release create vX.Y.Z \
-       build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
-       build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-       build/app/outputs/flutter-apk/app-x86_64-release.apk \
+       build/gh-release/cycle-app-<version>-armeabi-v7a.apk \
+       build/gh-release/cycle-app-<version>-arm64-v8a.apk \
+       build/gh-release/cycle-app-<version>-x86_64.apk \
        --generate-notes \
        --notes "SHA-256 certificate fingerprint: <from step 5's apksigner output>
-     APK SHA-256: <one sha256sum line per APK above, each prefixed with its path>"
+     APK SHA-256: cycle-app-<version>-armeabi-v7a.apk <sha256 of the armeabi-v7a APK>
+     APK SHA-256: cycle-app-<version>-arm64-v8a.apk <sha256 of the arm64-v8a APK>
+     APK SHA-256: cycle-app-<version>-x86_64.apk <sha256 of the x86_64 APK>"
      ```
+
+     The checksum lines reference the published filenames — those are
+     what users download and verify against.
 
      Create the tag explicitly with `git tag`/`git push` — `gh release
      create` would otherwise auto-create it at the default branch's HEAD,

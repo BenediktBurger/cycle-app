@@ -28,6 +28,15 @@
 // files, then rebuild the release APKs and rerun. CI cross-checks the
 // workflow input against the same pin.
 //
+// The attached APKs are published under friendly names, not the canonical
+// Gradle output names: right before `git tag`, the script stages
+// byte-identical copies of the three split APKs into the gitignored
+// build/gh-release/ directory as `cycle-app-<versionName>-<abi>.apk`
+// (e.g. `cycle-app-0.2.0-arm64-v8a.apk`) and `gh release create` attaches
+// those staged files; the release notes' SHA-256 lines reference these
+// published filenames. apksigner/aapt/sha256sum all run once against the
+// original build outputs — copies are byte-identical, hashes unchanged.
+//
 // Linux-release-machine note: by design this tool targets the project's
 // Linux release machine — it shells out to `sha256sum`, `git`, `gh`, and the
 // Android SDK build-tools binaries (`apksigner`, `aapt`; resolved under
@@ -113,6 +122,64 @@ int? abiCodeForApkPath(String apkPath) {
 int expectedVersionCode(int buildNumber, String apkPath) {
   final abiCode = abiCodeForApkPath(apkPath);
   return abiCode == null ? buildNumber : buildNumber * 10 + abiCode;
+}
+
+/// The gitignored staging directory, relative to the repository root, into
+/// which the publish copies are written before `gh release create` runs.
+/// Under the standard Flutter `build/` ignore rule, so the staged copies
+/// never touch the working tree state the clean-tree check guards — and they
+/// survive a failed `gh` call, because its retry message quotes them.
+const String ghReleaseStagingDir = 'build/gh-release';
+
+/// The publish basename for one release APK:
+/// `cycle-app-<versionName>-<abi>.apk`, e.g. `cycle-app-0.2.0-arm64-v8a.apk`.
+/// The ABI is extracted from the canonical build name
+/// (`app-<abi>-release.apk`); a name without a known ABI is a loud
+/// [ReleaseException] — no published asset may lack its ABI marker.
+String publishedApkFileName({
+  required String apkPath,
+  required String versionName,
+}) {
+  final fileName = apkPath.split('/').last;
+  final abi = RegExp(r'^app-(.+)-release\.apk$').firstMatch(fileName)?.group(1);
+  if (abi == null || !abiCodes.containsKey(abi)) {
+    throw ReleaseException(
+      'cannot derive a publish name from $apkPath — the file name carries '
+      'no known ABI (expected app-<abi>-release.apk with one of '
+      '${abiCodes.keys.join(', ')}).',
+    );
+  }
+  return 'cycle-app-$versionName-$abi.apk';
+}
+
+/// The staged publish paths for a release, in attach order: the [releaseApkPaths]
+/// under their publish basenames inside [ghReleaseStagingDir]. Dry run and
+/// real run both use this list — the dry run prints it, the real run creates
+/// the files and hands it to `gh release create`.
+List<String> stagedPublishApkPaths(String versionName) => [
+  for (final path in releaseApkPaths)
+    '$ghReleaseStagingDir/${publishedApkFileName(apkPath: path, versionName: versionName)}',
+];
+
+/// Copies the three built APKs under their publish names into
+/// [ghReleaseStagingDir] below [root] (byte-identical copies — the checksums
+/// verified above stay valid) and returns the staged paths in attach order.
+/// Existing files from a previous run are overwritten (the name includes the
+/// version). The copies deliberately survive the rest of the run so the
+/// `gh release create` retry message can quote them.
+Future<List<String>> stagePublishCopies({
+  required Directory root,
+  required String versionName,
+}) async {
+  final staged = stagedPublishApkPaths(versionName);
+  final stagingDirectory = Directory('${root.path}/$ghReleaseStagingDir');
+  await stagingDirectory.create(recursive: true);
+  for (var i = 0; i < releaseApkPaths.length; i++) {
+    await File(
+      '${root.path}/${releaseApkPaths[i]}',
+    ).copy('${root.path}/${staged[i]}');
+  }
+  return staged;
 }
 
 /// The published artifact set for a release: the three per-ABI split APKs
@@ -1108,7 +1175,9 @@ Future<void> runRelease(List<String> arguments) async {
     );
     stdout.write(
       'Has the device upgrade test (checklist step 6) been '
-      'completed with THESE exact APKs? Type "yes" to continue: ',
+      'completed with THESE exact APKs? (The published assets are '
+      'byte-identical renamed copies of exactly these files.) Type "yes" '
+      'to continue: ',
     );
     final answer = stdin.readLineSync()?.trim().toLowerCase() ?? '';
     if (answer != 'yes') {
@@ -1131,8 +1200,16 @@ Future<void> runRelease(List<String> arguments) async {
 
   final notesBody = buildNotesBody(
     certificateFingerprint: fingerprint,
-    apkSha256ByPath: checksums,
+    // Copies are byte-identical, so the hashes verified above are reused —
+    // but the notes must reference the names users download, i.e. the
+    // published filenames.
+    apkSha256ByPath: {
+      for (final artifact in artifacts)
+        publishedApkFileName(apkPath: artifact.path, versionName: versionName):
+            checksums[artifact.path]!,
+    },
   );
+  final publishApkPaths = stagedPublishApkPaths(versionName);
 
   // --- 10. dry run ----------------------------------------------------------
   if (options.dryRun) {
@@ -1147,11 +1224,15 @@ Future<void> runRelease(List<String> arguments) async {
         '(versionCode ${artifact.expectedVersionCode})',
       );
       print('  APK SHA-256:    ${checksums[artifact.path]}');
+      print(
+        '  published as:   $ghReleaseStagingDir/'
+        '${publishedApkFileName(apkPath: artifact.path, versionName: versionName)}',
+      );
     }
     print(
-      '  gh command:     ${formatDryRunGhCommand(tag, releaseApkPaths, notesBody)}',
+      '  gh command:     ${formatDryRunGhCommand(tag, publishApkPaths, notesBody)}',
     );
-    print('nothing was tagged, pushed, or released.');
+    print('nothing was copied, tagged, pushed, or released.');
     return;
   }
 
@@ -1166,6 +1247,18 @@ Future<void> runRelease(List<String> arguments) async {
     }
   }
 
+  // Stage the byte-identical publish copies BEFORE the tag exists: a copy
+  // failure must abort before anything is pushed — a tag with no release
+  // would be the misleading state, not a missing copy.
+  final stagedPaths = await stagePublishCopies(
+    root: Directory.current,
+    versionName: versionName,
+  );
+  print('staged publish copies in $ghReleaseStagingDir:');
+  for (final path in stagedPaths) {
+    print('  $path');
+  }
+
   await git(['tag', tag]);
   print('tagged $tag at HEAD.');
   await git(['push', 'origin', tag]);
@@ -1175,7 +1268,7 @@ Future<void> runRelease(List<String> arguments) async {
     'release',
     'create',
     tag,
-    ...releaseApkPaths,
+    ...stagedPaths,
     '--generate-notes',
     '--notes',
     notesBody,
@@ -1185,8 +1278,9 @@ Future<void> runRelease(List<String> arguments) async {
       'gh release create failed (exit ${release.exitCode}): '
       '${release.stderr}\nThe tag is already pushed; the release may not '
       'exist yet — retry `gh release create $tag '
-      '${releaseApkPaths.join(' ')} --generate-notes --notes <body>` or '
-      'inspect first (see docs/release.md).',
+      '${stagedPaths.join(' ')} --generate-notes --notes <body>` or '
+      'inspect first (the staged copies are still under '
+      '$ghReleaseStagingDir — see docs/release.md).',
     );
   }
 
