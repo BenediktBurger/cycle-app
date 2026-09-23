@@ -387,10 +387,15 @@ const double _epsilon = 1e-9;
 /// can exist between a mark and its group's first tracked day (the group
 /// opens precisely at the first entry on/after the mark), so the window
 /// shift into the untracked gap changes no entry's membership.
+///
+/// [today] is the grouping's injected clock for the span extension's
+/// last-cycle rule (see lib/domain/cycle_grouping.dart); production passes
+/// the wall clock (nowProvider at the UI call sites), tests pin a date.
 List<CycleEvaluation> evaluateCycles(
   List<DailyEntry> entries,
-  List<CycleMark> marks,
-) {
+  List<CycleMark> marks, {
+  DateTime? today,
+}) {
   // The ignored-day set, built ONCE from the temperature-ignore marks: a
   // marked day behaves like an unmeasured day in every rule below (R2/R8
   // gap, no low number, no baseline contribution, no usable rise value).
@@ -402,7 +407,7 @@ List<CycleEvaluation> evaluateCycles(
         DateOnly.normalize(mark.date),
   };
 
-  final cycles = groupIntoCycles(entries, marks);
+  final cycles = groupIntoCycles(entries, marks, today: today);
 
   // Pre-pass: the six-low window per cycle. The R10 segment-end clamps need
   // the NEXT cycle's window start, so the windows are computed before the

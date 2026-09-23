@@ -391,7 +391,14 @@ void main() {
         type: CycleMarkTypes.mucusPeakDay,
       ),
     ];
-    final model = buildPdfExportModel(entries: entries, marks: marks);
+    final model = buildPdfExportModel(
+      entries: entries,
+      marks: marks,
+      // The span extension would run this single (last) cycle out to
+      // "today"; the fixture pins the clock at the last tracked day so
+      // the 45-day slicing stays the subject.
+      today: base.add(const Duration(days: 44)),
+    );
     final cycle = model.cycles.single;
     test('the planner splits 45 tracked days into windows [40, 5]', () {
       final plan = planCyclePages([cycle.cycle.days.length]);

@@ -168,7 +168,9 @@ void main() {
       mark(2026, 3, 5, CycleMarkTypes.ignoreTemperature), // cycle 1, index 3
       mark(2026, 3, 3, CycleMarkTypes.ignoreTemperature), // cycle 1, index 1
       mark(2026, 3, 19, CycleMarkTypes.ignoreTemperature), // cycle 2, index 3
-      // An untracked gap day (Mar 12–15 carry no entries): yields no index.
+      // Cycle 1's trailing span-extension day after its last tracked data
+      // (the cycle runs to the day before the next start mark): keeps its
+      // OWN data-less column index.
       mark(2026, 3, 13, CycleMarkTypes.ignoreTemperature),
       // Before the first tracked day and of a foreign type: ignored.
       mark(2026, 2, 1, CycleMarkTypes.ignoreTemperature),
@@ -187,10 +189,13 @@ void main() {
         overlayMarks.where((m) => m.type == CycleMarkTypes.cycleStart).toList(),
       );
       expect(cycles.length, 2);
-      expect(ignoredDayIndexes(cycle: cycles[0], marks: ignoreMarks), {
-        1,
-        3,
-      }, reason: 'Mar 3 → index 1, Mar 5 → index 3 (gap marks untracked)');
+      expect(
+        ignoredDayIndexes(cycle: cycles[0], marks: ignoreMarks),
+        {1, 3, 11},
+        reason:
+            'Mar 3 → index 1, Mar 5 → index 3, Mar 13 → index 11 '
+            '(the data-less span extension belongs to the cycle)',
+      );
       expect(ignoredDayIndexes(cycle: cycles[1], marks: ignoreMarks), {
         3,
       }, reason: 'Mar 19 → index 3; cycle 1’s marks are not cycle 2’s');

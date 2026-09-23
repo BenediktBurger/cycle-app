@@ -98,9 +98,22 @@ Future<void> main() async {
     observedCyclesOutsideApp: 4,
     name: 'Maria Muster',
     birthDate: d(12, 24),
+    // The span rule (a cycle runs to the next start mark / today) extends
+    // the LAST cycle — here the pregnancy-style 120-day fixture (Apr 26 –
+    // Aug 23, all tracked) out to the pinned today (Sep 21): 149 days, so
+    // it takes 4 pages under the 40-column budget. Pinned for
+    // determinism; production passes the wall clock (nowProvider).
+    today: d(9, 21),
   );
   check(model.cycles.length == 3, 'three mark-opened cycles exported');
   check(model.observedCycleCount == 7, 'count includes 4 outside-app cycles');
+  // The extension: the last cycle's day list gains the data-less days
+  // from its last tracked day (Aug 23) out to the pinned today.
+  check(
+    model.cycles.last.cycle.days.length == 149,
+    'the last cycle extends through the pinned today: Apr 26 - Sep 21 (149 '
+    'days, 120 tracked + 29 data-less)',
+  );
 
   final overlay = model.overlays[0];
   check(
@@ -124,17 +137,17 @@ Future<void> main() async {
     model.cycles.map((e) => e.cycle.days.length).toList(),
   );
   check(
-    plan.length == 5,
-    'column budget 40: the two short cycles need 1 page each, the 120-day '
-    'cycle 3 pages = 5',
+    plan.length == 6,
+    'column budget 40: the two short cycles need 1 page each, the '
+    '149-day extended last cycle 4 pages = 6',
   );
   check(
     plan.every((w) => w.dayCount <= defaultMaxDaysPerPage),
     'no page window exceeds the column budget',
   );
   check(
-    plan.where((w) => w.cycleIndex == 2).length == 3,
-    'the pregnancy-style cycle continues across three pages',
+    plan.where((w) => w.cycleIndex == 2).length == 4,
+    'the pregnancy-style cycle continues across four pages',
   );
 
   final bytes = await generatePdfBytes(

@@ -52,6 +52,10 @@ PdfExportModel fixtureModel() => buildPdfExportModel(
   observedCyclesOutsideApp: 3,
   name: 'Maria Muster',
   birthDate: d(12, 24),
+  // The span extension runs the LAST cycle out to "today"; the fixture
+  // pins the clock at the second cycle's last tracked day so the 2-cycle
+  // plan below stays deterministic.
+  today: d(4, 28),
 );
 
 /// The bundled asset font, read from the checkout (the smoke path mirrors

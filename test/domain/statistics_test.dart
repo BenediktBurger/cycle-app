@@ -102,18 +102,22 @@ void main() {
         d(2026, 4, 4),
         d(2026, 4, 5),
       ];
-      // The last mark has NO tracked day on/after it: it opens no group and
-      // contributes neither an onset nor a length.
+      // The last mark has NO tracked day on/after it: under the span rule
+      // it opens its own DATA-LESS cycle, so the interval from the previous
+      // marked start (Apr 4) to it IS a counted length (that cycle really
+      // ended at the fresh mark).
       final marks = [start(2026, 3, 2), start(2026, 4, 4), start(2026, 6, 1)];
 
       // Length = mark date to mark date: Mar 2 → Apr 4 = 33 days, even
-      // though the first tracked day of the cycle is Mar 4.
-      expect(cycleLengthsInDays(entries, marks), [33]);
+      // though the first tracked day of the cycle is Mar 4; Apr 4 → Jun 1
+      // = 58 days into the fresh, data-less cycle.
+      expect(cycleLengthsInDays(entries, marks), [33, 58]);
       // The onsets are the mark dates themselves (the Mar 2 onset is an
-      // untracked gap day).
+      // untracked gap day; the Jun 1 onset is the data-less fresh mark).
       expect(menstruationOnsetDates(entries, marks), [
         DateOnly.normalize(DateTime(2026, 3, 2)),
         DateOnly.normalize(DateTime(2026, 4, 4)),
+        DateOnly.normalize(DateTime(2026, 6, 1)),
       ]);
     });
 
@@ -405,8 +409,11 @@ void main() {
     firstHigher(2026, 3, 31),
   ];
 
-  List<CycleEvaluation> perCycleEvaluations() =>
-      evaluateCycles(perCycleEntries(), perCycleMarks());
+  List<CycleEvaluation> perCycleEvaluations() => evaluateCycles(
+    perCycleEntries(),
+    perCycleMarks(),
+    today: DateTime(2026, 6, 1),
+  );
 
   group('markDrivenCycleCount', () {
     test('counts the mark-opened cycles of the grouping', () {
@@ -555,10 +562,65 @@ void main() {
       // Two marked cycles; the second one is the last group (no follow-up
       // start), so its window has no cycle end. Cycle 1: rise Mar 5, next
       // start Mar 30 -> cycle end Mar 29, INCLUSIVE span = 25 days.
-      expect(riseToEndDurationsInDays(evaluateCycles(entries, marks)), [
-        25,
-        null,
-      ]);
+      expect(
+        riseToEndDurationsInDays(
+          evaluateCycles(entries, marks, today: DateTime(2026, 4, 2)),
+        ),
+        [25, null],
+      );
+    });
+  });
+
+  group('the data-span extension (cycle runs to the next mark / today)', () {
+    // The grouping extends every cycle across its data-less tail; these
+    // tests pin what the STATISTICS make of the appended empty entries.
+    test('bleeding statistics are untouched by the appended data-less days '
+        '(empty entries bleed nothing)', () {
+      // perCycleEvaluations pins the clock at Jun 1: cycle 3 (start Apr 27,
+      // tracked to Apr 28) extends across data-less Apr 29..May 31 — still
+      // a bleeding-free cycle, contributing null.
+      expect(cycleBleedingDurationsInDays(perCycleEvaluations()), [4, null, 2]);
+    });
+
+    test('a trailing FRESH mark (no data after it) counts its interval: '
+        'the previous cycle ran to it, lengths and counts grow', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+      ];
+      final marks = [start(2026, 3, 2), start(2026, 3, 30), start(2026, 5, 10)];
+
+      // The fresh May 10 mark opens a data-less cycle; onsets now include
+      // it, so one more length is counted (mark-to-mark, Mar 2 -> May 10).
+      expect(cycleLengthsInDays(entries, marks), [28, 41]);
+      expect(markDrivenCycleCount(entries, marks), 3);
+    });
+
+    test('the cycle before a fresh mark gets a rise-to-end span to the day '
+        'before that mark', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+        d(2026, 3, 31, bbtC: 36.8),
+      ];
+      final marks = [
+        start(2026, 3, 2),
+        start(2026, 3, 30),
+        start(2026, 5, 10),
+        firstHigher(2026, 3, 5),
+        firstHigher(2026, 3, 31),
+      ];
+
+      // Cycle 1: rise Mar 5 -> next start Mar 30: 25 days (unchanged).
+      // Cycle 2: rise Mar 31 -> next (fresh) start May 10: ends May 9,
+      // span 40 days — before the extension rule this was null (no known
+      // follow-up start). The fresh cycle itself: no rise, null.
+      expect(
+        riseToEndDurationsInDays(
+          evaluateCycles(entries, marks, today: DateTime(2026, 5, 12)),
+        ),
+        [25, 40, null],
+      );
     });
   });
 

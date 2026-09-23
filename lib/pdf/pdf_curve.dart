@@ -17,14 +17,17 @@
 //   overlay's own dayCount already covers the cycle's full calendar span,
 //   so a mark on the last tracked day of a cycle with untracked gap days
 //   still reaches this mapping.
-// - Page windows slice TRACKED day positions (the layout planner's
-//   windows run over Cycle.days).
+// - Page windows slice day-list positions (the layout planner's windows
+//   run over Cycle.days — the tracked days plus the grouping's data-less
+//   span extension; untracked gap days BETWEEN tracked days stay out of
+//   the list).
 //
-// This helper maps an overlay index through the tracked days' calendar
-// offsets: an index only renders when its calendar offset names a TRACKED
-// day — a mark on an untracked gap day drops out instead of sliding onto
-// a neighboring column. While a cycle is tracked daily (the common case)
-// both spaces coincide and the mapping is the identity.
+// This helper maps an overlay index through the day list's calendar
+// offsets: an index only renders when its calendar offset names a day of
+// the list — a mark on an untracked gap day (still not listed) drops out
+// instead of sliding onto a neighboring column. While a cycle is tracked
+// daily (the common case) both spaces coincide and the mapping is the
+// identity.
 //
 // OUTPUT COORDINATES (column space, window-relative): window day i's
 // column spans [i, i+1] — measured dots, the computed-SUZ line and row

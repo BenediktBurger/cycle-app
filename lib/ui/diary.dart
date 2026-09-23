@@ -780,7 +780,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             ),
           ];
         }
-        final cycles = groupIntoCycles(entries, marks);
+        final cycles = groupIntoCycles(
+          entries,
+          marks,
+          // The grouping's injected clock (last-cycle span rule — the
+          // nowProvider seam, pinned in tests).
+          today: ref.read(nowProvider)(),
+        );
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
             _cycleTile(l10n, cycles[i]),

@@ -56,7 +56,13 @@ class StatistikScreen extends ConsumerWidget {
 
           // The per-cycle evaluations feed everything beyond the plain
           // cycle lengths (pure render-time arithmetic per ADR-0001).
-          final evaluations = evaluateCycles(entries, marks);
+          final evaluations = evaluateCycles(
+            entries,
+            marks,
+            // The grouping's injected clock (last-cycle span rule — the
+            // nowProvider seam, pinned in tests).
+            today: ref.read(nowProvider)(),
+          );
           // Each descriptive detail card aggregates the metric's values
           // over the mark-driven cycles; a cycle contributing no value
           // (no bleeding day, no rise mark, an open cycle) simply does

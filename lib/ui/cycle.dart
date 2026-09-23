@@ -134,7 +134,13 @@ class ZyklusScreen extends ConsumerWidget {
           final temperatureRange = ref.watch(temperatureRangeProvider);
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
-          final evaluations = evaluateCycles(entries, marks);
+          final evaluations = evaluateCycles(
+            entries,
+            marks,
+            // The grouping's injected clock (last-cycle span rule — the
+            // nowProvider seam, pinned in tests).
+            today: ref.read(nowProvider)(),
+          );
           // The "cycles observed outside this app" setting: watched here so
           // a settings change renumbers the chart's boundary ordinals in
           // the same rebuild — exactly why the chart takes the value as

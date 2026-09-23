@@ -4,6 +4,7 @@
 // (the leading pre-mark group is excluded from counting and numbering,
 // like everywhere the "Zyklus N" ordinals appear).
 import 'package:cycle_app/domain/cycle_grouping.dart';
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -211,7 +212,9 @@ void main() {
         5,
         6,
       ], reason: '"Zyklus 6" is the exported one — the latest of the list');
-      expect(upToSecond.cycles.last.cycle.startDate, d(3, 29));
+      // The start date is the opening mark's OWN date — the raw local
+      // midnight shape (like the entries), not the UTC-normalized one.
+      expect(upToSecond.cycles.last.cycle.startDate, DateTime(2026, 3, 29));
 
       // The default (null) exports everything mark-opened.
       final all = buildPdfExportModel(
@@ -406,6 +409,74 @@ void main() {
         same(custom),
         reason: 'echoed, not recounted (the settings owns the range)',
       );
+    });
+  });
+
+  group('the data-span extension (a cycle runs to the next mark / today)', () {
+    test('an interior cycle extends to the day before the next start mark; '
+        'the last cycle extends to the caller-pinned today', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        today: d(5, 20),
+      );
+      // Cycle 1: Mar 1 -> next start Mar 29 (end Mar 28); cycle 2:
+      // Mar 29 -> next start Apr 26 (end Apr 25); cycle 3 (last): Apr 26
+      // -> today (May 20). The cycles were tracked far shorter.
+      expect(model.cycles.map((e) => e.cycle.days.length).toList(), [
+        28,
+        28,
+        25,
+      ]);
+      expect(model.cycles.last.cycle.endDate, DateOnly.normalize(d(5, 20)));
+      // Overlays stay parallel to the exported cycles.
+      expect(model.overlays, hasLength(model.cycles.length));
+      // The extension days carry no derived artifacts (mark-free cycles).
+      for (final overlay in model.overlays.skip(1)) {
+        expect(overlay.circledIndexes, isEmpty);
+        expect(overlay.arrowIndexes, isEmpty);
+      }
+    });
+
+    test('a mark placed on a data-less extension day keeps its OWN column '
+        '(no drop-out, no slide onto a neighboring day)', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: [
+          ...modelMarks(),
+          CycleMark(date: d(4, 10), type: CycleMarkTypes.mucusPeakDay),
+        ],
+        today: d(5, 20),
+      );
+      // Apr 10 sits on cycle 2's extension (Mar 29..Apr 25, tracked only
+      // on Mar 29): index 12 = Apr 10's own calendar offset — the mark
+      // renders in its own (empty) column of the PDF page.
+      expect(model.overlays[1].peakIndexes, {12});
+      expect(model.overlays[0].peakIndexes, {11});
+    });
+
+    test('an analysis mark inside a data-less trailing cycle derives no '
+        'artifacts (no baseline/candidates from empty days)', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: [
+          ...modelMarks(),
+          CycleMark(
+            // Far enough into the trailing extension that the six-low
+            // window (rise−1 … rise−6) reaches no tracked day at all —
+            // the window day May 4–9 days are all data-less.
+            date: d(5, 10),
+            type: CycleMarkTypes.firstHigherMeasurement,
+          ),
+        ],
+        today: d(5, 20),
+      );
+      final last = model.cycles.last;
+      expect(last.firstHigherDay, DateOnly.normalize(d(5, 10)));
+      expect(last.baseline, isNull);
+      expect(last.higherMeasurements, isEmpty);
+      expect(last.numberedLows, isEmpty);
+      expect(last.evaluationStopped, isFalse);
     });
   });
 

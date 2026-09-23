@@ -232,6 +232,12 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
 /// group at every user-placed cycleStart mark, and the start date is that
 /// mark's own date). A trailing cycle start with no known follow-up
 /// contributes no length.
+///
+/// Span-rule note: a data-less FRESH mark (no tracked day after it — "just
+/// created the cycle mark") now opens its own cycle, so the interval from
+/// the previous marked start to it IS a counted length (that previous
+/// cycle really ended at the mark — the span rule). One very long such
+/// interval behaves like the pregnancy-span case below.
 List<int> cycleLengthsInDays(List<DailyEntry> entries, List<CycleMark> marks) {
   final onsets = menstruationOnsetDates(entries, marks);
   final lengths = <int>[];

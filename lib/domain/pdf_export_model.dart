@@ -187,6 +187,10 @@ final class PdfExportModel {
 /// [temperatureRange] is the settings card's display range, echoed into
 /// the model for the curve block's fixed y scale (default:
 /// [TemperatureRange.defaults] — the provider's starting window).
+///
+/// [today] is the grouping's injected clock for the span extension's
+/// last-cycle rule (lib/domain/cycle_grouping.dart); default: the wall
+/// clock at build time.
 PdfExportModel buildPdfExportModel({
   required List<DailyEntry> entries,
   required List<CycleMark> marks,
@@ -195,6 +199,7 @@ PdfExportModel buildPdfExportModel({
   DateTime? birthDate,
   DateTime? exportStartsUpTo,
   TemperatureRange temperatureRange = TemperatureRange.defaults,
+  DateTime? today,
 }) {
   // The iteration limit is a CALENDAR day: date-only normalized so the
   // comparison against the (also normalized) cycle starts is exact and
@@ -202,7 +207,7 @@ PdfExportModel buildPdfExportModel({
   final limit = exportStartsUpTo == null
       ? null
       : DateOnly.normalize(exportStartsUpTo);
-  final all = evaluateCycles(entries, marks);
+  final all = evaluateCycles(entries, marks, today: today);
   // The exported cycle groups as the indexes they hold in `all` (the
   // attribution windows the overlay builder consults span the WHOLE list,
   // so an exported cycle's position in it matters — same call shape the
@@ -272,10 +277,12 @@ PdfExportModel buildPdfExportModel({
   );
 }
 
-/// The cycle's full CALENDAR span as the overlay window's day count: from
-/// the cycle's start day through its LAST TRACKED day, inclusive — larger
-/// than `cycle.days.length` exactly when untracked gap days sit inside,
-/// so marks beyond a gap (e.g. on the last tracked day) still map to the
+/// The cycle's full CALENDAR span as the overlay window's day count:
+/// from the cycle's start day through its span end (the lib/domain/
+/// cycle_grouping.dart extension — data-less trailing days included),
+/// inclusive — larger than `cycle.days.length` exactly when untracked gap
+/// days sit between the tracked days (they are not in the day list), so
+/// marks beyond a gap (e.g. on the last tracked day) still map to the
 /// correct calendar offset (the draw layers map offsets onto tracked
 /// positions; see lib/pdf/pdf_curve.dart).
 int _calendarSpanDays(Cycle cycle) =>
@@ -294,10 +301,11 @@ List<({int ordinal, DateTime startDate})> exportableCycles(
   List<DailyEntry> entries,
   List<CycleMark> marks, {
   int observedCyclesOutsideApp = 0,
+  DateTime? today,
 }) {
   final rows = <({int ordinal, DateTime startDate})>[];
   var markOpenedIndex = 0;
-  for (final cycle in groupIntoCycles(entries, marks)) {
+  for (final cycle in groupIntoCycles(entries, marks, today: today)) {
     if (!cycle.startsAtMenstruation) continue;
     rows.add((
       ordinal: cycleOrdinalNumber(markOpenedIndex, observedCyclesOutsideApp),

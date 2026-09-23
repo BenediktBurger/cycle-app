@@ -1063,6 +1063,8 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       entries,
       marks,
       observedCyclesOutsideApp: outside,
+      // The grouping's injected clock (see nowProvider — test seam).
+      today: ref.watch(nowProvider)(),
     );
     // The DEFAULT selection: the latest observed cycle ("up to the
     // exported one"), i.e. the last row — unless the user hand-picked one
@@ -1145,6 +1147,7 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       entries,
       marks,
       observedCyclesOutsideApp: outside,
+      today: ref.read(nowProvider)(),
     );
     if (choices.isEmpty) {
       if (!context.mounted) return;
@@ -1173,6 +1176,7 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       // The settings card's display range is the PDF curve block's fixed
       // y scale — the same echo the chart reads (never rescaled for data).
       temperatureRange: ref.read(temperatureRangeProvider),
+      today: ref.read(nowProvider)(),
     );
     if (model.cycles.isEmpty) {
       if (!context.mounted) return;
