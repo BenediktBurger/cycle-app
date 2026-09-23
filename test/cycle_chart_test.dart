@@ -445,49 +445,55 @@ List<DailyEntry> _helpSheetEntries(int count) => [
     DailyEntry(date: DateTime.utc(2026, 9, 7 + i), bbtC: 36.5),
 ];
 
-/// The glossary entries (en wording); each is asserted inside the help
-/// sheet. The "Ignored temperature" entry presents the VISUAL consequence
-/// (the lighter temperature on the curve — the mark is the rendering key,
-/// owner decision 2026-09-19) while naming where the mark is set.
+/// The glossary entries (en wording), each asserted inside the help sheet
+/// and — in the appearance-order test — expected as the sheet's rendered
+/// label sequence: the order mirrors the cycle tab's top-down render
+/// order (the signal rows above the curve, then the temperature-curve
+/// group, then the below-chart strip). The "Ignored temperature" entry
+/// presents the VISUAL consequence (the lighter temperature on the curve
+/// — the mark is the rendering key, owner decision 2026-09-19) while
+/// naming where the mark is set.
 const _glossaryEn = [
-  'BBT (temperature)',
   'Bleeding',
   'Fertility sign (mucus)',
   'Mucus peak',
+  'Mittelschmerz (M)',
+  'Sex (X per time of day)',
+  'BBT (temperature) in °C',
   'Ignored temperature (lighter; set in the day sheet)',
   'Circled higher measurements',
   'Premature temperature rise',
   'Baseline',
   'Sicher unfruchtbare Zeit (SUZ)',
-  'Cervix position',
-  'Cervix firmness',
   'Measurement time',
-  'Sex (X per time of day)',
-  'Mittelschmerz (M)',
-  'Breast pain (B)',
   'Interrupted days (sp late to bed, a frequent night awakening, '
       'alk alcohol, kr illness)',
+  'Cervix position',
+  'Cervix firmness',
+  'Breast pain (B)',
   'Note (this day carries a note in the Diary)',
 ];
 
+/// The German glossary wording (authoritative draft per the language
+/// policy), in the same top-down appearance order as `_glossaryEn`.
 const _glossaryDe = [
-  'Aufwachtemperatur',
   'Blutung',
   'Fruchtbarkeitszeichen (Zervixschleim)',
   'Schleimhöhepunkt',
+  'Mittelschmerz (M)',
+  'Sex (X je Zeitpunkt)',
+  'Aufwachtemperatur in °C',
   'Temperatur ignoriert (heller gezeichnet)',
   'Umrandete höhere Messungen',
   'vorzeitiger Temperaturanstieg',
   'Basislinie',
   'Sicher unfruchtbare Zeit (SUZ)',
-  'Muttermund-Position',
-  'Muttermund-Festigkeit',
   'Messzeitpunkt',
-  'Sex (X je Zeitpunkt)',
-  'Mittelschmerz (M)',
-  'Brustschmerz (B)',
   'Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, '
       'alk Alkohol, kr Krank)',
+  'Muttermund-Position',
+  'Muttermund-Festigkeit',
+  'Brustschmerz (B)',
   'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
 ];
 
@@ -3437,6 +3443,73 @@ void main() {
           matching: find.text(_arithmeticNoteDe),
         ),
         findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'the glossary entries render in the cycle tab\'s top-down appearance '
+      'order (en)',
+      (tester) async {
+        await tester.pumpWidget(
+          _helpSheetHarness(entries: _helpSheetEntries(5)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+        await tester.pumpAndSettle();
+
+        // Walk the sheet's label texts in tree order (a Column renders its
+        // children top-down, which the descendant finder preserves) and
+        // compare the glossary members' sequence against the expected
+        // appearance order — the sheet title and the arithmetic note are
+        // not glossary members and are filtered out.
+        final labels = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data)
+            .whereType<String>()
+            .where(_glossaryEn.toSet().contains)
+            .toList();
+        expect(
+          labels,
+          _glossaryEn,
+          reason:
+              'the glossary mirrors the cycle tab\'s top-down render order: '
+              'the signal rows above the curve (bleeding, mucus, mucus '
+              'peak, Mittelschmerz, sex), then the temperature-curve group '
+              '(temperature, ignored temperature, circled higher, '
+              'premature rise, baseline, SUZ), then the below-chart strip '
+              '(measurement time, disturbance, cervix position, cervix '
+              'firmness, breast pain, note)',
+        );
+      },
+    );
+
+    testWidgets('the baseline entry samples the chart\'s dashed style', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_helpSheetHarness(entries: _helpSheetEntries(5)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+      await tester.pumpAndSettle();
+
+      final glyph = tester.widget<CustomPaint>(
+        find.descendant(
+          of: find.byKey(const ValueKey('cycleHelpSheet')),
+          matching: find.byKey(const ValueKey('legendBaselineGlyph')),
+        ),
+      );
+      expect(
+        (glyph.painter as dynamic).dashPattern,
+        const [6, 4],
+        reason:
+            'the legend paints the baseline dashed with the chart\'s own '
+            'dash pattern — the chart\'s baseline bar is an fl_chart '
+            'segment (dashArray [6, 4]) that cannot be reused outside '
+            'the chart, so the glyph repaints the same dashes',
       );
     });
   });

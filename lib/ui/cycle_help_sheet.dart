@@ -1,14 +1,18 @@
 // The Zyklus screen's symbol glossary (help sheet): the on-screen legend
 // moved into a bottom sheet opened from the AppBar's info_outline action —
-// every symbol the legend carried (temperature, bleeding, mucus, mucus
-// peak, circled higher, arrow higher, baseline, SUZ, cervix position,
-// cervix firmness, measurement time, sex, pain) plus the ignored-
-// temperature entry (the lighter temperature rendering of the
-// ignoreTemperature-marked days — see the entry note), the breast-pain
-// and Mittelschmerz letters, the disturbance letters, the note indicator
-// and the evaluation-arithmetic note. The glyph samples reuse the same
-// shapes the chart and its rows render, so the glossary always shows
-// what the screen draws. Pure display — no persistence (ADR-0001).
+// every symbol the legend carried (bleeding, mucus, mucus peak,
+// Mittelschmerz, sex, temperature, ignored temperature, circled higher,
+// arrow higher, baseline, SUZ, measurement time, disturbance, cervix
+// position, cervix firmness, breast pain, note) plus the entry notes for
+// the ignored-temperature entry (the lighter temperature rendering of the
+// ignoreTemperature-marked days — see the entry note), the disturbance
+// letters, the note indicator and the evaluation-arithmetic note. The
+// entries render in the cycle tab's top-down appearance order so glossary
+// and screen always agree. The glyph samples reuse the same shapes the
+// chart and its rows render, so the glossary always shows what the screen
+// draws. Pure display — no persistence (ADR-0001).
+
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -54,11 +58,13 @@ final class _CycleHelpSheet extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            _HelpEntry(
-              color: scheme.primary,
-              label: l10n.cycleLegendTemperature,
-              shape: _HelpEntryShape.dot,
-            ),
+            // The entries render in the cycle tab's top-down appearance
+            // order: the signal rows above the temperature block
+            // (_topSignalKinds, plus the mucus-peak dot above the mucus
+            // glyph), then the temperature-curve group as the plot draws
+            // it (curve, ignored-temperature rendering, circled higher,
+            // premature rise, dashed baseline, SUZ), then the below-chart
+            // strip (_belowChartKinds) — glossary and tab cannot drift.
             _HelpEntry(
               color: scheme.error,
               label: l10n.termBleeding,
@@ -78,6 +84,24 @@ final class _CycleHelpSheet extends StatelessWidget {
               label: l10n.termMucusPeak,
               // R6: the peak renders as a SOLID dot above the mucus glyph
               // in the mucus row — the old curve-ring glyph is gone.
+              shape: _HelpEntryShape.dot,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.termMittelschmerz,
+              // Sample Mittelschmerz glyph: the M letter, exactly how a
+              // recorded Mittelschmerz day renders in its own row beneath
+              // the mucus row.
+              shape: _HelpEntryShape.mittelschmerz,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.cycleLegendSex,
+              shape: _HelpEntryShape.sex,
+            ),
+            _HelpEntry(
+              color: scheme.primary,
+              label: l10n.cycleLegendTemperature,
               shape: _HelpEntryShape.dot,
             ),
             _HelpEntry(
@@ -102,24 +126,26 @@ final class _CycleHelpSheet extends StatelessWidget {
               shape: _HelpEntryShape.arrowUp,
             ),
             _HelpEntry(
-              color: scheme.onSurface,
-              label: l10n.termCervixPosition,
-              shape: _HelpEntryShape.cervix,
-            ),
-            _HelpEntry(
-              color: scheme.onSurface,
-              label: l10n.termCervixFirmness,
-              shape: _HelpEntryShape.firmness,
-            ),
-            _HelpEntry(
               color: scheme.secondary,
               label: l10n.cycleLegendBaseline,
-              shape: _HelpEntryShape.line,
+              // Sample baseline glyph: the chart's dashed baseline segment
+              // style, repainted by _DashedBaselinePainter — the chart's
+              // own bar is an fl_chart segment and cannot be reused
+              // outside the chart.
+              shape: _HelpEntryShape.dashedLine,
             ),
             _HelpEntry(
               color: scheme.secondary,
               label: l10n.cycleLegendSuz,
               shape: _HelpEntryShape.suz,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.termMeasurementTime,
+              // The measured-at entry keeps the clock icon here (in the
+              // help sheet only — the chart's day cells spell the time as
+              // text, vertically in narrow columns).
+              shape: _HelpEntryShape.clock,
             ),
             _HelpEntry(
               color: scheme.onSurface,
@@ -132,36 +158,25 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendNote,
-              // Sample note glyph: the sticky-note icon a noted day
-              // renders at the very bottom of the chart block.
-              shape: _HelpEntryShape.note,
+              label: l10n.termCervixPosition,
+              shape: _HelpEntryShape.cervix,
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.termMittelschmerz,
-              // Sample Mittelschmerz glyph: the M letter, exactly how a
-              // recorded Mittelschmerz day renders in its own row beneath
-              // the mucus row.
-              shape: _HelpEntryShape.mittelschmerz,
-            ),
-            _HelpEntry(
-              color: scheme.onSurface,
-              label: l10n.termMeasurementTime,
-              // The measured-at entry keeps the clock icon here (in the
-              // help sheet only — the chart's day cells spell the time as
-              // text, vertically in narrow columns).
-              shape: _HelpEntryShape.clock,
-            ),
-            _HelpEntry(
-              color: scheme.onSurface,
-              label: l10n.cycleLegendSex,
-              shape: _HelpEntryShape.sex,
+              label: l10n.termCervixFirmness,
+              shape: _HelpEntryShape.firmness,
             ),
             _HelpEntry(
               color: scheme.onSurface,
               label: l10n.termBreastPain,
               shape: _HelpEntryShape.pain,
+            ),
+            _HelpEntry(
+              color: scheme.onSurface,
+              label: l10n.cycleLegendNote,
+              // Sample note glyph: the sticky-note icon a noted day
+              // renders at the very bottom of the chart block.
+              shape: _HelpEntryShape.note,
             ),
             const SizedBox(height: 12),
             Text(
@@ -181,7 +196,7 @@ enum _HelpEntryShape {
   text,
   circledDot,
   arrowUp,
-  line,
+  dashedLine,
   cervix,
   firmness,
   suz,
@@ -260,7 +275,16 @@ final class _HelpEntry extends StatelessWidget {
         cervixFirmnessSymbol(CervixFirmness.soft),
         style: TextStyle(fontSize: 10, color: color),
       ),
-      _HelpEntryShape.line => Container(width: 16, height: 2, color: color),
+      // The baseline sample: the chart's dashed segment style, repainted
+      // by a small painter (the chart's bar is an fl_chart segment and
+      // cannot be reused outside the chart) — see _DashedBaselinePainter.
+      _HelpEntryShape.dashedLine => CustomPaint(
+        // Keyed for the glossary tests: the dashed style is the entry's
+        // changed aspect against the old solid line sample.
+        key: const ValueKey('legendBaselineGlyph'),
+        size: _baselineGlyphSize,
+        painter: _DashedBaselinePainter(color: color),
+      ),
       // The SUZ glyph: the chart's vertical bar plus the right-pointing
       // arrow from it (same shapes as the chart's painter).
       // TODO(user-review): the legend wording was re-checked against the
@@ -328,4 +352,42 @@ final class _HelpEntry extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The baseline sample's box: the same 16 × 2 line the solid sample drew.
+const Size _baselineGlyphSize = Size(16, 2);
+
+/// The baseline glyph's painter: a short dashed horizontal line with the
+/// strokeWidth 2 the old solid sample had. The chart draws its baseline as
+/// an fl_chart segment bar with `dashArray: [6, 4]` — a bar that cannot be
+/// reused outside the chart — so the legend repaints the same dashes here
+/// (6 px ink, 4 px gap, truncated at the box edges).
+final class _DashedBaselinePainter extends CustomPainter {
+  const _DashedBaselinePainter({required this.color});
+
+  final Color color;
+
+  /// The dash pattern of the chart's baseline bar (dashArray [6, 4]):
+  /// alternating ink length 6 and gap length 4, same order.
+  final dashPattern = const [6.0, 4.0];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    var x = 0.0;
+    var inkNext = true;
+    while (x < size.width) {
+      final remaining = size.width - x;
+      final length = math.min(dashPattern[inkNext ? 0 : 1], remaining);
+      if (inkNext) {
+        canvas.drawRect(Rect.fromLTWH(x, 0, length, size.height), paint);
+      }
+      x += length;
+      inkNext = !inkNext;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBaselinePainter oldDelegate) =>
+      color != oldDelegate.color;
 }

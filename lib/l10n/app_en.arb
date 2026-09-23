@@ -97,7 +97,7 @@
   "@cycleColumnCycleDay": {
     "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
   },
-  "cycleLegendTemperature": "BBT (temperature)",
+  "cycleLegendTemperature": "BBT (temperature) in °C",
   "cycleRowCervix": "Cervix",
   "cycleRowDisturbance": "Disturbed measurement",
   "@cycleRowDisturbance": {

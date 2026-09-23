@@ -88,7 +88,7 @@
   "cycleTapToEdit": "Tippen, um den Tag zu bearbeiten",
   "cycleColumnDate": "Datum",
   "cycleColumnCycleDay": "Zyklustag",
-  "cycleLegendTemperature": "Aufwachtemperatur",
+  "cycleLegendTemperature": "Aufwachtemperatur in °C",
   "cycleRowCervix": "Muttermund",
   "cycleRowDisturbance": "Messstörung",
   "cycleRowNote": "Notiz",
