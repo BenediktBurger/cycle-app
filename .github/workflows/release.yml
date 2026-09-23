@@ -1,149 +1,114 @@
 name: Release
 
-# PARKED release pipeline per ADR-0009 (amended 2026-09): release artifacts
-# are built and signed locally and attached to GitHub Releases manually —
-# the authoritative flow is the per-release checklist in docs/release.md. This
-# workflow is kept for a possible later re-enable; the tag trigger is
-# removed, so it only runs via manual workflow_dispatch (a dry run that
-# exercises the full build-and-sign path on a clean machine).
+# Unsigned CI release builds for byte-reproducibility with the F-Droid
+# buildserver. Triggered by push of a release/** branch (convention
+# release/v<semver>) or by workflow_dispatch — NO tag exists at build time.
+# The version in the artifact names comes from pubspec.yaml
+# (`version: A.B.C+N` → A.B.C); the tag and the GitHub release are authored
+# LATER, locally: tool/download_and_sign.dart downloads these artifacts,
+# validates, signs, and stages them into build/gh-release/ (source.json
+# manifest with this run's head SHA), and tool/publish_release.dart then
+# runs `gh release create vX.Y.Z --target <the manifest's head SHA>` so
+# that tag, release, and signed assets appear atomically at the exact
+# commit CI built. The publish half runs only after the operator's device
+# test passed between the two helpers.
+# APKs are uploaded as workflow artifacts and signed LOCALLY (the release
+# keystore never enters GitHub).
+# Build happens at the default checkout path /home/runner/work/cycle-app/cycle-app —
+# the fdroiddata recipe builds at exactly the same absolute path
+# (reproducibility invariant; keep both in sync when the workspace name changes).
+# NO --target-platform flag: plain --split-per-abi matches the fdroid recipe so
+# the NativeAssetsManifest.json in every split is the 3-ABI form. No caching:
+# outputs must stay byte-stable; caches can silently shift tool versions.
 #
-# RE-ENABLING: (1) set the five repository secrets listed in
-# docs/release.md, "Parked CI release path" (how to produce the keystore
-# payload is documented there too), (2) restore the
-# `push: tags: ["v*.*.*"]` trigger below, (3) validate signing with a
-# workflow_dispatch dry run first.
+# No Release creation on CI — hence `contents: read` below; the Release itself
+# is created locally by the publish script. A workflow_dispatch run on any branch is an
+# ordinary full run: it builds the pubspec version of that checkout, and the
+# branch name lands nowhere in the artifact names (the pubspec version is the
+# source now, not the ref — there is no tag to derive a version from anyway).
+# The fdroiddata recipe's checkout-path invariant above is unaffected: it
+# checks out a commit, regardless of how that commit is addressed.
 #
-# PREREQUISITE (when re-enabled): the five repository secrets below must
-# exist BEFORE the first tag push, else the pre-flight below aborts —
-# Gradle would silently fall back to the debug signing config and a
-# debug-signed APK would end up attached to a public Release:
-#   RELEASE_KEYSTORE_GPG_BASE64, RELEASE_KEYSTORE_PASSPHRASE,
-#   RELEASE_KEYSTORE_KEY_ALIAS, RELEASE_KEYSTORE_KEY_PASSWORD,
-#   RELEASE_KEYSTORE_STORE_PASSWORD
+# The Gradle release build uses the documented debug-signing fallback
+# (android/key.properties absent); apksigner replaces those signature blocks
+# during local signing — they never reach the published assets.
 
 on:
+  push:
+    branches: ["release/**"]
   workflow_dispatch:
 
 permissions:
-  contents: write # softprops/action-gh-release creates the GitHub Release
+  contents: read   # artifact upload only; the Release itself is created locally
 
 jobs:
-  release:
+  release-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7        # → /home/runner/work/cycle-app/cycle-app
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - name: Set up JDK (pinned — must match the F-Droid buildserver JDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The pinned Flutter version lives in tool/flutter-version (one bare
+      # version line under comments) and is read directly — the same file the
+      # F-Droid build recipe parses from the built commit, with the same
+      # parse. Shell expansion IS possible here: it runs in this run step,
+      # then is rendered into the action input below via ${{ }}; the literal
+      # flutter-version input is gone, so a Flutter bump edits
+      # tool/flutter-version ONLY. (Deliberately no `set -o pipefail`: a
+      # comment-only pin file must fail in the guards below, not abort
+      # silently inside the pipeline.)
+      - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
+        id: flutter-pin
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          [ -n "$pinned" ] || { echo "tool/flutter-version has no non-comment version line"; exit 1; }
+          [[ "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tool/flutter-version pins '$pinned', expected a bare X.Y.Z version (inline-comment contamination or whitespace/CRLF?)"; exit 1; }
+          echo "Resolved Flutter pin: $pinned"   # informational, not a gate
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.47.4
+          flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
-      # Full correctness gate — a release tag never ships untested code.
-      # (No system sqlite3 install needed: the database tests use the
-      # SQLite engine bundled by the sqlite3 package's build hook, see
-      # CONTRIBUTING.md, "Linux note (database tests)".)
+      # Full correctness gate (the same analyze/format/test parity gate the
+      # signed pipeline ran before un-parking). No sqlite3mc vendoring check
+      # here: that verifies the developer repo, not the build.
       - name: Analyze
         run: flutter analyze
-
       - name: Format
         run: dart format --output=none --set-exit-if-changed .
-
       - name: Test
         run: flutter test
 
-      # Pre-flight: refuse to run without the secrets. Without this check,
-      # Gradle would silently fall back to the debug signing config and a
-      # debug-signed APK would end up attached to a public Release
-      # (docs/release.md, "Parked CI release path").
-      - name: Pre-flight — all release secrets must be set
+      - name: Build split APKs
+        # NO --target-platform (see header comment); debug-signing fallback is fine.
+        run: flutter build apk --release --split-per-abi
+
+      - name: Compute version (from pubspec — no tag exists at build time)
+        id: ver
         run: |
-          required=(
-            RELEASE_KEYSTORE_GPG_BASE64 RELEASE_KEYSTORE_PASSPHRASE
-            RELEASE_KEYSTORE_KEY_ALIAS RELEASE_KEYSTORE_KEY_PASSWORD
-            RELEASE_KEYSTORE_STORE_PASSWORD
-          )
-          missing=0
-          for var in "${required[@]}"; do
-            if [ -z "${!var}" ]; then
-              echo "::error::Secret ${var} is not set — refusing to build."
-              missing=1
-            fi
-          done
-          [ "$missing" -eq 0 ] || exit 1
-        env:
-          RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
-          RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
-          RELEASE_KEYSTORE_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_KEY_ALIAS }}
-          RELEASE_KEYSTORE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_KEY_PASSWORD }}
-          RELEASE_KEYSTORE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_STORE_PASSWORD }}
+          v="$(sed -nE 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)(\+[0-9]+)?[[:space:]]*$/\1/p' pubspec.yaml | head -n 1)"
+          [ -n "$v" ] || { echo "Could not read a 'version: A.B.C[+N]' line from pubspec.yaml (pre-release state? half-committed bump?)"; exit 1; }
+          echo "v=$v" >> "$GITHUB_OUTPUT"
 
-      # Keystore provisioning: everything is written into $RUNNER_TEMP only,
-      # so the decrypted keystore never outlives the job and never lands
-      # outside that directory on the runner. The passphrase is fed to GPG
-      # on file descriptor 0, never as a command-line argument (the latter
-      # would be readable by any process on the runner via the process list).
-      - name: Decode keystore to a temporary file
-        run: |
-          printf '%s' "$RELEASE_KEYSTORE_PASSPHRASE" | \
-            gpg --quiet --batch --yes --decrypt \
-              --passphrase-fd 0 \
-              --output "$RUNNER_TEMP/cycleapp-release.jks" \
-              <(printf '%s' "$RELEASE_KEYSTORE_GPG_BASE64" | base64 -d)
-        env:
-          RELEASE_KEYSTORE_GPG_BASE64: ${{ secrets.RELEASE_KEYSTORE_GPG_BASE64 }}
-          RELEASE_KEYSTORE_PASSPHRASE: ${{ secrets.RELEASE_KEYSTORE_PASSPHRASE }}
-
-      # Generated for the Gradle signing config; never committed
-      # (android/.gitignore covers it) and never written outside $RUNNER_TEMP.
-      - name: Write key.properties (gitignored, generated)
-        run: |
-          cat > android/key.properties <<EOF
-          storeFile=$RUNNER_TEMP/cycleapp-release.jks
-          storePassword=$RELEASE_KEYSTORE_STORE_PASSWORD
-          keyAlias=$RELEASE_KEYSTORE_KEY_ALIAS
-          keyPassword=$RELEASE_KEYSTORE_KEY_PASSWORD
-          EOF
-        env:
-          RELEASE_KEYSTORE_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_KEY_ALIAS }}
-          RELEASE_KEYSTORE_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_KEY_PASSWORD }}
-          RELEASE_KEYSTORE_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_STORE_PASSWORD }}
-
-      - name: Build universal release APK
-        run: flutter build apk --release
-
-      - name: Build app bundle (AAB)
-        run: flutter build appbundle --release
-
-      # Prints the signing certificate fingerprint — this goes into the
-      # release notes as the trust anchor (F-Droid metadata cross-checks it).
-      # apksigner ships with the runner's preinstalled Android SDK
-      # build-tools but is not on PATH — resolve the newest one.
-      - name: Verify APK signature
-        run: |
-          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
-          "$apksigner" verify --print-certs \
-            build/app/outputs/flutter-apk/app-release.apk
-
-      # AAB is uploaded as a workflow artifact; the Play upload itself stays
-      # a manual step for now (Phase F discipline, docs/release.md).
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: app-bundle
-          path: build/app/outputs/bundle/release/app-release.aab
-
-      # Universal APK attached to the GitHub Release with auto-generated
-      # notes. NOTE: even when re-enabled for tagged CI releases, the device
-      # upgrade test
-      # (docs/release.md checklist) stays mandatory before a release counts
-      # as "shipped".
-      - name: Attach APK to GitHub Release
-        uses: softprops/action-gh-release@v2
+          name: cycle-app-${{ steps.ver.outputs.v }}-armeabi-v7a-unsigned
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+      - uses: actions/upload-artifact@v4
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
-          generate_release_notes: true
-          draft: false
+          name: cycle-app-${{ steps.ver.outputs.v }}-arm64-v8a-unsigned
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cycle-app-${{ steps.ver.outputs.v }}-x86_64-unsigned
+          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
