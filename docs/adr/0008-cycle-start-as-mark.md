@@ -3,6 +3,19 @@
 - **Date:** 2026-09-18
 - **Status:** Accepted
 
+> **Author's note (2026-09-23):** the cycle's start date is, in all layers,
+> the opening `cycleStart` mark's OWN date. A group still opens at the
+> first tracked day on/after the mark, but `Cycle.startDate` — and with it
+> the onset list, the cycle-length statistics, the evaluation windows and
+> the UI labels — anchors on the mark date itself. Among multiple marks
+> on/before a group's first tracked day the NEWEST one supersedes the
+> older ones (the re-marking rule). A mark placed on an untracked gap day
+> therefore yields a start inside the gap: the untracked gap days belong
+> to the new cycle (they are not in `Cycle.days`), and the calculated
+> cycle length equals the visible distance between the two marks. The
+> leading group (entries predating the first mark) keeps its first tracked
+> day as its start.
+
 > **Author's note (2026-09-18, post-schema-v9 and Phase 3):** the record
 > below was written against the multi-profile database (this ADR's
 > single-user posture had not yet been revisited). Two later rounds of
@@ -65,11 +78,13 @@ bleeding only suggests it.**
   tracked day on/after a `cycleStart` mark for that profile. Marks of other
   types never create boundaries. *(Author's note, schema v9: profile-free —
   a cycleStart mark keys to a day; no profile argument exists.)* A mark no
-  later than the current group's start is a no-op. A mark placed on an
-  untracked gap day opens the group at the next tracked entry. The leading
-  group — entries predating the first mark — keeps
+  later than the current group's start is a no-op. The cycle's start date is
+  the opening mark's own date — a mark placed on an untracked gap day keeps
+  its date as the start (the gap days belong to the new cycle), and among
+  multiple marks on/before a group's first tracked day the newest
+  supersedes. The leading group — entries predating the first mark — keeps
   `startsAtMenstruation == false` (its begin is unknown; the app shows only
-  its end).
+  its end) and anchors on its first tracked day.
 - The mark is **authoritative wherever placed**: it binds on days without
   bleeding and on temperature-ignored days alike (owner decision
   2026-09-19, confirmed with INER experts — recorded under Consequences
@@ -103,9 +118,10 @@ bleeding only suggests it.**
   rule remains. `menstruationOnsetDates` now returns the dates of the
   user-placed cycle starts that open a group (the groups with
   `startsAtMenstruation == true` — a mark yields a group only when at least
-  one tracked day falls on/after it), which includes marks placed on days
-  without menstruation bleeding and marks whose previous-day subtleties the
-  old rule would have suppressed.
+  one tracked day falls on/after it) — namely the opening mark's own date,
+  which sits on an untracked gap day when users place it there, and which
+  includes marks placed on days without menstruation bleeding and marks
+  whose previous-day subtleties the old rule would have suppressed.
 
 This continues [ADR-0001](0001-iner-mode-m-hypothesis.md)'s Mode-M posture:
 the prompt is a suggestion the user confirms, the mark is user-authored —

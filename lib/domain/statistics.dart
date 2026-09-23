@@ -15,8 +15,9 @@ import 'models.dart';
 
 /// Cycle lengths in days: differences between consecutive mark-driven
 /// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
-/// group at every user-placed cycleStart mark). A trailing cycle start with
-/// no known follow-up contributes no length.
+/// group at every user-placed cycleStart mark, and the start date is that
+/// mark's own date). A trailing cycle start with no known follow-up
+/// contributes no length.
 List<int> cycleLengthsInDays(List<DailyEntry> entries, List<CycleMark> marks) {
   final onsets = menstruationOnsetDates(entries, marks);
   final lengths = <int>[];

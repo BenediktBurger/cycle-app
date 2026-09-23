@@ -100,8 +100,8 @@ void main() {
       expect(cycles.single.days, hasLength(7));
     });
 
-    test('a mark on an untracked gap day opens the group at the next '
-        'tracked day (startsAtMenstruation == true)', () {
+    test('a mark on an untracked gap day anchors the start on the mark '
+        'date itself (gap days belong to the new cycle)', () {
       final entries = [
         d(2026, 3, 1),
         // Mar 2–3: untracked gap days — the mark sits in the gap.
@@ -118,10 +118,20 @@ void main() {
       expect(
         cycles[1].startsAtMenstruation,
         isTrue,
-        reason: 'the group opened for the mark, at the next tracked day',
+        reason: 'the group opened for the mark',
       );
-      expect(cycles[1].startDate, DateTime(2026, 3, 4));
-      expect(cycles[1].days.map((e) => e.date.day), [4, 5]);
+      // The start date is the MARK's own date — an untracked day — so the
+      // distance between the two marks equals the cycle length.
+      expect(cycles[1].startDate, DateTime(2026, 3, 3));
+      expect(cycles[1].days.map((e) => e.date.day), [
+        4,
+        5,
+      ], reason: 'days without entries in the gap are not member days');
+      expect(
+        cycles[1].days.map((e) => e.date.day),
+        isNot(contains(3)),
+        reason: 'startDate lies on an untracked gap day — not a member day',
+      );
     });
 
     test('a mark mid-cycle is authoritative wherever placed — including '
@@ -187,7 +197,8 @@ void main() {
       expect(cycles.single.startDate, DateTime(2026, 3, 5));
     });
 
-    test('two marks inside one untracked gap open ONE group', () {
+    test('two marks inside one untracked gap open ONE group — the newest '
+        'mark anchors the start', () {
       final entries = [
         d(2026, 3, 1),
         // Mar 2–4 untracked; two marks placed inside the gap.
@@ -198,8 +209,11 @@ void main() {
       final cycles = groupIntoCycles(entries, marks);
 
       expect(cycles, hasLength(2));
-      expect(cycles[1].startDate, DateTime(2026, 3, 5));
+      // The newer (re-marked) start supersedes the older one — the anchor
+      // rule of the mark sheet applies to the opening batch as well.
+      expect(cycles[1].startDate, DateTime(2026, 3, 4));
       expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(cycles[1].days.map((e) => e.date.day), [5]);
     });
 
     test('other mark types do not create boundaries', () {
@@ -285,12 +299,13 @@ void main() {
       ]);
     });
 
-    test('a mark on an untracked day contributes the next tracked day', () {
+    test('a mark on an untracked day anchors the onset on the mark date '
+        'itself', () {
       final entries = [d(2026, 3, 1), d(2026, 3, 4)];
       final marks = [start(2026, 3, 3)];
 
       expect(menstruationOnsetDates(entries, marks), [
-        DateOnly.normalize(DateTime(2026, 3, 4)),
+        DateOnly.normalize(DateTime(2026, 3, 3)),
       ]);
     });
 

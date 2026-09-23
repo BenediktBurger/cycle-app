@@ -1833,5 +1833,92 @@ void main() {
         reason: 'the most-recent rise mark anchors the single group',
       );
     });
+    test('a cycleStart mark on an untracked gap day leaves the evaluation '
+        'artifacts identical to a mark on the first tracked day', () {
+      // Same tracked days and analysis marks twice over; the ONLY
+      // difference is where the cycleStart mark sits: inside the Mar 2–3
+      // untracked gap (Mar 2) vs. on the group's first tracked day
+      // (Mar 4). The evaluation windows shift into empty space, so every
+      // computed artifact must be the same.
+      final entries = [
+        d(2026, 3, 1),
+        // Mar 2–3 untracked.
+        d(2026, 3, 4, t: 36.2),
+        d(2026, 3, 5, t: 36.1),
+        d(2026, 3, 6, t: 36.3),
+        d(2026, 3, 7, t: 36.4), // highest of the six lows → baseline
+        d(2026, 3, 8, t: 36.2),
+        d(2026, 3, 9, t: 36.3),
+        d(2026, 3, 10, t: 36.2),
+        d(2026, 3, 11, t: 36.8), // marked rise
+        d(2026, 3, 12, t: 36.9),
+        d(2026, 3, 13, t: 37.0),
+      ];
+
+      final withGapMark = evaluateCycles(entries, [
+        peak(2026, 3, 10),
+        rise(2026, 3, 11),
+        start(2026, 3, 2), // mark on an untracked gap day
+      ]);
+      expect(withGapMark, hasLength(2));
+      final gapLead = withGapMark[0];
+      final gapMarked = withGapMark[1];
+
+      final withTrackedMark = evaluateCycles(entries, [
+        peak(2026, 3, 10),
+        rise(2026, 3, 11),
+        start(2026, 3, 4), // mark on the group's first tracked day
+      ]);
+      expect(withTrackedMark, hasLength(2));
+      final trackedLead = withTrackedMark[0];
+      final trackedMarked = withTrackedMark[1];
+
+      // The leading group is untouched in both runs.
+      expect(gapLead.cycle.startDate, trackedLead.cycle.startDate);
+
+      // The mark-opened cycles: same member days, same evaluation
+      // artifacts — only the start DATE differs (the mark date vs. the
+      // first tracked day).
+      expect(gapMarked.cycle.days.map((e) => e.date), [
+        for (final e in trackedMarked.cycle.days) e.date,
+      ]);
+      for (final (a, b) in [
+        (gapMarked.firstHigherDay, trackedMarked.firstHigherDay),
+        (gapMarked.mucusPeakDay, trackedMarked.mucusPeakDay),
+        (gapMarked.baseline?.date, trackedMarked.baseline?.date),
+        (gapMarked.baseline?.value, trackedMarked.baseline?.value),
+        (
+          [for (final l in gapMarked.numberedLows) (l.number, l.date, l.value)],
+          [
+            for (final l in trackedMarked.numberedLows)
+              (l.number, l.date, l.value),
+          ],
+        ),
+        (
+          [
+            for (final h in gapMarked.higherMeasurements)
+              (h.date, h.value, h.markKind, h.ordinal, h.differenceK),
+          ],
+          [
+            for (final h in trackedMarked.higherMeasurements)
+              (h.date, h.value, h.markKind, h.ordinal, h.differenceK),
+          ],
+        ),
+        (
+          gapMarked.baselineSpan?.startDay,
+          trackedMarked.baselineSpan?.startDay,
+        ),
+        (gapMarked.baselineSpan?.endDay, trackedMarked.baselineSpan?.endDay),
+        (gapMarked.suzBegins, trackedMarked.suzBegins),
+        (gapMarked.evaluationStopped, trackedMarked.evaluationStopped),
+      ]) {
+        expect(a, b);
+      }
+      expect(gapMarked.baseline!.value, 36.4);
+      expect(
+        gapMarked.firstHigherDay,
+        DateOnly.normalize(DateTime(2026, 3, 11)),
+      );
+    });
   });
 }

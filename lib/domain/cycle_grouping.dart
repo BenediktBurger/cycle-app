@@ -6,11 +6,16 @@
 //   `cycleStart` mark (CycleMarkTypes.cycleStart). The mark
 //   is AUTHORITATIVE and binds wherever it sits — including on days without
 //   menstruation bleeding, on excluded (interrupted) days, and on untracked
-//   gap days (the group then opens at the next tracked entry). Bleeding
-//   never creates a boundary by itself; it only SUGGESTS a cycle start via
-//   [isSuggestedCycleStart] (prompts / derived marks). A leading group of
-//   entries that predate the first mark keeps
-//   `startsAtMenstruation == false`.
+//   gap days. Bleeding never creates a boundary by itself; it only SUGGESTS
+//   a cycle start via [isSuggestedCycleStart] (prompts / derived marks).
+//   The cycle's START DATE is the opening mark's OWN date — when that mark
+//   lies on an untracked gap day, the start sits inside the gap and the
+//   untracked gap days belong to the new cycle (they are not in
+//   [Cycle.days]). Among multiple marks on/before a group's first tracked
+//   day the NEWEST one supersedes the older ones (the re-marking rule of
+//   the mark sheet). A leading group of entries that predate the first
+//   mark keeps `startsAtMenstruation == false` and anchors on its first
+//   tracked day.
 //
 // Profile-free: marks key to days only (the (entry_date, mark_type) unique
 // index is the whole key); grouping is no longer per profile.
@@ -19,9 +24,13 @@ import 'date_only.dart';
 import 'marks.dart';
 import 'models.dart';
 
-/// One cycle = all tracked days between two consecutive cycle starts.
+/// One cycle = the tracked days between two consecutive cycle starts.
 final class Cycle {
-  const Cycle({required this.days, required this.startsAtMenstruation});
+  const Cycle({
+    required this.days,
+    required this.startsAtMenstruation,
+    required this.startDate,
+  });
 
   /// The cycle's tracked days, ordered ascending by date. Held non-empty by
   /// the grouping algorithm.
@@ -33,8 +42,14 @@ final class Cycle {
   /// predate the first cycleStart mark.
   final bool startsAtMenstruation;
 
-  /// First tracked day of the group.
-  DateTime get startDate => days.first.date;
+  /// The cycle's start date. For a mark-opened group it is the opening
+  /// cycleStart mark's OWN date (the newest mark on/before the group's
+  /// first tracked day — re-marking supersedes) and may lie on an untracked
+  /// gap day BEFORE the first tracked day of [days]; the days without
+  /// entries between mark and first tracked day belong to this cycle but
+  /// are not held in [days]. Only the leading group (no opening mark)
+  /// anchors on its first tracked day.
+  final DateTime startDate;
 
   /// Last tracked day of the group. Days without entries are silent gaps.
   DateTime get endDate => days.last.date;
@@ -43,8 +58,11 @@ final class Cycle {
 /// Dates of the mark-driven cycle starts — the anchors for cycle-length
 /// statistics (all groups with `startsAtMenstruation == true`, i.e. every
 /// user-placed cycle start that has at least one tracked day on/after it).
-/// Sorted ascending, normalized to UTC-midnight (see DateOnly.normalize) so
-/// calendar-day arithmetic is immune to DST shifts.
+/// The onsets are the opening mark dates themselves, so a mark placed on an
+/// untracked gap day yields an onset inside the gap — the resulting
+/// lengths match the visible distance between two marks. Sorted ascending,
+/// normalized to UTC-midnight (see DateOnly.normalize) so calendar-day
+/// arithmetic is immune to DST shifts.
 List<DateTime> menstruationOnsetDates(
   List<DailyEntry> entries,
   List<CycleMark> marks,
@@ -56,21 +74,29 @@ List<DateTime> menstruationOnsetDates(
 /// Groups the given (possibly unsorted) entries into cycles.
 ///
 /// Entries are sorted by date; entry timing (date-only) decides grouping.
-/// A group starts at the first tracked day on/after a cycleStart mark;
-/// leading entries (before the first mark) form one leading group with
-/// `startsAtMenstruation == false`. Day-keyed: every cycleStart mark in
-/// [marks] contributes (there is no profile dimension).
+/// A group opens at the first tracked day on/after a cycleStart mark, and
+/// its [Cycle.startDate] is that mark's own date — which may lie on an
+/// untracked gap day before the group's first tracked day. Leading entries
+/// (before the first mark) form one leading group with
+/// `startsAtMenstruation == false`, anchored on its first tracked day.
+/// Day-keyed: every cycleStart mark in [marks] contributes (there is no
+/// profile dimension).
 List<Cycle> groupIntoCycles(List<DailyEntry> entries, List<CycleMark> marks) {
   if (entries.isEmpty) return const [];
 
-  // The cycleStart mark dates (marks of other types never create
-  // boundaries). Normalized so calendar-day comparisons are exact.
-  final markDates = <DateTime>[];
+  // The cycleStart marks (marks of other types never create boundaries),
+  // as pairs of the normalized day (comparisons/sorting key) and the
+  // mark's raw date (the cycle's start date — kept local-midnight so
+  // callers see the same date shape as the entries themselves).
+  final cycleStartMarks = <({DateTime day, DateTime date})>[];
   for (final mark in marks) {
     if (mark.type != CycleMarkTypes.cycleStart) continue;
-    markDates.add(DateOnly.normalize(mark.date));
+    cycleStartMarks.add((
+      day: DateOnly.normalize(mark.date),
+      date: DateTime(mark.date.year, mark.date.month, mark.date.day),
+    ));
   }
-  markDates.sort();
+  cycleStartMarks.sort((a, b) => a.day.compareTo(b.day));
 
   // Index of the next NOT-yet-consumed mark. A mark is consumed when the
   // group it opens has started (all marks on/before that day together —
@@ -92,6 +118,10 @@ List<Cycle> groupIntoCycles(List<DailyEntry> entries, List<CycleMark> marks) {
       Cycle(
         days: List.unmodifiable(currentDays),
         startsAtMenstruation: currentStartsAtMenstruation,
+        // An entry only ever lands in currentDays after currentStart was
+        // assigned (both branch kinds set it before the add), so a
+        // non-empty currentDays implies currentStart != null.
+        startDate: currentStart!,
       ),
     );
     currentDays = <DailyEntry>[];
@@ -105,38 +135,45 @@ List<Cycle> groupIntoCycles(List<DailyEntry> entries, List<CycleMark> marks) {
   ///   group's start and no later than [entryDate] — a mark no later than
   ///   the current group's start is a no-op.
   /// On success all marks on or before [entryDate] are consumed (they
-  /// cannot open a second group for the same day).
-  bool markOpensGroup(DateTime entryDate, bool haveGroup) {
-    if (cursor >= markDates.length) return false;
-    final nextMark = markDates[cursor];
+  /// cannot open a second group for the same day) and the OPENER — the
+  /// LAST (newest) consumed mark — is returned: among multiple marks
+  /// on/before the group's first tracked day it supersedes the older ones
+  /// (the re-marking rule), and its own date is the cycle's start date.
+  /// Returns null when no group opens.
+  DateTime? markOpensGroup(DateTime entryDate, bool haveGroup) {
+    if (cursor >= cycleStartMarks.length) return null;
+    final nextMark = cycleStartMarks[cursor].day;
     final day = DateOnly.normalize(entryDate);
     if (haveGroup) {
       final lower = DateOnly.normalize(currentStart!);
       if (nextMark.compareTo(lower) <= 0 || nextMark.compareTo(day) > 0) {
-        return false;
+        return null;
       }
     } else if (nextMark.compareTo(day) > 0) {
-      return false;
+      return null;
     }
     var consumed = cursor;
-    while (consumed < markDates.length &&
-        markDates[consumed].compareTo(day) <= 0) {
+    while (consumed < cycleStartMarks.length &&
+        cycleStartMarks[consumed].day.compareTo(day) <= 0) {
       consumed++;
     }
     cursor = consumed;
-    return true;
+    return cycleStartMarks[consumed - 1].date;
   }
 
   for (final entry in sorted) {
     final isGroupOpen = currentStart != null;
-    final opens = markOpensGroup(entry.date, isGroupOpen);
-    if (opens || !isGroupOpen) {
+    final openerMark = markOpensGroup(entry.date, isGroupOpen);
+    if (openerMark != null || !isGroupOpen) {
       // A new boundary always opens a group; the very first group opens
       // regardless (leading, non-boundary group starts at false — unless a
       // mark on/before the first tracked day opens the cycle right there).
       flush();
-      currentStartsAtMenstruation = opens;
-      currentStart = entry.date;
+      currentStartsAtMenstruation = openerMark != null;
+      // Mark-opened groups anchor on the opening mark's own date (which
+      // may lie on an untracked gap day before this entry); only the
+      // leading group anchors on its first tracked day.
+      currentStart = openerMark ?? entry.date;
     }
     currentDays.add(entry);
   }

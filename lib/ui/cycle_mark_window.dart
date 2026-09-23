@@ -11,8 +11,10 @@ import '../domain/evaluation.dart';
 /// [index] in [evaluations]: the window is `[cycle.startDate, next cycle's
 /// startDate)` — half-open, so the next menstruation start itself belongs
 /// to the NEXT cycle — and the LAST cycle's window is open-ended. The
-/// bounds and [day] are compared as normalized UTC-midnight values
-/// (DateOnly convention).
+/// bounds are the cycleStart MARK dates (the start may sit on an untracked
+/// gap day before the cycle's first tracked day; the gap belongs to this
+/// cycle). The bounds and [day] are compared as normalized UTC-midnight
+/// values (DateOnly convention).
 ///
 /// This mirrors the attribution the domain's evaluateCycles applies to its
 /// own mark lookups (the `_latestMarkOf` filtering in

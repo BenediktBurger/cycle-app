@@ -410,14 +410,16 @@ Future<void> main() async {
     'bleeding alone never opens a group (one group without marks)',
   );
 
-  // A mark on an untracked gap day opens the group at the next tracked day.
+  // A mark on an untracked gap day anchors the start on the mark date
+  // itself; the untracked gap days belong to the new cycle.
   final gapEntries = [d(2026, 3, 1), d(2026, 3, 5)];
   final gapCycles = groupIntoCycles(gapEntries, starts([(2026, 3, 3)]));
   check(
     gapCycles.length == 2 &&
-        gapCycles[1].startDate.day == 5 &&
-        gapCycles[1].startsAtMenstruation,
-    'a mark in an untracked gap opens at the next tracked day',
+        gapCycles[1].startDate.day == 3 &&
+        gapCycles[1].startsAtMenstruation &&
+        gapCycles[1].days.first.date.day == 5,
+    'a mark in an untracked gap anchors the start on the mark date',
   );
 
   // Suggestion suppression is keyed PURELY to bleeding continuity
