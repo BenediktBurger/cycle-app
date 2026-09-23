@@ -426,6 +426,26 @@
   "@deleteDataFailed": {
     "description": "Failure message for the whole delete-data flow: shown when opening the database, the confirmation dialog's count reads, or the wipe itself fails. The wipe is one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors importFailed."
   },
+  "settingsPdfExport": "PDF export",
+  "settingsPdfExportName": "Name (paper form)",
+  "settingsPdfExportBirthDate": "Birth date",
+  "settingsPdfExportBirthDateFormat": "YYYY-MM-DD",
+  "settingsPdfExportBirthDateError": "Enter a real calendar date in the form YYYY-MM-DD.",
+  "settingsPdfExportNote": "Name and birth date appear in the header of every PDF export; the export's anonymize switch hides both for the respective export without changing what is stored. The observed-cycle count in the PDF includes the value of the \u201ccycles observed outside this app\u201d card.",
+  "pdfExportCycleUpTo": "Export up to cycle",
+  "pdfExportCycleOption": "Cycle {n}, from {day}",
+  "@pdfExportCycleOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfExportAnonymize": "Anonymize",
+  "pdfExportExportButton": "Export",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",

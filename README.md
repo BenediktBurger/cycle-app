@@ -188,3 +188,8 @@ they are also marked `TODO(user-review)` in the code:
 **Apache-2.0** — chosen (owner decision, 2026-09); the full text is in the
 [`LICENSE`](LICENSE) file at the repo root. The final confirmation before the
 first published release is still open.
+
+One shipped asset already carries its own license: the bundled Noto Sans
+Regular font (used by the PDF export so note text renders beyond Latin-1)
+is Google's, licensed under the SIL Open Font License 1.1 — see
+`assets/fonts/LICENSE-NotoSans.txt`.

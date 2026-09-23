@@ -64,9 +64,11 @@ class StatistikScreen extends ConsumerWidget {
           // all-empty case.
           final lengthDetail = summarizeInts(lengths);
           final bleedingDetail = summarizeInts(
-              cycleBleedingDurationsInDays(evaluations).nonNulls.toList());
+            cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
+          );
           final riseDetail = summarizeInts(
-              riseToEndDurationsInDays(evaluations).nonNulls.toList());
+            riseToEndDurationsInDays(evaluations).nonNulls.toList(),
+          );
           final earliest = earliestFirstHigherCycleDay(evaluations);
 
           // The cycle-count surface: the mark-opened cycles recorded in
@@ -137,14 +139,18 @@ class StatistikScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _ValueRow(
-                        label: l10n.statisticsFirstHigherReal,
-                        value: cycleDayText(earliest.afterMucusPeak)),
+                      label: l10n.statisticsFirstHigherReal,
+                      value: cycleDayText(earliest.afterMucusPeak),
+                    ),
                     _ValueRow(
-                        label: l10n.statisticsFirstHigherAny,
-                        value: cycleDayText(earliest.any)),
+                      label: l10n.statisticsFirstHigherAny,
+                      value: cycleDayText(earliest.any),
+                    ),
                     if (earliest.afterMucusPeak == null && earliest.any != null)
-                      Text(l10n.statisticsFirstHigherRealMissing,
-                          style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        l10n.statisticsFirstHigherRealMissing,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                   ],
                 ),
               ),
@@ -167,39 +173,36 @@ Widget _countCard(
   AppLocalizations l10n, {
   required int cyclesTotal,
   required String caption,
-}) =>
-    _StatCard(
-      key: const ValueKey('statisticsCard-cyclesCount'),
-      title: l10n.statisticsObservedCyclesTitle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$cyclesTotal',
-              style: Theme.of(context).textTheme.headlineSmall),
-          Text(caption),
-        ],
-      ),
-    );
+}) => _StatCard(
+  key: const ValueKey('statisticsCard-cyclesCount'),
+  title: l10n.statisticsObservedCyclesTitle,
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('$cyclesTotal', style: Theme.of(context).textTheme.headlineSmall),
+      Text(caption),
+    ],
+  ),
+);
 
 Widget _lengthsListCard(
   BuildContext context,
   AppLocalizations l10n,
   List<int> lengths,
-) =>
-    _StatCard(
-      key: const ValueKey('statisticsCard-lengthsList'),
-      title: l10n.statisticsCycles,
-      child: Column(
-        children: [
-          for (final length in lengths)
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.loop_outlined),
-              title: Text(l10n.termCycleDays(length)),
-            ),
-        ],
-      ),
-    );
+) => _StatCard(
+  key: const ValueKey('statisticsCard-lengthsList'),
+  title: l10n.statisticsCycles,
+  child: Column(
+    children: [
+      for (final length in lengths)
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.loop_outlined),
+          title: Text(l10n.termCycleDays(length)),
+        ),
+    ],
+  ),
+);
 
 Widget _averageShortestLongestRow(
   BuildContext context,
@@ -239,34 +242,35 @@ Widget _averageShortestLongestRow(
 }
 
 Widget _headlineText(BuildContext context, int? value) => Text(
-      value == null ? _missing : '$value',
-      style: Theme.of(context).textTheme.headlineSmall,
-    );
+  value == null ? _missing : '$value',
+  style: Theme.of(context).textTheme.headlineSmall,
+);
 
 Widget _onsetsCard(
   BuildContext context,
   List<DateTime> onsets,
   String Function(DateTime) day,
-) =>
-    _StatCard(
-      key: const ValueKey('statisticsCard-onsets'),
-      title: AppLocalizations.of(context).statisticsOnsets,
-      child: Column(
-        children: [
-          for (final onset in onsets)
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.border_color_outlined),
-              title: Text(day(onset)),
-            ),
-        ],
-      ),
-    );
+) => _StatCard(
+  key: const ValueKey('statisticsCard-onsets'),
+  title: AppLocalizations.of(context).statisticsOnsets,
+  child: Column(
+    children: [
+      for (final onset in onsets)
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.border_color_outlined),
+          title: Text(day(onset)),
+        ),
+    ],
+  ),
+);
 
 // The histogram over the cycle lengths — the same fixed buckets the
 // domain derives (bucket edges are a domain question, see there).
 Widget _distributionCard(
-    BuildContext context, List<CycleLengthBucket> buckets) {
+  BuildContext context,
+  List<CycleLengthBucket> buckets,
+) {
   final l10n = AppLocalizations.of(context);
   return _StatCard(
     key: const ValueKey('statisticsCard-distribution'),
@@ -280,8 +284,10 @@ Widget _distributionCard(
               children: [
                 SizedBox(
                   width: 64,
-                  child: Text(bucket.label,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  child: Text(
+                    bucket.label,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -289,17 +295,19 @@ Widget _distributionCard(
                     value: bucket.count == 0
                         ? 0
                         : bucket.count /
-                            buckets
-                                .map((b) => b.count)
-                                .fold<int>(0, (a, b) => a > b ? a : b),
+                              buckets
+                                  .map((b) => b.count)
+                                  .fold<int>(0, (a, b) => a > b ? a : b),
                     minHeight: 8,
                   ),
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 24,
-                  child: Text('${bucket.count}',
-                      style: Theme.of(context).textTheme.bodySmall),
+                  child: Text(
+                    '${bucket.count}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
               ],
             ),

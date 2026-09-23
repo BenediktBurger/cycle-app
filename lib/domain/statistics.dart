@@ -38,10 +38,7 @@ import 'models.dart';
 /// start, taken straight from the grouping — suitable for the statistics
 /// screen's "N cycles" line (add the observed-cycles-outside-app setting
 /// value on top of it there, never here).
-int markDrivenCycleCount(
-  List<DailyEntry> entries,
-  List<CycleMark> marks,
-) =>
+int markDrivenCycleCount(List<DailyEntry> entries, List<CycleMark> marks) =>
     groupIntoCycles(entries, marks).where((c) => c.startsAtMenstruation).length;
 
 /// Descriptive scalars (min, max, mean, standard deviation) over a list
@@ -92,7 +89,8 @@ DescriptiveSummary summarizeInts(List<int> values) {
   // Population variance: every squared deviation divided by N (see the
   // field's doc comment for why the population variant is the definition
   // of record).
-  final variance = values.fold<double>(0, (sum, v) {
+  final variance =
+      values.fold<double>(0, (sum, v) {
         final deviation = v - mean;
         return sum + deviation * deviation;
       }) /
@@ -140,14 +138,11 @@ int? bleedingSpanInDays(List<DailyEntry> cycleDays) {
 /// page's evaluation table applies to it), null for a cycle without any
 /// bleeding day. Pure arithmetic over [evaluateCycles] output (ADR-0001:
 /// render-time computation, nothing persisted).
-List<int?> cycleBleedingDurationsInDays(
-  List<CycleEvaluation> evaluations,
-) =>
-    [
-      for (final evaluation in evaluations)
-        if (evaluation.cycle.startsAtMenstruation)
-          bleedingSpanInDays(evaluation.cycle.days),
-    ];
+List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
+  for (final evaluation in evaluations)
+    if (evaluation.cycle.startsAtMenstruation)
+      bleedingSpanInDays(evaluation.cycle.days),
+];
 
 /// The per-cycle spans from the cycle's marked first higher measurement
 /// to the cycle's end, in INCLUSIVE calendar days, for the MARK-driven
@@ -170,8 +165,9 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
     // The next group of a mark-driven cycle is always mark-driven itself
     // (the leading group can only be the first group) — its start is the
     // end-of-window anchor here. Absent for the last cycle.
-    final nextStart =
-        i + 1 < evaluations.length ? evaluations[i + 1].cycle.startDate : null;
+    final nextStart = i + 1 < evaluations.length
+        ? evaluations[i + 1].cycle.startDate
+        : null;
     if (rise == null || nextStart == null) {
       spans.add(null);
       continue;
@@ -210,14 +206,18 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
     if (!evaluation.cycle.startsAtMenstruation) continue;
     final rise = evaluation.firstHigherDay;
     if (rise == null) continue;
-    final cycleDayNumber = DateOnly.daysBetween(
-            rise, DateOnly.normalize(evaluation.cycle.startDate)) +
+    final cycleDayNumber =
+        DateOnly.daysBetween(
+          rise,
+          DateOnly.normalize(evaluation.cycle.startDate),
+        ) +
         1;
     if (earliestAny == null || cycleDayNumber < earliestAny) {
       earliestAny = cycleDayNumber;
     }
     final peak = evaluation.mucusPeakDay;
-    final riseIsStrictlyAfterPeak = peak != null &&
+    final riseIsStrictlyAfterPeak =
+        peak != null &&
         DateOnly.daysBetween(rise, DateOnly.normalize(peak)) > 0;
     if (riseIsStrictlyAfterPeak &&
         (earliestAfterPeak == null || cycleDayNumber < earliestAfterPeak)) {

@@ -368,6 +368,54 @@
   "@deleteDataFailed": {
     "description": "Fehlermeldung für den gesamten Lösch-Ablauf: erscheint, wenn das Öffnen der Datenbank, die Vorab-Zählung für den Bestätigungsdialog oder das eigentliche Löschen fehlschlägt. Das Löschen ist eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu importFailed)."
   },
+  "settingsPdfExport": "PDF-Export",
+  "@settingsPdfExport": {
+    "description": "Settings card + export flow title: the PDF export feature. Mirrors the paper form the NFR teacher knows."
+  },
+  "settingsPdfExportName": "Name (Papierformular)",
+  "@settingsPdfExportName": {
+    "description": "Free-text field label for the export name: printed in the PDF header, hideable per export via anonymize."
+  },
+  "settingsPdfExportBirthDate": "Geburtsdatum",
+  "@settingsPdfExportBirthDate": {
+    "description": "Date field label for the export birth date: printed in the PDF header, hideable per export via anonymize."
+  },
+  "settingsPdfExportBirthDateFormat": "JJJJ-MM-TT",
+  "@settingsPdfExportBirthDateFormat": {
+    "description": "Hint under/in the birth-date field: the strict ISO date shape this field exchanges."
+  },
+  "settingsPdfExportBirthDateError": "Bitte ein echtes Kalenderdatum der Form JJJJ-MM-TT eintragen.",
+  "@settingsPdfExportBirthDateError": {
+    "description": "Validation error of the birth-date field (also for impossible days like 1990-02-30)."
+  },
+  "settingsPdfExportNote": "Name und Geburtsdatum erscheinen im Kopfbereich jedes PDF-Exports; der Anonymisieren-Schalter im Export blendet beide für den jeweiligen Export aus, ohne die Speicherung zu ändern. Die Zahl der beobachteten Zyklen im PDF schließt den Wert der Karte \u201eZyklen außerhalb dieser App\u201c ein.",
+  "@settingsPdfExportNote": {
+    "description": "Helper note of the PDF-export card: names where the values land, points to the per-export anonymize toggle and cross-references the outside-app cycle count that feeds the PDF's observed-cycle header fact."
+  },
+  "pdfExportCycleUpTo": "Export bis Zyklus",
+  "@pdfExportCycleUpTo": {
+    "description": "Dropdown label of the cycle selector: the export runs from the first cycle UP TO the chosen one (inclusive)."
+  },
+  "pdfExportCycleOption": "Zyklus {n}, ab {day}",
+  "@pdfExportCycleOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "day": {
+        "type": "String"
+      }
+    },
+    "description": "One dropdown row of the cycle selector: the shared cycle ordinal plus the cycle's start date (ISO)."
+  },
+  "pdfExportAnonymize": "Anonymisieren",
+  "@pdfExportAnonymize": {
+    "description": "Per-export switch: hides the stored name and birth date in THIS generated document (not persisted)."
+  },
+  "pdfExportExportButton": "Exportieren",
+  "@pdfExportExportButton": {
+    "description": "Button of the PDF-export card: generates the document and saves it via the file-transfer seam."
+  },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",

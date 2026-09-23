@@ -336,4 +336,127 @@ void main() {
       }, reason: 'the range choice must persist as its JSON map');
     });
   });
+
+  group('PDF export identifying values (name & birth date)', () {
+    // The settings pane is one scroll list; the PDF-export card sits low
+    // (below the outside-app cycle-count card), so both tests render the
+    // full pane height in one viewport instead of scrolling into position.
+    Future<void> enlargeViewport(WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(900, 2200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
+
+    testWidgets('a persisted name and birth date hydrate into the '
+        'PDF-export card on start', (WidgetTester tester) async {
+      await enlargeViewport(tester);
+      useDeviceLocales(tester, const [Locale('de')]);
+
+      Future<void> seed(CycleDatabase db) async {
+        final store = SettingsStore(db.settingsDao);
+        await store.persistPdfExportName('Ada Lovelace');
+        await store.persistPdfExportBirthDate(DateTime(1990, 1, 2));
+      }
+
+      await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.byKey(const ValueKey('pdfExportNameField'));
+      expect(
+        nameField,
+        findsOneWidget,
+        reason: 'the PDF-export card renders the name field',
+      );
+      expect(
+        tester.widget<TextField>(nameField).controller!.text,
+        'Ada Lovelace',
+        reason:
+            'the stored name must appear in the field after the '
+            'database opens',
+      );
+
+      final dateField = find.byKey(const ValueKey('pdfExportBirthDateField'));
+      expect(
+        tester.widget<TextField>(dateField).controller!.text,
+        '1990-01-02',
+        reason:
+            'the stored birth date appears as the ISO date string the '
+            'field exchanges',
+      );
+    });
+
+    testWidgets('name and birth date write through; an invalid date stays '
+        'local (error line, no row write)', (WidgetTester tester) async {
+      await enlargeViewport(tester);
+      useDeviceLocales(tester, const [Locale('de')]);
+
+      CycleDatabase? db;
+      await tester.pumpWidget(appScope(onCreated: (created) => db = created));
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('pdfExportNameField')),
+        'Ada',
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('pdfExportBirthDateField')),
+        '1990-01-02',
+      );
+      await tester.pumpAndSettle();
+
+      final store = SettingsStore(db!.settingsDao);
+      expect(
+        await store.readSetting(SettingKeys.pdfExportName),
+        'Ada',
+        reason:
+            'a valid name writes through to app_settings as a JSON '
+            'string',
+      );
+      expect(
+        await store.readSetting(SettingKeys.pdfExportBirthDate),
+        '1990-01-02',
+        reason: 'a valid birth date writes through as the ISO date string',
+      );
+
+      // Invalid: not a real day. The error line shows, the stored value
+      // keeps standing.
+      await tester.enterText(
+        find.byKey(const ValueKey('pdfExportBirthDateField')),
+        '1990-02-30',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        await store.readSetting(SettingKeys.pdfExportBirthDate),
+        '1990-01-02',
+        reason: 'an invalid date entry is rejected and never written',
+      );
+      expect(
+        find.byKey(const ValueKey('pdfExportBirthDateFieldError')),
+        findsOneWidget,
+        reason: 'the validation error is visible for the rejected entry',
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('pdfExportBirthDateField')),
+        '2001-03-15',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        await store.readSetting(SettingKeys.pdfExportBirthDate),
+        '2001-03-15',
+        reason: 'a corrected entry writes through again',
+      );
+      expect(
+        find.byKey(const ValueKey('pdfExportBirthDateFieldError')),
+        findsNothing,
+        reason: 'the error clears once the entry is valid again',
+      );
+    });
+  });
 }

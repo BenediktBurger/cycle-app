@@ -10,15 +10,16 @@
 // targets with neither dart:html nor dart:io.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 import 'package:share_plus/share_plus.dart';
 
 // The save-as dialog is a cross-platform affordance via file_picker
-// (Desktop file choosers and Android SAF alike), so every native target
-// the io file compiles for can offer it — no per-Platform switch and no
-// environment probe left (the old $HOME-writes branch is gone).
+// (desktop file choosers and Android SAF alike), so every native target
+// this file compiles for can offer it — a single call, no per-Platform
+// switch and no extra probing.
 const bool canSaveFile = true;
 
 // The share sheet is cross-platform via share_plus (Android/iOS and the
@@ -44,6 +45,11 @@ Future<bool> Function(String filename, String content)? shareFileOverride;
 /// channels: when set, the save action delegates here instead of opening
 /// the real save-as dialog. Always null in production code.
 Future<bool> Function(String filename, String content)? saveFileOverride;
+
+/// Test-only seam mirroring [saveFileOverride] for the byte exports (the
+/// PDF document): when set, `saveFileBytes` delegates here instead of
+/// opening the real save-as dialog. Always null in production code.
+Future<bool> Function(String filename, List<int> bytes)? saveFileBytesOverride;
 
 /// Opens the save-as dialog, pre-filled with [filename], and lets
 /// `file_picker` write [content] as application/json to the chosen
@@ -98,6 +104,30 @@ Future<bool> shareFile(String filename, String content) async {
   }
 }
 
+/// Opens the save-as dialog, pre-filled with [filename], and lets
+/// `file_picker` write [bytes] as application/pdf to the chosen
+/// destination (the PDF export route); true when the save destination was
+/// chosen and written, false on cancel or failure. The bytes variant of
+/// [saveFile] exists because the PDF is a binary document. The caller's
+/// bool contract matches [saveFile]'s — see the note there.
+Future<bool> saveFileBytes(String filename, List<int> bytes) async {
+  final save = saveFileBytesOverride;
+  if (save != null) return save(filename, bytes);
+
+  try {
+    final destination = await FilePicker.saveFile(
+      fileName: filename,
+      bytes: Uint8List.fromList(bytes),
+      mimeType: 'application/pdf',
+    );
+    return destination != null;
+  } catch (_) {
+    // The plugin's channel can fail per platform; the snackbar contract
+    // means the error lands in the UI, not in the crash log.
+    return false;
+  }
+}
+
 /// Opens the native file picker filtered by [accept] (the same HTML accept
 /// list as the web implementation, e.g. `application/json,.json` or
 /// `.csv,text/csv`) and reads the chosen file's text; null when the user
@@ -129,15 +159,13 @@ Future<String?> pickFileText({String accept = 'application/json,.json'}) async {
 /// `['csv']`); null when there is no extension to filter by, meaning "any
 /// file".
 ///
-/// What is lost compared to the file_selector days: MIME-only accept
-/// strings like `text/csv` or `application/json` used to filter the dialog
-/// via [XTypeGroup.mimeTypes]; file_picker's open dialog cannot filter by
-/// MIME at all ([FileType.custom] only takes extensions, and there is no
-/// mimeType parameter), so those accept strings degrade to an unfiltered
-/// dialog. Real callers always pair their MIME types with a dot-extension
-/// (`.json`, `.csv`), so the JSON/CSV pick dialogs stay filtered in
-/// practice; a picked file with the wrong content is caught by the
-/// import dialog's validation.
+/// Limitation (accepted): file_picker's custom open dialog filters by
+/// EXTENSION only — a MIME-only accept string like `text/csv` or
+/// `application/json` degrades to an unfiltered dialog (extension-only
+/// filtering is coarser than a MIME-aware one). Real callers
+/// always pair their MIME types with a dot-extension (`.json`, `.csv`),
+/// so the JSON/CSV pick dialogs stay filtered in practice; a picked file
+/// with the wrong content is caught by the import dialog's validation.
 List<String>? acceptExtensions(String accept) {
   final extensions = [
     for (final token in accept.split(',').map((token) => token.trim()))

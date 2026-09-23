@@ -25,6 +25,15 @@ const bool canPickFile = true;
 /// where to save / block the download, but that is beyond our control.
 Future<bool> saveFile(String filename, String content) async {
   final blob = html.Blob([utf8.encode(content)], 'application/json');
+  return _triggerDownload(filename, blob);
+}
+
+/// Binary variant of [saveFile] for the PDF export document: same download
+/// anchoring, PDF MIME type.
+Future<bool> saveFileBytes(String filename, List<int> bytes) =>
+    _triggerDownload(filename, html.Blob([bytes], 'application/pdf'));
+
+Future<bool> _triggerDownload(String filename, html.Blob blob) async {
   final url = html.Url.createObjectUrlFromBlob(blob);
   final anchor = html.AnchorElement(href: url)
     ..download = filename

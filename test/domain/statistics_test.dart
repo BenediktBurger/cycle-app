@@ -20,22 +20,25 @@ DailyEntry d(
   double? bbtC,
 }) {
   return DailyEntry(
-      date: DateTime(year, month, day), bleeding: bleeding, bbtC: bbtC);
+    date: DateTime(year, month, day),
+    bleeding: bleeding,
+    bbtC: bbtC,
+  );
 }
 
 // start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).
 
 /// A user-placed mucus-peak mark on (year, month, day).
 CycleMark mucusPeak(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.mucusPeakDay,
-    );
+  date: DateTime(year, month, day),
+  type: CycleMarkTypes.mucusPeakDay,
+);
 
 /// A user-placed first-higher-measurement mark on (year, month, day).
 CycleMark firstHigher(int year, int month, int day) => CycleMark(
-      date: DateTime(year, month, day),
-      type: CycleMarkTypes.firstHigherMeasurement,
-    );
+  date: DateTime(year, month, day),
+  type: CycleMarkTypes.firstHigherMeasurement,
+);
 
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
 /// Consecutive lengths: 28, 28, 28.
@@ -383,24 +386,24 @@ void main() {
   //   cycle 3: start Apr 27 — bleeding Apr 27-28, no first-higher mark
   // (Mar 3 clear: shows the interruption counting through the span.)
   List<DailyEntry> perCycleEntries() => [
-        d(2026, 3, 1, bleeding: Bleeding.heavy),
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 3),
-        d(2026, 3, 4, bleeding: Bleeding.light),
-        d(2026, 3, 29, bleeding: Bleeding.none),
-        d(2026, 4, 27, bleeding: Bleeding.medium),
-        d(2026, 4, 28, bleeding: Bleeding.medium),
-      ];
+    d(2026, 3, 1, bleeding: Bleeding.heavy),
+    d(2026, 3, 2, bleeding: Bleeding.medium),
+    d(2026, 3, 3),
+    d(2026, 3, 4, bleeding: Bleeding.light),
+    d(2026, 3, 29, bleeding: Bleeding.none),
+    d(2026, 4, 27, bleeding: Bleeding.medium),
+    d(2026, 4, 28, bleeding: Bleeding.medium),
+  ];
 
   List<CycleMark> perCycleMarks() => [
-        start(2026, 3, 1),
-        start(2026, 3, 29),
-        start(2026, 4, 27),
-        mucusPeak(2026, 3, 12),
-        firstHigher(2026, 3, 14),
-        mucusPeak(2026, 3, 30),
-        firstHigher(2026, 3, 31),
-      ];
+    start(2026, 3, 1),
+    start(2026, 3, 29),
+    start(2026, 4, 27),
+    mucusPeak(2026, 3, 12),
+    firstHigher(2026, 3, 14),
+    mucusPeak(2026, 3, 30),
+    firstHigher(2026, 3, 31),
+  ];
 
   List<CycleEvaluation> perCycleEvaluations() =>
       evaluateCycles(perCycleEntries(), perCycleMarks());
@@ -472,16 +475,19 @@ void main() {
       // 4 (interruption counts through, "Mensbeginn -> Mensende"); the
       // interruption-free single-day case stays 1.
       expect(
-          bleedingSpanInDays([
-            d(2026, 3, 1, bleeding: Bleeding.medium),
-            d(2026, 3, 2, bleeding: Bleeding.light),
-            d(2026, 3, 3, bleeding: Bleeding.none),
-            d(2026, 3, 4, bleeding: Bleeding.heavy),
-          ]),
-          4);
+        bleedingSpanInDays([
+          d(2026, 3, 1, bleeding: Bleeding.medium),
+          d(2026, 3, 2, bleeding: Bleeding.light),
+          d(2026, 3, 3, bleeding: Bleeding.none),
+          d(2026, 3, 4, bleeding: Bleeding.heavy),
+        ]),
+        4,
+      );
       expect(bleedingSpanInDays([d(2026, 3, 2, bleeding: Bleeding.medium)]), 1);
       expect(
-          bleedingSpanInDays([d(2026, 3, 2, bleeding: Bleeding.none)]), isNull);
+        bleedingSpanInDays([d(2026, 3, 2, bleeding: Bleeding.none)]),
+        isNull,
+      );
     });
   });
 
@@ -490,10 +496,11 @@ void main() {
       // Mar 1, 2, 4 bleed; Mar 3 does not — the span Mar 1..Mar 4 is an
       // INCLUSIVE calendar-day count of 4 (like "Mensbeginn -> Mensende",
       // first-to-last days, not the number of bleeding days itself).
-      final summary = summarizeInts(cycleBleedingDurationsInDays(
-              evaluateCycles(perCycleEntries(), perCycleMarks()))
-          .nonNulls
-          .toList());
+      final summary = summarizeInts(
+        cycleBleedingDurationsInDays(
+          evaluateCycles(perCycleEntries(), perCycleMarks()),
+        ).nonNulls.toList(),
+      );
       // Cycle 1: 4, cycle 2: no bleeding -> dropped from the aggregate.
       expect(summary.minimum, 2);
       expect(summary.maximum, 4);
@@ -548,8 +555,10 @@ void main() {
       // Two marked cycles; the second one is the last group (no follow-up
       // start), so its window has no cycle end. Cycle 1: rise Mar 5, next
       // start Mar 30 -> cycle end Mar 29, INCLUSIVE span = 25 days.
-      expect(
-          riseToEndDurationsInDays(evaluateCycles(entries, marks)), [25, null]);
+      expect(riseToEndDurationsInDays(evaluateCycles(entries, marks)), [
+        25,
+        null,
+      ]);
     });
   });
 
@@ -564,8 +573,7 @@ void main() {
       expect(earliest.afterMucusPeak, 3);
     });
 
-    test(
-        'both variants differ: a first higher BEFORE the mucus peak does '
+    test('both variants differ: a first higher BEFORE the mucus peak does '
         'not qualify for the real variant', () {
       // Cycle 1: rise Mar 4 (cycle day 4), peak Mar 6 — the rise is NOT
       // strictly after the peak, so the real variant ignores it.
@@ -584,37 +592,38 @@ void main() {
         mucusPeak(2026, 4, 2),
         firstHigher(2026, 4, 6),
       ];
-      final earliest =
-          earliestFirstHigherCycleDay(evaluateCycles(entries, marks));
+      final earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(entries, marks),
+      );
       expect(earliest.any, 4, reason: 'the minimum over all cycles');
-      expect(earliest.afterMucusPeak, 9,
-          reason: 'only the strictly-after-peak rise qualifies');
+      expect(
+        earliest.afterMucusPeak,
+        9,
+        reason: 'only the strictly-after-peak rise qualifies',
+      );
     });
 
     test('null variants when nothing qualifies', () {
       // No first-higher marks at all: both variants null.
       var earliest = earliestFirstHigherCycleDay(
-          evaluateCycles(threeCycleData(), threeCycleStarts()));
+        evaluateCycles(threeCycleData(), threeCycleStarts()),
+      );
       expect(earliest.any, isNull);
       expect(earliest.afterMucusPeak, isNull);
 
       // A rise before the peak in every marked cycle: any stays, real null.
-      earliest = earliestFirstHigherCycleDay(evaluateCycles([
-        DailyEntry(date: DateTime(2026, 3, 1))
-      ], [
-        start(2026, 3, 1),
-        firstHigher(2026, 3, 3),
-        mucusPeak(2026, 3, 5),
-      ]));
+      earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(
+          [DailyEntry(date: DateTime(2026, 3, 1))],
+          [start(2026, 3, 1), firstHigher(2026, 3, 3), mucusPeak(2026, 3, 5)],
+        ),
+      );
       expect(earliest.any, 3);
       expect(earliest.afterMucusPeak, isNull);
     });
 
     test('the leading pre-mark group is ignored', () {
-      final entries = [
-        d(2026, 2, 20),
-        d(2026, 3, 1),
-      ];
+      final entries = [d(2026, 2, 20), d(2026, 3, 1)];
       final marks = [
         // A first-higher mark BEFORE the first cycleStart mark belongs to
         // the leading group (startsAtMenstruation == false): no cycle day,
@@ -622,8 +631,9 @@ void main() {
         firstHigher(2026, 2, 25),
         start(2026, 3, 1),
       ];
-      final earliest =
-          earliestFirstHigherCycleDay(evaluateCycles(entries, marks));
+      final earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(entries, marks),
+      );
       expect(earliest.any, isNull);
       expect(earliest.afterMucusPeak, isNull);
     });

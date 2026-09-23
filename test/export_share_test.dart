@@ -174,9 +174,9 @@ void main() {
     testWidgets('the preview page offers the save button', (
       WidgetTester tester,
     ) async {
-      // Platform-independent since the save-as dialog replaced the old
-      // $HOME write: every native io target (including Android SAF) can
-      // offer the dialog, so `canSaveFile` is just `true` now.
+      // Platform-independent: every native io target (desktop and
+      // Android SAF alike) offers the save-as dialog, so `canSaveFile`
+      // is just `true`.
       expect(canSaveFile, isTrue);
 
       await pumpToExportPreview(tester);

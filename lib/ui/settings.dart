@@ -14,14 +14,21 @@
 // into an export document that goes through the existing
 // importJsonToDatabase (merge policy for free).
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/export_adapter.dart';
+import '../db/settings_store.dart';
 import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
+import '../domain/marks.dart';
+import '../domain/models.dart';
+import '../domain/pdf_export_model.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
+import '../pdf/cycle_pdf.dart'
+    show pdfExportFileName, pdfFontAsset, PdfExportOptions;
 import '../providers.dart';
 import 'about.dart';
 import 'file_transfer.dart';
@@ -119,6 +126,103 @@ final class _NonNegativeIntegerFieldState
             // state (empty text included): the validation, not a formatter.
             l10n.settingsObservedCyclesOutsideAppError,
             key: const ValueKey('observedCyclesOutsideAppFieldError'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The settings pane's plain text/date fields, same wiring shape as the
+/// outside-app integer field below: an UNCONTROLLED text field (controller
+/// initialized once, never re-synced from the provider on rebuilds —
+/// hydration lands before any screen is reachable behind the database
+/// gate), free-text entry validated per keystroke — a VALID entry writes
+/// through immediately via [onChanged], an invalid one only shows the
+/// keyed error line and leaves the stored value untouched. The PDF-export
+/// name and birth-date fields share this shape.
+final class _ValidatedSettingsField extends StatefulWidget {
+  const _ValidatedSettingsField({
+    required this.fieldKey,
+    required this.initialValue,
+    required this.labelText,
+    this.errorText,
+    this.errorKey,
+    this.hintText,
+    this.validator,
+    this.onChanged,
+  });
+
+  final Key fieldKey;
+  final String initialValue;
+  final String labelText;
+
+  /// The validation rejection line, shown while [validator] rejects the
+  /// current text (the text stays local; nothing writes).
+  final String? errorText;
+  final Key? errorKey;
+
+  /// The empty-content hint (e.g. the ISO date shape).
+  final String? hintText;
+
+  /// Returns true when the entry is acceptable; null = everything is.
+  final bool Function(String raw)? validator;
+
+  /// Fires for a VALID entry per keystroke (same write-through cadence as
+  /// the outside-app integer field); rejected entries fire nothing.
+  final ValueChanged<String>? onChanged;
+
+  @override
+  State<_ValidatedSettingsField> createState() =>
+      _ValidatedSettingsFieldState();
+}
+
+final class _ValidatedSettingsFieldState
+    extends State<_ValidatedSettingsField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool _valid(String raw) => widget.validator == null || widget.validator!(raw);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          key: widget.fieldKey,
+          controller: _controller,
+          keyboardType: TextInputType.text,
+          decoration: InputDecoration(
+            labelText: widget.labelText,
+            hintText: widget.hintText,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (raw) {
+            // The rejection line, visible for every invalid intermediate
+            // state — the validation, not a formatter.
+            setState(() {});
+            if (_valid(raw)) widget.onChanged?.call(raw);
+          },
+        ),
+        if (widget.validator != null && !_valid(_controller.text))
+          Text(
+            widget.errorText ?? '',
+            key: widget.errorKey,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.error,
             ),
@@ -421,6 +525,73 @@ class EinstellungenScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // --- PDF export: identifying values --------------------------
+          // The "identifying source" values the generated PDF's paper-form
+          // header carries: name and birth date (the birth date field is a
+          // strict ISO date with validation — impossible days never
+          // pass). Each export's "Anonymisieren" toggle decides PER EXPORT
+          // whether the document shows these values or hides them (the
+          // per-export toggle is intentionally NOT persisted — see the
+          // export card below). The helper cross-references the
+          // outside-app cycle count, which feeds the PDF's observed-cycle
+          // header fact.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsPdfExport,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportNameField'),
+                    initialValue: ref.watch(pdfExportNameProvider) ?? '',
+                    labelText: l10n.settingsPdfExportName,
+                    onChanged: (raw) {
+                      final trimmed = raw.trim();
+                      ref.read(pdfExportNameProvider.notifier).state =
+                          trimmed.isEmpty ? null : trimmed;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportBirthDateField'),
+                    initialValue: ref.watch(pdfExportBirthDateProvider) == null
+                        ? ''
+                        : formatIsoDate(ref.watch(pdfExportBirthDateProvider)!),
+                    labelText: l10n.settingsPdfExportBirthDate,
+                    hintText: l10n.settingsPdfExportBirthDateFormat,
+                    errorText: l10n.settingsPdfExportBirthDateError,
+                    errorKey: const ValueKey('pdfExportBirthDateFieldError'),
+                    // One strict parse shared with the settings store's
+                    // decode (tryParseIsoDate): correct shape AND a real
+                    // calendar day.
+                    validator: (raw) => raw.isEmpty
+                        ? true
+                        : tryParseIsoDate(raw.trim()) != null,
+                    onChanged: (raw) {
+                      final parsed = raw.trim().isEmpty
+                          ? null
+                          : tryParseIsoDate(raw.trim());
+                      if (parsed != null || raw.trim().isEmpty) {
+                        ref.read(pdfExportBirthDateProvider.notifier).state =
+                            parsed;
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsPdfExportNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // --- PIN lock stub -------------------------------------------
           // Disabled ON PURPOSE: flipping it on would falsely signal that a
           // lock exists. At-rest encryption of the database is already
@@ -489,6 +660,16 @@ class EinstellungenScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // --- PDF export action card ----------------------------------
+          // Generates the paper-form PDF from the tracked data "up to the
+          // exported one": a cycle selector (defaults to the LATEST
+          // mark-opened cycle), the per-export anonymize toggle (card-local
+          // state, never persisted) and the Export action. The pipeline:
+          // export model -> document builder provider (stubbed in tests)
+          // -> saveFileBytes seam, reported through the same SnackBar
+          // pattern as the JSON export card above.
+          const PdfExportCard(),
           const SizedBox(height: 8),
           // --- privacy / GDPR notice -----------------------------------
           // The same string the about/onboarding page shows (one source,
@@ -844,6 +1025,190 @@ class EinstellungenScreen extends ConsumerWidget {
       ScaffoldMessenger.of(
         dialogContext,
       ).showSnackBar(SnackBar(content: Text(l10n.importFailed)));
+    }
+  }
+}
+
+/// The PDF-export action card: cycle selector, anonymize toggle, Export
+/// button — see the call-site comment in the pane for the pipeline.
+///
+/// Card-local state (the chosen cycle ordinal and the anonymize flag) is a
+/// deliberate choice OVER persisted settings: the selection is a per-run
+/// view choice, and the anonymize toggle is per-export by definition
+/// (flipping it must never rewrite the stored identifying values — the
+/// tests pin that).
+final class PdfExportCard extends ConsumerStatefulWidget {
+  const PdfExportCard({super.key});
+
+  @override
+  ConsumerState<PdfExportCard> createState() => _PdfExportCardState();
+}
+
+final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
+  int? _selectedOrdinal;
+  var _anonymized = false;
+  var _running = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // The selector rows come from the live tracked data; a still-loading
+    // stream reads as "no data" (the card then only explains why there
+    // would be nothing to export).
+    final entries =
+        ref.watch(dailyEntriesProvider).value ?? const <DailyEntry>[];
+    final marks = ref.watch(marksProvider).value ?? const <CycleMark>[];
+    final outside = ref.watch(observedCyclesOutsideAppProvider);
+    final choices = exportableCycles(
+      entries,
+      marks,
+      observedCyclesOutsideApp: outside,
+    );
+    // The DEFAULT selection: the latest observed cycle ("up to the
+    // exported one"), i.e. the last row — unless the user hand-picked one
+    // that still exists.
+    final effectiveOrdinal =
+        _selectedOrdinal == null ||
+            choices.every((c) => c.ordinal != _selectedOrdinal)
+        ? (choices.isEmpty ? null : choices.last.ordinal)
+        : _selectedOrdinal;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.settingsPdfExport,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            if (choices.isEmpty)
+              Text(
+                l10n.exportNothing,
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              DropdownButtonFormField<int>(
+                key: const ValueKey('pdfExportCycleSelect'),
+                initialValue: effectiveOrdinal,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: l10n.pdfExportCycleUpTo,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  for (final choice in choices)
+                    DropdownMenuItem(
+                      value: choice.ordinal,
+                      child: Text(
+                        l10n.pdfExportCycleOption(
+                          choice.ordinal,
+                          formatIsoDate(choice.startDate),
+                        ),
+                      ),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _selectedOrdinal = value),
+              ),
+            SwitchListTile.adaptive(
+              key: const ValueKey('pdfExportAnonymizeSwitch'),
+              value: _anonymized,
+              onChanged: (value) => setState(() => _anonymized = value),
+              title: Text(l10n.pdfExportAnonymize),
+            ),
+            FilledButton.icon(
+              key: const ValueKey('pdfExportButton'),
+              onPressed: _running ? null : () => _runExport(context),
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(l10n.pdfExportExportButton),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The export pipeline for one run: build the model from the LIVE data
+  /// (read fresh — watching streams made the card rebuild mid-run is not a
+  /// concern here), generate via the builder provider, then save through
+  /// the bytes seam. The empty-data guard mirrors the JSON export's: an
+  /// empty document is never generated, the message explains instead.
+  Future<void> _runExport(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final entries =
+        ref.read(dailyEntriesProvider).value ?? const <DailyEntry>[];
+    final marks = ref.read(marksProvider).value ?? const <CycleMark>[];
+    final outside = ref.read(observedCyclesOutsideAppProvider);
+    final choices = exportableCycles(
+      entries,
+      marks,
+      observedCyclesOutsideApp: outside,
+    );
+    if (choices.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      return;
+    }
+    // The just-chosen selection (the dropdown default when untouched):
+    final ordinal =
+        _selectedOrdinal == null ||
+            choices.every((c) => c.ordinal != _selectedOrdinal)
+        ? choices.last.ordinal
+        : _selectedOrdinal!;
+    final chosenStart = choices
+        .firstWhere((c) => c.ordinal == ordinal)
+        .startDate;
+
+    final model = buildPdfExportModel(
+      entries: entries,
+      marks: marks,
+      observedCyclesOutsideApp: outside,
+      name: ref.read(pdfExportNameProvider),
+      birthDate: ref.read(pdfExportBirthDateProvider),
+      exportStartsUpTo: chosenStart,
+      // The settings card's display range is the PDF curve block's fixed
+      // y scale — the same echo the chart reads (never rescaled for data).
+      temperatureRange: ref.read(temperatureRangeProvider),
+    );
+    if (model.cycles.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      return;
+    }
+
+    setState(() => _running = true);
+    try {
+      final now = DateTime.now();
+      final fontData = await rootBundle.load(pdfFontAsset);
+      final builder = ref.read(pdfDocumentBuilderProvider);
+      final bytes = await builder(
+        model,
+        PdfExportOptions(anonymized: _anonymized, exportDate: now),
+        fontData.buffer.asUint8List(
+          fontData.offsetInBytes,
+          fontData.lengthInBytes,
+        ),
+      );
+      final ok = await saveFileBytes(pdfExportFileName(now), bytes);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? l10n.exportSaved : l10n.exportSaveFailed)),
+      );
+    } catch (_) {
+      // Generation problems (e.g. a broken font asset) land on the same
+      // failure surface as a failed save — nothing was written either way.
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSaveFailed)));
+    } finally {
+      if (mounted) setState(() => _running = false);
     }
   }
 }

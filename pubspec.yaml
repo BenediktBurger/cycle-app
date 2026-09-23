@@ -72,6 +72,11 @@ hooks:
 #   web target keeps its own file input and browser download, exotic
 #   targets fall back to the paste-only stub (see lib/ui/file_transfer.dart).
 #
+# pdf: the pure-Dart PDF writer for the PDF export feature — generates an
+#   ISO-32000 document in-process, fully offline, no platform channels. The
+#   `printing` plugin (share/print, platform channels) stays deliberately
+#   absent for now; the PDF is only saved to a file via the file_transfer
+#   seam.
 # share_plus: ^13.3.0. The system share sheet for the JSON export — an
 #   alternative hand-off (mail app, cloud drive, …) alongside the
 #   save-as dialog from file_picker, kept because not every target app
@@ -81,7 +86,7 @@ hooks:
 # Native at-rest encryption is always-on: SQLite3MultipleCiphers is supplied
 # as the sqlite3 engine via the build-hook user-define above and keyed in
 # lib/db/db_key.dart (ADR-005) — no sqlcipher_flutter_libs involved.
-# Deliberately NOT here: pdf/printing (deferred past M1), and no
+# Deliberately NOT here: the printing plugin, and no
 # Android-only plugins (ADR-003).
 # NOTE: if this file ever reverts to "A new Flutter project" defaults, a
 # `flutter create` run has clobbered it — restore from git history.
@@ -116,6 +121,11 @@ dependencies:
   file_picker: ^13.1.0
   flutter_secure_storage: ^11.2.0
   path_provider: ^2.1.6
+  # Pure-Dart PDF writer (no platform plugins): the PDF export generates its
+  # document in-process; version range floats within the 3.x line so pub
+  # picks a release compatible with the installed SDK (3.11+ requires recent
+  # Dart, resolved 3.13.x against Dart 3.13 — see lock).
+  pdf: ^3.11.0
   # Raw SQLite binding, needed at runtime for lib/db/cipher_setup.dart (the
   # `PRAGMA cipher`/`PRAGMA key` steps the native opener applies) and by the
   # migration tests (they bootstrap older-version database files via the raw
@@ -158,6 +168,12 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  # The bundled Noto Sans Regular TTF: the PDF export registers it in the
+  # generated document so free-form note text (symbols, arrows, non-Latin-1
+  # glyphs) renders beyond the CoreFonts' Latin-1 coverage. License of the
+  # font: SIL Open Font License 1.1 — assets/fonts/LICENSE-NotoSans.txt.
+  assets:
+    - assets/fonts/NotoSans-Regular.ttf
   # Required by Flutter 3.47: makes `flutter pub get`/`flutter test`/build run
   # `gen-l10n` automatically using l10n.yaml, so the real generated files under
   # lib/l10n (output configured in l10n.yaml) are produced before compile.

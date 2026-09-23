@@ -12,6 +12,9 @@ Future<bool> saveFile(String filename, String content) async => false;
 // conditional export compile with the same surface.
 Future<bool> shareFile(String filename, String content) async => false;
 
+/// Byte-export variant (the PDF document): the stub has no target either.
+Future<bool> saveFileBytes(String filename, List<int> bytes) async => false;
+
 Future<String?> pickFileText({
   String accept = 'application/json,.json',
 }) async => null;

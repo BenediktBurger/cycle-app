@@ -21,7 +21,9 @@ import 'db/settings_store.dart';
 import 'domain/date_only.dart';
 import 'domain/marks.dart';
 import 'domain/models.dart';
+import 'domain/pdf_export_model.dart';
 import 'domain/temperature_range.dart';
+import 'pdf/cycle_pdf.dart';
 
 /// The one open database for the app lifetime. `FutureProvider` (without
 /// autoDispose) keeps the instance cached; disposing the ProviderScope
@@ -136,10 +138,26 @@ final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 /// update) and written through on every change (main.CycleApp).
 final onboardingCompletedProvider = StateProvider<bool>((ref) => false);
 
+/// The user's NAME for the PDF export header (settings card "PDF-Export");
+/// null means "not given". The per-export "anonymize" toggle NEVER writes
+/// through this provider — it only changes what the generated document
+/// shows. Persisted, mirroring the other general settings: hydrated from
+/// the local app_settings table once the database opens and written
+/// through on every change (main.CycleApp).
+final pdfExportNameProvider = StateProvider<String?>((ref) => null);
+
+/// The user's BIRTH DATE for the PDF export header (date-only normalized);
+/// null means "not given". Hidden by the per-export anonymize toggle like
+/// [pdfExportNameProvider]. Persisted, mirroring the other general
+/// settings (hydration + write-through in main.CycleApp).
+final pdfExportBirthDateProvider = StateProvider<DateTime?>((ref) => null);
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// main.CycleApp's hydration listener applies each snapshot into
-/// [localeProvider], [themeModeProvider] and [temperatureRangeProvider].
+/// [localeProvider], [themeModeProvider], [temperatureRangeProvider],
+/// [observedCyclesOutsideAppProvider], [onboardingCompletedProvider],
+/// [pdfExportNameProvider] and [pdfExportBirthDateProvider].
 /// Non-autoDispose like [databaseProvider] — the load keeps the database
 /// open for the app lifetime.
 final persistedSettingsProvider = FutureProvider<PersistedSettings>((
@@ -176,3 +194,26 @@ final cycleChartJumpProvider =
 /// every writer is a chart day mapping). In-memory only: the panel is a
 /// view-mode, not data.
 final cycleDayPanelProvider = StateProvider<DateTime?>((ref) => null);
+
+/// The PDF export's document factory: turns model + per-export options
+/// (+ the bundled font's bytes) into the PDF byte stream. A Provider of a
+/// function keeps the export card pure UI — the widget tests override
+/// this to stub generation and capture the input (model / options),
+/// exactly like the file transfer's pick/save seams for the platform
+/// side.
+typedef PdfExportDocumentBuilder =
+    Future<List<int>> Function(
+      PdfExportModel model,
+      PdfExportOptions options,
+      List<int> fontBytes,
+    );
+
+final pdfDocumentBuilderProvider = Provider<PdfExportDocumentBuilder>(
+  (ref) => (model, options, fontBytes) {
+    return generatePdfBytes(
+      model: model,
+      fontBytes: fontBytes,
+      options: options,
+    );
+  },
+);

@@ -348,4 +348,96 @@ void main() {
       expect(await store.readSetting('neverWritten.key'), isNull);
     });
   });
+
+  group('PDF export identifying values (name & birth date)', () {
+    test('an empty table loads to no name and no birth date', () async {
+      final snapshot = await store.load();
+      expect(snapshot.pdfExportName, isNull);
+      expect(snapshot.pdfExportBirthDate, isNull);
+    });
+
+    test(
+      'a name round-trips as a JSON string under the dot-family key',
+      () async {
+        await store.persistPdfExportName('Ada Lovelace');
+        expect(
+          await store.readSetting(SettingKeys.pdfExportName),
+          'Ada Lovelace',
+          reason: 'the name column stores the plain JSON string',
+        );
+        expect((await store.load()).pdfExportName, 'Ada Lovelace');
+      },
+    );
+
+    test('persisting null or blank deletes the name row', () async {
+      await store.persistPdfExportName('Ada');
+      await store.persistPdfExportName('   ');
+      expect(
+        await store.readSetting(SettingKeys.pdfExportName),
+        isNull,
+        reason:
+            'a whitespace-only name is NOT stored as identifying '
+            'value — the settings row is deleted',
+      );
+      expect(await db.select(db.appSettings).get(), isEmpty);
+    });
+
+    test('non-string and corrupt name rows fall back to no name', () async {
+      for (final raw in [
+        '3', // JSON number
+        '"   "', // whitespace-only string
+        'true', // JSON bool
+        '"[" + "broken', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.pdfExportName, raw);
+        expect(
+          (await store.load()).pdfExportName,
+          isNull,
+          reason: 'corrupt stored value "$raw" must not surface an error',
+        );
+      }
+    });
+
+    test('a birth date round-trips as the ISO date string and loads as a '
+        'DateOnly-normalized day', () async {
+      await store.persistPdfExportBirthDate(DateTime(1990, 1, 2));
+      expect(
+        await store.readSetting(SettingKeys.pdfExportBirthDate),
+        '1990-01-02',
+        reason: 'the birth date stores as the plain ISO date string',
+      );
+      final loaded = (await store.load()).pdfExportBirthDate;
+      expect(
+        loaded,
+        DateTime.utc(1990, 1, 2),
+        reason:
+            'the decoded value is the calendar day, UTC-midnight '
+            'normalized (DateOnly convention)',
+      );
+    });
+
+    test('non-date and corrupt birth-date rows fall back to no date', () async {
+      for (final raw in [
+        '"1990-02-30"', // a JSON date string that is not a real day
+        '"not-a-date"', // JSON string, not a date
+        '19900102', // JSON number
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.pdfExportBirthDate, raw);
+        expect(
+          (await store.load()).pdfExportBirthDate,
+          isNull,
+          reason: 'corrupt stored value "$raw" must not surface an error',
+        );
+      }
+    });
+
+    test('both identifying values load in one snapshot', () async {
+      await store.persistPdfExportName('Ada');
+      await store.persistPdfExportBirthDate(DateTime(1990, 1, 2));
+      final snapshot = await store.load();
+      expect(snapshot.pdfExportName, 'Ada');
+      expect(snapshot.pdfExportBirthDate, DateTime.utc(1990, 1, 2));
+    });
+  });
 }

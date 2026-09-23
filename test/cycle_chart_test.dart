@@ -181,7 +181,7 @@ Widget _dayLabelsHarness({
 // other rows — while plain days render nothing. The letters are the raw
 // TempDisturbance tokens of the day's tempDisturbances mask, read
 // through a single letter-mapping seam (see the comment on
-// disturbanceLetters in lib/ui/cycle.dart). The interrupted curve
+// disturbanceLetters in lib/domain/disturbances.dart). The interrupted curve
 // rendering is keyed to the ignoreTemperature MARK, not this mask —
 // pinned by the temperature-curve section below.
 //
