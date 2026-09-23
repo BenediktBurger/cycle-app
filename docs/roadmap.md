@@ -52,8 +52,8 @@ the sections above track planned work, git history keeps the record (see
 - [ ] add °C to the legend of the temperature plot
 - [ ] title bar takes a lot of space in horizontal mode (cycle tab)
 - how to mark a pregnancy: replace cycle start with pregnancy start or add a "conception" mark -> calculate probable bith?
-- [ ] show the cycle start flag and cycle number even for the first cycle (if first day of data is cycle start, the flag is currently not rendered)
-- [ ] make sure that long running cycles (day-of-cycle > 100, e.g. pregnancy) renders well on chart
+- [x] show the cycle start flag and cycle number even for the first cycle (if first day of data is cycle start, the flag is currently not rendered)
+- [x] make sure that long running cycles (day-of-cycle > 100, e.g. pregnancy) renders well on chart
 - [ ] rework the statistics tab: don't show individual cycles starts / lengths, but possible to show a table (cycle start, number of bleeding, first higher measurement, length) at the bottom after the other statistics
 - [ ] order legend entries according to their appearance on the cycle tab
 - [ ] render the baseline on the cycle legend as dashed as it is on the cycle tab

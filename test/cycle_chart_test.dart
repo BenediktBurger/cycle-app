@@ -385,16 +385,32 @@ final _gapMarks = <CycleMark>[
   CycleMark(date: _gridLineDay(3), type: CycleMarkTypes.cycleStart),
 ];
 
+// The FIRST tracked day itself carries the cycleStart mark: tracking began
+// right on a cycle start (e.g. continued from the paper sheet), so there
+// is NO leading pre-mark group and the recorded range's LEFT edge is the
+// first cycle boundary.
+final _firstDayBoundaryEntries = longRangeEntries(12);
+
+final _firstDayBoundaryMarks = <CycleMark>[
+  CycleMark(date: longRangeDay(0), type: CycleMarkTypes.cycleStart),
+];
+
 /// The card-row border container inside the cell of [index]/[row]: the
 /// cell's decoration border is a non-uniform Border (right side only),
-/// unlike every glyph's own decoration (uniform Border.all or none).
-Border _cellRightBorder(WidgetTester tester, int index, String row) {
-  final containers = tester.widgetList<Container>(
-    find.descendant(
-      of: chartCell(index, row),
-      matching: find.byType(Container),
+/// unlike every glyph's own decoration (uniform Border.all or none). The
+/// recording-row cells key the whole cell (the border Container is a
+/// descendant of the key); the numbering row keys the cell CONTENT —
+/// so its border Container sits ABOVE the key. Both are searched.
+Border _cellBorder(WidgetTester tester, int index, String row) {
+  final cell = chartCell(index, row);
+  final containers = [
+    ...tester.widgetList<Container>(
+      find.descendant(of: cell, matching: find.byType(Container)),
     ),
-  );
+    ...tester.widgetList<Container>(
+      find.ancestor(of: cell, matching: find.byType(Container)),
+    ),
+  ];
   return containers
       .map((c) => c.decoration)
       .whereType<BoxDecoration>()
@@ -405,6 +421,12 @@ Border _cellRightBorder(WidgetTester tester, int index, String row) {
         orElse: () => fail('no cell border found in cell $index of $row'),
       );
 }
+
+Border _cellRightBorder(WidgetTester tester, int index, String row) =>
+    _cellBorder(tester, index, row);
+
+Border _cellLeftBorder(WidgetTester tester, int index, String row) =>
+    _cellBorder(tester, index, row);
 
 Widget _gridLinesHarness({
   required List<DailyEntry> entries,
@@ -1366,6 +1388,132 @@ void main() {
         reason:
             'a two-digit day-of-cycle label renders at its natural, '
             'unshrunk size (it must never be scaled down to fit)',
+      );
+    });
+  });
+
+  group('long-running cycles (day-of-cycle beyond three digits, '
+      'pregnancy-like)', () {
+    // ~130 consecutive tracked days with NO cycleStart mark (the leading
+    // group runs pregnancy-like 1..130). The columns overflow the
+    // viewport, so every column renders at the minimum usable width while
+    // the initial auto-scroll parks the window on the newest days.
+    List<DailyEntry> longRun() => _dayLabelsEntries(130);
+
+    testWidgets('a ~130-day run without any cycle start renders without '
+        'exceptions or overflow and the three-digit day-of-cycle header '
+        'label actually renders', (tester) async {
+      await tester.pumpWidget(_dayLabelsHarness(entries: longRun()));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'the long run builds without layout exceptions',
+      );
+
+      // Day index 119 shows day-of-cycle 120 (the leading group counts
+      // from 2026-01-20) and sits inside the parked window at the newest
+      // days: the three-digit header label renders and stays inside its
+      // column.
+      final column = tester.getRect(_dayLabel(119));
+      final label = tester.getRect(
+        find.descendant(of: _dayLabel(119), matching: find.text('120')),
+      );
+      expect(
+        label.left,
+        greaterThanOrEqualTo(column.left - 0.5),
+        reason: 'day-of-cycle 120 renders, not left of its column',
+      );
+      expect(
+        label.right,
+        lessThanOrEqualTo(column.right + 0.5),
+        reason: 'day-of-cycle 120 renders, not right of its column',
+      );
+    });
+
+    testWidgets('the same run with one mid-range cycle start renders the '
+        'day columns and the ordinal chip scaled within its span, without '
+        'exceptions', (tester) async {
+      // A mid-range cycle start at day index 80 (2026-04-10): it sits
+      // inside the initial parked window (the window covers the newest
+      // ~60 columns), so its chip renders right away.
+      final marks = [
+        CycleMark(date: _dayLabelsDay(80), type: CycleMarkTypes.cycleStart),
+      ];
+      await tester.pumpWidget(
+        _dayLabelsHarness(entries: longRun(), marks: marks),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the long run with a mid-range boundary builds without '
+            'layout exceptions',
+      );
+
+      // The restart is visible: the boundary day counts 1 again and the
+      // beyond-three-digit column continues the count.
+      expect(
+        find.descendant(of: _dayLabel(80), matching: find.text('1')),
+        findsOneWidget,
+        reason:
+            'the mid-range cycle start restarts the day-of-cycle '
+            'count at 1',
+      );
+      expect(
+        find.descendant(of: _dayLabel(119), matching: find.text('40')),
+        findsOneWidget,
+        reason: 'the columns after the cycle start count on',
+      );
+
+      // The ordinal chip hugs its label and stays INSIDE the cycle's own
+      // column span (boundary day through the range's end, clamped to the
+      // built window): the FittedBox scales the label within the span —
+      // the chip is bounded by it, never wider, and never overflows the
+      // plot.
+      final chip = find.byKey(const ValueKey('cycleOrdinalChip-80'));
+      expect(
+        chip,
+        findsOneWidget,
+        reason: 'the mid-range boundary renders its ordinal chip',
+      );
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / 130;
+      final chipRect = tester.getRect(chip);
+      expect(
+        chipRect.left,
+        closeTo(plot.left + 80 * colW, 2.5),
+        reason: 'the chip pins to the boundary day\'s column start',
+      );
+      // The built window's right edge is the range's end (column 129), so
+      // the chip's available span is 80..130 columns wide; the chip's
+      // background must stop at it.
+      expect(
+        chipRect.right,
+        lessThanOrEqualTo(plot.left + 130 * colW + 0.5),
+        reason: 'the chip stays inside its cycle\'s span',
+      );
+      expect(
+        chipRect.right,
+        lessThanOrEqualTo(plot.right),
+        reason: 'the chip never overflows the plot',
+      );
+      // The FittedBox kept the label within the chip's hugging background.
+      final textRect = tester.getRect(
+        find.descendant(of: chip, matching: find.text('Cycle 1')),
+      );
+      expect(
+        textRect.left,
+        greaterThanOrEqualTo(chipRect.left),
+        reason: 'the label starts inside the chip',
+      );
+      expect(
+        textRect.right,
+        lessThanOrEqualTo(chipRect.right),
+        reason: 'the label ends inside the chip',
       );
     });
   });
@@ -2618,6 +2766,107 @@ void main() {
         );
         expect(border.right.color, onSurface.withValues(alpha: 0.12));
       }
+    });
+
+    testWidgets('a cycle start on the FIRST tracked day is a boundary at the '
+        'range\'s left edge: the ordinal chip renders at index 0 and the '
+        'first day cells thicken their LEFT border (the mirror of the '
+        'right-edge separator rule)', (tester) async {
+      await tester.pumpWidget(
+        _gridLinesHarness(
+          entries: _firstDayBoundaryEntries,
+          marks: _firstDayBoundaryMarks,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final onSurface = chartScheme(tester).onSurface;
+
+      // The ordinal chip renders at index 0, pinned to the plot's left
+      // edge (the boundary column's start).
+      final chip = find.byKey(const ValueKey('cycleOrdinalChip-0'));
+      expect(
+        chip,
+        findsOneWidget,
+        reason:
+            'the first tracked day opens the first cycle in the recorded '
+            'range — its ordinal badge renders inside the plot',
+      );
+      final plot = tester.getRect(find.byType(LineChart));
+      expect(
+        tester.getRect(chip).left,
+        closeTo(plot.left + 2, 2.5),
+        reason:
+            'day-index 0: the chip pins to the boundary column\'s start, '
+            'the recorded range\'s left edge',
+      );
+
+      // The domain-edge boundary paints through the first day cells' thick
+      // LEFT border — the mirror of every interior boundary's thick RIGHT
+      // border on the cell before the new cycle. (The chart's extra
+      // separator line would sit exactly at the domain's left edge x =
+      // −0.5, where its 2 px stroke clamps outside the plot.)
+      const edgeThickRows = [
+        'bleeding',
+        'mucus',
+        'cervix',
+        'sex',
+        'pain',
+        'time',
+        'marks',
+      ];
+      for (final row in edgeThickRows) {
+        final border = _cellLeftBorder(tester, 0, row);
+        expect(
+          border.left.width,
+          closeTo(2, 0.01),
+          reason:
+              'row $row: the range\'s first cell carries the thick '
+              'left boundary border',
+        );
+        expect(
+          border.left.color,
+          onSurface,
+          reason: 'row $row: the boundary border is solid onSurface',
+        );
+        // The separator goes to the LEFT of the boundary column, so the
+        // first cell's right edge keeps the plain hairline.
+        expect(
+          border.right.width,
+          closeTo(0.5, 0.01),
+          reason: 'row $row: the first day keeps the hairline right edge',
+        );
+      }
+      // The header row's first cell carries the same thick left border.
+      final headerBorder = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byKey(const ValueKey('dayLabel-0')),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .map((d) => d.border)
+          .whereType<Border>()
+          .firstWhere(
+            (b) => !b.isUniform,
+            orElse: () => fail('no header cell border found'),
+          );
+      expect(headerBorder.left.width, closeTo(2, 0.01));
+      expect(headerBorder.left.color, onSurface);
+
+      // The extra-line list carries no edge line: the boundary at the
+      // recorded range's left edge is painted by the cells' borders, not
+      // by a chart line that would clamp at the plot edge (and the chip
+      // hangs from that border).
+      expect(
+        chartData(tester).extraLinesData.verticalLines.map((l) => l.x),
+        isNot(contains(-0.5)),
+        reason:
+            'the left-edge boundary does not draw an extra line at the '
+            'domain edge — the cells\' left borders carry it',
+      );
     });
 
     testWidgets('a boundary mark inside untracked gap days draws its '

@@ -27,6 +27,17 @@ final _entries = longRangeEntries(21);
 CycleMark _cycleStartAt(int index) =>
     CycleMark(date: boundaryDay(index), type: CycleMarkTypes.cycleStart);
 
+/// Twelve tracked days from 2026-01-01 whose FIRST tracked day already
+/// carries the cycleStart mark — tracking began right on a cycle start
+/// (e.g. continued from the paper sheet), so no leading pre-mark group
+/// exists.
+final _firstDayStartEntries = longRangeEntries(12);
+
+final _firstDayStartMark = CycleMark(
+  date: longRangeDay(0),
+  type: CycleMarkTypes.cycleStart,
+);
+
 void main() {
   /// The rendered ordinal text of the boundary day at [index] (keyed on the
   /// Text itself).
@@ -127,6 +138,48 @@ void main() {
       ordinalText(tester, 9),
       'Zyklus 3',
       reason: 'the German ordinal wording renders on the chart',
+    );
+  });
+
+  testWidgets('a cycle start on the FIRST tracked day is a cycle boundary: '
+      'the ordinal chip renders at index 0 as "Cycle 1"', (tester) async {
+    await tester.pumpWidget(
+      chartHarness(entries: _firstDayStartEntries, marks: [_firstDayStartMark]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('cycleOrdinal-0')),
+      findsOneWidget,
+      reason:
+          'the first tracked day opens the first cycle in the recorded '
+          'range — its ordinal renders inside the plot like every other '
+          'mark-opened start',
+    );
+    expect(
+      ordinalText(tester, 0),
+      'Cycle 1',
+      reason: 'the first mark-opened cycle is "Cycle 1"',
+    );
+  });
+
+  testWidgets('the first tracked day\'s ordinal shifts by the outside-app '
+      'count like every other boundary', (tester) async {
+    await tester.pumpWidget(
+      chartHarness(
+        entries: _firstDayStartEntries,
+        marks: [_firstDayStartMark],
+        observedCyclesOutsideApp: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      ordinalText(tester, 0),
+      'Cycle 3',
+      reason:
+          'outside-app cycles shift every ordinal: prior count 2 '
+          'makes the range\'s first day "Cycle 3"',
     );
   });
 }

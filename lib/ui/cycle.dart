@@ -278,16 +278,17 @@ final class _ChartDays {
 
   /// Whether day [index] opens a new cycle (the opening cycleStart
   /// mark's own date — the shared "is cycle boundary" predicate
-  /// driving the card's thick separator lines). The very first recorded
-  /// day is never a boundary: there is no line at the recorded range's
-  /// left edge (a leading pre-mark group is not a mark-opened group
-  /// either). A mark on an untracked gap day keeps ITS OWN date as the
+  /// driving the card's thick separator lines). A mark ON THE FIRST
+  /// tracked day too (tracking began on a cycle start, no leading
+  /// pre-mark group) makes index 0 a boundary — the separator for it is
+  /// drawn by the first day cells' thick LEFT border, the mirror of every
+  /// interior boundary's thick right border; the in-plot extra line starts
+  /// at index 1. A mark on an untracked gap day keeps its OWN date as the
   /// boundary: the separator runs through the mark's gap-day column, not
   /// the next tracked day. A mark recorded before the range's first day
   /// lies outside the index range and draws no line (consistent — its
   /// boundary is at or left of the left edge).
-  bool isCycleBoundary(int index) =>
-      index > 0 && cycleStartDates.contains(dayAt(index));
+  bool isCycleBoundary(int index) => cycleStartDates.contains(dayAt(index));
 }
 
 /// fl_chart line chart over all measured days plus a per-day symbol row.
@@ -1179,10 +1180,21 @@ final class _CycleChartState extends State<_CycleChart> {
                                     // untracked gap days draws its separator
                                     // at the mark's gap-day column, one
                                     // column (or more) before the cycle's
-                                    // first tracked day.
+                                    // first tracked day. A boundary on the
+                                    // FIRST tracked day draws no extra
+                                    // line: its x = −0.5 sits at the
+                                    // domain's left edge, where the stroke
+                                    // clamps at the plot — the boundary
+                                    // paints through the window's first
+                                    // cells' thick LEFT border (the mirror
+                                    // of the right-edge rule below).
                                     extraLinesData: ExtraLinesData(
                                       verticalLines: [
-                                        for (var i = winStart; i <= winEnd; i++)
+                                        for (
+                                          var i = math.max(winStart, 1);
+                                          i <= winEnd;
+                                          i++
+                                        )
                                           if (_days.isCycleBoundary(i))
                                             VerticalLine(
                                               x: i - 0.5,
@@ -1640,10 +1652,20 @@ final class _SignalRow extends StatelessWidget {
               // The day-cell separator: hairline matching the chart's
               // vertical day grid lines, thickened to the solid
               // cycle-start line when the NEXT day opens a cycle (the
-              // separator sits on this cell's right edge).
+              // separator sits on this cell's right edge). The FIRST
+              // tracked day thickens its LEFT border when it opens a
+              // cycle itself — the mirror of the interior right-edge
+              // rule, because the domain-edge separator line would clamp
+              // at the plot's left edge (see the chart config above).
               child: Container(
                 decoration: BoxDecoration(
                   border: Border(
+                    left: i == 0
+                        ? cycleDayCellBorderSide(
+                            context,
+                            isCycleBoundary: days.isCycleBoundary(0),
+                          )
+                        : BorderSide.none,
                     right: cycleDayCellBorderSide(
                       context,
                       isCycleBoundary: days.isCycleBoundary(i + 1),
@@ -2007,9 +2029,20 @@ final class _DayHeaderRow extends StatelessWidget {
             height: _CycleChartState.dayHeaderRowHeight,
             child: Container(
               // The day-cell separator, same as the signal rows below
-              // (the vertical lines run through the whole card).
+              // (the vertical lines run through the whole card). The FIRST
+              // tracked day thickens its LEFT border when it opens a
+              // cycle: the mirror of the interior boundaries' thick right
+              // border, because the domain-edge separator's line stroke
+              // would clamp at the plot's left edge (a cycle start on the
+              // first tracked day).
               decoration: BoxDecoration(
                 border: Border(
+                  left: i == 0
+                      ? cycleDayCellBorderSide(
+                          context,
+                          isCycleBoundary: days.isCycleBoundary(0),
+                        )
+                      : BorderSide.none,
                   right: cycleDayCellBorderSide(
                     context,
                     isCycleBoundary: days.isCycleBoundary(i + 1),
@@ -2103,7 +2136,9 @@ Widget _columnPrototype({required String prototype, required String label}) =>
 /// ([_ChartDays.cycleOrdinalByStart] — lib/domain/cycle_grouping.dart's
 /// cycleOrdinalNumber with the outside-app setting), the same number the
 /// evaluation table's column headers use; the leading pre-mark group is
-/// not a boundary and carries no chip.
+/// not a boundary and carries no chip — but a cycle start ON the first
+/// tracked day renders its chip at the plot's left edge like any other
+/// mark-opened start.
 ///
 /// TODO(user-review): the chip's look (rounded surface-tinted container at
 /// ~0.9 opacity, 9 px primary-colored text, top-of-plot pinning, inset
