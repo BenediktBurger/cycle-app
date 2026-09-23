@@ -3,7 +3,7 @@
 //
 // It performs checklist step 7 mechanically (tag + push + GitHub Release) and
 // the sanity parts of the earlier steps (version/tag match, clean tree,
-// release-signed APK, embedded version, checksum). It deliberately does NOT
+// release-signed APKs, embedded versions, checksums). It deliberately does NOT
 // build (step 4), interactively eyeball the signature (step 5), or replace
 // the device upgrade test (step 6) — those stay manual checklist work.
 //
@@ -12,10 +12,10 @@
 // 1. the `vX.Y.Z` tag matches the `version: X.Y.Z+N` line in pubspec.yaml —
 //    a half-committed version bump is exactly how wrong-version APKs get
 //    published;
-// 2. the APK is signed with the pinned release certificate (SHA-256
-//    fingerprint in tool/release_fingerprint.txt) — Gradle silently falls
-//    back to debug signing when `android/key.properties` is missing, and a
-//    debug-signed APK must never be attached to a public release.
+// 2. every attached APK is signed with the pinned release certificate
+//    (SHA-256 fingerprint in tool/release_fingerprint.txt) — Gradle silently
+//    falls back to debug signing when `android/key.properties` is missing,
+//    and a debug-signed APK must never be attached to a public release.
 //
 // The installed Flutter SDK version is checked against tool/flutter-version
 // the same way: that file is what the F-Droid build recipe parses from each
@@ -25,7 +25,7 @@
 // the pin file from the installed SDK AND updates the flutter-version:
 // inputs in .github/workflows/ci.yml (and .github/workflows/release.yml when
 // present) to the same version, then stops; one commit collects the changed
-// files, then rebuild the release APK and rerun. CI cross-checks the
+// files, then rebuild the release APKs and rerun. CI cross-checks the
 // workflow input against the same pin.
 //
 // Linux-release-machine note: by design this tool targets the project's
@@ -56,13 +56,74 @@ const String flutterPinFilePath = 'tool/flutter-version';
 const String ciWorkflowPath = '.github/workflows/ci.yml';
 const String releaseWorkflowPath = '.github/workflows/release.yml';
 
-/// Release artifact built by checklist step 4 (`flutter build apk --release`).
-const String defaultApkPath = 'build/app/outputs/flutter-apk/app-release.apk';
+/// The release artifacts built by checklist step 4 (`flutter build apk
+/// --release --split-per-abi`): the three per-ABI split APKs, in the order
+/// they are attached to the GitHub release. Releases publish these three
+/// only — the universal `app-release.apk` stays a local testing artifact.
+const List<String> releaseApkPaths = [
+  'build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk',
+  'build/app/outputs/flutter-apk/app-arm64-v8a-release.apk',
+  'build/app/outputs/flutter-apk/app-x86_64-release.apk',
+];
+
+/// ABI version-code offsets, mirroring the scheme in
+/// android/app/build.gradle.kts: a split APK's versionCode is
+/// `N * 10 + abiCode` (N = pubspec build number); the universal APK has no
+/// ABI filter and keeps exactly N.
+const Map<String, int> abiCodes = {
+  'armeabi-v7a': 1,
+  'arm64-v8a': 2,
+  'x86_64': 3,
+};
 
 const String usage =
     'usage: dart run tool/make_release.dart vX.Y.Z '
     '[--accept-fingerprint] [--accept-flutter-version] [--dry-run] '
     '[--tested]';
+
+/// One release APK and the versionCode the build scheme must have embedded
+/// in it.
+class ReleaseArtifact {
+  const ReleaseArtifact({
+    required this.path,
+    required this.expectedVersionCode,
+  });
+
+  /// Path relative to the repository root.
+  final String path;
+
+  /// `N * 10 + abiCode` from the split scheme in
+  /// android/app/build.gradle.kts (N = pubspec build number); a path whose
+  /// file name carries no known ABI would keep exactly N.
+  final int expectedVersionCode;
+}
+
+/// The ABI code (1/2/3) encoded in a well-known split APK file name
+/// (`app-<abi>-release.apk`); null when the name has no ABI part (e.g. a
+/// universal APK).
+int? abiCodeForApkPath(String apkPath) {
+  final fileName = apkPath.split('/').last;
+  final match = RegExp(r'^app-(.+)-release\.apk$').firstMatch(fileName);
+  if (match == null) return null;
+  return abiCodes[match.group(1)];
+}
+
+/// The versionCode expectation for one artifact path: the split scheme for
+/// known ABIs, plain `buildNumber` otherwise (universal form).
+int expectedVersionCode(int buildNumber, String apkPath) {
+  final abiCode = abiCodeForApkPath(apkPath);
+  return abiCode == null ? buildNumber : buildNumber * 10 + abiCode;
+}
+
+/// The published artifact set for a release: the three per-ABI split APKs
+/// ([releaseApkPaths], attach order) with their expected version codes.
+List<ReleaseArtifact> buildReleaseArtifacts(int buildNumber) => [
+  for (final path in releaseApkPaths)
+    ReleaseArtifact(
+      path: path,
+      expectedVersionCode: expectedVersionCode(buildNumber, path),
+    ),
+];
 
 /// Failure of a script stage — always loud, always exit 1.
 class ReleaseException implements Exception {
@@ -538,8 +599,9 @@ String flutterPinMismatchMessage({
       '(.github/workflows/ci.yml, and .github/workflows/release.yml when '
       'present) itself, then stops.\n'
       'Either way: commit all changed files (the pin and the workflow '
-      'files), rebuild the release APK on that SDK (checklist step 4: '
-      '`flutter build apk --release`), and rerun this script.';
+      'files), rebuild the release APKs on that SDK (checklist step 4: '
+      '`flutter build apk --release --split-per-abi`), and rerun this '
+      'script.';
 }
 
 /// Stop message after a successful re-pin (also the first-run staging
@@ -554,10 +616,11 @@ String flutterPinWriteStopMessage(String version) {
       'updated workflow files:\n'
       '  git add $flutterPinFilePath .github/workflows/* && git commit '
       '-m "pin Flutter SDK version"\n'
-      'Then rebuild the release APK on that SDK (checklist step 4: '
-      '`flutter build apk --release`) and rerun this script: the F-Droid '
-      'recipe parses the committed pin from the tagged commit, so the '
-      'committed pin is what a Flutter-version bump publishes.\n'
+      'Then rebuild the release APKs on that SDK (checklist step 4: '
+      '`flutter build apk --release --split-per-abi`) and rerun this '
+      'script: the F-Droid recipe parses the committed pin from the '
+      'tagged commit, so the committed pin is what a Flutter-version '
+      'bump publishes.\n'
       'Stopping keeps the tree clean — tag and push must not run with a '
       'fresh, uncommitted pin.';
 }
@@ -601,26 +664,59 @@ int _compareVersionKeys(List<int> a, List<int> b) {
   return 0;
 }
 
-/// Assembles the GitHub release notes body: the two machine-checkable trust
-/// lines. `gh release create --generate-notes` appends the auto-generated
+/// Assembles the GitHub release notes body: the certificate fingerprint line
+/// (single release key shared by all three APKs) plus one checksum line per
+/// APK. `gh release create --generate-notes` appends the auto-generated
 /// changelog after this body (documented behavior the runbook relies on).
 String buildNotesBody({
   required String certificateFingerprint,
-  required String apkSha256,
+  required Map<String, String> apkSha256ByPath,
 }) {
-  return 'SHA-256 certificate fingerprint: '
-      '${normalizeFingerprint(certificateFingerprint)}\n'
-      'APK SHA-256: ${apkSha256.trim().toLowerCase()}\n';
+  final buffer = StringBuffer(
+    'SHA-256 certificate fingerprint: '
+    '${normalizeFingerprint(certificateFingerprint)}\n',
+  );
+  apkSha256ByPath.forEach((path, sha256) {
+    buffer.write('APK SHA-256: $path ${sha256.trim().toLowerCase()}\n');
+  });
+  return buffer.toString();
+}
+
+/// The `gh release create` command line shown in the dry run: the tag, all
+/// three APK paths in attach order, then the escaped notes body.
+String formatDryRunGhCommand(
+  String tag,
+  List<String> apkPaths,
+  String notesBody,
+) {
+  return 'gh release create $tag ${apkPaths.join(' ')} '
+      '--generate-notes '
+      '--notes "${notesBody.trim().replaceAll('\n', '\\n')}"';
+}
+
+/// The warning printed when an APK's embedded versionCode differs from the
+/// split scheme expectation. Keep the current semantics: not a hard abort,
+/// but the operator must double-check the artifact set (the expectation is
+/// exact now, so a mismatch means a stale or misbuilt APK about to go out).
+String versionCodeMismatchWarning({
+  required String apkPath,
+  required int embeddedVersionCode,
+  required int expectedVersionCode,
+}) {
+  return 'WARNING: $apkPath embeds versionCode $embeddedVersionCode, '
+      'expected $expectedVersionCode (split scheme: build number N * 10 + '
+      'abiCode — see android/app/build.gradle.kts). Not a hard abort, but '
+      'double-check you are publishing the right artifact.';
 }
 
 Never _fail(String message) => throw ReleaseException(message);
 
-/// The APK's SHA-256 checksum via the Linux `sha256sum` binary.
-Future<String> _sha256sumOfApk() async {
-  final result = await Process.run('sha256sum', [defaultApkPath]);
+/// An APK's SHA-256 checksum via the Linux `sha256sum` binary.
+Future<String> _sha256sumOf(String apkPath) async {
+  final result = await Process.run('sha256sum', [apkPath]);
   if (result.exitCode != 0) {
     _fail(
-      'sha256sum failed (exit ${result.exitCode}): '
+      'sha256sum failed for $apkPath (exit ${result.exitCode}): '
       '${result.stderr}\n'
       'This tool targets the Linux release machine by design.',
     );
@@ -836,19 +932,23 @@ Future<void> runRelease(List<String> arguments) async {
     );
   }
 
-  // --- 5. the APK exists (built earlier, checklist step 4) ----------------
-  final apk = File(defaultApkPath);
-  if (!apk.existsSync()) {
-    _fail(
-      'no release APK at $defaultApkPath — build it first (checklist '
-      'step 4: `flutter build apk --release`). This script does not build.',
-    );
-  }
-  if (apk.lengthSync() == 0) {
-    _fail(
-      'release APK at $defaultApkPath is empty — rebuild (checklist '
-      'step 4).',
-    );
+  // --- 5. the APKs exist (built earlier, checklist step 4) ----------------
+  final artifacts = buildReleaseArtifacts(version.build);
+  for (final artifact in artifacts) {
+    final apk = File(artifact.path);
+    if (!apk.existsSync()) {
+      _fail(
+        'no release APK at ${artifact.path} — build the release APKs first '
+        '(checklist step 4: `flutter build apk --release '
+        '--split-per-abi`).',
+      );
+    }
+    if (apk.lengthSync() == 0) {
+      _fail(
+        'release APK at ${artifact.path} is empty — rebuild (checklist '
+        'step 4).',
+      );
+    }
   }
 
   // --- 6. signature pin (debug-fallback / wrong-key guard) ----------------
@@ -859,24 +959,33 @@ Future<void> runRelease(List<String> arguments) async {
   if (!File(apksigner).existsSync()) {
     _fail('apksigner not found at $apksigner.');
   }
-  final certs = await Process.run(apksigner, [
-    'verify',
-    '--print-certs',
-    defaultApkPath,
-  ]);
-  if (certs.exitCode != 0) {
-    _fail(
-      'apksigner verify failed (exit ${certs.exitCode}): '
-      '${certs.stderr}',
+  // All three split APKs must carry the same release key — verify each one.
+  final certDigests = <String, String?>{};
+  for (final artifact in artifacts) {
+    final certs = await Process.run(apksigner, [
+      'verify',
+      '--print-certs',
+      artifact.path,
+    ]);
+    if (certs.exitCode != 0) {
+      _fail(
+        'apksigner verify failed for ${artifact.path} '
+        '(exit ${certs.exitCode}): ${certs.stderr}',
+      );
+    }
+    certDigests[artifact.path] = parseCertificateFingerprint(
+      certs.stdout as String,
     );
   }
-  final actualFingerprint = parseCertificateFingerprint(certs.stdout as String);
-  if (actualFingerprint == null) {
+  final fingerprints = certDigests.values.toSet();
+  if (fingerprints.length != 1 || fingerprints.single == null) {
     _fail(
-      'could not parse the SHA-256 certificate digest from apksigner '
-      'output:\n${certs.stdout}',
+      'could not parse a single consistent SHA-256 certificate digest '
+      'across the APKs — apksigner output was:\n'
+      '${certDigests.entries.map((e) => '${e.key}: ${e.value ?? '<none>'}').join('\n')}',
     );
   }
+  final actualFingerprint = fingerprints.single!;
 
   final pinFile = File(pinFilePath);
   var fingerprint = actualFingerprint;
@@ -933,54 +1042,61 @@ Future<void> runRelease(List<String> arguments) async {
     );
   }
 
-  // --- 7. embedded version check (best effort, via aapt) ------------------
+  // --- 7. embedded version checks (best effort, via aapt) -----------------
   final aapt = '$buildTools/aapt';
   if (!File(aapt).existsSync()) {
     print(
-      'aapt not found at $aapt — embedded version check skipped '
+      'aapt not found at $aapt — embedded version checks skipped '
       '(best-effort check).',
     );
   } else {
-    final badging = await Process.run(aapt, [
-      'dump',
-      'badging',
-      defaultApkPath,
-    ]);
-    final info = badging.exitCode == 0
-        ? parseAaptBadging(badging.stdout as String)
-        : null;
-    if (info == null) {
+    for (final artifact in artifacts) {
+      final badging = await Process.run(aapt, [
+        'dump',
+        'badging',
+        artifact.path,
+      ]);
+      final info = badging.exitCode == 0
+          ? parseAaptBadging(badging.stdout as String)
+          : null;
+      if (info == null) {
+        print(
+          'WARNING: aapt output for ${artifact.path} could not be parsed '
+          '— embedded version check skipped.',
+        );
+        continue;
+      }
       print(
-        'WARNING: aapt output could not be parsed — embedded version '
-        'check skipped.',
-      );
-    } else {
-      print(
-        'embedded APK version: versionName=${info.versionName} '
-        'versionCode=${info.versionCode}',
+        'embedded version of ${artifact.path}: '
+        'versionName=${info.versionName} versionCode=${info.versionCode}',
       );
       if (info.versionName != versionName) {
         _fail(
-          'STALE APK: embedded versionName "${info.versionName}" != '
-          '$versionName — rebuild (checklist step 4) before publishing.',
+          'STALE APK: ${artifact.path} embeds versionName '
+          '"${info.versionName}" != $versionName — rebuild (checklist '
+          'step 4) before publishing.',
         );
       }
-      if (info.versionCode != version.build) {
+      if (info.versionCode != artifact.expectedVersionCode) {
         print(
-          'WARNING: embedded versionCode ${info.versionCode} != pubspec '
-          'build number ${version.build}. Equal is expected for the '
-          'universal APK (ABI splits offset the code — see '
-          'android/app/build.gradle.kts); not a hard abort, but '
-          'double-check you are publishing the right artifact.',
+          versionCodeMismatchWarning(
+            apkPath: artifact.path,
+            embeddedVersionCode: info.versionCode,
+            expectedVersionCode: artifact.expectedVersionCode,
+          ),
         );
       }
     }
   }
 
-  // --- 8. checksum --------------------------------------------------------
-  final apkSha = await _sha256sumOfApk();
-  print('APK: $defaultApkPath');
-  print('APK SHA-256: $apkSha');
+  // --- 8. checksums -------------------------------------------------------
+  final checksums = <String, String>{};
+  for (final artifact in artifacts) {
+    final sha = await _sha256sumOf(artifact.path);
+    checksums[artifact.path] = sha;
+    print('APK: ${artifact.path}');
+    print('APK SHA-256: $sha');
+  }
 
   // --- 9. upgrade-test gate ------------------------------------------------
   // A dry run never reaches the question: it performs checks only and has
@@ -992,7 +1108,7 @@ Future<void> runRelease(List<String> arguments) async {
     );
     stdout.write(
       'Has the device upgrade test (checklist step 6) been '
-      'completed with THIS exact APK? Type "yes" to continue: ',
+      'completed with THESE exact APKs? Type "yes" to continue: ',
     );
     final answer = stdin.readLineSync()?.trim().toLowerCase() ?? '';
     if (answer != 'yes') {
@@ -1007,7 +1123,7 @@ Future<void> runRelease(List<String> arguments) async {
     print(
       'dry-run note: on a real run without --tested, the script here '
       'asks for confirmation that the device upgrade test (checklist '
-      'step 6) was done with this exact APK before publishing.',
+      'step 6) was done with these exact APKs before publishing.',
     );
   } else {
     print('upgrade test: asserted done via --tested.');
@@ -1015,7 +1131,7 @@ Future<void> runRelease(List<String> arguments) async {
 
   final notesBody = buildNotesBody(
     certificateFingerprint: fingerprint,
-    apkSha256: apkSha,
+    apkSha256ByPath: checksums,
   );
 
   // --- 10. dry run ----------------------------------------------------------
@@ -1024,14 +1140,16 @@ Future<void> runRelease(List<String> arguments) async {
     print('dry run — would publish with these values:');
     print('  tag:            $tag');
     print('  versionName:    $versionName');
-    print('  versionCode:    ${version.build}');
     print('  fingerprint:    $fingerprint');
-    print('  APK path:       $defaultApkPath');
-    print('  APK SHA-256:    $apkSha');
+    for (final artifact in artifacts) {
+      print(
+        '  APK:            ${artifact.path} '
+        '(versionCode ${artifact.expectedVersionCode})',
+      );
+      print('  APK SHA-256:    ${checksums[artifact.path]}');
+    }
     print(
-      '  gh command:     gh release create $tag $defaultApkPath '
-      '--generate-notes --notes '
-      '"${notesBody.trim().replaceAll('\n', '\\n')}"',
+      '  gh command:     ${formatDryRunGhCommand(tag, releaseApkPaths, notesBody)}',
     );
     print('nothing was tagged, pushed, or released.');
     return;
@@ -1057,7 +1175,7 @@ Future<void> runRelease(List<String> arguments) async {
     'release',
     'create',
     tag,
-    defaultApkPath,
+    ...releaseApkPaths,
     '--generate-notes',
     '--notes',
     notesBody,
@@ -1066,9 +1184,9 @@ Future<void> runRelease(List<String> arguments) async {
     _fail(
       'gh release create failed (exit ${release.exitCode}): '
       '${release.stderr}\nThe tag is already pushed; the release may not '
-      "exist yet — retry `gh release create $tag $defaultApkPath "
-      '--generate-notes --notes <body>` or inspect first (see '
-      'docs/release.md).',
+      'exist yet — retry `gh release create $tag '
+      '${releaseApkPaths.join(' ')} --generate-notes --notes <body>` or '
+      'inspect first (see docs/release.md).',
     );
   }
 

@@ -801,6 +801,157 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
     });
   });
 
+  group('split-APK artifact set and version-code scheme', () {
+    test('the published set is exactly the three per-ABI split APKs', () {
+      expect(releaseApkPaths, [
+        'build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk',
+        'build/app/outputs/flutter-apk/app-arm64-v8a-release.apk',
+        'build/app/outputs/flutter-apk/app-x86_64-release.apk',
+      ]);
+    });
+
+    test('the universal APK is not part of the published set', () {
+      expect(
+        releaseApkPaths,
+        everyElement(isNot(contains('app-release.apk'))),
+        reason:
+            'releases attach the three split APKs only; the universal '
+            'APK stays a local testing artifact',
+      );
+    });
+
+    test('ABI codes are parsed from the well-known split file names', () {
+      expect(abiCodeForApkPath(releaseApkPaths[0]), 1);
+      expect(abiCodeForApkPath(releaseApkPaths[1]), 2);
+      expect(abiCodeForApkPath(releaseApkPaths[2]), 3);
+      expect(
+        abiCodeForApkPath('build/app/outputs/flutter-apk/app-release.apk'),
+        isNull,
+        reason: 'a universal APK name carries no ABI',
+      );
+    });
+
+    test('expected version codes follow the N*10 + abiCode scheme', () {
+      final artifacts = buildReleaseArtifacts(2);
+      expect(artifacts.map((artifact) => artifact.path), releaseApkPaths);
+      expect(
+        artifacts.map((artifact) => artifact.expectedVersionCode),
+        [21, 22, 23],
+        reason:
+            'N = 2 (pubspec 0.2.0+2): armeabi-v7a 21, arm64-v8a 22, '
+            'x86_64 23',
+      );
+      expect(
+        buildReleaseArtifacts(
+          7,
+        ).map((artifact) => artifact.expectedVersionCode),
+        [71, 72, 73],
+      );
+    });
+
+    test(
+      'a path without a known ABI keeps exactly the pubspec build number',
+      () {
+        expect(expectedVersionCode(5, 'x/app-release.apk'), 5);
+      },
+    );
+  });
+
+  group('expanded release-notes body (one checksum line per APK)', () {
+    const fingerprint =
+        '6a1f2c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809';
+
+    test(
+      'lists the certificate fingerprint once and one line per artifact',
+      () {
+        final body = buildNotesBody(
+          certificateFingerprint: fingerprint,
+          apkSha256ByPath: {
+            releaseApkPaths[0]: 'AA' * 32,
+            releaseApkPaths[1]: 'BB' * 32,
+            releaseApkPaths[2]: 'CC' * 32,
+          },
+        );
+        expect(
+          'SHA-256 certificate fingerprint: '.allMatches(body).length,
+          1,
+          reason: 'all three APKs share one release key',
+        );
+        expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
+        expect('APK SHA-256: '.allMatches(body).length, 3);
+        for (final path in releaseApkPaths) {
+          expect(body, contains('APK SHA-256: $path '));
+        }
+        expect(body, contains('aa' * 32));
+        expect(body, contains('bb' * 32));
+        expect(body, contains('cc' * 32));
+      },
+    );
+
+    test('normalizes a colonized certificate fingerprint in the notes', () {
+      final body = buildNotesBody(
+        certificateFingerprint:
+            '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:'
+            'F8:09:1A:2B:3C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09',
+        apkSha256ByPath: {releaseApkPaths.first: 'ff' * 32},
+      );
+      expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
+    });
+  });
+
+  group('dry-run gh command format (all three split APKs attached)', () {
+    test('attaches every published APK path in release order', () {
+      final command = formatDryRunGhCommand(
+        'v0.2.0',
+        releaseApkPaths,
+        'fingerprint line\nchecksum line\n',
+      );
+      expect(command, contains('gh release create v0.2.0'));
+      expect(command, contains(' --generate-notes --notes "'));
+      var lastIndex = -1;
+      for (final path in releaseApkPaths) {
+        final index = command.indexOf(path);
+        expect(index, greaterThan(lastIndex), reason: '$path out of order');
+        lastIndex = index;
+      }
+    });
+
+    test('flattens the notes body newlines into the escaped form', () {
+      final command = formatDryRunGhCommand(
+        'v0.2.0',
+        releaseApkPaths,
+        'a\nb\n',
+      );
+      expect(command, contains('--notes "a\\nb"'));
+    });
+  });
+
+  group('aapt versionCode warning (split scheme wording)', () {
+    test('names the artifact, the embedded code, and the expectation', () {
+      final warning = versionCodeMismatchWarning(
+        apkPath: 'build/app/outputs/flutter-apk/app-arm64-v8a-release.apk',
+        embeddedVersionCode: 5,
+        expectedVersionCode: 22,
+      );
+      expect(warning, contains('app-arm64-v8a-release.apk'));
+      expect(warning, contains('versionCode 5'));
+      expect(warning, contains('expected 22'));
+      expect(warning, contains('android/app/build.gradle.kts'));
+    });
+
+    test('carries no stale offset/universal wording', () {
+      final warning = versionCodeMismatchWarning(
+        apkPath: releaseApkPaths.first,
+        embeddedVersionCode: 9,
+        expectedVersionCode: 11,
+      );
+      expect(warning, isNot(contains('force-version-code-ignoring-abi')));
+      expect(warning, isNot(contains('1000')));
+      expect(warning, isNot(contains('ABI splits offset')));
+      expect(warning, isNot(contains('universal')));
+    });
+  });
+
   group('release-notes body assembly', () {
     const fingerprint =
         '6a1f2c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809';
@@ -808,14 +959,16 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
     test('contains the certificate fingerprint and APK checksum lines', () {
       final body = buildNotesBody(
         certificateFingerprint: fingerprint,
-        apkSha256:
-            'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef',
+        apkSha256ByPath: {
+          releaseApkPaths.first:
+              'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef',
+        },
       );
       expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
       expect(
         body,
         contains(
-          'APK SHA-256: '
+          'APK SHA-256: ${releaseApkPaths.first} '
           'deadbeefcafebabe0123456789abcdefdeadbeefcafebabe0123456789abcdef',
         ),
       );
@@ -826,7 +979,7 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         certificateFingerprint:
             '6A:1F:2C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:'
             'F8:09:1A:2B:3C:4D:5E:6F:70:81:92:A3:B4:C5:D6:E7:F8:09',
-        apkSha256: 'ff' * 32,
+        apkSha256ByPath: {'x/app-release.apk': 'ff' * 32},
       );
       expect(body, contains('SHA-256 certificate fingerprint: $fingerprint'));
     });
