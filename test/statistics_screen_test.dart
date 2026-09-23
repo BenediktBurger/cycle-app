@@ -267,6 +267,153 @@ void main() {
   });
 
   testWidgets(
+    'the shared first-higher-until-cycle-end metric keeps the upstream '
+    'counting rule on the shared card shape',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: screenMarks()),
+      );
+      await tester.pumpAndSettle();
+
+      // The upstream metric: cycle 1's first higher (Mar 14) counts to the
+      // NEXT marked start (Mar 29) -> 15 — the same inclusive rule the
+      // cycle table's column uses, so the metric and the table cannot
+      // disagree. The trailing cycle has no known end here -> no value.
+      final untilEnd = find.byKey(
+        const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+      );
+      expect(untilEnd, findsOneWidget);
+      expect(
+        find.descendant(
+          of: untilEnd,
+          matching: find.text('First higher measurement to end of cycle'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('15 days')),
+        findsNWidgets(2),
+        reason: 'min and max duplicate the single span',
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('15.0')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('0.0')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('the per-cycle table renders below all other statistics', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(entries: screenEntries(), marks: screenMarks()),
+    );
+    await tester.pumpAndSettle();
+
+    final table = find.byKey(const ValueKey('statisticsCycleTable'));
+    expect(table, findsOneWidget);
+    // Two rows: one per mark-opened cycle (start-cell keyed).
+    expect(find.byKey(const ValueKey('statisticsRowStart-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowStart-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowStart-2')), findsNothing);
+
+    // Column headers: cycle start, bleeding days, first higher, length.
+    for (final header in [
+      'Cycle start',
+      'Bleeding days',
+      'First higher measurement',
+      'Length',
+    ]) {
+      expect(
+        find.descendant(of: table, matching: find.text(header)),
+        findsOneWidget,
+      );
+    }
+
+    // Row 0 (cycle Mar 1..Mar 28): bleeding days 3 (Mar 1-3), first
+    // higher on day 14 of the cycle, length 28 days.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowStart-0')),
+        matching: find.text('3/1/2026'),
+      ),
+      findsOneWidget,
+      reason: 'the start column carries the cycle start date',
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('statisticsRowBleeding-0')))
+          .data,
+      '3',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowFirstHigher-0')),
+        matching: find.text('Cycle day 14'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowLength-0')),
+        matching: find.text('28 days'),
+      ),
+      findsOneWidget,
+    );
+
+    // Row 1 (the trailing cycle): no length, no first higher yet. The
+    // other cells carry their values (bleeding days 2, start date).
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowStart-1')),
+        matching: find.text('3/29/2026'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('statisticsRowBleeding-1')))
+          .data,
+      '2',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowFirstHigher-1')),
+        matching: find.text('—'),
+      ),
+      findsOneWidget,
+      reason: 'the trailing cycle carries no first higher yet',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowLength-1')),
+        matching: find.text('—'),
+      ),
+      findsOneWidget,
+      reason: 'the trailing cycle carries no length yet',
+    );
+
+    // Below ALL other statistics: the table sits lower than the count
+    // card and lower than the first-higher-until-end metric card.
+    final countCardTop = tester.getTopLeft(
+      find.byKey(const ValueKey('statisticsCard-cyclesCount')),
+    );
+    final untilEndTop = tester.getTopLeft(
+      find.byKey(const ValueKey('statisticsMetric-firstHigherUntilEnd')),
+    );
+    expect(tester.getTopLeft(table).dy, greaterThan(countCardTop.dy));
+    expect(tester.getTopLeft(table).dy, greaterThan(untilEndTop.dy));
+  });
+
+  testWidgets(
     'the earliest first higher rows: both variants, real one primary',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1800));

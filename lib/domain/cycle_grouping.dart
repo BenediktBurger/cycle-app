@@ -53,6 +53,7 @@ final class Cycle {
     required this.days,
     required this.startsAtMenstruation,
     required this.startDate,
+    required this.trackedEndDate,
   });
 
   /// The cycle's days, ordered ascending by date: the tracked days plus
@@ -75,6 +76,17 @@ final class Cycle {
   /// are not held in [days]. Only the leading group (no opening mark)
   /// anchors on its first tracked day.
   final DateTime startDate;
+
+  /// The cycle's last TRACKED day — the last entry of [days] that carries
+  /// real recorded data, i.e. WITHOUT the data-less span-extension
+  /// placeholder days after it (see the span rule). Null only for a
+  /// data-less cycle (a fresh mark without any tracked day on/after it).
+  ///
+  /// Statistics endpoints that report an OBSERVED end ("one day past the
+  /// last tracked day") anchor on this instead of [endDate]: the span
+  /// extension reaches toward today for UI display, but such unobserved
+  /// extension days must not shift a statistics count.
+  final DateTime? trackedEndDate;
 
   /// Last day of the group — the span-extension end (day before the next
   /// cycle-start mark, or the last-cycle rule), data-less when extended
@@ -182,6 +194,10 @@ List<Cycle> groupIntoCycles(
       days: List.unmodifiable([...tracked, ...extras]),
       startsAtMenstruation: startsAtMenstruation,
       startDate: startDate,
+      // The tracked list is never empty here: materialize always receives
+      // the group's tracked body (leading group, mark-opened group) — the
+      // data-less case never routes through materialize.
+      trackedEndDate: DateOnly.normalize(tracked.last.date),
     );
   }
 
@@ -343,6 +359,8 @@ List<Cycle> groupIntoCycles(
         // The data-less placeholder days are normalized-day arithmetic
         // (see the span rule) — the start date matches that shape.
         startDate: start.day,
+        // A data-less mark cycle observes nothing by definition.
+        trackedEndDate: null,
       ),
     );
   }

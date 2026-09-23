@@ -77,6 +77,14 @@ class StatistikScreen extends ConsumerWidget {
           );
           final earliest = earliestFirstHigherCycleDay(evaluations);
 
+          // The upstream statistics rework's aggregate + per-cycle table
+          // data: the fact rows and the first-higher-until-cycle-end
+          // metric keep upstream's counting rule (each fact's span counts
+          // to the next marked start; the trailing observed end is one
+          // day past the last TRACKED day — see cycleFacts), rendered on
+          // the shared card shape below.
+          final stats = cycleStatistics(entries, marks);
+
           // The cycle-count surface: the mark-opened cycles recorded in
           // this app plus the outside-app count from the settings value.
           final cyclesInApp = markDrivenCycleCount(entries, marks);
@@ -138,6 +146,12 @@ class StatistikScreen extends ConsumerWidget {
                 detail: riseDetail,
               ),
               const SizedBox(height: 8),
+              _MetricCard(
+                key: const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+                title: l10n.statisticsMetricFirstHigherUntilEnd,
+                detail: _descriptiveDetail(stats.firstHigherUntilCycleEnd),
+              ),
+              const SizedBox(height: 8),
               _StatCard(
                 key: const ValueKey('statisticsCard-earliestFirstHigher'),
                 title: l10n.statisticsEarliestFirstHigher,
@@ -165,6 +179,16 @@ class StatistikScreen extends ConsumerWidget {
                 _onsetsCard(context, onsets, day),
                 const SizedBox(height: 8),
                 _distributionCard(context, buckets),
+                const SizedBox(height: 8),
+                // The table sits below ALL other statistics: one row per
+                // mark-opened cycle keeps the numbers auditable against
+                // the mark-driven boundaries without adding any
+                // evaluation (the upstream rework's placement — kept).
+                _CycleTableCard(
+                  key: const ValueKey('statisticsCycleTable'),
+                  facts: stats.facts,
+                  day: day,
+                ),
               ],
             ],
           );
@@ -393,6 +417,133 @@ final class _ValueRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Re-expresses the shared cycle statistics' [MetricSummary] on the
+/// screen's descriptive card shape so every metric card renders through
+/// ONE shared class (no card drifts onto its own presentation).
+DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
+    DescriptiveSummary(
+      minimum: summary.min,
+      maximum: summary.max,
+      average: summary.average,
+      standardDeviation: summary.stdDev,
+    );
+
+/// The per-cycle table card: a simple bordered table (equal-width columns,
+/// headers wrap) with the four exact columns the roadmap names: cycle
+/// start, number of bleeding days, first higher measurement, length.
+/// (The upstream statistics rework's card — kept verbatim, the shared
+/// [_StatCard] shell rendering its rows.)
+final class _CycleTableCard extends StatelessWidget {
+  const _CycleTableCard({super.key, required this.facts, required this.day});
+
+  final List<CycleFact> facts;
+  final String Function(DateTime) day;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return _StatCard(
+      title: l10n.statisticsCycleTable,
+      child: Table(
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        border: TableBorder.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(),
+          1: FlexColumnWidth(),
+          2: FlexColumnWidth(),
+          3: FlexColumnWidth(),
+        },
+        children: [
+          TableRow(
+            children: [
+              _cell(
+                context,
+                Text(
+                  l10n.termCycleStart,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.statisticsBleedingDays,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.termFirstHigher,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.statisticsTableLength,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ],
+          ),
+          for (final (index, fact) in facts.indexed)
+            TableRow(
+              children: [
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowStart-$index'),
+                    child: Text(day(fact.cycleStart)),
+                  ),
+                ),
+                _cell(
+                  context,
+                  Text(
+                    '${fact.bleedingDays}',
+                    key: ValueKey('statisticsRowBleeding-$index'),
+                  ),
+                ),
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowFirstHigher-$index'),
+                    child: Text(
+                      fact.firstHigherDay == null
+                          ? _missing
+                          : l10n.statisticsFirstHigherDayOfCycle(
+                              DateOnly.daysBetween(
+                                    fact.firstHigherDay!,
+                                    fact.cycleStart,
+                                  ) +
+                                  1,
+                            ),
+                    ),
+                  ),
+                ),
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowLength-$index'),
+                    child: Text(
+                      fact.lengthDays == null
+                          ? _missing
+                          : l10n.termCycleDays(fact.lengthDays!),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(BuildContext context, Widget child) =>
+      Padding(padding: const EdgeInsets.all(4), child: child);
 }
 
 /// One statistics card: a titled Card block (ONE style so the screen's

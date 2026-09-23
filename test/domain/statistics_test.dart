@@ -11,6 +11,7 @@ import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/statistics.dart';
 
 import 'mark_fixtures.dart';
+import '../support/fixtures.dart' show evaluationScenarioEntries;
 
 DailyEntry d(
   int year,

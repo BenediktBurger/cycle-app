@@ -441,11 +441,19 @@ List<CycleFact> cycleFacts(List<DailyEntry> entries, List<CycleMark> marks) {
     }
 
     final firstHigher = _resolveFirstHigher(evaluations[i]);
-    final endExclusive =
+    // Two end notions share this spot, both anchored in their owner rules:
+    // a cycle WITH a follow-up start ends at that start (the mark-driven
+    // length rule); the trailing cycle's observed end is one day past its
+    // last TRACKED day — the span-extension placeholder days toward today
+    // (see the span rule in cycle_grouping.dart) carry nothing observed,
+    // so they must not inflate the span toward the wall clock. A data-less
+    // trailing cycle observes no end at all (null), mirroring the
+    // evaluation's trailing rise-to-end rule.
+    final observedEndExclusive =
         nextStart ??
-        // Observed end: one past the last TRACKED day (untracked days
-        // carry nothing to observe).
-        DateOnly.addDays(DateOnly.normalize(cycle.endDate), 1);
+        (cycle.trackedEndDate == null
+            ? null
+            : DateOnly.addDays(DateOnly.normalize(cycle.trackedEndDate!), 1));
 
     facts.add(
       CycleFact(
@@ -455,9 +463,10 @@ List<CycleFact> cycleFacts(List<DailyEntry> entries, List<CycleMark> marks) {
         lengthDays: nextStart == null
             ? null
             : DateOnly.daysBetween(nextStart, start),
-        firstHigherUntilCycleEndDays: firstHigher == null
+        firstHigherUntilCycleEndDays:
+            firstHigher == null || observedEndExclusive == null
             ? null
-            : DateOnly.daysBetween(endExclusive, firstHigher),
+            : DateOnly.daysBetween(observedEndExclusive, firstHigher),
       ),
     );
   }
