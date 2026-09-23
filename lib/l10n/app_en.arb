@@ -15,6 +15,10 @@
   "termCervixFirmness": "Cervix firmness",
   "termMeasurementTime": "Measurement time",
   "termFirstHigher": "First higher measurement",
+  "termCycleStart": "Cycle start",
+  "@termCycleStart": {
+    "description": "Name of the cycleStart mark (the day panel's first chip) and, at the same time, the \"Cycle start\" column header of the statistics table — one string on both surfaces so the two names cannot drift."
+  },
   "termCycleDays": "{n} days",
   "@termCycleDays": {
     "placeholders": {
@@ -97,7 +101,7 @@
   "@cycleColumnCycleDay": {
     "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
   },
-  "cycleLegendTemperature": "BBT (temperature)",
+  "cycleLegendTemperature": "BBT (temperature) in °C",
   "cycleRowCervix": "Cervix",
   "cycleRowDisturbance": "Disturbed measurement",
   "@cycleRowDisturbance": {
@@ -119,7 +123,6 @@
   "cycleJumpToDate": "Jump to date",
   "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
-  "cycleSheetCycleStartLabel": "Cycle start",
   "cycleSheetSuzEveningLabel": "SUZ from this evening",
   "@cycleSheetSuzEveningLabel": {
     "description": "Static label of the SUZ-evening chip (the chip state, not the label, carries set/remove). TODO(user-review): the wording replaces the old set/remove labels that said \"today\" (heute) while the panel opens for an arbitrary selected day — pending the expert review."
@@ -194,10 +197,10 @@
   "diaryCycleStartPromptBody": "The bleeding on this day suggests that a new cycle begins here. Set a cycle start mark on this day?",
   "diaryCycleStartPromptConfirm": "Set cycle start",
   "diaryCycleStartPromptDismiss": "Not now",
-  "cycleSheetSuzSuggestionEvening": "Suggested: sicher unfruchtbare Zeit begins this evening (rule D)",
-  "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
+  "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening (rule D)",
+  "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning (rule E)",
   "cycleLegendSex": "Sex (X per time of day)",
-  "cycleLegendDisturbance": "Interrupted days (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
+  "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
     "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
   },
@@ -206,15 +209,30 @@
     "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
   },
   "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
-  "statisticsNoData": "Cycle lengths appear once two cycle starts are recorded.",
-  "statisticsCycles": "Cycle lengths",
-  "statisticsOnsets": "Cycle starts",
-  "@statisticsOnsets": {
-    "description": "Card title of the statistics screen's list of the mark-driven cycle starts (the recorded dates of the user-placed cycleStart marks that opened a cycle group). The key mirrors the domain function menstruationOnsetDates on purpose, to keep one name across the boundary."
+  "statisticsNoData": "Statistics appear once a first cycle start is recorded.",
+  "statisticsCycleCount": "Cycles",
+  "statisticsMetricCycleLength": "Cycle length",
+  "statisticsBleedingDays": "Bleeding days",
+  "statisticsMetricFirstHigherUntilEnd": "First higher measurement to end of cycle",
+  "statisticsMinimum": "Minimum",
+  "statisticsStdDev": "Standard deviation",
+  "@statisticsStdDev": {
+    "description": "Row label of the population standard deviation inside the uniform metric presentation (German: Streuung)."
   },
   "statisticsAverage": "Average",
-  "statisticsShortest": "Shortest",
-  "statisticsLongest": "Longest",
+  "statisticsMaximum": "Maximum",
+  "statisticsEarliestFirstHigher": "Earliest first higher measurement",
+  "statisticsFirstHigherDayOfCycle": "Cycle day {n}",
+  "@statisticsFirstHigherDayOfCycle": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "A cycle's first higher measurement as a day-of-cycle number: the earliest entry among all cycles in the metrics block, and the first-higher column of the cycle table."
+  },
+  "statisticsCycleTable": "Cycle table",
+  "statisticsTableLength": "Length",
   "statisticsDistribution": "Distribution",
   "settingsLanguage": "Language",
   "languageGerman": "Deutsch",

@@ -1,14 +1,21 @@
-// Statistik screen: pure arithmetic over cycle lengths.
+// Statistik screen: pure arithmetic over cycle data.
 //
 // HARD PRODUCT RULE (docs/product/vision.md req. 3, lib/domain/statistics.dart):
-// this screen shows RECORDED-DERIVED NUMBERS ONLY — lengths, averages,
-// buckets. No status, no classification, no fertility statements. The
-// caption below states this explicitly in the UI.
+// this screen shows RECORDED-DERIVED NUMBERS ONLY — counts, lengths,
+// spreads, buckets. No status, no classification, no fertility statements.
+// The caption below states this explicitly in the UI.
+//
+// Layout: the number of cycles first, then the uniform metric presentation
+// (Minimum/Streuung/Maximum/Durchschnitt) for the three metrics — cycle
+// length, bleeding days, first higher measurement until the cycle end —
+// plus the earliest first higher measurement as a day-of-cycle number, and
+// below ALL other statistics the per-cycle table (start, bleeding days,
+// first higher, length). The distribution card keeps its place above the
+// table.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/marks.dart';
 import '../domain/statistics.dart';
@@ -32,14 +39,14 @@ class StatistikScreen extends ConsumerWidget {
         data: (entries) {
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+          final stats = cycleStatistics(entries, marks);
           final lengths = cycleLengthsInDays(entries, marks);
-          final summary = summarizeCycleLengths(lengths);
           final buckets = cycleLengthDistribution(lengths);
-          final onsets = menstruationOnsetDates(entries, marks);
           String day(DateTime d) =>
               DateFormat.yMd(locale).format(DateOnly.normalize(d).toLocal());
 
           return ListView(
+            key: const ValueKey('statisticsScroll'),
             padding: const EdgeInsets.all(12),
             children: [
               Text(
@@ -47,71 +54,50 @@ class StatistikScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
-              if (summary.lengths.isEmpty) ...[
+              if (stats.cycleCount == 0) ...[
+                // The statistics appear once a mark-opened cycle (with
+                // tracked data) exists — not "two cycle starts" as before.
                 Text(l10n.statisticsNoData),
               ] else ...[
                 _StatCard(
-                  title: l10n.statisticsCycles,
-                  child: Column(
-                    children: [
-                      for (final length in summary.lengths)
-                        ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.loop_outlined),
-                          title: Text(l10n.termCycleDays(length)),
-                        ),
-                    ],
+                  key: const ValueKey('statisticsCycleCountCard'),
+                  title: l10n.statisticsCycleCount,
+                  child: Text(
+                    '${stats.cycleCount}',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        title: l10n.statisticsAverage,
-                        child: Text(
-                          summary.average!.toStringAsFixed(1),
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        title: l10n.statisticsShortest,
-                        child: Text(
-                          '${summary.shortest}',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        title: l10n.statisticsLongest,
-                        child: Text(
-                          '${summary.longest}',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                    ),
-                  ],
+                _MetricCard(
+                  key: const ValueKey('statisticsMetric-cycleLength'),
+                  title: l10n.statisticsMetricCycleLength,
+                  summary: stats.cycleLengths,
+                  locale: locale,
                 ),
                 const SizedBox(height: 8),
-                // The raw cycle-start dates keep the length list auditable
-                // against the mark-driven boundaries without adding any
-                // evaluation.
+                _MetricCard(
+                  key: const ValueKey('statisticsMetric-bleedingDays'),
+                  title: l10n.statisticsBleedingDays,
+                  summary: stats.bleedingDays,
+                  locale: locale,
+                ),
+                const SizedBox(height: 8),
+                _MetricCard(
+                  key: const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+                  title: l10n.statisticsMetricFirstHigherUntilEnd,
+                  summary: stats.firstHigherUntilCycleEnd,
+                  locale: locale,
+                ),
+                const SizedBox(height: 8),
                 _StatCard(
-                  title: l10n.statisticsOnsets,
-                  child: Column(
-                    children: [
-                      for (final onset in onsets)
-                        ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.border_color_outlined),
-                          title: Text(day(onset)),
-                        ),
-                    ],
+                  key: const ValueKey('statisticsEarliestFirstHigher'),
+                  title: l10n.statisticsEarliestFirstHigher,
+                  child: Text(
+                    stats.earliestFirstHigherDayOfCycle == null
+                        ? '-'
+                        : l10n.statisticsFirstHigherDayOfCycle(
+                            stats.earliestFirstHigherDayOfCycle!,
+                          ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -160,6 +146,11 @@ class StatistikScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                // The table sits below ALL other statistics: one row per
+                // mark-opened cycle keeps the numbers auditable against the
+                // mark-driven boundaries without adding any evaluation.
+                _CycleTableCard(facts: stats.facts, day: day),
               ],
             ],
           );
@@ -169,8 +160,172 @@ class StatistikScreen extends ConsumerWidget {
   }
 }
 
+final class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    super.key,
+    required this.title,
+    required this.summary,
+    required this.locale,
+  });
+
+  final String title;
+  final MetricSummary summary;
+  final String locale;
+
+  /// One decimal place (average and spread), localized — the same "0.0"
+  /// pattern in every locale; intl renders the decimal separator per
+  /// [locale]. Missing values render as the dash placeholder.
+  String _fmt(double? value) =>
+      value == null ? '-' : NumberFormat('0.0', locale).format(value);
+
+  String _fmtInt(int? value) => value == null ? '-' : '$value';
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return _StatCard(
+      title: title,
+      child: Column(
+        children: [
+          _metricRow(context, l10n.statisticsMinimum, _fmtInt(summary.min)),
+          _metricRow(context, l10n.statisticsStdDev, _fmt(summary.stdDev)),
+          _metricRow(context, l10n.statisticsMaximum, _fmtInt(summary.max)),
+          _metricRow(context, l10n.statisticsAverage, _fmt(summary.average)),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Text(value, style: Theme.of(context).textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+}
+
+/// The per-cycle table card: a simple bordered table (equal-width columns,
+/// headers wrap) with the four exact columns the roadmap names: cycle
+/// start, number of bleeding days, first higher measurement, length.
+final class _CycleTableCard extends StatelessWidget {
+  const _CycleTableCard({required this.facts, required this.day});
+
+  final List<CycleFact> facts;
+  final String Function(DateTime) day;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return _StatCard(
+      key: const ValueKey('statisticsCycleTable'),
+      title: l10n.statisticsCycleTable,
+      child: Table(
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        border: TableBorder.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        columnWidths: const {
+          0: FlexColumnWidth(),
+          1: FlexColumnWidth(),
+          2: FlexColumnWidth(),
+          3: FlexColumnWidth(),
+        },
+        children: [
+          TableRow(
+            children: [
+              _cell(
+                context,
+                Text(
+                  l10n.termCycleStart,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.statisticsBleedingDays,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.termFirstHigher,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              _cell(
+                context,
+                Text(
+                  l10n.statisticsTableLength,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ],
+          ),
+          for (final (index, fact) in facts.indexed)
+            TableRow(
+              children: [
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowStart-$index'),
+                    child: Text(day(fact.cycleStart)),
+                  ),
+                ),
+                _cell(
+                  context,
+                  Text(
+                    '${fact.bleedingDays}',
+                    key: ValueKey('statisticsRowBleeding-$index'),
+                  ),
+                ),
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowFirstHigher-$index'),
+                    child: Text(
+                      fact.firstHigherDay == null
+                          ? '-'
+                          : l10n.statisticsFirstHigherDayOfCycle(
+                              DateOnly.daysBetween(
+                                    fact.firstHigherDay!,
+                                    fact.cycleStart,
+                                  ) +
+                                  1,
+                            ),
+                    ),
+                  ),
+                ),
+                _cell(
+                  context,
+                  KeyedSubtree(
+                    key: ValueKey('statisticsRowLength-$index'),
+                    child: Text(
+                      fact.lengthDays == null
+                          ? '-'
+                          : l10n.termCycleDays(fact.lengthDays!),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(BuildContext context, Widget child) =>
+      Padding(padding: const EdgeInsets.all(4), child: child);
+}
+
 final class _StatCard extends StatelessWidget {
-  const _StatCard({required this.title, required this.child});
+  const _StatCard({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;

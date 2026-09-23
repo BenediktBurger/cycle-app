@@ -441,9 +441,11 @@ final class SuzArrowDotPainter extends FlDotPainter {
 /// the chart's vertical day grid lines (a subtle onSurface tint), thickened
 /// to the SOLID cycle-start line on cycle boundaries (the separator sits at
 /// x = nextCycleStart − 0.5 — i.e. on the RIGHT edge of the cell before the
-/// new cycle's first day). Shared by every row of the card (day header,
-/// signal rows, the 1–6 numbering row) so the vertical lines run through
-/// the whole card.
+/// new cycle's first day; on the recorded range's LEFT edge the mirror
+/// holds: the boundary column — the chart's first day, day index 0 —
+/// thickens its LEFT border, see _ChartDays.isCycleBoundary in cycle.dart).
+/// Shared by every row of the card (day header, signal rows, the 1–6
+/// numbering row) so the vertical lines run through the whole card.
 BorderSide cycleDayCellBorderSide(
   BuildContext context, {
   required bool isCycleBoundary,
@@ -499,11 +501,16 @@ final class EvaluationMarksRow extends StatelessWidget {
 
   /// The shared cycle-boundary predicate (see _ChartDays.isCycleBoundary
   /// in cycle.dart): when given, cell i's right border thickens on the
-  /// cell before a cycle start (day i + 1 opens a cycle).
+  /// cell before a cycle start (day i + 1 opens a cycle), and day index 0
+  /// thickens its LEFT border when it opens a cycle itself (the
+  /// domain-edge mirror of that rule).
   final bool Function(int index)? isCycleBoundary;
 
   @override
   Widget build(BuildContext context) {
+    // Local copy so the predicate is nullable-promotable inside build
+    // (the field itself does not promote — non-promo-public-field).
+    final boundaryPredicate = isCycleBoundary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -527,6 +534,19 @@ final class EvaluationMarksRow extends StatelessWidget {
                       context,
                       isCycleBoundary: isCycleBoundary?.call(i + 1) ?? false,
                     ),
+                    // The FIRST tracked day thickens its LEFT border when
+                    // it opens a cycle — the mirror of the interior
+                    // right-edge rule (see _ChartDays.isCycleBoundary in
+                    // cycle.dart; a cycle start on the recorded range's
+                    // first day has no extra chart line, the border owns
+                    // that separator).
+                    left: i == 0
+                        ? cycleDayCellBorderSide(
+                            context,
+                            isCycleBoundary:
+                                boundaryPredicate?.call(0) ?? false,
+                          )
+                        : BorderSide.none,
                   ),
                 ),
                 child: _NumberCell(

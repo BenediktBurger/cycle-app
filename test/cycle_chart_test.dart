@@ -385,16 +385,32 @@ final _gapMarks = <CycleMark>[
   CycleMark(date: _gridLineDay(3), type: CycleMarkTypes.cycleStart),
 ];
 
+// The FIRST tracked day itself carries the cycleStart mark: tracking began
+// right on a cycle start (e.g. continued from the paper sheet), so there
+// is NO leading pre-mark group and the recorded range's LEFT edge is the
+// first cycle boundary.
+final _firstDayBoundaryEntries = longRangeEntries(12);
+
+final _firstDayBoundaryMarks = <CycleMark>[
+  CycleMark(date: longRangeDay(0), type: CycleMarkTypes.cycleStart),
+];
+
 /// The card-row border container inside the cell of [index]/[row]: the
 /// cell's decoration border is a non-uniform Border (right side only),
-/// unlike every glyph's own decoration (uniform Border.all or none).
-Border _cellRightBorder(WidgetTester tester, int index, String row) {
-  final containers = tester.widgetList<Container>(
-    find.descendant(
-      of: chartCell(index, row),
-      matching: find.byType(Container),
+/// unlike every glyph's own decoration (uniform Border.all or none). The
+/// recording-row cells key the whole cell (the border Container is a
+/// descendant of the key); the numbering row keys the cell CONTENT —
+/// so its border Container sits ABOVE the key. Both are searched.
+Border _cellBorder(WidgetTester tester, int index, String row) {
+  final cell = chartCell(index, row);
+  final containers = [
+    ...tester.widgetList<Container>(
+      find.descendant(of: cell, matching: find.byType(Container)),
     ),
-  );
+    ...tester.widgetList<Container>(
+      find.ancestor(of: cell, matching: find.byType(Container)),
+    ),
+  ];
   return containers
       .map((c) => c.decoration)
       .whereType<BoxDecoration>()
@@ -423,49 +439,55 @@ List<DailyEntry> _helpSheetEntries(int count) => [
     DailyEntry(date: DateTime.utc(2026, 9, 7 + i), bbtC: 36.5),
 ];
 
-/// The glossary entries (en wording); each is asserted inside the help
-/// sheet. The "Ignored temperature" entry presents the VISUAL consequence
-/// (the lighter temperature on the curve — the mark is the rendering key,
-/// owner decision 2026-09-19) while naming where the mark is set.
+/// The glossary entries (en wording), each asserted inside the help sheet
+/// and — in the appearance-order test — expected as the sheet's rendered
+/// label sequence: the order mirrors the cycle tab's top-down render
+/// order (the signal rows above the curve, then the temperature-curve
+/// group, then the below-chart strip). The "Ignored temperature" entry
+/// presents the VISUAL consequence (the lighter temperature on the curve
+/// — the mark is the rendering key, owner decision 2026-09-19) while
+/// naming where the mark is set.
 const _glossaryEn = [
-  'BBT (temperature)',
   'Bleeding',
   'Fertility sign (mucus)',
   'Mucus peak',
+  'Mittelschmerz (M)',
+  'Sex (X per time of day)',
+  'BBT (temperature) in °C',
   'Ignored temperature (lighter; set in the day sheet)',
   'Circled higher measurements',
   'Premature temperature rise',
   'Baseline',
   'Sicher unfruchtbare Zeit (SUZ)',
+  'Measurement time',
+  'Disturbed measurement (sp late to bed, a frequent night awakening, '
+      'alk alcohol, kr illness)',
   'Cervix position',
   'Cervix firmness',
-  'Measurement time',
-  'Sex (X per time of day)',
-  'Mittelschmerz (M)',
   'Breast pain (B)',
-  'Interrupted days (sp late to bed, a frequent night awakening, '
-      'alk alcohol, kr illness)',
   'Note (this day carries a note in the Diary)',
 ];
 
+/// The German glossary wording (authoritative draft per the language
+/// policy), in the same top-down appearance order as `_glossaryEn`.
 const _glossaryDe = [
-  'Aufwachtemperatur',
   'Blutung',
   'Fruchtbarkeitszeichen (Zervixschleim)',
   'Schleimhöhepunkt',
+  'Mittelschmerz (M)',
+  'Sex (X je Zeitpunkt)',
+  'Aufwachtemperatur in °C',
   'Temperatur ignoriert (heller gezeichnet)',
   'Umrandete höhere Messungen',
-  'vorzeitiger Temperaturanstieg',
+  'Vorzeitiger Temperaturanstieg',
   'Basislinie',
   'Sicher unfruchtbare Zeit (SUZ)',
+  'Messzeitpunkt',
+  'Messstörung (sp Spät ins Bett, a Nachts öfter aufstehen, '
+      'alk Alkohol, kr Krank)',
   'Muttermund-Position',
   'Muttermund-Festigkeit',
-  'Messzeitpunkt',
-  'Sex (X je Zeitpunkt)',
-  'Mittelschmerz (M)',
   'Brustschmerz (B)',
-  'Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, '
-      'alk Alkohol, kr Krank)',
   'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
 ];
 
@@ -1370,6 +1392,132 @@ void main() {
     });
   });
 
+  group('long-running cycles (day-of-cycle beyond three digits, '
+      'pregnancy-like)', () {
+    // ~130 consecutive tracked days with NO cycleStart mark (the leading
+    // group runs pregnancy-like 1..130). The columns overflow the
+    // viewport, so every column renders at the minimum usable width while
+    // the initial auto-scroll parks the window on the newest days.
+    List<DailyEntry> longRun() => _dayLabelsEntries(130);
+
+    testWidgets('a ~130-day run without any cycle start renders without '
+        'exceptions or overflow and the three-digit day-of-cycle header '
+        'label actually renders', (tester) async {
+      await tester.pumpWidget(_dayLabelsHarness(entries: longRun()));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'the long run builds without layout exceptions',
+      );
+
+      // Day index 119 shows day-of-cycle 120 (the leading group counts
+      // from 2026-01-20) and sits inside the parked window at the newest
+      // days: the three-digit header label renders and stays inside its
+      // column.
+      final column = tester.getRect(_dayLabel(119));
+      final label = tester.getRect(
+        find.descendant(of: _dayLabel(119), matching: find.text('120')),
+      );
+      expect(
+        label.left,
+        greaterThanOrEqualTo(column.left - 0.5),
+        reason: 'day-of-cycle 120 renders, not left of its column',
+      );
+      expect(
+        label.right,
+        lessThanOrEqualTo(column.right + 0.5),
+        reason: 'day-of-cycle 120 renders, not right of its column',
+      );
+    });
+
+    testWidgets('the same run with one mid-range cycle start renders the '
+        'day columns and the ordinal chip scaled within its span, without '
+        'exceptions', (tester) async {
+      // A mid-range cycle start at day index 80 (2026-04-10): it sits
+      // inside the initial parked window (the window covers the newest
+      // ~60 columns), so its chip renders right away.
+      final marks = [
+        CycleMark(date: _dayLabelsDay(80), type: CycleMarkTypes.cycleStart),
+      ];
+      await tester.pumpWidget(
+        _dayLabelsHarness(entries: longRun(), marks: marks),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the long run with a mid-range boundary builds without '
+            'layout exceptions',
+      );
+
+      // The restart is visible: the boundary day counts 1 again and the
+      // beyond-three-digit column continues the count.
+      expect(
+        find.descendant(of: _dayLabel(80), matching: find.text('1')),
+        findsOneWidget,
+        reason:
+            'the mid-range cycle start restarts the day-of-cycle '
+            'count at 1',
+      );
+      expect(
+        find.descendant(of: _dayLabel(119), matching: find.text('40')),
+        findsOneWidget,
+        reason: 'the columns after the cycle start count on',
+      );
+
+      // The ordinal chip hugs its label and stays INSIDE the cycle's own
+      // column span (boundary day through the range's end, clamped to the
+      // built window): the FittedBox scales the label within the span —
+      // the chip is bounded by it, never wider, and never overflows the
+      // plot.
+      final chip = find.byKey(const ValueKey('cycleOrdinalChip-80'));
+      expect(
+        chip,
+        findsOneWidget,
+        reason: 'the mid-range boundary renders its ordinal chip',
+      );
+      final plot = tester.getRect(find.byType(LineChart));
+      final colW = plot.width / 130;
+      final chipRect = tester.getRect(chip);
+      expect(
+        chipRect.left,
+        closeTo(plot.left + 80 * colW, 2.5),
+        reason: 'the chip pins to the boundary day\'s column start',
+      );
+      // The built window's right edge is the range's end (column 129), so
+      // the chip's available span is 80..130 columns wide; the chip's
+      // background must stop at it.
+      expect(
+        chipRect.right,
+        lessThanOrEqualTo(plot.left + 130 * colW + 0.5),
+        reason: 'the chip stays inside its cycle\'s span',
+      );
+      expect(
+        chipRect.right,
+        lessThanOrEqualTo(plot.right),
+        reason: 'the chip never overflows the plot',
+      );
+      // The FittedBox kept the label within the chip's hugging background.
+      final textRect = tester.getRect(
+        find.descendant(of: chip, matching: find.text('Cycle 1')),
+      );
+      expect(
+        textRect.left,
+        greaterThanOrEqualTo(chipRect.left),
+        reason: 'the label starts inside the chip',
+      );
+      expect(
+        textRect.right,
+        lessThanOrEqualTo(chipRect.right),
+        reason: 'the label ends inside the chip',
+      );
+    });
+  });
+
   group('header above the chart', () {
     testWidgets('the day header row renders ABOVE the temperature curve '
         '(the paper\'s header line on top of the sheet)', (tester) async {
@@ -1582,7 +1730,7 @@ void main() {
       find.descendant(
         of: find.byKey(const ValueKey('cycleHelpSheet')),
         matching: find.text(
-          'Interrupted days (sp late to bed, '
+          'Disturbed measurement (sp late to bed, '
           'a frequent night awakening, alk alcohol, kr illness)',
         ),
       ),
@@ -1609,7 +1757,7 @@ void main() {
       find.descendant(
         of: find.byKey(const ValueKey('cycleHelpSheet')),
         matching: find.text(
-          'Gestörte Messung (sp Spät ins Bett, '
+          'Messstörung (sp Spät ins Bett, '
           'a Nachts öfter aufstehen, alk Alkohol, kr Krank)',
         ),
       ),
@@ -2475,7 +2623,7 @@ void main() {
         'pain',
         'time',
       ]) {
-        final border = _cellRightBorder(tester, 1, row);
+        final border = _cellBorder(tester, 1, row);
         expect(
           border.right.width,
           closeTo(0.5, 0.01),
@@ -2561,7 +2709,7 @@ void main() {
           'pain',
           'time',
         ]) {
-          final thick = _cellRightBorder(tester, 4, row);
+          final thick = _cellBorder(tester, 4, row);
           expect(
             thick.right.width,
             closeTo(2, 0.01),
@@ -2573,13 +2721,13 @@ void main() {
             reason: 'row $row: the boundary border is solid onSurface',
           );
           // The neighboring cells keep the hairline.
-          final thinBefore = _cellRightBorder(tester, 3, row);
+          final thinBefore = _cellBorder(tester, 3, row);
           expect(
             thinBefore.right.width,
             closeTo(0.5, 0.01),
             reason: 'row $row: only the boundary cell is thick',
           );
-          final thinAfter = _cellRightBorder(tester, 5, row);
+          final thinAfter = _cellBorder(tester, 5, row);
           expect(
             thinAfter.right.width,
             closeTo(0.5, 0.01),
@@ -2608,7 +2756,7 @@ void main() {
       // The first cell of every row keeps the plain hairline.
       final onSurface = chartScheme(tester).onSurface;
       for (final row in const ['bleeding', 'mucus', 'time']) {
-        final border = _cellRightBorder(tester, 0, row);
+        final border = _cellBorder(tester, 0, row);
         expect(
           border.right.width,
           closeTo(0.5, 0.01),
@@ -2618,6 +2766,107 @@ void main() {
         );
         expect(border.right.color, onSurface.withValues(alpha: 0.12));
       }
+    });
+
+    testWidgets('a cycle start on the FIRST tracked day is a boundary at the '
+        'range\'s left edge: the ordinal chip renders at index 0 and the '
+        'first day cells thicken their LEFT border (the mirror of the '
+        'right-edge separator rule)', (tester) async {
+      await tester.pumpWidget(
+        _gridLinesHarness(
+          entries: _firstDayBoundaryEntries,
+          marks: _firstDayBoundaryMarks,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final onSurface = chartScheme(tester).onSurface;
+
+      // The ordinal chip renders at index 0, pinned to the plot's left
+      // edge (the boundary column's start).
+      final chip = find.byKey(const ValueKey('cycleOrdinalChip-0'));
+      expect(
+        chip,
+        findsOneWidget,
+        reason:
+            'the first tracked day opens the first cycle in the recorded '
+            'range — its ordinal badge renders inside the plot',
+      );
+      final plot = tester.getRect(find.byType(LineChart));
+      expect(
+        tester.getRect(chip).left,
+        closeTo(plot.left + 2, 2.5),
+        reason:
+            'day-index 0: the chip pins to the boundary column\'s start, '
+            'the recorded range\'s left edge',
+      );
+
+      // The domain-edge boundary paints through the first day cells' thick
+      // LEFT border — the mirror of every interior boundary's thick RIGHT
+      // border on the cell before the new cycle. (The chart's extra
+      // separator line would sit exactly at the domain's left edge x =
+      // −0.5, where its 2 px stroke clamps outside the plot.)
+      const edgeThickRows = [
+        'bleeding',
+        'mucus',
+        'cervix',
+        'sex',
+        'pain',
+        'time',
+        'marks',
+      ];
+      for (final row in edgeThickRows) {
+        final border = _cellBorder(tester, 0, row);
+        expect(
+          border.left.width,
+          closeTo(2, 0.01),
+          reason:
+              'row $row: the range\'s first cell carries the thick '
+              'left boundary border',
+        );
+        expect(
+          border.left.color,
+          onSurface,
+          reason: 'row $row: the boundary border is solid onSurface',
+        );
+        // The separator goes to the LEFT of the boundary column, so the
+        // first cell's right edge keeps the plain hairline.
+        expect(
+          border.right.width,
+          closeTo(0.5, 0.01),
+          reason: 'row $row: the first day keeps the hairline right edge',
+        );
+      }
+      // The header row's first cell carries the same thick left border.
+      final headerBorder = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byKey(const ValueKey('dayLabel-0')),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .map((d) => d.border)
+          .whereType<Border>()
+          .firstWhere(
+            (b) => !b.isUniform,
+            orElse: () => fail('no header cell border found'),
+          );
+      expect(headerBorder.left.width, closeTo(2, 0.01));
+      expect(headerBorder.left.color, onSurface);
+
+      // The extra-line list carries no edge line: the boundary at the
+      // recorded range's left edge is painted by the cells' borders, not
+      // by a chart line that would clamp at the plot edge (and the chip
+      // hangs from that border).
+      expect(
+        chartData(tester).extraLinesData.verticalLines.map((l) => l.x),
+        isNot(contains(-0.5)),
+        reason:
+            'the left-edge boundary does not draw an extra line at the '
+            'domain edge — the cells\' left borders carry it',
+      );
     });
 
     testWidgets('a boundary mark inside untracked gap days draws its '
@@ -3188,6 +3437,112 @@ void main() {
           matching: find.text(_arithmeticNoteDe),
         ),
         findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'the glossary entries render in the cycle tab\'s top-down appearance '
+      'order (en)',
+      (tester) async {
+        await tester.pumpWidget(
+          _helpSheetHarness(entries: _helpSheetEntries(5)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+        await tester.pumpAndSettle();
+
+        // Walk the sheet's label texts in tree order (a Column renders its
+        // children top-down, which the descendant finder preserves) and
+        // compare the glossary members' sequence against the expected
+        // appearance order — the sheet title and the arithmetic note are
+        // not glossary members and are filtered out.
+        final labels = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data)
+            .whereType<String>()
+            .where(_glossaryEn.toSet().contains)
+            .toList();
+        expect(
+          labels,
+          _glossaryEn,
+          reason:
+              'the glossary mirrors the cycle tab\'s top-down render order: '
+              'the signal rows above the curve (bleeding, mucus, mucus '
+              'peak, Mittelschmerz, sex), then the temperature-curve group '
+              '(temperature, ignored temperature, circled higher, '
+              'premature rise, baseline, SUZ), then the below-chart strip '
+              '(measurement time, disturbance, cervix position, cervix '
+              'firmness, breast pain, note)',
+        );
+      },
+    );
+
+    testWidgets(
+      'the glossary entries render in the cycle tab\'s top-down appearance '
+      'order (de)',
+      (tester) async {
+        await tester.pumpWidget(
+          _helpSheetHarness(
+            entries: _helpSheetEntries(5),
+            locale: const Locale('de'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+        await tester.pumpAndSettle();
+
+        // The mirrored en assertion next door: the sheet renders the same
+        // top-down entry sequence in the German wording `_glossaryDe`
+        // documents — de/en appearance order stays in parity (en/de parallel
+        // draft policy).
+        final labels = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data)
+            .whereType<String>()
+            .where(_glossaryDe.toSet().contains)
+            .toList();
+        expect(
+          labels,
+          _glossaryDe,
+          reason:
+              'the German sheet mirrors the en appearance order: signal '
+              'rows, temperature-curve group, below-chart strip',
+        );
+      },
+    );
+
+    testWidgets('the baseline entry samples the chart\'s dashed style', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_helpSheetHarness(entries: _helpSheetEntries(5)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+      await tester.pumpAndSettle();
+
+      final glyph = tester.widget<CustomPaint>(
+        find.descendant(
+          of: find.byKey(const ValueKey('cycleHelpSheet')),
+          matching: find.byKey(const ValueKey('legendBaselineGlyph')),
+        ),
+      );
+      expect(
+        (glyph.painter as dynamic).dashPattern,
+        const [6, 4],
+        reason:
+            'the legend paints the baseline dashed with the chart\'s own '
+            'dash pattern — the chart\'s baseline bar is an fl_chart '
+            'segment (dashArray [6, 4]) that cannot be reused outside '
+            'the chart, so the glyph repaints the same dashes',
       );
     });
   });

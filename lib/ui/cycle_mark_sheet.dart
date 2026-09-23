@@ -1,14 +1,23 @@
 // The day options panel of the cycle tab (Mode M, ADR-0001): tapping a
 // chart day shows this panel below the chart instead of jumping straight
-// to the entry form. It opens with a day header (the selected day's
-// locale-formatted label next to the close button), offers the preserved
-// "edit day" jump as the full-width action above the mark chips, and
-// shows the user-placed marks as Material FilterChips in a two-column
-// grid (three columns when the grid spans 600 dp or more). Each chip
+// to the entry form. It opens with a one-row day header: the selected
+// day's locale-formatted label (expanded, so long localized names
+// soft-wrap), then the compact "edit day" icon button, then the close
+// button. The chips show the user-placed marks as Material FilterChips —
+// ALL six of them (the five mark chips AND the temperature-exclusion
+// chip) in ONE shared two-column grid of equal column widths (three
+// columns when the grid spans 600 dp or more), so every row completes
+// evenly and nothing ends on its own full-width bottom row. Each chip
 // carries a STATIC mark-name label plus the mark type's identifying
 // leading avatar icon, and the chip's selected state carries the mark
-// state itself — the Material selected fill with the canvas-drawn check
-// over the scrimmed avatar, announced as selected to screen readers.
+// state itself — the Material selected fill, announced as selected to
+// screen readers; the canvas-drawn check on selected chips is OFF (see
+// the gridChip doc comment).
+//
+// COMMENT EDITING IS NOT HOSTED HERE (by design): the panel distributes
+// nothing but the chips above — notes live in the diary entry form (see
+// cycle.dart's note row), so there is no comment surface to lay out in
+// columns in the first place.
 //
 // The toggles are the cycle start (the authoritative cycle boundary of
 // the mark-driven grouping; bleeding only suggests it — see
@@ -16,10 +25,12 @@
 // first higher measurement (both may live on one day, two independent
 // chips), and the SUZ start (from a morning or from an evening; the two
 // variants are mutually exclusive per day: placing one removes the
-// other). The temperature exclusion lives in its own keyed group BELOW
-// the chip grid. The measurement time is not part of the panel: the
-// chart's time row renders it on wide columns and the diary entry form
-// edits it.
+// other). The temperature exclusion is the grid's THIRD chip, directly
+// before first higher (the evaluation-based reading order: cycle start,
+// mucus peak, exclusion/first higher grouped, then SUZ; it keeps its own
+// keyed group cell inside the grid). The measurement time is not
+// part of the panel: the chart's time row renders it on wide columns and
+// the diary entry form edits it.
 //
 // NON-MODAL by design: the panel is owned by the Zyklus screen
 // (cycle_day_panel_provider) and rendered in a fixed slot below the chart,
@@ -58,14 +69,14 @@ import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'cycle_mark_window.dart';
 
-/// One chip column's width inside a [Wrap] whose row fits [columns]
-/// columns with the 8 dp wrap spacing between them (two columns on
-/// phone-width grids, three from 600 dp).
+/// One chip column's width inside the shared [Wrap] whose row fits
+/// [columns] columns with the 8 dp wrap spacing between them (two columns
+/// on phone-width grids, three from 600 dp).
 double _chipWidthFor(double gridWidth, int columns) =>
     (gridWidth - 8 * (columns - 1)) / columns;
 
 /// The shared chip column width for [maxWidth]: two columns on phone-width
-/// grids, three from 600 dp (the breakpoint both LayoutBuilders share).
+/// grids, three from 600 dp (the breakpoint THE grid uses).
 double _gridChipWidth(double maxWidth) =>
     _chipWidthFor(maxWidth, maxWidth >= 600 ? 3 : 2);
 
@@ -74,8 +85,8 @@ double _gridChipWidth(double maxWidth) =>
 /// tapped day lives in cycleDayPanelProvider, so a chart tap simply moves
 /// the panel to the new day with the old day's marks untouched. The mark
 /// chips read their selected state from the live marks stream — the state
-/// visualization (selected fill + check mark) instead of flipping
-/// set/remove labels.
+/// visualization (selected fill; the canvas check is off, see gridChip)
+/// instead of flipping set/remove labels.
 final class CycleDayPanel extends ConsumerWidget {
   const CycleDayPanel({super.key, required this.day, required this.onClose});
 
@@ -87,8 +98,8 @@ final class CycleDayPanel extends ConsumerWidget {
   final VoidCallback onClose;
 
   /// Whether the day already carries a mark of [type]. The resulting
-  /// booleans decide each chip's selected state (the selected fill plus
-  /// the check mark), never a contextual set/remove wording.
+  /// booleans decide each chip's selected state (the Material selected
+  /// fill), never a contextual set/remove wording.
   bool _hasMark(List<CycleMark> marks, String type) =>
       marks.any((m) => m.type == type && DateOnly.sameDay(m.date, day));
 
@@ -421,15 +432,19 @@ final class CycleDayPanel extends ConsumerWidget {
     /// mark type's identifying leading [icon] (recovered from the
     /// pre-refactor toggle rows — flag, dot, ring, dusk, sun, crossed-out
     /// eye — identification only, never a set/remove affordance: the
-    /// selected state carries set/remove now). The built-in selected fill
-    /// and check mark stay untouched (showCheckmark defaults to true):
-    /// the selected state is the Material fill with the canvas-drawn check
-    /// over the scrimmed avatar — the identity icon survives the selection
-    /// under the paint. [onSelected] receives the wanted new state; true
-    /// places the mark through the unchanged write path, false removes it.
-    /// Space check: at the three-column (>= 600 dp) chip width even the
-    /// widest German label ("Erste höhere Messung") fits beside the icon
-    /// on a single line, so no width/ellipsis fallback is needed.
+    /// selected state carries set/remove now). The selected state takes
+    /// the Material fill only: the canvas-drawn check is OFF — it
+    /// overlapped the scrimmed avatar icon, and the fill plus the
+    /// announced selection carry set/remove to screen readers, so the
+    /// check adds nothing. [onSelected] receives the wanted new state;
+    /// true places the mark through the unchanged write path, false
+    /// removes it. Space check: at the three-column (>= 600 dp) chip
+    /// width even the widest German label ("Erste höhere Messung") fits
+    /// beside the icon on a single line, so no width/ellipsis fallback is
+    /// needed.
+    // TODO(user-review): removing the check mark is an owner-visible
+    // appearance decision — confirm with the experts that the selected
+    // fill alone reads clearly as "placed".
     Widget gridChip(
       String label,
       bool selected,
@@ -442,6 +457,7 @@ final class CycleDayPanel extends ConsumerWidget {
         label: Text(label),
         avatar: Icon(icon),
         selected: selected,
+        showCheckmark: false,
         onSelected: onSelected,
       ),
     );
@@ -458,10 +474,12 @@ final class CycleDayPanel extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // The day header: the selected day's locale-formatted label next
-          // to the explicit close affordance. The label lives in the
-          // expanded space so long localized names soft-wrap instead of
-          // overflowing the row.
+          // The day header ROW: the selected day's locale-formatted label
+          // (expanded, so long localized names soft-wrap instead of
+          // overflowing the row), then the compact "edit day" icon button,
+          // then the explicit close affordance — the whole row replaces
+          // both the old label+close line and the old full-width "edit
+          // day" action above the chips, saving a whole row.
           Padding(
             padding: const EdgeInsets.only(left: 16),
             child: Row(
@@ -473,6 +491,14 @@ final class CycleDayPanel extends ConsumerWidget {
                     ).format(DateOnly.normalize(day).toLocal()),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
+                ),
+                // The preserved old tap behavior, now the compact header
+                // action between the date and the close button.
+                IconButton(
+                  key: const ValueKey('cycleDayPanelEdit'),
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: l10n.cycleSheetEditDay,
+                  onPressed: () => _editDay(context, ref),
                 ),
                 IconButton(
                   key: const ValueKey('cycleDayPanelClose'),
@@ -496,25 +522,29 @@ final class CycleDayPanel extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          const SizedBox(height: 4),
-          // The full-width "edit day" action — the panel's leading action,
-          // above the chip grid.
+          // The SHARED chip grid: all six chips (the five mark chips AND
+          // the temperature-exclusion chip) in ONE LayoutBuilder/Wrap of
+          // equal column widths — two columns on phone-width panels and
+          // three columns from 600 dp of grid width. With the exclusion in
+          // the grid every row completes evenly by construction: six chips
+          // make three even rows of two on a phone and two even rows of
+          // three from 600 dp, instead of the old 3+2 wrap with a lone
+          // below-grid exclusion row.
+          // TODO(user-review): the grid stops at the three-column
+          // breakpoint; a further column count on even wider surfaces
+          // (>600 dp) was deliberately left out until a concrete viewport
+          // asks for it.
+          //
+          // Reading order: cycle start, mucus peak, temperature
+          // exclusion, first higher measurement, SUZ evening, SUZ
+          // morning.
+          //
+          // No comment surface follows: the panel deliberately hosts no
+          // note editing (notes live in the diary entry form — see
+          // cycle.dart's note row), so there is nothing else to
+          // distribute across the columns.
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: () => _editDay(context, ref),
-                icon: const Icon(Icons.edit_outlined),
-                label: Text(l10n.cycleSheetEditDay),
-              ),
-            ),
-          ),
-          // The mark chips, two columns on phone-width panels and three
-          // columns from 600 dp of grid width. Reading order: cycle start,
-          // mucus peak, first higher measurement, SUZ evening, SUZ morning.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final chipWidth = _gridChipWidth(constraints.maxWidth);
@@ -530,7 +560,7 @@ final class CycleDayPanel extends ConsumerWidget {
                     // begin; the chart draws the boundary line where the
                     // grouping opens the group.
                     gridChip(
-                      l10n.cycleSheetCycleStartLabel,
+                      l10n.termCycleStart,
                       hasCycleStart,
                       icon: Icons.flag_outlined,
                       (wanted) => _writeMark(
@@ -550,6 +580,42 @@ final class CycleDayPanel extends ConsumerWidget {
                         remove: !wanted,
                       ),
                       width: chipWidth,
+                    ),
+                    // The exclusion group (owner decision 2026-09-19:
+                    // manual-only exclusion, made visible), the grid's
+                    // THIRD chip — it sits directly before the
+                    // first-higher chip (evaluation-based reading order:
+                    // the exclusion groups with the temperature
+                    // evaluation marks, ahead of the SUZ variants). Its
+                    // keyed group cell keeps its
+                    // test-visible key while sharing the same column width
+                    // as every other chip, instead of opening its own
+                    // full-width row below. The day's disturbance flags are
+                    // NOT shown here (the chart's disturbance row already
+                    // spells them per day), so on a flagged and a flag-less
+                    // day alike the group is exactly this chip.
+                    // Flag EDITING stays diary-side (data entry), the chip
+                    // writes through the unchanged _writeMark path. A
+                    // marked day's temperature is excluded from the
+                    // evaluation arithmetic (the day behaves like an
+                    // unmeasured one — see lib/domain/evaluation.dart);
+                    // the mark does NOT affect cycle-start suggestions
+                    // (bleeding continuity only), and it IS the temperature
+                    // curve's rendering key (marked days render lighter —
+                    // owner decision 2026-09-19).
+                    SizedBox(
+                      key: const ValueKey('cycleSheetExcludeGroup'),
+                      child: gridChip(
+                        l10n.cycleSheetSetIgnoreTemperature,
+                        hasExcluded,
+                        icon: Icons.visibility_off_outlined,
+                        (wanted) => _writeMark(
+                          ref,
+                          type: CycleMarkTypes.ignoreTemperature,
+                          remove: !wanted,
+                        ),
+                        width: chipWidth,
+                      ),
                     ),
                     // The first-higher placement goes through the consistency
                     // dialog check (the dialog fires on PLACEMENT only, the
@@ -600,48 +666,6 @@ final class CycleDayPanel extends ConsumerWidget {
               },
             ),
           ),
-          // The exclusion group (owner decision 2026-09-19: manual-only
-          // exclusion, made visible): the temperature-ignore chip lives in
-          // its own keyed group BELOW the marks grid — the two-column chip
-          // layout cannot carry a mid-grid group row. The day's disturbance
-          // flags are NOT shown here (the chart's disturbance row already
-          // spells them per day), so on a flagged and a flag-less day alike
-          // the group is exactly this chip in the first column; its width
-          // matches the grid chips' column width. Flag EDITING stays
-          // diary-side (data entry), the chip writes through the unchanged
-          // _writeMark path. A marked day's temperature is excluded from
-          // the evaluation arithmetic (the day behaves like an unmeasured
-          // one — see lib/domain/evaluation.dart); the mark does NOT affect
-          // cycle-start suggestions (bleeding continuity only), and it IS
-          // the temperature curve's rendering key (marked days render
-          // lighter — owner decision 2026-09-19).
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final chipWidth = _gridChipWidth(constraints.maxWidth);
-                return Column(
-                  key: const ValueKey('cycleSheetExcludeGroup'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    gridChip(
-                      l10n.cycleSheetSetIgnoreTemperature,
-                      hasExcluded,
-                      icon: Icons.visibility_off_outlined,
-                      (wanted) => _writeMark(
-                        ref,
-                        type: CycleMarkTypes.ignoreTemperature,
-                        remove: !wanted,
-                      ),
-                      width: chipWidth,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
         ],
       ),
     );
