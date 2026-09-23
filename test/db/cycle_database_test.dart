@@ -1861,9 +1861,21 @@ void main() {
         final summary = await importJsonToDatabase(target, json);
         expect(summary.entriesInvalid, 0);
         expect(summary.entriesWritten, 2);
+        // The export document carries only observation keys — never the
+        // createdAt/updatedAt audit columns — and importing the day stamps
+        // fresh audit values for it. The round trip is therefore compared on
+        // the stored day data (via dailyEntryFromDrift), not on the audit
+        // columns, which keeps this deterministic instead of wall-clock
+        // dependent.
         expect(
-          await target.entriesDao.allEntries(),
-          unorderedEquals(await db.entriesDao.allEntries()),
+          [
+            for (final row in await target.entriesDao.allEntries())
+              dailyEntryFromDrift(row),
+          ],
+          unorderedEquals([
+            for (final row in await db.entriesDao.allEntries())
+              dailyEntryFromDrift(row),
+          ]),
           reason: 'import stores exactly the source day set',
         );
 
