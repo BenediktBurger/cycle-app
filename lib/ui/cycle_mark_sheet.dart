@@ -560,7 +560,7 @@ final class CycleDayPanel extends ConsumerWidget {
                     // begin; the chart draws the boundary line where the
                     // grouping opens the group.
                     gridChip(
-                      l10n.cycleSheetCycleStartLabel,
+                      l10n.termCycleStart,
                       hasCycleStart,
                       icon: Icons.flag_outlined,
                       (wanted) => _writeMark(

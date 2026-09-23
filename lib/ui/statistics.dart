@@ -241,7 +241,7 @@ final class _CycleTableCard extends StatelessWidget {
               _cell(
                 context,
                 Text(
-                  l10n.statisticsTableCycleStart,
+                  l10n.termCycleStart,
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),

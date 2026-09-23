@@ -15,6 +15,10 @@
   "termCervixFirmness": "Cervix firmness",
   "termMeasurementTime": "Measurement time",
   "termFirstHigher": "First higher measurement",
+  "termCycleStart": "Cycle start",
+  "@termCycleStart": {
+    "description": "Name of the cycleStart mark (the day panel's first chip) and, at the same time, the \"Cycle start\" column header of the statistics table — one string on both surfaces so the two names cannot drift."
+  },
   "termCycleDays": "{n} days",
   "@termCycleDays": {
     "placeholders": {
@@ -119,7 +123,6 @@
   "cycleJumpToDate": "Jump to date",
   "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
-  "cycleSheetCycleStartLabel": "Cycle start",
   "cycleSheetSuzEveningLabel": "SUZ from this evening",
   "@cycleSheetSuzEveningLabel": {
     "description": "Static label of the SUZ-evening chip (the chip state, not the label, carries set/remove). TODO(user-review): the wording replaces the old set/remove labels that said \"today\" (heute) while the panel opens for an arbitrary selected day — pending the expert review."
@@ -197,7 +200,7 @@
   "cycleSheetSuzSuggestionEvening": "Suggested: sicher unfruchtbare Zeit begins this evening (rule D)",
   "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
   "cycleLegendSex": "Sex (X per time of day)",
-  "cycleLegendDisturbance": "Interrupted days (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
+  "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
     "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
   },
@@ -229,7 +232,6 @@
     "description": "A cycle's first higher measurement as a day-of-cycle number: the earliest entry among all cycles in the metrics block, and the first-higher column of the cycle table."
   },
   "statisticsCycleTable": "Cycle table",
-  "statisticsTableCycleStart": "Cycle start",
   "statisticsTableLength": "Length",
   "statisticsDistribution": "Distribution",
   "settingsLanguage": "Language",

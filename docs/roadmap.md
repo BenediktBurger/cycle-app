@@ -101,8 +101,6 @@ worth doing at all.
 - On a returning app start the onboarding/about gate can flash for one frame
   until settings hydration applies (same single-frame pattern as other
   hydrated settings).
-- statistics.dart card builders mix styles (top-level
-  _countCard/_lengthsListCard functions vs the _MetricCard class).
 - Some test files carry historical section banners from a former cleanup
   pass ("former test/… (bodies concatenated verbatim)") that now only
   document section origin — the wording could mislead a reader into

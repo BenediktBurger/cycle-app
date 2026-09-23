@@ -466,7 +466,7 @@ const _glossaryEn = [
   'Baseline',
   'Sicher unfruchtbare Zeit (SUZ)',
   'Measurement time',
-  'Interrupted days (sp late to bed, a frequent night awakening, '
+  'Disturbed measurement (sp late to bed, a frequent night awakening, '
       'alk alcohol, kr illness)',
   'Cervix position',
   'Cervix firmness',
@@ -485,11 +485,11 @@ const _glossaryDe = [
   'Aufwachtemperatur in °C',
   'Temperatur ignoriert (heller gezeichnet)',
   'Umrandete höhere Messungen',
-  'vorzeitiger Temperaturanstieg',
+  'Vorzeitiger Temperaturanstieg',
   'Basislinie',
   'Sicher unfruchtbare Zeit (SUZ)',
   'Messzeitpunkt',
-  'Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, '
+  'Messstörung (sp Spät ins Bett, a Nachts öfter aufstehen, '
       'alk Alkohol, kr Krank)',
   'Muttermund-Position',
   'Muttermund-Festigkeit',
@@ -1736,7 +1736,7 @@ void main() {
       find.descendant(
         of: find.byKey(const ValueKey('cycleHelpSheet')),
         matching: find.text(
-          'Interrupted days (sp late to bed, '
+          'Disturbed measurement (sp late to bed, '
           'a frequent night awakening, alk alcohol, kr illness)',
         ),
       ),
@@ -1763,7 +1763,7 @@ void main() {
       find.descendant(
         of: find.byKey(const ValueKey('cycleHelpSheet')),
         matching: find.text(
-          'Gestörte Messung (sp Spät ins Bett, '
+          'Messstörung (sp Spät ins Bett, '
           'a Nachts öfter aufstehen, alk Alkohol, kr Krank)',
         ),
       ),

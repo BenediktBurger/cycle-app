@@ -12,6 +12,10 @@
   "termCervixFirmness": "Muttermund-Festigkeit",
   "termMeasurementTime": "Messzeitpunkt",
   "termFirstHigher": "Erste höhere Messung",
+  "termCycleStart": "Zyklusbeginn",
+  "@termCycleStart": {
+    "description": "Name des Zyklusbeginn-Marks (der erste Chip im Tag-Panel) und zugleich Spaltentitel „Zyklusbeginn“ in der Zyklen-Tabelle der Statistik — eine Zeichenkette auf beiden Flächen, damit die beiden Namen nicht auseinanderlaufen."
+  },
   "termCycleDays": "{n} Tage",
   "@termCycleDays": {
     "placeholders": {
@@ -95,13 +99,12 @@
   "cycleHelpShow": "Zeichenerklärung anzeigen",
   "cycleHelpTitle": "Zeichenerklärung",
   "cycleLegendCircledHigher": "Umrandete höhere Messungen",
-  "cycleLegendArrowHigher": "vorzeitiger Temperaturanstieg",
+  "cycleLegendArrowHigher": "Vorzeitiger Temperaturanstieg",
   "cycleLegendBaseline": "Basislinie",
   "cycleNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
   "cycleJumpToDate": "Zum Datum springen",
   "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
-  "cycleSheetCycleStartLabel": "Zyklusbeginn",
   "cycleSheetSuzEveningLabel": "SUZ ab diesem Abend",
   "cycleSheetSuzMorningLabel": "SUZ ab diesem Morgen",
   "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
@@ -151,7 +154,7 @@
   "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend",
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh",
   "cycleLegendSex": "Sex (X je Zeitpunkt)",
-  "cycleLegendDisturbance": "Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
+  "cycleLegendDisturbance": "Messstörung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
   "statisticsNoData": "Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier Statistiken.",
@@ -174,7 +177,6 @@
     "description": "Die erste höhere Messung eines Zyklus als Zyklustag-Nummer: der früheste Schwellenwert-Eintrag unter allen Zyklen im Metrik-Kasten und die erste-höhere-Spalte in der Zyklen-Tabelle."
   },
   "statisticsCycleTable": "Zyklen-Tabelle",
-  "statisticsTableCycleStart": "Zyklusbeginn",
   "statisticsTableLength": "Länge",
   "statisticsDistribution": "Verteilung",
   "settingsLanguage": "Sprache",
