@@ -100,15 +100,15 @@ jobs:
           [ -n "$v" ] || { echo "Could not read a 'version: A.B.C[+N]' line from pubspec.yaml (pre-release state? half-committed bump?)"; exit 1; }
           echo "v=$v" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cycle-app-${{ steps.ver.outputs.v }}-armeabi-v7a-unsigned
           path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cycle-app-${{ steps.ver.outputs.v }}-arm64-v8a-unsigned
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cycle-app-${{ steps.ver.outputs.v }}-x86_64-unsigned
           path: build/app/outputs/flutter-apk/app-x86_64-release.apk
