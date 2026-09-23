@@ -234,6 +234,58 @@
   "statisticsCycleTable": "Cycle table",
   "statisticsTableLength": "Length",
   "statisticsDistribution": "Distribution",
+  "statisticsObservedCyclesTitle": "Observed cycles",
+  "@statisticsObservedCyclesTitle": {
+    "description": "Card title of the cycle-count surface on the statistics screen: all observed cycles. The card's caption names the composition (in this app + the observed-cycles-outside-app setting value)."
+  },
+  "statisticsCyclesInApp": "in this app: {n}",
+  "@statisticsCyclesInApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles recorded IN this app (mark-opened cycles). Numbers only — the compositional meaning of the total."
+  },
+  "statisticsCyclesOutsideApp": "outside: {n}",
+  "@statisticsCyclesOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles observed outside this app (the settings value), shown when it is non-zero."
+  },
+  "statisticsStandardDeviation": "Standard deviation",
+  "@statisticsStandardDeviation": {
+    "description": "Population standard deviation (std-dev over the whole observed set, not an N-1 sample estimate) — descriptive fact only."
+  },
+  "statisticsMetricBleedingDuration": "Bleeding duration",
+  "statisticsMetricRiseSpan": "First higher measurement → cycle end",
+  "@statisticsMetricRiseSpan": {
+    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
+  },
+  "statisticsCycleDay": "cycle day {n}",
+  "@statisticsCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+  },
+  "statisticsFirstHigherReal": "strictly after the mucus peak",
+  "@statisticsFirstHigherReal": {
+    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+  },
+  "statisticsFirstHigherAny": "over all cycles",
+  "@statisticsFirstHigherAny": {
+    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
+  },
+  "statisticsFirstHigherRealMissing": "no first higher measurement marked strictly after the mucus peak",
+  "@statisticsFirstHigherRealMissing": {
+    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+  },
   "settingsLanguage": "Language",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
@@ -250,6 +302,10 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "How many cycles you observed before using this app (e.g. on paper). The cycle numbers on the cycle page only start counting after this value.",
   "settingsObservedCyclesOutsideAppError": "Please enter a whole number ≥ 0",
+  "settingsObservedCyclesOutsideAppCount": "Number of observed cycles",
+  "@settingsObservedCyclesOutsideAppCount": {
+    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
+  },
   "cycleOrdinal": "Cycle {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -452,5 +508,12 @@
   "@cycleDayPanelClose": {
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
-  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
+  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)",
+  "statisticsCycles": "Cycle lengths",
+  "statisticsOnsets": "Cycle starts",
+  "@statisticsOnsets": {
+    "description": "Card title of the statistics screen's list of the mark-driven cycle starts (the recorded dates of the user-placed cycleStart marks that opened a cycle group). The key mirrors the domain function menstruationOnsetDates on purpose, to keep one name across the boundary."
+  },
+  "statisticsShortest": "Shortest",
+  "statisticsLongest": "Longest"
 }

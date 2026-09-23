@@ -179,6 +179,58 @@
   "statisticsCycleTable": "Zyklen-Tabelle",
   "statisticsTableLength": "Länge",
   "statisticsDistribution": "Verteilung",
+  "statisticsObservedCyclesTitle": "Beobachtete Zyklen",
+  "@statisticsObservedCyclesTitle": {
+    "description": "Card title of the cycle-count surface on the statistics screen: all observed cycles. The card's caption names the composition (in this app + the observed-cycles-outside-app setting value)."
+  },
+  "statisticsCyclesInApp": "in dieser App: {n}",
+  "@statisticsCyclesInApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles recorded IN this app (mark-opened cycles). Numbers only — the compositional meaning of the total."
+  },
+  "statisticsCyclesOutsideApp": "außerhalb: {n}",
+  "@statisticsCyclesOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles observed outside this app (the settings value), shown when it is non-zero."
+  },
+  "statisticsStandardDeviation": "Standardabweichung",
+  "@statisticsStandardDeviation": {
+    "description": "Population standard deviation (StdAbw über die gesamte beobachtete Menge, kein N-1-Schätzwert) — beschreibender Rechenwert."
+  },
+  "statisticsMetricBleedingDuration": "Blutungsdauer",
+  "statisticsMetricRiseSpan": "Erste höhere Messung → Zyklusende",
+  "@statisticsMetricRiseSpan": {
+    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
+  },
+  "statisticsCycleDay": "Zyklustag {n}",
+  "@statisticsCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+  },
+  "statisticsFirstHigherReal": "streng nach dem Schleimhöhepunkt",
+  "@statisticsFirstHigherReal": {
+    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+  },
+  "statisticsFirstHigherAny": "über alle Zyklen",
+  "@statisticsFirstHigherAny": {
+    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
+  },
+  "statisticsFirstHigherRealMissing": "keine erste höhere Messung streng nach dem Schleimhöhepunkt markiert",
+  "@statisticsFirstHigherRealMissing": {
+    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+  },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
@@ -195,6 +247,10 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "Wie viele Zyklen du vor dieser App beobachtet hast (z. B. auf Papier). Die Zyklus-Nummern auf der Zyklusseite fangen erst nach dieser Zahl an zu zählen.",
   "settingsObservedCyclesOutsideAppError": "Bitte eine ganze Zahl ≥ 0 eingeben",
+  "settingsObservedCyclesOutsideAppCount": "Anzahl der beobachteten Zyklen",
+  "@settingsObservedCyclesOutsideAppCount": {
+    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
+  },
   "cycleOrdinal": "Zyklus {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -372,5 +428,9 @@
   "@cycleDayPanelClose": {
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
-  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)"
+  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
+  "statisticsCycles": "Zykluslängen",
+  "statisticsOnsets": "Zyklusbeginne",
+  "statisticsShortest": "Kürzester",
+  "statisticsLongest": "Längster"
 }

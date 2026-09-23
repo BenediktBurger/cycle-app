@@ -9,6 +9,13 @@
 // stay arithmetic-only (Mode M, ADR-0001, Accepted): no fertility verdicts.
 // Keep it that way in reviews.
 //
+// Open data question, deliberately NOT handled here: one very long
+// mark-driven cycle (e.g. a pregnancy-span cycle, where the next
+// cycleStart mark sits months later) skews every average, std-dev and
+// span computed from these lists — whether such spans should be capped,
+// excluded or marked is a needs-discussion expert question (roadmap),
+// not a settled rule. No cap, no exclusion is applied in this layer.
+//
 // The per-cycle facts below REUSE [evaluateCycles]
 // (lib/domain/evaluation.dart) for the first-higher truth: the evaluated
 // candidates are arithmetic render-time artifacts, and picking the earliest
@@ -22,6 +29,203 @@ import 'date_only.dart';
 import 'evaluation.dart';
 import 'marks.dart';
 import 'models.dart';
+
+/// The number of mark-driven cycles: cycle groups that opened at a
+/// user-placed cycleStart mark (`startsAtMenstruation == true` — the
+/// leading pre-mark group, which predates the first cycleStart mark, is
+/// NOT one of them and shifts nothing). This is the count of
+/// CycleEvaluations from [evaluateCycles] whose group carries a cycle
+/// start, taken straight from the grouping — suitable for the statistics
+/// screen's "N cycles" line (add the observed-cycles-outside-app setting
+/// value on top of it there, never here).
+int markDrivenCycleCount(
+  List<DailyEntry> entries,
+  List<CycleMark> marks,
+) =>
+    groupIntoCycles(entries, marks).where((c) => c.startsAtMenstruation).length;
+
+/// Descriptive scalars (min, max, mean, standard deviation) over a list
+/// of ints — used for cycle lengths, bleeding durations and rise-to-end
+/// spans alike.
+///
+/// Data-shape note: what a pregnancy-span cycle does to these values is
+/// the open data question documented in the file header — the numbers
+/// below are computed verbatim from the input.
+final class DescriptiveSummary {
+  const DescriptiveSummary({
+    required this.minimum,
+    required this.maximum,
+    required this.average,
+    required this.standardDeviation,
+  });
+
+  /// Smallest input value, or null when there is no data.
+  final int? minimum;
+
+  /// Largest input value, or null when there is no data.
+  final int? maximum;
+
+  /// Mean of the input, or null when there is no data.
+  final double? average;
+
+  /// Population standard deviation (variance divided by the number of
+  /// values N, not N-1), or null when there is no data. Rationale: the
+  /// tracked days ARE the complete recorded data set — these describe
+  /// what was observed, they are not an estimate for a population of
+  /// unobserved cycles; a single value has standard deviation 0.
+  final double? standardDeviation;
+}
+
+/// Computes the [DescriptiveSummary] of [values]. Empty input yields all
+/// nulls — mirroring the existing CycleLengthSummary rules ("no data"
+/// instead of a zero-based misleading average).
+DescriptiveSummary summarizeInts(List<int> values) {
+  if (values.isEmpty) {
+    return const DescriptiveSummary(
+      minimum: null,
+      maximum: null,
+      average: null,
+      standardDeviation: null,
+    );
+  }
+  final mean = values.fold<int>(0, (sum, v) => sum + v) / values.length;
+  // Population variance: every squared deviation divided by N (see the
+  // field's doc comment for why the population variant is the definition
+  // of record).
+  final variance = values.fold<double>(0, (sum, v) {
+        final deviation = v - mean;
+        return sum + deviation * deviation;
+      }) /
+      values.length;
+  return DescriptiveSummary(
+    minimum: values.reduce((a, b) => a < b ? a : b),
+    maximum: values.reduce((a, b) => a > b ? a : b),
+    average: mean,
+    standardDeviation: math.sqrt(variance),
+  );
+}
+
+/// The bleeding duration of ONE cycle window, in INCLUSIVE calendar days:
+/// the span from the cycle's FIRST bleeding day to its LAST bleeding day
+/// ("Mensbeginn → Mensende" as a first-to-last-days span). Definition of
+/// record:
+///
+/// - a bleeding day is a day with a bleeding level >= 1 (spotting
+///   counts); a level of 0 (none) is not;
+/// - interruption days (untracked, unbleeding) INSIDE the span count
+///   through it — the span is first-day-to-last-day, not the number of
+///   bleeding days themselves;
+/// - the count is inclusive (`last - first + 1`, DST-free via
+///   [DateOnly]); a single bleeding day has duration 1;
+/// - null when the window contains no bleeding day.
+///
+/// This one documented helper is the single definition behind the
+/// per-cycle bleeding statistics.
+int? bleedingSpanInDays(List<DailyEntry> cycleDays) {
+  DateTime? first;
+  DateTime? last;
+  for (final entry in cycleDays) {
+    if (entry.bleeding.level < 1) continue;
+    final day = DateOnly.normalize(entry.date);
+    if (first == null || day.isBefore(first)) first = day;
+    if (last == null || day.isAfter(last)) last = day;
+  }
+  if (first == null || last == null) return null;
+  return DateOnly.daysBetween(last, first) + 1;
+}
+
+/// The per-cycle bleeding durations of the MARK-driven cycles, in group
+/// order: one value per numbered cycle (the leading pre-mark group is not
+/// a numbered cycle and is excluded — the same dash convention the cycle
+/// page's evaluation table applies to it), null for a cycle without any
+/// bleeding day. Pure arithmetic over [evaluateCycles] output (ADR-0001:
+/// render-time computation, nothing persisted).
+List<int?> cycleBleedingDurationsInDays(
+  List<CycleEvaluation> evaluations,
+) =>
+    [
+      for (final evaluation in evaluations)
+        if (evaluation.cycle.startsAtMenstruation)
+          bleedingSpanInDays(evaluation.cycle.days),
+    ];
+
+/// The per-cycle spans from the cycle's marked first higher measurement
+/// to the cycle's end, in INCLUSIVE calendar days, for the MARK-driven
+/// cycles in group order.
+///
+/// The cycle end is the calendar day BEFORE the next mark-driven cycle
+/// start (the last day before the next menstruation); untracked gap days
+/// before the next start count through, calendar-honest exactly like
+/// [cycleLengthsInDays]. Single definitions: null when the cycle has no
+/// first-higher mark, and null for the LAST mark-driven cycle (no known
+/// follow-up start — its end is open). The leading pre-mark group is
+/// excluded like everywhere here. Pure arithmetic over [evaluateCycles]
+/// output (ADR-0001).
+List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
+  final spans = <int?>[];
+  for (var i = 0; i < evaluations.length; i++) {
+    final evaluation = evaluations[i];
+    if (!evaluation.cycle.startsAtMenstruation) continue;
+    final rise = evaluation.firstHigherDay;
+    // The next group of a mark-driven cycle is always mark-driven itself
+    // (the leading group can only be the first group) — its start is the
+    // end-of-window anchor here. Absent for the last cycle.
+    final nextStart =
+        i + 1 < evaluations.length ? evaluations[i + 1].cycle.startDate : null;
+    if (rise == null || nextStart == null) {
+      spans.add(null);
+      continue;
+    }
+    final cycleEnd = DateOnly.previousDay(DateOnly.normalize(nextStart));
+    spans.add(DateOnly.daysBetween(cycleEnd, DateOnly.normalize(rise)) + 1);
+  }
+  return spans;
+}
+
+/// The earliest (minimum) cycle-day number of the cycle's marked first
+/// higher measurement across all mark-driven cycles, as a record of TWO
+/// documented variants:
+///
+/// - `any`: the minimum over every mark-driven cycle that carries a
+///   first-higher mark, wherever it sits relative to the mucus peak;
+/// - `afterMucusPeak`: the minimum over only those first-higher marks
+///   lying STRICTLY AFTER the cycle's marked mucus peak day — the "real
+///   first higher". A cycle without a marked mucus peak (or with its rise
+///   at/before the peak) does not qualify for this variant.
+///
+/// Both variants are returned (possibly null when no cycle qualifies for
+/// them). The cycle-day number is `(firstHigherDay - cycleStart) + 1`
+/// (the cycle's marked start day is day 1 — DST-free via [DateOnly]).
+/// A first-higher mark inside the LEADING pre-mark group has no cycle
+/// start to count from and is ignored. Pure arithmetic over
+/// [evaluateCycles] output ([CycleEvaluation.firstHigherDay] and
+/// [CycleEvaluation.mucusPeakDay] — the marks are anchored per cycle
+/// window; ADR-0001: render-time computation, nothing persisted).
+({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay(
+  List<CycleEvaluation> evaluations,
+) {
+  int? earliestAny;
+  int? earliestAfterPeak;
+  for (final evaluation in evaluations) {
+    if (!evaluation.cycle.startsAtMenstruation) continue;
+    final rise = evaluation.firstHigherDay;
+    if (rise == null) continue;
+    final cycleDayNumber = DateOnly.daysBetween(
+            rise, DateOnly.normalize(evaluation.cycle.startDate)) +
+        1;
+    if (earliestAny == null || cycleDayNumber < earliestAny) {
+      earliestAny = cycleDayNumber;
+    }
+    final peak = evaluation.mucusPeakDay;
+    final riseIsStrictlyAfterPeak = peak != null &&
+        DateOnly.daysBetween(rise, DateOnly.normalize(peak)) > 0;
+    if (riseIsStrictlyAfterPeak &&
+        (earliestAfterPeak == null || cycleDayNumber < earliestAfterPeak)) {
+      earliestAfterPeak = cycleDayNumber;
+    }
+  }
+  return (any: earliestAny, afterMucusPeak: earliestAfterPeak);
+}
 
 /// Cycle lengths in days: differences between consecutive mark-driven
 /// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
