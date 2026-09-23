@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'support/diary_harness.dart';
+import 'support/finders.dart';
 import 'support/viewport.dart';
 import 'support/error_collector.dart';
 
@@ -140,7 +141,7 @@ void main() {
   /// controller listener rebuild the form (the time row's visibility
   /// follows the temperature).
   Future<void> enterTemperature(WidgetTester tester, String text) async {
-    await tester.enterText(find.byType(TextFormField).first, text);
+    await tester.enterText(diaryTemperatureField(), text);
     await tester.pumpAndSettle();
   }
 
@@ -150,8 +151,10 @@ void main() {
     await tester.pumpWidget(_measuredTimeHarness.scope());
     await tester.pumpAndSettle();
 
+    // The time row's visibility rides on the keyed picker button: both the
+    // label and the button exist only while the temperature is plausible.
     expect(
-      find.text('Gemessen um'),
+      measuredTimeField(),
       findsNothing,
       reason:
           'without a temperature there is no measurement time to '
@@ -162,7 +165,7 @@ void main() {
     await enterTemperature(tester, '36.5');
 
     expect(
-      find.text('Gemessen um'),
+      measuredTimeField(),
       findsOneWidget,
       reason: 'with a temperature the picker row becomes visible',
     );
@@ -190,6 +193,7 @@ void main() {
       final tempField = find.byType(TextFormField).first;
       final tempTop = tester.getTopLeft(tempField).dy;
       final tempBottom = tester.getBottomRight(tempField).dy;
+      // Deliberate: this geometry pins the label's rect, not the control.
       final timeTop = tester.getTopLeft(find.text('Gemessen um')).dy;
       expect(
         timeTop,
@@ -267,7 +271,7 @@ void main() {
     await enterTemperature(tester, '999');
 
     expect(
-      find.text('Gemessen um'),
+      measuredTimeField(),
       findsNothing,
       reason:
           'a temperature outside the BBT range can never be saved, '
@@ -324,7 +328,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('06:47'), findsNothing);
 
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
@@ -348,14 +352,14 @@ void main() {
     // current-time prefill), then removes the temperature again — e.g. the
     // thermometer showed an unusable value — and saves the mucus-only day.
     await enterTemperature(tester, '36.5');
-    expect(find.text('Gemessen um'), findsOneWidget);
+    expect(measuredTimeField(), findsOneWidget);
     await enterTemperature(tester, '');
     // Mucus sign S so the day is a real, meaningful entry (not an empty
     // form save).
-    await tester.tap(find.text('S'));
+    await tester.tap(diaryChip('mucusSign', 's'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
@@ -380,7 +384,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '36.5');
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
@@ -560,7 +564,7 @@ void main() {
     expect(_bbtText(tester), '36.4');
 
     // The user types a new temperature but does NOT save.
-    await tester.enterText(find.byType(TextFormField).first, '39.9');
+    await tester.enterText(diaryTemperatureField(), '39.9');
     await tester.pumpAndSettle();
 
     // Navigating away loads the next day fresh — the unsaved edit is gone
@@ -606,7 +610,7 @@ void main() {
     // First recorded day, bleeding "leicht" (level 2): already
     // menstruation-level, so the suggestion predicate flags it as a cycle
     // start — the prompt does not wait for the central levels.
-    await _promptHarness.saveWithBleeding(tester, 'leicht');
+    await _promptHarness.saveWithBleeding(tester, Bleeding.light);
 
     expect(
       find.byType(AlertDialog),
@@ -656,7 +660,7 @@ void main() {
     await tester.pumpWidget(_promptHarness.scope());
     await tester.pumpAndSettle();
 
-    await _promptHarness.saveWithBleeding(tester, 'stark');
+    await _promptHarness.saveWithBleeding(tester, Bleeding.heavy);
 
     expect(find.byType(AlertDialog), findsOneWidget);
     await tester.tap(
@@ -686,7 +690,7 @@ void main() {
     await tester.pumpWidget(_promptHarness.scope());
     await tester.pumpAndSettle();
 
-    await _promptHarness.saveWithBleeding(tester, 'Schmierblutung');
+    await _promptHarness.saveWithBleeding(tester, Bleeding.spotting);
 
     expect(
       find.byType(AlertDialog),
@@ -716,7 +720,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, 'stark');
+      await _promptHarness.saveWithBleeding(tester, Bleeding.heavy);
 
       expect(
         find.byType(AlertDialog),
@@ -750,7 +754,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, 'leicht');
+      await _promptHarness.saveWithBleeding(tester, Bleeding.light);
 
       expect(
         find.byType(AlertDialog),
@@ -789,7 +793,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, 'leicht');
+      await _promptHarness.saveWithBleeding(tester, Bleeding.light);
 
       expect(
         find.byType(AlertDialog),

@@ -12,6 +12,7 @@
 //      800x600 viewport) and the bleeding-chip save + mark readback helpers.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
+import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'database.dart';
+import 'finders.dart';
 import 'viewport.dart';
 
 /// Entry-form selector scope: the real app over an in-memory database,
@@ -77,13 +79,12 @@ class DiaryHarness {
   void tallSurface(WidgetTester tester, {double height = 2400}) =>
       useTallSurface(tester, height: height);
 
-  /// Selects the bleeding chip [chipLabel] (German: the pinned locale) and
-  /// saves the day. The labels used here are unique on the form — the
-  /// cervix rows reuse "mittel" for their own chips.
-  Future<void> saveWithBleeding(WidgetTester tester, String chipLabel) async {
-    await tester.tap(find.widgetWithText(ChoiceChip, chipLabel));
+  /// Selects the bleeding chip [bleeding] (by key, not by label) and saves
+  /// the day through the form's bottom save button.
+  Future<void> saveWithBleeding(WidgetTester tester, Bleeding bleeding) async {
+    await tester.tap(diaryChip('bleeding', bleeding.name));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
   }
 

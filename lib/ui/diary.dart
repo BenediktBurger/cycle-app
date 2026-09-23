@@ -399,6 +399,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     children: [
                       Expanded(
                         child: TextFormField(
+                          key: const ValueKey('diaryTemperatureField'),
                           controller: _bbtController,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -437,6 +438,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                                 const SizedBox(width: 4),
                               ],
                               OutlinedButton(
+                                key: const ValueKey('measuredTimeField'),
                                 onPressed: _pickTime,
                                 child: Text(
                                   _measuredAt == null
@@ -497,6 +499,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                       children: [
                         for (final disturbance in TempDisturbance.values)
                           FilterChip(
+                            key: ValueKey(
+                              'disturbanceChip-${disturbance.name}',
+                            ),
                             label: Text(switch (disturbance) {
                               TempDisturbance.sp => l10n.disturbanceLateToBed,
                               TempDisturbance.a =>
@@ -537,6 +542,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 children: [
                   for (final bleeding in Bleeding.values)
                     ChoiceChip(
+                      key: ValueKey('bleedingChip-${bleeding.name}'),
                       label: Text(switch (bleeding) {
                         Bleeding.none => l10n.bleedingNone,
                         Bleeding.spotting => l10n.bleedingSpotting,
@@ -571,6 +577,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 runSpacing: 6,
                 children: [
                   ChoiceChip(
+                    key: const ValueKey('mucusSignChip-unset'),
                     label: Text(l10n.mucusSignUnset),
                     selected: _sign == null,
                     onSelected: (_) => setState(() {
@@ -580,6 +587,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final sign in MucusSign.values)
                     ChoiceChip(
+                      key: ValueKey('mucusSignChip-${sign.name}'),
                       label: Text(mucusSignSymbol(sign)),
                       selected: _sign == sign,
                       onSelected: (selected) => setState(() {
@@ -594,11 +602,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 Text(l10n.mucusQuality),
                 const SizedBox(height: 4),
                 Wrap(
+                  key: const ValueKey('mucusQualityRow'),
                   spacing: 6,
                   runSpacing: 6,
                   children: [
                     for (final quality in MucusQuality.values)
                       ChoiceChip(
+                        key: ValueKey('mucusQualityChip-${quality.name}'),
                         label: Text(mucusQualityToken(quality)),
                         selected: _quality == quality,
                         onSelected: (selected) => setState(() {
@@ -627,6 +637,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final position in CervixPosition.values)
                     ChoiceChip(
+                      key: ValueKey('cervixPositionChip-${position.name}'),
                       label: Text(switch (position) {
                         CervixPosition.low => l10n.cervixPositionLow,
                         CervixPosition.medium => l10n.cervixPositionMedium,
@@ -656,6 +667,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final opening in CervixOpening.values)
                     ChoiceChip(
+                      key: ValueKey('cervixOpeningChip-${opening.name}'),
                       label: Text(switch (opening) {
                         CervixOpening.closed => l10n.cervixOpeningClosed,
                         CervixOpening.middle => l10n.cervixOpeningMiddle,
@@ -682,6 +694,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                   for (final firmness in CervixFirmness.values)
                     ChoiceChip(
+                      key: ValueKey('cervixFirmnessChip-${firmness.name}'),
                       label: Text(switch (firmness) {
                         CervixFirmness.hard => l10n.cervixFirmnessHard,
                         CervixFirmness.halfSoft => l10n.cervixFirmnessHalfSoft,
@@ -710,6 +723,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 children: [
                   for (final timing in SexTiming.values)
                     FilterChip(
+                      key: ValueKey('sexTimingChip-${timing.name}'),
                       label: Text(switch (timing) {
                         SexTiming.start => l10n.sexTimingStart,
                         SexTiming.middle => l10n.sexTimingMiddle,
@@ -730,11 +744,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 spacing: 8,
                 children: [
                   FilterChip(
+                    key: const ValueKey('painChip-breast'),
                     label: Text(l10n.termBreastPain),
                     selected: _painBreast,
                     onSelected: (v) => setState(() => _painBreast = v),
                   ),
                   FilterChip(
+                    key: const ValueKey('painChip-mittelschmerz'),
                     label: Text(l10n.termMittelschmerz),
                     selected: _painMittelschmerz,
                     onSelected: (v) => setState(() => _painMittelschmerz = v),
@@ -751,6 +767,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               const SizedBox(height: 12),
               Center(
                 child: FilledButton.icon(
+                  key: const ValueKey('diarySaveButton'),
                   onPressed: () => _save(l10n),
                   icon: const Icon(Icons.save_outlined),
                   label: Text(l10n.save),

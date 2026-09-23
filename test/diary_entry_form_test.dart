@@ -23,6 +23,7 @@ import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/diary_harness.dart';
+import 'support/finders.dart';
 import 'support/viewport.dart';
 import 'support/error_collector.dart';
 
@@ -107,13 +108,13 @@ void main() {
     }
 
     // Select the heaviest level and save the day.
-    await tester.ensureVisible(find.text('stark'));
+    await tester.ensureVisible(diaryChip('bleeding', 'heavy'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('stark'));
+    await tester.tap(diaryChip('bleeding', 'heavy'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     // Read the saved day back through the database provider — the same
@@ -134,15 +135,15 @@ void main() {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    // The German label of the new top level sits next to "stark"; the exact
-    // matcher below only hits "sehr stark", never the middle chip "stark".
-    await tester.ensureVisible(find.text('sehr stark'));
+    // Selecting the top level locates the chip by key — "sehr stark" and
+    // the middle "stark" differ only in a shared substring of their labels.
+    await tester.ensureVisible(diaryChip('bleeding', 'maximum'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('sehr stark'));
+    await tester.tap(diaryChip('bleeding', 'maximum'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final (:db, :date) = await savedDayOf(tester);
@@ -186,16 +187,16 @@ void main() {
     expect(find.text('offen'), findsOneWidget);
 
     // Select a disambiguating combination: position tief, opening offen.
-    await tester.ensureVisible(find.text('tief'));
+    await tester.ensureVisible(diaryChip('cervixPosition', 'low'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('tief'));
+    await tester.tap(diaryChip('cervixPosition', 'low'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('offen'));
+    await tester.tap(diaryChip('cervixOpening', 'open'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     // Read the saved day back through the database provider — the same
@@ -239,20 +240,20 @@ void main() {
     );
 
     // Select breast and Mittelschmerz together, then breast only.
-    await tester.ensureVisible(find.text('Brustschmerz (B)'));
+    await tester.ensureVisible(diaryChip('pain', 'breast'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Brustschmerz (B)'));
+    await tester.tap(diaryChip('pain', 'breast'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Mittelschmerz (M)'));
+    await tester.tap(diaryChip('pain', 'mittelschmerz'));
     await tester.pumpAndSettle();
     // Tapping the selected breast chip again deselects it (chip toggle,
     // same semantics as the bleeding chips).
-    await tester.tap(find.text('Brustschmerz (B)'));
+    await tester.tap(diaryChip('pain', 'breast'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     // Read the saved day back through the database provider — the same
@@ -318,14 +319,14 @@ void main() {
       reason: 'the firmness option weich must be selectable',
     );
 
-    await tester.ensureVisible(find.text('weich'));
+    await tester.ensureVisible(diaryChip('cervixFirmness', 'soft'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('weich'));
+    await tester.tap(diaryChip('cervixFirmness', 'soft'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     // Read the saved day back through the database provider — the same
@@ -346,17 +347,17 @@ void main() {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('hart'));
+    await tester.ensureVisible(diaryChip('cervixFirmness', 'hard'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('hart'));
+    await tester.tap(diaryChip('cervixFirmness', 'hard'));
     await tester.pumpAndSettle();
     // Tap-again-deselect: the chips pattern of position/opening.
-    await tester.tap(find.text('hart'));
+    await tester.tap(diaryChip('cervixFirmness', 'hard'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final (:db, :date) = await savedDayOf(tester);
@@ -392,16 +393,16 @@ void main() {
     );
 
     // Select TWO slots at once — the old single bool is gone.
-    await tester.ensureVisible(find.text('Anfang'));
+    await tester.ensureVisible(diaryChip('sexTiming', 'start'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Anfang'));
+    await tester.tap(diaryChip('sexTiming', 'start'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ende'));
+    await tester.tap(diaryChip('sexTiming', 'end'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final (:db, :date) = await savedDayOf(tester);
@@ -420,18 +421,18 @@ void main() {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Mitte'));
+    await tester.ensureVisible(diaryChip('sexTiming', 'middle'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Mitte'));
+    await tester.tap(diaryChip('sexTiming', 'middle'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Mitte')); // deselect again
+    await tester.tap(diaryChip('sexTiming', 'middle')); // deselect again
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ende'));
+    await tester.tap(diaryChip('sexTiming', 'end'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Speichern'));
+    await tester.ensureVisible(diarySaveButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
     final (:db, :date) = await savedDayOf(tester);
@@ -488,40 +489,48 @@ void main() {
         // Walk every option of the row, including the two-glyph f/S: the
         // single-glyph options around it leave the row narrow, f/S forces
         // the reflow. Tapping S first brings up the quality row (its rule
-        // is exercised below with f/S).
-        for (final glyph in ['t', 'Ø', 'f', 'S']) {
-          await tester.ensureVisible(find.text(glyph));
+        // is exercised below with f/S). The chips are located by key —
+        // their labels are the glyphs, but the taps' targets are not what
+        // this repro asserts.
+        for (final sign in [
+          MucusSign.t,
+          MucusSign.nothing,
+          MucusSign.f,
+          MucusSign.s,
+        ]) {
+          await tester.ensureVisible(diaryChip('mucusSign', sign.name));
           await tester.pumpAndSettle();
-          await tester.tap(find.text(glyph));
+          await tester.tap(diaryChip('mucusSign', sign.name));
           await tester.pumpAndSettle();
         }
         // Selecting S shows the quality row (quality only exists with S);
         // a recorded quality chips the row on.
-        await tester.tap(find.widgetWithText(ChoiceChip, 'EW'));
+        await tester.tap(diaryChip('mucusQuality', 'ew'));
         await tester.pumpAndSettle();
 
-        // Leaving S for f/S hides the quality row again.
-        await tester.ensureVisible(find.text('f/S'));
+        // Leaving S for f/S hides the quality row again (addressed by the
+        // chip's key: 'EW' is the display token, 'ew' the row's key token).
+        await tester.ensureVisible(diaryChip('mucusSign', 'fs'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('f/S'));
+        await tester.tap(diaryChip('mucusSign', 'fs'));
         await tester.pumpAndSettle();
         expect(
-          find.widgetWithText(ChoiceChip, 'EW'),
+          diaryChip('mucusQuality', 'ew'),
           findsNothing,
           reason: 'the quality row must hide once the sign leaves S',
         );
 
         // And A (Ausfluss) — the last two-glyph-risky option after f/S.
-        await tester.tap(find.text('A'));
+        await tester.tap(diaryChip('mucusSign', 'a'));
         await tester.pumpAndSettle();
 
         // End on f/S for the save round-trip. Tap-again would deselect (the
         // unset chip turns null), so A → f/S is the final selection.
-        await tester.tap(find.text('f/S'));
+        await tester.tap(diaryChip('mucusSign', 'fs'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Speichern'));
+        await tester.ensureVisible(diarySaveButton());
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Speichern'));
+        await tester.tap(diarySaveButton());
         await tester.pumpAndSettle();
 
         final (:db, :date) = await savedDayOf(tester);

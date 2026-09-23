@@ -1,11 +1,11 @@
 // Shared chart pump harness: one scope wiring for the cycle-chart widget
-// tests. Every chart test (test/cycle_chart_test.dart) pumps the
-// ZyklusScreen with the
-// same three stream overrides (daily entries, marks, selected date) plus
-// the app's MaterialApp wiring (localization delegates, en locale, seeded
-// color scheme); the parameters below cover the shapes the tests grew into —
-// ProviderScope outside vs. inside the MaterialApp, an optional dark
-// scheme, and optionally no theme wiring at all.
+// tests. Every chart test pumps the ZyklusScreen with the same three stream
+// overrides (daily entries, marks, selected date) plus the app's MaterialApp
+// wiring (localization delegates, en locale, seeded color scheme).
+//
+// The parameters below cover the shapes the tests grew into: ProviderScope
+// outside vs. inside the MaterialApp, an optional dark scheme, and
+// optionally no theme wiring at all.
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -14,6 +14,7 @@ import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// The seed color of the app's scheme (lib/main.dart), pinned so tests can
 /// reach the same ColorScheme the charts render with.
@@ -96,4 +97,15 @@ Widget chartHarness({
   return scopeInsideMaterialApp
       ? materialApp
       : ProviderScope(overrides: overrides, child: materialApp);
+}
+
+/// Pumps [widget] into the tester and then runs one settling cycle — the
+/// standard (pumpWidget, pumpAndSettle) pair every chart test opens with.
+///
+/// A test that needs extra intermediate frames (stream re-emit timers, dialog
+/// animations) keeps its explicit pumps and calls this first, then pumps
+/// those frames itself.
+Future<void> pumpChart(WidgetTester tester, Widget widget) async {
+  await tester.pumpWidget(widget);
+  await tester.pumpAndSettle();
 }

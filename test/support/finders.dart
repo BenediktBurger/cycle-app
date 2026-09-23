@@ -23,6 +23,11 @@ Finder navLabel(String label) => find.descendant(
 /// below the chart while a tapped day's options are showing.
 Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 
+/// The day options panel's "edit day" icon button (the form-jump affordance
+/// in the panel header next to the day label and the close button).
+Finder cycleDayPanelEditButton() =>
+    find.byKey(const ValueKey('cycleDayPanelEdit'));
+
 /// The Zyklus screen's vertical list scroller (the horizontal chart
 /// scroller is excluded by direction). Offstage tabs are skipped
 /// by default, so in the full-app scope this still matches once — if a
@@ -50,6 +55,119 @@ Finder chartCellCorner(String row) => find.byKey(ValueKey('${row}Corner'));
 /// A finder scoped inside a chart-block cell.
 Finder chartCellContent(int index, String row, Finder inner) =>
     find.descendant(of: chartCell(index, row), matching: inner);
+
+/// A diary entry-form chip: [group] is the chip row's key group (`bleeding`,
+/// `disturbance`, `mucusSign`, `mucusQuality`, `cervixPosition`,
+/// `cervixOpening`, `cervixFirmness`, `sexTiming`, `pain`) and [value] the
+/// option token — the domain enum's `.name` (e.g. bleeding `none`…`maximum`,
+/// sex timing `start`/`middle`/`end`, pain `breast`/`mittelschmerz`, whose
+/// row has no enum of its own), or `unset` for the mucus sign row's
+/// "no sign" chip. The cervix rows' leading unset chips ("—") carry no key
+/// (the mucus sign row's does, via the `unset` value above), and the
+/// mucusQuality chips only exist while the S sign is selected (the row
+/// wrapper is keyed `mucusQualityRow`).
+///
+/// The Tagebuch screen mounts exactly once (the shell's IndexedStack keeps
+/// every tab built, but offstage tabs are skipped by default finders), so a
+/// bare key matches once whenever the diary tab is in view; tests that
+/// reach the form from a shell-level scope keep their existing
+/// TagebuchScreen-descendant wrapper around this finder.
+Finder diaryChip(String group, String value) =>
+    find.byKey(ValueKey('${group}Chip-$value'));
+
+/// The entry form's temperature input (the BBT field, the form's first
+/// field).
+Finder diaryTemperatureField() =>
+    find.byKey(const ValueKey('diaryTemperatureField'));
+
+/// The entry form's measured-time button: visible only while a plausible
+/// temperature is entered, showing the stored or prefilled time.
+Finder measuredTimeField() => find.byKey(const ValueKey('measuredTimeField'));
+
+/// The entry form's bottom save button — NOT the AppBar's save action,
+/// which carries its own `diarySaveAction` key.
+Finder diarySaveButton() => find.byKey(const ValueKey('diarySaveButton'));
+
+/// A mark chip in the day options panel: [markType] is the mark-type token
+/// (`cycleStart`, `mucusPeakDay`, `firstHigherMeasurement`, `suzEvening`,
+/// `suzMorning`, `ignoreTemperature`) — the panel keys every chip
+/// `cycleSheetChip-<token>`, so the finder argument follows the domain's
+/// mark vocabulary instead of the chip's static label. The
+/// temperature-exclusion chip carries its chip key too, inside the keyed
+/// `cycleSheetExcludeGroup` cell of the shared grid; the group key stays
+/// available for tests that scope at the whole group.
+///
+/// The chip keys are unique in the tree (mark chips render only in the
+/// panel, whose presence a test already ensures before a tap), so a bare
+/// key matches once; a test sharing the tree with a retargeted open
+/// panel must gate the tap behind the day tap that opens it, as everywhere
+/// else in the cycle-list harnesses.
+Finder cycleSheetChip(String markType) =>
+    find.byKey(ValueKey('cycleSheetChip-$markType'));
+
+/// The rise-consistency dialog's Keep choice (keeps the just-placed,
+/// inconsistent first-higher mark standing — same effect as dismissing).
+Finder cycleSheetRiseKeepButton() =>
+    find.byKey(const ValueKey('cycleSheetRiseKeepButton'));
+
+/// The rise-consistency dialog's Remove choice (removes the just-placed
+/// first-higher mark through the toggle path).
+Finder cycleSheetRiseRemoveButton() =>
+    find.byKey(const ValueKey('cycleSheetRiseRemoveButton'));
+
+// --- settings screen -------------------------------------------------------
+
+/// The settings screen's language switcher (the `SegmentedButton<String>`
+/// heading the language card).
+///
+/// The screen mounts once, and default finders skip the IndexedStack's
+/// offstage tabs, so a bare key matches once whenever the settings tab is
+/// in view — but it stays resolvable UNDER a pushed route (the about page,
+/// an import dialog), since those leave the settings screen on stage; a
+/// test sharing the tree with such an overlay scopes through it.
+Finder settingsLanguageSwitcher() =>
+    find.byKey(const ValueKey('languageSwitcher'));
+
+/// One segment of the language switcher: [value] is the switcher's model
+/// token (`'system'`/`'de'`/`'en'` — the segment model strings, not the
+/// label wording). The key lives on the segment's label Text (a
+/// ButtonSegment cannot carry a key, and the rendered segment is an
+/// unkeyed TextButton — see settings.dart); it is sought as the
+/// switcher-scoped descendant so the tap cannot land anywhere else.
+Finder settingsLanguageSegment(String value) => find.descendant(
+  of: settingsLanguageSwitcher(),
+  matching: find.byKey(ValueKey('languageSegment-$value')),
+);
+
+/// The settings screen's theme-mode switcher (the
+/// `SegmentedButton<ThemeMode>` heading the theme card) — same
+/// mounting/offstage story as settingsLanguageSwitcher above.
+Finder settingsThemeSwitcher() => find.byKey(const ValueKey('themeSwitcher'));
+
+/// One segment of the theme-mode switcher: [value] is the ThemeMode enum
+/// name (`'system'`/`'light'`/`'dark'`), not the label wording. Key rides on
+/// the segment label Text, scoped inside the switcher (mirrors
+/// settingsLanguageSegment above).
+Finder settingsThemeSegment(String value) => find.descendant(
+  of: settingsThemeSwitcher(),
+  matching: find.byKey(ValueKey('themeSegment-$value')),
+);
+
+/// The settings pane's JSON export launch button (the download action of
+/// the export card).
+Finder settingsExportButton() =>
+    find.byKey(const ValueKey('settingsExportButton'));
+
+/// The settings pane's JSON import launch button (opens the JSON import
+/// dialog).
+Finder settingsImportJsonButton() =>
+    find.byKey(const ValueKey('settingsImportJsonButton'));
+
+/// The drip CSV import card's launch button — distinct from the dialog's
+/// apply action, which shares the l10n label and is scoped through the
+/// AlertDialog where needed.
+Finder settingsImportDripButton() =>
+    find.byKey(const ValueKey('settingsImportDripButton'));
 
 /// The color-scheme brightness actually materialized by the running app,
 /// taken from the shell's Scaffold (below the MaterialApp theme wiring).

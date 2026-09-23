@@ -222,10 +222,12 @@ final class CycleDayPanel extends ConsumerWidget {
           content: Text(body),
           actions: [
             TextButton(
+              key: const ValueKey('cycleSheetRiseKeepButton'),
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(l10n.cycleSheetRiseConsistencyKeep),
             ),
             TextButton(
+              key: const ValueKey('cycleSheetRiseRemoveButton'),
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
                 // Remove goes through the existing mark-toggle path.
@@ -450,10 +452,12 @@ final class CycleDayPanel extends ConsumerWidget {
       bool selected,
       ValueChanged<bool> onSelected, {
       required IconData icon,
+      Key? key,
       double? width,
     }) => SizedBox(
       width: width,
       child: FilterChip(
+        key: key,
         label: Text(label),
         avatar: Icon(icon),
         selected: selected,
@@ -565,6 +569,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       l10n.termCycleStart,
                       hasCycleStart,
                       icon: Icons.flag_outlined,
+                      key: const ValueKey('cycleSheetChip-cycleStart'),
                       (wanted) => _writeMark(
                         ref,
                         type: CycleMarkTypes.cycleStart,
@@ -576,6 +581,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       l10n.termMucusPeak,
                       hasPeak,
                       icon: Icons.circle,
+                      key: const ValueKey('cycleSheetChip-mucusPeakDay'),
                       (wanted) => _writeMark(
                         ref,
                         type: CycleMarkTypes.mucusPeakDay,
@@ -611,6 +617,7 @@ final class CycleDayPanel extends ConsumerWidget {
                         l10n.cycleSheetSetIgnoreTemperature,
                         hasExcluded,
                         icon: Icons.visibility_off_outlined,
+                        key: const ValueKey('cycleSheetChip-ignoreTemperature'),
                         (wanted) => _writeMark(
                           ref,
                           type: CycleMarkTypes.ignoreTemperature,
@@ -626,6 +633,9 @@ final class CycleDayPanel extends ConsumerWidget {
                       l10n.termFirstHigher,
                       hasFirstHigher,
                       icon: Icons.adjust,
+                      key: const ValueKey(
+                        'cycleSheetChip-firstHigherMeasurement',
+                      ),
                       (wanted) => _writeFirstHigherMark(
                         context,
                         ref,
@@ -643,6 +653,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       l10n.cycleSheetSuzEveningLabel,
                       hasSuzEvening,
                       icon: Icons.nightlight_outlined,
+                      key: const ValueKey('cycleSheetChip-suzEvening'),
                       (wanted) => _writeSuzMark(
                         ref,
                         type: CycleMarkTypes.suzEvening,
@@ -655,6 +666,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       l10n.cycleSheetSuzMorningLabel,
                       hasSuzMorning,
                       icon: Icons.wb_sunny_outlined,
+                      key: const ValueKey('cycleSheetChip-suzMorning'),
                       (wanted) => _writeSuzMark(
                         ref,
                         type: CycleMarkTypes.suzMorning,

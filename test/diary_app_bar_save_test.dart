@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/diary_harness.dart';
+import 'support/finders.dart';
 
 final _harness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
 
@@ -47,17 +48,21 @@ void main() {
 
     // The bottom button stays: both surfaces offer the same action.
     expect(
-      find.ancestor(
-        of: find.text('Speichern'),
-        matching: find.byType(FilledButton),
-      ),
+      diarySaveButton(),
       findsOneWidget,
       reason:
           'the bottom save button is kept in addition to the app-bar '
           'action',
     );
+    expect(
+      tester.widget<Widget>(diarySaveButton()),
+      isA<FilledButton>(),
+      reason:
+          'the bottom save button is the FilledButton, not the app-bar '
+          'action',
+    );
 
-    await tester.enterText(find.byType(TextFormField).first, '36.5');
+    await tester.enterText(diaryTemperatureField(), '36.5');
     await tester.pumpAndSettle();
 
     await tester.tap(_saveAction());

@@ -218,15 +218,17 @@ void main() {
       await tester.tap(navLabel('Einstellungen'));
       await tester.pumpAndSettle();
 
-      final languageSwitcher = find.byType(SegmentedButton<String>);
       expect(
-        tester.widget<SegmentedButton<String>>(languageSwitcher).selected,
+        tester
+            .widget<SegmentedButton<String>>(settingsLanguageSwitcher())
+            .selected,
         const {'de'},
         reason: 'the stored language choice must appear in the switcher',
       );
-      final themeSwitcher = find.byType(SegmentedButton<ThemeMode>);
       expect(
-        tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher).selected,
+        tester
+            .widget<SegmentedButton<ThemeMode>>(settingsThemeSwitcher())
+            .selected,
         {ThemeMode.dark},
         reason: 'the stored theme choice must appear in the switcher',
       );
@@ -285,21 +287,11 @@ void main() {
 
       // Switch language to English (the UI rebuilds under our fingers —
       // the subsequent lookups use the English labels).
-      await tester.tap(
-        find.descendant(
-          of: find.byType(SegmentedButton<String>),
-          matching: find.text('English'),
-        ),
-      );
+      await tester.tap(settingsLanguageSegment('en'));
       await tester.pumpAndSettle();
 
       // Theme to Dark.
-      await tester.tap(
-        find.descendant(
-          of: find.byType(SegmentedButton<ThemeMode>),
-          matching: find.text('Dark'),
-        ),
-      );
+      await tester.tap(settingsThemeSegment('dark'));
       await tester.pumpAndSettle();
 
       // Range to 35–39 °C: lower picker first, then the upper one (the

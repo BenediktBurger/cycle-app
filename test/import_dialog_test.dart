@@ -80,20 +80,21 @@ Widget settingsHarness() => ProviderScope(
 /// Pumps the app shell, opens the settings tab and the drip CSV import
 /// dialog.
 ///
-/// All taps go through the navigation bar / dedicated card labels: all tabs
-/// stay mounted (IndexedStack), so the 'Einstellungen' label also matches the
-/// offstage screen's AppBar.
+/// The tab goes through the shared navigation finder (nav surface, both
+/// adaptive surfaces match — see finders.dart): all tabs stay mounted
+/// (IndexedStack), so the 'Einstellungen' label also matches the offstage
+/// screen's AppBar.
 Future<void> pumpAndOpenDripDialogInShell(WidgetTester tester) async {
   await tester.pumpWidget(appScope(locale: const Locale('de')));
   await tester.pumpAndSettle();
   await tester.tap(navLabel('Einstellungen'));
   await tester.pumpAndSettle();
 
-  // Scroll the lazy settings list until the drip card is built; the finders
-  // are scoped to the settings screen (the shell keeps the other tabs'
-  // scrollables in the tree).
+  // Scroll the lazy settings list until the drip button is built; the
+  // scrollable is scoped to the settings screen (the shell keeps the other
+  // tabs' scrollables in the tree).
   await tester.scrollUntilVisible(
-    find.text('Drip-Daten importieren'),
+    settingsImportDripButton(),
     200,
     scrollable: find
         .descendant(
@@ -103,7 +104,7 @@ Future<void> pumpAndOpenDripDialogInShell(WidgetTester tester) async {
         .first,
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.widgetWithText(FilledButton, 'CSV importieren').first);
+  await tester.tap(settingsImportDripButton());
   await tester.pumpAndSettle();
 }
 
@@ -118,7 +119,7 @@ void main() {
           await tester.pumpWidget(settingsHarness());
           await tester.pumpAndSettle();
           await tester.scrollUntilVisible(
-            find.text('Drip-Daten importieren'),
+            settingsImportDripButton(),
             200,
             scrollable: find
                 .descendant(
@@ -128,9 +129,7 @@ void main() {
                 .first,
           );
           await tester.pumpAndSettle();
-          await tester.tap(
-            find.widgetWithText(FilledButton, 'CSV importieren').first,
-          );
+          await tester.tap(settingsImportDripButton());
           await tester.pumpAndSettle();
           // The dialog is open; now the keyboard slides in and the dialog
           // relayouts into the reduced area — the reproducing step.

@@ -40,16 +40,16 @@ void main() {
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
-    // The settings list is a lazy ListView; scroll down until the drip card
-    // is built, then make sure its button is fully on-screen (the list is
+    // The settings list is a lazy ListView; scroll down until the drip
+    // card's launch button is built (the list is
     // allowed to grow above the drip card — e.g. the theme-mode switcher —
     // so fixed-amount drag loops would be brittle; the card ORDER assertion
-    // below does not depend on how much content sits above). Both finders
-    // are scoped to the settings screen: with the shell keeping every tab
+    // below does not depend on how much content sits above). The scrollable
+    // is scoped to the settings screen: with the shell keeping every tab
     // mounted, the diary and statistics screens bring their own scrollables
     // and ListViews into the tree.
     await tester.scrollUntilVisible(
-      find.text('Drip-Daten importieren'),
+      settingsImportDripButton(),
       200,
       scrollable: find
           .descendant(
@@ -80,13 +80,11 @@ void main() {
       reason: 'The drip card must sit below the JSON import card',
     );
 
-    // Opening the drip dialog: the launch button is pinned by its dedicated
-    // label (dripImportButton, "CSV importieren"), distinct from the card
-    // heading ("Drip-Daten importieren") AND from the dialog's Apply action
-    // (checked after the dialog opens below).
-    final dripButton = find
-        .widgetWithText(FilledButton, 'CSV importieren')
-        .first;
+    // Opening the drip dialog: the launch button is keyed
+    // (settingsImportDripButton), distinct from the card heading
+    // ('Drip-Daten importieren') AND from the dialog's Apply action
+    // (shares the button's l10n label; scoped to the dialog below).
+    final dripButton = settingsImportDripButton();
     await tester.ensureVisible(dripButton);
     await tester.pumpAndSettle();
     await tester.tap(dripButton);

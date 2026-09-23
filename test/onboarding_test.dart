@@ -75,14 +75,16 @@ void main() {
     await tester.pumpAndSettle();
 
     // The one way forward — bring it into view ( ListView builds only the
-    // visible children) and tap it.
+    // visible children) and tap it. The key, not the button wording: the
+    // action is located by key, the label renders from the generated
+    // localizations.
     await tester.dragUntilVisible(
-      find.text('Weiter'),
+      find.byKey(const ValueKey('aboutContinueButton')),
       find.byType(ListView),
       const Offset(0, -150),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Weiter'));
+    await tester.tap(find.byKey(const ValueKey('aboutContinueButton')));
     await tester.pumpAndSettle();
 
     expect(
