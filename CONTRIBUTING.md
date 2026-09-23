@@ -245,14 +245,15 @@ failures):
 
 ## 5. JSON export/import limits
 
-- **Export paths differ per platform on purpose** — no share-sheet plugin:
-  Settings → JSON export shows the whole document as copyable text on ALL
-  platforms; a file save/download additionally exists on web (browser
-  download) and on desktop (written next to the user's home directory,
-  when `HOME`/`USERPROFILE` is set).
+- **Export routes** — Settings → JSON export shows the whole document as
+  copyable text on ALL platforms; a real save-as dialog additionally
+  exists on every native target (the `file_picker` plugin — desktop file
+  choosers and Android's SAF alike; web uses the browser download instead).
+  On the native targets the system share sheet (via `share_plus`) stays
+  available alongside the save dialog as a second hand-off.
 - **Import:** paste the exported JSON into the settings import dialog, or
   pick a file — every platform except the bare stub offers the picker
-  (web: browser file input; native/Android: `file_selector`, SAF-backed on
+  (web: browser file input; native/Android: `file_picker`, SAF-backed on
   Android). Merge policy: merges by
   (profile, day) with **overwrite** of conflicting days; known marks are
   skipped (idempotent); unknown profiles are re-created. A summary counts

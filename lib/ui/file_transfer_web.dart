@@ -14,10 +14,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 
-bool get canSaveFile => true;
+const bool canSaveFile = true;
 // No system share sheet on web — the browser download above carries the
 // export file, so the share button stays hidden here.
-bool get canShareFile => false;
+const bool canShareFile = false;
 const bool canPickFile = true;
 
 /// Triggers a browser download of [content] as [filename] (anchor + Blob).

@@ -3,13 +3,13 @@
 // design, ADR-0005), and JSON export/import.
 //
 // Export UX: an always-available JSON text screen with a copy button on
-// every platform, a file save/download where the platform supports it
-// (web, desktop with a home directory), and a system share sheet where
-// share_plus provides one (Android/iOS, desktops — the Android route to a
-// real export file, since free-form paths do not exist there). Import:
+// every platform, a file save-as dialog where the platform supports one
+// (a real dialog on all native io targets via the file_picker plugin,
+// SAF-backed on Android; browser download on web), and a system share
+// sheet alongside on the native targets (share_plus). Import:
 // paste-JSON dialog
 // everywhere, plus a file picker on web and on the native targets (the
-// file_selector plugin, SAF-backed on Android). The drip CSV import (below
+// file_picker plugin, SAF-backed on Android). The drip CSV import (below
 // the JSON card) reuses the same dialog widget: the mapper turns the CSV
 // into an export document that goes through the existing
 // importJsonToDatabase (merge policy for free).

@@ -1,25 +1,23 @@
 // Widget tests for the JSON export's file actions on the preview page:
 // the share action that hands a real, export-named file to the system
-// share sheet (the Android/iOS route — free-form file paths and
-// home-directory writes do not exist there, and the native hint long
-// promised a share sheet), its success and failure snackbars, and the
-// desktop save button the share work must not regress.
+// share sheet, its success and failure snackbars, and the save-as-dialog
+// path (file_picker's save dialog on every native target now, Android SAF
+// included) the share work must not regress.
 //
 // Harness notes: the tests pin the German locale and use the in-memory
 // drift database override (test/support/database.dart) with a seeded
 // entry so the export is non-empty — nothing platform-channel based.
-// The share path goes through the test-only seam in file_transfer_io.dart
-// (shareFileOverride, the same pattern as the picker's
-// pickFileTextOverride): the real share plugin is never invoked, the
-// suite stays hermetic. Navigation mimics the user path — Settings ›
-// JSON-Export › preview page. The German literals below (button,
-// snackbars) must stay in step with the localization entries
-// (exportShare / exportShared / exportShareFailed) they exercise.
-import 'dart:io';
-
+// The share and save paths go through the test-only seams in
+// file_transfer_io.dart (shareFileOverride / saveFileOverride, the same
+// pattern as the picker's pickFileTextOverride): the real plugins are
+// never invoked, the suite stays hermetic. Navigation mimics the user
+// path — Settings › JSON-Export › preview page. The German literals below
+// (button, snackbars) must stay in step with the localization entries
+// (exportShare / exportShared / exportShareFailed / exportSaved /
+// exportSaveFailed) they exercise.
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show canSaveFile, shareFileOverride;
+    show canSaveFile, saveFileOverride, shareFileOverride;
 import 'package:cycle_app/ui/settings.dart'
     show EinstellungenScreen, exportFileName;
 import 'package:flutter/material.dart';
@@ -37,6 +35,8 @@ const shareButtonLabel = 'Teilen';
 const sharedSnackbarLabel = 'Datei geteilt.';
 const shareFailedSnackbarLabel = 'Teilen fehlgeschlagen.';
 const saveFileButtonLabel = 'Als Datei speichern';
+const savedSnackbarLabel = 'Datei gespeichert.';
+const saveFailedSnackbarLabel = 'Speichern fehlgeschlagen.';
 const previewTitleLabel = 'JSON-Vorschau';
 const exportButtonLabel = 'JSON-Export';
 
@@ -170,22 +170,13 @@ void main() {
     });
   });
 
-  group('export preview: desktop save regression', () {
-    testWidgets('the preview keeps offering the home-directory save button', (
+  group('export preview: save-as-dialog path', () {
+    testWidgets('the preview page offers the save button', (
       WidgetTester tester,
     ) async {
-      // The desktop save path keys off HOME/USERPROFILE; the widget-test
-      // environment cannot rewrite those variables for the running
-      // process, so the runner's own environment is the fixture: it must
-      // carry a home directory for this target class.
-      expect(
-        Platform.environment['HOME'],
-        isNotEmpty,
-        reason:
-            'the test environment is expected to carry HOME — '
-            'without it the desktop save button legitimately stays '
-            'hidden and this goal is undriveable',
-      );
+      // Platform-independent since the save-as dialog replaced the old
+      // $HOME write: every native io target (including Android SAF) can
+      // offer the dialog, so `canSaveFile` is just `true` now.
       expect(canSaveFile, isTrue);
 
       await pumpToExportPreview(tester);
@@ -193,9 +184,65 @@ void main() {
         find.text(saveFileButtonLabel),
         findsOneWidget,
         reason:
-            'desktop keeps the existing save-as-file path even '
-            'after the share action arrives',
+            'the save-as-file path survives next to the share action '
+            '(save dialog on the native targets, browser download on web)',
       );
+    });
+
+    testWidgets('tapping save drives the save implementation through the seam '
+        '(filename and JSON content) and confirms with a snackbar', (
+      WidgetTester tester,
+    ) async {
+      final saves = <(String, String)>[];
+      saveFileOverride = (filename, content) async {
+        saves.add((filename, content));
+        return true;
+      };
+      addTearDown(() => saveFileOverride = null);
+
+      await pumpToExportPreview(tester);
+      await tester.tap(find.text(saveFileButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(
+        saves,
+        hasLength(1),
+        reason:
+            'the save tap must reach the save implementation '
+            '(here: the hermetic test seam standing in for the real '
+            'save-as dialog)',
+      );
+      final (filename, content) = saves.single;
+      expect(filename, exportFileName);
+      expect(
+        content,
+        contains('schema_version'),
+        reason:
+            'the saved file content must be the self-describing '
+            'export JSON',
+      );
+      expect(find.text(savedSnackbarLabel), findsOneWidget);
+    });
+
+    testWidgets('a failed save reports the failure snackbar', (
+      WidgetTester tester,
+    ) async {
+      saveFileOverride = (filename, content) async => false;
+      addTearDown(() => saveFileOverride = null);
+
+      await pumpToExportPreview(tester);
+      await tester.tap(find.text(saveFileButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(saveFailedSnackbarLabel),
+        findsOneWidget,
+        reason:
+            'a save failure must be reported, mirroring the share '
+            'failure snackbar (a cancelled dialog also lands here — the '
+            'bool contract cannot tell cancel from failure)',
+      );
+      expect(find.text(savedSnackbarLabel), findsNothing);
     });
   });
 }
