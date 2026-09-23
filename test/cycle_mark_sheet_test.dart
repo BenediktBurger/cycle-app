@@ -122,9 +122,9 @@ Finder panelText(String label) =>
     find.descendant(of: cycleDayPanel(), matching: find.text(label));
 
 /// Whether the chip's merged semantics node carries the selected flag —
-/// the accessibility side of the Material selected state. The M3 check
-/// mark is canvas-painted (no Icon widget), so the visible state is
-/// asserted through the chip's `selected` property and this flag.
+/// the accessibility side of the Material selected state. The chips render
+/// without a check mark (`showCheckmark: false`), so the selection state
+/// is asserted via this flag and the chip's `selected` property.
 bool chipSelectedSemantics(WidgetTester tester, String label) =>
     tester.getSemantics(markChip(label)).flagsCollection.isSelected ==
     Tristate.isTrue;

@@ -422,12 +422,6 @@ Border _cellBorder(WidgetTester tester, int index, String row) {
       );
 }
 
-Border _cellRightBorder(WidgetTester tester, int index, String row) =>
-    _cellBorder(tester, index, row);
-
-Border _cellLeftBorder(WidgetTester tester, int index, String row) =>
-    _cellBorder(tester, index, row);
-
 Widget _gridLinesHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
@@ -2629,7 +2623,7 @@ void main() {
         'pain',
         'time',
       ]) {
-        final border = _cellRightBorder(tester, 1, row);
+        final border = _cellBorder(tester, 1, row);
         expect(
           border.right.width,
           closeTo(0.5, 0.01),
@@ -2715,7 +2709,7 @@ void main() {
           'pain',
           'time',
         ]) {
-          final thick = _cellRightBorder(tester, 4, row);
+          final thick = _cellBorder(tester, 4, row);
           expect(
             thick.right.width,
             closeTo(2, 0.01),
@@ -2727,13 +2721,13 @@ void main() {
             reason: 'row $row: the boundary border is solid onSurface',
           );
           // The neighboring cells keep the hairline.
-          final thinBefore = _cellRightBorder(tester, 3, row);
+          final thinBefore = _cellBorder(tester, 3, row);
           expect(
             thinBefore.right.width,
             closeTo(0.5, 0.01),
             reason: 'row $row: only the boundary cell is thick',
           );
-          final thinAfter = _cellRightBorder(tester, 5, row);
+          final thinAfter = _cellBorder(tester, 5, row);
           expect(
             thinAfter.right.width,
             closeTo(0.5, 0.01),
@@ -2762,7 +2756,7 @@ void main() {
       // The first cell of every row keeps the plain hairline.
       final onSurface = chartScheme(tester).onSurface;
       for (final row in const ['bleeding', 'mucus', 'time']) {
-        final border = _cellRightBorder(tester, 0, row);
+        final border = _cellBorder(tester, 0, row);
         expect(
           border.right.width,
           closeTo(0.5, 0.01),
@@ -2822,7 +2816,7 @@ void main() {
         'marks',
       ];
       for (final row in edgeThickRows) {
-        final border = _cellLeftBorder(tester, 0, row);
+        final border = _cellBorder(tester, 0, row);
         expect(
           border.left.width,
           closeTo(2, 0.01),
@@ -3484,6 +3478,45 @@ void main() {
               'premature rise, baseline, SUZ), then the below-chart strip '
               '(measurement time, disturbance, cervix position, cervix '
               'firmness, breast pain, note)',
+        );
+      },
+    );
+
+    testWidgets(
+      'the glossary entries render in the cycle tab\'s top-down appearance '
+      'order (de)',
+      (tester) async {
+        await tester.pumpWidget(
+          _helpSheetHarness(
+            entries: _helpSheetEntries(5),
+            locale: const Locale('de'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
+        await tester.pumpAndSettle();
+
+        // The mirrored en assertion next door: the sheet renders the same
+        // top-down entry sequence in the German wording `_glossaryDe`
+        // documents — de/en appearance order stays in parity (en/de parallel
+        // draft policy).
+        final labels = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('cycleHelpSheet')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data)
+            .whereType<String>()
+            .where(_glossaryDe.toSet().contains)
+            .toList();
+        expect(
+          labels,
+          _glossaryDe,
+          reason:
+              'the German sheet mirrors the en appearance order: signal '
+              'rows, temperature-curve group, below-chart strip',
         );
       },
     );

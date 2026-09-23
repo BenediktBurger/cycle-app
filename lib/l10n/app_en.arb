@@ -197,8 +197,8 @@
   "diaryCycleStartPromptBody": "The bleeding on this day suggests that a new cycle begins here. Set a cycle start mark on this day?",
   "diaryCycleStartPromptConfirm": "Set cycle start",
   "diaryCycleStartPromptDismiss": "Not now",
-  "cycleSheetSuzSuggestionEvening": "Suggested: sicher unfruchtbare Zeit begins this evening (rule D)",
-  "cycleSheetSuzSuggestionMorning": "Suggested: sicher unfruchtbare Zeit begins this morning (rule E)",
+  "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening (rule D)",
+  "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning (rule E)",
   "cycleLegendSex": "Sex (X per time of day)",
   "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
