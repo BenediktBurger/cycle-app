@@ -47,7 +47,7 @@ void main() {
       reason: 'the panel is NOT a modal route — the chart stays reachable',
     );
     expect(
-      find.text('Edit day'),
+      find.byKey(const ValueKey('cycleDayPanelEdit')),
       findsOneWidget,
       reason: 'the form jump stays reachable via "edit day"',
     );
@@ -119,7 +119,7 @@ void main() {
       findsNothing,
       reason: 'the close button dismisses the panel',
     );
-    expect(find.text('Edit day'), findsNothing);
+    expect(find.byKey(const ValueKey('cycleDayPanelEdit')), findsNothing);
   });
 
   testWidgets('a mark chip inside the panel writes through the MarksDao — the '

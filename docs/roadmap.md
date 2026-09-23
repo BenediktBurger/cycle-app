@@ -58,7 +58,7 @@ the sections above track planned work, git history keeps the record (see
 - [x] order legend entries according to their appearance on the cycle tab
 - [x] render the baseline on the cycle legend as dashed as it is on the cycle tab
 - [x] revisit language entries, can some be consolidated (e.g. cycle legend and cycle row?)?
-- [ ] mark sheet (implement all)
+- [x] mark sheet (implement all)
   - move edit between date and X in order to save space
   - checkmark overlaps the icon - do we need the checkmark at all?
   - comments should be in one column as well (not spanning the whole sheet)

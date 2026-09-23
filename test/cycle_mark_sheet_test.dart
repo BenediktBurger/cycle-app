@@ -1,20 +1,21 @@
 // Widget tests of the day options panel on the cycle tab (Mode M, ADR-0001):
-// tapping a chart day shows a NON-MODAL panel below the chart with the day
-// header (the selected day's locale-formatted label next to the close
-// button), the "edit day" action, the mark toggles as Material FilterChips
-// in a two-column grid (three columns on viewports from 600 dp of grid
-// width) — each chip carries the STATIC mark-name label plus its mark
-// type's identifying leading icon and shows the mark state itself
-// (selected fill plus check mark over the scrimmed avatar, announced as
-// selected to screen readers): the mucus peak, the first higher
+// tapping a chart day shows a NON-MODAL panel below the chart with a single
+// header row (the day's locale-formatted label, then the compact "edit day"
+// icon button, then the close button) and the mark toggles as Material
+// FilterChips in ONE shared two-column grid of equal column widths
+// (three columns on viewports from 600 dp of grid width) — ALL six chips
+// (the five mark chips AND the temperature-exclusion chip, which keeps its
+// keyed group cell inside the grid) — each chip carries the STATIC mark-name
+// label plus its mark type's identifying leading icon and shows the mark
+// state itself (the selected fill, announced as selected to screen readers;
+// the canvas-drawn check is off): the mucus peak, the first higher
 // measurement, the SUZ
 // start, the cycle start (the authoritative cycle boundary — bleeding only
-// suggests it) and the temperature exclusion inside its keyed group below
-// the grid — plus the computed info lines (derived artifacts such as the
-// baseline value, the 1-6 low numbering, the difference to the baseline
-// for marked candidates and the stopped-evaluation notice). Formerly a
-// modal bottom sheet; the fixture/scenarios and all write paths are
-// unchanged by the conversion.
+// suggests it) and the temperature exclusion — plus the computed info lines
+// (derived artifacts such as the baseline value, the 1-6 low numbering, the
+// difference to the baseline for marked candidates and the stopped-evaluation
+// notice). Formerly a modal bottom sheet; the fixture/scenarios and all
+// write paths are unchanged by the conversion.
 //
 // Unlike the evaluation section of test/cycle_chart_test.dart (fixed
 // marks streams), these tests write through the REAL MarksDao against an
@@ -98,6 +99,10 @@ String dayLabelOf(int day) => DateFormat.yMMMEd(
 /// The day header's close button (the explicit panel close affordance).
 Finder panelCloseButton() => find.byKey(const ValueKey('cycleDayPanelClose'));
 
+/// The day header's "edit day" icon button (the compact form-jump
+/// affordance between the day label and the close button).
+Finder panelEditButton() => find.byKey(const ValueKey('cycleDayPanelEdit'));
+
 /// The FilterChip inside the panel carrying one static mark [label] —
 /// panel-scoped because the screen's legend/summary texts can spell the
 /// same mark names outside the panel.
@@ -143,7 +148,7 @@ void main() {
         reason: 'the day tap shows the non-modal day options panel',
       );
       expect(
-        find.text('Edit day'),
+        panelEditButton(),
         findsOneWidget,
         reason: 'the form jump stays reachable via "edit day"',
       );
@@ -416,9 +421,9 @@ void main() {
       tester,
       entries: scenarioEntries,
     ); // no marks yet
-    // The chip's selected state rides its semantics (the M3 check mark is
-    // canvas-painted, not an Icon widget), so the screen-reader side is
-    // asserted alongside the widget state.
+    // The chip's selected state rides its semantics (the announced
+    // selection is part of the Material chip state), so the screen-reader
+    // side is asserted alongside the widget state.
     final semantics = tester.ensureSemantics();
 
     await tapCycleDay(tester, 4); // 9/10, an arbitrary day
@@ -452,12 +457,11 @@ void main() {
       isTrue,
       reason:
           'the selected chip announces itself (the built-in state '
-          'visualization: fill, check mark, semantics)',
+          'visualization: fill and semantics — the canvas check is off)',
     );
-    // The identity icon NEVER disappears with the selection: the M3 check
-    // is canvas-painted over a scrim ON TOP of the still-present avatar
-    // (the Icon widget stays in the tree under the paint, so the finder —
-    // not a bare byIcon, but the chip-scoped one — sees it).
+    // The identity icon NEVER disappears with the selection: the selected
+    // fill scrim sits ON TOP of the still-present avatar (no canvas-drawn
+    // check anymore — the icon carries the identity, the fill the state).
     expect(
       find.descendant(
         of: markChip('Mucus peak'),
@@ -466,7 +470,7 @@ void main() {
       findsOneWidget,
       reason:
           'the selected peak chip still carries its identifying '
-          'glyph under the scrimmed check mark',
+          'glyph under the selected fill',
     );
 
     await tester.tap(panelText('Mucus peak'));
@@ -547,8 +551,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Removing the second mark keeps the first one untouched. The chip can
-    // sit below the panel fold once the column carries the exclusion group
-    // too — scroll it into view first (same pattern as the SUZ chips).
+    // sit below the panel fold (the shared grid carries all six chips
+    // now) — scroll it into view first (same pattern as the SUZ chips).
     await scrollSheetTo(tester, panelText('First higher measurement'));
     await tester.tap(panelText('First higher measurement'));
     await tester.pumpAndSettle();
@@ -577,7 +581,7 @@ void main() {
     );
 
     await tapCycleDay(tester, 4); // 9/10
-    await tester.tap(find.text('Edit day'));
+    await tester.tap(panelEditButton());
     await tester.pumpAndSettle();
 
     expect(
@@ -591,7 +595,7 @@ void main() {
       reason: 'the shell switches to the Tagebuch tab',
     );
     expect(
-      find.text('Edit day'),
+      panelEditButton(),
       findsNothing,
       reason: 'the sheet closes after the navigation',
     );
@@ -613,7 +617,7 @@ void main() {
     ); // 9/8
     await tester.pumpAndSettle();
 
-    expect(find.text('Edit day'), findsOneWidget);
+    expect(panelEditButton(), findsOneWidget);
     expect(
       find.text('Low measurement 6'),
       findsOneWidget,
@@ -673,8 +677,11 @@ void main() {
 
     await tapCycleDay(tester, 0); // 9/6: before the six-low window
 
-    expect(find.text('Edit day'), findsOneWidget);
-    expect(find.byType(Text), findsWidgets); // the sheet itself renders
+    expect(panelEditButton(), findsOneWidget);
+    expect(
+      find.byType(Text),
+      findsWidgets,
+    ); // the sheet itself renders — see the harness
     for (final info in [
       'Baseline: 36.40',
       'Low measurement 1',
@@ -739,8 +746,8 @@ void main() {
           chipSelectedSemantics(tester, 'Cycle start'),
           isTrue,
           reason:
-              'the selected state carries fill, check mark and the '
-              'announced selection',
+              'the selected state carries fill and the announced '
+              'selection',
         );
         semantics.dispose();
       },
@@ -790,11 +797,11 @@ void main() {
     );
   });
 
-  group('ignoreTemperature toggle (the temperature-ignore mark)', () {
+  group('panel layout (the header row and the shared chip grid)', () {
     testWidgets(
-      'the panel layout: the day header on top, the edit-day action above '
-      'the chip grid, the five mark chips reading in two columns, the '
-      'exclusion group below the grid',
+      'the header row carries the day title, the edit-day affordance and '
+      'the close button — "edit day" sits between the title and the close, '
+      'and no full-width action precedes the grid',
       (tester) async {
         // A narrow surface pins the grid to its phone-width two columns (the
         // breakpoint is 600 dp of grid width — see the wide-viewport test).
@@ -805,14 +812,71 @@ void main() {
         );
         await tapCycleDay(tester, 4); // 9/10, an arbitrary day
 
-        Rect chipRect(String label) => tester.getRect(markChip(label));
-        const spacing = 8.0;
+        final titleTop = tester.getCenter(find.text(dayLabelOf(10))).dy;
+        final editTop = tester.getCenter(panelEditButton()).dy;
+        final closeTop = tester.getCenter(panelCloseButton()).dy;
 
-        final headerTop = tester.getTopLeft(find.text(dayLabelOf(10))).dy;
-        final closeTop = tester
-            .getTopLeft(find.byKey(const ValueKey('cycleDayPanelClose')))
-            .dy;
-        final editTop = tester.getTopLeft(find.text('Edit day')).dy;
+        // One header row: the title, the edit affordance and the close
+        // button all sit on the same line (row CENTERS — the icon
+        // buttons' 48 dp tap targets center the label text)...
+        expect(
+          (titleTop - editTop).abs(),
+          lessThan(4),
+          reason: 'the day title shares the header row with "edit day"',
+        );
+        expect(
+          (editTop - closeTop).abs(),
+          lessThan(4),
+          reason: '"edit day" shares the header row with the close button',
+        );
+        // ...reading left to right: title, edit, close. (The title's Text
+        // box fills the expanded header space — the ordering is asserted
+        // by the left edges.)
+        final titleRect = tester.getRect(find.text(dayLabelOf(10)));
+        final editRect = tester.getRect(panelEditButton());
+        final closeRect = tester.getRect(panelCloseButton());
+        expect(
+          titleRect.left,
+          lessThan(editRect.left),
+          reason: 'the day title reads left of the edit affordance',
+        );
+        expect(
+          editRect.left,
+          lessThan(closeRect.left),
+          reason:
+              '"edit day" sits between the title and the close button '
+              '(the icon buttons\' tap targets touch in the row)',
+        );
+        // The former full-width "edit day" action above the chips is gone —
+        // the compact header icon button replaces it.
+        expect(
+          find.descendant(
+            of: cycleDayPanel(),
+            matching: find.byType(FilledButton),
+          ),
+          findsNothing,
+          reason:
+              '"edit day" is the compact header icon button — no '
+              'full-width action above the grid anymore',
+        );
+      },
+    );
+
+    testWidgets(
+      'all six chips — the five mark chips AND the exclusion chip — share '
+      'ONE equal-width grid in the reading order cycle start, mucus peak, '
+      'exclusion, first higher, SUZ evening, SUZ morning: on a narrow '
+      'surface the last row completes evenly with the SUZ variants and '
+      'the exclusion sits directly before first higher',
+      (tester) async {
+        final (_, _) = await _pumpAt(
+          tester,
+          width: 500,
+          entries: scenarioEntries,
+        );
+        await tapCycleDay(tester, 4); // 9/10, an arbitrary day
+
+        Rect chipRect(String label) => tester.getRect(markChip(label));
         final cycleStart = chipRect('Cycle start');
         final peak = chipRect('Mucus peak');
         final firstHigher = chipRect('First higher measurement');
@@ -820,74 +884,86 @@ void main() {
         final suzMorn = chipRect('SUZ from this morning');
         final ignore = chipRect('Ignore temperature');
 
-        // The header (day label + close button) precedes everything.
-        expect(
-          headerTop < editTop && closeTop < editTop,
-          isTrue,
-          reason: 'the day header sits above the actions',
-        );
-        // The full-width edit-day action above the grid...
-        expect(
-          editTop < cycleStart.top,
-          isTrue,
-          reason: '"edit day" stays the leading action above the chips',
-        );
-        // ...the grid rows in reading order: cycle start & mucus peak, then
-        // first higher & SUZ evening, then SUZ morning...
+        // The grid rows (two columns): cycle start + mucus peak, exclusion
+        // + first higher (the exclusion sits directly BEFORE first
+        // higher, per the evaluation-based reading order), then the SUZ
+        // variants.
         expect(
           (cycleStart.top - peak.top).abs(),
           lessThan(4),
           reason: 'the first grid row carries the first two chips',
         );
         expect(
-          peak.left,
-          greaterThan(cycleStart.right),
-          reason: 'the peak reads to the right of the cycle start',
-        );
-        expect(
-          (peak.left - cycleStart.right) - spacing,
+          (firstHigher.top - ignore.top).abs(),
           lessThan(4),
-          reason: 'adjacent columns separated by the wrap spacing',
+          reason:
+              'the second grid row carries the exclusion chip (left) '
+              'and first higher (right) — the exclusion sits directly '
+              'before the first-higher chip',
         );
         expect(
-          (firstHigher.top - suzEvening.top).abs(),
+          (suzEvening.top - suzMorn.top).abs(),
           lessThan(4),
-          reason: 'the second grid row carries first higher + SUZ evening',
+          reason: 'the last row completes evenly with the SUZ variants',
         );
-        expect(suzEvening.left, greaterThan(firstHigher.right));
         expect(
-          suzMorn.top,
-          greaterThan(firstHigher.bottom),
-          reason: 'the SUZ morning chip is the last, lone grid row',
+          suzEvening.left,
+          closeTo(cycleStart.left, 4),
+          reason: 'the third row restarts in the first column',
+        );
+        expect(
+          ignore.left,
+          closeTo(cycleStart.left, 4),
+          reason:
+              'the exclusion chip opens the second row (first column) '
+              'like every other chip — the keyed exclusion group '
+              'SURVIVES on the chip cell inside the grid)',
+        );
+        expect(
+          firstHigher.left,
+          closeTo(peak.left, 4),
+          reason: 'the first-higher chip occupies the second column',
         );
         expect(
           suzMorn.left,
-          closeTo(cycleStart.left, 4),
-          reason: 'the lone last chip sits in the first column',
+          closeTo(peak.left, 4),
+          reason: 'the SUZ morning chip occupies the second column',
         );
-        // ...and the exclusion group BELOW the whole grid.
-        for (final (name, top) in [
-          ('Cycle start', cycleStart.top),
-          ('Mucus peak', peak.top),
-          ('First higher measurement', firstHigher.top),
-          ('SUZ from this evening', suzEvening.top),
-          ('SUZ from this morning', suzMorn.top),
+        expect(
+          suzMorn.top,
+          greaterThan(firstHigher.bottom),
+          reason:
+              'the SUZ variants wrap BELOW the exclusion/first-higher '
+              'row',
+        );
+        expect(
+          excludeGroup,
+          findsOneWidget,
+          reason: 'narrow surface: the exclusion group renders inside the grid',
+        );
+        // Every chip shares the same column width — the grid distributes
+        // all six chips evenly.
+        final columnWidth = cycleStart.width;
+        for (final (name, rect) in [
+          ('mucus peak', peak),
+          ('first higher measurement', firstHigher),
+          ('SUZ evening', suzEvening),
+          ('SUZ morning', suzMorn),
+          ('temperature exclusion', ignore),
         ]) {
           expect(
-            ignore.top,
-            greaterThan(top),
-            reason:
-                'the exclusion toggle renders below the $name chip — '
-                'the two-column layout moved the exclusion group out of '
-                'the grid',
+            rect.width,
+            closeTo(columnWidth, 1),
+            reason: 'the $name chip shares the grid column width',
           );
         }
       },
     );
 
     testWidgets(
-      'on a wide viewport (grid width >= 600 dp) the chips lay out THREE '
-      'per row: the two SUZ chips end up as the lone second row',
+      'on a wide viewport (grid width >= 600 dp) the shared grid lays out '
+      'THREE per row and BOTH rows complete evenly (3+3 — the exclusion '
+      'chip closes the first row directly after the mucus peak)',
       (tester) async {
         final (_, _) = await _pumpAt(
           tester,
@@ -902,30 +978,52 @@ void main() {
         final firstHigher = chipRect('First higher measurement');
         final suzEvening = chipRect('SUZ from this evening');
         final suzMorn = chipRect('SUZ from this morning');
+        final ignore = chipRect('Ignore temperature');
 
         expect(
           (cycleStart.top - peak.top).abs(),
           lessThan(4),
           reason: 'the first wide row carries the first three chips',
         );
-        expect((cycleStart.top - firstHigher.top).abs(), lessThan(4));
         expect(
-          firstHigher.left,
-          greaterThan(peak.right),
-          reason: 'the first-higher chip is the row\'s third column',
+          (cycleStart.top - ignore.top).abs(),
+          lessThan(4),
+          reason:
+              'the exclusion chip joins the FIRST wide row — it sits '
+              'directly after the mucus-peak chip in the reading order',
         );
         expect(
-          suzEvening.top,
-          greaterThan(firstHigher.bottom),
-          reason: 'the two SUZ chips wrap into the second row',
+          firstHigher.top,
+          greaterThan(ignore.bottom),
+          reason:
+              'the first-higher chip starts the SECOND row — the '
+              'exclusion sits directly before it on the first row',
+        );
+        expect(
+          (suzEvening.top - firstHigher.top).abs(),
+          lessThan(4),
+          reason:
+              'the second wide row continues with first higher and the '
+              'SUZ variants',
         );
         expect((suzEvening.top - suzMorn.top).abs(), lessThan(4));
+        // The distribution stays even on wide surfaces (3+3, no lone
+        // chip).
         expect(
           suzEvening.left,
-          closeTo(cycleStart.left, 4),
-          reason: 'the second row restarts in the first column',
+          closeTo(peak.left, 4),
+          reason: 'the SUZ evening chip is the second row\'s second column',
         );
-        expect(suzMorn.left, closeTo(peak.left, 4));
+        expect(
+          suzMorn.left,
+          closeTo(ignore.left, 4),
+          reason: 'the SUZ morning chip is the second row\'s third column',
+        );
+        expect(
+          ignore.left,
+          greaterThan(peak.right),
+          reason: 'the exclusion chip is the first row\'s third column',
+        );
       },
     );
 
@@ -962,6 +1060,41 @@ void main() {
       },
     );
 
+    testWidgets(
+      'no chip draws the canvas check mark — the selected fill plus the '
+      'announced selection carry the mark state (the check overlapped '
+      'the avatar icon)',
+      (tester) async {
+        final (_, _) = await _pump(
+          tester,
+          entries: scenarioEntries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        );
+        await tapCycleDay(tester, 4); // 9/10: peak unmarked, arbitrary day
+
+        final chips = find.descendant(
+          of: cycleDayPanel(),
+          matching: find.byType(FilterChip),
+        );
+        expect(
+          chips,
+          findsNWidgets(6),
+          reason: 'five mark chips plus the exclusion chip',
+        );
+        for (final chip in chips.evaluate()) {
+          expect(
+            (chip.widget as FilterChip).showCheckmark,
+            isFalse,
+            reason:
+                'every panel chip suppresses the canvas-drawn check on '
+                'the selected state',
+          );
+        }
+      },
+    );
+  });
+
+  group('ignoreTemperature toggle (the temperature-ignore mark)', () {
     testWidgets('tapping the exclusion chip places the ignoreTemperature mark '
         'through the MarksDao on ANY day; tapping again removes it', (
       tester,
@@ -1155,7 +1288,7 @@ void main() {
         findsOneWidget,
         reason:
             'the temperature-exclusion chip keeps its '
-            'crossed-out-eye glyph inside its keyed group',
+            'crossed-out-eye glyph inside its keyed grid cell',
       );
 
       // The two SUZ icons identify THEIR variant, not the pair — the
@@ -1253,8 +1386,8 @@ void main() {
           ),
           findsOneWidget,
           reason:
-              'the temperature-exclusion chip stays inside the group, '
-              'now BELOW the marks grid',
+              'the temperature-exclusion chip stays inside the group '
+              'cell of the shared chip grid',
         );
       },
     );
