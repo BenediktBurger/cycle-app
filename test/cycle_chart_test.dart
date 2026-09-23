@@ -373,8 +373,9 @@ final _twoCycleMarks = <CycleMark>[
 ];
 
 /// A gap scenario: day 0 tracked, days 1..4 untracked, a cycleStart mark
-/// on an untracked gap day (say day 3) — the next tracked day 5 opens the
-/// new cycle, and the boundary is drawn across the untracked gap days.
+/// on the untracked gap day 3 — the mark date itself is the new cycle's
+/// start (the untracked gap days belong to it), so the separator is drawn
+/// at day 3's column, between the mark and the next tracked day 5.
 final _gapEntries = <DailyEntry>[
   DailyEntry(date: _gridLineDay(0), bbtC: 36.5, bleeding: Bleeding.heavy),
   DailyEntry(date: _gridLineDay(5), bbtC: 36.5, bleeding: Bleeding.heavy),
@@ -2619,21 +2620,31 @@ void main() {
       }
     });
 
-    testWidgets('a boundary across untracked gap days is still drawn', (
-      tester,
-    ) async {
+    testWidgets('a boundary mark inside untracked gap days draws its '
+        'separator at the mark\'s own day column', (tester) async {
       await tester.pumpWidget(
         _gridLinesHarness(entries: _gapEntries, marks: _gapMarks),
       );
       await tester.pumpAndSettle();
 
       final verticalLines = chartData(tester).extraLinesData.verticalLines;
+      // The mark sits on the untracked day index 3; the separator runs
+      // through the gap at the mark's own column (not at the next tracked
+      // day) — the boundary anchor is the mark date, and the line is
+      // drawn at the boundary day's column START (x = i − 0.5).
       expect(
         verticalLines.map((l) => l.x),
-        contains(4.5),
+        contains(2.5),
         reason:
-            'the group opened across the untracked gap days draws '
-            'its separator across the gap',
+            'the mark inside the untracked gap draws its separator at '
+            'the mark\'s own day column',
+      );
+      expect(
+        verticalLines.map((l) => l.x),
+        isNot(contains(4.5)),
+        reason:
+            'the new cycle\'s first tracked day is no separator line: '
+            'the boundary anchored on the mark date',
       );
     });
 

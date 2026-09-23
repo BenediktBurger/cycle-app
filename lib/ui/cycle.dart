@@ -204,10 +204,11 @@ final class _ChartDays {
     // group start on or before it — a cycle only ends at the next cycle
     // start, so untracked gap days keep counting from the last start. A
     // group opens at the first tracked day on/after a user-placed
-    // cycleStart mark; a mark on an untracked gap day opens the group at
-    // the next tracked day (the boundary line still drawn across the gap).
-    // The first (leading) group starts at the first recorded day before
-    // the first mark, so every index is covered.
+    // cycleStart mark, and its boundary anchor is the MARK's own date:
+    // the untracked gap days between the mark and the group's first
+    // tracked day count toward the mark-opening cycle. The first
+    // (leading) group starts at the first recorded day before the first
+    // mark, so every index is covered.
     final groups = groupIntoCycles(sorted, marks);
     final starts = [for (final g in groups) DateOnly.normalize(g.startDate)];
     cycleStartDates = {
@@ -275,14 +276,16 @@ final class _ChartDays {
 
   DateTime dayAt(int index) => DateOnly.addDays(firstDay, index);
 
-  /// Whether day [index] opens a new cycle (a user-placed cycleStart mark
-  /// opens its group there — the shared "is cycle boundary" predicate
+  /// Whether day [index] opens a new cycle (the opening cycleStart
+  /// mark's own date — the shared "is cycle boundary" predicate
   /// driving the card's thick separator lines). The very first recorded
   /// day is never a boundary: there is no line at the recorded range's
   /// left edge (a leading pre-mark group is not a mark-opened group
-  /// either). Untracked gap days before a marked day do not hide the
-  /// boundary: the grouping opens the group at the next tracked day, and
-  /// the predicate matches that day's calendar date wherever it falls.
+  /// either). A mark on an untracked gap day keeps ITS OWN date as the
+  /// boundary: the separator runs through the mark's gap-day column, not
+  /// the next tracked day. A mark recorded before the range's first day
+  /// lies outside the index range and draws no line (consistent — its
+  /// boundary is at or left of the left edge).
   bool isCycleBoundary(int index) =>
       index > 0 && cycleStartDates.contains(dayAt(index));
 }
@@ -1171,9 +1174,12 @@ final class _CycleChartState extends State<_CycleChart> {
                                     // same one the row cells' thick borders
                                     // use). No line before the first
                                     // cycleStart mark (the leading group is
-                                    // not a boundary), and a boundary opened
-                                    // after untracked gap days is drawn
-                                    // across the gap.
+                                    // not a boundary). The boundary is the
+                                    // mark's own date: a mark inside
+                                    // untracked gap days draws its separator
+                                    // at the mark's gap-day column, one
+                                    // column (or more) before the cycle's
+                                    // first tracked day.
                                     extraLinesData: ExtraLinesData(
                                       verticalLines: [
                                         for (var i = winStart; i <= winEnd; i++)

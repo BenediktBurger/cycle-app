@@ -791,6 +791,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Widget _cycleTile(AppLocalizations l10n, Cycle cycle) {
     final locale = Localizations.localeOf(context).toString();
+    // The start label is the opening cycleStart mark's own date for
+    // mark-opened cycles — which may sit on an untracked gap day before the
+    // first tracked day, so the day count can span untracked gap days too.
     final startLabel = _formatDay(cycle.startDate, locale);
     final endLabel = _formatDay(cycle.endDate, locale);
     final title = cycle.startsAtMenstruation

@@ -3,6 +3,8 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cycle_app/domain/cycle_grouping.dart';
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -70,6 +72,31 @@ void main() {
       );
       // Without marks there are no boundaries and no lengths at all.
       expect(cycleLengthsInDays(entries, const []), isEmpty);
+    });
+
+    test('a mark in an untracked gap anchors the length at the mark date', () {
+      final entries = [
+        d(2026, 3, 1),
+        // Mar 2–3 untracked — the Mar 2 mark sits INSIDE the gap.
+        for (var day = 4; day <= 12; day++) d(2026, 3, day),
+        // Tracked days around the second mark, so the next cycle exists.
+        d(2026, 4, 3),
+        d(2026, 4, 4),
+        d(2026, 4, 5),
+      ];
+      // The last mark has NO tracked day on/after it: it opens no group and
+      // contributes neither an onset nor a length.
+      final marks = [start(2026, 3, 2), start(2026, 4, 4), start(2026, 6, 1)];
+
+      // Length = mark date to mark date: Mar 2 → Apr 4 = 33 days, even
+      // though the first tracked day of the cycle is Mar 4.
+      expect(cycleLengthsInDays(entries, marks), [33]);
+      // The onsets are the mark dates themselves (the Mar 2 onset is an
+      // untracked gap day).
+      expect(menstruationOnsetDates(entries, marks), [
+        DateOnly.normalize(DateTime(2026, 3, 2)),
+        DateOnly.normalize(DateTime(2026, 4, 4)),
+      ]);
     });
 
     test('a mark on an excluded day anchors a length too', () {

@@ -377,11 +377,16 @@ const double _epsilon = 1e-9;
 /// Computes the evaluation artifacts for every cycle group.
 ///
 /// The cycle windows are MARK-driven (see groupIntoCycles): a group opens
-/// at the first tracked day on/after a user-placed cycleStart mark.
+/// at the first tracked day on/after a user-placed cycleStart mark, and its
+/// window starts at the MARK's own date ([Cycle.startDate] — which may lie
+/// on an untracked gap day before the first tracked day).
 ///
 /// Marks are attached to a cycle by date: a mark belongs to the cycle whose
 /// [Cycle.startDate, next cycle start) window contains it (the last cycle's
-/// window is open-ended); marks before the first group are ignored.
+/// window is open-ended); marks before the first group are ignored. No entry
+/// can exist between a mark and its group's first tracked day (the group
+/// opens precisely at the first entry on/after the mark), so the window
+/// shift into the untracked gap changes no entry's membership.
 List<CycleEvaluation> evaluateCycles(
   List<DailyEntry> entries,
   List<CycleMark> marks,
@@ -429,19 +434,27 @@ List<CycleEvaluation> evaluateCycles(
 }
 
 /// The start of the NEXT cycle's date window, or null for the last cycle.
+/// Windows span [mark date, next mark date) — the mark's own date anchors
+/// the window, so an untracked gap between the mark and the group's first
+/// tracked day belongs to the mark-opening cycle.
 DateTime? _nextStart(List<Cycle> cycles, int index) => index + 1 < cycles.length
     ? DateOnly.normalize(cycles[index + 1].startDate)
     : null;
 
 /// The most recent mark of [type] inside this cycle's date window, if any
-/// (owner-confirmed anchor rule: re-marking supersedes). Multiple mucus
-/// peaks arise from delayed ovulation — "Höhepunkt = letzter Tag mit der
-/// besten Qualität", so the LAST marked peak anchors the evaluation — and
-/// the first higher measurement is re-markable too (after a broken
-/// Hochlage or a delayed second peak). Earlier duplicate marks stay
-/// STORED (the domain does not filter them; their removal is the mark
-/// sheet's toggle concern) — they simply stop anchoring and render no
-/// candidate (an earlier rise mark lies before the walk region, R3).
+/// (owner-confirmed anchor rule: re-marking supersedes). The window is
+/// [Cycle.startDate, next cycle start) — bounded by the MARK dates, and
+/// since no entry can exist between a mark and its group's first tracked
+/// day (the group opens precisely at the first entry on/after the mark),
+/// entry membership is unchanged by the window reaching into the untracked
+/// gap. Multiple mucus peaks arise from delayed ovulation — "Höhepunkt =
+/// letzter Tag mit der besten Qualität", so the LAST marked peak anchors
+/// the evaluation — and the first higher measurement is re-markable too
+/// (after a broken Hochlage or a delayed second peak). Earlier duplicate
+/// marks stay STORED (the domain does not filter them; their removal is
+/// the mark sheet's toggle concern) — they simply stop anchoring and
+/// render no candidate (an earlier rise mark lies before the walk region,
+/// R3).
 DateTime? _latestMarkOf(
   Cycle cycle,
   List<CycleMark> marks,
