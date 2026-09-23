@@ -49,16 +49,8 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
-- [x] add °C to the legend of the temperature plot
 - [ ] title bar takes a lot of space in horizontal mode (cycle tab)
 - how to mark a pregnancy: replace cycle start with pregnancy start or add a "conception" mark -> calculate probable bith?
-- [x] show the cycle start flag and cycle number even for the first cycle (if first day of data is cycle start, the flag is currently not rendered)
-- [x] make sure that long running cycles (day-of-cycle > 100, e.g. pregnancy) renders well on chart
-- [x] rework the statistics tab: don't show individual cycles starts / lengths, but possible to show a table (cycle start, number of bleeding, first higher measurement, length) at the bottom after the other statistics
-- [x] order legend entries according to their appearance on the cycle tab
-- [x] render the baseline on the cycle legend as dashed as it is on the cycle tab
-- [x] revisit language entries, can some be consolidated (e.g. cycle legend and cycle row?)?
-- [x] mark sheet (implement all)
   - move edit between date and X in order to save space
   - checkmark overlaps the icon - do we need the checkmark at all?
   - comments should be in one column as well (not spanning the whole sheet)
@@ -78,7 +70,6 @@ the sections above track planned work, git history keeps the record (see
       (native files are now always-on encrypted, ADR-005); what a
       user-facing passphrase would additionally protect, and how it
       interacts with the device-bound key, needs discussion.
-- [x] clean up statistics on the cycle tab -> all statistics on the statistics tab. Relevant: number of cycles (just count), detailed statistics (min,max, std, avg) for cycle length, for bleeding length, and for first higher measurement until end of cycle. Entry for earliest first higher measurement among all cycles (if possible, real first higher measurement, i.e. after mucus peak)
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
 - export as password protected zip
