@@ -47,10 +47,11 @@
 //   paints candidate ordinals; the day panel's circle-numbering line is
 //   the only ordinal surface (circles-only, see cycle_mark_sheet.dart).
 //   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
-//   from the temperature chart's top border by a fixed °C drop and the
-//   arrow anchors just below that border — is an owner-eyeball placement,
-//   not a settled rule (the constants live beside the chart's SUZ bar
-//   code in cycle.dart; the old baseline anchor is retired). A
+//   from the temperature chart's top border by suzBarHangSpanDegrees of
+//   the scale and the arrow anchors suzArrowTopInsetDegrees just below
+//   that border — is an owner-eyeball placement, not a settled rule (the
+//   constants live beside the SUZ glyph section below, shared with the
+//   PDF export's mirroring renderer in lib/pdf/cycle_pdf.dart). A
 //   temperature dot near the scale top can visually meet the top arrow —
 //   accepted, no avoidance logic.
 //   (The glyph's SIZE is chosen: shaft 8 px, head 7 x 11 px — see
@@ -64,6 +65,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/evaluation_overlay.dart';
+
+// The glyph's anchoring constants (suzBarHangSpanDegrees /
+// suzArrowTopInsetDegrees) live in suz_glyph.dart — pure Dart, shared with
+// the PDF export's mirroring renderer (lib/pdf/cycle_pdf.dart) — and are
+// re-exported here for the chart surfaces (cycle.dart reads them through
+// this import).
+export 'suz_glyph.dart' show suzArrowTopInsetDegrees, suzBarHangSpanDegrees;
 
 // --- dot painters -----------------------------------------------------------
 
@@ -192,7 +200,6 @@ FlDotPainter dotPainterForDay({
 }
 
 // --- SUZ mark glyph ----------------------------------------------------------
-
 /// Paints a RIGHT-POINTING arrow whose base starts at [base]: an 8 px
 /// horizontal shaft followed by a triangular head (7 px long, 11 px high),
 /// used as the companion glyph of the SUZ vertical bar (the bar marks the

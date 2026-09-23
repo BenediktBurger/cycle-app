@@ -156,14 +156,80 @@ void main() {
       test('the circled candidates carry rings on their dots', () {
         // The domain lists EVERY above-baseline measured day from the marked
         // rise onward (R1) — the marked rise (day 10) plus the unmarked
-        // days 11/12, all strictly after the peak ⇒ circles.
+        // days 11/12, all strictly after the peak ⇒ circles. Day 12's 38.4
+        // is OUT of the display range: like the chart (whose dot painter
+        // never runs for out-of-range spots), the PDF draws NOTHING there
+        // — no dot and no clamped edge-ring.
         expect(overlay.circledIndexes, {10, 11, 12});
         expect(
           drawing.rings.map((r) => (r.index, r.value)),
           contains((10, 36.8)),
         );
-        expect(drawing.rings, hasLength(3));
+        expect(drawing.rings, hasLength(2));
+        expect(
+          drawing.rings.any((r) => r.value > 38.0 || r.value.isNaN),
+          isFalse,
+        );
       });
+
+      test('every ring marks a DRAWN dot\'s exact (column, value) position '
+          '(the painter centers the ring on the dot — one shared mapping)', () {
+        final dotPositions = {
+          for (final dot in drawing.dots) (dot.index, dot.value),
+        };
+        for (final ring in drawing.rings) {
+          expect(
+            dotPositions,
+            contains((ring.index, ring.value)),
+            reason:
+                'ring (index ${ring.index}, value ${ring.value}) must sit '
+                'on the dot drawn at the same position',
+          );
+        }
+      });
+
+      test(
+        'the arrow-up glyph hangs CLEAR of the dot it marks: the tip sits '
+        'the dot\'s radius plus a fixed clearance below the dot\'s center',
+        () {
+          // The one arrow candidate in the index-space group below also pins
+          // the drop; here the tolerance semantics live on the draw list.
+          final arrowFixture = [
+            for (var i = 0; i < 7; i++)
+              DailyEntry(date: day(1 + i), bbtC: i == 5 ? 37.9 : 36.2),
+          ];
+          final model = buildPdfExportModel(
+            entries: arrowFixture,
+            marks: [
+              CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
+              CycleMark(
+                date: day(6),
+                type: CycleMarkTypes.firstHigherMeasurement,
+              ),
+            ],
+          );
+          final drawing = pdfCurveDrawing(
+            cycle: model.cycles[0],
+            overlay: model.overlays[0],
+            range: _range,
+            windowFirstIndex: 0,
+            windowDayCount: 7,
+            computedSuz: (suzBegins: null, suzRule: null),
+          );
+          expect(drawing.arrows, hasLength(1));
+          final arrow = drawing.arrows.single;
+          expect(
+            arrow.tipDropPt,
+            closeTo(pdfCurveDotRadiusPt + pdfArrowClearanceBelowDotPt, 1e-9),
+            reason:
+                'the tip drops the dot\'s radius (its bottom edge) PLUS the '
+                'clearance gap — the glyph must never touch the dot',
+          );
+          expect(pdfArrowClearanceBelowDotPt, greaterThan(0));
+          expect(arrow.index, 5);
+          expect(arrow.value, 37.9);
+        },
+      );
 
       test('the 1–6 low numbers land under their low dots', () {
         expect(drawing.lowNumbers, {

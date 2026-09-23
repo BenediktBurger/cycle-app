@@ -108,9 +108,10 @@ final class PdfExportModel {
     this.temperatureRange = TemperatureRange.defaults,
   });
 
-  /// The exported cycles: the MARK-OPENED cycle groups up to the export
-  /// end, in observation order (see [buildPdfExportModel] for the filter).
-  /// The leading pre-mark group is never among them.
+  /// The exported cycles: the MARK-OPENED cycle groups surviving the
+  /// export constraints (see [buildPdfExportModel] — "up to" and/or the
+  /// card's selected-cycles set), in observation order. The leading
+  /// pre-mark group is never among them.
   final List<CycleEvaluation> cycles;
 
   /// The per-cycle evaluation overlays, PARALLEL to [cycles]
@@ -177,9 +178,24 @@ final class PdfExportModel {
 /// Builds the [PdfExportModel] for one export run.
 ///
 /// Export filter: a cycle group is exported exactly when a user-placed
-/// cycleStart mark opened it AND — given [exportStartsUpTo] — its start day
-/// is no later than that calendar day. [exportStartsUpTo] is null
-/// (the default): every mark-opened cycle is exported.
+/// cycleStart mark opened it (`Cycle.startsAtMenstruation == true`) AND —
+/// its start date (the opening mark's local-midnight datetime since the
+/// mark-anchoring change) normalized to the calendar day is no later than
+/// [exportStartsUpTo]'s (equally normalized) calendar day AND — given
+/// [selectedStartDates] — its identity START DATE is in the
+/// chosen set. Both constraints default to null (no constraint): every
+/// mark-opened cycle is exported. [selectedStartDates] is the PDF export
+/// card's checkbox selection; its IDENTITY is the cycle's start DAY — the
+/// values are normalized (DateOnly) before matching, so time-of-day noise
+/// in a caller's set can never miss a cycle, and dates matching no cycle
+/// are silently dropped (the set is what the user checked, cycles come
+/// from the data). NOTE (accepted, same semantics as the "up to" filter
+/// before it): a selection that drops interior cycles makes the exported
+/// list SHORTER than the observed record; the exported cycles are still
+/// numbered POSITIONALLY ("Zyklus k" with k = index among the EXPORTED
+/// tuples) and the header's observed-cycle count is the EXPORTED count
+/// plus the outside-app count — a subset export deliberately reports the
+/// subset's numbering, not the user's full history.
 ///
 /// [birthDate] may carry time-of-day noise; it is normalized to the
 /// calendar day (DateOnly convention) so header formatting stays exact.
@@ -198,15 +214,26 @@ PdfExportModel buildPdfExportModel({
   String? name,
   DateTime? birthDate,
   DateTime? exportStartsUpTo,
+  Set<DateTime>? selectedStartDates,
   TemperatureRange temperatureRange = TemperatureRange.defaults,
   DateTime? today,
 }) {
-  // The iteration limit is a CALENDAR day: date-only normalized so the
-  // comparison against the (also normalized) cycle starts is exact and
-  // time-of-day noise can never filter a cycle away.
+  // The iteration limit is a CALENDAR day: date-only normalized (the
+  // builder does this itself, so a caller's time-of-day noise is already
+  // gone). The compared cycle start is NOT in that shape automatically —
+  // since the mark-anchoring change `Cycle.startDate` is the placed
+  // mark's local-midnight datetime — so the start date is normalized to
+  // its calendar day before the instant comparison against the (already
+  // normalized) limit; the local UTC offset can then never shift a start
+  // across the limit's day (wrongly dropping it) or pull it back to it.
   final limit = exportStartsUpTo == null
       ? null
       : DateOnly.normalize(exportStartsUpTo);
+  // The chosen cycles' identity set (see the header note): normalized
+  // start dates.
+  final selected = selectedStartDates == null
+      ? null
+      : {for (final d in selectedStartDates) DateOnly.normalize(d)};
   final all = evaluateCycles(entries, marks, today: today);
   // The exported cycle groups as the indexes they hold in `all` (the
   // attribution windows the overlay builder consults span the WHOLE list,
@@ -215,7 +242,10 @@ PdfExportModel buildPdfExportModel({
   final exportedIndexes = [
     for (var i = 0; i < all.length; i++)
       if (all[i].cycle.startsAtMenstruation &&
-          (limit == null || !all[i].cycle.startDate.isAfter(limit)))
+          (limit == null ||
+              !DateOnly.normalize(all[i].cycle.startDate).isAfter(limit)) &&
+          (selected == null ||
+              selected.contains(DateOnly.normalize(all[i].cycle.startDate))))
         i,
   ];
   final exported = [for (final i in exportedIndexes) all[i]];

@@ -60,12 +60,23 @@ CycleMark ignoredDay(int year, int month, int day) => CycleMark(
   type: CycleMarkTypes.ignoreTemperature,
 );
 
-/// Matches a data-less span-extension placeholder day: no temperature, no
-/// bleeding, no observation of any kind.
+/// Matches a data-less span-extension placeholder day: no observation of
+/// any kind — every recorded surface (measurement and its time, bleeding,
+/// mucus sign and quality, cervix, the two pains, sex timings, raw
+/// disturbance flags, notes) reads as the entry constructor's default.
 final hasNoData = isA<DailyEntry>()
     .having((e) => e.bbtC, 'bbtC', isNull)
+    .having((e) => e.measuredAtMinutes, 'measuredAtMinutes', isNull)
     .having((e) => e.bleeding, 'bleeding', Bleeding.none)
-    .having((e) => e.mucusSign, 'mucusSign', isNull);
+    .having((e) => e.mucusSign, 'mucusSign', isNull)
+    .having((e) => e.mucusQuality, 'mucusQuality', isNull)
+    .having((e) => e.cervixPosition, 'cervixPosition', isNull)
+    .having((e) => e.cervixFirmness, 'cervixFirmness', isNull)
+    .having((e) => e.painBreast, 'painBreast', isFalse)
+    .having((e) => e.painMittelschmerz, 'painMittelschmerz', isFalse)
+    .having((e) => e.sexTimings, 'sexTimings', 0)
+    .having((e) => e.tempDisturbances, 'tempDisturbances', 0)
+    .having((e) => e.notes, 'notes', null);
 
 void main() {
   group('groupIntoCycles — cycleStart marks open the groups', () {

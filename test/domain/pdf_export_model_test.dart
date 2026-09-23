@@ -224,6 +224,104 @@ void main() {
       expect(all.cycles.length, 3);
     });
 
+    test('a cycle starting exactly ON the "up to" limit day is exported: '
+        'the start date is normalized before the instant comparison', () {
+      // Cycle 2's startDate since the mark-anchoring change is the placed
+      // mark's local-midnight datetime, while the limit is the normalized
+      // UTC-midnight day. In a UTC-negative locale the raw local-midnight
+      // INSTANT lies after the limit instant even though both name the
+      // same calendar day — a raw `isAfter` comparison there wrongly
+      // drops the cycle (run this file with TZ=Etc/GMT+5 against the raw
+      // comparison to reproduce it on a UTC-positive host). The filter
+      // must compare calendar days: normalize the start date like every
+      // other identity comparison (the limit is normalized by the
+      // builder itself).
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        exportStartsUpTo: d(3, 29),
+      );
+      expect(model.cycles.length, 2);
+      expect(
+        model.cycles.last.cycle.startDate,
+        DateTime(2026, 3, 29),
+        reason:
+            'cycle 2 starts exactly ON the limit day — the local-midnight '
+            'instant is normalized to the same calendar day as the limit, '
+            'so "up to" stays inclusive of it',
+      );
+    });
+
+    test('a SELECTED subset exports exactly the chosen cycles, in bucket '
+        'order, with parallel overlays (the checkbox list\'s constraint)', () {
+      // Cycles 1 and 3 of 3 (the checkbox fixture's shape).
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        observedCyclesOutsideApp: 4,
+        selectedStartDates: {d(3, 1), d(4, 26)},
+      );
+      // The listed cycles carry the Cycle's own startDate — the mark's
+      // local-midnight date shape (see lib/domain/cycle_grouping.dart);
+      // the SELECTION identity above is normalized before matching.
+      expect(
+        model.cycles.map((e) => e.cycle.startDate).toList(),
+        [DateTime(2026, 3, 1), DateTime(2026, 4, 26)],
+        reason:
+            'the chosen cycles in observation order — the middle one '
+            'stays out even though a later cycle is in',
+      );
+      expect(model.overlays, hasLength(model.cycles.length));
+      // Cycle 1's artifacts are still derived from the WHOLE evaluation list
+      // (its marks/overlay are unaffected by the other cycles' export fate).
+      expect(model.overlays[0].suzMarks, isNotEmpty);
+
+      final ordinals = [
+        for (var i = 0; i < model.cycles.length; i++)
+          cycleOrdinalNumber(i, model.observedCyclesOutsideApp),
+      ];
+      expect(
+        ordinals,
+        [5, 6],
+        reason:
+            'the exported list is numbered POSITIONALLY (one-two of the '
+            'SELECTED set, like the "up to" filter did — the gap to cycle 7 '
+            'is documented behavior of a subset export)',
+      );
+    });
+
+    test('the selection is the normalized cycle-START identity: time-of-day '
+        'noise and unknown dates do not break the match', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        // May 1 with a stray time-of-day, plus a nonsense date.
+        selectedStartDates: {
+          DateTime(2026, 4, 26, 14, 30), // time-of-day noise on cycle 3
+          DateTime(2026, 5, 1, 9), // matches no cycle start: dropped
+          DateTime(2026, 3, 29, 23, 59), // matches cycle 2 exactly
+        },
+      );
+      expect(
+        model.cycles.map((e) => e.cycle.startDate).toList(),
+        [DateTime(2026, 3, 29), DateTime(2026, 4, 26)],
+        reason:
+            'the start-day identity is the normalized UTC-midnight date; '
+            'the unselected date is dropped silently',
+      );
+    });
+
+    test('an EMPTY explicit selection exports nothing (the card\'s '
+        '"Keine" state keeps the empty-document guard in charge)', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        selectedStartDates: const {},
+      );
+      expect(model.cycles, isEmpty);
+      expect(model.overlays, isEmpty);
+    });
+
     test('the selection list mirrors the exported cycles: ordinal + start '
         'per mark-opened cycle, pre-mark group omitted', () {
       final choices = exportableCycles(

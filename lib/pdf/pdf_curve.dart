@@ -35,7 +35,10 @@
 // edge (x = i), an evening bar the column middle (x = i + 0.5); the R10
 // baseline runs from a low column's left edge to half a column past its
 // end day. Line pieces carry fractional x at range-boundary crossings;
-// cross-window pieces clip at the window edges.
+// cross-window pieces clip at the window edges. The arrow glyph's vertical
+// placement is solved at DRAW-LIST time in pt (PdfArrowMark.tipDropPt —
+// the dot radius plus the clearance gap, see the constants), so its
+// "clear of the dot" semantics are pin-able without the pdf package.
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../domain/pdf_export_model.dart';
@@ -106,17 +109,42 @@ final class PdfSuzBar {
 }
 
 /// One candidate mark carried to the painter: a circled higher
-/// measurement (drawn as a ring around its dot) or an arrowed one (drawn
-/// as an arrow-up glyph below its dot — the paper writes the arrow under
-/// the column's dot). The dot is identified by column index + RAW value —
-/// an out-of-window candidate value just clamps onto the plot edge in the
-/// painter.
+/// measurement (drawn as a ring around its dot — the ring's center is by
+/// construction the DOT's drawn position: same column-center x, same
+/// clamped yFor(value) point) or an arrowed one. The dot is identified by
+/// column index + RAW value. CHART PARITY (decided): a candidate whose
+/// day carries no measured in-range temperature produces NO mark at all —
+/// like the chart, whose dot painter never runs for out-of-range spots
+/// (nothing clamps onto the plot edge positionlessly).
 final class PdfCandidateMark {
   const PdfCandidateMark(this.index, this.value);
 
   final int index;
   final double value;
 }
+
+/// One ARROWED candidate's draw item: [PdfCandidateMark] identity plus the
+/// arrow glyph's vertical placement SOLVED at draw-list time (pure Dart,
+/// testable) so the painter just paints at the stated coordinates.
+final class PdfArrowMark extends PdfCandidateMark {
+  const PdfArrowMark(super.index, super.value, this.tipDropPt);
+
+  /// The distance (pt) from the dot's CENTER y (= the clamped
+  /// `yFor(value)` point) DOWN to the arrow glyph's tip: the dot's radius
+  /// (its bottom edge) PLUS [pdfArrowClearanceBelowDotPt] — the glyph sits
+  /// clearly below the dot without touching it.
+  final double tipDropPt;
+}
+
+/// The PDF curve dot's painted radius (pt) — one constant shared by the
+/// dot painter, the ring geometry and the arrow placement above.
+const double pdfCurveDotRadiusPt = 1.5;
+
+/// The clearance (pt) between a candidate dot's bottom edge and its
+/// arrow-up glyph's tip: the paper writes the arrow under the dot, and it
+/// must not touch the dot it marks (owner refinement — the glyph used to
+/// hang flush at the edge).
+const double pdfArrowClearanceBelowDotPt = 2.5;
 
 /// One computed-SUZ artifact: a thin vertical line at the `suzBegins`
 /// day's column middle plus the rule letter (D/E) — visually distinct
@@ -170,7 +198,7 @@ final class PdfCurveDrawing {
   final List<PdfCandidateMark> rings;
 
   /// The arrow-marked candidates (arrow-up glyphs below their dots).
-  final List<PdfCandidateMark> arrows;
+  final List<PdfArrowMark> arrows;
 
   /// The 1–6 low numbers by window column index.
   final Map<int, int> lowNumbers;
@@ -316,15 +344,27 @@ PdfCurveDrawing pdfCurveDrawing({
   }
 
   // --- the remaining candidate/mark artifacts, mapped + window-filtered.
+  // CHART PARITY: a candidate without a MEASURED IN-RANGE temperature draws
+  // no dot — so it draws neither a ring nor an arrow (the chart skips the
+  // whole painter for out-of-range spots; drawing a clamped edge ring over
+  // a position with no dot would confound the reading).
   final rings = [
     for (final index in overlay.circledIndexes)
       if (windowPositionOf(index) case final pos?)
-        PdfCandidateMark(pos, trackedValues[index] ?? double.nan),
+        if (trackedValues[index] case final value?
+            when isBbtCInRange(value, range))
+          PdfCandidateMark(pos, value),
   ];
   final arrows = [
     for (final index in overlay.arrowIndexes)
       if (windowPositionOf(index) case final pos?)
-        PdfCandidateMark(pos, trackedValues[index] ?? double.nan),
+        if (trackedValues[index] case final value?
+            when isBbtCInRange(value, range))
+          PdfArrowMark(
+            pos,
+            value,
+            pdfCurveDotRadiusPt + pdfArrowClearanceBelowDotPt,
+          ),
   ];
   final lowNumbers = {
     for (final MapEntry(:key, :value) in overlay.numbersByIndex.entries)

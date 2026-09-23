@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/export_adapter.dart';
 import '../db/settings_store.dart';
+import '../domain/date_only.dart';
 import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
 import '../domain/marks.dart';
@@ -662,13 +663,16 @@ class EinstellungenScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           // --- PDF export action card ----------------------------------
-          // Generates the paper-form PDF from the tracked data "up to the
-          // exported one": a cycle selector (defaults to the LATEST
-          // mark-opened cycle), the per-export anonymize toggle (card-local
-          // state, never persisted) and the Export action. The pipeline:
-          // export model -> document builder provider (stubbed in tests)
-          // -> saveFileBytes seam, reported through the same SnackBar
-          // pattern as the JSON export card above.
+          // Generates the paper-form PDF for chosen exportable cycles: a
+          // card with a summary line + a "select cycles" button that opens
+          // the full-screen cycle-selection page at click time (the
+          // formerly inline checkbox list grew unmanageable with many
+          // cycles), the per-export anonymize toggle (card-local state,
+          // never persisted) and the Export action. The pipeline: export
+          // model (the selection intersected by cycle-start identity) ->
+          // document builder provider (stubbed in tests) -> saveFileBytes
+          // seam, reported through the same SnackBar pattern as the JSON
+          // export card above.
           const PdfExportCard(),
           const SizedBox(height: 8),
           // --- privacy / GDPR notice -----------------------------------
@@ -1029,14 +1033,31 @@ class EinstellungenScreen extends ConsumerWidget {
   }
 }
 
-/// The PDF-export action card: cycle selector, anonymize toggle, Export
-/// button — see the call-site comment in the pane for the pipeline.
+/// The PDF-export action card: a summary line plus a "select cycles"
+/// button that opens the full-screen [_CycleSelectionPage] (with the
+/// Alle/Keine bulk buttons and per-cycle checkboxes — moved there because
+/// the inline list grew unmanageable with many cycles), the anonymize
+/// toggle and the Export button — see the call-site comment in the pane
+/// for the pipeline.
 ///
-/// Card-local state (the chosen cycle ordinal and the anonymize flag) is a
-/// deliberate choice OVER persisted settings: the selection is a per-run
-/// view choice, and the anonymize toggle is per-export by definition
-/// (flipping it must never rewrite the stored identifying values — the
-/// tests pin that).
+/// SELECTION FLOW: the selection lives in THIS card's state. The page is
+/// seeded from the card's current selection, holds its own editing copy
+/// while open, and on CONFIRM the final selection is popped back and
+/// applied via [State.setState]; any other way out (back button, back
+/// gesture, no confirm) leaves the card's state untouched. The
+/// `Set<DateOnly>`-materialized null-means-all logic stays exactly as
+/// before: null = every exportable cycle (the default, matching the
+/// card's former export-all behavior), the explicit set = the chosen
+/// subset.
+///
+/// Card-local state (the cycle selection set and the anonymize flag) is a
+/// deliberate choice OVER persisted settings: both are per-run view
+/// choices (a new app start exports everything again unless re-chosen),
+/// and the anonymize toggle is per-export by definition (flipping it must
+/// never rewrite the stored identifying values — the tests pin that). The
+/// settings store's `pdfExport.*` keys carry identifying source data; a
+/// selection row would naturally extend there, but no existing consumer
+/// needs the choice to survive a restart.
 final class PdfExportCard extends ConsumerStatefulWidget {
   const PdfExportCard({super.key});
 
@@ -1045,7 +1066,15 @@ final class PdfExportCard extends ConsumerStatefulWidget {
 }
 
 final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
-  int? _selectedOrdinal;
+  /// The selected cycles' normalized (DateOnly) start dates — the export's
+  /// cycle identity passed into [buildPdfExportModel] — or null while
+  /// NOTHING was chosen differently yet: null = "all exportable cycles" (the
+  /// default, matching the card's former export-all behavior). Written
+  /// back from the selection page on confirm (see the class doc).
+  /// Card-local like the anonymize toggle (a per-run view choice, not a
+  /// persisted setting; the settings store's pdfExport.* rows carry
+  /// identifying source data, not a selection).
+  Set<DateTime>? _selection;
   var _anonymized = false;
   var _running = false;
 
@@ -1063,18 +1092,21 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       entries,
       marks,
       observedCyclesOutsideApp: outside,
-      // The grouping's injected clock (see nowProvider — test seam).
-      today: ref.watch(nowProvider)(),
+      // The grouping's injected clock (see nowProvider — test seam): read
+      // fresh (the same NON-reactive convention as every choice call site —
+      // the data streams above already drive the rebuild).
+      today: ref.read(nowProvider)(),
     );
-    // The DEFAULT selection: the latest observed cycle ("up to the
-    // exported one"), i.e. the last row — unless the user hand-picked one
-    // that still exists.
-    final effectiveOrdinal =
-        _selectedOrdinal == null ||
-            choices.every((c) => c.ordinal != _selectedOrdinal)
-        ? (choices.isEmpty ? null : choices.last.ordinal)
-        : _selectedOrdinal;
-
+    // The SELECTION is the export card's cycle choice, shown as the
+    // summary line: the set of chosen cycles' start dates (DateOnly
+    // identity), or null = "everything" (the pre-interaction default,
+    // matching the card's former "up to the latest" all-export behavior
+    // and today's users). The member state stays card-local like the
+    // anonymize toggle — a per-run view choice, never persisted (see the
+    // class doc).
+    final selectedCount = _selection == null
+        ? choices.length
+        : _shownSelection(choices).length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1092,28 +1124,27 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
                 style: Theme.of(context).textTheme.bodySmall,
               )
             else
-              DropdownButtonFormField<int>(
-                key: const ValueKey('pdfExportCycleSelect'),
-                initialValue: effectiveOrdinal,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: l10n.pdfExportCycleUpTo,
-                  border: const OutlineInputBorder(),
+              Text(
+                l10n.pdfExportCyclesSelectedSummary(
+                  selectedCount,
+                  choices.length,
                 ),
-                items: [
-                  for (final choice in choices)
-                    DropdownMenuItem(
-                      value: choice.ordinal,
-                      child: Text(
-                        l10n.pdfExportCycleOption(
-                          choice.ordinal,
-                          formatIsoDate(choice.startDate),
-                        ),
-                      ),
-                    ),
-                ],
-                onChanged: (value) => setState(() => _selectedOrdinal = value),
+                key: const ValueKey('pdfExportSelectedSummary'),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+            // The cycle choice moved OFF the card: the summary above +
+            // this button is all the card shows; the button opens the
+            // full-screen selection page AT CLICK TIME (the page's rows
+            // are seeded from the card's current selection). Disabled in
+            // the "no cycles" state — the guard message above explains.
+            FilledButton.tonalIcon(
+              key: const ValueKey('pdfExportSelectCyclesButton'),
+              onPressed: choices.isEmpty
+                  ? null
+                  : () => _openCycleSelection(context, choices),
+              icon: const Icon(Icons.checklist),
+              label: Text(l10n.pdfExportSelectCycles),
+            ),
             SwitchListTile.adaptive(
               key: const ValueKey('pdfExportAnonymizeSwitch'),
               value: _anonymized,
@@ -1130,6 +1161,48 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
         ),
       ),
     );
+  }
+
+  /// The current selected set seen through the LIVE choices: null means
+  /// "everything", otherwise the explicit set (its members may have gone
+  /// stale against new data — the page and the model builder check
+  /// membership against the live choices anyway).
+  Set<DateTime> _shownSelection(
+    List<({int ordinal, DateTime startDate})> choices,
+  ) =>
+      _selection ??
+      {for (final choice in choices) DateOnly.normalize(choice.startDate)};
+
+  /// Opens the full-screen cycle-selection page (see [_CycleSelectionPage]
+  /// for the surface): the page is seeded with the card's current choice
+  /// — null = all kept AS the all state (the explicit materialization
+  /// happens inside the page only per row) — and edits its own copy until
+  /// Confirm pops the page with the final selection.
+  ///
+  /// Confirmed result: `(confirmed: true, selected: …)` where `selected`
+  /// is null for the Alle state (matching [_selection]'s null-means-all
+  /// semantics) or the explicit set. Any other exit pops WITHOUT a record
+  /// (`null` here) — the card state stays untouched, exactly the
+  /// owner-specified "confirm applies, back cancels" flow.
+  Future<void> _openCycleSelection(
+    BuildContext context,
+    List<({int ordinal, DateTime startDate})> choices,
+  ) async {
+    final outcome = await Navigator.of(context)
+        .push<({bool confirmed, Set<DateTime>? selected})>(
+          MaterialPageRoute(
+            builder: (_) => _CycleSelectionPage(
+              choices: choices,
+              startAll: _selection == null,
+              startSelected: _shownSelection(choices),
+            ),
+          ),
+        );
+    if (outcome == null || !outcome.confirmed) return;
+    // The settings pane can be gone by the time the page pops (the app
+    // navigated away in between) — setState only while this State lives.
+    if (!mounted) return;
+    setState(() => _selection = outcome.selected);
   }
 
   /// The export pipeline for one run: build the model from the LIVE data
@@ -1156,15 +1229,8 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
       return;
     }
-    // The just-chosen selection (the dropdown default when untouched):
-    final ordinal =
-        _selectedOrdinal == null ||
-            choices.every((c) => c.ordinal != _selectedOrdinal)
-        ? choices.last.ordinal
-        : _selectedOrdinal!;
-    final chosenStart = choices
-        .firstWhere((c) => c.ordinal == ordinal)
-        .startDate;
+    // The chosen selection (null = the default, everything):
+    final selected = _selection == null ? null : _shownSelection(choices);
 
     final model = buildPdfExportModel(
       entries: entries,
@@ -1172,7 +1238,10 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       observedCyclesOutsideApp: outside,
       name: ref.read(pdfExportNameProvider),
       birthDate: ref.read(pdfExportBirthDateProvider),
-      exportStartsUpTo: chosenStart,
+      // The cycle selection is the model-level cycle filter (the
+      // builder intersects by start-day identity — see its doc); the
+      // former "up to the chosen cycle" seam is retired from this UI.
+      selectedStartDates: selected,
       // The settings card's display range is the PDF curve block's fixed
       // y scale — the same echo the chart reads (never rescaled for data).
       temperatureRange: ref.read(temperatureRangeProvider),
@@ -1214,6 +1283,185 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
     } finally {
       if (mounted) setState(() => _running = false);
     }
+  }
+}
+
+/// Full-screen cycle-selection page for the PDF export — the surface the
+/// card's "Zyklen auswählen…" button pushes (same Scaffold + AppBar
+/// scaffolding shape as the JSON export's [_ExportPreviewPage]).
+///
+/// Requirements (the many-cycles reality, ~400 rows):
+///
+/// - CONTROLS PINNED AT THE TOP: the Alle/Keine bulk buttons and the
+///   confirm button ("Auswahl bestätigen") sit in the non-scrolling head
+///   next to a live count summary, together with the MOST-RECENT cycle
+///   row visible without scrolling — only scrolling reveals older
+///   cycles.
+/// - ROWS SORTED MOST-RECENT-FIRST (the newest cycle at the top — the
+///   common case is adjusting what is tracked now), rendered by a
+///   [ListView.builder] so a long list never builds all tiles eagerly.
+///   Row label builder: the same shared wording as before
+///   ([AppLocalizations.pdfExportCycleOption]). ROW KEYS: the names stay
+///   stable (`pdfExportCycleCheckboxRow$i`) but the index now counts the
+///   page's VISIBLE order (newest-first), so `Row0` is the most recent
+///   cycle — the former card listed them oldest-first.
+/// - STATE: a page-local editing copy, seeded from the card's selection
+///   (`null` = the all state, kept as null — nothing materializes until a
+///   row toggles or Keine picks the empty set). Confirm pops with
+///   `(confirmed: true, selected: the copy)`; the Alle button restores
+///   null inside the copy so a confirmed Alle reverts the card to the
+///   all state. The copy is applied by the CARD's caller (see the card
+///   class doc); Confirm is the only way the toggling leaves the page —
+///   the back button/gesture closes without effect.
+final class _CycleSelectionPage extends StatefulWidget {
+  const _CycleSelectionPage({
+    required this.choices,
+    required this.startAll,
+    required this.startSelected,
+  });
+
+  /// The exportable cycles in observation order (oldest→newest, shared
+  /// output of [exportableCycles]); the display reverses it.
+  final List<({int ordinal, DateTime startDate})> choices;
+
+  /// Whether the card's current choice is the null "all" state.
+  final bool startAll;
+
+  /// The card's materialized selection (only meaningful when
+  /// [startAll] is false).
+  final Set<DateTime> startSelected;
+
+  @override
+  State<_CycleSelectionPage> createState() => _CycleSelectionPageState();
+}
+
+final class _CycleSelectionPageState extends State<_CycleSelectionPage> {
+  /// The page-local copy of the selection (null = "every cycle"), seeded
+  /// in [State.initState] from the pushed-in card state.
+  Set<DateTime>? _selection;
+
+  /// The display rows, most-recent-first (built once — the choices are a
+  /// pushed-in snapshot, not a stream).
+  late final List<({int ordinal, DateTime startDate})> _rows = widget
+      .choices
+      .reversed
+      .toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = widget.startAll ? null : {...widget.startSelected};
+  }
+
+  bool _isShownSelected(int displayIndex) =>
+      // null = all → every row shows checked; otherwise row membership
+      // against the row's normalized start date (the same DateOnly
+      // identity the card and the model builder use).
+      _selection?.contains(DateOnly.normalize(_rows[displayIndex].startDate)) ??
+      true;
+
+  /// The materialized all-selected state: every choice's normalized
+  /// start date — what a row toggle's FIRST press converts the implicit
+  /// null (= all) into, before flipping the row.
+  Set<DateTime> _allStarts() => {
+    for (final choice in widget.choices) DateOnly.normalize(choice.startDate),
+  };
+
+  /// Toggles display row [i]: the FIRST toggle materializes the implicit
+  /// all-selected state into the explicit set, then flips the row (the
+  /// same per-run semantics the card's old inline list had).
+  void _toggle(int displayIndex, bool checked) {
+    final current = _selection ?? _allStarts();
+    final start = DateOnly.normalize(_rows[displayIndex].startDate);
+    setState(() {
+      final next = {...current};
+      if (checked) {
+        next.add(start);
+      } else {
+        next.remove(start);
+      }
+      _selection = next;
+    });
+  }
+
+  void _confirm() =>
+      Navigator.of(context).pop((confirmed: true, selected: _selection));
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // The pinned head's summary: the same shared wording the card shows
+    // (counted against the page's own editing copy).
+    final shownCount = _selection == null
+        ? _rows.length
+        : _rows
+              .where(
+                (row) =>
+                    _selection!.contains(DateOnly.normalize(row.startDate)),
+              )
+              .length;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.pdfExportSelectionTitle)),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The PINNED control head: bulk buttons + confirm + a live
+          // count, one row above the list — visible (with the newest
+          // cycle row below it) without scrolling.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton(
+                  key: const ValueKey('pdfExportCycleSelectAll'),
+                  onPressed: () => setState(() => _selection = null),
+                  child: Text(l10n.pdfExportCyclesAll),
+                ),
+                TextButton(
+                  key: const ValueKey('pdfExportCycleSelectNone'),
+                  onPressed: () => setState(() => _selection = const {}),
+                  child: Text(l10n.pdfExportCyclesNone),
+                ),
+                Text(
+                  l10n.pdfExportCyclesSelectedSummary(shownCount, _rows.length),
+                  key: const ValueKey('pdfExportSelectionSummary'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('pdfExportSelectionConfirmButton'),
+                  onPressed: _confirm,
+                  icon: const Icon(Icons.check),
+                  label: Text(l10n.pdfExportSelectionConfirm),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // The lazy list: with ~400 cycles only the visible tiles build.
+          Expanded(
+            child: ListView.builder(
+              itemCount: _rows.length,
+              itemBuilder: (context, index) => CheckboxListTile(
+                key: ValueKey('pdfExportCycleCheckboxRow$index'),
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                value: _isShownSelected(index),
+                title: Text(
+                  l10n.pdfExportCycleOption(
+                    _rows[index].ordinal,
+                    formatIsoDate(_rows[index].startDate),
+                  ),
+                ),
+                onChanged: (checked) => _toggle(index, checked ?? false),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

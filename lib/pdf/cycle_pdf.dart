@@ -13,13 +13,19 @@
 //   sheet's structure — a left rail (the temperature scale in the curve
 //   block; small row names elsewhere), 40 day columns across the full
 //   printable width, and the row stack top-down: day numbers ("1. Tag"
-//   first; the rail legends "Zyklustag"/"Datum" name the two header rows),
+//   first; the rail legends "Zyklustag"/"Datum" name the header rows —
+//   the curve block has no caption row of its own any more: the °C lives
+//   in every scale label, so the former "Temperatur in °C" header row was
+//   removed and its 9 pt now flow into the rotated notes flex below),
 //   dates (day-of-month; month + year stacked on every first-of-month
 //   column so multi-month windows read right), the recording rows ABOVE
 //   the plot like the cycle tab (bleeding bands, mucus glyphs with the
 //   peak-dot slot and quality superscripts, the Mittelschmerz M, the sex
 //   X), the CURVE BLOCK (plot + the 1–6 low-number row), the numeric
-//   temperature values BELOW the plot
+//   temperature values BELOW the plot, whose rail legend reads
+//   "Temperatur in °C" (the row legend style of "Zyklustag"/"Datum" — it
+//   moved here from the removed header row; the earlier "Temp" short
+//   form named the row only cryptically)
 //   (immediately above the times, so out-of-range readings stay readable),
 //   the recorded measurement times (vertical, narrow-column convention),
 //   then disturbance/cervix/pain and the rotated notes area. Columns the
@@ -37,17 +43,27 @@
 //   from the chart's pure helpers; this file only paints geometry.
 // - THE EVALUATION OVERLAY IS DRAWN from the model's per-cycle overlay
 //   (lib/pdf/pdf_curve.dart maps it into draw items; nothing here
-//   re-derives a rule): rings around circled candidates, arrow-up glyphs
-//   under arrowed ones, the 1–6 low numbers under their dots, the solid
-//   peak dot above the mucus glyph, user-placed SUZ bars (bar hanging
-//   from the plot's top + right arrow — morning ⇒ column start, evening ⇒
-//   column middle) and the COMPUTED suzBegins as its own artifact — a
-//   thin solid vertical line at that day plus the rule letter D/E,
-//   deliberately distinct from the user marks' bar+arrow pair. The chart
-//   draws only user marks; the PDF is an evaluation document for
-//   teacher/doctor and adds the computed line (owner-confirmation open).
-//   TODO(user-review): the computed-SUZ deviation from the chart wants
-//   the owner's yes — thin line + rule letter is the chosen visual.
+//   re-derives a rule): rings around circled candidates (centered on the
+//   dot's drawn position — dot and ring share one circle-emission helper,
+//   pdfFillCircle/pdfStrokeCircle, whose center+radius call matches
+//   PdfGraphics.drawEllipse's center+half-axes semantics), arrow-up glyphs
+//   hanging CLEAR below their dots (tip = dot radius + clearance, carried
+//   on the draw list's PdfArrowMark.tipDropPt), the 1–6 low numbers under
+//   their dots, the solid peak dot above the mucus glyph and the
+//   user-placed SUZ marks drawn as the CYCLE CHART's glyph (a vertical bar
+//   hanging from the plot's top border by suzBarHangSpanDegrees of the
+//   scale plus its right-pointing arrow glyph at
+//   suzArrowTopInsetDegrees — the same shape, orientation, anchoring and
+//   −0.5/middle x anchor the chart paints; the constants live in
+//   lib/ui/suz_glyph.dart — pure Dart, so this generation layer keeps no
+//   material import for the host smoke scripts — and flow through
+//   lib/ui/cycle_marks.dart's re-export to the chart. The bar's morning
+//   anchor is the column's START edge, the evening's the column middle). The computed suzBegins
+//   is deliberately a DIFFERENT artifact — a thin solid vertical line at
+//   that day plus the rule letter D/E (decided: the evaluation document
+//   shows the computed boundary as the sheet's suggestion line, visually
+//   distinct at a glance from the user-placed bars; the chart draws only
+//   user marks, the PDF is for teacher/doctor and adds the line).
 // - INDEX SPACES: the model overlay's day indexes are calendar offsets
 //   from the cycle's start day; page windows slice tracked positions.
 //   lib/pdf/pdf_curve.dart maps explicitly between the two (marks on
@@ -105,6 +121,8 @@ import '../domain/date_only.dart';
 import '../domain/models.dart';
 import '../domain/pdf_export_model.dart';
 import '../ui/cycle_curve.dart' show ignoredTemperatureAlpha;
+import '../ui/suz_glyph.dart'
+    show suzArrowTopInsetDegrees, suzBarHangSpanDegrees;
 import 'pdf_axis.dart';
 import 'pdf_curve.dart';
 import 'pdf_layout.dart';
@@ -176,6 +194,20 @@ List<({String label, String value})> pdfHeaderFacts({
 /// The app identifier printed in every page header (the document's own
 /// wording, German — see the file-header language decision).
 const String pdfAppIdentifier = 'Zyklus-App';
+
+/// The scaffold's rail legends — the pure pin-able strings the private
+/// row builders place into the left rail (document language: German, see
+/// the file header).
+///
+/// The curve block itself has NO caption row (the former "Temperatur in
+/// °C" header row above the plot was removed: the °C already lives in
+/// every scale label — "37,5 °C" — so that naming was redundant; its
+/// height flows into the rotated notes area below). The temperature
+/// naming now lives where the numbers live: the below-plot VALUE row's
+/// legend reads exactly [pdfRailCaptionTemperatureValues].
+const String pdfRailCaptionDayNumbers = 'Zyklustag';
+const String pdfRailCaptionDates = 'Datum';
+const String pdfRailCaptionTemperatureValues = 'Temperatur in °C';
 
 /// The bundled asset font (the app loads the bytes via rootBundle before
 /// handing them to the builder; host smoke scripts read the file directly).
@@ -316,14 +348,9 @@ const double _sexRowHeight = 11;
 const double _curvePlotHeight = 185;
 const double _lowNumbersRowHeight = 10;
 
-/// The recording row above the plot (the cycle tab's top-strip order:
+/// The recording rows above the plot (the cycle tab's top-strip order:
 /// bleeding → mucus → Mittelschmerz → sex).
 const double _mittelschmerzRowHeight = 10;
-
-/// The unit caption's slot at the top of the plot's rail: ONE small "°C"
-/// above the scale labels (not suffixed onto every label — the narrow
-/// rail stays uncluttered; see [pdfScaleUnitLabel]).
-const double _railUnitCaptionHeight = 8;
 
 /// The below-plot strip rows, in the strip order (value → time →
 /// disturbance → cervix → pain → note).
@@ -527,7 +554,7 @@ pw.Widget _gridColumns({
 pw.Widget _dayNumberRow(int windowDayCount, int windowFirstIndex) {
   return _paperRow(
     height: _dayNumberRowHeight,
-    railCaption: 'Zyklustag',
+    railCaption: pdfRailCaptionDayNumbers,
     windowDayCount: windowDayCount,
     cell: (position) => pw.Center(
       child: pw.Text(
@@ -553,7 +580,7 @@ pw.Widget _dayNumberRow(int windowDayCount, int windowFirstIndex) {
 pw.Widget _dateRow(int windowDayCount, List<DailyEntry> windowDays) {
   return _paperRow(
     height: _dateRowHeight,
-    railCaption: 'Datum',
+    railCaption: pdfRailCaptionDates,
     windowDayCount: windowDayCount,
     cell: (position) => _dateCell(windowDays[position].date),
   );
@@ -657,10 +684,13 @@ pw.Widget _bleedingRow(int windowDayCount, List<DailyEntry> windowDays) {
 /// The numeric temperature value row, BELOW the plot (right above the
 /// measured times; kept so out-of-range/clipped readings lose no data):
 /// the measured value with one German comma decimal, "—" unmeasured.
+/// Its rail legend is exactly "Temperatur in °C" (this is where the
+/// temperature naming lives since the curve block's caption row was
+/// removed — see the rail-legends constants).
 pw.Widget _tempValueRow(int windowDayCount, List<DailyEntry> windowDays) {
   return _paperRow(
     height: _tempValueRowHeight,
-    railCaption: 'Temp',
+    railCaption: pdfRailCaptionTemperatureValues,
     windowDayCount: windowDayCount,
     cell: (position) => pw.Center(
       child: pw.Text(
@@ -676,9 +706,15 @@ pw.Widget _tempValueRow(int windowDayCount, List<DailyEntry> windowDays) {
   );
 }
 
-/// The curve block: the unit caption row (rail: ONE "°C" above the
-/// scale), the painted plot row (rail = scale labels, day columns = the
-/// painter's canvas) and the plot's 1–6 low-number band below it.
+/// The curve block: the painted plot row (rail = scale labels, day
+/// columns = the painter's canvas) and the plot's 1–6 low-number band
+/// below it. NO caption row above the plot any more: the former
+/// "Temperatur in °C" header slot was removed — the scale labels carry
+/// the unit on every number and the temperature naming now lives on the
+/// numeric value row's rail legend (below the plot). The block's row
+/// boundaries stay the plot's own hairlines: the top hairline on the
+/// plot container is the block's edge against the sex row, the low
+/// numbers row follows directly below.
 pw.Widget _curveBlock(
   int windowDayCount,
   PdfCurveDrawing drawing,
@@ -687,30 +723,6 @@ pw.Widget _curveBlock(
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
-      // The rail's unit caption: a small "°C" above the scale labels (ONE
-      // caption; the labels stay unit-suffix-free — see
-      // [pdfScaleUnitLabel]). The app chart's rail carries the same
-      // caption (lib/ui/cycle.dart's frozen rail); the two rails are
-      // separate implementations — keep the caption styling in sync by
-      // eye. The row is borderless so the plot's own top hairline stays
-      // the plot's edge.
-      pw.Container(
-        height: _railUnitCaptionHeight,
-        child: pw.Row(
-          children: [
-            pw.SizedBox(
-              width: pdfRailWidth,
-              child: pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 2),
-                child: pw.Align(
-                  alignment: pw.Alignment.topLeft,
-                  child: pw.Text(pdfScaleUnitLabel, style: _tiny),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
       pw.Container(
         height: _curvePlotHeight,
         decoration: const pw.BoxDecoration(border: pw.Border(top: _hairline)),
@@ -865,28 +877,39 @@ void _paintCurveBlock(
       canvas.setGraphicState(PdfGraphicState(opacity: ignoredTemperatureAlpha));
     }
     canvas.setFillColor(_ink);
-    _fillCircle(canvas, _columnCenterX(dot.index), yOf(dot.value), 1.5);
+    pdfFillCircle(
+      canvas,
+      _columnCenterX(dot.index),
+      yOf(dot.value),
+      pdfCurveDotRadiusPt,
+    );
     if (dot.ignored) {
       canvas.setGraphicState(const PdfGraphicState(opacity: 1.0));
     }
   }
 
-  // Rings around the circled candidates.
+  // Rings around the circled candidates — centered EXACTLY on the dot's
+  // drawn position: same column-center x, same yFor(value) conversion and
+  // clamping as the dot above (one shared circle helper keeps the two
+  // from ever disagreeing).
   canvas.setStrokeColor(_markAccent);
   canvas.setLineWidth(0.7);
   for (final ring in drawing.rings) {
-    _strokeCircle(canvas, _columnCenterX(ring.index), yOf(ring.value), 3.0);
+    pdfStrokeCircle(canvas, _columnCenterX(ring.index), yOf(ring.value), 3.0);
   }
 
-  // Arrow-up glyphs BELOW the arrow-marked dots: a tip at the dot's
-  // bottom edge, head + short stem pointing UP at the dot (the paper
-  // writes the arrow under the column's dot).
+  // Arrow-up glyphs BELOW the arrow-marked dots: head + short stem
+  // pointing UP at the dot (the paper writes the arrow under the column's
+  // dot), with the tip CLEAR of the dot — the drop from the dot's center
+  // (radius + clearance) is carried on the draw item itself
+  // (PdfArrowMark.tipDropPt), clamped so the stem stays inside the plot.
   canvas.setFillColor(_markAccent);
   for (final arrow in drawing.arrows) {
     final x = _columnCenterX(arrow.index);
-    // Canvas y-up: the glyph hangs BELOW the dot — the tip sits on its
-    // bottom edge, head + stem extend further down (smaller y).
-    final tipY = yOf(arrow.value) - 1.5;
+    // Canvas y-up: the glyph hangs BELOW the dot — the tip sits
+    // [tipDropPt] under the dot's center, head + stem extend further
+    // down (smaller y).
+    final tipY = (yOf(arrow.value) - arrow.tipDropPt).clamp(8.0, plotHeight);
     canvas
       ..moveTo(x, tipY)
       ..lineTo(x - 3, tipY - 4)
@@ -897,31 +920,50 @@ void _paintCurveBlock(
     canvas.fillPath();
   }
 
-  // The user-placed SUZ bars: a bar hanging from the plot's top edge
-  // (fixed drop — the chart's top anchor) plus its right-pointing arrow
-  // just below; morning bars at the column START, evening bars at the
-  // column middle.
+  // The user-placed SUZ marks drawn as the CYCLE CHART's glyph (same
+  // shape, orientation and anchoring — the constants are shared with
+  // lib/ui/cycle_marks.dart): a vertical bar hanging DOWN from the plot's
+  // top border by [suzBarHangSpanDegrees] of the temperature scale, plus
+  // its right-pointing arrow whose base is anchored at the bar, centered
+  // on [suzArrowTopInsetDegrees] below that border (the chart's glyph
+  // pair; the arrow's painted geometry mirrors paintSuzArrowGlyph: an
+  // 8-pt shaft, a 7-pt head, 11 pt high). Morning bars anchor at the
+  // column START (= the bar's x), evening bars at the column middle —
+  // exactly the chart's barX rule.
   for (final bar in drawing.suzBars) {
     final x = bar.x * pdfColumnWidth;
+    // Canvas y-up: the bar spans from the top edge down by the hang span
+    // (expressed in scale degrees via the axis, like the chart does); a
+    // hang beyond the window degenerates to the plot's full height.
+    final barBottom =
+        plotHeight - axis.yFor(axis.range.max - suzBarHangSpanDegrees);
     canvas
       ..setStrokeColor(_markAccent)
-      ..setLineWidth(1.6)
-      ..drawLine(x, plotHeight, x, plotHeight - 20)
-      ..strokePath()
+      ..setLineWidth(2)
+      ..drawLine(x, plotHeight, x, barBottom)
+      ..strokePath();
+    // The arrow: base at the bar (x anchored as above), centered on the
+    // arrow inset below the top border. Same head/shaft proportions as
+    // the chart's paintSuzArrowGlyph.
+    final anchorY =
+        plotHeight - axis.yFor(axis.range.max - suzArrowTopInsetDegrees);
+    canvas
       ..setFillColor(_markAccent)
-      ..drawRect(x, plotHeight - 23 - 1, 8, 2)
+      ..drawRect(x, anchorY - 1, 8, 2)
       ..fillPath();
     canvas
-      ..moveTo(x + 15, plotHeight - 23)
-      ..lineTo(x + 8, plotHeight - 23 - 5.5)
-      ..lineTo(x + 8, plotHeight - 23 + 5.5)
+      ..moveTo(x + 15, anchorY)
+      ..lineTo(x + 8, anchorY - 5.5)
+      ..lineTo(x + 8, anchorY + 5.5)
       ..closePath()
       ..fillPath();
   }
 
   // The computed SUZ: a thin solid vertical line through the whole plot
-  // at the suzBegins column's middle — its rule letter is a positioned
-  // widget (kept out of the canvas-font path).
+  // at the suzBegins column's middle — deliberately DISTINCT from the
+  // user marks' bar+arrow glyph above (the file header's decision note),
+  // its rule letter is a positioned widget (kept out of the canvas-font
+  // path).
   if (drawing.suzLine case final line?) {
     canvas
       ..setStrokeColor(_ink)
@@ -939,15 +981,24 @@ void _paintCurveBlock(
 double _columnCenterX(int windowColumn) =>
     (windowColumn + 0.5) * pdfColumnWidth;
 
-void _fillCircle(PdfGraphics canvas, double x, double y, double radius) {
+/// Fills a circle centered at (x, y) with the given radius.
+///
+/// SEMANTICS PIN: PdfGraphics.drawEllipse(x, y, r1, r2) draws an ellipse
+/// CENTERED on (x, y) with r1/r2 as HALF-axes (its curves run through
+/// x±r1 / y±r2) — corner+size arithmetic here drifts every circle
+/// off-center and double its size (the ring-centering defect this helper
+/// fixes, pinned byte-level in test/pdf/pdf_circle_geometry_test.dart).
+void pdfFillCircle(PdfGraphics canvas, double x, double y, double radius) {
   canvas
-    ..drawEllipse(x - radius, y - radius, radius * 2, radius * 2)
+    ..drawEllipse(x, y, radius, radius)
     ..fillPath();
 }
 
-void _strokeCircle(PdfGraphics canvas, double x, double y, double radius) {
+/// Strokes a circle centered at (x, y) with the given radius (see
+/// [pdfFillCircle] for the drawEllipse semantics pin).
+void pdfStrokeCircle(PdfGraphics canvas, double x, double y, double radius) {
   canvas
-    ..drawEllipse(x - radius, y - radius, radius * 2, radius * 2)
+    ..drawEllipse(x, y, radius, radius)
     ..strokePath();
 }
 

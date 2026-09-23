@@ -83,14 +83,15 @@ void main() {
     });
 
     test('the scale labels mark every 0.5 °C plus the range\'s own bounds, '
-        'with the German decimal comma', () {
+        'with the German decimal comma and the °C unit on EVERY label', () {
       final labels = axis.axisLabels();
       expect(
         labels.map((l) => l.text).toList(),
-        ['38', '37,5', '37', '36,5', '36'],
+        ['38 °C', '37,5 °C', '37 °C', '36,5 °C', '36 °C'],
         reason:
             'the paper form labels half degrees with a decimal comma; '
-            'whole degrees stay plain',
+            'whole degrees stay plain; the unit is part of every label '
+            '(no separate caption row — see the axis-label rail decision)',
       );
       expect(labels.map((l) => l.value).toList(), [
         38.0,
@@ -108,15 +109,15 @@ void main() {
       }
     });
 
-    test('the scale carries ONE unit caption, never a suffix per label', () {
-      expect(pdfScaleUnitLabel, '°C');
+    test('every axis label carries the °C suffix (unit per label, decoded '
+        'caption row removed)', () {
+      final labels = axis.axisLabels();
       expect(
-        axis.axisLabels().map((l) => l.text).toList(),
-        everyElement(isNot(contains('°'))),
+        labels.map((l) => l.text).toList(),
+        everyElement(endsWith(' °C')),
         reason:
-            'the labels stay unit-suffix-free — the rail renders the '
-            'unit as a single caption above the scale (the narrow rail '
-            'stays uncluttered)',
+            'the rail labels carry the unit themselves — the old '
+            'standalone "°C" caption is redundant and was removed',
       );
     });
 
@@ -127,11 +128,11 @@ void main() {
         plotHeight: 100,
       );
       expect(axis.axisLabels().map((l) => l.text).toList(), [
-        '37,6',
-        '37,5',
-        '37',
-        '36,5',
-        '36,2',
+        '37,6 °C',
+        '37,5 °C',
+        '37 °C',
+        '36,5 °C',
+        '36,2 °C',
       ]);
       expect(
         axis.gridLines().length,

@@ -10,6 +10,7 @@
 
 import 'dart:io';
 
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
@@ -148,6 +149,42 @@ Future<void> main() async {
   check(
     plan.where((w) => w.cycleIndex == 2).length == 4,
     'the pregnancy-style cycle continues across four pages',
+  );
+
+  // The export card's checkbox-list constraint, pinned at tool level: a
+  // SUBSET export (cycles 1 and 3 of 3) carries exactly those cycles —
+  // their pages only, nothing of cycle 2 anywhere in the document.
+  final subset = buildPdfExportModel(
+    entries: fixtureEntries(),
+    marks: fixtureMarks(),
+    observedCyclesOutsideApp: 4,
+    selectedStartDates: {d(3, 1), d(4, 26)},
+    today: d(9, 21),
+  );
+  check(
+    subset.cycles.length == 2 &&
+        // The Cycle carries the mark's local-midnight startDate shape; the
+        // day identity is compared normalized (DateOnly convention).
+        DateOnly.sameDay(subset.cycles.last.cycle.startDate, d(4, 26)),
+    'a selected subset exports exactly the chosen cycles (1 and 3 of 3)',
+  );
+  final subsetPlan = planCyclePages(
+    subset.cycles.map((e) => e.cycle.days.length).toList(),
+  );
+  check(
+    subsetPlan.length == 5,
+    'the subset plan skips cycle 2\'s page: 1 + 4 pages instead of 6',
+  );
+  final subsetBytes = await generatePdfBytes(
+    model: subset,
+    fontBytes: fontBytes,
+    options: PdfExportOptions(anonymized: true, exportDate: d(9, 21)),
+    compress: false,
+  );
+  check(
+    countPageMarkers(subsetBytes) == subsetPlan.length,
+    'the subset document page-marker count equals its plan '
+    '(${subsetPlan.length})',
   );
 
   final bytes = await generatePdfBytes(

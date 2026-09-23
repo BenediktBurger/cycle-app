@@ -392,10 +392,6 @@
   "@settingsPdfExportNote": {
     "description": "Helper note of the PDF-export card: names where the values land, points to the per-export anonymize toggle and cross-references the outside-app cycle count that feeds the PDF's observed-cycle header fact."
   },
-  "pdfExportCycleUpTo": "Export bis Zyklus",
-  "@pdfExportCycleUpTo": {
-    "description": "Dropdown label of the cycle selector: the export runs from the first cycle UP TO the chosen one (inclusive)."
-  },
   "pdfExportCycleOption": "Zyklus {n}, ab {day}",
   "@pdfExportCycleOption": {
     "placeholders": {
@@ -406,7 +402,39 @@
         "type": "String"
       }
     },
-    "description": "One dropdown row of the cycle selector: the shared cycle ordinal plus the cycle's start date (ISO)."
+    "description": "One checkbox row of the export card's cycle-selection list: the shared cycle ordinal plus the cycle's start date (ISO)."
+  },
+  "pdfExportCyclesAll": "Alle",
+  "@pdfExportCyclesAll": {
+    "description": "Bulk button of the export card's cycle-selection list: selects every exportable cycle."
+  },
+  "pdfExportCyclesNone": "Keine",
+  "@pdfExportCyclesNone": {
+    "description": "Bulk button of the export card's cycle-selection list: deselects every cycle (the empty selection keeps the export behind the empty-data guard)."
+  },
+  "pdfExportCyclesSelectedSummary": "{n} von {total} Zyklen ausgewählt",
+  "@pdfExportCyclesSelectedSummary": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    },
+    "description": "Summary line: how many of the exportable cycles are currently selected. Shown on the export card and (live) on the cycle-selection page — the card itself has no checkboxes, the checkbox rows live on the selection page."
+  },
+  "pdfExportSelectCycles": "Zyklen auswählen…",
+  "@pdfExportSelectCycles": {
+    "description": "Button of the PDF-export card: opens the full-screen cycle-selection page. (The card itself keeps only the summary line — the formerly inline checkbox list grew unmanageable with many cycles.)"
+  },
+  "pdfExportSelectionTitle": "Zyklen für den Export auswählen",
+  "@pdfExportSelectionTitle": {
+    "description": "Title of the pushed full-screen cycle-selection page above the PDF export."
+  },
+  "pdfExportSelectionConfirm": "Auswahl bestätigen",
+  "@pdfExportSelectionConfirm": {
+    "description": "Pinned confirm button of the cycle-selection page (top, alongside the All/None bulk buttons): applies the selection back into the export card and closes the page. Das Verlassen der Seite ohne Bestätigung ändert nichts."
   },
   "pdfExportAnonymize": "Anonymisieren",
   "@pdfExportAnonymize": {

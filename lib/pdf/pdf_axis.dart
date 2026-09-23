@@ -50,16 +50,24 @@ double pdfColumnCenter(int windowDayIndex) =>
 double get pdfGridRightEdge =>
     pdfRailWidth + defaultMaxDaysPerPage * pdfColumnWidth;
 
-/// The temperature scale's unit caption: ONE small "°C" at the top of the
-/// left rail, above the scale labels — the labels themselves stay
-/// unit-suffix-free so the narrow rail stays uncluttered (the value-side
-/// readability comes from the caption's context, like the paper sheet's
-/// written-out "°C" heading). The app chart's rail carries the SAME
-/// caption (lib/ui/cycle.dart's frozen rail, temperature-scale slot) — the
-/// two implementations are deliberately separate (pdf_axis labels the
-/// PDF rail, the chart rail renders its own labels), so keep the caption's
-/// styling in sync by eye on both sides.
-const String pdfScaleUnitLabel = '°C';
+/// The temperature scale's label convention: EVERY scale label carries the
+/// unit itself ("37,5 °C", see [_labelText]) — and because the unit lives
+/// on every number, the scaffold carries no separate temperature caption
+/// row: the curve block is plot-only (the former caption row above the
+/// plot is removed) and the temperature naming lives on the numeric value
+/// row's rail legend "Temperatur in °C" BELOW the plot (cycle_pdf.dart's
+/// value row). The app chart's rail renders the
+/// identical label convention (lib/ui/cycle.dart's frozen rail,
+/// temperature-scale slot) — the two implementations are deliberately
+/// separate (pdf_axis labels the PDF rail, the chart rail renders its own
+/// labels), so keep the unit-suffix styling in sync by eye on both sides.
+///
+/// RAIL WIDTH: the suffix needs no wider rail — the widest label
+/// ("37,5 °C") still fits comfortably into [pdfRailWidth] at the rail's
+/// label size (~21 pt at 5.2 pt type, right-aligned inside 58 pt with the
+/// 2/3 pt insets), so rail + 40 columns keep filling the printable width
+/// exactly (see the invariant test in test/pdf/pdf_axis_test.dart).
+const String pdfScaleUnit = '°C';
 
 /// One label/grid-line slot of the temperature scale: the °C value, its y
 /// in the plot (PDF y-up, see the file header) and — labels only — its
@@ -74,7 +82,8 @@ final class PdfAxisLine {
 final class PdfAxisLabel extends PdfAxisLine {
   const PdfAxisLabel(super.value, super.y, this.text);
 
-  /// The label text, German decimal comma ("37,5"; whole degrees plain).
+  /// The label text, German decimal comma with the °C unit on every label
+  /// ("37,5 °C"; whole degrees plain but suffixed too: "38 °C").
   final String text;
 }
 
@@ -133,11 +142,14 @@ final class PdfCurveAxis {
   }
 }
 
-/// The German decimal-comma label text: whole degrees without decimals
-/// ("37"), fractions with one comma decimal ("37,5", "36,2").
+/// The German decimal-comma label text with the unit on EVERY label: whole
+/// degrees without decimals ("38 °C"), fractions with one comma decimal
+/// ("37,5 °C", "36,2 °C") — the suffix rides on the whole scale like on the
+/// paper sheet's margin ("36.5 °C" app-side style is locale-consistent
+/// separately; this document is German).
 String _labelText(double value) {
   final whole = (value.truncateToDouble()) == value
       ? value.toInt().toString()
       : value.toStringAsFixed(1).replaceFirst('.', ',');
-  return whole;
+  return '$whole $pdfScaleUnit';
 }

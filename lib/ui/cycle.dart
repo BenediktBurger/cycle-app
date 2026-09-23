@@ -751,14 +751,10 @@ final class _CycleChartState extends State<_CycleChart> {
     // border by a fixed [suzBarHangSpanDegrees] drop, and the arrow glyph
     // anchors [suzArrowTopInsetDegrees] below that border (inside the hung
     // band), so the whole glyph sits below the sex row above the plot.
-    // TODO(user-review): both values are owner-eyeball rendering details,
-    // not settled rules. TODO(user-review): top-border collision — a
-    // temperature dot near the scale top (especially a dot exactly AT the
-    // boundary yMax) can visually meet the top arrow; accepted for now, no
-    // avoidance logic.
-    const suzBarHangSpanDegrees = 0.5;
-    const suzArrowTopInsetDegrees = 0.25;
-
+    // The constants live in cycle_marks.dart, shared with the PDF export
+    // (lib/pdf/cycle_pdf.dart anchors its mirror-rendered glyph in degrees
+    // through the PdfCurveAxis too). TODO(user-review): both values are
+    // owner-eyeball rendering details, not settled rules.
     // Ignored (marked) TEMPERATURES read lighter: the scheme color at the
     // shared lighter alpha (owner decision 2026-09-19: the
     // ignoreTemperature mark is the rendering key). The dark scheme's
@@ -2254,9 +2250,13 @@ final class _TemperatureScale {
     for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5,
   ];
 
-  /// The two-scale label for a tick: integers plain ("37"), halves with one
-  /// decimal ("36.5") — the numbering the chart's own axis titles used.
-  String labelFor(double value) => _formatHalfDegree(value);
+  /// The two-scale label for a tick, WITH the °C unit on every label
+  /// (mirrors the PDF's axis-label convention): the decimal formatting
+  /// stays unlocalized ("37.5", a period — the rail's current rendering;
+  /// the wiki-facing German comma lives in the PDF, which is a German
+  /// document). TODO(user-review): a locale-aware comma ("37,5 °C" in de)
+  /// is the open refinement question for the app side.
+  String labelFor(double value) => '${_formatHalfDegree(value)} °C';
 }
 
 // --- frozen left rail --------------------------------------------------------
@@ -2344,19 +2344,13 @@ final class _LeftRail extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // The unit caption: ONE small "°C" at the scale's top
-                  // line, left of the topmost tick label — the labels
-                  // themselves stay unit-suffix-free (like the paper
-                  // sheet's margin numbers). The PDF export's rail carries
-                  // the same caption (lib/pdf/pdf_axis.dart's
-                  // pdfScaleUnitLabel); the two rails are separate
-                  // implementations — keep the caption's styling in sync
-                  // by eye.
-                  const Positioned(
-                    left: 2,
-                    top: -6,
-                    child: Text('°C', style: TextStyle(fontSize: 10)),
-                  ),
+                  // The scale labels: EVERY tick carries the °C unit
+                  // (mirroring the PDF's axis labels exactly — the old
+                  // standalone "°C" caption above the scale is redundant
+                  // and removed; width check: the widest label
+                  // "37.5 °C" ≈ 34 px at the 10 px type fits the frozen
+                  // rail's 44 px with the 3 px right inset, so the rail
+                  // width stays as-is).
                   for (final value in scale.ticks)
                     Positioned(
                       left: 0,
@@ -2435,9 +2429,10 @@ final class _LeftRail extends StatelessWidget {
 
 // --- half-degree formatting ---------------------------------------------------
 
-/// The rail's tick labels: integers plain ("37"), halves with one decimal
-/// ("36.5") — the numbering behaves exactly like the paper sheet's margin
-/// scale values.
+/// The rail's tick-label numerals: integers plain ("37"), halves with one
+/// decimal ("36.5") — the numbering behaves exactly like the paper sheet's
+/// margin scale values. The °C unit is appended by [_TemperatureScale
+/// .labelFor] (in lib/ui/cycle.dart's scale class), NOT here.
 String _formatHalfDegree(double value) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0
