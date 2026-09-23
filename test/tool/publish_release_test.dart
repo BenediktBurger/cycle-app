@@ -549,7 +549,7 @@ void main() {
       expect(
         payload,
         contains(
-          'gh pr create --repo BenediktBurger/cycle-app --base development '
+          'gh pr create --repo BenediktBurger/cycle-app --base main '
           '--head release/v0.2.1 --title "Release v0.2.1"',
         ),
       );
@@ -562,7 +562,7 @@ void main() {
     const branch = 'release/v0.2.1';
     const tag = 'v0.2.1';
 
-    test('gh pr create argv: base development, head the release branch, '
+    test('gh pr create argv: base main, head the release branch, '
         'release-URL body', () {
       expect(publish.prCreateArguments(branch: branch, tag: tag), [
         'pr',
@@ -570,7 +570,7 @@ void main() {
         '--repo',
         releaseRepo,
         '--base',
-        'development',
+        'main',
         '--head',
         branch,
         '--title',
@@ -587,7 +587,7 @@ void main() {
     });
 
     test('gh pr merge argv: merge-commit method, auto (never squash/rebase '
-        '— the release commit must stay an ancestor of development)', () {
+        '— the release commit must stay an ancestor of main)', () {
       expect(publish.prAutoMergeArguments(branch), [
         'pr',
         'merge',
@@ -647,7 +647,7 @@ void main() {
       expect(
         output,
         contains(
-          'gh pr create --repo BenediktBurger/cycle-app --base development '
+          'gh pr create --repo BenediktBurger/cycle-app --base main '
           '--head release/v0.2.1 --title "Release v0.2.1"',
         ),
         reason: 'the exact manual command must be printed on failure',

@@ -26,6 +26,61 @@ import '../../tool/release_names.dart';
 const pinnedReleaseFingerprint =
     '0aa5749804b8ed9e3c207f851b5902775d762207d60c2485a26b5d75eff5355b';
 
+/// Builds a synthetic signed-APK-like byte buffer: [prefix] (the ZIP entry
+/// area stand-in), a signing block carrying [blockPairs] (each an arbitrary
+/// id/payload), and a suffix ending in a minimal EOCD whose
+/// central-directory offset field points at the block end — the shape
+/// apksigner signs (entries → block → central directory → EOCD).
+List<int> syntheticApk({
+  required List<int> prefix,
+  required List<(int, List<int>)> blockPairs,
+  required List<int> centralDirectory,
+}) {
+  var pairsLen = 0;
+  final pairs = <int>[];
+  for (final (id, value) in blockPairs) {
+    final pairLen = 4 + value.length;
+    final pair = <int>[..._u64(pairLen), ..._u32(id), ...value];
+    pairsLen += pair.length;
+    pairs.addAll(pair);
+  }
+  // Layout: [u64 leading size][pairs][u64 trailing size][magic]; both size
+  // fields count everything except their own field.
+  final blockSize = pairsLen + 8 + 16;
+  final block = <int>[
+    ..._u64(blockSize),
+    ...pairs,
+    ..._u64(blockSize),
+    ...'APK Sig Block 42'.codeUnits,
+  ];
+  final blockEnd = prefix.length + block.length;
+  final eocd = <int>[
+    ...[0x50, 0x4B, 0x05, 0x06],
+    ..._u16(0),
+    ..._u16(0),
+    ..._u16(1),
+    ..._u16(1),
+    ..._u32(centralDirectory.length),
+    ..._u32(blockEnd),
+    ..._u16(0),
+  ];
+  return [...prefix, ...block, ...centralDirectory, ...eocd];
+}
+
+List<int> _u32(int value) => [
+  value & 0xFF,
+  (value >> 8) & 0xFF,
+  (value >> 16) & 0xFF,
+  (value >> 24) & 0xFF,
+];
+
+List<int> _u16(int value) => [value & 0xFF, (value >> 8) & 0xFF];
+
+List<int> _u64(int value) => [
+  ..._u32(value),
+  ..._u32((value ~/ 0x100000000) & 0xFFFFFFFF),
+];
+
 void main() {
   group('argument parsing', () {
     test('accepts a well-formed tag plus --run-id', () {
@@ -601,45 +656,287 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
     });
   });
 
-  group('apksigner determinism sanity (double sign, byte-compare)', () {
-    test('byte comparison distinguishes identical and differing outputs', () {
-      expect(sign.bytesIdentical(<int>[1, 2, 3], <int>[1, 2, 3]), isTrue);
-      expect(sign.bytesIdentical(<int>[1, 2, 3], <int>[1, 2, 4]), isFalse);
-      expect(
-        sign.bytesIdentical(<int>[1, 2], <int>[1, 2, 3]),
-        isFalse,
-        reason: 'a length difference is a difference',
+  group('keystore password sources (env vars, gitignored key.properties)', () {
+    test('parseKeyProperties reads the three known keys', () {
+      final parsed = sign.parseKeyProperties(
+        'storePassword=store\n'
+        'keyPassword=key\n'
+        'keyAlias=alias\n',
       );
-      expect(sign.bytesIdentical(<int>[], <int>[]), isTrue);
+      expect(parsed, isNotNull);
+      expect(parsed!.storePassword, 'store');
+      expect(parsed.keyPassword, 'key');
+      expect(parsed.keyAlias, 'alias');
     });
 
-    test('the failure message names the APK and remedies by re-signing', () {
-      final message = sign.determinismFailureMessage(
-        publishName: 'cycle-app-0.2.1-arm64-v8a.apk',
+    test('comments, blank lines and whitespace are tolerated', () {
+      final parsed = sign.parseKeyProperties(
+        '\n'
+        '# keystore config\n'
+        '  # indented comment\n'
+        '! another comment\n'
+        'storePassword = store-pw\n'
+        '\tkeyPassword : key-pw\n'
+        'unknownKey=ignored\n',
       );
-      expect(message, contains('cycle-app-0.2.1-arm64-v8a.apk'));
-      expect(message, contains('sign'));
+      expect(parsed, isNotNull);
+      expect(parsed!.storePassword, 'store-pw');
+      expect(parsed.keyPassword, 'key-pw');
+      expect(parsed.keyAlias, isNull);
     });
 
-    test('the would-be apksigner sign command names keystore, alias and '
-        'paths', () {
+    test('the first separator splits the key; later separators stay in '
+        'the value', () {
+      final parsed = sign.parseKeyProperties(
+        'storePassword=pw;with=equals:and:colons\n',
+      );
+      expect(parsed!.storePassword, 'pw;with=equals:and:colons');
+    });
+
+    test('values may carry structural characters that properties files '
+        'do not escape here', () {
+      final parsed = sign.parseKeyProperties(
+        'storePassword=pw:p1=;#not-comment\n',
+      );
+      expect(parsed!.storePassword, 'pw:p1=;#not-comment');
+    });
+
+    test('trailing whitespace of a value is kept (java.util.Properties '
+        'semantics, so Gradle and apksigner see the same bytes)', () {
+      final parsed = sign.parseKeyProperties('storePassword=pw \n');
+      expect(parsed!.storePassword, 'pw ');
+    });
+
+    test('empty or missing values count as absent, no keys → null', () {
+      expect(sign.parseKeyProperties('storePassword=\n'), isNull);
+      expect(sign.parseKeyProperties('no-separator-line\n# c\n'), isNull);
+      expect(sign.parseKeyProperties(''), isNull);
       expect(
-        sign.formatSignCommand(
-          apksigner: '/opt/android-sdk/build-tools/34.0.0/apksigner',
-          ksPath: '/home/benedikt/keystores/cycleapp-release.jks',
-          outPath: 'build/gh-release/cycle-app-0.2.1-arm64-v8a.apk',
-          inputPath:
-              'build/ci-artifacts/cycle-app-0.2.1-arm64-v8a-unsigned'
-              '/app-arm64-v8a-release.apk',
-        ),
-        allOf(
-          contains('/opt/android-sdk/build-tools/34.0.0/apksigner sign'),
-          contains('--ks /home/benedikt/keystores/cycleapp-release.jks'),
-          contains('--ks-key-alias ${sign.keystoreAlias}'),
-          contains('--out build/gh-release/cycle-app-0.2.1-arm64-v8a.apk'),
-          contains(sign.keystorePasswordEnvVar),
+        sign.parseKeyProperties('keyPassword=k\n'),
+        isNotNull,
+        reason: 'keyPassword-only input still parses',
+      );
+    });
+  });
+
+  group('resolveKeystorePasswords (precedence + loud fallback)', () {
+    test('the env var wins over key.properties', () {
+      final resolved = sign.resolveKeystorePasswords(
+        environmentStorePassword: 'env-pw',
+        keyProperties: const sign.KeyPropertiesPasswords(
+          storePassword: 'props-pw',
+          keyPassword: 'props-key',
+          keyAlias: 'alias',
         ),
       );
+      expect(resolved.storePassword, 'env-pw');
+      expect(
+        resolved.keyPassword,
+        isNull,
+        reason: 'the env source carries no per-key password',
+      );
+      expect(resolved.source, contains(sign.keystorePasswordEnvVar));
+    });
+
+    test('an empty env var falls through to key.properties', () {
+      final resolved = sign.resolveKeystorePasswords(
+        environmentStorePassword: '',
+        keyProperties: const sign.KeyPropertiesPasswords(
+          storePassword: 'props-pw',
+        ),
+      );
+      expect(resolved.storePassword, 'props-pw');
+      expect(resolved.source, contains(sign.keyPropertiesPath));
+    });
+
+    test('key.properties supplies store + optional key password + alias', () {
+      final resolved = sign.resolveKeystorePasswords(
+        environmentStorePassword: null,
+        keyProperties: const sign.KeyPropertiesPasswords(
+          storePassword: 'store',
+          keyPassword: 'key',
+          keyAlias: 'something-else',
+        ),
+      );
+      expect(resolved.storePassword, 'store');
+      expect(resolved.keyPassword, 'key');
+      expect(resolved.keyAlias, 'something-else');
+    });
+
+    test('neither source throws loudly, naming both remedies and the '
+        'prompting impossibility', () {
+      expect(
+        () => sign.resolveKeystorePasswords(
+          environmentStorePassword: null,
+          keyProperties: null,
+        ),
+        throwsA(
+          isA<ReleaseToolException>().having(
+            (error) => error.message,
+            'message',
+            allOf(
+              contains(sign.keystorePasswordEnvVar),
+              contains(sign.keyPropertiesPath),
+              contains('cannot prompt interactively'),
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => sign.resolveKeystorePasswords(
+          environmentStorePassword: null,
+          keyProperties: const sign.KeyPropertiesPasswords(
+            keyPassword: 'only-key',
+          ),
+        ),
+        throwsA(isA<ReleaseToolException>()),
+        reason: 'a key password without a store password is not enough',
+      );
+    });
+  });
+
+  group(
+    'apksigner determinism sanity (double sign, outside-block compare)',
+    () {
+      test('byte comparison distinguishes identical and differing outputs', () {
+        expect(sign.bytesIdentical(<int>[1, 2, 3], <int>[1, 2, 3]), isTrue);
+        expect(sign.bytesIdentical(<int>[1, 2, 3], <int>[1, 2, 4]), isFalse);
+        expect(
+          sign.bytesIdentical(<int>[1, 2], <int>[1, 2, 3]),
+          isFalse,
+          reason: 'a length difference is a difference',
+        );
+        expect(sign.bytesIdentical(<int>[], <int>[]), isTrue);
+      });
+
+      test('the failure message names the APK and the outside-block scope', () {
+        final message = sign.determinismFailureMessage(
+          publishName: 'cycle-app-0.2.1-arm64-v8a.apk',
+        );
+        expect(message, contains('cycle-app-0.2.1-arm64-v8a.apk'));
+        expect(message, contains('sign'));
+        expect(message, contains('OUTSIDE the signing block'));
+      });
+
+      test('the would-be apksigner sign command names keystore, alias, both '
+          'password forms and paths', () {
+        expect(
+          sign.formatSignCommand(
+            apksigner: '/opt/android-sdk/build-tools/34.0.0/apksigner',
+            ksPath: '/home/benedikt/keystores/cycleapp-release.jks',
+            outPath: 'build/gh-release/cycle-app-0.2.1-arm64-v8a.apk',
+            inputPath:
+                'build/ci-artifacts/cycle-app-0.2.1-arm64-v8a-unsigned'
+                '/app-arm64-v8a-release.apk',
+          ),
+          allOf(
+            contains('/opt/android-sdk/build-tools/34.0.0/apksigner sign'),
+            contains('--ks /home/benedikt/keystores/cycleapp-release.jks'),
+            contains('--ks-key-alias ${sign.keystoreAlias}'),
+            contains('--out build/gh-release/cycle-app-0.2.1-arm64-v8a.apk'),
+            contains('env:${sign.keystorePasswordEnvVar}'),
+            contains('env:${sign.keyPasswordEnvVar}'),
+          ),
+        );
+      });
+    },
+  );
+
+  group('APK signing block extent + the outside-block determinism compare', () {
+    final prefix = List.generate(48, (i) => 0x20 + (i % 60));
+    final centralDirectory = List.generate(40, (i) => i);
+    final base = syntheticApk(
+      prefix: prefix,
+      blockPairs: [(0x7109871a, List.generate(30, (i) => i))],
+      centralDirectory: centralDirectory,
+    );
+
+    test('a structurally consistent synthetic suit is located and matches '
+        'itself', () {
+      final extent = sign.signingBlockExtent(base);
+      expect(extent, isNotNull);
+      expect(
+        extent!.$1,
+        prefix.length,
+        reason: 'the block starts right after the ZIP entry area',
+      );
+      expect(extent.$2, base.length - centralDirectory.length - 22);
+      expect(sign.outputsMatchOutsideSigningBlocks(base, base), isTrue);
+    });
+
+    test('differences inside the block are tolerated (the ECDSA '
+        'randomization the release key makes unavoidable)', () {
+      final reSigned = syntheticApk(
+        prefix: prefix,
+        blockPairs: [(0x7109871a, List.generate(30, (i) => i))],
+        centralDirectory: centralDirectory,
+      );
+      // Flip a byte inside the v2 pair payload AND change its length by one
+      // byte — the DER leading-zero wobble of concrete ECDSA signatures. The
+      // second file gets its own (shifted) central directory.
+      final shifted = syntheticApk(
+        prefix: prefix,
+        blockPairs: [
+          (0x7109871a, [...List.generate(30, (i) => i ^ 0xFF), 7]),
+        ],
+        centralDirectory: centralDirectory,
+      );
+      expect(sign.outputsMatchOutsideSigningBlocks(base, reSigned), isTrue);
+      expect(
+        sign.outputsMatchOutsideSigningBlocks(base, shifted),
+        isTrue,
+        reason: 'block-length shifts move only the EOCD CD-offset field',
+      );
+      // sanity: whole-file compare WOULD fail for the shifted length
+      expect(shifted.length, isNot(base.length));
+    });
+
+    test('any difference in the ZIP entry area fails (the actual '
+        'nondeterminism guard)', () {
+      final tamperedPrefix = [...prefix];
+      tamperedPrefix[7] ^= 1;
+      final other = syntheticApk(
+        prefix: tamperedPrefix,
+        blockPairs: [(0x7109871a, List.generate(30, (i) => i))],
+        centralDirectory: centralDirectory,
+      );
+      expect(sign.outputsMatchOutsideSigningBlocks(base, other), isFalse);
+    });
+
+    test('any difference in the central directory fails', () {
+      final tamperedCd = [...centralDirectory];
+      tamperedCd[3] ^= 0x10;
+      final other = syntheticApk(
+        prefix: prefix,
+        blockPairs: [(0x7109871a, List.generate(30, (i) => i))],
+        centralDirectory: tamperedCd,
+      );
+      expect(sign.outputsMatchOutsideSigningBlocks(base, other), isFalse);
+    });
+
+    test('a different entry-area length fails (different inputs)', () {
+      final other = syntheticApk(
+        prefix: [...prefix, 1],
+        blockPairs: [(0x7109871a, List.generate(30, (i) => i))],
+        centralDirectory: centralDirectory,
+      );
+      expect(sign.outputsMatchOutsideSigningBlocks(base, other), isFalse);
+    });
+
+    test('a missing or inconsistent block is reported as incomparable '
+        '(null), not as a match', () {
+      expect(sign.signingBlockExtent(prefix), isNull);
+      final noBlock = [
+        ...prefix,
+        ...centralDirectory,
+        ...base.sublist(base.length - 22),
+      ];
+      expect(sign.outputsMatchOutsideSigningBlocks(base, noBlock), isNull);
+      // A block whose two size fields disagree is not a block.
+      final corrupt = [...base];
+      final blockStart = sign.signingBlockExtent(corrupt)!.$1;
+      corrupt[blockStart] ^= 0xFF; // break the leading size field
+      expect(sign.signingBlockExtent(corrupt), isNull);
     });
   });
 

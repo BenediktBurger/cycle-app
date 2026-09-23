@@ -354,8 +354,10 @@ Do **not** start until Android went through Phases B–F at least once.
 
    ```sh
    dart run tool/download_and_sign.dart vX.Y.Z
-   # keystore password: interactive apksigner prompt, or the
-   # APKSIGNER_STORE_PASSWORD environment variable (never a committed file)
+   # keystore password: the APKSIGNER_STORE_PASSWORD env var, or the
+   # gitignored android/key.properties (the same file the Gradle release
+   # signing reads; interactive apksigner prompting is not possible from
+   # the script's process harness)
    ```
 
    This local step performs no builds and no tests — the artifact already
@@ -369,11 +371,18 @@ Do **not** start until Android went through Phases B–F at least once.
    `cycle-app-<version>-<abi>.apk` — exactly the URLs the F-Droid
    metadata's `binary:` field downloads (Phase E). The signature comes
    from apksigner in Android build-tools ≤ 34 (hard cap, invariants
-   below); every signature is verified against the pinned fingerprint in
+   below), with the v1 (JAR) scheme signed off on purpose — v1 would
+   embed a randomized ECDSA signature inside the zip entries (the release
+   key is EC) and defeat the determinism sanity, and v1 is unnecessary at
+   minSdk 24 (Android 7+ verifies v2 natively). Every signature is
+   verified against the pinned fingerprint in
    `tool/release_fingerprint.txt` (hard gate: mismatch = wrong key —
    never attach; the CI build's debug-signing fallback blocks are gone by
-   then), and one APK is signed a second time and compared byte-for-byte
-   (determinism sanity, aborts on any difference). Mismatched or corrupt
+   then), and one APK is signed a second time and compared with the staged
+   one everywhere except the signing-block interior (determinism sanity,
+   aborts on any other difference — the release key is EC, and ECDSA
+   randomizes every signature by design, so byte-for-byte equality is not
+   attainable; identical ZIP content still is). Mismatched or corrupt
    artifacts abort before anything is staged. The script ends by writing
    the handoff manifest `build/gh-release/source.json` (the run id and
    head SHA the publish step will use) and printing the adb install
