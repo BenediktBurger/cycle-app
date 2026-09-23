@@ -1,11 +1,19 @@
-// Publish script: per-release checklist step 7 of docs/release.md, as a
-// command — `dart run tool/make_release.dart vX.Y.Z`.
+// Publish script: the per-release checklist's publish step of
+// docs/release.md, as a command — `dart run tool/make_release.dart vX.Y.Z`.
 //
-// It performs checklist step 7 mechanically (tag + push + GitHub Release) and
-// the sanity parts of the earlier steps (version/tag match, clean tree,
-// release-signed APKs, embedded versions, checksums). It deliberately does NOT
-// build (step 4), interactively eyeball the signature (step 5), or replace
-// the device upgrade test (step 6) — those stay manual checklist work.
+// It performs the publish step mechanically (tag + push + GitHub Release)
+// and the sanity parts of the earlier steps (version/tag match, clean tree,
+// release-signed APKs, embedded versions, checksums). It deliberately does
+// NOT build (the build step), interactively eyeball the signature (the
+// signature check), or replace the device upgrade test — those stay manual
+// checklist work.
+//
+// After a successful publish it runs the branch plumbing of the merge-main
+// step (only off main, never on a detached HEAD): push the current release
+// branch, open a pull request into main, and queue the auto-merge with the
+// merge-commit method. Every plumbing failure there is a SOFT failure —
+// the publish already succeeded, so the script prints the exact manual
+// remediation command and keeps the exit code at 0.
 //
 // Two hard invariants it enforces, never bypassable, loud abort (exit 1) on
 // violation:
@@ -65,10 +73,11 @@ const String flutterPinFilePath = 'tool/flutter-version';
 const String ciWorkflowPath = '.github/workflows/ci.yml';
 const String releaseWorkflowPath = '.github/workflows/release.yml';
 
-/// The release artifacts built by checklist step 4 (`flutter build apk
-/// --release --split-per-abi`): the three per-ABI split APKs, in the order
-/// they are attached to the GitHub release. Releases publish these three
-/// only — the universal `app-release.apk` stays a local testing artifact.
+/// The release artifacts built by the checklist's build step
+/// (`flutter build apk --release --split-per-abi`): the three per-ABI split
+/// APKs, in the order they are attached to the GitHub release. Releases
+/// publish these three only — the universal `app-release.apk` stays a local
+/// testing artifact.
 const List<String> releaseApkPaths = [
   'build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk',
   'build/app/outputs/flutter-apk/app-arm64-v8a-release.apk',
@@ -242,8 +251,8 @@ class Options {
   /// Check-only mode: no tag, no push, no release, no prompts.
   final bool dryRun;
 
-  /// Scripted use: assume the device upgrade test (checklist step 6) was
-  /// done and skip the interactive confirmation.
+  /// Scripted use: assume the device upgrade test was done and skip the
+  /// interactive confirmation.
   final bool tested;
 
   /// Consulted when the pin file is missing: the run on which
@@ -263,7 +272,8 @@ class Options {
   bool get stopsAfterWritingFlutterPin => acceptFlutterVersion && !dryRun;
 
   /// Whether the script interactively asks for the upgrade-test
-  /// confirmation (checklist step 6). A dry run performs checks only and
+  /// confirmation (the checklist's device upgrade test). A dry run performs
+  /// checks only and
   /// has no publishing side effects to gate, so it never prompts — a short
   /// note is printed instead.
   bool get promptsForUpgradeTest => !dryRun && !tested;
@@ -666,7 +676,7 @@ String flutterPinMismatchMessage({
       '(.github/workflows/ci.yml, and .github/workflows/release.yml when '
       'present) itself, then stops.\n'
       'Either way: commit all changed files (the pin and the workflow '
-      'files), rebuild the release APKs on that SDK (checklist step 4: '
+      'files), rebuild the release APKs on that SDK (the build step: '
       '`flutter build apk --release --split-per-abi`), and rerun this '
       'script.';
 }
@@ -683,7 +693,7 @@ String flutterPinWriteStopMessage(String version) {
       'updated workflow files:\n'
       '  git add $flutterPinFilePath .github/workflows/* && git commit '
       '-m "pin Flutter SDK version"\n'
-      'Then rebuild the release APKs on that SDK (checklist step 4: '
+      'Then rebuild the release APKs on that SDK (the build step: '
       '`flutter build apk --release --split-per-abi`) and rerun this '
       'script: the F-Droid recipe parses the committed pin from the '
       'tagged commit, so the committed pin is what a Flutter-version '
@@ -778,6 +788,76 @@ String versionCodeMismatchWarning({
 
 Never _fail(String message) => throw ReleaseException(message);
 
+// --- post-publish branch plumbing (pure helpers) ---------------------------
+
+/// Current branch name parsed from `git rev-parse --abbrev-ref HEAD`
+/// stdout: trimmed. Null on a detached HEAD (the command prints `HEAD`) or
+/// on empty output — both mean there is no release branch, so the
+/// post-publish branch plumbing is skipped.
+String? parseCurrentBranch(String commandOutput) {
+  final branch = commandOutput.trim();
+  if (branch.isEmpty || branch == 'HEAD') return null;
+  return branch;
+}
+
+/// Whether the post-publish branch plumbing (push branch, PR into main,
+/// queued auto-merge) applies on [branch] after a successful publish.
+/// Skipped on `main` (the release was published from main itself — the old
+/// flow and emergencies; main already carries the version bump) and on a
+/// detached HEAD ([branch] is null from [parseCurrentBranch]).
+bool plumbingApplies(String? branch) => branch != null && branch != 'main';
+
+/// argv for pushing [branch] and setting its upstream:
+/// `git push -u origin <branch>`.
+List<String> branchPushArguments(String branch) => [
+  'push',
+  '-u',
+  'origin',
+  branch,
+];
+
+/// One-line body for the release-branch → main pull request: one sentence
+/// on what the PR carries and why the merge method is fixed.
+String prCreateBody(String tag) =>
+    'Merge the release branch back into main: version bump, fastlane '
+    'changelog files, and the signed-tag publish for $tag. Merge commit '
+    'only — the tagged commit must stay an ancestor of main.';
+
+/// argv for opening the release-branch → main pull request:
+/// `gh pr create --base main --head <branch> --title "Release <tag>" …`.
+List<String> prCreateArguments({required String branch, required String tag}) =>
+    [
+      'pr',
+      'create',
+      '--base',
+      'main',
+      '--head',
+      branch,
+      '--title',
+      'Release $tag',
+      '--body',
+      prCreateBody(tag),
+    ];
+
+/// argv for queueing the auto-merge with the merge-commit method:
+/// `gh pr merge --merge --auto <branch>` (never squash/rebase — the tagged
+/// commit itself must become an ancestor of main).
+List<String> prAutoMergeArguments(String branch) => [
+  'pr',
+  'merge',
+  '--merge',
+  '--auto',
+  branch,
+];
+
+/// Whether `gh pr create` output indicates that a pull request for the
+/// head branch already exists (rerun safety: in that case the plumbing
+/// continues straight to the auto-merge step instead of reporting a
+/// failure). Matched case-insensitively and deliberately lenient: both `gh`
+/// CLI and API wording contain "already exists".
+bool prAlreadyExists(String ghOutput) =>
+    ghOutput.toLowerCase().contains('already exists');
+
 /// An APK's SHA-256 checksum via the Linux `sha256sum` binary.
 Future<String> _sha256sumOf(String apkPath) async {
   final result = await Process.run('sha256sum', [apkPath]);
@@ -810,7 +890,7 @@ String _resolveNewestBuildTools(String androidHome) {
   if (!buildToolsRoot.existsSync()) {
     _fail(
       'no build-tools under $androidHome — install the Android SDK '
-      'build-tools (checklist step 4 already built the APK, so the SDK '
+      'build-tools (the build step already produced the APK, so the SDK '
       'must exist somewhere; check ANDROID_HOME).',
     );
   }
@@ -846,12 +926,28 @@ Future<void> runRelease(List<String> arguments) async {
   final tag = options.tag;
   final versionName = tagToVersion(tag);
 
-  print(
-    'Release script — per-release checklist step 7 of docs/release.md '
-    'for $tag.',
-  );
+  // --- 0. current branch (informational; decides the plumbing later) ------
+  final branchProbe = await Process.run('git', [
+    'rev-parse',
+    '--abbrev-ref',
+    'HEAD',
+  ]);
+  String? detectedBranch;
+  if (branchProbe.exitCode != 0) {
+    print(
+      'current branch: could not be resolved '
+      '(${branchProbe.stderr.trim()})',
+    );
+  } else {
+    detectedBranch = parseCurrentBranch(branchProbe.stdout as String);
+    print('current branch: ${detectedBranch ?? 'detached HEAD'}');
+  }
 
   // --- 1. version sanity (pubspec vs tag) --------------------------------
+  print(
+    'Release script — the publish step of the per-release checklist '
+    '(docs/release.md) for $tag.',
+  );
   final pubspecFile = File('pubspec.yaml');
   if (!pubspecFile.existsSync()) {
     _fail('pubspec.yaml not found — run from the repository root.');
@@ -999,21 +1095,20 @@ Future<void> runRelease(List<String> arguments) async {
     );
   }
 
-  // --- 5. the APKs exist (built earlier, checklist step 4) ----------------
+  // --- 5. the APKs exist (built earlier, the build step) ------------------
   final artifacts = buildReleaseArtifacts(version.build);
   for (final artifact in artifacts) {
     final apk = File(artifact.path);
     if (!apk.existsSync()) {
       _fail(
         'no release APK at ${artifact.path} — build the release APKs first '
-        '(checklist step 4: `flutter build apk --release '
-        '--split-per-abi`).',
+        '(the build step: `flutter build apk --release --split-per-abi`).',
       );
     }
     if (apk.lengthSync() == 0) {
       _fail(
-        'release APK at ${artifact.path} is empty — rebuild (checklist '
-        'step 4).',
+        'release APK at ${artifact.path} is empty — rebuild (the build '
+        'step).',
       );
     }
   }
@@ -1140,8 +1235,8 @@ Future<void> runRelease(List<String> arguments) async {
       if (info.versionName != versionName) {
         _fail(
           'STALE APK: ${artifact.path} embeds versionName '
-          '"${info.versionName}" != $versionName — rebuild (checklist '
-          'step 4) before publishing.',
+          '"${info.versionName}" != $versionName — rebuild (the build '
+          'step) before publishing.',
         );
       }
       if (info.versionCode != artifact.expectedVersionCode) {
@@ -1174,16 +1269,15 @@ Future<void> runRelease(List<String> arguments) async {
       'release.',
     );
     stdout.write(
-      'Has the device upgrade test (checklist step 6) been '
-      'completed with THESE exact APKs? (The published assets are '
-      'byte-identical renamed copies of exactly these files.) Type "yes" '
-      'to continue: ',
+      'Has the device upgrade test been completed with THESE exact '
+      'APKs? (The published assets are byte-identical renamed copies of '
+      'exactly these files.) Type "yes" to continue: ',
     );
     final answer = stdin.readLineSync()?.trim().toLowerCase() ?? '';
     if (answer != 'yes') {
       _fail(
         'upgrade-test confirmation not given — nothing was published. '
-        'Complete the device upgrade test first (checklist step 6). '
+        'Complete the device upgrade test first. '
         '--tested exists for scripted use and must never be used to skip '
         'the real test.',
       );
@@ -1191,8 +1285,8 @@ Future<void> runRelease(List<String> arguments) async {
   } else if (options.dryRun) {
     print(
       'dry-run note: on a real run without --tested, the script here '
-      'asks for confirmation that the device upgrade test (checklist '
-      'step 6) was done with these exact APKs before publishing.',
+      'asks for confirmation that the device upgrade test was done with '
+      'these exact APKs before publishing.',
     );
   } else {
     print('upgrade test: asserted done via --tested.');
@@ -1286,9 +1380,97 @@ Future<void> runRelease(List<String> arguments) async {
 
   print('');
   print('Release published: ${release.stdout.trim()}');
+
+  // --- 12. post-publish branch plumbing (soft-fail by design) ---------------
+  // The publish already succeeded, so nothing beyond this point may abort
+  // the run: every failure prints the exact manual remediation command and
+  // the run keeps its exit code. The plumbing is deliberately skipped on
+  // main (the old flow publishes from main itself; main already carries the
+  // version bump) and on a detached HEAD.
+  if (!plumbingApplies(detectedBranch)) {
+    print(
+      detectedBranch == null
+          ? 'Post-publish branch plumbing skipped: detached HEAD — there is '
+                'no release branch to merge back into main.'
+          : 'Post-publish branch plumbing skipped: the release was '
+                'published from main itself — main already carries the '
+                'version bump.',
+    );
+    print(
+      'Next: distribute (sideload → testers, Play internal track, F-Droid '
+      'MR) and watch the store dashboards.',
+    );
+    return;
+  }
+  final branch = detectedBranch!;
   print(
-    'Next: checklist steps 8–9 of docs/release.md — distribute '
-    '(sideload → testers, Play internal track, F-Droid MR) and watch the '
-    'store dashboards.',
+    'Branch plumbing: getting the published release branch back into main '
+    '(pull request + queued auto-merge, merge-commit method).',
+  );
+
+  final push = await Process.run('git', branchPushArguments(branch));
+  if (push.exitCode != 0) {
+    print(
+      'branch push failed (exit ${push.exitCode}): '
+      '${processOutputText(push)}\n'
+      'The publish itself succeeded — a soft failure the publish path does '
+      'not treat as fatal. Remediate by hand when convenient:\n'
+      '  git push -u origin $branch',
+    );
+  } else {
+    print('pushed $branch to origin (upstream set).');
+  }
+
+  final prCreate = await Process.run(
+    'gh',
+    prCreateArguments(branch: branch, tag: tag),
+  );
+  if (prCreate.exitCode == 0) {
+    print('opened the pull request into main: ${prCreate.stdout.trim()}');
+  } else {
+    final ghOutput = processOutputText(prCreate);
+    if (prAlreadyExists(ghOutput)) {
+      print(
+        'a pull request from $branch into main already exists — continuing '
+        'with the auto-merge step.',
+      );
+    } else {
+      print(
+        'gh pr create failed (exit ${prCreate.exitCode}): $ghOutput\n'
+        'The publish itself succeeded — a soft failure the publish path '
+        'does not treat as fatal. Create the pull request by hand when '
+        'convenient:\n'
+        '  gh pr create --base main --head $branch --title "Release $tag" '
+        '--body "${prCreateBody(tag)}"',
+      );
+    }
+  }
+
+  final merge = await Process.run('gh', prAutoMergeArguments(branch));
+  if (merge.exitCode == 0) {
+    print('auto-merge queued (merge-commit method); CI gates the merge.');
+  } else {
+    print(
+      'gh pr merge failed (exit ${merge.exitCode}): '
+      '${processOutputText(merge)}\n'
+      'The publish itself succeeded — a soft failure the publish path does '
+      'not treat as fatal. Queue the auto-merge by hand when convenient '
+      '(requires "Allow auto-merge" in the GitHub repository settings):\n'
+      '  gh pr merge --merge --auto $branch',
+    );
+  }
+
+  print('');
+  print(
+    'Next: watch the pull request from $branch merge into main (the '
+    'auto-merge queues it until CI is green), then distribute (sideload → '
+    'testers, Play internal track, F-Droid MR) and watch the store '
+    'dashboards.',
   );
 }
+
+/// Combined stdout/stderr text of a failed `gh` run, for failure messages
+/// (existing-PR output and error detail may land in either stream,
+/// depending on the gh version).
+String processOutputText(ProcessResult result) =>
+    '${result.stderr} ${result.stdout}'.trim();
