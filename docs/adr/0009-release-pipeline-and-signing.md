@@ -2,9 +2,12 @@
 
 - **Date:** 2026-09-18
 - **Status:** Accepted
-  (amended in place, 2026-09: releases are built and signed locally and
-  published manually; the tag-triggered CI release pipeline is parked —
-  see decision #6)
+  (amended in place four times, 2026-09: first to local-only releases with
+  the tag-triggered pipeline parked, then to an unsigned tag-triggered CI
+  build, then to a tagless branch-triggered CI build with the tag and
+  release authored at publish time, and finally to a two-script split of
+  the local release helper with the CI Flutter pin read directly from
+  `tool/flutter-version`; see decision #6 and its amendment notes)
 
 ## Context
 
@@ -16,7 +19,7 @@ starting state:
   ([ADR-0006](0006-ci.md)) — that original decision predates this ADR, and
   this ADR's follow-up decision (#6, documented after the Context section)
   now supersedes the web-only clause: ADR-0006 has since been amended to
-  also compile an Android debug build and run tag-triggered signed releases.
+  also compile an Android debug build and run tag-triggered release builds.
 - `android/` started from the untouched Flutter template: release build signed
   with the *debug* key, `applicationId` was the
   [ADR-0002](0002-package-name-cycle-app-placeholder.md) placeholder
@@ -92,12 +95,72 @@ sideload/F-Droid, so key custody is a governance question in itself.
    secrets never enter GitHub. The tag-triggered workflow above is **parked,
    not deleted** (kept with `workflow_dispatch` as its only trigger) for a
    possible later re-enable; the keystore-as-GPG-secrets provisioning scheme
-   stays documented in [`docs/release.md`](../release.md) ("Parked CI release
-   path"). Reason: a minimal custody surface until F-Droid distribution is
-   running. This amendment supersedes the tag-triggered clause above; the
+   was documented in [`docs/release.md`](../release.md) ("Parked CI release
+   path" — historical; since superseded, see the 2026-09 un-park amendment
+   below; the pointer's target section is gone, its topic is superseded
+   history). Reason: a
+   minimal custody surface until F-Droid distribution is running. This
+   amendment supersedes the tag-triggered clause above; the
    documentation split itself is unchanged, and decision #5's device
    upgrade test is unaffected — under the local path it runs *before*
    publishing, which the parked CI flow could not guarantee.
+
+   **Amended again in place (2026-09):** the workflow is un-parked in the
+   opposite shape: GitHub Actions builds the release APKs **unsigned** on
+   `vX.Y.Z` tag pushes and uploads them as workflow artifacts; the
+   release keystore stays off GitHub entirely, and signing is a *local*
+   apksigner step that replaces the CI builds' debug-signing-fallback
+   blocks, automated by the local release helper of the time (a single
+   all-in-one sign-then-publish script; its name is retired and its
+   duties are split — see the 2026-09 split amendment below: download →
+   verify → sign → attach). apksigner must come from Android build-tools
+   ≤ 34: a
+   35+ apksigner signature cannot be handled by the F-Droid buildserver's
+   signature copying. This supersedes the parked state and the
+   keystore-as-GPG-secrets scheme documented above; the runbook in
+   [`docs/release.md`](../release.md) is the authority (originally its
+   "CI release path" section, later folded into the single per-release
+   checklist — see the amendment below). Reason: the upstream release
+   APKs must be byte-reproducible
+   against the F-Droid buildserver (per-build `binary:` verification), a
+   requirement that shapes the CI build environment — and the CI checkout
+   path invariant — not the signing custody.
+
+   **Amended a third time in place (2026-09):** the release build no
+   longer waits for a tag: it triggers on pushes of `release/**`
+   branches (naming `release/v<semver>`) and on `workflow_dispatch`; the
+   version in the artifact names comes from `pubspec.yaml`
+   (`version: A.B.C+N`), so no tag exists at build time. The tag and the
+   GitHub release are authored later, at publish time, by the local
+   publish helper of that amendment (`gh release create vX.Y.Z --target
+   <the commit CI built>`), so tag, release, and signed assets appear
+   atomically at the exact commit the run built — and a failed CI build
+   leaves no dangling tag. This supersedes the tag-push trigger
+   documented above; [`docs/release.md`](../release.md) stays the
+   authority.
+
+   **Amended a fourth time in place (2026-09):** the single local release
+   helper referenced by the two amendments above (the all-in-one
+   sign-then-publish script; its file name is retired since the script
+   was deleted) is replaced by a two-script split with a deliberate
+   break between them:
+   `tool/download_and_sign.dart` runs everything through signing and
+   staging (no publish, no PR, and — by design — no dry-run; it mutates
+   nothing outside gitignored directories) and ends by writing the
+   handoff manifest `build/gh-release/source.json` (tag, versionName,
+   versionCodeBase, runId, headSha) and printing the adb install lines;
+   the device install + DB-migration test (decision #5) now happens as a
+   real script break; `tool/publish_release.dart` then consumes the
+   staged directory, computes checksums, assembles the release/tag at the
+   manifest's head SHA, opens the release-branch PR, and carries the
+   only `--dry-run` — print-only, with REAL checksums computed from the
+   staged files (the former sign-side rehearsal mode is removed). A
+   Flutter bump is now a one-file edit: ALL CI workflows read
+   `tool/flutter-version` directly with the F-Droid build recipe's exact
+   parse — the pin-sync tooling of the separately deleted local-build
+   release helper is gone with it, mirror input lines remain in no
+   workflow, and a malformed pin fails loudly in both workflows' resolve
+   steps. [`docs/release.md`](../release.md) stays the authority.
 
 ## Consequences
 

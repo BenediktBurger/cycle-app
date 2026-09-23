@@ -22,27 +22,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Keep equal to tool/flutter-version (single source of truth, enforced
-      # by the gate below); shell expansion is not possible in action inputs.
+      # The pinned Flutter version lives in tool/flutter-version (one bare
+      # version line under comments) and is read directly — the same file the
+      # F-Droid build recipe parses from each built commit, with the same
+      # parse. Shell expansion IS possible here: it runs in this run step,
+      # then is rendered into the action input below via ${{ }}; the literal
+      # flutter-version input is gone, so a Flutter bump edits
+      # tool/flutter-version ONLY. (Deliberately no `set -o pipefail`: a
+      # comment-only pin file must fail in the guards below, not abort
+      # silently inside the pipeline.)
+      - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
+        id: flutter-pin
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          [ -n "$pinned" ] || { echo "tool/flutter-version has no non-comment version line"; exit 1; }
+          [[ "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tool/flutter-version pins '$pinned', expected a bare X.Y.Z version (inline-comment contamination or whitespace/CRLF?)"; exit 1; }
+          echo "Resolved Flutter pin: $pinned"   # informational, not a gate
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.47.4
-
-      # The pinned Flutter version lives in tool/flutter-version (one bare
-      # version line under comments) — the file the F-Droid build recipe
-      # parses from each tagged commit. Fail the run loudly when the
-      # workflow's Flutter above and that pin drift apart.
-      - name: Flutter version matches tool/flutter-version
-        run: |
-          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
-          installed="$(flutter --version | sed -n 's/^Flutter \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
-          if [ "$installed" != "$pinned" ]; then
-            echo "Flutter version mismatch: installed $installed, but tool/flutter-version pins $pinned."
-            echo "Update tool/flutter-version (together with this workflow's flutter-version input) —"
-            echo "the F-Droid recipe reads tool/flutter-version from the tagged release."
-            exit 1
-          fi
+          flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
 
       - name: Install dependencies
         run: flutter pub get

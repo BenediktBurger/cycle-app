@@ -17,7 +17,7 @@ Preparing the first release to the different app stores.
 
 | Channel                      | Role                             | Blocked by                                                                  |
 |------------------------------|----------------------------------|-----------------------------------------------------------------------------|
-| Sideload APK                 | development/testing, demo builds | nothing (Phase D discipline; APK built + signed locally, released manually) |
+| Sideload APK                 | development/testing, demo builds | nothing (built on CI unsigned; signed + published locally via the two helper scripts)   |
 | Google Play                  | primary store                    | Gate G3 (Phase F; G1 resolved 2026-09)                                      |
 | F-Droid (official)           | intermediate, possibly permanent | Gate G2 (Phase E; G1 resolved 2026-09)                                      |
 | iOS (TestFlight → App Store) | deferred workstream              | macOS + Apple Developer Program (Phase G)                                   |
@@ -28,13 +28,15 @@ Of the one-time setup phases, Phase A (Android toolchain) and Phase C
 Phase D is ongoing discipline. One-time setup still open: the remaining
 Phase B item (adaptive launcher icon) and Phases E, F, G
 behind the gates above. Routine releases skip the phases entirely: they
-follow the
-[per-release checklist](#per-release-checklist-every-distribution-update)
-(the tag-triggered CI pipeline is
-[parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-per-release-checklist)).
-Signing secrets never enter GitHub: release builds and signing happen on
-the release machine, and the GitHub Release is created from the locally
-built per-ABI APKs (ADR-0009 amended 2026-09).
+follow the one-path
+[per-release checklist](#per-release-checklist-every-distribution-update):
+push a `release/**` branch and CI builds the unsigned per-ABI release
+artifacts; the local helper pair (`tool/download_and_sign.dart`, then —
+after the mandatory device test — `tool/publish_release.dart`) downloads,
+validates, and signs them with the release keystore, and publishes tag +
+GitHub Release + assets plus the release-branch PR. The release keystore
+never enters GitHub — CI only produces **unsigned** artifacts (ADR-0009
+amendments in place).
 
 ### Decision gates — resolve before the first store upload
 
@@ -104,13 +106,17 @@ Current state: the release keystore exists at
 `~/keystores/cycleapp-release.jks` (alias `cycleapp-release`), and the
 signing wiring is committed in `android/app/build.gradle.kts` — it reads
 the gitignored `android/key.properties` and falls back to debug signing
-when that file is absent (the per-release checklist guards against that).
+when that file is absent (the CI release build relies on exactly that
+fallback; those debug signature blocks are replaced entirely by the local
+apksigner step and never reach the published assets).
 **Still outstanding before the first signed build:** fill the two literal
 `CHANGE-ME` passwords in `android/key.properties` from the password
-manager. On the first real release, the script's `--accept-fingerprint`
-flow creates and commits `tool/release_fingerprint.txt` — see the
-[publish step of the per-release
-checklist](#per-release-checklist-every-distribution-update).
+manager. The release certificate fingerprint is pinned in the committed
+`tool/release_fingerprint.txt`; the
+[download-and-sign script](#per-release-checklist-every-distribution-update)
+refuses to attach any APK whose certificate does not match that pin (see
+the sign step of the per-release checklist), and the F-Droid metadata
+carries the same value (`AllowedAPKSigningKeys`).
 
 **Custody rules (ADR-0009 §2 — non-negotiable):**
 
@@ -135,7 +141,7 @@ Build variants (from the repo root):
 
 ```sh
 flutter build apk --release                 # universal APK — one file, quick for local tests
-flutter build apk --release --split-per-abi # smaller per-ABI APKs — THE release artifact path
+flutter build apk --release --split-per-abi # smaller per-ABI APKs — the shape the CI release build and the F-Droid recipe use
 flutter build appbundle --release           # .aab for Google Play
 ```
 
@@ -194,11 +200,11 @@ for every distributed build (Play and F-Droid see the same versionCode).
   the **universal APK** (a split-based F-Droid recipe would need its own
   version-code scheme statement at submission time; Phase E step 3 covers
   that choice, no changes here) — F-Droid's
-  `UpdateCheckData` regex derives its candidate versionCode from the
-  pubspec `+N` at the tagged commit, so `pubspec.yaml` is the single
-  source — and the `aapt` re-check in the publish step
-  verifies each split APK's embedded versionCode against
-  `N*10 + {1, 2, 3}` (and the universal against plain `N`).
+   `UpdateCheckData` regex derives its candidate versionCode from the
+   pubspec `+N` at the tagged commit, so `pubspec.yaml` is the single
+   source — and the download-and-sign script's `aapt` validation (sign
+   step of the per-release checklist) verifies each split APK's embedded
+   versionCode against `N*10 + {1, 2, 3}`.
 - The fastlane changelog filename (the changelog-files step) is the
   bare `N` — the split scheme changes nothing about that.
 
@@ -207,10 +213,16 @@ for every distributed build (Play and F-Droid see the same versionCode).
 Expectation management: the inclusion queue takes weeks to months; the app
 can meanwhile distribute as APKs. F-Droid builds **from source** with the
 app's declared signing key fingerprint. Because it builds from the source
-at the tagged commit, it does not consume the GitHub Release APKs — asset
-filenames, including the `cycle-app-<version>-<abi>.apk` publish names, are
-irrelevant to it. `pubspec.yaml` stays the single source of the
-versionCode.
+at the tagged commit, it only consumes the GitHub Release APKs for their
+signature (the metadata's `binary:` field: the buildserver downloads the
+upstream assets at
+`https://github.com/BenediktBurger/cycle-app/releases/download/v<version>/cycle-app-<version>-<abi>.apk`,
+copies their signature onto its own build of the same commit, and
+compares byte-for-byte) — so those upstream APKs must stay
+byte-reproducible against the F-Droid build (see the
+[per-release checklist](#per-release-checklist-every-distribution-update);
+on a mismatch F-Droid silently skips publishing that version).
+`pubspec.yaml` stays the single source of the versionCode.
 
 1. Preconditions: `LICENSE` committed; license Apache-2.0 confirmed final
    (G2), final applicationId (G1), universal-APK build reproducible locally,
@@ -226,10 +238,11 @@ versionCode.
    define recipes in `fdroiddata` *at submission time* (conventions move;
    find a recent Flutter app's yaml as the blueprint — do not copy a stale
    one from memory). Decide there between universal APK and ABI splits.
-   The exact pin lives in `tool/flutter-version`, enforced by CI and by
-   `tool/make_release.dart`; the recipe parses that file from the tagged
-   commit, so a Flutter bump after the first parsed recipe needs no
-   `fdroiddata` edit.
+   The exact pin lives in `tool/flutter-version` — both CI workflows and
+   the F-Droid buildserver read that same file, parsed the same way (the
+   recipe parses it from the built commit, which is the commit the
+   publish script tags) — so a Flutter bump after the first parsed recipe
+   needs no `fdroiddata` edit.
 4. Store-facing metadata follows the fastlane/triple-T structure under
    `fastlane/metadata/android/<locale>/`: full/short description, changelogs
    per versionCode, text+image assets. German-first with English mirrored,
@@ -286,8 +299,9 @@ Do **not** start until Android went through Phases B–F at least once.
 
 ## Per-release checklist (every distribution update)
 
-1. **Release branch** — cut a dedicated release branch off an up-to-date
-   `main` and do the next six steps on it:
+1. **Release branch + version bump (manual)** — cut the dedicated release
+   branch off an up-to-date `main` and commit the version bump on
+   it:
 
    ```sh
    git switch main
@@ -295,16 +309,14 @@ Do **not** start until Android went through Phases B–F at least once.
    git switch -c release/vX.Y.Z
    ```
 
-   The version bump through the upgrade test happens on this branch;
-   `main` stays untouched until the **Merge main** step, so a
-   half-finished release never lands there and CI can still vet the
-   branch–`main` PR afterwards.
-2. **Version bump** — change the version in `pubspec.yaml`:
-   `version: X.Y.Z+N`: always bump the versionCode `+N`; change the
-   versionName `X.Y.Z`, if applicable.
-3. **Test gate** — run tests: `flutter analyze && flutter test --no-pub -r expanded`
-   (full gate, [ADR-0006](adr/0006-ci.md) conventions).
-4. **Changelog files** — create the fastlane changelog file
+   Version bump: `version: X.Y.Z+N` in `pubspec.yaml` — always bump the
+   versionCode `+N`; change the versionName `X.Y.Z` depending on the
+   change — and commit it on the branch. The branch name `release/vX.Y.Z`
+   triggers the Release workflow, the download-and-sign
+   script selects the run by exactly this branch, and it re-checks the
+   requested `X.Y.Z` against pubspec at the run's own commit.
+2. **Changelog files (release notes, manual)** — create the fastlane
+   changelog file
    `fastlane/metadata/android/<locale>/changelogs/<N>.txt` for all
    locales present under `fastlane/metadata/android/` — the filename
    is exactly the bare versionCode integer from pubspec, e.g. `2.txt` for
@@ -317,238 +329,178 @@ Do **not** start until Android went through Phases B–F at least once.
    derives the per-version changelog its users see solely from these
    files. Store-metadata layout context: Phase E step 4 and
    [`fastlane/metadata/android/README.md`](../fastlane/metadata/android/README.md).
-5. **Build** — build the release artifacts themselves:
-   `flutter build apk --release --split-per-abi` — the three per-ABI APKs
-   that get attached to the GitHub Release (`app-armeabi-v7a-release.apk`,
-   `app-arm64-v8a-release.apk`, `app-x86_64-release.apk` under
-   `build/app/outputs/flutter-apk/`). The publish step publishes these
-   same files under the download-friendly `cycle-app-<version>-<abi>.apk`
-   names — byte-identical copies, hashed once here. With the local
-   `key.properties` present this is release-signed via the Phase C wiring;
-   if the file is missing, Gradle silently falls back to **debug** signing —
-   the `apksigner verify` step below is the guard against that, never skip
-   it.
-6. **Signature check** — verify the signatures — this is both the
-   trust-anchor source and the debug-fallback guard; the release script
-   runs this per APK — all three are signed with the same release key, so
-   they must show one fingerprint:
-
-   ```sh
-   for abi in armeabi-v7a arm64-v8a x86_64; do
-     $ANDROID_HOME/build-tools/<N>.0.0/apksigner verify --print-certs \
-       "build/app/outputs/flutter-apk/app-$abi-release.apk"
-   done
-   ```
-
-   The certificate must be the release key, not the debug key.
-7. **Upgrade test** — on the real device (Phase D) with the **exact APK
-   matching the test device** — non-negotiable, and it happens **before**
-   publishing: the locally built per-ABI APKs *are* the artifacts users
-   install — the publish step publishes them only under the
-   `cycle-app-<version>-<abi>.apk` names as byte-identical renamed copies —
-   so installing the canonical build file tests exactly what ships. Install
-   the device-matching split APK over the previous release and verify the
-   cycle data survives before anything is public.
-   Install for example with
-   `adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
-   (on an arm64 phone).
-
-8. **Publish** — run the release script:
-
-   ```sh
-   dart run tool/make_release.dart vX.Y.Z
-   # --dry-run first: performs the checks below, no side effects, no prompt
-   # first release ever: --accept-fingerprint (see below)
-   ```
-
-   - **Checks (refuse to publish on any failure):**
-     - requires a clean working tree.
-     - requires the build step's three APKs to exist.
-     - cross-checks the tag against the `pubspec.yaml` version and refuses
-       when `vX.Y.Z` already exists as a tag.
-     - requires the installed SDK to match `tool/flutter-version`.
-       To resolve a mismatch, either switch the installed Flutter SDK to
-       the pinned version, or rerun with `--accept-flutter-version`; the
-       run rewrites the pin to the installed SDK and updates the
-       `flutter-version:` inputs in `.github/workflows/ci.yml` and in
-       `.github/workflows/release.yml` (when that workflow is present)
-       itself, then stops there. Then commit all changed files (pin +
-       workflows), rebuild the APKs (the build step), and rerun the script.
-   - **Signature pin:** the `apksigner verify --print-certs` SHA-256
-     certificate fingerprint — checked per APK; all three share the one
-     release key — must match the pin in
-     `tool/release_fingerprint.txt` — a mismatch means the wrong key or
-     the silent debug-signing fallback; never publish. Also re-checks each
-     APK's embedded versionName/versionCode via `aapt` (best effort;
-     expected versionCode = `N*10 + abiCode` per the split scheme, see
-     Phase D "Numbers discipline") and prints each APK's SHA-256.
-   - **First run (`--accept-fingerprint`):** writes the actual fingerprint
-     into `tool/release_fingerprint.txt` and stops — the operator decides
-     at the pin that the certificate is genuinely the release key — then
-     commit the pin (it is public; it goes into the release notes anyway)
-     and rerun: the rerun matches the APKs against the pin and proceeds.
-   - **Confirm, then publish:** on a real run the script demands explicit
-     confirmation that the upgrade test was done with the
-     **device-matching exact APK** (`--tested` skips the prompt for
-     scripted use — do not use it to skip the real test). It then copies
-     the three APKs byte-identically into the gitignored
-     `build/gh-release/` directory under the publish names
-     `cycle-app-<version>-<abi>.apk` (e.g.
-     `cycle-app-0.2.0-arm64-v8a.apk`) — before any tag is created, so a
-     copy failure cannot leave a pushed tag — and then runs
-     `git tag vX.Y.Z` → `git push origin vX.Y.Z`
-     → `gh release create vX.Y.Z <apk1> <apk2> <apk3> --generate-notes
-     --notes` attaching the staged copies under those publish names,
-     with the SHA-256 certificate fingerprint and each published APK's
-     SHA-256 in the notes body (GitHub appends the auto-generated
-     changelog; the fingerprint is the trust anchor F-Droid metadata later
-     cross-checks).
-   - **Not covered:** the build, signature check, and upgrade test steps —
-     it never builds, never tests, never touches the device; the signature
-     check's trust decision stays with the operator at the first pin.
-   - **Manual fallback** (script unusable on some machine). Stage the
-     publish copies by hand with plain `mkdir`/`cp` first (same publish
-     names as the script, same byte-identical copies), then tag, push, and
-     attach the copies — `<version>` is the release's versionName `X.Y.Z`
-     without the build number:
-
-     ```sh
-     mkdir -p build/gh-release
-     for abi in armeabi-v7a arm64-v8a x86_64; do
-       cp "build/app/outputs/flutter-apk/app-$abi-release.apk" \
-         "build/gh-release/cycle-app-<version>-$abi.apk"
-     done
-     git tag vX.Y.Z
-     git push origin vX.Y.Z
-     gh release create vX.Y.Z \
-       build/gh-release/cycle-app-<version>-armeabi-v7a.apk \
-       build/gh-release/cycle-app-<version>-arm64-v8a.apk \
-       build/gh-release/cycle-app-<version>-x86_64.apk \
-       --generate-notes \
-      --notes "SHA-256 certificate fingerprint: <from the signature check's apksigner output>
-     APK SHA-256: cycle-app-<version>-armeabi-v7a.apk <sha256 of the armeabi-v7a APK>
-     APK SHA-256: cycle-app-<version>-arm64-v8a.apk <sha256 of the arm64-v8a APK>
-     APK SHA-256: cycle-app-<version>-x86_64.apk <sha256 of the x86_64 APK>"
-     ```
-
-     The checksum lines reference the published filenames — those are
-     what users download and verify against.
-
-     Create the tag explicitly with `git tag`/`git push` — `gh release
-     create` would otherwise auto-create it at the default branch's HEAD,
-     which may not be the pubspec-bump commit — and by hand the operator
-     must apply the same guards the script automates: compare the
-     `apksigner` fingerprint against `tool/release_fingerprint.txt` and
-     the tag name against `pubspec.yaml`.
-
-   Only point testers at the release once it is visible. (Git history is
-   the release diary; the roadmap stays a queue.)
-9. **Merge main** — after the publish step succeeded, get the release
-   branch back into `main`: the release script does this automatically
-   after a successful publish (it runs the trio below itself, with
-   soft-fail behavior — see the script's output); by hand, for a skipped
-   plumbing section (the release was on `main` or a detached HEAD) or to
-   remediate a plumbing error:
+3. **Push the branch → CI builds unsigned (NO tag exists yet)** —
 
    ```sh
    git push -u origin release/vX.Y.Z
-   gh pr create --base main --head release/vX.Y.Z \
-     --title "Release vX.Y.Z" \
-     --body "Merge the release branch back into main: version bump, fastlane changelog files, and the signed-tag publish for vX.Y.Z. Merge commit only — the tagged commit must stay an ancestor of main."
-   gh pr merge --merge --auto release/vX.Y.Z
    ```
 
+   The push triggers the
+   Release workflow (`.github/workflows/release.yml`): the full
+   correctness gate (analyze, format, test —
+   [ADR-0006](adr/0006-ci.md) conventions), then the three **unsigned**
+   per-ABI APKs built with plain `--split-per-abi` (no
+   `--target-platform`) at the fixed checkout path (invariants below),
+   uploaded as workflow artifacts `cycle-app-<version>-<abi>-unsigned`.
+   The version in those names comes from the branch's `pubspec.yaml` —
+   nothing is derived from a ref, because no tag exists at build time.
+   Wait for the run to finish green (`gh run watch` or the Actions page).
+   Reruns and rehearsals need no tag either: `workflow_dispatch` on the
+   release branch is an ordinary full run, and when several runs exist
+   for the branch the download-and-sign script picks newest-first — or
+   explicitly via `--run-id <id>` (the re-attach path, step 6).
+4. **Sign — download, validate, sign (`tool/download_and_sign.dart`)**;
+   runs NO builds and NO tests** —
+
+   ```sh
+   dart run tool/download_and_sign.dart vX.Y.Z
+   # keystore password: interactive apksigner prompt, or the
+   # APKSIGNER_STORE_PASSWORD environment variable (never a committed file)
+   ```
+
+   This local step performs no builds and no tests — the artifact already
+   passed the CI gate; the script's stages are pure download, validation,
+   and signing. It downloads the three artifacts, re-checks each APK's
+   embedded versionName (`X.Y.Z`) and versionCode (`N*10 + abiCode`, via
+   `aapt`) against the requested version and the pubspec
+   `version: X.Y.Z+N` **at the CI run's own commit** (fetched via the
+   GitHub contents API — the local checkout may sit on any branch), and
+   signs into the gitignored `build/gh-release/` under the publish names
+   `cycle-app-<version>-<abi>.apk` — exactly the URLs the F-Droid
+   metadata's `binary:` field downloads (Phase E). The signature comes
+   from apksigner in Android build-tools ≤ 34 (hard cap, invariants
+   below); every signature is verified against the pinned fingerprint in
+   `tool/release_fingerprint.txt` (hard gate: mismatch = wrong key —
+   never attach; the CI build's debug-signing fallback blocks are gone by
+   then), and one APK is signed a second time and compared byte-for-byte
+   (determinism sanity, aborts on any difference). Mismatched or corrupt
+   artifacts abort before anything is staged. The script ends by writing
+   the handoff manifest `build/gh-release/source.json` (the run id and
+   head SHA the publish step will use) and printing the adb install
+   lines below — it publishes nothing and opens no PR.
+5. **Device install + DB-migration test** — the download-and-sign script
+   printed the exact install commands, device-default ABIs first:
+
+   ```sh
+   adb install -r build/gh-release/cycle-app-<version>-armeabi-v7a.apk
+   adb install -r build/gh-release/cycle-app-<version>-arm64-v8a.apk
+   ```
+
+   Run the Phase D upgrade test against the **previously installed
+   release**: previous released version with representative data entered
+   → `adb install -r` the newly signed device-matching APK **over it** →
+   journal/chart intact, schema migration ran, export → import
+   round-trip still works (`tool/smoke_export_import.dart` logic mirrors
+   this). These CI-built, locally signed files are what ships and what
+   users download, so installing the device-matching one tests exactly
+   that. The publish script (Publish step) runs only once this test passed —
+   the break is a real script boundary, the checklist order is the
+   run order (attach is reversible; a data-loss incident is not).
+6. **Publish — tag + release + assets, atomically at the built commit
+   (`tool/publish_release.dart`)** —
+
+   ```sh
+   dart run tool/publish_release.dart vX.Y.Z
+   ```
+
+   Optional rehearsal first: `dart run tool/publish_release.dart vX.Y.Z --dry-run`
+   is print-only and computes REAL checksums from the
+   staged APKs, so every printed `gh` command (the release-create with
+   `--target`, or the `--clobber` re-attach, plus the PR payloads)
+   comes with the exact hashes the real run will publish — nothing is
+   uploaded or edited.
+
+   A release that does not exist yet is **created** with one command
+   that authors **the tag `vX.Y.Z` as well**:
+
+   ```sh
+   gh release create vX.Y.Z build/gh-release/cycle-app-<version>-<abi>.apk … \
+     --repo BenediktBurger/cycle-app --target <the manifest's head SHA> \
+     --generate-notes --notes-file build/gh-release/notes-vX.Y.Z.md
+   ```
+
+   The head SHA comes from the handoff manifest
+   `build/gh-release/source.json` (written by the download-and-sign
+   script from the resolved run — not re-resolved, so a newer run on the
+   branch or a `flutter clean` cannot retarget the release), pointing at
+   the exact commit the CI run built, so tag, release, and signed assets
+   appear atomically and a failed publish leaves no dangling tag; the
+   CI build stays the only thing a push triggers. The notes body is the
+   pinned fingerprint line plus one `APK SHA-256:` line per APK (GitHub
+   appends the auto-generated changelog; the fingerprint is the trust
+   anchor F-Droid metadata cross-checks). An already existing release is
+   **re-attached** instead: the signed APKs are uploaded with `--clobber`
+   and the fresh checksum lines are spliced into the existing notes body
+   (everything else preserved). The re-attach path needs no tag
+   delete/re-push games: re-sign from the original run via the
+   download-and-sign script's `--run-id <original run>` (when the
+   artifacts still exist) or re-dispatch a Release run on a release
+   branch whose head is reset to the original commit, then run the
+   publish script as usual.
+7. **Post-release PR into `development` (automated; verify it)** — after
+   publishing (create or re-attach), the publish script opens the PR
+   `release/vX.Y.Z` → `development` (title "Release vX.Y.Z") and queues
+   its auto-merge. What the operator verifies:
+
+   - **Merge commit, never squash or rebase** — the tag points at the
+     release commit, which must stay an ancestor of `development`; F-Droid
+     build-recipe metadata and the version bookkeeping pin that exact
+     SHA, so a squash/rebase would leave the tag pointing at a SHA the
+     history no longer contains.
    - **Auto-merge prerequisite:** switch on **"Allow auto-merge"** in the
      GitHub repo Settings (General → Pull Requests), otherwise `--auto`
      cannot queue the merge.
-   - The `pull_request` trigger in `.github/workflows/ci.yml` vets the PR;
-     `--auto` queues it until the required checks are green.
-   - **Merge commit, never squash or rebase:** the tagged commit `vX.Y.Z`
-     itself must become an ancestor of `main` — F-Droid build-recipe
-     metadata and the version bookkeeping pin that exact commit, so a
-     squash/rebase would leave the tag pointing at a SHA that main's
-     history no longer contains.
-   - Until the PR merges, `main` does not yet carry the version bump —
-     that is deliberate: everything was tested on the release branch, and
-     main receives only the finished, tagged state.
-10. **Distribute** (sideload → testers; Play internal track; F-Droid MR
-   or automatic build on their side). When Play is involved, the AAB is
-   also built locally (`flutter build appbundle --release`); there is no
-   automated Play upload.
-11. **Observe** — confirm the store dashboards show the intended version;
-    observe crash reports (Play) / F-Droid comments in the days after.
+   - The `pull_request` trigger in `.github/workflows/ci.yml` vets the
+     PR; `--auto` queues it until the required checks are green.
+   - PR plumbing failures are **soft failures**: the release is already
+     published, so the script prints the exact manual fallback commands
+     (`gh pr create …` / `gh pr merge --merge --auto release/vX.Y.Z`)
+     instead of aborting, and an "already exists" answer is handled
+     leniently (it just ensures auto-merge).
+8. **F-Droid tasks (operator)** — the fdroiddata MR (Phase E) with the
+   new `Builds:` entry: its `commit:` is the **same commit SHA the
+   release tag points at** — that equality is what makes the signature
+   comparison meaningful — and its `binary:` URLs name the just-published
+   assets. Then the verification loop: the per-versionCode JSONs under
+   `https://verification.f-droid.org/io.github.benediktburger.cycleapp_<versionCode>.apk.json`
+   must report verified; on a mismatch iterate on the CI side only (JDK /
+   build-tools / NDK alignment; the `-Wl,--build-id=none` suppressor is a
+   documented last resort for the `libdartjni.so` build-id diff) and
+   rerun the loop: re-dispatch → re-sign → re-attach → re-verify.
+9. **Distribute & observe** — sideload to testers first; Play internal
+   track when involved (its AAB is built locally,
+   `flutter build appbundle --release`; no automated Play upload); F-Droid
+   ships when verification passed. Confirm the store dashboards show the
+   intended version; observe crash reports (Play) / F-Droid comments in
+   the days after. Only point testers at the release once it is visible
+   and the upgrade test is done. (Git history is the release diary; the
+   roadmap stays a queue.)
 
-## Parked CI release path (ADR-0009 amended 2026-09, superseded by the per-release checklist)
+### Release invariants & hard gates (supporting detail)
 
-`.github/workflows/release.yml` — the tag-triggered build-and-sign
-pipeline — is **parked, not deleted**: releases are made locally, via
-the per-release checklist's publish step and its manual fallback (the
-[ADR-0009](adr/0009-release-pipeline-and-signing.md) amendment).
-The workflow is kept with **`workflow_dispatch` as its only trigger** —
-pushing a `vX.Y.Z` tag no
-longer runs it — and stays useful as a manual dry run on a clean machine.
-
-**Re-enable checklist** (returning to the old tag-push flow):
-
-1. Set the five secrets below (they may also be set while parked).
-2. Restore `push: tags: ["v*.*.*"]` in `.github/workflows/release.yml`.
-3. Dry-run via **workflow_dispatch** (GitHub → Actions → Release → Run
-   workflow) to validate secrets, signing, and the build.
-4. Then follow the old flow again: push the `vX.Y.Z` tag (the tag push
-   triggers the workflow), wait for it to finish green, download the
-   signed APK, run the device upgrade test, then distribute. The
-   workflow's outputs are unchanged: a signed universal release APK
-   attached to a GitHub Release with automatically generated notes (the
-   workflow prints the signing certificate fingerprint in its log — copy
-   it into the release notes as the trust anchor; F-Droid metadata later
-   cross-checks it), plus an AAB uploaded as a workflow **artifact** for
-   the manual Play upload (no Play API integration exists). Note that the
-   parked workflow still builds and attaches the signed **universal** APK —
-   its output shape predates the split-apk release path; align it with the
-   three per-ABI artifacts when re-enabling.
-
-Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
-tagged commit; the tag name itself is only the trigger and trust anchor.
-Keep the two in sync (the per-release checklist's publish step) — nothing in the
-workflow verifies them against each other (the local release script does
-have that cross-check, but it only guards the scripted local publishing
-path; when publishing by hand, the operator applies the same cross-check).
-
-**Required repository secrets (GitHub Settings → Secrets → Actions), all
-five — set them BEFORE the first tag push. Why the hard pre-flight
-requirement: missing secrets are not reported by the build chain itself —
-Gradle silently falls back to the debug signing config, and a debug-signed
-APK would get attached to a public Release. The workflow now aborts with a
-preflight check when a secret is absent, but treat a debug-signed APK on a
-Release as a trigger failure to investigate and never trust it:**
-
-1. `RELEASE_KEYSTORE_GPG_BASE64` — the keystore below, GPG-encrypted then
-   base64-encoded (how to produce it: the two commands below; Phase C
-   creates the `.jks`).
-2. `RELEASE_KEYSTORE_PASSPHRASE` — the GPG passphrase used in the same
-   encryption (store it in the password manager like the keystore
-   passwords; it is NOT the keystore password unless you chose to reuse).
-3. `RELEASE_KEYSTORE_KEY_ALIAS` — Phase C keystore alias (`cycleapp-release`).
-4. `RELEASE_KEYSTORE_KEY_PASSWORD` — the key's password.
-5. `RELEASE_KEYSTORE_STORE_PASSWORD` — the keystore's password.
-
-**Create the encrypted secret payload from the Phase C `.jks`:**
-
-```sh
-gpg --symmetric --output ~/keystores/cycleapp-release.jks.gpg ~/keystores/cycleapp-release.jks
-base64 ~/keystores/cycleapp-release.jks.gpg > ~/keystores/cycleapp-release.jks.gpg.b64
-# paste the .b64 content into the RELEASE_KEYSTORE_GPG_BASE64 secret, then
-# keep the passphrase mentally paired with it (password-manager entries).
-```
-
-The workflow decrypts the keystore **only into `$RUNNER_TEMP`** and writes
-a generated, gitignored `android/key.properties` pointing there; nothing
-keystore-shaped is committed or leaves `$RUNNER_TEMP`. The local keystore
-and its offline backups remain authoritative.
-
-When the parked path is re-enabled, the workflow again does **not** make a
-release count as "shipped": the device upgrade test remains a mandatory
-manual step before announcing the release (re-enable checklist item 4).
+- **Signing fingerprint pin (`tool/release_fingerprint.txt`)** — the
+  release-certificate SHA-256 is pinned in the committed file; the
+  download-and-sign script refuses to attach any APK signed with another
+  key, and the F-Droid
+  metadata carries the same value (`AllowedAPKSigningKeys`). Custody
+  rules: Phase C.
+- **apksigner only from Android build-tools ≤ 34** — a 35+ apksigner
+  signature cannot be handled by the F-Droid buildserver's signature
+  copying, hence the hard cap; the download-and-sign script resolves the
+  newest qualifying directory under `$ANDROID_HOME/build-tools` and
+  aborts loudly when none qualifies.
+- **Keystore never on GitHub** — CI only produces **unsigned** artifacts
+  (the Gradle release build's documented debug-signing fallback is
+  exactly the CI case); apksigner replaces those signature blocks during
+  local signing, so they never reach the published assets. Custody rules:
+  Phase C.
+- **Checkout-path invariant (byte-equality load-bearing for
+  `libapp.so`):** the CI checkout path and the fdroiddata build path must
+  stay identical. The fdroiddata recipe mirrors
+  `/home/runner/work/cycle-app/cycle-app`; any change of the CI workspace
+  directory (e.g. a repo rename → `/home/runner/work/<new>/<new>`) must
+  be mirrored in the same change to the fdroiddata recipe — and vice
+  versa.
 
 ## Fresh-machine recovery (the handover note)
 
@@ -557,13 +509,28 @@ machine:
 
 1. Flutter SDK + Android toolchain per
    [CONTRIBUTING.md](../CONTRIBUTING.md) (§1 and its "Android toolchain"
-   section) — required: releases are built and signed locally, so releases
-   cannot be made without the full Android toolchain (the parked CI path
-   would be the alternative if re-enabled).
+   section) — needed for day-to-day development and local builds; the
+   release build itself runs on GitHub Actions (unsigned), so publishing
+   depends only on a local Android SDK with build-tools ≤ 34
+   (apksigner/aapt, resolved via `ANDROID_HOME`), an authenticated `gh`
+   CLI, and the restored keystore below — not on a full local release
+   build. No tag is needed to rebuild a release either: dispatch a
+   Release run (`workflow_dispatch`) on a `release/**` branch — or push
+   the branch again — and the CI artifacts are there to download; the
+   tag itself is authored only at publish time, by
+   `tool/publish_release.dart`, at the head SHA the manifest written by
+   `tool/download_and_sign.dart` carries. A Flutter-version bump is a
+   one-file edit: change `tool/flutter-version` — both CI workflows and
+   the F-Droid recipe read that file directly; there are no per-workflow
+   mirror lines to update anymore.
 2. Restore the **keystore** from the offline backup (custody rules, Phase C)
    — without the `.jks` no update can be signed for the installed base.
-3. Recreate `android/key.properties` from the password-manager record.
-4. Follow the per-release checklist above; F-Droid metadata lives in the
+3. Recreate `android/key.properties` from the password-manager record
+   (needed for locally signed release builds during development, not for
+   the publish path).
+4. Follow the per-release checklist above — its two-script flow
+   (`download_and_sign` → device test → `publish_release`) is the same
+   on a fresh machine; F-Droid metadata lives in the
    `fdroiddata` fork (separate git repo), Play listing lives in the console.
 
 ---
