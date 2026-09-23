@@ -55,7 +55,6 @@ the sections above track planned work, git history keeps the record (see
   - comments should be in one column as well (not spanning the whole sheet)
   - strange distribution: one column with 3, the other one with 2 marks and then on the bottom joined another mark. All marks (and/or comments) should be distributed among columns. Maybe even more columns on wider screen?
 - how to mark pregnancy and breast-feeding cycles -> they should not enter into statistics of "normal" cycles
-- [ ] PDF Export (at most 1 cycle per page, longer cycles like pregnancy take several), with additional information (like paper form): name ( hideable per export "anonymize"), birth date (hidden by anonymization), count of observed cycles, shortest cycle, earliest first higher temperature. Also write out notes (vertically). For all these additional options offer a settings field to take into consideration either only source (name, birth date) or as information about cycles observed outside this app (e. G. Before stating here). For example cycle count should include previous cycles and cycles stored in the app up to the exported one
 - order settings: everything related should be together, e.g pdf related (name, birth date) should be near pdf export. Don't show the datenschutz entry on the settings page
 - should we add the birth bleeding (Wochenbett, marked as ~)?
 - show cycle start mark on journal like temp?
