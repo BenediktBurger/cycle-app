@@ -39,16 +39,27 @@ exist yet.)
 
 ### Where to get it
 
-Download the APK from the
+Download an APK from the
 [GitHub releases page](https://github.com/BenediktBurger/cycle-app/releases).
-Each release carries one release-signed, universal APK — a single file that
-runs on all Android devices. Every release note also lists the APK's SHA-256
-checksum and the signing certificate's SHA-256 fingerprint, so you can verify
-the download if you want to.
+Each release carries three release-signed APKs — one per device
+architecture (ABI). Pick the one matching your phone:
+
+- `app-arm64-v8a-release.apk` — modern phones (the right choice for most
+  devices),
+- `app-armeabi-v7a-release.apk` — older 32-bit devices,
+- `app-x86_64-release.apk` — mainly emulators.
+
+Not sure which? Check *Settings → About phone* for the processor
+information, or — with the phone connected to a computer and
+developer options enabled — run `adb shell getprop ro.product.cpu.abi`.
+All three APKs are signed with the same release key. Every release note
+lists each APK's SHA-256 checksum plus the signing certificate's SHA-256
+fingerprint, so you can verify the download if you want to.
 
 ### Installing
 
-1. Download the APK from the latest release.
+1. Download the APK matching your device (see above) from the latest
+   release.
 2. Open the downloaded file on the device.
 3. Android will warn about installing apps from an external source
    (sideloading / "unknown sources") — accept it to continue.
@@ -59,7 +70,8 @@ the download if you want to.
 
 ### Updating
 
-Download the most recent APK from the releases page and install it over the
+Download the most recent APK for your device's architecture (the same one
+you installed before) from the releases page and install it over the
 existing version. Because the signing certificate stays the same, Android
 updates the app in place instead of treating it as a new install, and your
 data stays. That said: this is an alpha — data loss is not ruled out, so

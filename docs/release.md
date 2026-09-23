@@ -34,7 +34,7 @@ follow the
 [parked](#parked-ci-release-path-adr-0009-amended-2026-09-superseded-by-the-per-release-checklist)).
 Signing secrets never enter GitHub: release builds and signing happen on
 the release machine, and the GitHub Release is created from the locally
-built APK (ADR-0009 amended 2026-09).
+built per-ABI APKs (ADR-0009 amended 2026-09).
 
 ### Decision gates — resolve before the first store upload
 
@@ -134,19 +134,28 @@ ADR-0009 §2 covers the rationale.
 Build variants (from the repo root):
 
 ```sh
-flutter build apk --release                 # universal APK — simplest, F-Droid-ish default
-flutter build apk --release --split-per-abi # smaller per-ABI APKs for sideloading
+flutter build apk --release                 # universal APK — one file, quick for local tests
+flutter build apk --release --split-per-abi # smaller per-ABI APKs — THE release artifact path
 flutter build appbundle --release           # .aab for Google Play
 ```
 
-Artifacts land under `build/app/outputs/flutter-apk/` (and
-`.../bundle/release/` for the AAB).
+Artifacts land under `build/app/outputs/flutter-apk/`: the universal
+`app-release.apk`, and with `--split-per-abi` the three per-ABI APKs
+`app-armeabi-v7a-release.apk`, `app-arm64-v8a-release.apk`, and
+`app-x86_64-release.apk` (and `.../bundle/release/` for the AAB). The
+universal APK stays valid for quick local testing; GitHub Releases attach
+the three per-ABI APKs only.
 
 Install on a device:
 
 ```sh
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+(the per-ABI APK matching the device; the universal APK installs the same
+way via `app-release.apk` — see
+[CONTRIBUTING.md](../CONTRIBUTING.md), "Running on your own Android
+device", for which ABI a device needs).
 
 **Upgrade test (mandatory for every distribution update, ADR-0009 §5):**
 
@@ -163,28 +172,31 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 for every distributed build (Play and F-Droid see the same versionCode).
 
 - `X.Y.Z` is the **versionName** (the user-visible version string); `N`,
-  the integer after the `+`, is the **versionCode** — the only number
+  the integer after the `+`, is the **base versionCode** — the only number
   stores, F-Droid, and fastlane changelog naming actually care about.
 - The versionCode is monotonically increasing with every published version
   regardless the used versionName.
 - How `N` flows: pubspec `+N` → Gradle's `flutter.versionCode` → the
-  versionCode embedded in the APK (wired as `versionCode =
+  versionCode embedded in the APKs (wired as `versionCode =
   flutter.versionCode` in the `defaultConfig` of
-  `android/app/build.gradle.kts`). For the universal APK
-  (`flutter build apk --release` — the per-release checklist default) that
-  is **exactly `N`**; the offset mentioned in that file's comment (Flutter
-  adds `1000 * ABI_VERSION` for split APKs, suppressible with
-  `-P force-version-code-ignoring-abi=true`) applies **only** to
-  `--split-per-abi` builds, never to the universal APK.
+  `android/app/build.gradle.kts`). The universal APK embeds **exactly
+  `N`**; each of the three split APKs embeds `N*10 + abiCode` with
+  abiCode 1 = armeabi-v7a, 2 = arm64-v8a, 3 = x86_64 — set explicitly by
+  the abiCodes override (an `applicationVariants.configureEach` block) in
+  `android/app/build.gradle.kts`; the universal APK has no ABI filter and
+  is untouched by that block.
 - Equalities to maintain: the F-Droid `Builds:` entry's
-  `versionCode:` (Phase E step 2) must equal `N` — F-Droid's
+  `versionCode:` (Phase E step 2) must equal `N` — that equality anchors
+  the **universal APK** (a split-based F-Droid recipe would need its own
+  version-code scheme statement at submission time; Phase E step 3 covers
+  that choice, no changes here) — F-Droid's
   `UpdateCheckData` regex derives its candidate versionCode from the
   pubspec `+N` at the tagged commit, so `pubspec.yaml` is the single
   source — and the `aapt` re-check in per-release checklist step 7
-  verifies the APK's embedded versionCode matches the pubspec `+N` behind
-  the published tag.
-- The fastlane changelog filename (per-release checklist step 3) is that
-  same `N`.
+  verifies each split APK's embedded versionCode against
+  `N*10 + {1, 2, 3}` (and the universal against plain `N`).
+- The fastlane changelog filename (per-release checklist step 3) is the
+  bare `N` — the split scheme changes nothing about that.
 
 ### Phase E — official F-Droid inclusion (after Gates G1 + G2)
 
@@ -283,27 +295,36 @@ Do **not** start until Android went through Phases B–F at least once.
    derives the per-version changelog its users see solely from these
    files. Store-metadata layout context: Phase E step 4 and
    [`fastlane/metadata/android/README.md`](../fastlane/metadata/android/README.md).
-4. **Build the release artifact** itself:
-   `flutter build apk --release` (universal APK). With the local
+4. **Build the release artifacts** themselves:
+   `flutter build apk --release --split-per-abi` — the three per-ABI APKs
+   that get attached to the GitHub Release (`app-armeabi-v7a-release.apk`,
+   `app-arm64-v8a-release.apk`, `app-x86_64-release.apk` under
+   `build/app/outputs/flutter-apk/`). With the local
    `key.properties` present this is release-signed via the Phase C wiring;
    if the file is missing, Gradle silently falls back to **debug** signing —
    the `apksigner verify` step below is the guard against that, never skip
    it.
-5. **Verify the signature** — this is both the trust-anchor source and the
-   debug-fallback guard:
+5. **Verify the signatures** — this is both the trust-anchor source and the
+   debug-fallback guard; the release script runs this per APK — all three
+   are signed with the same release key, so they must show one fingerprint:
 
    ```sh
-   $ANDROID_HOME/build-tools/<N>.0.0/apksigner verify --print-certs \
-     build/app/outputs/flutter-apk/app-release.apk
+   for abi in armeabi-v7a arm64-v8a x86_64; do
+     $ANDROID_HOME/build-tools/<N>.0.0/apksigner verify --print-certs \
+       "build/app/outputs/flutter-apk/app-$abi-release.apk"
+   done
    ```
 
    The certificate must be the release key, not the debug key.
-6. **Upgrade test on the real device** (Phase D) with **this exact APK** —
-   non-negotiable, and it happens **before** publishing: the locally built
-   APK *is* the artifact users install (byte-identical), so install it over
+6. **Upgrade test on the real device** (Phase D) with **the exact APK
+   matching the test device** — non-negotiable, and it happens **before**
+   publishing: the locally built per-ABI APKs *are* the artifacts users
+   install (byte-identical), so install the device-matching split APK over
    the previous release and verify the cycle data survives before anything
    is public.
-   Install for example with `adb install -r build/app/outputs/flutter-apk/app-release.apk`.
+   Install for example with
+   `adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
+   (on an arm64 phone).
 
 7. **Run the release script**:
 
@@ -315,7 +336,7 @@ Do **not** start until Android went through Phases B–F at least once.
 
    - **Checks (refuse to publish on any failure):**
      - requires a clean working tree.
-     - requires the step-4 APK to exist.
+     - requires the three step-4 APKs to exist.
      - cross-checks the tag against the `pubspec.yaml` version and refuses
        when `vX.Y.Z` already exists as a tag.
      - requires the installed SDK to match `tool/flutter-version`.
@@ -325,24 +346,28 @@ Do **not** start until Android went through Phases B–F at least once.
        `flutter-version:` inputs in `.github/workflows/ci.yml` and in
        `.github/workflows/release.yml` (when that workflow is present)
        itself, then stops there. Then commit all changed files (pin +
-       workflows), rebuild the APK (step 4), and rerun the script.
+       workflows), rebuild the APKs (step 4), and rerun the script.
    - **Signature pin:** the `apksigner verify --print-certs` SHA-256
-     certificate fingerprint must match the pin in
+     certificate fingerprint — checked per APK; all three share the one
+     release key — must match the pin in
      `tool/release_fingerprint.txt` — a mismatch means the wrong key or
-     the silent debug-signing fallback; never publish. Also re-checks the
-     APK's embedded versionName/versionCode via `aapt` (best effort) and
-     prints the APK SHA-256.
+     the silent debug-signing fallback; never publish. Also re-checks each
+     APK's embedded versionName/versionCode via `aapt` (best effort;
+     expected versionCode = `N*10 + abiCode` per the split scheme, see
+     Phase D "Numbers discipline") and prints each APK's SHA-256.
    - **First run (`--accept-fingerprint`):** writes the actual fingerprint
      into `tool/release_fingerprint.txt` and stops — the operator decides
      at the pin that the certificate is genuinely the release key — then
      commit the pin (it is public; it goes into the release notes anyway)
-     and rerun: the rerun matches the APK against the pin and proceeds.
+     and rerun: the rerun matches the APKs against the pin and proceeds.
    - **Confirm, then publish:** on a real run the script demands explicit
-     confirmation that step 6's upgrade test was done with **this exact
-     APK** (`--tested` skips the prompt for scripted use — do not use it
-     to skip the real test); then `git tag vX.Y.Z` → `git push origin vX.Y.Z`
-     → `gh release create vX.Y.Z <apk> --generate-notes --notes`
-     with the SHA-256 certificate fingerprint and the APK SHA-256 in the
+     confirmation that step 6's upgrade test was done with the
+     **device-matching exact APK** (`--tested` skips the prompt for
+     scripted use — do not use it to skip the real test); then
+     `git tag vX.Y.Z` → `git push origin vX.Y.Z`
+     → `gh release create vX.Y.Z <apk1> <apk2> <apk3> --generate-notes
+     --notes` attaching all three per-ABI APKs
+     with the SHA-256 certificate fingerprint and each APK's SHA-256 in the
      notes body (GitHub appends the auto-generated changelog; the
      fingerprint is the trust anchor F-Droid metadata later cross-checks).
    - **Not covered:** steps 4–6 — it never builds, never tests, never
@@ -354,10 +379,12 @@ Do **not** start until Android went through Phases B–F at least once.
      git tag vX.Y.Z
      git push origin vX.Y.Z
      gh release create vX.Y.Z \
-       build/app/outputs/flutter-apk/app-release.apk \
+       build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+       build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+       build/app/outputs/flutter-apk/app-x86_64-release.apk \
        --generate-notes \
        --notes "SHA-256 certificate fingerprint: <from step 5's apksigner output>
-     APK SHA-256: <sha256sum build/app/outputs/flutter-apk/app-release.apk>"
+     APK SHA-256: <one sha256sum line per APK above, each prefixed with its path>"
      ```
 
      Create the tag explicitly with `git tag`/`git push` — `gh release
@@ -400,7 +427,10 @@ longer runs it — and stays useful as a manual dry run on a clean machine.
    workflow prints the signing certificate fingerprint in its log — copy
    it into the release notes as the trust anchor; F-Droid metadata later
    cross-checks it), plus an AAB uploaded as a workflow **artifact** for
-   the manual Play upload (no Play API integration exists).
+   the manual Play upload (no Play API integration exists). Note that the
+   parked workflow still builds and attaches the signed **universal** APK —
+   its output shape predates the split-apk release path; align it with the
+   three per-ABI artifacts when re-enabling.
 
 Note on versions: the APK embeds the `version:` from `pubspec.yaml` at the
 tagged commit; the tag name itself is only the trigger and trust anchor.

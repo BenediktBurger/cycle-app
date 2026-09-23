@@ -185,8 +185,24 @@ flutter build apk --release            # universal APK; debug-signed locally is 
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Sideload without adb: copy
-`build/app/outputs/flutter-apk/app-release.apk` to the phone (USB file
+The universal APK is the simple one-file path for local testing. To build
+exactly what a release ships, use the per-ABI splits instead:
+
+```sh
+flutter build apk --release --split-per-abi
+# produces app-armeabi-v7a-release.apk, app-arm64-v8a-release.apk, and
+# app-x86_64-release.apk in build/app/outputs/flutter-apk/
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
+
+Install the split APK matching your device (`arm64-v8a` for most phones;
+check with `adb shell getprop ro.product.cpu.abi`) — it is smaller, and it
+is the kind of APK that GitHub Releases attach. The version-code
+scheme behind the splits is described in
+[`docs/release.md`](docs/release.md), Phase D "Numbers discipline".
+
+Sideload without adb: copy the APK (the universal one, or the split APK
+matching your device) to the phone (USB file
 transfer, KDE Connect, …), open it with the file manager, and allow
 "install unknown apps" for that app when prompted.
 
