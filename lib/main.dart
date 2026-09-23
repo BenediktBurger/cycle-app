@@ -26,6 +26,15 @@ import 'ui/statistics.dart';
 /// explicit — keeping it keeps the light look byte-for-byte familiar.
 const _themeSeedColor = Color(0xFF6750A4);
 
+/// ThemeData built on one brightness' color scheme. Shared by light and
+/// dark mode so both stay in sync: the app bars are slightly slimmer than
+/// the Material 3 default to keep more of the screen for content
+/// (especially the cycle chart).
+ThemeData _buildTheme(ColorScheme scheme) => ThemeData(
+  colorScheme: scheme,
+  appBarTheme: const AppBarTheme(toolbarHeight: 48),
+);
+
 void main() {
   runApp(const ProviderScope(child: CycleApp()));
 }
@@ -143,11 +152,9 @@ class _CycleAppState extends ConsumerState<CycleApp> {
       // the same tonal neighborhood, and the app follows the device
       // brightness setting (themeMode: system).
       themeMode: themeMode,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: _themeSeedColor),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
+      theme: _buildTheme(ColorScheme.fromSeed(seedColor: _themeSeedColor)),
+      darkTheme: _buildTheme(
+        ColorScheme.fromSeed(
           seedColor: _themeSeedColor,
           brightness: Brightness.dark,
         ),
@@ -412,6 +419,7 @@ class _HomeShell extends ConsumerWidget {
     int index,
     AppLocalizations l10n,
   ) => NavigationBar(
+    height: 64,
     selectedIndex: index,
     onDestinationSelected: (int newIndex) =>
         ref.read(tabIndexProvider.notifier).state = newIndex,
