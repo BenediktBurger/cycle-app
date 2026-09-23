@@ -207,7 +207,7 @@ final class CycleDayPanel extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.cycleSheetRiseConsistencyTitle),
+          title: Text(l10n.termFirstHigher),
           content: Text(body),
           actions: [
             TextButton(
@@ -541,7 +541,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       width: chipWidth,
                     ),
                     gridChip(
-                      l10n.cycleSheetMucusPeakLabel,
+                      l10n.termMucusPeak,
                       hasPeak,
                       icon: Icons.circle,
                       (wanted) => _writeMark(
@@ -555,7 +555,7 @@ final class CycleDayPanel extends ConsumerWidget {
                     // dialog check (the dialog fires on PLACEMENT only, the
                     // unselect path removes directly).
                     gridChip(
-                      l10n.cycleSheetFirstHigherLabel,
+                      l10n.termFirstHigher,
                       hasFirstHigher,
                       icon: Icons.adjust,
                       (wanted) => _writeFirstHigherMark(

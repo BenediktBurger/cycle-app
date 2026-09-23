@@ -192,7 +192,7 @@ class EinstellungenScreen extends ConsumerWidget {
                     segments: [
                       ButtonSegment(
                         value: 'system',
-                        label: Text(l10n.languageSystem),
+                        label: Text(l10n.termSystem),
                       ),
                       ButtonSegment(
                         value: 'de',
@@ -236,14 +236,13 @@ class EinstellungenScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   // System follows the device brightness (the MaterialApp
                   // default); the explicit choices win over the platform
-                  // (its own `themeSystem` label — not the language
-                  // switcher's `languageSystem`, so the two switchers can
-                  // evolve independently).
+                  // (its own switcher uses the shared `termSystem` label —
+                  // one vocabulary across both switchers).
                   SegmentedButton<ThemeMode>(
                     segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        label: Text(l10n.themeSystem),
+                        label: Text(l10n.termSystem),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
@@ -539,7 +538,7 @@ class EinstellungenScreen extends ConsumerWidget {
                   FilledButton.tonalIcon(
                     onPressed: () => _openDripImportDialog(context, ref),
                     icon: const Icon(Icons.upload_outlined),
-                    label: Text(l10n.dripImportButton),
+                    label: Text(l10n.termCsvImport),
                   ),
                 ],
               ),
@@ -784,7 +783,7 @@ class EinstellungenScreen extends ConsumerWidget {
       builder: (dialogContext) => _ImportDialog(
         title: l10n.dripImportTitle,
         hint: l10n.dripImportHint,
-        applyLabel: l10n.dripImportApply,
+        applyLabel: l10n.termCsvImport,
         // CSV from the sibling project, both the extension and the MIME.
         accept: '.csv,text/csv',
         apply: (applyContext, raw) =>

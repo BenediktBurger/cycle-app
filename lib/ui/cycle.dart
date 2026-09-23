@@ -1489,14 +1489,14 @@ String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
 // entry form's vocabulary; the experts may want different names.
 String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
     switch (kind) {
-      _SignalKind.bleeding => l10n.cycleRowBleeding,
-      _SignalKind.mucus => l10n.cycleRowMucus,
-      _SignalKind.mittelschmerz => l10n.cycleRowMittelschmerz,
-      _SignalKind.sex => l10n.cycleRowSex,
+      _SignalKind.bleeding => l10n.termBleeding,
+      _SignalKind.mucus => l10n.termMucus,
+      _SignalKind.mittelschmerz => l10n.termMittelschmerz,
+      _SignalKind.sex => l10n.termSex,
       _SignalKind.cervix => l10n.cycleRowCervix,
-      _SignalKind.pain => l10n.cycleRowPain,
+      _SignalKind.pain => l10n.termBreastPain,
       _SignalKind.disturbance => l10n.cycleRowDisturbance,
-      _SignalKind.time => l10n.cycleRowMeasurementTime,
+      _SignalKind.time => l10n.termMeasurementTime,
       _SignalKind.note => l10n.cycleRowNote,
     };
 

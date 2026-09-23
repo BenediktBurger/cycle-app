@@ -5,13 +5,32 @@
   "navCycle": "Zyklus",
   "navStatistics": "Statistik",
   "navSettings": "Einstellungen",
+  "termBleeding": "Blutung",
+  "termMucus": "Fruchtbarkeitszeichen (Zervixschleim)",
+  "termMucusPeak": "Schleimhöhepunkt",
+  "termCervixPosition": "Muttermund-Position",
+  "termCervixFirmness": "Muttermund-Festigkeit",
+  "termMeasurementTime": "Messzeitpunkt",
+  "termFirstHigher": "Erste höhere Messung",
+  "termCycleDays": "{n} Tage",
+  "@termCycleDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "termSystem": "System",
+  "termCsvImport": "CSV importieren",
+  "termBreastPain": "Brustschmerz (B)",
+  "termMittelschmerz": "Mittelschmerz (M)",
+  "termSex": "Sex",
   "entryDate": "Datum",
   "entryPreviousDay": "Voriger Tag",
   "entryNextDay": "Nächster Tag",
   "temperature": "Temperatur",
   "measuredTime": "Gemessen um",
   "measuredTimeUnset": "nicht erfasst",
-  "bleeding": "Blutung",
   "notes": "Notizen",
   "splashLoadingDatabase": "Lade Datenbank …",
   "dbErrorTitle": "Datenbank konnte nicht geöffnet werden",
@@ -27,10 +46,8 @@
   "bleedingMedium": "mittel",
   "bleedingHeavy": "stark",
   "bleedingMaximum": "sehr stark",
-  "mucusSign": "Zeichen der Fruchtbarkeit",
   "mucusSignUnset": "—",
   "mucusQuality": "Qualität",
-  "cervixPosition": "Muttermund-Position",
   "cervixPositionUnset": "—",
   "cervixPositionLow": "tief",
   "cervixPositionMedium": "mittel",
@@ -42,14 +59,10 @@
   "cervixOpeningClosed": "geschlossen",
   "cervixOpeningMiddle": "mittel",
   "cervixOpeningOpen": "offen",
-  "cervixFirmness": "Muttermund-Festigkeit",
   "cervixFirmnessUnset": "—",
   "cervixFirmnessHard": "hart",
   "cervixFirmnessHalfSoft": "h-w",
   "cervixFirmnessSoft": "weich",
-  "painBreast": "Brustschmerzen (B)",
-  "painMittelschmerz": "Mittelschmerz (M)",
-  "sex": "Sex",
   "sexTimingStart": "Anfang",
   "sexTimingMiddle": "Mitte",
   "sexTimingEnd": "Ende",
@@ -72,44 +85,23 @@
       }
     }
   },
-  "cycleDays": "{n} Tage",
-  "@cycleDays": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "cycleTapToEdit": "Tippen, um den Tag zu bearbeiten",
   "cycleColumnDate": "Datum",
   "cycleColumnCycleDay": "Zyklustag",
-  "cycleLegendTemperature": "BBT (Temperatur)",
-  "cycleRowBleeding": "Blutung",
-  "cycleRowMucus": "Fruchtbarkeitszeichen (Schleim)",
+  "cycleLegendTemperature": "Aufwachtemperatur",
   "cycleRowCervix": "Muttermund",
-  "cycleRowSex": "Sex",
-  "cycleRowMittelschmerz": "Mittelschmerz",
-  "cycleRowPain": "Schmerz",
   "cycleRowDisturbance": "Messstörung",
-  "cycleRowMeasurementTime": "Messzeitpunkt",
   "cycleRowNote": "Notiz",
   "cycleHelpShow": "Zeichenerklärung anzeigen",
   "cycleHelpTitle": "Zeichenerklärung",
-  "cycleLegendBleeding": "Blutung",
-  "cycleLegendMucus": "Zeichen der Fruchtbarkeit (Schleim)",
-  "cycleLegendMucusPeak": "Schleimhöhepunkt",
   "cycleLegendCircledHigher": "Umrandete höhere Messungen",
   "cycleLegendArrowHigher": "vorzeitiger Temperaturanstieg",
   "cycleLegendBaseline": "Basislinie",
-  "cycleLegendCervix": "Muttermund-Position",
-  "cycleLegendCervixFirmness": "Muttermund-Festigkeit",
   "cycleNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
   "cycleJumpToDate": "Zum Datum springen",
   "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
   "cycleSheetCycleStartLabel": "Zyklusbeginn",
-  "cycleSheetMucusPeakLabel": "Schleimhöhepunkt",
-  "cycleSheetFirstHigherLabel": "Erste höhere Messung",
   "cycleSheetSuzEveningLabel": "SUZ ab diesem Abend",
   "cycleSheetSuzMorningLabel": "SUZ ab diesem Morgen",
   "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
@@ -147,7 +139,6 @@
     "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (R7); der Wert ist bereits im Gebietsschema formatiert."
   },
   "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze die erste höhere Messung bei der nächsten höheren Messung neu.",
-  "cycleSheetRiseConsistencyTitle": "Erste höhere Messung",
   "cycleSheetRiseConsistencyBelow": "{value} °C am markierten Tag liegt nicht über der Basislinie {baseline} °C.",
   "cycleSheetRiseConsistencyNoValue": "Am markierten Tag ist keine verwertbare Temperatur erfasst (ungemessen oder unterbrochen).",
   "cycleSheetRiseConsistencyKeep": "Behalten",
@@ -157,15 +148,12 @@
   "diaryCycleStartPromptBody": "Die Blutung an diesem Tag deutet darauf hin, dass hier ein neuer Zyklus beginnt. Soll an diesem Tag eine Zyklusbeginn-Markierung gesetzt werden?",
   "diaryCycleStartPromptConfirm": "Zyklusbeginn setzen",
   "diaryCycleStartPromptDismiss": "Nicht jetzt",
-  "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend (Regel D)",
-  "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh (Regel E)",
-  "cycleLegendMeasuredAt": "Messzeitpunkt",
+  "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend",
+  "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh",
   "cycleLegendSex": "Sex (X je Zeitpunkt)",
-  "cycleLegendPain": "Brustschmerz (B)",
-  "cycleLegendMittelschmerz": "Mittelschmerz (M)",
   "cycleLegendDisturbance": "Gestörte Messung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
-  "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen) — keine Bewertung oder Aussagen über Fruchtbarkeit. Eine gesetzte Zyklusbeginn-Markierung gilt unabhängig vom Bleedingsmuster; Störungen verschieben sie nicht.",
+  "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
   "statisticsNoData": "Sobald zwei Zyklusbeginne erfasst sind, erscheinen Zykluslängen.",
   "statisticsCycles": "Zykluslängen",
   "statisticsOnsets": "Zyklusbeginne",
@@ -173,20 +161,10 @@
   "statisticsShortest": "Kürzester",
   "statisticsLongest": "Längster",
   "statisticsDistribution": "Verteilung",
-  "statisticsDays": "{n} Tage",
-  "@statisticsDays": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "settingsLanguage": "Sprache",
-  "languageSystem": "System",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
   "settingsThemeMode": "Design",
-  "themeSystem": "System",
   "themeLight": "Hell",
   "themeDark": "Dunkel",
   "settingsTemperatureRange": "Temperaturbereich",
@@ -342,9 +320,7 @@
   "importSummary": "Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
   "dripImportTitle": "Drip-Daten importieren",
-  "dripImportButton": "CSV importieren",
   "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Eine ausgeschlossene Temperatur erzeugt eine „vom Auswerten ausschließen“-Markierung; Stimmung- und Lust-Kennzeichen fallen weg (ihre Notizen bleiben erhalten).",
-  "dripImportApply": "CSV importieren",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",
   "dripImportInvalid": "Das ist kein Drip-CSV-Export (keine „date“-Spalte in der Kopfzeile).",
   "dripImportSummary": "{imported} Tage importiert, {skipped} leere Tage übersprungen, {invalid} ungültige Zeilen; Tage neu: {newDays}, Tage überschrieben: {overwritten}.",
@@ -378,5 +354,5 @@
   "@cycleDayPanelClose": {
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
-  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet; im Tagesblatt gesetzt)"
+  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)"
 }

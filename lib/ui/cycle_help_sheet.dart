@@ -61,7 +61,7 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.error,
-              label: l10n.cycleLegendBleeding,
+              label: l10n.termBleeding,
               // Sample bleeding glyph: the shared square box in its
               // dotted spotting mode — the level least like a plain
               // fill, rendered exactly like a recorded spotting day on
@@ -70,12 +70,12 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.tertiary,
-              label: l10n.cycleLegendMucus,
+              label: l10n.termMucus,
               shape: _HelpEntryShape.text,
             ),
             _HelpEntry(
               color: scheme.tertiary,
-              label: l10n.cycleLegendMucusPeak,
+              label: l10n.termMucusPeak,
               // R6: the peak renders as a SOLID dot above the mucus glyph
               // in the mucus row — the old curve-ring glyph is gone.
               shape: _HelpEntryShape.dot,
@@ -103,12 +103,12 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendCervix,
+              label: l10n.termCervixPosition,
               shape: _HelpEntryShape.cervix,
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendCervixFirmness,
+              label: l10n.termCervixFirmness,
               shape: _HelpEntryShape.firmness,
             ),
             _HelpEntry(
@@ -139,7 +139,7 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendMittelschmerz,
+              label: l10n.termMittelschmerz,
               // Sample Mittelschmerz glyph: the M letter, exactly how a
               // recorded Mittelschmerz day renders in its own row beneath
               // the mucus row.
@@ -147,7 +147,7 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendMeasuredAt,
+              label: l10n.termMeasurementTime,
               // The measured-at entry keeps the clock icon here (in the
               // help sheet only — the chart's day cells spell the time as
               // text, vertically in narrow columns).
@@ -160,7 +160,7 @@ final class _CycleHelpSheet extends StatelessWidget {
             ),
             _HelpEntry(
               color: scheme.onSurface,
-              label: l10n.cycleLegendPain,
+              label: l10n.termBreastPain,
               shape: _HelpEntryShape.pain,
             ),
             const SizedBox(height: 12),

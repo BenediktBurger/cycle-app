@@ -526,7 +526,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // All six levels of the numeric scale, none first. Wrap of
               // ChoiceChips like the mucus quality row below: a six-label
               // SegmentedButton risks overflowing small phone widths.
-              Text(l10n.bleeding),
+              Text(l10n.termBleeding),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -561,7 +561,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // the cheat-sheet glyphs themselves (t/Ø/f/S/A). A quality
               // exists only together with S, so the quality picker appears
               // only while S is selected (hidden otherwise).
-              Text(l10n.mucusSign),
+              Text(l10n.termMucus),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -611,7 +611,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // All three rows are independent pickers; the leading unset
               // chip ("—") plus the tap-again-deselects rule return to the
               // no-observation state, like the mucus quality chips.
-              Text(l10n.cervixPosition),
+              Text(l10n.termCervixPosition),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -666,7 +666,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(l10n.cervixFirmness),
+              Text(l10n.termCervixFirmness),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -699,7 +699,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // encodes whether sex happened (no bits = not recorded); a
               // time-less "sex happened" is deliberately not representable
               // (see DailyEntry.sexTimings).
-              Text(l10n.sex),
+              Text(l10n.termSex),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -727,12 +727,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 spacing: 8,
                 children: [
                   FilterChip(
-                    label: Text(l10n.painBreast),
+                    label: Text(l10n.termBreastPain),
                     selected: _painBreast,
                     onSelected: (v) => setState(() => _painBreast = v),
                   ),
                   FilterChip(
-                    label: Text(l10n.painMittelschmerz),
+                    label: Text(l10n.termMittelschmerz),
                     selected: _painMittelschmerz,
                     onSelected: (v) => setState(() => _painMittelschmerz = v),
                   ),
@@ -803,7 +803,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     return ExpansionTile(
       // Most recent work stays at the top of the list.
       title: Text(title),
-      subtitle: Text(l10n.cycleDays(dayCount)),
+      subtitle: Text(l10n.termCycleDays(dayCount)),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
