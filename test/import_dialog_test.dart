@@ -17,7 +17,7 @@
 // dialog measurement.
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show acceptTypeGroup, pickFileTextOverride;
+    show acceptExtensions, pickFileTextOverride;
 import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -229,45 +229,32 @@ void main() {
   });
 
   group('accept-string translation for the native picker', () {
-    test('default JSON accept produces the JSON type group', () {
-      final group = acceptTypeGroup('application/json,.json');
-      expect(group.label, 'JSON');
-      expect(group.extensions, ['json']);
-      expect(group.mimeTypes, ['application/json']);
+    test('default JSON accept keeps the paired extension filter', () {
+      expect(acceptExtensions('application/json,.json'), ['json']);
     });
 
-    test('CSV accept produces the CSV type group', () {
-      final group = acceptTypeGroup('.csv,text/csv');
-      expect(group.label, 'CSV');
-      expect(group.extensions, ['csv']);
-      expect(group.mimeTypes, ['text/csv']);
+    test('CSV accept keeps its extension filter', () {
+      expect(acceptExtensions('.csv,text/csv'), ['csv']);
     });
 
-    test('extension-only accept keeps only extensions', () {
-      final group = acceptTypeGroup('.json');
-      expect(group.label, 'JSON');
-      expect(group.extensions, ['json']);
-      expect(group.mimeTypes, isNull);
+    test('extension-only accept keeps its extension filter', () {
+      expect(acceptExtensions('.json'), ['json']);
     });
 
     test('empty accept matches every file', () {
-      final group = acceptTypeGroup('');
-      expect(group.extensions, isNull);
-      expect(group.mimeTypes, isNull);
+      expect(acceptExtensions(''), isNull);
     });
 
-    test('unknown types fall back to the generic group', () {
-      final group = acceptTypeGroup('application/octet-stream');
-      expect(group.extensions, isNull);
-      expect(group.mimeTypes, ['application/octet-stream']);
-      expect(group.label, isNot(isIn(['JSON', 'CSV'])));
+    test('MIME-only accepts cannot filter, matching every file', () {
+      // file_picker cannot filter by MIME, so a bare MIME token degrades
+      // to the unfiltered dialog (the import validation catches a wrong
+      // pick) — the paired-extension accepts above stay filtered.
+      expect(acceptExtensions('application/octet-stream'), isNull);
     });
 
-    test('whitespace-padded and duplicate tokens stay stable', () {
-      final group = acceptTypeGroup(' .csv , text/csv ');
-      expect(group.label, 'CSV');
-      expect(group.extensions, ['csv']);
-      expect(group.mimeTypes, ['text/csv']);
+    test('whitespace-padded tokens are trimmed', () {
+      final extensions = acceptExtensions(' .csv , text/csv ');
+      expect(extensions, ['csv']);
     });
   });
 }
