@@ -434,6 +434,43 @@ void main() {
             'positions',
       );
     });
+
+    test('interior untracked calendar days SPLIT the curve runs (exactly '
+        'the chart\'s run-break rule): measured days around the gap are '
+        'NOT connected by a piece, consecutive tracked days still are', () {
+      // The gap fixture again (Mar 2 untracked): Mar 1 (measured 36.1,
+      // window column 0) and Mar 3 (measured 36.1, column 1) both draw
+      // dots — but their CALENDAR offsets differ by two (the untracked
+      // day between them), so no line piece may connect them.
+      final entries = [
+        for (final e in cycleEntries())
+          if (!DateOnly.sameDay(e.date, day(2))) e,
+      ];
+      final model = buildPdfExportModel(entries: entries, marks: cycleMarks());
+      final drawing = pdfCurveDrawing(
+        cycle: model.cycles[0],
+        overlay: model.overlays[0],
+        range: _range,
+        windowFirstIndex: 0,
+        windowDayCount: model.cycles[0].cycle.days.length,
+        computedSuz: (suzBegins: null, suzRule: null),
+      );
+      expect(drawing.dots.any((d) => d.index == 0), isTrue);
+      expect(drawing.dots.any((d) => d.index == 1), isTrue);
+      expect(
+        drawing.pieces.where((p) => p.startX == 0.0 || p.endX == 0.0),
+        isEmpty,
+        reason:
+            'the Mar 1 dot starts no line: its direct CALENDAR successor '
+            '(Mar 3) sits two days ahead, not an adjacent tracked column '
+            'away from a connected run',
+      );
+      expect(
+        drawing.pieces.any((p) => p.startX == 1.0 && p.endX == 2.0),
+        isTrue,
+        reason: 'the consecutive tracked days Mar 3 -> Mar 4 still connect',
+      );
+    });
   });
 
   group('continuation-page slicing (long cycle over several pages)', () {

@@ -486,9 +486,11 @@ final class CycleDayPanel extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    DateFormat.yMMMEd(
-                      locale,
-                    ).format(DateOnly.normalize(day).toLocal()),
+                    // The date-only convention is UTC-normalized
+                    // midnights; DateFormat reads the value's OWN fields —
+                    // print it verbatim (a .toLocal() would show the
+                    // PREVIOUS day on UTC-negative hosts).
+                    DateFormat.yMMMEd(locale).format(DateOnly.normalize(day)),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),

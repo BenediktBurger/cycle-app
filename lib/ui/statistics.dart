@@ -51,8 +51,13 @@ class StatistikScreen extends ConsumerWidget {
           final summary = summarizeCycleLengths(lengths);
           final buckets = cycleLengthDistribution(lengths);
           final onsets = menstruationOnsetDates(entries, marks);
-          String day(DateTime d) =>
-              DateFormat.yMd(locale).format(DateOnly.normalize(d).toLocal());
+          String day(DateTime d) => DateFormat.yMd(locale).format(
+            // A date-only value is already UTC-normalized midnights (the
+            // DateOnly convention); DateFormat reads the value's OWN
+            // fields, so it must be printed verbatim — a .toLocal() would
+            // show the PREVIOUS day on UTC-negative hosts.
+            DateOnly.normalize(d),
+          );
 
           // The per-cycle evaluations feed everything beyond the plain
           // cycle lengths (pure render-time arithmetic per ADR-0001).
@@ -119,10 +124,16 @@ class StatistikScreen extends ConsumerWidget {
                 caption: countCaption,
               ),
               const SizedBox(height: 8),
-              if (summary.lengths.isEmpty) ...[
+              if (onsets.isEmpty) ...[
+                // The no-data note keys on the FACT that no cycle start is
+                // recorded yet (the first recorded start is the note's own
+                // threshold) — never on the length count: a single still-
+                // open cycle has recorded starts but no countable lengths
+                // yet, and the lengths surfaces below stay hidden for it.
                 Text(l10n.statisticsNoData),
                 const SizedBox(height: 8),
-              ] else ...[
+              ],
+              if (summary.lengths.isNotEmpty) ...[
                 _lengthsListCard(context, l10n, summary.lengths),
                 const SizedBox(height: 8),
                 _averageShortestLongestRow(context, summary),
@@ -175,11 +186,20 @@ class StatistikScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              if (summary.lengths.isNotEmpty) ...[
+              // The fact-gated surfaces (the recorded data's own count —
+              // not the lengths'): the onset list shows whenever a cycle
+              // start is recorded, the per-cycle table whenever fact rows
+              // exist; only the DISTRIBUTION card stays glued to the
+              // lengths (it buckets lengths).
+              if (onsets.isNotEmpty) ...[
                 _onsetsCard(context, onsets, day),
                 const SizedBox(height: 8),
+              ],
+              if (summary.lengths.isNotEmpty) ...[
                 _distributionCard(context, buckets),
                 const SizedBox(height: 8),
+              ],
+              if (stats.facts.isNotEmpty)
                 // The table sits below ALL other statistics: one row per
                 // mark-opened cycle keeps the numbers auditable against
                 // the mark-driven boundaries without adding any
@@ -189,7 +209,6 @@ class StatistikScreen extends ConsumerWidget {
                   facts: stats.facts,
                   day: day,
                 ),
-              ],
             ],
           );
         },

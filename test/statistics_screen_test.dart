@@ -613,5 +613,54 @@ void main() {
       findsNWidgets(2),
       reason: 'both earliest-first-higher rows dash',
     );
+    // The fact-gated surfaces: no cycle start recorded, no onset card and
+    // no per-cycle table (with ANY later data the table's row count is the
+    // recorded-count gate, never the lengths').
+    expect(find.byKey(const ValueKey('statisticsCard-onsets')), findsNothing);
+    expect(find.byKey(const ValueKey('statisticsCycleTable')), findsNothing);
+  });
+
+  testWidgets('ONE recorded cycle: the onset card and the table row show, '
+      'but no no-data note and nothing about lengths', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(
+        entries: [
+          DailyEntry(date: m(3, 1), bbtC: 36.4, bleeding: Bleeding.heavy),
+          DailyEntry(date: m(3, 2), bbtC: 36.4, bleeding: Bleeding.medium),
+        ],
+        marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The recorded start shows in BOTH fact surfaces: onset list + table
+    // row (one mark-opened cycle — the table's rule).
+    expect(
+      find.descendant(
+        of: oldCard('onsets'),
+        matching: find.text('Cycle starts'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: oldCard('onsets'), matching: find.text('3/1/2026')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('statisticsRowStart-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowLength-0')), findsOneWidget);
+    // No "no-data" note: a cycle start IS recorded — the note's own
+    // wording promises exactly that threshold.
+    expect(find.textContaining('once a first cycle start'), findsNothing);
+    // The lengths surfaces stay hidden: the still-open cycle has no
+    // countable length yet (lengths, av/sc/lo, distribution).
+    for (final id in ['lengthsList', 'average', 'shortest', 'distribution']) {
+      expect(
+        find.byKey(ValueKey('statisticsCard-$id')),
+        findsNothing,
+        reason: '$id is a lengths surface, untouched by the one-cycle case',
+      );
+    }
   });
 }

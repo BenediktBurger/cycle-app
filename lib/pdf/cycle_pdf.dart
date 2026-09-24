@@ -325,8 +325,11 @@ Future<List<int>> generatePdfBytes({
             ),
             pw.SizedBox(height: 4),
             _paperFormGrid(
+              // The page window's day-number labels key on the cycle's
+              // normalized start day (calendar offsets — never the page
+              // window's tracked positions).
+              cycleStart: DateOnly.normalize(evaluation.cycle.startDate),
               windowDays: windowDays,
-              windowFirstIndex: window.firstDayIndex,
               drawing: drawing,
               axis: PdfCurveAxis(
                 range: model.temperatureRange,
@@ -456,11 +459,14 @@ pw.Widget _cycleHeader({
 
 /// One page window's paper-form scaffold. The raster is ALWAYS the full
 /// 40 columns (rail + columns), labels only in the window's tracked
-/// columns — narrow pages keep the sheet's column geometry, so the curve
-/// painter and every row's text agree through the pdf_axis geometry.
+/// columns — the day-number labels count CALENDAR offsets from the cycle's
+/// start day ([cycleStart], the cycle's normalized start), the other rows
+/// read the window's tracked days — narrow pages keep the sheet's column
+/// geometry, so the curve painter and every row's text agree through the
+/// pdf_axis geometry.
 pw.Widget _paperFormGrid({
+  required DateTime cycleStart,
   required List<DailyEntry> windowDays,
-  required int windowFirstIndex,
   required PdfCurveDrawing drawing,
   required PdfCurveAxis axis,
 }) {
@@ -473,7 +479,7 @@ pw.Widget _paperFormGrid({
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _dayNumberRow(windowDays.length, windowFirstIndex, weekend),
+        _dayNumberRow(cycleStart, windowDays, weekend),
         _dateRow(windowDays.length, windowDays, weekend),
         _bleedingRow(windowDays.length, windowDays, weekend),
         // The cycle tab's top strip order, above the plot: bleeding →
@@ -594,26 +600,39 @@ pw.Widget _gridColumns({
   );
 }
 
-/// The day-number row: "1. Tag" labels the sheet's first column; the
-/// numbers otherwise keep counting over the cycle's tracked days (a
-/// continuation page's first column carries its continuing cycle day).
-/// The rail legend "Zyklustag" names this row for the reader — the paper
-/// sheet writes its labels into the same margin column.
+/// The day-number labels: one shared rule for every page window and page
+/// position — a column whose day sits exactly [DateOnly]-calendar-offset 0
+/// from the cycle's start opens the cycle ("1. Tag"), otherwise the offset
+/// counts cycle days ("N."). Pure and exported so the snapshot pins the
+/// rule without the pdf package.
+String cycleDayNumberLabel(int calendarOffset) =>
+    calendarOffset == 0 ? '1. Tag' : '${calendarOffset + 1}.';
+
+/// The day-number row: the labels are the CALENDAR cycle days — the window
+/// day's offset from the cycle's start day ([cycleStart]) — so an interior
+/// untracked gap keeps its day numbers (the next tracked day labels the
+/// offset it names) and the "1. Tag" sits only on the day the cycle start
+/// mark anchored, even when that mark lies before the cycle's first
+/// TRACKED day (start < tracked list), which would slip under position
+/// counting. Continuation pages derive their numbers from the dates the
+/// same way — no carried page arithmetic. The rail legend "Zyklustag"
+/// names this row for the reader — the paper sheet writes its labels into
+/// the same margin column.
 pw.Widget _dayNumberRow(
-  int windowDayCount,
-  int windowFirstIndex,
+  DateTime cycleStart,
+  List<DailyEntry> windowDays,
   List<int> weekend,
 ) {
   return _paperRow(
     height: _dayNumberRowHeight,
     railCaption: pdfRailCaptionDayNumbers,
-    windowDayCount: windowDayCount,
+    windowDayCount: windowDays.length,
     weekend: weekend,
     cell: (position) => pw.Center(
       child: pw.Text(
-        windowFirstIndex + position == 0
-            ? '1. Tag'
-            : '${windowFirstIndex + position + 1}.',
+        cycleDayNumberLabel(
+          DateOnly.daysBetween(windowDays[position].date, cycleStart),
+        ),
         style: _tiny,
         textAlign: pw.TextAlign.center,
       ),

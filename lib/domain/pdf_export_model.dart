@@ -143,10 +143,13 @@ final class PdfExportModel {
   /// date-only normalized, or null when unset.
   final DateTime? birthDate;
 
-  /// The shortest cycle length among the EXPORTED cycles in whole days
-  /// (gap between consecutive mark-opened cycle starts; the last exported
-  /// cycle has no known follow-up start and contributes no length), or
-  /// null when fewer than two exported starts.
+  /// The shortest cycle length among the EXPORTED cycles in whole days:
+  /// each exported cycle's gap to its direct successor's start in the
+  /// WHOLE mark-opened cycle list (its real length — unaffected by the
+  /// subset selection, even when the successor is a cycle that was not
+  /// exported); a cycle without a successor (the last one) has an open
+  /// end and contributes no length. Null when fewer than two exported
+  /// starts.
   final int? shortestCycleLength;
 
   /// The earliest cycle-day of the cycles' marked first higher
@@ -195,7 +198,11 @@ final class PdfExportModel {
 /// numbered POSITIONALLY ("Zyklus k" with k = index among the EXPORTED
 /// tuples) and the header's observed-cycle count is the EXPORTED count
 /// plus the outside-app count — a subset export deliberately reports the
-/// subset's numbering, not the user's full history.
+/// subset's numbering, not the user's full history. The header's
+/// shortest-cycle fact stays truthful regardless: each exported cycle's
+/// length is its gap to its direct successor in the WHOLE record (see
+/// [PdfExportModel.shortestCycleLength]), never the distance between
+/// non-neighboring exported starts.
 ///
 /// [birthDate] may carry time-of-day noise; it is normalized to the
 /// calendar day (DateOnly convention) so header formatting stays exact.
@@ -271,21 +278,26 @@ PdfExportModel buildPdfExportModel({
       ),
   ];
 
-  // Shortest length: the gaps between consecutive exported starts (the
-  // last exported cycle's end is open — no length). Calendar-day gaps via
+  // Shortest length: each EXPORTED cycle's gap to its direct successor's
+  // start in the WHOLE cycle list `all` — the next cycle, always
+  // mark-opened by the grouping's opening rule (only the LEADING group,
+  // which opens at no mark and is never exported, can be
+  // non-mark-opened) — so an exported cycle's REAL length is known even
+  // when the following exported cycle is not its successor: a
+  // non-contiguous subset export must never print a between-cycles
+  // distance as a cycle length. A cycle with no successor (the list's
+  // last one) has an open end and contributes none. Calendar-day gaps via
   // DateOnly (DST-immune; see lib/domain/date_only.dart).
   int? shortestCycleLength;
   if (exported.length >= 2) {
-    var best = DateOnly.daysBetween(
-      exported[1].cycle.startDate,
-      exported[0].cycle.startDate,
-    );
-    for (var i = 1; i + 1 < exported.length; i++) {
+    int? best;
+    for (final index in exportedIndexes) {
+      if (index + 1 >= all.length) continue;
       final gap = DateOnly.daysBetween(
-        exported[i + 1].cycle.startDate,
-        exported[i].cycle.startDate,
+        all[index + 1].cycle.startDate,
+        all[index].cycle.startDate,
       );
-      if (gap < best) best = gap;
+      if (best == null || gap < best) best = gap;
     }
     shortestCycleLength = best;
   }

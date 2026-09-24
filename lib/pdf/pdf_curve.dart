@@ -254,16 +254,35 @@ PdfCurveDrawing pdfCurveDrawing({
     return windowPos >= 0 && windowPos < windowDayCount ? windowPos : null;
   }
 
-  // --- the temperature curve: the chart's rule set over the window's
-  // entries (ignored = window-local marked days for the lighter flag).
+  /// The constant shift between a run point's CALENDAR OFFSET key and its
+  /// window-relative column (run points are consecutive offsets, so the
+  /// shift is constant within one run — and within every segment/piece of
+  /// a run): the anchor's offset minus its window column, which maps
+  /// fractional x (range-boundary crossings) too. [offset] must name a
+  /// tracked day of the window (every run point does).
+  double offsetToColumnShift(int offset) =>
+      offset - (trackedPositions[offset]! - windowFirstIndex).toDouble();
+
+  // --- the temperature curve: the chart's rule set over the page
+  // window's days, keyed by CALENDAR OFFSET from the cycle's start (the
+  // chart's x space, see _ChartDays): the run-break rule (a day without a
+  // temperature breaks the line) then acts on the day keys' adjacency —
+  // and the untracked gap days are absent from the key set by
+  // construction, so an interior gap splits the line exactly as the chart
+  // renders it across its recorded range. The keys map back to
+  // window-relative columns afterwards (see below); the
+  // ignoredDayIndexes stay offset-keyed like the overlay indexes (they
+  // key the lighter rendering, never the connectivity).
   final windowRuns = curveRuns(
     {
-      for (var i = windowFirstIndex; i < windowEnd; i++)
-        i - windowFirstIndex: days[i],
+      for (final MapEntry(key: offset, value: position)
+          in trackedPositions.entries)
+        if (position >= windowFirstIndex && position < windowEnd)
+          offset: days[position],
     },
     ignoredDayIndexes: {
       for (final index in overlay.ignoredIndexes)
-        if (windowPositionOf(index) case final pos?) pos,
+        if (windowPositionOf(index) != null) index,
     },
   );
 
@@ -271,14 +290,22 @@ PdfCurveDrawing pdfCurveDrawing({
     for (final run in windowRuns)
       for (final point in run.points)
         if (isBbtCInRange(point.bbtC, range))
-          PdfCurveDot(point.dayIndex, point.bbtC, point.excluded),
+          PdfCurveDot(
+            windowPositionOf(point.dayIndex)!,
+            point.bbtC,
+            point.excluded,
+          ),
   ];
   final pieces = [
     for (final span in visibleCurveSegments(curveSegments(windowRuns), range))
+      // The span's x runs in OFFSET space; inside one run (and therefore
+      // inside one segment) offset and window column differ by a CONSTANT
+      // shift — the offsetToColumnShift of the segment's anchor a (run
+      // points share it; fractional range-boundary x included).
       PdfCurvePiece(
-        span.startX,
+        span.startX - offsetToColumnShift(span.source.a.dayIndex),
         span.startY,
-        span.endX,
+        span.endX - offsetToColumnShift(span.source.a.dayIndex),
         span.endY,
         span.lighter,
       ),

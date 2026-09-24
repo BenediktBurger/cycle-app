@@ -388,7 +388,7 @@
   "@settingsPdfExportBirthDateError": {
     "description": "Validation error of the birth-date field (also for impossible days like 1990-02-30)."
   },
-  "settingsPdfExportNote": "Name und Geburtsdatum erscheinen im Kopfbereich jedes PDF-Exports; der Anonymisieren-Schalter im Export blendet beide für den jeweiligen Export aus, ohne die Speicherung zu ändern. Die Zahl der beobachteten Zyklen im PDF schließt den Wert der Karte \u201eZyklen außerhalb dieser App\u201c ein.",
+  "settingsPdfExportNote": "Name und Geburtsdatum erscheinen im Kopfbereich jedes PDF-Exports; der Anonymisieren-Schalter im Export blendet beide für den jeweiligen Export aus, ohne die Speicherung zu ändern. Die Zahl der beobachteten Zyklen im PDF schließt den Wert der Karte \u201eBeobachtete Zyklen außerhalb dieser App\u201c ein.",
   "@settingsPdfExportNote": {
     "description": "Helper note of the PDF-export card: names where the values land, points to the per-export anonymize toggle and cross-references the outside-app cycle count that feeds the PDF's observed-cycle header fact."
   },

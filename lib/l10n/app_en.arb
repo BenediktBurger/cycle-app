@@ -431,7 +431,7 @@
   "settingsPdfExportBirthDate": "Birth date",
   "settingsPdfExportBirthDateFormat": "YYYY-MM-DD",
   "settingsPdfExportBirthDateError": "Enter a real calendar date in the form YYYY-MM-DD.",
-  "settingsPdfExportNote": "Name and birth date appear in the header of every PDF export; the export's anonymize switch hides both for the respective export without changing what is stored. The observed-cycle count in the PDF includes the value of the \u201ccycles observed outside this app\u201d card.",
+  "settingsPdfExportNote": "Name and birth date appear in the header of every PDF export; the export's anonymize switch hides both for the respective export without changing what is stored. The observed-cycle count in the PDF includes the value of the \u201cCycles observed outside this app\u201d card.",
   "pdfExportCycleOption": "Cycle {n}, from {day}",
   "@pdfExportCycleOption": {
     "placeholders": {

@@ -12,6 +12,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -296,6 +297,61 @@ void main() {
       // through (day numbers … notes area) plus the painted plot bands —
       // well above 8 fill emissions.
       expect(weekendFills.length, greaterThanOrEqualTo(8));
+    });
+  });
+
+  group('cycle-day numbering (calendar offsets from the cycle start)', () {
+    test("'1. Tag' labels the start day; the numbers keep counting per "
+        'calendar day on the normal, gapless fixture', () {
+      final cycleOne = fixtureModel().cycles.first;
+      final cycleStart = DateOnly.normalize(cycleOne.cycle.startDate);
+      expect(
+        [
+          for (final day in cycleOne.cycle.days.take(3))
+            cycleDayNumberLabel(DateOnly.daysBetween(day.date, cycleStart)),
+        ],
+        ['1. Tag', '2.', '3.'],
+        reason: 'the tracked date at offset k labels cycle day k + 1',
+      );
+    });
+
+    test('a cycleStart mark on an untracked gap day (start BEFORE the first '
+        'tracked day): the first column still labels the calendar cycle '
+        'day, and the columns behind an interior untracked gap show the '
+        'correct offset', () {
+      // The mark is placed Apr 1, but the first TRACKED day is Apr 2; the
+      // tracked list then skips Apr 4–6 (an interior untracked gap). The
+      // labels must follow the CALENDAR offsets from the mark — never the
+      // tracked positions (which would print "1." with a lost day).
+      final entries = [
+        DailyEntry(date: d(4, 2), bbtC: 36.5),
+        DailyEntry(date: d(4, 3), bbtC: 36.4),
+        DailyEntry(date: d(4, 7), bbtC: 36.5),
+        DailyEntry(date: d(4, 8), bbtC: 36.6),
+      ];
+      final marks = [CycleMark(date: d(4, 1), type: CycleMarkTypes.cycleStart)];
+      final model = buildPdfExportModel(entries: entries, marks: marks);
+      final cycle = model.cycles.single;
+      final cycleStart = DateOnly.normalize(cycle.cycle.startDate);
+      expect(
+        cycleStart,
+        d(4, 1),
+        reason:
+            'the opening mark anchors the cycle a day BEFORE the first '
+            'tracked day — offsets from it must count that gap day',
+      );
+      // The first page window's leading columns, labeled exactly the way
+      // the day-number row labels them (offset from the cycle start).
+      expect(
+        [
+          for (final day in cycle.cycle.days.take(4))
+            cycleDayNumberLabel(DateOnly.daysBetween(day.date, cycleStart)),
+        ],
+        ['2.', '3.', '7.', '8.'],
+        reason:
+            'the untracked Apr 4–6 own no column; the next tracked '
+            'column (Apr 7) carries the calendar cycle day 7',
+      );
     });
   });
 

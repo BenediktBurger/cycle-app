@@ -1164,14 +1164,28 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
   }
 
   /// The current selected set seen through the LIVE choices: null means
-  /// "everything", otherwise the explicit set (its members may have gone
-  /// stale against new data — the page and the model builder check
-  /// membership against the live choices anyway).
+  /// "everything", otherwise the explicit set intersected with the live
+  /// choices' normalized start dates — a stale member (a start no longer
+  /// among the live choices) drops out, so the summary line and the export
+  /// always count selected cycles the data still shows (the model builder
+  /// intersects by the same start-day identity; pruning here keeps the
+  /// summary, the seeded selection page and the model consistent).
   Set<DateTime> _shownSelection(
     List<({int ordinal, DateTime startDate})> choices,
-  ) =>
-      _selection ??
-      {for (final choice in choices) DateOnly.normalize(choice.startDate)};
+  ) {
+    if (_selection == null) {
+      return {
+        for (final choice in choices) DateOnly.normalize(choice.startDate),
+      };
+    }
+    return {
+      for (final member in _selection!)
+        if (choices.any(
+          (choice) => DateOnly.normalize(choice.startDate) == member,
+        ))
+          member,
+    };
+  }
 
   /// Opens the full-screen cycle-selection page (see [_CycleSelectionPage]
   /// for the surface): the page is seeded with the card's current choice

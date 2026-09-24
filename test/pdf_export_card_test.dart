@@ -10,6 +10,8 @@
 // only the summary line, the anonymize switch and the export buttons.
 // The sub-page's rows are ordered MOST-RECENT-FIRST, pinned controls
 // (All/None/confirm) on top.
+import 'dart:async';
+
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -355,6 +357,78 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('3 of 3 cycles selected'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the summary counts the selection against the LIVE choices: a chosen '
+    'start that disappears from the data drops out of the count (never '
+    '"3 of 2")',
+    (WidgetTester tester) async {
+      await enlargeViewport(tester);
+      // The entry/mark streams stay CONTROLLABLE in this test: after the
+      // selection is applied, the underlying data changes underneath the
+      // card (the stale-selection case).
+      final entriesCtrl = StreamController<List<DailyEntry>>();
+      final marksCtrl = StreamController<List<CycleMark>>();
+      addTearDown(() {
+        entriesCtrl.close();
+        marksCtrl.close();
+      });
+      entriesCtrl.add(cardEntries());
+      marksCtrl.add(cardMarks());
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dailyEntriesProvider.overrideWith((ref) => entriesCtrl.stream),
+            marksProvider.overrideWith((ref) => marksCtrl.stream),
+            pdfExportNameProvider.overrideWith((ref) => 'Maria Muster'),
+            pdfExportBirthDateProvider.overrideWith(
+              (ref) => DateTime.utc(1990, 1, 2),
+            ),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: EinstellungenScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Toggle a row to materialize the selection (the first press
+      // materializes the implicit all into an explicit set), then toggle
+      // it back — the confirmed set then carries ALL THREE starts
+      // explicitly, still reading "3 of 3".
+      await openSelectionPage(tester);
+      await tester.tap(row(0), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      await tester.tap(row(0), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text('3 of 3 cycles selected'), findsWidgets);
+      await tester.tap(
+        find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3 of 3 cycles selected'), findsOneWidget);
+
+      // The data changes underneath: the newest cycle's start (Apr 26)
+      // disappears from the tracked record (its entries + marks go).
+      entriesCtrl.add([
+        for (final e in cardEntries())
+          if (e.date.isBefore(d(4, 26))) e,
+      ]);
+      marksCtrl.add([
+        for (final mk in cardMarks())
+          if (mk.date != d(4, 26)) mk,
+      ]);
+      await tester.pumpAndSettle();
+
+      // The chosen-by-name set still holds 3 starts, but one of them is
+      // not among the two LIVE choices any more: the summary shows the
+      // reduced count ("2 of 2"), never the stale "3 of 2".
+      expect(find.text('2 of 2 cycles selected'), findsOneWidget);
+      expect(find.text('3 of 2 cycles selected'), findsNothing);
     },
   );
 

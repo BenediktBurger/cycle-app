@@ -357,6 +357,44 @@ void main() {
       );
     });
 
+    test('a NON-CONTIGUOUS subset reports the exported cycles\' REAL '
+        'lengths: each exported cycle is measured to its direct successor '
+        'in the WHOLE cycle list', () {
+      // Cycles 1 and 3 of 3: cycle 1's successor is the UNSELECTED cycle 2
+      // (Mar 29 -> 28 days). The consecutive-EXPORTED distance (Mar 1 ->
+      // Apr 26 = 56) is a between-cycles distance, not a cycle length, and
+      // must never print as "Kürzester Zyklus".
+      final subset = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        selectedStartDates: {d(3, 1), d(4, 26)},
+      );
+      expect(subset.cycles.length, 2);
+      expect(
+        subset.shortestCycleLength,
+        28,
+        reason:
+            'cycle 1\'s real length (to its successor in the marked '
+            'cycle list), not the 56 the exported starts would suggest',
+      );
+    });
+
+    test('a CONSECUTIVE selection keeps its minimum: each exported cycle '
+        'has its successor among the exported ones, too', () {
+      final subset = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        selectedStartDates: {d(3, 1), d(3, 29)},
+      );
+      expect(
+        subset.shortestCycleLength,
+        28,
+        reason:
+            'the min over the exported cycles\' successor gaps — the '
+            'same value the consecutive-exported computation gave',
+      );
+    });
+
     test('fewer than two exported starts: no length at all', () {
       final single = buildPdfExportModel(
         entries: modelEntries(),
