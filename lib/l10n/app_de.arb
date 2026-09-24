@@ -24,10 +24,23 @@
       }
     }
   },
+  "entryCycleDay": "Zyklustag {n}",
+  "@entryCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Zyklustag-Bezeichnung im Tagebuch-Überblick: die kleine Bezeichnung an jedem Tages-Kachel der zyklusgruppierten Liste und neben der Datumszeile des Eingabeformulars, gezählt ab dem Zyklusbeginn (das Datum des Zyklusbeginn-Marks — liegt das Mark auf einem ungetrackten Lückentag, ist es der Anker). TODO(user-review): Formulierung."
+  },
   "termSystem": "System",
   "termCsvImport": "CSV importieren",
   "termBreastPain": "Brustschmerz (B)",
   "termMittelschmerz": "Mittelschmerz (M)",
+  "termPain": "Schmerzen",
+  "@termPain": {
+    "description": "Überschrift des Schmerz-Chips-Blocks (Brustschmerz, Mittelschmerz) im Tagebuch-Eingabeformular. TODO(user-review): Formulierung — prüfen, ob ein passenderer Titel passt."
+  },
   "termSex": "Sex",
   "entryDate": "Datum",
   "entryPreviousDay": "Voriger Tag",
@@ -147,10 +160,6 @@
   "cycleSheetRiseConsistencyKeep": "Behalten",
   "cycleSheetRiseInconsistent": "Am markierten Tag liegt keine Messung über der Basislinie {value} °C.",
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
-  "diaryCycleStartPromptTitle": "Neuen Zyklus beginnen?",
-  "diaryCycleStartPromptBody": "Die Blutung an diesem Tag deutet darauf hin, dass hier ein neuer Zyklus beginnt. Soll an diesem Tag eine Zyklusbeginn-Markierung gesetzt werden?",
-  "diaryCycleStartPromptConfirm": "Zyklusbeginn setzen",
-  "diaryCycleStartPromptDismiss": "Nicht jetzt",
   "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend",
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh",
   "cycleLegendSex": "Sex (X je Zeitpunkt)",

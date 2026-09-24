@@ -7,7 +7,9 @@
 //   is AUTHORITATIVE and binds wherever it sits — including on days without
 //   menstruation bleeding, on excluded (interrupted) days, and on untracked
 //   gap days. Bleeding never creates a boundary by itself; it only SUGGESTS
-//   a cycle start via [isSuggestedCycleStart] (prompts / derived marks).
+//   a cycle start via [isSuggestedCycleStart] (derived marks — a
+//   foreign-import derivation only, since the diary's bleeding-suggested
+//   prompt became the entry form's explicit cycle-start switch).
 //   The cycle's START DATE is the opening mark's OWN date — when that mark
 //   lies on an untracked gap day, the start sits inside the gap and the
 //   untracked gap days belong to the new cycle (they are not in
@@ -379,12 +381,49 @@ List<Cycle> groupIntoCycles(
 int cycleOrdinalNumber(int markOpenedIndex, int observedCyclesOutsideApp) =>
     observedCyclesOutsideApp + markOpenedIndex + 1;
 
+/// The 1-based day-of-cycle of [date] within the latest cycle in [cycles]
+/// that starts on or before it — the label no. of a diary day tile and the
+/// entry form's date row. The containing cycle is the one with the LATEST
+/// [Cycle.startDate] <= [date] (normalized comparison, so calendar-day
+/// arithmetic is DST-immune); its number is `date - startDate + 1`
+/// (DateOnly.daysBetween + 1).
+///
+/// Two anchoring rules keep the numbering continuous:
+///
+///  - The count anchors on [Cycle.startDate] itself. For a mark-opened
+///    cycle that is the SYNCHRONOUS cycleStart mark's own date, which may
+///    sit on an untracked gap day before the first tracked day — the gap
+///    days between mark and first tracked day keep counting (so a first
+///    tracked day after a gap-day start numbers > 1), and a tracked day
+///    AFTER the cycle's last tracked day keeps counting too: without a
+///    later start the cycle silently continues (forward projection) — the
+///    day is labeled as if the cycle went on until the next mark opens.
+///  - The leading pre-mark group (no opening mark) anchors on its FIRST
+///    TRACKED day, since its begin is unknown otherwise.
+///
+/// Returns null when no cycle starts on or before [date] (a day before
+/// every group start — nothing is labeled there) or when [cycles] is empty.
+int? dayOfCycleFor(DateTime date, List<Cycle> cycles) {
+  Cycle? containing;
+  for (final cycle in cycles) {
+    final startsOnOrBefore = DateOnly.daysBetween(date, cycle.startDate) >= 0;
+    if (startsOnOrBefore &&
+        (containing == null ||
+            DateOnly.daysBetween(cycle.startDate, containing.startDate) > 0)) {
+      containing = cycle;
+    }
+  }
+  if (containing == null) return null;
+  return DateOnly.daysBetween(date, containing.startDate) + 1;
+}
+
 /// The bleeding SUGGESTION predicate (the demoted former boundary rule):
 /// a day with menstruation-level bleeding (`level >= 2`) suggests starting
 /// a new cycle unless the immediately preceding CALENDAR day is also a
 /// menstruation-level day (i.e. we are in the middle of one continuous
-/// menstruation). This gates prompts and derived marks — it NEVER creates
-/// a cycle boundary by itself.
+/// menstruation). This gates derivations only — the diary's old
+/// bleeding-suggested prompt is now the entry form's explicit cycle-start
+/// switch, and the predicate NEVER creates a cycle boundary by itself.
 ///
 /// Temperature-only semantics (owner decision 2026-09-18): the suppression
 /// is keyed PURELY on bleeding continuity. The ignoreTemperature mark does

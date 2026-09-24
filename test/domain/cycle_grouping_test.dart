@@ -3,9 +3,11 @@
 //
 // Boundary rule: cycle groups are MARK-driven. A user-placed cycleStart
 // mark (CycleMarkTypes.cycleStart) opens a new cycle group; bleeding only
-// SUGGESTS a cycle start (isSuggestedCycleStart — the prompt/derivation
-// gate, never a boundary). The old automatic "first bleeding day starts a
-// cycle" rule is superseded; bleeding sequences alone form ONE group.
+// SUGGESTS a cycle start (isSuggestedCycleStart — the derivation gate:
+// foreign-import derivation only, the diary now has an explicit
+// cycle-start switch — never a boundary). The old automatic
+// "first bleeding day starts a cycle" rule is superseded; bleeding
+// sequences alone form ONE group.
 //
 // Span rule (owner requirement, app-wide): a cycle runs on UNTIL the next
 // cycle-start mark, regardless whether data exists there. Grouping extends
@@ -649,6 +651,71 @@ void main() {
         (Bleeding.medium, 30),
         (Bleeding.spotting, 10),
       ]);
+    });
+  });
+
+  group('dayOfCycleFor — the 1-based position of a date inside its cycle', () {
+    // Shared fixture: a leading group (Mar 1, untracked Mar 2) plus a
+    // mark-opened cycle whose start mark sits on the UNTRACKED gap day
+    // Mar 3 — first tracked day Mar 4, then Mar 5.
+    final entries = [d(2026, 3, 1), d(2026, 3, 4), d(2026, 3, 5)];
+    final marks = [start(2026, 3, 3)];
+    late List<Cycle> cycles;
+    setUpAll(() {
+      cycles = groupIntoCycles(entries, marks);
+    });
+
+    test('a tracked day of a mark-opened cycle numbers from the MARK date', () {
+      // The mark sits on Mar 3 (untracked), so the first tracked day
+      // Mar 4 is already cycle day 2 — numbering counts from the mark.
+      expect(dayOfCycleFor(DateTime(2026, 3, 4), cycles), 2);
+      expect(dayOfCycleFor(DateTime(2026, 3, 5), cycles), 3);
+      expect(dayOfCycleFor(DateTime(2026, 3, 3), cycles), 1);
+    });
+
+    test('an untracked gap day between mark and first tracked day keeps '
+        'counting (belongs to the mark-opened cycle)', () {
+      // Mark on Mar 2 with the next tracked day on Mar 5 (fixture chain:
+      // entries extended by the isolated members this pin needs).
+      final gapped = groupIntoCycles(
+        [d(2026, 3, 1), d(2026, 3, 5)],
+        [start(2026, 3, 2)],
+      );
+      expect(dayOfCycleFor(DateTime(2026, 3, 2), gapped), 1);
+      expect(dayOfCycleFor(DateTime(2026, 3, 3), gapped), 2);
+      expect(dayOfCycleFor(DateTime(2026, 3, 4), gapped), 3);
+      expect(dayOfCycleFor(DateTime(2026, 3, 5), gapped), 4);
+    });
+
+    test("a day after the cycle's last tracked day projects forward "
+        '(silent continuation until the next mark)', () {
+      expect(dayOfCycleFor(DateTime(2026, 3, 6), cycles), 4);
+      expect(dayOfCycleFor(DateTime(2026, 3, 10), cycles), 8);
+    });
+
+    test('the leading pre-mark group numbers from its first tracked day', () {
+      expect(dayOfCycleFor(DateTime(2026, 3, 1), cycles), 1);
+      expect(dayOfCycleFor(DateTime(2026, 3, 2), cycles), 2);
+    });
+
+    test('the cycle with the latest start on/before the date wins', () {
+      // Second cycle opens at the mark Mar 3, which is its ONLY tracked
+      // day — no tracked days follow it. Later dates still project the
+      // SECOND cycle, not the first.
+      final twoCycles = groupIntoCycles(
+        [d(2026, 3, 1), d(2026, 3, 3)],
+        [start(2026, 3, 3)],
+      );
+      expect(dayOfCycleFor(DateTime(2026, 3, 1), twoCycles), 1);
+      expect(dayOfCycleFor(DateTime(2026, 3, 4), twoCycles), 2);
+    });
+
+    test('a date before every group start returns null', () {
+      expect(dayOfCycleFor(DateTime(2026, 2, 28), cycles), isNull);
+    });
+
+    test('no cycles at all (empty database) → null everywhere', () {
+      expect(dayOfCycleFor(DateTime(2026, 3, 1), const <Cycle>[]), isNull);
     });
   });
 

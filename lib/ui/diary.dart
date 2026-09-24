@@ -1,10 +1,12 @@
 // Tagebuch screen: daily symptom entry form + the cycle-grouped entry list.
 //
 // The form writes one day at a time through EntriesDao.upsertDaily (full
-// replacement of the day; nulls included). The list underneath groups the
-// live entry stream into cycles using the mark-driven boundary rule from
-// lib/domain/cycle_grouping.dart (a cycle starts at a user-placed
-// cycleStart mark; bleeding only suggests) and pre-loads the tapped day
+// replacement of the day; nulls included). The entry form carries the
+// explicit cycle-start switch — the diary-side writer of the authoritative
+// cycleStart mark (bleeding never implies or asks for a cycle start here).
+// The list underneath groups the live entry stream into cycles using the
+// mark-driven boundary rule from lib/domain/cycle_grouping.dart (a cycle
+// starts at a user-placed cycleStart mark) and pre-loads the tapped day
 // back into the form for editing.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +46,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Bleeding _bleeding = Bleeding.none;
   int _tempDisturbances = 0;
   bool _excludeTemperature = false;
+  bool _cycleStartMarked = false;
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
@@ -76,24 +79,35 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final existing = await db.entriesDao.entryFor(date);
     // The exclude switch seeds from the day's ACTUAL mark state (not the
     // disturbance mask): an externally placed ignoreTemperature mark —
-    // day sheet, imports — shows up as "excluded" in the form.
+    // day sheet, imports — shows up as "excluded" in the form. The
+    // cycle-start switch seeds the same way from the day's cycleStart
+    // mark.
     final dayMarks = await db.marksDao.marksForDay(date);
     final excludeMarked = dayMarks.any(
       (m) => m.markType == CycleMarkTypes.ignoreTemperature,
+    );
+    final cycleStartMarked = dayMarks.any(
+      (m) => m.markType == CycleMarkTypes.cycleStart,
     );
     if (!mounted) return;
     setState(() {
       _applyEntry(
         existing == null ? null : dailyEntryFromDrift(existing),
         excludeMarked,
+        cycleStartMarked,
       );
     });
   }
 
-  void _applyEntry(DailyEntry? entry, bool excludeMarked) {
+  void _applyEntry(
+    DailyEntry? entry,
+    bool excludeMarked,
+    bool cycleStartMarked,
+  ) {
     _bleeding = entry?.bleeding ?? Bleeding.none;
     _tempDisturbances = entry?.tempDisturbances ?? 0;
     _excludeTemperature = excludeMarked;
+    _cycleStartMarked = cycleStartMarked;
     // Measured time: a fresh day (nothing stored yet) starts from the
     // CURRENT time as a convenience; a re-opened day keeps what was stored
     // — including deliberately cleared days (stored null), which never
@@ -213,58 +227,24 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     } else {
       await db.marksDao.deleteMark(date, CycleMarkTypes.ignoreTemperature);
     }
+    // The cycleStart mark follows the explicit CYCLE-START SWITCH alone
+    // (manual-only coupling — bleeding never implies or asks for a cycle
+    // start): the switch toggles the mark in BOTH directions (addMark is
+    // idempotent, deleteMark no-ops when nothing is there). The switch
+    // seeds from the day's existing mark (see _loadEntry), so an
+    // untouched switch keeps an externally placed mark (day sheet,
+    // imports) in place.
+    if (_cycleStartMarked) {
+      await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
+    } else {
+      await db.marksDao.deleteMark(date, CycleMarkTypes.cycleStart);
+    }
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(l10n.saved)));
-    // Bleeding only SUGGESTS a cycle start (the user places the mark, the
-    // authoritative cycleStart one): after saving a menstruation-level day
-    // that the shared suggestion predicate flags, the app ASKS before
-    // placing the mark. `isSuggestedCycleStart` requires bleeding level >= 2
-    // on a day that does not continue the previous calendar day's
-    // menstruation-level bleeding — the prompt is suppressed both by
-    // bleeding continuity and by a cycleStart mark that is already present
-    // on the saved day (a re-save must not re-fire the ask; the mark is
-    // the boundary). The ignoreTemperature mark does NOT suppress the
-    // prompt (owner decision 2026-09-18 — the mark is
-    // temperature-evaluation-scoped).
-    if (entry.bleeding.level < 2) return;
-    final previousRow = await db.entriesDao.entryFor(
-      DateOnly.addDays(date, -1),
-    );
-    final previous = previousRow == null
-        ? null
-        : dailyEntryFromDrift(previousRow);
-    if (!isSuggestedCycleStart(entry, previous)) return;
-    final existingMarks = await db.marksDao.marksForDay(date);
-    if (existingMarks.any(
-      (mark) => mark.markType == CycleMarkTypes.cycleStart,
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.diaryCycleStartPromptTitle),
-        content: Text(l10n.diaryCycleStartPromptBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.diaryCycleStartPromptDismiss),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.diaryCycleStartPromptConfirm),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
-    }
   }
 
   String _formatDay(DateTime d, String locale) =>
@@ -295,6 +275,20 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final entriesAsync = ref.watch(dailyEntriesProvider);
     final selected = ref.watch(selectedDateProvider);
     final marks = ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+    // The cycle groups are computed ONCE per build and shared by both
+    // consumers — the entry form's day-of-cycle label and the grouped list
+    // (which re-used to group the same entries a second time). While the
+    // entry stream is still loading there is nothing to group yet.
+    final entries = entriesAsync.valueOrNull;
+    final cycles = entries == null
+        ? const <Cycle>[]
+        : groupIntoCycles(
+            entries,
+            marks,
+            // The grouping's injected clock (last-cycle span rule — the
+            // nowProvider seam, pinned in tests).
+            today: ref.read(nowProvider)(),
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -303,7 +297,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         // from anywhere in the form — not only at the bottom (where the
         // form's bottom button stays available in addition). It calls the
         // same handler, with identical behavior (validation, snackbar, the
-        // cycle-start prompt on a suggested menstruation day).
+        // mark writes).
         actions: [
           IconButton(
             key: const ValueKey('diarySaveAction'),
@@ -316,15 +310,20 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _buildForm(l10n, locale, selected),
+          _buildForm(l10n, locale, selected, cycles),
           const SizedBox(height: 16),
-          ..._buildCycleList(l10n, entriesAsync, marks),
+          ..._buildCycleList(l10n, entriesAsync, cycles),
         ],
       ),
     );
   }
 
-  Widget _buildForm(AppLocalizations l10n, String locale, DateTime selected) {
+  Widget _buildForm(
+    AppLocalizations l10n,
+    String locale,
+    DateTime selected,
+    List<Cycle> cycles,
+  ) {
     // The navigation window matches the date picker's (see _pickDate):
     // nothing before 2000, nothing beyond tomorrow ("measured just after
     // midnight") — no unbounded future. "Now" comes from nowProvider so
@@ -332,6 +331,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final now = ref.watch(nowProvider);
     final previousDay = DateOnly.addDays(selected, -1);
     final nextDay = DateOnly.addDays(selected, 1);
+    // The selected day's position in its cycle, 1-based (null before the
+    // first group start).
+    final selectedCycleDay = dayOfCycleFor(selected, cycles);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -370,6 +372,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                 ],
               ),
+              // The day-of-cycle of the SELECTED day, small type in its
+              // own line below the navigation row. Not inside the row:
+              // that row is already the recorded narrow-width overflow
+              // case (see the temperature/time row comment) and the
+              // label would widen a line that is too tight as it is.
+              if (selectedCycleDay != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  l10n.entryCycleDay(selectedCycleDay),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 12),
               // --- BBT + measured time (compact one-line density) --------
               // The measurement time is metadata OF the temperature (the
@@ -560,6 +574,23 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     ),
                 ],
               ),
+              // --- cycle start ------------------------------------------
+              // The explicit cycle-start toggle writes/removes the
+              // authoritative cycleStart mark on save — bleeding never
+              // implies or asks for a cycle start. Same contract as the
+              // exclude switch above: the switch seeds from the day's
+              // existing mark (see _loadEntry) and the save mirrors its
+              // state in both directions (addMark idempotent, deleteMark
+              // no-op). The label reuses the shared "Zyklusbeginn"
+              // string.
+              SwitchListTile(
+                key: const ValueKey('diaryCycleStartSwitch'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(l10n.termCycleStart),
+                value: _cycleStartMarked,
+                onChanged: (v) => setState(() => _cycleStartMarked = v),
+              ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----
               // Chips as in the bleeding row above: all six sign options
@@ -740,8 +771,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- pain toggles ----------------------------------------
+              Text(l10n.termPain),
+              const SizedBox(height: 4),
               Wrap(
-                spacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: [
                   FilterChip(
                     key: const ValueKey('painChip-breast'),
@@ -783,7 +817,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   List<Widget> _buildCycleList(
     AppLocalizations l10n,
     AsyncValue<List<DailyEntry>> entriesAsync,
-    List<CycleMark> marks,
+    List<Cycle> cycles,
   ) {
     return entriesAsync.when(
       loading: () => <Widget>[const SizedBox.shrink()],
@@ -800,22 +834,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             ),
           ];
         }
-        final cycles = groupIntoCycles(
-          entries,
-          marks,
-          // The grouping's injected clock (last-cycle span rule — the
-          // nowProvider seam, pinned in tests).
-          today: ref.read(nowProvider)(),
-        );
+        // The groups arrive pre-computed from build (see the comment
+        // there) — one grouping pass per build, shared with the form.
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
-            _cycleTile(l10n, cycles[i]),
+            _cycleTile(l10n, cycles[i], cycles),
         ];
       },
     );
   }
 
-  Widget _cycleTile(AppLocalizations l10n, Cycle cycle) {
+  Widget _cycleTile(AppLocalizations l10n, Cycle cycle, List<Cycle> cycles) {
     final locale = Localizations.localeOf(context).toString();
     // The start label is the opening cycleStart mark's own date for
     // mark-opened cycles — which may sit on an untracked gap day before the
@@ -841,18 +870,37 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
-        for (final day in cycle.days.reversed) _dayTile(day),
+        for (final day in cycle.days.reversed) _dayTile(l10n, day, cycles),
       ],
     );
   }
 
-  Widget _dayTile(DailyEntry day) {
+  Widget _dayTile(AppLocalizations l10n, DailyEntry day, List<Cycle> cycles) {
     final locale = Localizations.localeOf(context).toString();
+    // The day's position inside its cycle, 1-based (null before the first
+    // group start) — shown as a small label under the tile's date.
+    final cycleDay = dayOfCycleFor(day.date, cycles);
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       leading: _bleedingMarker(day),
-      title: Text(_formatDay(day.date, locale)),
+      // The day label block: date, then the small day-of-cycle label —
+      // NOT in the trailing row: that row already fills the tile with the
+      // widest chip shapes (the recorded narrow-width tile check), and a
+      // ListTile lays its trailing out unbounded, so a fixed extra member
+      // there would overflow the narrow tile instead of wrapping onto the
+      // tile's own second line as this one does.
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_formatDay(day.date, locale)),
+          if (cycleDay != null)
+            Text(
+              l10n.entryCycleDay(cycleDay),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

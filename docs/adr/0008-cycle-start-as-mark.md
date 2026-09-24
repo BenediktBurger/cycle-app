@@ -3,6 +3,20 @@
 - **Date:** 2026-09-18
 - **Status:** Accepted
 
+> **Author's note (2026-09-24):** the diary's "asks on suggested saves"
+> prompt (the Decision bullet below) is superseded by an explicit
+> cycle-start switch on the diary entry form — it writes/removes the same
+> user-authored `cycleStart` mark, seeded from the day's existing mark, in
+> both directions. Bleeding no longer triggers any diary-side ask: a
+> menstruation-level save without the switch touched places no mark and
+> shows no dialog. The suggestion predicate `isSuggestedCycleStart` keeps
+> its exact logic, but its remaining role is the foreign-import
+> derivation only (drip CSV import; cycle-app's own exports already carry
+> the marks). Open question (c)'s dialog wording is thereby moot in the
+> diary: the switch's label reuses the shared "Cycle start" /
+> "Zyklusbeginn" string already on the day sheet's mark chip and the
+> statistics table — its wording review follows that surface now.
+>
 > **Author's note (2026-09-23):** the cycle's start date is, in all layers,
 > the opening `cycleStart` mark's OWN date. A group still opens at the
 > first tracked day on/after the mark, but `Cycle.startDate` — and with it

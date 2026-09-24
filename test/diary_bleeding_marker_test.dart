@@ -22,7 +22,8 @@ final _spottingDay = DateOnly.normalize(DateTime(2026, 9, 6));
 
 /// The day tile's date label, exactly as the screen formats it (the
 /// pinned German locale).
-String _tileTitle(DateTime day) => DateFormat.yMd('de').format(day.toLocal());
+String _tileTitle(DateTime day) =>
+    DateFormat.yMd('de').format(DateOnly.normalize(day));
 
 /// The bleeding marker inside the tile whose title shows [day].
 Finder _tileMarker(DateTime day) => find.descendant(

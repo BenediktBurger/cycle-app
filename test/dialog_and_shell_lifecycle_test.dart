@@ -90,7 +90,7 @@ Future<List<FlutterErrorDetails>> collectLifecycleErrors(
 /// The German yMd day label exactly as the diary renders it (same formatter
 /// and locale as the screen itself).
 String germanDayLabel(DateTime day) =>
-    DateFormat.yMd('de').format(DateOnly.normalize(day).toLocal());
+    DateFormat.yMd('de').format(DateOnly.normalize(day));
 
 /// Pumps the real app shell (in-memory database, German pin, every tab
 /// mounted) and settles it, DISCHARGING the one-time pump-time layout

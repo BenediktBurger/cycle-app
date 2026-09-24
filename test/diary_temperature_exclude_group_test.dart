@@ -16,8 +16,8 @@
 // Import paths (drip CSV, old export documents) derive the mark
 // independently and are covered elsewhere; the REVERSE-direction
 // no-auto-removal of the old engine (mark survives flag clears) is also
-// pinned by test/diary_cycle_start_prompt_test.dart (the pre-existing mark
-// survives the save there).
+// pinned by test/diary_time_and_navigation_test.dart (the pre-existing
+// mark survives the untouched save there).
 //
 // The database is an in-memory override and the German locale is pinned,
 // same harness pattern as test/diary_measured_time_test.dart.

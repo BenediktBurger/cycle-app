@@ -27,10 +27,23 @@
       }
     }
   },
+  "entryCycleDay": "Cycle day {n}",
+  "@entryCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Day-of-cycle label in the diary overview: the small label on each day tile of the cycle-grouped list and next to the entry form's date row, numbered from the cycle's start (the cycleStart mark's date — a mark on an untracked gap day is the anchor). TODO(user-review): wording."
+  },
   "termSystem": "System",
   "termCsvImport": "Import CSV",
   "termBreastPain": "Breast pain (B)",
   "termMittelschmerz": "Mittelschmerz (M)",
+  "termPain": "Pain",
+  "@termPain": {
+    "description": "Section header of the pain chips (breast pain, Mittelschmerz) on the diary entry form. TODO(user-review): wording — check whether a more specific title fits."
+  },
   "termSex": "Sex",
   "entryDate": "Date",
   "entryPreviousDay": "Previous day",
@@ -190,13 +203,6 @@
     "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
   },
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
-  "diaryCycleStartPromptTitle": "Start new cycle?",
-  "@diaryCycleStartPromptTitle": {
-    "description": "Confirmation prompt after the diary saves a day whose menstruation-level bleeding SUGGESTS a new cycle start (not a continuation of the previous day's bleeding)."
-  },
-  "diaryCycleStartPromptBody": "The bleeding on this day suggests that a new cycle begins here. Set a cycle start mark on this day?",
-  "diaryCycleStartPromptConfirm": "Set cycle start",
-  "diaryCycleStartPromptDismiss": "Not now",
   "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening (rule D)",
   "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning (rule E)",
   "cycleLegendSex": "Sex (X per time of day)",
