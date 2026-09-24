@@ -26,9 +26,10 @@ abstract final class CycleMarkTypes {
   /// The temperature-ignore mark ("Temperatur ignorieren"): a marked
   /// day's temperature is EXCLUDED FROM THE TEMPERATURE EVALUATION — the
   /// evaluation arithmetic (lib/domain/evaluation.dart) treats the day
-  /// like an unmeasured one. The mark does NOT affect cycle-start
-  /// suggestions (bleeding continuity only, see
-  /// lib/domain/cycle_grouping.dart), and since owner decision
+  /// like an unmeasured one. The mark does NOT affect the foreign-import
+  /// cycleStart replay (drip-local bleeding continuity: a bleeding day —
+  /// any level — still opens/continues a row of bleedings — see
+  /// lib/domain/drip_import.dart), and since owner decision
   /// 2026-09-19 it IS the temperature curve's rendering key (marked days
   /// render lighter — see lib/ui/cycle_curve.dart; the raw mask survives
   /// only as the diary
@@ -53,9 +54,10 @@ abstract final class CycleMarkTypes {
 
   /// The user-placed start of a menstrual cycle. The AUTHORITATIVE cycle
   /// boundary: cycle grouping (lib/domain/cycle_grouping.dart) opens a new
-  /// cycle group at this mark, wherever it sits — bleeding only SUGGESTS a
-  /// cycle start via isSuggestedCycleStart, it never creates boundaries by
-  /// itself.
+  /// cycle group at this mark, wherever it sits. Bleeding never creates a
+  /// boundary by itself — the only bleeding-driven cycleStart derivation
+  /// is the foreign-import drip replay (lib/domain/drip_import.dart),
+  /// whose derived marks are user marks once imported.
   static const cycleStart = 'cycleStart';
 }
 

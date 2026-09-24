@@ -5,6 +5,8 @@
 *.log
 *.pyc
 *.swp
+*~
+*.un~
 .buildlog/
 .history
 .idea

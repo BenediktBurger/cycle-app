@@ -154,8 +154,9 @@
 // [evaluateCycles] builds the ignored-day set once from the marks and
 // treats those days like unmeasured ones (no number, no baseline
 // contribution, a gap day in the candidate sequence, no usable rise
-// value). The mark does NOT affect cycle-start suggestions (bleeding
-// continuity only, see lib/domain/cycle_grouping.dart).
+// value). The mark does NOT affect the foreign-import cycleStart replay
+// (drip-local bleeding continuity, any level — see
+// lib/domain/drip_import.dart).
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';
@@ -399,8 +400,9 @@ List<CycleEvaluation> evaluateCycles(
   // The ignored-day set, built ONCE from the temperature-ignore marks: a
   // marked day behaves like an unmeasured day in every rule below (R2/R8
   // gap, no low number, no baseline contribution, no usable rise value).
-  // Raw disturbance flags never contribute here, and cycle-start
-  // suggestions are untouched by these marks.
+  // Raw disturbance flags never contribute here, and the foreign-import
+  // cycleStart replay is untouched by these marks either (that rule keys
+  // to bleeding continuity only — see lib/domain/drip_import.dart).
   final excludedDays = <DateTime>{
     for (final mark in marks)
       if (mark.type == CycleMarkTypes.ignoreTemperature)

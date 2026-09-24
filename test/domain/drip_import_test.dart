@@ -89,6 +89,15 @@ const List<String> sexHeader = [
   'sex.note',
 ];
 
+/// A minimal bleeding-block header (header order as drip writes it) for the
+/// `bleeding.exclude` pins: the replay-skip flag rides next to the bleeding
+/// value, exactly like `temperature.exclude` rides next to its value.
+const List<String> bleedingExcludeHeader = [
+  'date',
+  'bleeding.value',
+  'bleeding.exclude',
+];
+
 /// Builds a drip CSV: [header] plus one data [row] joined the way drip
 /// writes its files (plain comma join, plain newlines).
 String dripOneRowCsv(List<String> header, List<String> row) =>
@@ -97,6 +106,14 @@ String dripOneRowCsv(List<String> header, List<String> row) =>
 /// Same for several data rows at once.
 String dripCsv(List<String> header, List<List<String>> rows) =>
     [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+/// Cells aligned to [bleedingExcludeHeader]: [exclude] writes the
+/// `bleeding.exclude=true` cell, every other cell stays empty.
+List<String> bleedingExcludeCells(
+  String date, {
+  String? value,
+  bool exclude = false,
+}) => [date, value ?? '', exclude ? 'true' : ''];
 
 /// Runs one data row ([cells] aligned to [header]) through the importer and
 /// returns the single produced entry row map of the document.
@@ -293,10 +310,10 @@ void main() {
         {'date': '2026-06-22', 'bleeding': 4},
       ];
 
-      final sparseMarks = deriveDripMarks(sparseRows, {'2026-06-02'});
+      final sparseMarks = deriveDripMarks(sparseRows, {'2026-06-02'}, {});
       final explicitMarks = deriveDripMarks(paddedWithNone(sparseRows), {
         '2026-06-02',
-      });
+      }, {});
 
       expect(
         sparseMarks,
@@ -341,7 +358,7 @@ void main() {
         {'date': '2026-06-01', 'bleeding': 'junk-token'},
       ];
       expect(
-        () => deriveDripMarks(rows, {}),
+        () => deriveDripMarks(rows, {}, {}),
         throwsA(
           isA<ArgumentError>().having(
             (e) => e.toString(),
@@ -1328,8 +1345,9 @@ void main() {
       test('mid-flow continuation derives nothing (light still continues '
           'the flow)', () {
         // drip 2 → stored level 3 (medium); drip 1 → stored level 2
-        // (light). Both are menstruation-level (>= 2), so only the episode's
-        // FIRST day suggests a cycle start; the continuations derive nothing.
+        // (light). Every stored bleeding level (1–4) both opens and
+        // continues a row of bleedings, so only the episode's FIRST day
+        // derives a mark; the continuations derive nothing.
         final result = dripCsvToExportJson(
           dripCsv(dripHeader, [
             cells('2026-01-01', {4: '2'}),
@@ -1341,11 +1359,14 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-01')]);
       });
 
-      test('spotting does not continue the flow: the next menstruation '
-          'level day is an onset again', () {
-        // drip 0 → stored level 1 (spotting): below the suggestion level,
-        // so it neither derives a mark itself nor suppresses the following
-        // menstruation-level day.
+      test('spotting is bleeding: it continues the flow (the next bleeding '
+          'day derives no mark)', () {
+        // drip 2 → stored level 3 (medium); drip 0 → stored level 1
+        // (spotting). ANY stored bleeding level (1–4) both opens and
+        // continues a row of bleedings (spotting is full-coverage
+        // bleeding): the spotting day continues 01-01's flow, and 01-03
+        // continues the spotting day — only the episode's first day
+        // derives a mark.
         final result = dripCsvToExportJson(
           dripCsv(dripHeader, [
             cells('2026-01-01', {4: '2'}),
@@ -1353,10 +1374,7 @@ void main() {
             cells('2026-01-03', {4: '2'}),
           ]),
         );
-        expect(marksOf(result), [
-          derivedMark('2026-01-01'),
-          derivedMark('2026-01-03'),
-        ]);
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
       });
 
       test('the hand-authored specimen derives exactly one cycleStart mark '
@@ -1418,8 +1436,8 @@ void main() {
         // temperature-evaluation-scoped: it does NOT suppress the
         // suggestion any more — 2026-01-01 (bleeding level 2, no previous
         // bleeding day) SUGGESTS and derives its own cycleStart mark,
-        // while 2026-01-02 stays mid-flow (previous calendar day also
-        // bleeding level >= 2) and derives nothing.
+        // while 2026-01-02 stays mid-flow (the previous calendar day also
+        // BLEEDS, level >= 1) and derives nothing.
         final result = dripCsvToExportJson(
           dripCsv(dripHeader, [
             cells('2026-01-01', {4: '2', 2: 'true'}),
@@ -1444,16 +1462,86 @@ void main() {
         expect(marksOf(result), [derivedMark('2026-01-01')]);
       });
 
-      test('out-of-range or spotting-only bleeding derives no mark', () {
-        // Out-of-range means no observation (stored level 0); spotting is
-        // stored level 1 — both below the menstruation suggestion level.
+      test('a spotting-only bleeding day derives a mark (out-of-range '
+          'still does not)', () {
+        // Spotting (drip 0) is stored level 1 — full bleeding: it opens a
+        // row of bleedings and derives the mark. Out-of-range means no
+        // observation (stored level 0): it neither opens nor continues.
+        final spotting = dripCsvToExportJson(
+          dripOneRowCsv(dripHeader, cells('2026-01-01', {4: '0'})),
+        );
+        expect(marksOf(spotting), [derivedMark('2026-01-01')]);
+        final outOfRange = dripCsvToExportJson(
+          dripOneRowCsv(dripHeader, cells('2026-01-01', {4: '7', 1: '36.2'})),
+        );
+        expect(marksOf(outOfRange), isEmpty);
+      });
+
+      test('an excluded bleeding day neither opens nor continues: the next '
+          'non-excluded bleeding day is an onset again', () {
+        // bleeding.exclude is a replay-skip flag only: the excluded day
+        // (01-02, drip 1 → stored level 2) derives no mark, cannot
+        // continue 01-01's flow and cannot suppress 01-03 — the next
+        // non-excluded bleeding day is a fresh onset. The stored entry
+        // keeps its bleeding level either way.
         final result = dripCsvToExportJson(
-          dripCsv(dripHeader, [
-            cells('2026-01-01', {4: '7', 1: '36.2'}),
-            cells('2026-01-02', {4: '0'}),
+          dripCsv(bleedingExcludeHeader, [
+            bleedingExcludeCells('2026-01-01', value: '2'),
+            bleedingExcludeCells('2026-01-02', value: '1', exclude: true),
+            bleedingExcludeCells('2026-01-03', value: '1'),
           ]),
         );
-        expect(marksOf(result), isEmpty);
+        expect(marksOf(result), [
+          derivedMark('2026-01-01'),
+          derivedMark('2026-01-03'),
+        ]);
+      });
+
+      test('an excluded FIRST day of a bleeding row derives no mark: the '
+          'following calendar day is a fresh onset', () {
+        // The row's first day is the excluded one (01-01, drip 1 → stored
+        // level 2): it derives nothing and cannot continue/suppress
+        // anything — the next non-excluded bleeding day (01-02) is NOT
+        // suppressed by it and is a fresh onset itself. The stored entry
+        // keeps its bleeding level either way.
+        final result = dripCsvToExportJson(
+          dripCsv(bleedingExcludeHeader, [
+            bleedingExcludeCells('2026-01-01', value: '1', exclude: true),
+            bleedingExcludeCells('2026-01-02', value: '1'),
+          ]),
+        );
+        expect(marksOf(result), [derivedMark('2026-01-02')]);
+      });
+
+      test('bleeding.exclude never derives an ignoreTemperature mark', () {
+        // The ignoreTemperature mark is temperature-only: the bleeding
+        // exclusion feeds ONLY the cycleStart replay (where the excluded
+        // day is skipped entirely — it cannot open either).
+        final result = dripCsvToExportJson(
+          dripOneRowCsv(
+            bleedingExcludeHeader,
+            bleedingExcludeCells('2026-01-01', value: '1', exclude: true),
+          ),
+        );
+        expect(
+          marksOf(result).where((m) => m['mark_type'] == 'ignoreTemperature'),
+          isEmpty,
+        );
+        expect(marksOf(result), isEmpty, reason: 'an excluded day cannot open');
+      });
+
+      test('a bleeding.exclude-only row is not data (skipped empty)', () {
+        // Symmetric to temperature.exclude: the exclusion itself is only
+        // meaningful alongside mapped data — without a bleeding value (or
+        // another data anchor) the blank calendar day skips as usual.
+        final result = dripCsvToExportJson(
+          dripOneRowCsv(
+            bleedingExcludeHeader,
+            bleedingExcludeCells('2026-01-01', exclude: true),
+          ),
+        );
+        expect(result.stats.rowsImported, 0);
+        expect(result.stats.rowsSkippedEmpty, 1);
       });
     });
   });

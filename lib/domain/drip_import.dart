@@ -17,11 +17,10 @@
 // lib/domain/export_import.dart) that the write phase feeds through the
 // EXISTING importJsonToDatabase — no second db writer for this feature.
 // On top of the mapped entries the mapper DERIVES marks (author 'import')
-// from the CSV content: cycleStart marks from the bleeding sequence via the
-// shared suggestion predicate (isSuggestedCycleStart,
-// lib/domain/cycle_grouping.dart) — bleeding only SUGGESTS a cycle start;
-// the derived mark is what the mark-driven cycle grouping consumes (see
-// lib/domain/marks.dart) — and ignoreTemperature marks from
+// from the CSV content: cycleStart marks from a drip-local bleeding replay
+// — every first day of a row of bleedings, at ANY bleeding level, derives
+// one; the derived mark is what the mark-driven cycle grouping consumes
+// (see lib/domain/marks.dart) — and ignoreTemperature marks from
 // temperature.exclude (drip's "not usable for fertility detection": the
 // roadmap's "drip excluded temp → a mark, not an observation"). Cycle-app's
 // own export already carries its marks verbatim, so re-importing an app
@@ -33,7 +32,6 @@
 // TODO(user-review) marker.
 
 import 'cervix.dart';
-import 'cycle_grouping.dart';
 import 'date_only.dart';
 import 'export_import.dart';
 import 'marks.dart';
@@ -170,11 +168,11 @@ final class DripCsvImport {
   /// A current-version export document (see lib/domain/export_import.dart)
   /// — profile-free: the document root is exactly schema_version /
   /// exported_at / entries / marks — with the mapped entries and the
-  /// DERIVED marks (author 'import'): cycleStart marks for the suggested
-  /// cycle-start days and ignoreTemperature marks for the
-  /// temperature.exclude days (drip has no mark analogue of its own, so
-  /// foreign imports get their cycle boundaries and analysis exclusions
-  /// derived from the imported data).
+  /// DERIVED marks (author 'import'): cycleStart marks for the first
+  /// bleeding days of every row of bleedings and ignoreTemperature marks
+  /// for the temperature.exclude days (drip has no mark analogue of its
+  /// own, so foreign imports get their cycle boundaries and analysis
+  /// exclusions derived from the imported data).
   final String json;
 
   final DripCsvStats stats;
@@ -226,6 +224,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
   final entries = <Map<String, Object?>>[];
   final excludedDays = <String>{};
+  final bleedingExcludedDays = <String>{};
   var skippedEmpty = 0;
   var invalid = 0;
 
@@ -251,6 +250,13 @@ DripCsvImport dripCsvToExportJson(String raw) {
         ? null
         : _parseDripTimeMinutes(cell(dataRow, 'temperature.time'));
     final bleeding = _parseBleeding(cell(dataRow, 'bleeding.value'));
+    // drip ALSO carries bleeding.exclude ("ignored" bleeding, e.g. after
+    // stopping the pill). It is NOT data (a bleeding-exclude-only row is a
+    // blank calendar day, like every dropped flag), but when the row
+    // imports its day feeds the cycleStart replay's skip set — unlike the
+    // other excludes it changes behavior, only not at the storage level:
+    // the entry keeps its bleeding level untouched.
+    final bleedingExcluded = boolCell(dataRow, 'bleeding.exclude');
     final mucus = _mucusObservation(
       nfpNumber: cell(dataRow, 'mucus.value'),
       feeling: cell(dataRow, 'mucus.feeling'),
@@ -369,6 +375,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
     if (excluded) {
       excludedDays.add(formatIsoDay(day));
     }
+    if (bleedingExcluded) {
+      bleedingExcludedDays.add(formatIsoDay(day));
+    }
     final entry = <String, Object?>{
       'date': formatIsoDay(day),
       'bbt_c': bbtC,
@@ -390,7 +399,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
   final blob = ExportBlob(
     entries: entries,
-    marks: deriveDripMarks(entries, excludedDays),
+    marks: deriveDripMarks(entries, excludedDays, bleedingExcludedDays),
     exportedAt: DateTime.now(),
   );
 
@@ -415,21 +424,23 @@ DripCsvImport dripCsvToExportJson(String raw) {
 /// no-op). The rows carry no profile id (there is none).
 ///
 /// Two mark kinds, both with author 'import':
-/// - `cycleStart`: replayed through the SHARED suggestion predicate
-///   [isSuggestedCycleStart] — no derivation-local bleeding rule: a
-///   menstruation-level day (light or heavier) that does not continue the
-///   previous calendar day's menstruation-level flow suggests a cycle
-///   start. The suppression is keyed PURELY to bleeding continuity
-///   (temperature-only semantics): [excludedDays] (the temperature.exclude
-///   days) does NOT feed the predicate — an ignored bleeding day derives
-///   its own cycleStart mark like any other menstruation-level day.
+/// - `cycleStart`: replayed with the drip-local onset rule (_isDripOnset):
+///   a bleeding day on ANY stored level (1–4; spotting is full-coverage
+///   bleeding) opens a row of bleedings — a mark on the row's first day,
+///   nothing on its continuation days. [bleedingExcludedDays]
+///   (the bleeding.exclude days) are skipped by the replay ONLY — they
+///   cannot open, continue or suppress, while the stored entries keep
+///   their bleeding level.
 /// - `ignoreTemperature`: one per temperature.exclude day — the roadmap's
 ///   "drip excluded temp → a mark, not an observation". Drip has no reason
-///   column, so no mask bits come from drip.
+///   column, so no mask bits come from drip. [ignoreTemperatureDays] feeds
+///   ONLY this mark; a bleeding-excluded day ALONE derives no
+///   ignoreTemperature mark — one that ALSO carries temperature.exclude
+///   derives it like any temperature-excluded day.
 ///
 /// Replay details (kept in step with the import merge plan):
 /// - the rows are judged in DAY order, not CSV row order (drip exports one
-///   row per calendar day, but the previous-day check of the predicate
+///   row per calendar day, but the previous-day check of the onset rule
 ///   must always see the prior day, wherever it sat in the file);
 /// - duplicated same-day keys keep their FIRST occurrence, like the merge
 ///   plan counts them;
@@ -443,7 +454,8 @@ DripCsvImport dripCsvToExportJson(String raw) {
 /// the export document carries (they replay verbatim).
 List<Map<String, Object?>> deriveDripMarks(
   List<Map<String, Object?>> entries,
-  Set<String> excludedDays,
+  Set<String> ignoreTemperatureDays,
+  Set<String> bleedingExcludedDays,
 ) {
   final seenDates = <String>{};
   final replayed = <DailyEntry>[];
@@ -475,19 +487,23 @@ List<Map<String, Object?>> deriveDripMarks(
   for (var i = 0; i < replayed.length; i++) {
     final entry = replayed[i];
     final iso = formatIsoDay(entry.date);
-    if (excludedDays.contains(iso)) {
+    if (ignoreTemperatureDays.contains(iso)) {
       marks.add(<String, Object?>{
         'entry_date': iso,
         'mark_type': CycleMarkTypes.ignoreTemperature,
         'author': 'import',
       });
     }
-    // The ignored-day set feeds ONLY the ignoreTemperature mark
-    // derivation above — the suggestion predicate reads bleeding
-    // continuity alone (temperature-only semantics, owner decision
-    // 2026-09-18).
+    // The two exclusion sets have separate scopes: [ignoreTemperatureDays]
+    // (the temperature.exclude days) feeds ONLY the ignoreTemperature mark
+    // derivation above; [bleedingExcludedDays] feeds ONLY the onset rule
+    // below (it makes its days invisible to the cycleStart replay). No
+    // set affects the other derivation — a temperature-excluded day still
+    // opens/continues a row of bleedings, and a bleeding-excluded day
+    // ALONE derives no ignoreTemperature mark (only a combined day that
+    // also carries temperature.exclude would).
     final previous = i == 0 ? null : replayed[i - 1];
-    if (isSuggestedCycleStart(entry, previous)) {
+    if (_isDripOnset(entry, previous, bleedingExcludedDays)) {
       marks.add(<String, Object?>{
         'entry_date': iso,
         'mark_type': CycleMarkTypes.cycleStart,
@@ -503,6 +519,34 @@ List<Map<String, Object?>> deriveDripMarks(
     return (a['mark_type']! as String).compareTo(b['mark_type']! as String);
   });
   return marks;
+}
+
+/// The drip-local onset rule of the cycleStart replay: a replayed [entry]
+/// whose day is NOT bleeding-excluded and carries ANY bleeding level
+/// (1–4; spotting is full-coverage bleeding) opens a row of bleedings.
+/// It keeps the row running (deriving nothing) only when the immediately
+/// previous REPLAYED entry exists on the previous CALENDAR day, is
+/// bleeding at any level, and is itself not bleeding-excluded — an
+/// excluded or bleeding-less day between, or a data gap further back than
+/// yesterday, leaves the day a fresh onset. ANY level on purpose: drip
+/// routinely records spotting (its heaviest scale step 0), which is full
+/// bleeding there and must open AND continue rows of bleedings the same
+/// way.
+bool _isDripOnset(
+  DailyEntry entry,
+  DailyEntry? previous,
+  Set<String> bleedingExcludedDays,
+) {
+  if (bleedingExcludedDays.contains(formatIsoDay(entry.date))) return false;
+  if (entry.bleeding.level < 1) return false;
+  if (previous == null) return true;
+  if (!DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date))) {
+    return true; // a data gap still opens a fresh onset
+  }
+  if (bleedingExcludedDays.contains(formatIsoDay(previous.date))) {
+    return true; // an excluded day cannot continue/suppress the row
+  }
+  return previous.bleeding.level < 1; // bleeding previous day → continuation
 }
 
 /// Parses a drip temperature cell (`36.2`); any non-number means no

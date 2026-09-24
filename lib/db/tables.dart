@@ -191,9 +191,10 @@ abstract final class MarkTypes {
   /// temperature is EXCLUDED FROM THE TEMPERATURE EVALUATION — the day
   /// behaves like an unmeasured day in the evaluation arithmetic (no low
   /// number, no baseline contribution, a gap in the candidate sequence),
-  /// see lib/domain/evaluation.dart. The mark never touches cycle-start
-  /// suggestions (the suggestion is keyed purely to bleeding continuity —
-  /// see lib/domain/cycle_grouping.dart). MANUAL ONLY (owner decision
+  /// see lib/domain/evaluation.dart. The mark never touches the
+  /// foreign-import cycleStart replay (that rule keys purely to
+  /// bleeding continuity, any level — see lib/domain/drip_import.dart).
+  /// MANUAL ONLY (owner decision
   /// 2026-09-19): written/removed by the diary form's exclude switch and
   /// the day sheet's toggle; disturbance flags never auto-set it and
   /// clearing them never auto-removes it. Foreign imports derive it with
@@ -212,8 +213,8 @@ abstract final class MarkTypes {
   static const suzEvening = 'suzEvening';
 
   /// The user-placed start of a menstrual cycle: the authoritative cycle
-  /// boundary of the mark-driven grouping (bleeding only suggests a cycle
-  /// start — see lib/domain/cycle_grouping.dart).
+  /// boundary of the mark-driven grouping (bleeding never creates a
+  /// boundary by itself — see lib/domain/cycle_grouping.dart).
   static const cycleStart = 'cycleStart';
 }
 

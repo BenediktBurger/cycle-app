@@ -133,8 +133,9 @@ enum SexTiming {
 /// lib/domain/evaluation.dart), which is MANUAL ONLY (owner decision
 /// 2026-09-19): the diary form's exclude switch and the day sheet's toggle
 /// write/remove it — a flagged day is never auto-excluded, and clearing
-/// the flags never auto-removes the mark; cycle-start suggestions are
-/// untouched by both (bleeding continuity only).
+/// the flags never auto-removes the mark; the foreign-import cycleStart
+/// replay (drip-local bleeding continuity, any level) is untouched by
+/// both — see lib/domain/drip_import.dart.
 enum TempDisturbance {
   /// Late to bed ("spät ins Bett").
   sp(1),

@@ -6,10 +6,11 @@
 //   `cycleStart` mark (CycleMarkTypes.cycleStart). The mark
 //   is AUTHORITATIVE and binds wherever it sits — including on days without
 //   menstruation bleeding, on excluded (interrupted) days, and on untracked
-//   gap days. Bleeding never creates a boundary by itself; it only SUGGESTS
-//   a cycle start via [isSuggestedCycleStart] (derived marks — a
-//   foreign-import derivation only, since the diary's bleeding-suggested
-//   prompt became the entry form's explicit cycle-start switch).
+//   gap days. Bleeding never creates a boundary by itself and never
+//   suggests one — the only bleeding-driven cycleStart derivation is the
+//   foreign-import replay in lib/domain/drip_import.dart (drip-local rule:
+//   any bleeding level opens a row of bleedings, bleed-excluded days are
+//   skipped), whose derived marks are USER marks once imported.
 //   The cycle's START DATE is the opening mark's OWN date — when that mark
 //   lies on an untracked gap day, the start sits inside the gap and the
 //   untracked gap days belong to the new cycle (they are not in
@@ -415,29 +416,4 @@ int? dayOfCycleFor(DateTime date, List<Cycle> cycles) {
   }
   if (containing == null) return null;
   return DateOnly.daysBetween(date, containing.startDate) + 1;
-}
-
-/// The bleeding SUGGESTION predicate (the demoted former boundary rule):
-/// a day with menstruation-level bleeding (`level >= 2`) suggests starting
-/// a new cycle unless the immediately preceding CALENDAR day is also a
-/// menstruation-level day (i.e. we are in the middle of one continuous
-/// menstruation). This gates derivations only — the diary's old
-/// bleeding-suggested prompt is now the entry form's explicit cycle-start
-/// switch, and the predicate NEVER creates a cycle boundary by itself.
-///
-/// Temperature-only semantics (owner decision 2026-09-18): the suppression
-/// is keyed PURELY on bleeding continuity. The ignoreTemperature mark does
-/// NOT affect suggestions (a marked bleeding day suggests, a marked
-/// previous bleeding day suppresses like any other bleeding day), and the
-/// raw disturbance flags ([DailyEntry.tempDisturbances]) are equally
-/// invisible — the predicate reads bleeding levels only.
-bool isSuggestedCycleStart(DailyEntry entry, DailyEntry? previous) {
-  if (entry.bleeding.level < 2) return false;
-
-  if (previous != null &&
-      DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date)) &&
-      previous.bleeding.level >= 2) {
-    return false;
-  }
-  return true;
 }

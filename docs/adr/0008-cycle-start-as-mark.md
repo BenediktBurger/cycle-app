@@ -3,16 +3,48 @@
 - **Date:** 2026-09-18
 - **Status:** Accepted
 
+> **Author's note (2026-09-24, drip import):** the shared suggestion
+> predicate `isSuggestedCycleStart` is REMOVED — its last production
+> caller was the foreign-import derivation, and the new rules below
+> contradict the level >= 2 gate it pinned. The derivation now uses a
+> drip-local replay rule. The journal side had already lost its
+> bleeding-driven suggestion with the entry-form switch (see the note
+> below from the same day), so nothing on the diary side changes.
+> Owner decisions of 2026-09-24:
+>
+> - **Any bleeding level:** every stored bleeding level (drip values
+>   0–3) both OPENS a row of bleedings — the row's first day derives a
+>   `cycleStart` mark, author `import` — and CONTINUES it: a previous
+>   calendar-day bleeding at any level suppresses the mark. Spotting
+>   is full-coverage bleeding.
+> - **`bleeding.exclude` = replay-skip only:** an excluded bleeding
+>   day cannot open, continue, or suppress — the next non-excluded
+>   bleeding day is a fresh onset. The stored entry keeps its
+>   bleeding level unchanged, and an excluded bleeding day derives NO
+>   `ignoreTemperature` mark (that mark is temperature-only).
+> - **`temperature.exclude` semantics unchanged:** it still derives
+>   the `ignoreTemperature` mark exactly as before and never affects
+>   the cycleStart replay.
+>
+> This supersedes the level >= 2 predicate wording still quoted in the
+> Decision bullets, in the dated notes below and in settled question
+> (b) — they are history now, pointing at the drip-local rule where
+> they describe current behavior — and it supersedes this record's
+> statement that the predicate "keeps its exact logic": the predicate
+> and its characterization tests are gone with it.
+>
 > **Author's note (2026-09-24):** the diary's "asks on suggested saves"
 > prompt (the Decision bullet below) is superseded by an explicit
 > cycle-start switch on the diary entry form — it writes/removes the same
 > user-authored `cycleStart` mark, seeded from the day's existing mark, in
 > both directions. Bleeding no longer triggers any diary-side ask: a
 > menstruation-level save without the switch touched places no mark and
-> shows no dialog. The suggestion predicate `isSuggestedCycleStart` keeps
-> its exact logic, but its remaining role is the foreign-import
-> derivation only (drip CSV import; cycle-app's own exports already carry
-> the marks). Open question (c)'s dialog wording is thereby moot in the
+> shows no dialog. The suggestion predicate `isSuggestedCycleStart`
+> (as of this note) retained its exact logic, with the foreign-import
+> derivation as its remaining role (drip CSV import; cycle-app's own
+> exports already carry the marks) — the newer 2026-09-24 drip note
+> above has since removed the predicate and moved that derivation to
+> a drip-local rule. Open question (c)'s dialog wording is thereby moot in the
 > diary: the switch's label reuses the shared "Cycle start" /
 > "Zyklusbeginn" string already on the day sheet's mark chip and the
 > statistics table — its wording review follows that surface now.
@@ -103,15 +135,23 @@ bleeding only suggests it.**
   bleeding and on temperature-ignored days alike (owner decision
   2026-09-19, confirmed with INER experts — recorded under Consequences
   below).
-- Bleeding only **suggests**: `isSuggestedCycleStart(entry, previous)` keeps
-  the former automatic predicate verbatim (bleeding level >= 2 on a
-  non-excluded day whose previous non-excluded calendar day is not also a
-  non-excluded level >= 2 day), but its role is demoted to gating prompts
-  and derivations. It never creates a boundary by itself.
-- The diary save flow **asks on suggested saves**: when a menstruation-level
-  save fires the suggestion, a localized confirm dialog appears; confirming
-  writes the mark (author `user`), dismissing stores nothing. Committed
-  wording (implementer-inventable per language; see open question (c)):
+- Bleeding only **suggests**: bleeding never decides the boundary by
+  itself in the diary. Nothing there derives a mark from bleeding — a
+  bleeding save places no mark; the mark comes only from the entry
+  form's explicit cycle-start switch (see the 2026-09-24 author's
+  note). The suggestion role survives only in the drip import's
+  drip-local replay rule (see the 2026-09-24 author's note): any
+  bleeding level opens/continues a row of bleedings, and
+  `bleeding.exclude` days are skipped by the replay only — the derived
+  marks stay provenance-tagged (`author: import`), user-owned marks
+  remain the only in-app boundary source.
+- The old diary save flow **asked on suggested saves** (superseded by
+  the entry-form switch, see the 2026-09-24 author's note — kept for
+  the committed wording record, see open question (c)): when a
+  menstruation-level save fired the suggestion, a localized confirm
+  dialog appeared; confirming wrote the mark (author `user`),
+  dismissing stored nothing. Committed wording (implementer-inventable
+  per language; see open question (c)):
   - en: title "Start new cycle?", body "The bleeding on this day suggests
     that a new cycle begins here. Set a cycle start mark on this day?",
     confirm "Set cycle start", dismiss "Not now".
@@ -123,8 +163,12 @@ bleeding only suggests it.**
   author `user`) — so it can be placed or corrected independently of any
   bleeding day.
 - **Foreign imports (drip) derive marks**: the importer replays the mapped
-  entry rows through the same suggestion predicate and writes a
-  `cycleStart` mark with author `import` for every suggested day — the
+  entry rows through the drip-local onset rule (any bleeding level opens
+  or continues a row of bleedings; `bleeding.exclude` days are skipped by
+  the replay only — they cannot open, continue or suppress, they still
+  store their bleeding level, and they derive no `ignoreTemperature`
+  mark; see the 2026-09-24 author's note) and writes a
+  `cycleStart` mark with author `import` for every onset day — the
   author column records that the mark was derived, not placed. Cycle-app's
   own exports already carry the marks, so a round-trip never re-derives:
   derivation applies only to foreign imports.
@@ -149,8 +193,10 @@ the app never decides a boundary on its own.
 - Existing local data is not backfilled (no users yet); before the first
   `cycleStart` mark the app shows only the leading group without a known
   begin.
-- The suggestion predicate stays verbatim characterization logic (tests pin
-  it), so expert review can change its role without touching its logic.
+- The drip-local replay rule is characterization logic (tests pin it),
+  so expert review can change the derivation without touching the
+  grouping machinery; the removed shared predicate's level >= 2
+  characterization is history.
 - Exports/imports round-trip `cycleStart` marks unchanged, including the
   author column (`user` vs. `import` provenance is preserved).
 
@@ -164,12 +210,15 @@ wherever placed, and the temperature-ignore mark never blocks it
 (unchanged behavior; the old exclude_* flags are gone, see the author's
 note).
 
-(b) **Suggestion predicate's mid-flow suppression:** keep the strict
-previous-calendar-day bleeding rule — a day whose previous CALENDAR day
-bleeds at level >= 2 does not suggest (bleeding continuity is the ONLY
-suppression; no wider continuity notion). The `ignoreTemperature` mark
-and the raw disturbance mask do not affect the predicate (a marked
-bleeding day still suggests).
+(b) **Mid-flow suppression (now the drip replay rule):** the strict
+previous-calendar-day bleeding rule survives in the drip-local onset
+rule — a bleeding day whose previous CALENDAR day also bleeds (any
+level, drip 0–3) derives no mark (bleeding continuity is the ONLY
+suppression; no wider continuity notion). Days tagged
+`bleeding.exclude` are skipped by the replay entirely: they cannot
+suppress, and the next non-excluded bleeding day is a fresh onset.
+The `ignoreTemperature` mark and the raw disturbance mask do not
+affect the replay (a marked bleeding day still derives).
 
 ### Open questions for INER experts (`TODO(user-review)`)
 

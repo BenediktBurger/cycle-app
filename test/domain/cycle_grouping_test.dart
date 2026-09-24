@@ -2,12 +2,12 @@
 // Pure Dart — imports only lib/domain, runs on the host VM.
 //
 // Boundary rule: cycle groups are MARK-driven. A user-placed cycleStart
-// mark (CycleMarkTypes.cycleStart) opens a new cycle group; bleeding only
-// SUGGESTS a cycle start (isSuggestedCycleStart — the derivation gate:
-// foreign-import derivation only, the diary now has an explicit
-// cycle-start switch — never a boundary). The old automatic
-// "first bleeding day starts a cycle" rule is superseded; bleeding
-// sequences alone form ONE group.
+// mark (CycleMarkTypes.cycleStart) opens a new cycle group; bleeding
+// NEVER creates a boundary by itself and never suggests one — the only
+// bleeding-driven derivation lives in the foreign-import replay
+// (lib/domain/drip_import.dart: the drip-local onset rule).
+// The old automatic "first bleeding day starts a cycle" rule is
+// superseded; bleeding sequences alone form ONE group.
 //
 // Span rule (owner requirement, app-wide): a cycle runs on UNTIL the next
 // cycle-start mark, regardless whether data exists there. Grouping extends
@@ -20,14 +20,6 @@
 // tracked days stay out of the list (the gap-day drop-out convention).
 // The "today" of the last-cycle rule is injectable (tests pin a date;
 // production uses the wall clock / nowProvider at the call sites).
-//
-// Suggestion semantics (owner decision 2026-09-18, temperature-only): the
-// suppression is keyed PURELY on bleeding continuity — a day suggests iff
-// bleeding >= 2 and the previous calendar day is not also bleeding >= 2.
-// The ignoreTemperature mark is IRRELEVANT to the predicate (a marked day
-// with menstruation-level bleeding suggests; a marked previous bleeding
-// day suppresses like any other bleeding day). The predicate takes NO
-// excluded-state parameters.
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -746,100 +738,6 @@ void main() {
       final entries = [d(2026, 3, 2, bleeding: Bleeding.medium), d(2026, 3, 3)];
       expect(menstruationOnsetDates(entries, const []), isEmpty);
       expect(menstruationOnsetDates(const [], const []), isEmpty);
-    });
-  });
-
-  group('isSuggestedCycleStart — the bleeding suggestion predicate '
-      '(characterization: the old automatic rule, demoted to a suggestion '
-      'gate)', () {
-    test('a menstruation-level day after a non-bleeding day suggests', () {
-      final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
-      final previous = d(2026, 3, 1);
-
-      expect(isSuggestedCycleStart(entry, previous), isTrue);
-    });
-
-    test('a first entry with no previous day suggests', () {
-      final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
-      expect(isSuggestedCycleStart(entry, null), isTrue);
-    });
-
-    test('a data gap (previous day untracked) lets the day suggest', () {
-      // previous is from an earlier day, not the previous calendar day —
-      // an absent previous day cannot be proven non-menstruating.
-      final entry = d(2026, 3, 10, bleeding: Bleeding.heavy);
-      final previous = d(2026, 3, 1);
-
-      expect(isSuggestedCycleStart(entry, previous), isTrue);
-    });
-
-    test('a mid-flow day does not suggest (previous day also bleeding '
-        'level >= 2)', () {
-      final entry = d(2026, 3, 3, bleeding: Bleeding.medium);
-      final previous = d(2026, 3, 2, bleeding: Bleeding.heavy);
-
-      expect(isSuggestedCycleStart(entry, previous), isFalse);
-    });
-
-    test('spotting (level 1) never suggests', () {
-      final entry = d(2026, 3, 2, bleeding: Bleeding.spotting);
-      expect(isSuggestedCycleStart(entry, null), isFalse);
-    });
-
-    test('raw disturbance flags never reach the suggestion predicate', () {
-      // The predicate reads bleeding continuity only: raw disturbance
-      // flags (isInterrupted) and the ignoreTemperature mark are both
-      // invisible to it — a flagged, menstruation-level day suggests.
-      final entry = d(
-        2026,
-        3,
-        2,
-        bleeding: Bleeding.medium,
-        tempDisturbances: TempDisturbance.kr.bit | TempDisturbance.sp.bit,
-      );
-      expect(
-        isSuggestedCycleStart(entry, null),
-        isTrue,
-        reason: 'raw flags are rendering input only',
-      );
-    });
-
-    test('a marked (ignored) day with bleeding >= 2 DOES suggest', () {
-      // The ignoreTemperature mark is analysis-scoped (evaluation) and
-      // never touches the suggestion: a marked menstruation-level day is
-      // as good a cycle-start suggestion as any other.
-      final entry = d(2026, 3, 2, bleeding: Bleeding.medium);
-      expect(
-        isSuggestedCycleStart(entry, null),
-        isTrue,
-        reason:
-            'marks are irrelevant to the predicate — the suppression '
-            'is keyed purely on bleeding continuity',
-      );
-    });
-
-    test('a previous bleeding day suppresses REGARDLESS of its mark', () {
-      // Bleeding continuity is the only suppression: a previous calendar
-      // day at bleeding level >= 2 proves a continuous menstruation, mark
-      // or no mark.
-      final entry = d(2026, 3, 3, bleeding: Bleeding.medium);
-      final previous = d(2026, 3, 2, bleeding: Bleeding.medium);
-
-      expect(
-        isSuggestedCycleStart(entry, previous),
-        isFalse,
-        reason: 'mid-flow: the previous day bleeds, marks are irrelevant',
-      );
-    });
-
-    test('light (level 2) suggests like any menstruation level', () {
-      expect(
-        isSuggestedCycleStart(
-          d(2026, 3, 2, bleeding: Bleeding.light),
-          d(2026, 3, 1),
-        ),
-        isTrue,
-      );
     });
   });
 }
