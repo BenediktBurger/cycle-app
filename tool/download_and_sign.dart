@@ -42,14 +42,26 @@
 // The signing key never touches CI: the CI artifacts carry the documented
 // debug-signing fallback signature, and apksigner REPLACES those signature
 // blocks during signing — they never reach the published assets. Keystore
-// passwords are only ever entered interactively (apksigner's own prompt) or
-// via the APKSIGNER_STORE_PASSWORD environment variable — never a committed
-// file.
+// passwords come from the APKSIGNER_STORE_PASSWORD / APKSIGNER_KEY_PASSWORD
+// environment variables or from the gitignored android/key.properties (the
+// same file the Gradle release signing android/app/build.gradle.kts reads);
+// interactive apksigner prompting is NOT possible here (the script's
+// process harness gives apksigner no terminal stdin), so no password
+// source means a loud abort. The v1 (JAR) scheme is signed OFF on purpose:
+// for an EC key its META-INF/*.EC file would embed a randomized ECDSA
+// signature inside the zip entries and defeat the determinism sanity —
+// and v1 is unnecessary at minSdk 24 (Android 7+ verifies v2 natively).
 //
 // Determinism: before staging is finalized, the first APK is signed a
-// second time and compared byte-for-byte with the staged one (apksigner's
-// v2/v3 signatures carry no timestamp by default); any difference aborts
-// the run loudly.
+// second time and the two outputs are compared everywhere EXCEPT the
+// signature-block interior: identical input must yield identical ZIP entry
+// area and central directory (apksigner writes no timestamps). Full
+// byte-for-byte equality is unattainable for the release key BY DESIGN —
+// it is an EC key and ECDSA randomizes every signature (RSA/PSS salt; the
+// 0.2.1 release already shipped with it) — and the EOCD's
+// central-directory offset field is neutralized because the ECDSA DER
+// encoding may shift the block length by a few bytes. Any difference
+// outside the block aborts the run loudly.
 //
 // Linux-release-machine note: this tool targets the project's Linux release
 // machine — it shells out to `gh` (authenticated) and the Android SDK
@@ -75,9 +87,21 @@ const String keystoreTildePath = '~/keystores/cycleapp-release.jks';
 const String keystoreAlias = 'cycleapp-release';
 
 /// Environment variable for scripted runs: keystore store password, passed
-/// to apksigner as `--ks-pass env:APKSIGNER_STORE_PASSWORD`. Never a
-/// committed file; when absent, apksigner prompts interactively instead.
+/// to apksigner as `--ks-pass env:APKSIGNER_STORE_PASSWORD` (the value is
+/// handed to the apksigner child process via its environment, never its
+/// command line). When absent, the gitignored [keyPropertiesPath] provides
+/// the password instead.
 const String keystorePasswordEnvVar = 'APKSIGNER_STORE_PASSWORD';
+
+/// Environment variable for the optional per-key password, passed as
+/// `--key-pass env:APKSIGNER_KEY_PASSWORD` only when the password source
+/// provides one. apksigner otherwise reuses the store password.
+const String keyPasswordEnvVar = 'APKSIGNER_KEY_PASSWORD';
+
+/// Gitignored password source beside the Gradle release signing:
+/// android/key.properties (the same file android/app/build.gradle.kts
+/// loads; never committed, covered by android/.gitignore and .gitignore).
+const String keyPropertiesPath = 'android/key.properties';
 
 /// The workflow name the release pipeline declares; matched against
 /// `gh run list --workflow` output.
@@ -533,10 +557,133 @@ Future<ProcessResult> _gh(List<String> arguments) async {
 
 Never _fail(String message) => throw ReleaseToolException(message);
 
+// --- keystore password sources (env vars, gitignored key.properties) ------------
+
+/// storePassword / keyPassword / keyAlias from the gitignored
+/// [keyPropertiesPath]. Nulls = key absent or empty.
+class KeyPropertiesPasswords {
+  const KeyPropertiesPasswords({
+    this.storePassword,
+    this.keyPassword,
+    this.keyAlias,
+  });
+
+  final String? storePassword;
+  final String? keyPassword;
+  final String? keyAlias;
+}
+
+/// Parses the Java-Properties-style lines the Gradle release signing loads
+/// (android/app/build.gradle.kts). Separators `=` or `:` (first one wins),
+/// `#`/`!` comment lines and blank lines are skipped, unknown keys are
+/// ignored. Deliberately minimal: Java's backslash escapes are NOT decoded
+/// (a password needing those must ride the env var instead); trailing
+/// whitespace of a value is KEPT, matching java.util.Properties (Gradle
+/// would send those trailing spaces to the keystore too; don't pad
+/// passwords). Empty values are treated as absent, never as empty passwords.
+KeyPropertiesPasswords? parseKeyProperties(String source) {
+  String? storePassword;
+  String? keyPassword;
+  String? keyAlias;
+  for (final rawLine in source.replaceAll('\r\n', '\n').split('\n')) {
+    // Left-trim only: a value's trailing bytes are part of the password
+    // (java.util.Properties keeps them, and so does Gradle).
+    final line = rawLine.trimLeft();
+    if (line.isEmpty || line.startsWith('#') || line.startsWith('!')) {
+      continue;
+    }
+    final equals = line.indexOf('=');
+    final colon = line.indexOf(':');
+    final separator = equals == -1
+        ? colon
+        : colon == -1
+        ? equals
+        : math.min(equals, colon);
+    if (separator < 1) continue;
+    final key = line.substring(0, separator).trim();
+    // Java Properties: skip the value's leading whitespace after the
+    // separator.
+    final value = line.substring(separator + 1).trimLeft();
+    if (key.isEmpty || value.isEmpty) continue;
+    switch (key) {
+      case 'storePassword':
+        storePassword = value;
+      case 'keyPassword':
+        keyPassword = value;
+      case 'keyAlias':
+        keyAlias = value;
+    }
+  }
+  if (storePassword == null && keyPassword == null && keyAlias == null) {
+    return null;
+  }
+  return KeyPropertiesPasswords(
+    storePassword: storePassword,
+    keyPassword: keyPassword,
+    keyAlias: keyAlias,
+  );
+}
+
+/// The resolved keystore passwords for one signing run: a non-null store
+/// password, an optional per-key password, and — when the source is
+/// key.properties — its keyAlias (informational cross-check only; the
+/// pinned-fingerprint gate remains the true enforcement).
+class ResolvedKeystorePasswords {
+  const ResolvedKeystorePasswords({
+    required this.storePassword,
+    required this.source,
+    this.keyPassword,
+    this.keyAlias,
+  });
+
+  final String storePassword;
+  final String? keyPassword;
+  final String? keyAlias;
+
+  /// Human-readable source name for the run log.
+  final String source;
+}
+
+/// Precedence: the [keystorePasswordEnvVar] environment variable first, then
+/// the gitignored [keyPropertiesPath] content. Throws [ReleaseToolException]
+/// naming both remedies when neither carries a store password — interactive
+/// apksigner prompting is impossible from this script's process harness.
+ResolvedKeystorePasswords resolveKeystorePasswords({
+  required String? environmentStorePassword,
+  KeyPropertiesPasswords? keyProperties,
+}) {
+  final envValue = environmentStorePassword;
+  if (envValue != null && envValue.isNotEmpty) {
+    return ResolvedKeystorePasswords(
+      storePassword: envValue,
+      source: '$keystorePasswordEnvVar (environment variable)',
+    );
+  }
+  final properties = keyProperties;
+  if (properties?.storePassword != null) {
+    return ResolvedKeystorePasswords(
+      storePassword: properties!.storePassword!,
+      keyPassword: properties.keyPassword,
+      keyAlias: properties.keyAlias,
+      source:
+          '$keyPropertiesPath (gitignored; also read by the Gradle '
+          'release signing)',
+    );
+  }
+  throw ReleaseToolException(
+    'no keystore password available — set $keystorePasswordEnvVar in the '
+    'environment or make the gitignored $keyPropertiesPath carry '
+    'storePassword/keyPassword (the same file '
+    'android/app/build.gradle.kts reads for the Gradle release signing; '
+    'never a committed file). apksigner cannot prompt interactively here: '
+    'this script gives it no terminal stdin.',
+  );
+}
+
 // --- sign command display + determinism ------------------------------------------------
 
 /// The would-be apksigner sign command line for one APK (displayed before
-/// the password handling decides the `--ks-pass` form).
+/// the password handling decides the `--ks-pass`/`--key-pass` forms).
 String formatSignCommand({
   required String apksigner,
   required String ksPath,
@@ -545,6 +692,7 @@ String formatSignCommand({
 }) {
   return '$apksigner sign --ks $ksPath --ks-key-alias $keystoreAlias '
       '[--ks-pass env:$keystorePasswordEnvVar] '
+      '[--key-pass env:$keyPasswordEnvVar] '
       '--out $outPath $inputPath';
 }
 
@@ -560,9 +708,118 @@ bool bytesIdentical(List<int> a, List<int> b) {
 /// The failure message when the double-sign determinism sanity disagrees.
 String determinismFailureMessage({required String publishName}) =>
     'SIGN DETERMINISM FAILURE: signing the same input twice produced '
-    'different bytes for $publishName — apksigner output must be '
-    'reproducible before anything is attached. Check the build-tools '
-    'version and apksigner inputs, then rerun.';
+    'different bytes OUTSIDE the signing block for $publishName — with a '
+    'byte-identical input the ZIP content must be identical before '
+    'anything is attached. Check the build-tools version and apksigner '
+    'inputs, then rerun.';
+
+// --- APK signing block extent (the determinism sanity's frame) -------------------
+
+/// The APK Signing Block's magic bytes, the block's last 16 bytes.
+final List<int> _signingBlockMagic = 'APK Sig Block 42'.codeUnits;
+
+const List<int> _eocdMagic = [0x50, 0x4B, 0x05, 0x06]; // 'PK\x05\x06'
+
+/// Little-endian u64 at [offset], or null when out of bounds.
+int? _readUint64LE(List<int> bytes, int offset) {
+  if (offset < 0 || offset + 8 > bytes.length) return null;
+  var value = 0;
+  for (var i = 7; i >= 0; i--) {
+    value = (value << 8) | bytes[offset + i];
+  }
+  return value;
+}
+
+/// Little-endian u32 at [offset], or null when out of bounds.
+int? _readUint32LE(List<int> bytes, int offset) {
+  if (offset < 0 || offset + 4 > bytes.length) return null;
+  return (bytes[offset] |
+          (bytes[offset + 1] << 8) |
+          (bytes[offset + 2] << 16) |
+          (bytes[offset + 3] << 24)) &
+      0xFFFFFFFF;
+}
+
+/// Whether [bytes] carries [magic] at [index].
+bool _matchesAt(List<int> bytes, int index, List<int> magic) {
+  if (index < 0 || index + magic.length > bytes.length) return false;
+  for (var i = 0; i < magic.length; i++) {
+    if (bytes[index + i] != magic[i]) return false;
+  }
+  return true;
+}
+
+/// The APK Signing Block extent in [bytes], located by its trailing magic
+/// (layout: `[u64 leading size][pairs…][u64 trailing size][16-byte magic]`;
+/// both size fields are the block size excluding their own field, so they
+/// must be equal). null when no consistent block exists.
+(int, int)? signingBlockExtent(List<int> bytes) {
+  for (var i = bytes.length - 16; i >= 0; i--) {
+    if (!_matchesAt(bytes, i, _signingBlockMagic)) continue;
+    final trailingSize = _readUint64LE(bytes, i - 8);
+    if (trailingSize == null || trailingSize < 24) return null;
+    final blockStart = i + 16 - (trailingSize + 8);
+    if (blockStart < 0) return null;
+    final leadingSize = _readUint64LE(bytes, blockStart);
+    if (leadingSize == null || leadingSize != trailingSize) return null;
+    return (blockStart, i + 16);
+  }
+  return null;
+}
+
+/// The EOCD (`PK\x05\x06`) offset in [bytes] whose central-directory offset
+/// field equals [centralDirectoryOffset]; null when none matches. Searching
+/// from the end pins the sole EOCD that actually describes the block we
+/// located (the CD starts right after it).
+int? _eocdOffsetAt(List<int> bytes, int centralDirectoryOffset) {
+  for (var i = bytes.length - 22; i >= 0; i--) {
+    if (!_matchesAt(bytes, i, _eocdMagic)) continue;
+    final cdOffset = _readUint32LE(bytes, i + 16);
+    if (cdOffset == centralDirectoryOffset) return i;
+  }
+  return null;
+}
+
+/// Whether the two signed outputs agree everywhere EXCEPT their signing
+/// blocks — the determinism sanity for randomized signature algorithms
+/// (ECDSA signs with a fresh nonce per signature, RSA-PSS with a salt; the
+/// release key is EC and ECDSA's DER encoding may even shift the block
+/// length by a few bytes).
+///
+/// With a byte-identical input both outputs share the ZIP entry area (the
+/// block starts identically for both) and the central directory + EOCD —
+/// except the EOCD's central-directory offset field, which is neutralized
+/// in both, because it holds each file's own block length. Returns null
+/// when either file carries no structurally consistent signing block (the
+/// caller fails loudly — that is a broken APK, not a deterministic one).
+bool? outputsMatchOutsideSigningBlocks(List<int> a, List<int> b) {
+  final blockA = signingBlockExtent(a);
+  final blockB = signingBlockExtent(b);
+  if (blockA == null || blockB == null) return null;
+  if (blockA.$1 != blockB.$1) return false;
+  if (!bytesIdentical(a.sublist(0, blockA.$1), b.sublist(0, blockB.$1))) {
+    return false;
+  }
+  final suffixA = a.sublist(blockA.$2);
+  final suffixB = b.sublist(blockB.$2);
+  if (suffixA.length != suffixB.length) return false;
+  final eocdA = _eocdOffsetAt(a, blockA.$2);
+  final eocdB = _eocdOffsetAt(b, blockB.$2);
+  if (eocdA == null || eocdB == null) return null;
+  final suffixEocdA = eocdA - blockA.$2;
+  final suffixEocdB = eocdB - blockB.$2;
+  // Neutralize each file's own EOCD central-directory offset field (4 bytes
+  // at EOCD+16), then compare the whole suffixes.
+  final neutralizedA = List<int>.of(suffixA);
+  for (var i = 0; i < 4; i++) {
+    neutralizedA[suffixEocdA + 16 + i] = 0;
+  }
+  final neutralizedB = List<int>.of(suffixB);
+  for (var i = 0; i < 4; i++) {
+    neutralizedB[suffixEocdB + 16 + i] = 0;
+  }
+  return bytesIdentical(neutralizedA, neutralizedB);
+}
 
 // --- the end-of-run pointer (script 1 ends at the device-test break) --------------
 
@@ -850,32 +1107,61 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
   print('signing …');
   final stagingDirectory = Directory(ghReleaseStagingDir);
   await stagingDirectory.create(recursive: true);
-  final storePassword = Platform.environment[keystorePasswordEnvVar];
+  final keyPropertiesFile = File(keyPropertiesPath);
+  final keyProperties = keyPropertiesFile.existsSync()
+      ? parseKeyProperties(await keyPropertiesFile.readAsString())
+      : null;
+  final passwords = resolveKeystorePasswords(
+    environmentStorePassword: Platform.environment[keystorePasswordEnvVar],
+    keyProperties: keyProperties,
+  );
+  print('keystore passwords: ${passwords.source}');
+  if (passwords.keyAlias != null && passwords.keyAlias != keystoreAlias) {
+    print(
+      'note: key.properties keyAlias "${passwords.keyAlias}" differs from '
+      'the tool default "$keystoreAlias" — apksigner will still use '
+      '"$keystoreAlias" (the pinned-fingerprint gate below remains the '
+      'enforcement).',
+    );
+  }
   final signArguments = <String>[
     'sign',
     '--ks',
     keystoreResolved.path,
     '--ks-key-alias',
     keystoreAlias,
+    // The release key is EC, and apksigner's v1 (JAR) signature carries the
+    // randomized ECDSA signature INSIDE the zip entries (META-INF/*.EC) —
+    // that would break the determinism sanity (its goal: identical input →
+    // identical output around the signature blocks). v1 is also strictly
+    // unnecessary here: minSdk 24 means the APK installs on Android 7.0+,
+    // where v2 is the verification floor, and both the F-Droid buildserver
+    // (apksigcopier) and cert-pinning consumers verify via the v2/v3
+    // blocks.
+    '--v1-signing-enabled',
+    'false',
+    '--ks-pass',
+    'env:$keystorePasswordEnvVar',
+    if (passwords.keyPassword != null) ...[
+      '--key-pass',
+      'env:$keyPasswordEnvVar',
+    ],
   ];
-  if (storePassword != null) {
-    signArguments
-      ..add('--ks-pass')
-      ..add('env:$keystorePasswordEnvVar');
-  } else {
-    print(
-      'no $keystorePasswordEnvVar in the environment — apksigner will prompt '
-      'for the keystore password interactively (set the variable to script '
-      'this run).',
-    );
-  }
+  // The passwords travel in the child environment, never the command line
+  // (they would be world-readable via ps otherwise).
+  final signEnvironment = {
+    ...Platform.environment,
+    keystorePasswordEnvVar: passwords.storePassword,
+    if (passwords.keyPassword != null)
+      keyPasswordEnvVar: passwords.keyPassword!,
+  };
   for (var i = 0; i < releaseAbis.length; i++) {
     final result = await Process.run(apksignerPath, [
       ...signArguments,
       '--out',
       stagedPaths[i],
       downloadedApkByArtifact[artifactNameList[i]]!,
-    ]);
+    ], environment: signEnvironment);
     if (result.exitCode != 0) {
       _fail(
         'apksigner sign failed for ${artifactNameList[i]} '
@@ -912,7 +1198,11 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
     print('verified $path against the pinned release key: $digest');
   }
 
-  // Determinism sanity: sign the first APK a second time, compare bytes.
+  // Determinism sanity: sign the first APK a second time and compare the
+  // outputs everywhere EXCEPT the signing blocks (see the header comment:
+  // the release key is EC — ECDSA randomizes every signature, so full
+  // byte-for-byte equality is unattainable; the ZIP content around the
+  // blocks must still be identical, and apksigner writes no timestamps).
   final firstArtifactName = artifactNameList.first;
   final sanityInput =
       '$ciArtifactsDir/$firstArtifactName-determinism-input.apk';
@@ -924,7 +1214,7 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
     '--out',
     sanityOutput,
     sanityInput,
-  ]);
+  ], environment: signEnvironment);
   if (reSign.exitCode != 0) {
     _fail(
       'the determinism re-sign of $firstArtifactName failed '
@@ -932,9 +1222,39 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
       '${processOutputText(reSign)}',
     );
   }
+  final reSignVerify = await _run(
+    apksignerPath,
+    ['verify', '--print-certs', sanityOutput],
+    'apksigner verify failed for the determinism re-signing output '
+    '$sanityOutput',
+  );
+  final reSignDigest = parseCertificateFingerprint(
+    reSignVerify.stdout as String,
+  );
+  if (reSignDigest == null ||
+      !fingerprintsMatch(pinnedFingerprint, reSignDigest)) {
+    _fail(
+      'the determinism re-signing of $firstArtifactName produced an '
+      'unexpected certificate fingerprint '
+      '(${reSignDigest ?? '<unparsable>'}) instead of the pinned '
+      '$pinnedFingerprint — inspect by hand before attaching anything.',
+    );
+  }
   final stagedBytes = await File(stagedPaths.first).readAsBytes();
   final reSignedBytes = await File(sanityOutput).readAsBytes();
-  if (!bytesIdentical(stagedBytes, reSignedBytes)) {
+  final outsideMatch = outputsMatchOutsideSigningBlocks(
+    stagedBytes,
+    reSignedBytes,
+  );
+  if (outsideMatch == null) {
+    _fail(
+      'could not locate a structurally consistent APK signing block in the '
+      'staged or re-signed ${publishApkNames(versionName).first} — cannot '
+      'run the determinism sanity; inspect by hand before attaching '
+      'anything.',
+    );
+  }
+  if (!outsideMatch) {
     _fail(
       determinismFailureMessage(
         publishName: publishApkNames(versionName).first,
@@ -942,8 +1262,10 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
     );
   }
   print(
-    'determinism sanity: signing the first APK twice produced '
-    'byte-identical output.',
+    'determinism sanity: the re-signed output matches the staged one '
+    'outside the signing blocks (ZIP entries and central directory '
+    'identical; the release key is EC, so ECDSA signature bytes randomize '
+    'per sign).',
   );
 
   // --- stage 10: finalize the staging set + the handoff manifest ---------------

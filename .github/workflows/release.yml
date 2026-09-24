@@ -44,6 +44,16 @@ permissions:
 jobs:
   release-build:
     runs-on: ubuntu-latest
+    # The pub cache must live at the same absolute path as on the F-Droid
+    # buildserver: the recipe sets PUB_CACHE=$repo/.pub-cache, which resolves
+    # to exactly this path via the checkout-path invariant in the header
+    # comment. The Gradle/CMake build of jni's libdartjni.so bakes the
+    # pub-cache absolute path into its output and thereby its GNU build-id.
+    # A job-level env is the cleanest shape: one declaration covers every
+    # step that may touch the cache (pub get and the Gradle build) without
+    # duplicated per-step env.
+    env:
+      PUB_CACHE: /home/runner/work/cycle-app/cycle-app/.pub-cache
     steps:
       - uses: actions/checkout@v7        # → /home/runner/work/cycle-app/cycle-app
 
@@ -89,9 +99,42 @@ jobs:
       - name: Test
         run: flutter test
 
+      # The NDK must equal the flutter.ndkVersion that the Flutter pinned in
+      # tool/flutter-version requests — and what the F-Droid buildserver's
+      # sdkmanager auto-installs. The pin guards against runner-image drift
+      # (ubuntu-latest preinstalls r27d) and against the sqlite3
+      # native-assets build hook silently resolving another NDK. The env
+      # export is defense-in-depth for that hook's compiler resolution; via
+      # $GITHUB_ENV (not a job-level env) because $ANDROID_HOME must be
+      # resolved at runtime, not at YAML render time.
+      - name: Pin NDK (r28c)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
       - name: Build split APKs
         # NO --target-platform (see header comment); debug-signing fallback is fine.
         run: flutter build apk --release --split-per-abi
+
+      # Verifies the hook-built libs (libsqlite3.so from the sqlite3
+      # native-assets hook, libdartjni.so from Gradle/CMake) were compiled
+      # with NDK r28c / clang 19.0.1, matching the F-Droid buildserver; the
+      # content is read via `strings` because readelf note parsing is
+      # brittle. Fail fast in CI instead of at F-Droid verification, where a
+      # mismatch silently skips publishing.
+      - name: Drift guard (toolchain fingerprints in the hook-built libs)
+        run: |
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            apk="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            for lib in "lib/${abi}/libsqlite3.so" "lib/${abi}/libdartjni.so"; do
+              for pattern in "clang version 19.0.1" "13676358"; do
+                if ! unzip -p "$apk" "$lib" | strings | grep -F "$pattern" >/dev/null; then
+                  echo "Toolchain drift: $apk / $lib does not contain '$pattern' (expected NDK r28c, clang 19.0.1, 28.2.13676358)" >&2
+                  exit 1
+                fi
+              done
+            done
+          done
 
       - name: Compute version (from pubspec — no tag exists at build time)
         id: ver

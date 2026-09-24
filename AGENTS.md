@@ -99,3 +99,7 @@ failures only surface in a summary at the end. Instead:
 - `docs/adr/` — one ADR per decision; unresolved working assumptions stay
   marked (e.g. `TODO(user-review)`) and are questions for INER experts, not
   settled behavior.
+
+## Coding Style
+
+- Use comments only to describe the why.

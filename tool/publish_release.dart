@@ -56,10 +56,10 @@ import 'dart:io';
 
 import 'release_names.dart';
 
-/// The base branch the post-release PR merges into: `development`, the
+/// The base branch the post-release PR merges into, the
 /// repo's integration branch (merge commits; the release commit must stay
 /// an ancestor of it).
-const String prBaseBranch = 'development';
+const String prBaseBranch = 'main';
 
 const String usage =
     'usage: dart run tool/publish_release.dart vX.Y.Z [--dry-run]';
