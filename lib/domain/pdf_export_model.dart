@@ -99,7 +99,9 @@ final class PdfCycleOverlay {
 final class PdfExportModel {
   const PdfExportModel({
     required this.cycles,
+    required this.markOpenedIndexes,
     required this.overlays,
+    required this.observedCycleCount,
     required this.observedCyclesOutsideApp,
     required this.name,
     required this.birthDate,
@@ -113,6 +115,16 @@ final class PdfExportModel {
   /// card's selected-cycles set), in observation order. The leading
   /// pre-mark group is never among them.
   final List<CycleEvaluation> cycles;
+
+  /// The real mark-opened index of every exported cycle, PARALLEL to
+  /// [cycles] (`markOpenedIndexes[i]` is `cycles[i]`'s 0-based position
+  /// among ALL mark-opened cycles of the record — the leading unnumbered
+  /// pre-mark group excluded, same as the count). [ordinalOf] routes
+  /// through it so an exported cycle always prints its REAL number from
+  /// the whole record — a subset export never re-indexes the selected
+  /// set (the same spirit as [shortestCycleLength], which also reads the
+  /// whole record).
+  final List<int> markOpenedIndexes;
 
   /// The per-cycle evaluation overlays, PARALLEL to [cycles]
   /// (`overlays[i]` carries the display artifacts of `cycles[i]` — the
@@ -163,19 +175,19 @@ final class PdfExportModel {
   final ({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay;
 
   /// The display ordinal ("Zyklus N") of the exported cycle at 0-based
-  /// [index] — through [cycleOrdinalNumber] — the exact number the
-  /// cycle page draws at the same position.
+  /// [index] — the cycle's REAL number: its mark-opened index in the
+  /// whole record ([markOpenedIndexes]) through [cycleOrdinalNumber], so
+  /// the page header names the cycle exactly as the selection list and
+  /// the cycle page do, whatever subset was exported.
   int ordinalOf(int index) =>
-      cycleOrdinalNumber(index, observedCyclesOutsideApp);
+      cycleOrdinalNumber(markOpenedIndexes[index], observedCyclesOutsideApp);
 
-  /// The total observed cycles the header reports: the mark-opened cycles
-  /// recorded up to the exported one, PLUS the outside-app cycles the
-  /// settings count shifts in ahead of them ("Zyklus' gesamt").
-  int get observedCycleCount => cycles.length + observedCyclesOutsideApp;
-
-  /// The display ordinal of the LAST exported cycle — the one "exported
-  /// up to" the header names.
-  int get lastOrdinal => ordinalOf(cycles.length - 1);
+  /// The total observed cycles the header reports: the WHOLE record's
+  /// mark-opened cycles PLUS the outside-app cycles the settings count
+  /// shifts in ahead of them ("Zyklus' gesamt") — a subset export still
+  /// reports the user's full observed history, never the exported pages'
+  /// count.
+  final int observedCycleCount;
 }
 
 /// Builds the [PdfExportModel] for one export run.
@@ -192,15 +204,15 @@ final class PdfExportModel {
 /// values are normalized (DateOnly) before matching, so time-of-day noise
 /// in a caller's set can never miss a cycle, and dates matching no cycle
 /// are silently dropped (the set is what the user checked, cycles come
-/// from the data). NOTE (accepted, same semantics as the "up to" filter
-/// before it): a selection that drops interior cycles makes the exported
-/// list SHORTER than the observed record; the exported cycles are still
-/// numbered POSITIONALLY ("Zyklus k" with k = index among the EXPORTED
-/// tuples) and the header's observed-cycle count is the EXPORTED count
-/// plus the outside-app count — a subset export deliberately reports the
-/// subset's numbering, not the user's full history. The header's
-/// shortest-cycle fact stays truthful regardless: each exported cycle's
-/// length is its gap to its direct successor in the WHOLE record (see
+/// from the data). NOTE: a selection that drops interior cycles makes the
+/// exported list SHORTER than the observed record — but the exported
+/// cycles keep their REAL numbers from the whole record (each carries its
+/// mark-opened index; see [PdfExportModel.markOpenedIndexes]) and the
+/// header's observed-cycle count is the WHOLE record's count plus the
+/// outside-app count, so a subset export never re-indexes the user's
+/// history. In the same spirit the header's shortest-cycle fact stays
+/// truthful regardless: each exported cycle's length is its gap to its
+/// direct successor in the WHOLE record (see
 /// [PdfExportModel.shortestCycleLength]), never the distance between
 /// non-neighboring exported starts.
 ///
@@ -245,16 +257,25 @@ PdfExportModel buildPdfExportModel({
   // The exported cycle groups as the indexes they hold in `all` (the
   // attribution windows the overlay builder consults span the WHOLE list,
   // so an exported cycle's position in it matters — same call shape the
-  // chart uses, one overlay per exported cycle).
-  final exportedIndexes = [
-    for (var i = 0; i < all.length; i++)
-      if (all[i].cycle.startsAtMenstruation &&
-          (limit == null ||
-              !DateOnly.normalize(all[i].cycle.startDate).isAfter(limit)) &&
-          (selected == null ||
-              selected.contains(DateOnly.normalize(all[i].cycle.startDate))))
-        i,
-  ];
+  // chart uses, one overlay per exported cycle). The same loop counts the
+  // record's mark-opened cycles, so every exported cycle records its REAL
+  // 0-based mark-opened index alongside (ordinal shift included in the
+  // ordinal, not here) and the whole-record mark-opened count is known
+  // even when only a subset is exported.
+  final exportedIndexes = <int>[];
+  final markOpenedIndexes = <int>[];
+  var markOpenedCount = 0;
+  for (var i = 0; i < all.length; i++) {
+    if (!all[i].cycle.startsAtMenstruation) continue;
+    final markOpenedIndex = markOpenedCount++;
+    if ((limit == null ||
+            !DateOnly.normalize(all[i].cycle.startDate).isAfter(limit)) &&
+        (selected == null ||
+            selected.contains(DateOnly.normalize(all[i].cycle.startDate)))) {
+      exportedIndexes.add(i);
+      markOpenedIndexes.add(markOpenedIndex);
+    }
+  }
   final exported = [for (final i in exportedIndexes) all[i]];
 
   // The per-cycle overlays, parallel to `exported`: the shared derivation
@@ -306,7 +327,12 @@ PdfExportModel buildPdfExportModel({
 
   return PdfExportModel(
     cycles: List.unmodifiable(exported),
+    markOpenedIndexes: List.unmodifiable(markOpenedIndexes),
     overlays: List.unmodifiable(overlays),
+    // The header count is the WHOLE record's count (see the class doc):
+    // the subset selection may drop cycles from the pages, never from
+    // the user's observed history.
+    observedCycleCount: markOpenedCount + observedCyclesOutsideApp,
     observedCyclesOutsideApp: observedCyclesOutsideApp,
     // The name is trimmed HERE, at the model entry point, so the model can
     // never carry padding — persistPdfExportName and the settings UI trim

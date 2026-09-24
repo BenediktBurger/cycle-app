@@ -25,7 +25,9 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 
 const _fakeModel = PdfExportModel(
   cycles: [],
+  markOpenedIndexes: [],
   overlays: [],
+  observedCycleCount: 3,
   observedCyclesOutsideApp: 3,
   name: 'Maria Muster',
   birthDate: null,
@@ -176,7 +178,9 @@ void main() {
     test('a stored birth date is formatted as the German calendar date', () {
       final model = PdfExportModel(
         cycles: const [],
+        markOpenedIndexes: const [],
         overlays: const [],
+        observedCycleCount: 0,
         observedCyclesOutsideApp: 0,
         name: null,
         birthDate: DateTime.utc(1980, 12, 24),
@@ -224,7 +228,9 @@ void main() {
         'variant and falls back to any', () {
       final model = PdfExportModel(
         cycles: const [],
+        markOpenedIndexes: const [],
         overlays: const [],
+        observedCycleCount: 0,
         observedCyclesOutsideApp: 0,
         name: null,
         birthDate: null,

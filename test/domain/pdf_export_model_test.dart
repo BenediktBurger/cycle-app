@@ -201,12 +201,14 @@ void main() {
       expect(upToSecond.cycles.length, 2);
       expect(
         upToSecond.observedCycleCount,
-        6,
-        reason: '4 outside + the first two in-app cycles',
+        7,
+        reason:
+            'the WHOLE record: 4 outside-app cycles + 3 recorded here — '
+            'not the exported subset\'s size',
       );
       final ordinals = [
         for (var i = 0; i < upToSecond.cycles.length; i++)
-          cycleOrdinalNumber(i, upToSecond.observedCyclesOutsideApp),
+          upToSecond.ordinalOf(i),
       ];
       expect(ordinals, [
         5,
@@ -277,17 +279,52 @@ void main() {
       expect(model.overlays[0].suzMarks, isNotEmpty);
 
       final ordinals = [
-        for (var i = 0; i < model.cycles.length; i++)
-          cycleOrdinalNumber(i, model.observedCyclesOutsideApp),
+        for (var i = 0; i < model.cycles.length; i++) model.ordinalOf(i),
       ];
       expect(
         ordinals,
-        [5, 6],
+        [5, 7],
         reason:
-            'the exported list is numbered POSITIONALLY (one-two of the '
-            'SELECTED set, like the "up to" filter did — the gap to cycle 7 '
-            'is documented behavior of a subset export)',
+            'the exported cycles carry their REAL numbers from the whole '
+            'record (cycle 1 -> 5, cycle 3 -> 7) — a subset export never '
+            're-indexes the selected set',
       );
+    });
+
+    test('a SINGLE selected cycle is numbered with its REAL number, the '
+        'header count reads the whole record', () {
+      // Only the last of the three mark-opened cycles: the bug report's
+      // shape — before the fix the page header printed "Zyklus 1".
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        observedCyclesOutsideApp: 4,
+        selectedStartDates: {d(4, 26)},
+      );
+      expect(model.cycles.length, 1);
+      expect(
+        model.ordinalOf(0),
+        7,
+        reason:
+            'the record\'s third mark-opened cycle, shifted by the 4 '
+            'outside-app cycles — never the subset\'s re-indexed "1"',
+      );
+      expect(
+        model.observedCycleCount,
+        7,
+        reason: '4 outside-app cycles + 3 recorded in the app',
+      );
+
+      // The report's scenario with a larger paper history: 10 observed
+      // on paper, the 15th app cycle exported -> "Zyklus 13"-shaped truth.
+      final tenPaper = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        observedCyclesOutsideApp: 10,
+        selectedStartDates: {d(4, 26)},
+      );
+      expect(tenPaper.ordinalOf(0), 13);
+      expect(tenPaper.observedCycleCount, 13);
     });
 
     test('the selection is the normalized cycle-START identity: time-of-day '
