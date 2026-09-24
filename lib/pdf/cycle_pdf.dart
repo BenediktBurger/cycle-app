@@ -104,6 +104,27 @@
 //   the JSON export precedent is language-free data; the app's UI strings
 //   stay l10n-driven (arbs), while THIS document's labels live here,
 //   German-first. Localizing the document is future work, not wired yet.
+// - PRINT FRIENDLINESS (the sheet's own rendering principle, applied to
+//   everything on it): the sheet must survive plain B/W printing — no
+//   information may be encoded in COLOR alone. Every colored or
+//   informative element therefore carries a second, color-independent
+//   difference (shape, position, weight or luminance), and its grayscale
+//   fallback stays legible against everything around it:
+//   the curve (ink, near-black) vs the accent marks (_markAccent — rings
+//   around dots, arrow-up glyphs, dashed R10 baseline, bold 1–6 numbers,
+//   the peak dot and the user SUZ bars: each differs from the curve by
+//   SHAPE or POSITION, and the accent grayscales to a mid-gray clearly
+//   lighter than ink), the bleeding levels (solid fill FRACTION and the
+//   dotted spotting mechanic, not the red), the dimmed
+//   ignoreTemperature pieces (ExtGState alpha → lighter gray + a thinner
+//   stroke), the computed-SUZ line (thin ink line + rule letter, distinct
+//   in shape and letter from the user SUZ bar+arrow glyph), the dashed
+//   window bounds (at the plot's very edges, baseline dashes elsewhere),
+//   the always-dark scale labels and value row, and the weekend bands
+//   (pdfWeekendShade: all-equal near-white gray — never a pale color —
+//   under every letter and mark, its luminance far from ink/accent/grid
+//   grays so nothing above or beside it loses legibility). The audit file
+//   of record: every element below was checked against this rule.
 //
 // The generated text is drawn with the bundled Noto Sans TTF (OFL license,
 // assets/fonts/) instead of the Latin-1-only CoreFonts, so note text
@@ -373,6 +394,18 @@ final PdfColor _bleedingRed = PdfColor.fromInt(0xFFC0392B);
 final PdfColor _gridGray = PdfColor.fromInt(0xFFC4C4C4);
 final PdfColor _ruleGray = PdfColor.fromInt(0xFF8A8A8A);
 
+/// The weekend column band's shade: all-equal LIGHT GRAY (luminance ~230)
+/// — the mirror of the cycle tab's whisper band behind its weekend
+/// columns (DateOnly.isWeekend there, the pure weekendPositions helper
+/// here), made print-safe: never a pale COLOR (a hue would collapse to
+/// unreadable noise in B/W printing), near-white enough to keep every
+/// letter/mark above it legible, yet several steps darker than the white
+/// paper so the band itself still reads. Grayscale contrast check
+/// (luminances): band 230 vs grid gray 196 (the band is LIGHTER — the
+/// grid stays visible on top of it), ink 27, accent-mark gray ~85,
+/// bleeding red ~85 — everything drawn over the band is far darker.
+final PdfColor pdfWeekendShade = PdfColor.fromInt(0xFFE6E6E6);
+
 const pw.BorderSide _hairline = pw.BorderSide(width: 0.35);
 
 pw.Widget _cycleHeader({
@@ -431,27 +464,32 @@ pw.Widget _paperFormGrid({
   required PdfCurveDrawing drawing,
   required PdfCurveAxis axis,
 }) {
+  // The window's weekend columns (pure, date-derived): every scaffold row
+  // paints its light-gray band in exactly these columns, so the band runs
+  // through the FULL sheet height — the cycle tab's weekend bands taken
+  // print-friendly across the paper form.
+  final weekend = weekendPositions(windowDays);
   return pw.Expanded(
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _dayNumberRow(windowDays.length, windowFirstIndex),
-        _dateRow(windowDays.length, windowDays),
-        _bleedingRow(windowDays.length, windowDays),
+        _dayNumberRow(windowDays.length, windowFirstIndex, weekend),
+        _dateRow(windowDays.length, windowDays, weekend),
+        _bleedingRow(windowDays.length, windowDays, weekend),
         // The cycle tab's top strip order, above the plot: bleeding →
         // mucus (peak dot above the glyph) → Mittelschmerz M → sex.
-        _mucusBand(windowDays.length, windowDays, drawing),
-        _mittelschmerzRow(windowDays.length, windowDays),
-        _sexRow(windowDays.length, windowDays),
-        _curveBlock(windowDays.length, drawing, axis),
+        _mucusBand(windowDays.length, windowDays, drawing, weekend),
+        _mittelschmerzRow(windowDays.length, windowDays, weekend),
+        _sexRow(windowDays.length, windowDays, weekend),
+        _curveBlock(windowDays.length, drawing, axis, weekend),
         // The numeric values render BELOW the plot (mirror of the curve
         // tab's below-chart strip): the curve/dots stay above, and the
         // readings sit right above the measured times.
-        _tempValueRow(windowDays.length, windowDays),
-        _timeRow(windowDays.length, windowDays),
-        _disturbanceRow(windowDays.length, windowDays),
-        _cervixRow(windowDays.length, windowDays),
-        _painRow(windowDays.length, windowDays),
+        _tempValueRow(windowDays.length, windowDays, weekend),
+        _timeRow(windowDays.length, windowDays, weekend),
+        _disturbanceRow(windowDays.length, windowDays, weekend),
+        _cervixRow(windowDays.length, windowDays, weekend),
+        _painRow(windowDays.length, windowDays, weekend),
         // The rotated notes area absorbs the remaining page height (the
         // bottom repeats of the day numbers were removed — the header
         // rows above the curve are the one day-number row).
@@ -460,6 +498,7 @@ pw.Widget _paperFormGrid({
             height: 0,
             railCaption: 'Notizen',
             windowDayCount: windowDays.length,
+            weekend: weekend,
             cell: (position) => windowDays[position].notes == null
                 ? null
                 // Multi-line notes fold to one line: the rotated column
@@ -477,11 +516,15 @@ pw.Widget _paperFormGrid({
 /// One scaffold row: the fixed rail slot plus the 40 fixed-width columns
 /// (a hairline between columns, a hairline on the row's top edge — the
 /// paper's horizontal rules). Empty cells keep the column rhythm; the
-/// wrapping column container closes the right edge.
+/// wrapping column container closes the right edge. [weekend] carries the
+/// window positions whose column background is the print-friendly
+/// weekend shade — the band segment this row contributes to the full
+/// sheet-height weekend band.
 pw.Widget _paperRow({
   required double height,
   required String? railCaption,
   required int windowDayCount,
+  required List<int> weekend,
   required pw.Widget? Function(int position) cell,
 }) {
   return pw.Container(
@@ -490,15 +533,19 @@ pw.Widget _paperRow({
     child: _gridColumns(
       railCaption: railCaption,
       windowDayCount: windowDayCount,
+      weekend: weekend,
       cell: cell,
     ),
   );
 }
 
 /// The 40 fixed columns behind every row (with the rail at their left).
+/// A weekend column's container keeps its requested background (the
+/// band) UNDER the cell content; untracked columns never shade.
 pw.Widget _gridColumns({
   required String? railCaption,
   required int windowDayCount,
+  required List<int> weekend,
   required pw.Widget? Function(int position) cell,
 }) {
   return pw.Row(
@@ -533,8 +580,9 @@ pw.Widget _gridColumns({
               pw.SizedBox(
                 width: pdfColumnWidth,
                 child: pw.Container(
-                  decoration: const pw.BoxDecoration(
-                    border: pw.Border(left: _hairline),
+                  decoration: pw.BoxDecoration(
+                    border: const pw.Border(left: _hairline),
+                    color: weekend.contains(k) ? pdfWeekendShade : null,
                   ),
                   child: k < windowDayCount ? cell(k) : null,
                 ),
@@ -551,11 +599,16 @@ pw.Widget _gridColumns({
 /// continuation page's first column carries its continuing cycle day).
 /// The rail legend "Zyklustag" names this row for the reader — the paper
 /// sheet writes its labels into the same margin column.
-pw.Widget _dayNumberRow(int windowDayCount, int windowFirstIndex) {
+pw.Widget _dayNumberRow(
+  int windowDayCount,
+  int windowFirstIndex,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _dayNumberRowHeight,
     railCaption: pdfRailCaptionDayNumbers,
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) => pw.Center(
       child: pw.Text(
         windowFirstIndex + position == 0
@@ -577,11 +630,16 @@ pw.Widget _dayNumberRow(int windowDayCount, int windowFirstIndex) {
 /// date carrying the window's first month/year could mislead on windows
 /// spanning several months. The full-width home of the window's year is
 /// the header's "Zykluszeitraum" fact.
-pw.Widget _dateRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _dateRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _dateRowHeight,
     railCaption: pdfRailCaptionDates,
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) => _dateCell(windowDays[position].date),
   );
 }
@@ -631,11 +689,16 @@ String _monthAbbreviation(int month) => _germanMonthAbbreviations[month - 1];
 /// The bleeding row: bottom-anchored red band pieces per the shared
 /// symbol's semantics (spotting dotted in the bottom quarter; heavier
 /// levels a solid fraction) — positioned containers in the cell's Stack.
-pw.Widget _bleedingRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _bleedingRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _bleedingRowHeight,
     railCaption: 'Blutung',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       final fill = bleedingFill(windowDays[position].bleeding);
       if (fill == null) return null;
@@ -687,11 +750,16 @@ pw.Widget _bleedingRow(int windowDayCount, List<DailyEntry> windowDays) {
 /// Its rail legend is exactly "Temperatur in °C" (this is where the
 /// temperature naming lives since the curve block's caption row was
 /// removed — see the rail-legends constants).
-pw.Widget _tempValueRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _tempValueRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _tempValueRowHeight,
     railCaption: pdfRailCaptionTemperatureValues,
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) => pw.Center(
       child: pw.Text(
         windowDays[position].bbtC == null
@@ -719,6 +787,7 @@ pw.Widget _curveBlock(
   int windowDayCount,
   PdfCurveDrawing drawing,
   PdfCurveAxis axis,
+  List<int> weekend,
 ) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -757,8 +826,14 @@ pw.Widget _curveBlock(
                   pdfGridRightEdge - pdfRailWidth,
                   _curvePlotHeight,
                 ),
-                painter: (canvas, size) =>
-                    _paintCurveBlock(canvas, size.x, size.y, drawing, axis),
+                painter: (canvas, size) => _paintCurveBlock(
+                  canvas,
+                  size.x,
+                  size.y,
+                  drawing,
+                  axis,
+                  weekend,
+                ),
                 child: pw.Stack(
                   children: [
                     // The computed SUZ's rule letter rides its line's
@@ -782,7 +857,7 @@ pw.Widget _curveBlock(
           ],
         ),
       ),
-      _lowNumbersRow(windowDayCount, drawing),
+      _lowNumbersRow(windowDayCount, drawing, weekend),
     ],
   );
 }
@@ -798,12 +873,22 @@ void _paintCurveBlock(
   double plotHeight,
   PdfCurveDrawing drawing,
   PdfCurveAxis axis,
+  List<int> weekend,
 ) {
   // The painter's PdfGraphics origin is the box's bottom-left corner
   // (PDF y-up), while the axis returns distances DOWN from the top —
   // every geometric y goes through this conversion (see pdf_axis.dart's
   // file header).
   double yOf(double value) => plotHeight - axis.yFor(value);
+
+  // The weekend columns' bands FIRST — the print-friendly backing the
+  // cycle tab paints behind its weekend columns; every line, curve,
+  // dot and mark above stays in front of the near-white shade.
+  canvas.setFillColor(pdfWeekendShade);
+  for (final k in weekend) {
+    canvas.drawRect(k * pdfColumnWidth, 0, pdfColumnWidth, plotHeight);
+    canvas.fillPath();
+  }
 
   // 0.1 °C graduation lines (the paper's fine scale).
   canvas.setStrokeColor(_gridGray);
@@ -1005,11 +1090,16 @@ void pdfStrokeCircle(PdfGraphics canvas, double x, double y, double radius) {
 /// The 1–6 low numbers under their low dots (bold accent — the paper
 /// writes the numbers inside the low band; the thin row keeps them off
 /// the plotted dots).
-pw.Widget _lowNumbersRow(int windowDayCount, PdfCurveDrawing drawing) {
+pw.Widget _lowNumbersRow(
+  int windowDayCount,
+  PdfCurveDrawing drawing,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _lowNumbersRowHeight,
     railCaption: 'Zahl',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       final number = drawing.lowNumbers[position];
       if (number == null) return null;
@@ -1026,11 +1116,13 @@ pw.Widget _mucusBand(
   int windowDayCount,
   List<DailyEntry> windowDays,
   PdfCurveDrawing drawing,
+  List<int> weekend,
 ) {
   return _paperRow(
     height: _mucusBandHeight,
     railCaption: 'Zeichen',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       const mucusGlyph = pw.TextStyle(fontSize: 6.4);
       const mucusQuality = pw.TextStyle(fontSize: 4.8);
@@ -1080,11 +1172,16 @@ pw.Widget _mucusBand(
 /// before the sex X). TODO(user-review): the exact M home is an
 /// owner-eyeball choice — the paper writes it under the mucus letters;
 /// clinicians may want it twice, with the below-strip pain row as well.
-pw.Widget _mittelschmerzRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _mittelschmerzRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _mittelschmerzRowHeight,
     railCaption: 'Mittelschmerz',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) =>
         _centerLetter(mittelschmerzLetter(windowDays[position]), _label),
   );
@@ -1092,11 +1189,16 @@ pw.Widget _mittelschmerzRow(int windowDayCount, List<DailyEntry> windowDays) {
 
 /// The sex row: the X cell (any recorded time slot; the timing's own
 /// thirds stay the chart's finer rendering).
-pw.Widget _sexRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _sexRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _sexRowHeight,
     railCaption: 'Sex',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) => _centerLetter(sexGlyph(windowDays[position]), _label),
   );
 }
@@ -1106,11 +1208,16 @@ pw.Widget _sexRow(int windowDayCount, List<DailyEntry> windowDays) {
 /// convention (the ~18 pt paper column cannot hold "08:33" lying down;
 /// the row only exists where a temperature (and therefore a time) exists).
 /// CHOOSE-DOCUMENTED: vertical text is chosen over dropping the time.
-pw.Widget _timeRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _timeRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _timeRowHeight,
     railCaption: 'Zeit',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       final text = measuredAtText(windowDays[position].measuredAtMinutes);
       if (text == null) return null;
@@ -1121,11 +1228,16 @@ pw.Widget _timeRow(int windowDayCount, List<DailyEntry> windowDays) {
 
 /// The disturbance row: the stacked letter codes (one per set flag), the
 /// shared letter vocabulary.
-pw.Widget _disturbanceRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _disturbanceRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _disturbanceRowHeight,
     railCaption: 'Störung',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       final codes = disturbanceCodes(windowDays[position]);
       if (codes.isEmpty) return null;
@@ -1145,11 +1257,16 @@ pw.Widget _disturbanceRow(int windowDayCount, List<DailyEntry> windowDays) {
 
 /// The cervix row: position letter + firmness shorthand (the OPENING is
 /// not displayed — entry-form-only field, matching the chart row).
-pw.Widget _cervixRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _cervixRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _cervixRowHeight,
     railCaption: 'Muttermund',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) {
       final letters = cervixLetters(windowDays[position]);
       if (letters == null) return null;
@@ -1165,11 +1282,16 @@ pw.Widget _cervixRow(int windowDayCount, List<DailyEntry> windowDays) {
 
 /// The pain row: the breast-tenderness letter B (Mittelschmerz M has its
 /// own row above the plot, directly beneath the mucus letters).
-pw.Widget _painRow(int windowDayCount, List<DailyEntry> windowDays) {
+pw.Widget _painRow(
+  int windowDayCount,
+  List<DailyEntry> windowDays,
+  List<int> weekend,
+) {
   return _paperRow(
     height: _painRowHeight,
     railCaption: 'Schmerz',
     windowDayCount: windowDayCount,
+    weekend: weekend,
     cell: (position) => _centerLetter(painLetter(windowDays[position]), _label),
   );
 }

@@ -188,6 +188,39 @@ void main() {
     });
   });
 
+  group('weekend positions (the weekend band columns of one page window)', () {
+    test('judged by the CALENDAR DATE, never by the column index — a window '
+        'starting mid-week puts the band on Sa/So wherever they fall', () {
+      // Jul 1 2026 is a Wednesday: Sa/So = Jul 4/5, positions 3 and 4 —
+      // not the grid positions a mod-7 column rule would pick up.
+      final days = [for (var i = 0; i < 8; i++) DailyEntry(date: _d(7, 1 + i))];
+      expect(weekendPositions(days), [3, 4]);
+    });
+
+    test('Sa and So are ADJACENT columns; both get their own band', () {
+      final days = [for (var i = 0; i < 2; i++) DailyEntry(date: _d(7, 4 + i))];
+      expect(weekendPositions(days), [0, 1]);
+    });
+
+    test('a weekend-free window (tracked days Mon–Fri only) stays white', () {
+      final days = [
+        // Jul 6–10 2026 is a full Mon–Fri run; Feb 23–27 too.
+        for (var i = 0; i < 5; i++) DailyEntry(date: _d(7, 6 + i)),
+      ];
+      expect(weekendPositions(days), isEmpty);
+    });
+
+    test('following weekend bands fall out of the dates for free — a window '
+        'crossing two weekends carries both pairs', () {
+      final days = [
+        // Jul 11 Sa..? window Jul 8..21: two weekends: Jul 11/12 and
+        // Jul 18/19 → positions 3,4,10,11.
+        for (var i = 0; i < 14; i++) DailyEntry(date: _d(7, 8 + i)),
+      ];
+      expect(weekendPositions(days), [3, 4, 10, 11]);
+    });
+  });
+
   group('measurement time (the temperature\'s recorded time of day)', () {
     test('formats as German HH:mm, bottom edge minutes included', () {
       expect(measuredAtText(0), '00:00');

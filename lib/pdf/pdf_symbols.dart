@@ -8,6 +8,7 @@
 // sanitize rule, the cervix chart glyphs, the shared disturbance letter
 // vocabulary in lib/domain/disturbances.dart) — nothing is reinterpreted
 // or reworded here, so the PDF cannot drift from the chart's conventions.
+import '../domain/date_only.dart';
 import '../domain/disturbances.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
@@ -98,6 +99,19 @@ final disturbanceCodes = disturbanceLetters;
 /// VERTICAL NOTES bullet in lib/pdf/cycle_pdf.dart's file header).
 String joinedNoteText(String notes) =>
     notes.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+/// One page window's WEEKEND columns: the tracked-day positions whose
+/// calendar date falls on a Saturday or Sunday. Judged purely by the DATE
+/// via [DateOnly.isWeekend] — the same pure predicate the cycle tab's
+/// weekend bands use — never by a column-index rule, so continuation
+/// pages and multi-month windows keep the true weekday rhythm wherever
+/// the window happens to start. The scaffold paints a print-friendly
+/// light-gray band through every one of these columns (and the painter
+/// through the plot's); see [pdfWeekendShade] in cycle_pdf.dart.
+List<int> weekendPositions(List<DailyEntry> windowDays) => [
+  for (var i = 0; i < windowDays.length; i++)
+    if (DateOnly.isWeekend(windowDays[i].date)) i,
+];
 
 /// The measurement row's cell text: the recorded time-of-day of the
 /// temperature measurement as German "HH:mm" (minutes since midnight,
