@@ -99,38 +99,26 @@ void main() {
       await tester.tap(navLabel('Settings'));
       await tester.pumpAndSettle();
 
-      // All three options are offered (the language switcher also shows a
-      // "System" segment, hence the type-scoped lookup).
-      final themeSwitcher = find.byType(SegmentedButton<ThemeMode>);
+      // The keyed switcher (the language switcher also renders in the
+      // settings pane; scoping by key keeps this one unambiguous).
+      final themeSwitcher = settingsThemeSwitcher();
       expect(
         themeSwitcher,
         findsOneWidget,
         reason: 'The theme-mode switcher must be on the settings screen',
       );
-      expect(
-        find.descendant(of: themeSwitcher, matching: find.text('System')),
-        findsOneWidget,
-        reason: 'Theme option "System" must be offered',
-      );
-      expect(
-        find.descendant(of: themeSwitcher, matching: find.text('Light')),
-        findsOneWidget,
-        reason: 'Theme option "Light" must be offered',
-      );
-      expect(
-        find.descendant(of: themeSwitcher, matching: find.text('Dark')),
-        findsOneWidget,
-        reason: 'Theme option "Dark" must be offered',
-      );
       final switcher = tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher);
+      expect(switcher.segments.map((segment) => segment.value), [
+        ThemeMode.system,
+        ThemeMode.light,
+        ThemeMode.dark,
+      ], reason: 'The switcher must offer System, Light and Dark');
       expect(switcher.selected, {
         ThemeMode.system,
       }, reason: 'The default selection must be "System"');
 
       // Switching to dark applies it immediately, overriding the light device.
-      await tester.tap(
-        find.descendant(of: themeSwitcher, matching: find.text('Dark')),
-      );
+      await tester.tap(settingsThemeSegment('dark'));
       await tester.pumpAndSettle();
       expect(
         materializedBrightness(tester),
@@ -143,9 +131,7 @@ void main() {
       expect(switcher2.selected, {ThemeMode.dark});
 
       // Back to light explicitly.
-      await tester.tap(
-        find.descendant(of: themeSwitcher, matching: find.text('Light')),
-      );
+      await tester.tap(settingsThemeSegment('light'));
       await tester.pumpAndSettle();
       expect(
         materializedBrightness(tester),
@@ -158,9 +144,7 @@ void main() {
       expect(switcher3.selected, {ThemeMode.light});
 
       // Back to the system default: the light device brightness returns.
-      await tester.tap(
-        find.descendant(of: themeSwitcher, matching: find.text('System')),
-      );
+      await tester.tap(settingsThemeSegment('system'));
       await tester.pumpAndSettle();
       expect(
         materializedBrightness(tester),

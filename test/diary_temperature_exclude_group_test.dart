@@ -30,6 +30,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/finders.dart';
 import 'support/viewport.dart';
 
 final _fixedNow = DateTime(2026, 4, 10, 14, 35);
@@ -60,18 +61,15 @@ ProviderScope _scope({Future<void> Function(CycleDatabase db)? seed}) {
 }
 
 void main() {
-  /// Selects the disturbance chip [label] (German: the pinned locale) —
+  /// Selects the disturbance chip [token] (sp / a / alk / kr) —
   /// the disturbance options are FilterChips (independent toggles).
-  Future<void> toggleDisturbanceChip(
-    WidgetTester tester,
-    String chipLabel,
-  ) async {
-    await tester.tap(find.widgetWithText(FilterChip, chipLabel));
+  Future<void> toggleDisturbanceChip(WidgetTester tester, String token) async {
+    await tester.tap(diaryChip('disturbance', token));
     await tester.pumpAndSettle();
   }
 
   Future<void> save(WidgetTester tester) async {
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
   }
 
@@ -95,7 +93,7 @@ void main() {
       reason: 'guard: a fresh day carries no marks',
     );
 
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
+    await toggleDisturbanceChip(tester, 'sp');
     await save(tester);
 
     expect(
@@ -221,7 +219,7 @@ void main() {
         reason: 'the seed: the switch mirrors the mark\'s present state',
       );
 
-      await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)');
+      await toggleDisturbanceChip(tester, 'sp');
       await save(tester);
 
       final marks = await _db!.marksDao.marksForDay(_selectedDay);
@@ -258,8 +256,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await toggleDisturbanceChip(tester, 'Spät ins Bett (sp)'); // deselect
-    await toggleDisturbanceChip(tester, 'Alkohol (alk)'); // deselect
+    await toggleDisturbanceChip(tester, 'sp'); // deselect
+    await toggleDisturbanceChip(tester, 'alk'); // deselect
     await save(tester);
 
     final marks = await _db!.marksDao.marksForDay(_selectedDay);

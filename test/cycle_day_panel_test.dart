@@ -47,7 +47,7 @@ void main() {
       reason: 'the panel is NOT a modal route — the chart stays reachable',
     );
     expect(
-      find.byKey(const ValueKey('cycleDayPanelEdit')),
+      cycleDayPanelEditButton(),
       findsOneWidget,
       reason: 'the form jump stays reachable via "edit day"',
     );
@@ -119,7 +119,7 @@ void main() {
       findsNothing,
       reason: 'the close button dismisses the panel',
     );
-    expect(find.byKey(const ValueKey('cycleDayPanelEdit')), findsNothing);
+    expect(cycleDayPanelEditButton(), findsNothing);
   });
 
   testWidgets('a mark chip inside the panel writes through the MarksDao — the '
@@ -133,10 +133,7 @@ void main() {
     ); // no marks yet
 
     await tapCycleDay(tester, 6); // 9/12, the day to mark
-    final chip = find.descendant(
-      of: find.byKey(const ValueKey('cycleDayPanel')),
-      matching: find.text('Mucus peak'),
-    );
+    final chip = cycleSheetChip('mucusPeakDay');
     await tester.tap(chip);
     await tester.pumpAndSettle();
 
@@ -178,12 +175,7 @@ void main() {
 
       // Mark 9/12 with the mucus peak.
       await tapCycleDay(tester, 6);
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey('cycleDayPanel')),
-          matching: find.text('Mucus peak'),
-        ),
-      );
+      await tester.tap(cycleSheetChip('mucusPeakDay'));
       await tester.pumpAndSettle();
       expect(await storedMarkTypes(db, scenarioDay(12)), ['mucusPeakDay']);
 
@@ -191,20 +183,10 @@ void main() {
       // placement is INCONSISTENT there (36.30 below the baseline 36.40), so
       // the owner warning pops — Keep keeps the just-placed mark.
       await tapCycleDay(tester, 7);
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey('cycleDayPanel')),
-          matching: find.text('First higher measurement'),
-        ),
-      );
+      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Keep'),
-        ),
-      );
+      await tester.tap(cycleSheetRiseKeepButton());
       await tester.pumpAndSettle();
       expect(
         await storedMarkTypes(db, scenarioDay(12)),

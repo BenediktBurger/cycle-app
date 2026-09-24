@@ -40,6 +40,11 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
+- [x] Consolidate the chart widget-test suite by merging duplicated scenarios
+  into parameterized tests — kept within the conservative cap (20 of the
+  suite's 148 tests merged, chart suite now at 128); further consolidation
+  beyond that cap needs owner sign-off first.
+
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent

@@ -294,18 +294,34 @@ class EinstellungenScreen extends ConsumerWidget {
                   // model uses a string key ('system'/'de'/'en') so all
                   // three states fit one SegmentedButton (ADR-0007).
                   SegmentedButton<String>(
+                    // Test seam: the switcher wrapper plus one key per
+                    // segment so tests can pick a segment by its model
+                    // token (system/de/en) instead of its label. The key
+                    // rides on the segment's label Text — a ButtonSegment
+                    // cannot carry a key, and the segment's rendered change
+                    // button enters the tree unkeyed.
+                    key: const ValueKey('languageSwitcher'),
                     segments: [
                       ButtonSegment(
                         value: 'system',
-                        label: Text(l10n.termSystem),
+                        label: Text(
+                          l10n.termSystem,
+                          key: const ValueKey('languageSegment-system'),
+                        ),
                       ),
                       ButtonSegment(
                         value: 'de',
-                        label: Text(l10n.languageGerman),
+                        label: Text(
+                          l10n.languageGerman,
+                          key: const ValueKey('languageSegment-de'),
+                        ),
                       ),
                       ButtonSegment(
                         value: 'en',
-                        label: Text(l10n.languageEnglish),
+                        label: Text(
+                          l10n.languageEnglish,
+                          key: const ValueKey('languageSegment-en'),
+                        ),
                       ),
                     ],
                     selected: {locale == null ? 'system' : locale.languageCode},
@@ -344,18 +360,31 @@ class EinstellungenScreen extends ConsumerWidget {
                   // (its own switcher uses the shared `termSystem` label —
                   // one vocabulary across both switchers).
                   SegmentedButton<ThemeMode>(
+                    // Test seam, mirroring the language switcher above:
+                    // wrapper key plus per-segment keys on the label Text
+                    // (ButtonSegment cannot carry a key).
+                    key: const ValueKey('themeSwitcher'),
                     segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        label: Text(l10n.termSystem),
+                        label: Text(
+                          l10n.termSystem,
+                          key: const ValueKey('themeSegment-system'),
+                        ),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
-                        label: Text(l10n.themeLight),
+                        label: Text(
+                          l10n.themeLight,
+                          key: const ValueKey('themeSegment-light'),
+                        ),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        label: Text(l10n.themeDark),
+                        label: Text(
+                          l10n.themeDark,
+                          key: const ValueKey('themeSegment-dark'),
+                        ),
                       ),
                     ],
                     selected: {ref.watch(themeModeProvider)},
@@ -637,6 +666,7 @@ class EinstellungenScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
+                    key: const ValueKey('settingsExportButton'),
                     onPressed: () => _openExport(context, ref),
                     icon: const Icon(Icons.download_outlined),
                     label: Text(l10n.settingsExport),
@@ -653,6 +683,7 @@ class EinstellungenScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
+                    key: const ValueKey('settingsImportJsonButton'),
                     onPressed: () => _openImportDialog(context, ref),
                     icon: const Icon(Icons.upload_outlined),
                     label: Text(l10n.settingsImport),
@@ -721,6 +752,7 @@ class EinstellungenScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   FilledButton.tonalIcon(
+                    key: const ValueKey('settingsImportDripButton'),
                     onPressed: () => _openDripImportDialog(context, ref),
                     icon: const Icon(Icons.upload_outlined),
                     label: Text(l10n.termCsvImport),

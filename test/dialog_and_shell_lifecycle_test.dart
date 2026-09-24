@@ -268,7 +268,7 @@ void main() {
 
         final errors = await collectLifecycleErrors(tester, () async {
           // --- select sign S + a quality (unsaved form state) ------------
-          final sChip = inDiary(find.widgetWithText(ChoiceChip, 'S'));
+          final sChip = inDiary(diaryChip('mucusSign', 's'));
           await tester.scrollUntilVisible(
             sChip,
             150,
@@ -277,8 +277,11 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(sChip.first);
           await tester.pumpAndSettle();
-          expect(inDiary(find.text('Qualität')), findsOneWidget);
-          final ewChip = inDiary(find.widgetWithText(ChoiceChip, 'EW'));
+          expect(
+            inDiary(find.byKey(const ValueKey('mucusQualityRow'))),
+            findsOneWidget,
+          );
+          final ewChip = inDiary(diaryChip('mucusQuality', 'ew'));
           await tester.scrollUntilVisible(
             ewChip,
             150,
@@ -319,7 +322,10 @@ void main() {
           );
           // The reload resets the unsaved S/EW selection: the quality row is
           // gone again.
-          expect(inDiary(find.text('Qualität')), findsNothing);
+          expect(
+            inDiary(find.byKey(const ValueKey('mucusQualityRow'))),
+            findsNothing,
+          );
         });
 
         expect(

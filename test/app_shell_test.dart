@@ -176,13 +176,15 @@ void main() {
       );
     }
 
-    // The quality picker stays hidden until the sign S is selected.
-    expect(find.text('Qualität'), findsNothing);
-    await tester.ensureVisible(find.text('S'));
+    // The quality row stays hidden until the sign S is selected; the row
+    // wrapper is keyed mucusQualityRow, so the key (not the caption) is
+    // what pins the picker's visibility.
+    expect(find.byKey(const ValueKey('mucusQualityRow')), findsNothing);
+    await tester.ensureVisible(diaryChip('mucusSign', 's'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('S'));
+    await tester.tap(diaryChip('mucusSign', 's'));
     await tester.pumpAndSettle();
-    expect(find.text('Qualität'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mucusQualityRow')), findsOneWidget);
     const qualityTokens = [
       'w',
       'mi',
@@ -205,16 +207,16 @@ void main() {
 
     // Selecting a quality keeps the picker; switching to another sign
     // hides it again (a quality only exists together with S).
-    await tester.ensureVisible(find.text('EW'));
+    await tester.ensureVisible(diaryChip('mucusQuality', 'ew'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('EW'));
+    await tester.tap(diaryChip('mucusQuality', 'ew'));
     await tester.pumpAndSettle();
-    expect(find.text('Qualität'), findsOneWidget);
-    await tester.ensureVisible(find.text('Ø'));
+    expect(find.byKey(const ValueKey('mucusQualityRow')), findsOneWidget);
+    await tester.ensureVisible(diaryChip('mucusSign', 'nothing'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ø'), warnIfMissed: false);
+    await tester.tap(diaryChip('mucusSign', 'nothing'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.text('Qualität'), findsNothing);
+    expect(find.byKey(const ValueKey('mucusQualityRow')), findsNothing);
   });
 
   testWidgets('PIN lock stub is visible and non-interactive', (
