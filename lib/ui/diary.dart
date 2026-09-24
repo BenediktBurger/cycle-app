@@ -16,6 +16,7 @@ import '../db/mappers.dart';
 import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/decimal_input.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
@@ -42,6 +43,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bbtController = TextEditingController();
   final _notesController = TextEditingController();
+
+  /// The resolved display locale, captured in [didChangeDependencies] —
+  /// entries load async before any build, so the prefill cannot resolve
+  /// `Localizations.localeOf` at write time; it reads this cache instead.
+  /// ('en' matches MaterialApp's first-supported fallback and is never
+  /// observed: the capture above always precedes the first load.)
+  String _displayLocale = 'en';
 
   Bleeding _bleeding = Bleeding.none;
   int _tempDisturbances = 0;
@@ -72,6 +80,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _bbtController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _displayLocale = Localizations.localeOf(context).toString();
   }
 
   Future<void> _loadEntry(DateTime date) async {
@@ -126,7 +140,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _sexTimings = entry?.sexTimings ?? 0;
     final bbt = entry?.bbtC;
-    _bbtController.text = bbt == null ? '' : bbt.toString();
+    // The prefill follows the display locale ("36,4" in de / "36.4" in en):
+    // what the user sees reinstates what she sees elsewhere. Entry stays
+    // separator-free by rule — parseDecimalInput accepts BOTH separators,
+    // so the comma form saves back identically.
+    _bbtController.text = bbt == null
+        ? ''
+        : formatDecimalPrefill(bbt, locale: _displayLocale);
     _notesController.text = entry?.notes ?? '';
   }
 
@@ -253,12 +273,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       // would show the PREVIOUS day on UTC-negative hosts.
       DateFormat.yMd(locale).format(DateOnly.normalize(d));
 
-  /// Locale-aware two-decimal temperature display ("36,65" in German).
+  /// Locale-aware two-decimal temperature display ("36,65" in German) —
+  /// routed through the shared display formatter (single-sourced like
+  /// every other decimal surface).
   String _formatBbt(double bbt, String locale) =>
-      NumberFormat.decimalPatternDigits(
-        locale: locale,
-        decimalDigits: 2,
-      ).format(bbt);
+      formatDecimal(bbt, locale: locale, decimalDigits: 2);
 
   @override
   Widget build(BuildContext context) {

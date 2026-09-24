@@ -517,6 +517,54 @@ void main() {
   });
 
   testWidgets(
+    'de locale: the fraction rows render the German comma separator',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(
+          entries: screenEntries(),
+          marks: screenMarks(),
+          locale: const Locale('de'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Same fixtures as the en descriptive card: one-decimal aggregates —
+      // only the separator flips with the effective locale.
+      expect(
+        find.descendant(
+          of: metricCard('cycleLength'),
+          matching: find.text('28,0'),
+        ),
+        findsOneWidget,
+        reason: 'the cycle-length average renders comma in de',
+      );
+      expect(
+        find.descendant(
+          of: metricCard('cycleLength'),
+          matching: find.text('0,0'),
+        ),
+        findsOneWidget,
+        reason: 'the cycle-length standard deviation renders comma in de',
+      );
+      expect(
+        find.descendant(
+          of: metricCard('bleedingDuration'),
+          matching: find.text('2,5'),
+        ),
+        findsOneWidget,
+        reason: 'the bleeding-duration average renders comma in de',
+      );
+      expect(
+        find.descendant(of: oldCard('average'), matching: find.text('28,0')),
+        findsOneWidget,
+        reason: 'the old average card renders comma in de',
+      );
+    },
+  );
+
+  testWidgets(
     'the old surfaces remain: lengths list, average/shortest/longest, '
     'cycle starts, distribution',
     (tester) async {

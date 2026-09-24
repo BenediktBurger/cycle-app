@@ -451,8 +451,10 @@ void main() {
 
       expect(
         _bbtText(tester),
-        '36.4',
-        reason: 'the form opens on the seeded first day',
+        '36,4',
+        reason:
+            'the form opens on the seeded first day, '
+            'comma-prefilled (display follows the locale)',
       );
       expect(
         find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
@@ -477,8 +479,10 @@ void main() {
       );
       expect(
         _bbtText(tester),
-        '36.9',
-        reason: 'the new day\'s entry is loaded into the form',
+        '36,9',
+        reason:
+            'the new day\'s entry is loaded into the form '
+            '(comma-prefilled — display follows the locale)',
       );
 
       // Previous: back to the first day, its entry reloaded.
@@ -490,7 +494,7 @@ void main() {
         find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
         findsOneWidget,
       );
-      expect(_bbtText(tester), '36.4');
+      expect(_bbtText(tester), '36,4');
 
       // The chevron buttons carry localized tooltips (German pinned locale).
       expect(_chevron(tester, Icons.chevron_left).tooltip, 'Voriger Tag');
@@ -568,7 +572,7 @@ void main() {
     await tester.pumpWidget(_dayNavScope(selectedDay: _day1));
     await tester.pumpAndSettle();
 
-    expect(_bbtText(tester), '36.4');
+    expect(_bbtText(tester), '36,4');
 
     // The user types a new temperature but does NOT save.
     await tester.enterText(diaryTemperatureField(), '39.9');
@@ -581,7 +585,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       _bbtText(tester),
-      '36.9',
+      '36,9',
       reason: 'the next day loads fresh, not with the unsaved edit',
     );
 
@@ -590,7 +594,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       _bbtText(tester),
-      '36.4',
+      '36,4',
       reason: 'the discarded edit never reached the database',
     );
 

@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db/export_adapter.dart';
 import '../db/settings_store.dart';
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
 import '../domain/marks.dart';
@@ -670,8 +671,11 @@ class EinstellungenScreen extends ConsumerWidget {
                                 ))
                                   DropdownMenuItem(
                                     value: step,
+                                    // Display follows the effective locale
+                                    // ("36,0 °C" in de); the stored double
+                                    // stays untouched.
                                     child: Text(
-                                      '${step.toStringAsFixed(1)} °C',
+                                      '${formatDecimal(step, locale: Localizations.localeOf(context).toString(), decimalDigits: 1)} °C',
                                     ),
                                   ),
                               ],
@@ -702,8 +706,11 @@ class EinstellungenScreen extends ConsumerWidget {
                                 ))
                                   DropdownMenuItem(
                                     value: step,
+                                    // Display follows the effective locale
+                                    // ("36,0 °C" in de); the stored double
+                                    // stays untouched.
                                     child: Text(
-                                      '${step.toStringAsFixed(1)} °C',
+                                      '${formatDecimal(step, locale: Localizations.localeOf(context).toString(), decimalDigits: 1)} °C',
                                     ),
                                   ),
                               ],

@@ -25,6 +25,7 @@ import 'package:intl/intl.dart';
 
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
 import '../domain/statistics.dart';
@@ -325,7 +326,7 @@ Widget _averageShortestLongestRow(
           key: const ValueKey('statisticsCard-average'),
           title: l10n.statisticsAverage,
           child: Text(
-            _scalarText(summary.average),
+            _scalarText(context, summary.average),
             style: Theme.of(context).textTheme.headlineSmall,
           ),
         ),
@@ -458,11 +459,11 @@ final class _MetricCard extends StatelessWidget {
           ),
           _ValueRow(
             label: l10n.statisticsAverage,
-            value: _scalarText(detail.average),
+            value: _scalarText(context, detail.average),
           ),
           _ValueRow(
             label: l10n.statisticsStandardDeviation,
-            value: _scalarText(detail.standardDeviation),
+            value: _scalarText(context, detail.standardDeviation),
           ),
         ],
       ),
@@ -471,10 +472,17 @@ final class _MetricCard extends StatelessWidget {
 }
 
 /// ONE scalar formatting rule for fractional descriptive values (average,
-/// standard deviation): one decimal digit, or the "—" dash. Shared by the
-/// metric cards and the old average card so they cannot drift.
-String _scalarText(double? value) =>
-    value == null ? _missing : value.toStringAsFixed(1);
+/// standard deviation): one decimal digit following the effective locale
+/// ("28,0" in de / "28.0" in en, via the shared display formatter), or the
+/// "—" dash. Shared by the metric cards and the old average card so they
+/// cannot drift.
+String _scalarText(BuildContext context, double? value) => value == null
+    ? _missing
+    : formatDecimal(
+        value,
+        locale: Localizations.localeOf(context).toString(),
+        decimalDigits: 1,
+      );
 
 /// One label/value line inside a statistics card (numbers only — the
 /// label names WHAT is counted, never how to read it).
