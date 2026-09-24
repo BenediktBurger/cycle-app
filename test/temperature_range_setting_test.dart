@@ -48,10 +48,18 @@ DropdownButton<double> _picker(WidgetTester tester, Finder field) =>
     );
 
 void main() {
-  testWidgets('with no override the provider defaults to 36.0..38.0 °C and the '
-      'card renders the two pickers on it', (WidgetTester tester) async {
+  Future<void> pumpApp(WidgetTester tester) async {
+    // The range card sits below the pane's top cards (lazy ListView —
+    // enlarge the surface so the whole card list is built).
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('with no override the provider defaults to 36.0..38.0 °C and the '
+      'card renders the two pickers on it', (WidgetTester tester) async {
+    await pumpApp(tester);
 
     final range = _container(tester).read(temperatureRangeProvider);
     expect(range.min, 36.0, reason: 'no override → the default 36–38 °C range');
@@ -80,8 +88,7 @@ void main() {
     'changing the lower limit updates the provider immediately and the '
     'picker shows the half-degree steps',
     (WidgetTester tester) async {
-      await tester.pumpWidget(_appScope());
-      await tester.pumpAndSettle();
+      await pumpApp(tester);
       await _openSettings(tester);
 
       await tester.tap(_minField());
@@ -104,8 +111,7 @@ void main() {
       'values strictly on its side of the other bound', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(_appScope());
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
     await _openSettings(tester);
 
     final minDrop = _picker(tester, _minField());

@@ -12,7 +12,9 @@
 // file_picker plugin, SAF-backed on Android). The drip CSV import (below
 // the JSON card) reuses the same dialog widget: the mapper turns the CSV
 // into an export document that goes through the existing
-// importJsonToDatabase (merge policy for free).
+// importJsonToDatabase (merge policy for free). The PDF export card
+// (further below) mirrors the hand-off UX with its own one-run pipeline:
+// save into a PDF file and share the generated document next to it.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, rootBundle;
@@ -37,12 +39,18 @@ import 'file_transfer.dart';
 /// Export file name used by the save/download path.
 const String exportFileName = 'cycle_app_export.json';
 
-/// The integer field of the "cycles observed outside this app" settings
-/// card: free-text entry validated per keystroke against "whole number
-/// >= 0" — a valid entry writes through to
-/// [observedCyclesOutsideAppProvider] immediately (the same write-through
-/// wiring the switcher cards use), an invalid one shows the keyed error
-/// line and leaves the stored value untouched.
+/// The integer field of the settings pane's integer cards (the outside-app
+/// cycle count and the paper-history pair: shortest cycle length, earliest
+/// first higher's cycle day): free-text entry validated per keystroke
+/// against "whole number >= [minValue]" — a valid entry writes through to
+/// the field's provider immediately (the same write-through wiring the
+/// switcher cards use), an invalid one shows the keyed error line and
+/// leaves the stored value untouched.
+///
+/// [initialValue] null means "no value given": the field renders empty and
+/// only [allowEmpty] fields (the optional paper-history values) accept an
+/// empty entry as the cleared state, writing through null. The count field
+/// (>= 0, always given) keeps its old semantics.
 ///
 /// Manual validation instead of a digits-only input formatter on purpose:
 /// the formatter would silently swallow characters while the visible
@@ -52,14 +60,39 @@ const String exportFileName = 'cycle_app_export.json';
 /// belongs to the user and is not clobbered from outside mid-entry.
 final class _NonNegativeIntegerField extends StatefulWidget {
   const _NonNegativeIntegerField({
-    required this.initialValue,
+    required this.fieldKey,
+    required this.errorKey,
+    required this.errorText,
     required this.labelText,
     required this.onChanged,
+    this.initialValue = 0,
+    this.minValue = 0,
+    this.allowEmpty = false,
   });
 
-  final int initialValue;
+  final Key fieldKey;
+  final Key errorKey;
+
+  /// The validation rejection line (localized at the call site, so the
+  /// count field and the paper fields can carry their own >= 0 / >= 1
+  /// wording).
+  final String errorText;
   final String labelText;
-  final ValueChanged<int> onChanged;
+
+  /// The provider's current value; null renders the empty field.
+  final int? initialValue;
+
+  /// The smallest acceptable entry (0 for the count, 1 for the paper
+  /// history values — a "cycle" plausibly has at least one day).
+  final int minValue;
+
+  /// Whether an empty entry is the valid "cleared" state (writes null) —
+  /// only the paper-history values are optional, so only they clear.
+  final bool allowEmpty;
+
+  /// Fires for a VALID entry per keystroke (empty text → null only when
+  /// [allowEmpty]); rejected entries fire nothing.
+  final ValueChanged<int?> onChanged;
 
   @override
   State<_NonNegativeIntegerField> createState() =>
@@ -69,19 +102,22 @@ final class _NonNegativeIntegerField extends StatefulWidget {
 final class _NonNegativeIntegerFieldState
     extends State<_NonNegativeIntegerField> {
   late final TextEditingController _controller;
+
+  String _textOf(int? value) => value == null ? '' : '$value';
+
   bool _userEdited = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: '${widget.initialValue}');
+    _controller = TextEditingController(text: _textOf(widget.initialValue));
   }
 
   @override
   void didUpdateWidget(_NonNegativeIntegerField oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialValue != oldWidget.initialValue && !_userEdited) {
-      _controller.text = '${widget.initialValue}';
+      _controller.text = _textOf(widget.initialValue);
     }
   }
 
@@ -93,26 +129,33 @@ final class _NonNegativeIntegerFieldState
 
   void _onChanged(String raw) {
     _userEdited = true;
-    final value = int.tryParse(raw.trim());
-    final valid = value != null && value >= 0;
+    final text = raw.trim();
+    if (text.isEmpty) {
+      setState(() {});
+      if (widget.allowEmpty) widget.onChanged(null);
+      return;
+    }
+    final value = int.tryParse(text);
+    final valid = value != null && value >= widget.minValue;
     setState(() {});
     if (valid) widget.onChanged(value);
   }
 
   bool get _invalid {
-    final value = int.tryParse(_controller.text.trim());
-    return value == null || value < 0;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return !widget.allowEmpty;
+    final value = int.tryParse(text);
+    return value == null || value < widget.minValue;
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         TextField(
-          key: const ValueKey('observedCyclesOutsideAppField'),
+          key: widget.fieldKey,
           controller: _controller,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
@@ -125,8 +168,8 @@ final class _NonNegativeIntegerFieldState
           Text(
             // The rejection line, visible for every invalid intermediate
             // state (empty text included): the validation, not a formatter.
-            l10n.settingsObservedCyclesOutsideAppError,
-            key: const ValueKey('observedCyclesOutsideAppFieldError'),
+            widget.errorText,
+            key: widget.errorKey,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.error,
             ),
@@ -278,6 +321,188 @@ class EinstellungenScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // --- general information -------------------------------------
+          // Name and birth date moved here from the former PDF-titled
+          // identifying card — a pure move: the same settings keys and
+          // field wiring, only the card around them changed (the owner's
+          // Q&A verdict: these are user data, not "PDF settings"). The
+          // caption under the title says the entries are optional and what
+          // they are used for; the anonymization note lives at the switch
+          // that acts on these values (inside the export card below).
+          Card(
+            key: const ValueKey('generalInfoCard'),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsGeneralInformation,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.settingsGeneralInformationNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportNameField'),
+                    initialValue: ref.watch(pdfExportNameProvider) ?? '',
+                    labelText: l10n.settingsPdfExportName,
+                    onChanged: (raw) {
+                      final trimmed = raw.trim();
+                      ref.read(pdfExportNameProvider.notifier).state =
+                          trimmed.isEmpty ? null : trimmed;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportBirthDateField'),
+                    initialValue: ref.watch(pdfExportBirthDateProvider) == null
+                        ? ''
+                        : formatIsoDate(ref.watch(pdfExportBirthDateProvider)!),
+                    labelText: l10n.settingsPdfExportBirthDate,
+                    hintText: l10n.settingsPdfExportBirthDateFormat,
+                    errorText: l10n.settingsPdfExportBirthDateError,
+                    errorKey: const ValueKey('pdfExportBirthDateFieldError'),
+                    // One strict parse shared with the settings store's
+                    // decode (tryParseIsoDate): correct shape AND a real
+                    // calendar day.
+                    validator: (raw) => raw.isEmpty
+                        ? true
+                        : tryParseIsoDate(raw.trim()) != null,
+                    onChanged: (raw) {
+                      final parsed = raw.trim().isEmpty
+                          ? null
+                          : tryParseIsoDate(raw.trim());
+                      if (parsed != null || raw.trim().isEmpty) {
+                        ref.read(pdfExportBirthDateProvider.notifier).state =
+                            parsed;
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // --- paper history: the cycles outside this app --------------
+          // The three facts a user observed OUTSIDE this app go together
+          // in ONE card because they are the same migration story: the
+          // count of foregoing cycles (the cycle page's "Zyklus N"
+          // ordinals count up from it), the shortest of those cycles (a
+          // length in days) and their earliest first higher measurement
+          // (a cycle-day number counting from 1). All three are optional
+          // paper-form values that feed statistics and the PDF export;
+          // free-text integer entry with keystroke validation, write-
+          // through like every card on this pane. Positioned right after
+          // the general-information card: both gather user-recorded facts
+          // about oneself/history, before the app-behaviour settings.
+          Card(
+            key: const ValueKey('paperHistoryCard'),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsPaperHistory,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsPaperHistoryHelper,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _NonNegativeIntegerField(
+                    fieldKey: const ValueKey('observedCyclesOutsideAppField'),
+                    errorKey: const ValueKey(
+                      'observedCyclesOutsideAppFieldError',
+                    ),
+                    errorText: l10n.settingsObservedCyclesOutsideAppError,
+                    initialValue: ref.watch(observedCyclesOutsideAppProvider),
+                    // A plain label: the field names the count with the
+                    // existing setting wording.
+                    labelText: l10n.settingsObservedCyclesOutsideApp,
+                    // The count is never optional (allowEmpty stays false),
+                    // so a valid entry is always a real int here.
+                    onChanged: (value) =>
+                        ref
+                                .read(observedCyclesOutsideAppProvider.notifier)
+                                .state =
+                            value!,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsObservedCyclesOutsideAppHelper,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _NonNegativeIntegerField(
+                    fieldKey: const ValueKey('paperShortestCycleLengthField'),
+                    errorKey: const ValueKey(
+                      'paperShortestCycleLengthFieldError',
+                    ),
+                    errorText: l10n.settingsPaperShortestCycleLengthError,
+                    initialValue: ref.watch(
+                      shortestCycleLengthOutsideAppProvider,
+                    ),
+                    labelText: l10n.settingsPaperShortestCycleLength,
+                    // A paper "cycle" plausibly has at least one day, so
+                    // the optional value validates >= 1 and empty clears.
+                    minValue: 1,
+                    allowEmpty: true,
+                    onChanged: (value) =>
+                        ref
+                                .read(
+                                  shortestCycleLengthOutsideAppProvider
+                                      .notifier,
+                                )
+                                .state =
+                            value,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsPaperShortestCycleLengthHelper,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _NonNegativeIntegerField(
+                    fieldKey: const ValueKey(
+                      'paperEarliestFirstHigherCycleDayField',
+                    ),
+                    errorKey: const ValueKey(
+                      'paperEarliestFirstHigherCycleDayFieldError',
+                    ),
+                    errorText: l10n.settingsPaperEarliestFirstHigherError,
+                    initialValue: ref.watch(
+                      earliestFirstHigherCycleDayOutsideAppProvider,
+                    ),
+                    labelText: l10n.settingsPaperEarliestFirstHigher,
+                    // A cycle-day number on the paper form counts from 1.
+                    minValue: 1,
+                    allowEmpty: true,
+                    onChanged: (value) =>
+                        ref
+                                .read(
+                                  earliestFirstHigherCycleDayOutsideAppProvider
+                                      .notifier,
+                                )
+                                .state =
+                            value,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsPaperEarliestFirstHigherHelper,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // --- language ------------------------------------------------
           Card(
             child: Padding(
@@ -513,115 +738,6 @@ class EinstellungenScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // --- cycles observed outside this app ------------------------
-          // The groundwork the cycle page's "Zyklus N" ordinals count up
-          // from: a user who tracked on paper (or in another tracker)
-          // before entering her data here sets the number of those
-          // foregoing cycles, and the cycle page's numbering — the chart's
-          // boundary labels and the evaluation table's column headers
-          // alike — starts after this count instead of at 1. Free-text
-          // integer entry with keystroke validation (>= 0), write-through
-          // like every card on this pane; the helper note explains what
-          // the number moves.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.settingsObservedCyclesOutsideApp,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  _NonNegativeIntegerField(
-                    initialValue: ref.watch(observedCyclesOutsideAppProvider),
-                    // A plain label: the field names the count with the
-                    // card title's wording.
-                    labelText: l10n.settingsObservedCyclesOutsideApp,
-                    onChanged: (value) =>
-                        ref
-                                .read(observedCyclesOutsideAppProvider.notifier)
-                                .state =
-                            value,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.settingsObservedCyclesOutsideAppHelper,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // --- PDF export: identifying values --------------------------
-          // The "identifying source" values the generated PDF's paper-form
-          // header carries: name and birth date (the birth date field is a
-          // strict ISO date with validation — impossible days never
-          // pass). Each export's "Anonymisieren" toggle decides PER EXPORT
-          // whether the document shows these values or hides them (the
-          // per-export toggle is intentionally NOT persisted — see the
-          // export card below). The helper cross-references the
-          // outside-app cycle count, which feeds the PDF's observed-cycle
-          // header fact.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.settingsPdfExport,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  _ValidatedSettingsField(
-                    fieldKey: const ValueKey('pdfExportNameField'),
-                    initialValue: ref.watch(pdfExportNameProvider) ?? '',
-                    labelText: l10n.settingsPdfExportName,
-                    onChanged: (raw) {
-                      final trimmed = raw.trim();
-                      ref.read(pdfExportNameProvider.notifier).state =
-                          trimmed.isEmpty ? null : trimmed;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _ValidatedSettingsField(
-                    fieldKey: const ValueKey('pdfExportBirthDateField'),
-                    initialValue: ref.watch(pdfExportBirthDateProvider) == null
-                        ? ''
-                        : formatIsoDate(ref.watch(pdfExportBirthDateProvider)!),
-                    labelText: l10n.settingsPdfExportBirthDate,
-                    hintText: l10n.settingsPdfExportBirthDateFormat,
-                    errorText: l10n.settingsPdfExportBirthDateError,
-                    errorKey: const ValueKey('pdfExportBirthDateFieldError'),
-                    // One strict parse shared with the settings store's
-                    // decode (tryParseIsoDate): correct shape AND a real
-                    // calendar day.
-                    validator: (raw) => raw.isEmpty
-                        ? true
-                        : tryParseIsoDate(raw.trim()) != null,
-                    onChanged: (raw) {
-                      final parsed = raw.trim().isEmpty
-                          ? null
-                          : tryParseIsoDate(raw.trim());
-                      if (parsed != null || raw.trim().isEmpty) {
-                        ref.read(pdfExportBirthDateProvider.notifier).state =
-                            parsed;
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.settingsPdfExportNote,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           // --- PIN lock stub -------------------------------------------
           // Disabled ON PURPOSE: flipping it on would falsely signal that a
           // lock exists. At-rest encryption of the database is already
@@ -699,37 +815,14 @@ class EinstellungenScreen extends ConsumerWidget {
           // the full-screen cycle-selection page at click time (the
           // formerly inline checkbox list grew unmanageable with many
           // cycles), the per-export anonymize toggle (card-local state,
-          // never persisted) and the Export action. The pipeline: export
-          // model (the selection intersected by cycle-start identity) ->
-          // document builder provider (stubbed in tests) -> saveFileBytes
-          // seam, reported through the same SnackBar pattern as the JSON
-          // export card above.
+          // never persisted) and a save/share action pair. The pipeline:
+          // export model (the selection intersected by cycle-start
+          // identity) -> document builder provider (stubbed in tests) ->
+          // ONE generation run handing off either via saveFileBytes or via
+          // shareFileBytes, reported through the same SnackBar pattern as
+          // the JSON export card above (each hand-off reports its own
+          // verb).
           const PdfExportCard(),
-          const SizedBox(height: 8),
-          // --- privacy / GDPR notice -----------------------------------
-          // The same string the about/onboarding page shows (one source,
-          // lib/ui/about.dart): the app's data-control reality in plain
-          // German-first prose — no servers, nothing ever sent, GDPR rights
-          // exercisable directly via the export/delete/import actions.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.aboutPrivacyHeading,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.aboutPrivacyBody,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
           // --- drip CSV import ------------------------------------------
           // Drip (sibling project) exports calendar days as a CSV; the
@@ -1183,11 +1276,42 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
               onChanged: (value) => setState(() => _anonymized = value),
               title: Text(l10n.pdfExportAnonymize),
             ),
-            FilledButton.icon(
-              key: const ValueKey('pdfExportButton'),
-              onPressed: _running ? null : () => _runExport(context),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(l10n.pdfExportExportButton),
+            // The anonymization note sits AT the control it explains, not
+            // at the data entry: the values it talks about live in the
+            // general-information card above, but what this note adds is
+            // what the toggle does — one switch row, one explanation.
+            const SizedBox(height: 8),
+            Text(
+              l10n.pdfExportAnonymizeNote,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            // The hand-off row: ONE generation run serves both actions —
+            // the generated document goes either through the save-as
+            // dialog or, staged in the temp directory, through the system
+            // share sheet (the JSON export page's wrap idiom; web has no
+            // share sheet, so its browser download stays the hand-off).
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('pdfExportButton'),
+                  onPressed: _running
+                      ? null
+                      : () => _runExport(context, share: false),
+                  icon: const Icon(Icons.save_outlined),
+                  label: Text(l10n.pdfExportSaveButton),
+                ),
+                if (canShareFile)
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('pdfExportShareButton'),
+                    onPressed: _running
+                        ? null
+                        : () => _runExport(context, share: true),
+                    icon: const Icon(Icons.share_outlined),
+                    label: Text(l10n.exportShare),
+                  ),
+              ],
             ),
           ],
         ),
@@ -1253,11 +1377,22 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
 
   /// The export pipeline for one run: build the model from the LIVE data
   /// (read fresh — watching streams made the card rebuild mid-run is not a
-  /// concern here), generate via the builder provider, then save through
-  /// the bytes seam. The empty-data guard mirrors the JSON export's: an
-  /// empty document is never generated, the message explains instead.
-  Future<void> _runExport(BuildContext context) async {
+  /// concern here), generate via the builder provider, then hand the bytes
+  /// to the pressed hand-off ([share] chooses the system share sheet over
+  /// the save-as dialog). Both hand-offs consume the SAME generated bytes —
+  /// they differ nowhere else, and each reports its OWN verb's snackbars
+  /// (a generation failure reports the pressed verb's failure message:
+  /// nothing was written or staged either way). The empty-data guard
+  /// mirrors the JSON export's: an empty document is never generated, the
+  /// message explains instead.
+  Future<void> _runExport(BuildContext context, {required bool share}) async {
     final l10n = AppLocalizations.of(context);
+    // Each hand-off reports only its own verb — a failed share must not
+    // claim a failure to save, a successful one not a saved file.
+    final successMessage = share ? l10n.exportShared : l10n.exportSaved;
+    final failureMessage = share
+        ? l10n.exportShareFailed
+        : l10n.exportSaveFailed;
     final entries =
         ref.read(dailyEntriesProvider).value ?? const <DailyEntry>[];
     final marks = ref.read(marksProvider).value ?? const <CycleMark>[];
@@ -1282,6 +1417,15 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       entries: entries,
       marks: marks,
       observedCyclesOutsideApp: outside,
+      // The paper-history constants ride along: the paper figures were
+      // known facts when the FIRST in-app cycle was printed, so they fold
+      // into every exported cycle's header stats (see the builder).
+      shortestCycleLengthOutsideApp: ref.read(
+        shortestCycleLengthOutsideAppProvider,
+      ),
+      earliestFirstHigherCycleDayOutsideApp: ref.read(
+        earliestFirstHigherCycleDayOutsideAppProvider,
+      ),
       name: ref.read(pdfExportNameProvider),
       birthDate: ref.read(pdfExportBirthDateProvider),
       // The cycle selection is the model-level cycle filter (the
@@ -1314,18 +1458,22 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
           fontData.lengthInBytes,
         ),
       );
-      final ok = await saveFileBytes(pdfExportFileName(now), bytes);
+      final filename = pdfExportFileName(now);
+      final ok = await (share
+          ? shareFileBytes(filename, bytes)
+          : saveFileBytes(filename, bytes));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? l10n.exportSaved : l10n.exportSaveFailed)),
+        SnackBar(content: Text(ok ? successMessage : failureMessage)),
       );
     } catch (_) {
-      // Generation problems (e.g. a broken font asset) land on the same
-      // failure surface as a failed save — nothing was written either way.
+      // Generation problems (e.g. a broken font asset) land on the
+      // pressed hand-off's failure surface — nothing was written or
+      // staged either way.
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.exportSaveFailed)));
+      ).showSnackBar(SnackBar(content: Text(failureMessage)));
     } finally {
       if (mounted) setState(() => _running = false);
     }

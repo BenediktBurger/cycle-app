@@ -88,7 +88,11 @@ void main() {
   testWidgets(
     'settings switcher renders System/Light/Dark and switches between them',
     (WidgetTester tester) async {
-      // No test value to set: the dispatcher defaults to light.
+      // No test value to set: the dispatcher defaults to light. The
+      // switcher sits below the pane's top cards (lazy ListView — enlarge
+      // the surface so the whole card list is built).
+      await tester.binding.setSurfaceSize(const Size(900, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
       // Tap through the shared navigation finder (nav surface, both adaptive

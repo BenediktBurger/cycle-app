@@ -260,6 +260,122 @@ void main() {
     });
   });
 
+  group('paper history outside the app (shortest cycle & earliest first '
+      'higher, int >= 1)', () {
+    test('an empty table loads to no paper values', () async {
+      final snapshot = await store.load();
+      expect(
+        snapshot.shortestCycleLengthOutsideApp,
+        isNull,
+        reason:
+            'an absent row means "not given" — the paper history is '
+            'optional',
+      );
+      expect(snapshot.earliestFirstHigherCycleDayOutsideApp, isNull);
+    });
+
+    test(
+      'valid integer values round-trip under their dot-family keys',
+      () async {
+        await store.persistShortestCycleLengthOutsideApp(21);
+        expect(
+          await store.readSetting(SettingKeys.shortestCycleLengthOutsideApp),
+          21,
+          reason: 'the value column stores the plain JSON integer',
+        );
+        await store.persistEarliestFirstHigherCycleDayOutsideApp(14);
+        expect(
+          await store.readSetting(
+            SettingKeys.earliestFirstHigherCycleDayOutsideApp,
+          ),
+          14,
+        );
+
+        final snapshot = await store.load();
+        expect(snapshot.shortestCycleLengthOutsideApp, 21);
+        expect(snapshot.earliestFirstHigherCycleDayOutsideApp, 14);
+        expect(
+          await db.select(db.appSettings).get(),
+          hasLength(2),
+          reason: 'one row per key, no leftovers',
+        );
+      },
+    );
+
+    test('persisting null or a value < 1 deletes the row (cleared reads '
+        'the same as absent)', () async {
+      // An explicit 0/negative is never a paper fact (the field validates
+      // >= 1), so it must not linger as a row that "reads back 0".
+      for (final shortest in [null, 0, -3]) {
+        await store.persistShortestCycleLengthOutsideApp(21);
+        await store.persistShortestCycleLengthOutsideApp(shortest);
+        expect(
+          await store.readSetting(SettingKeys.shortestCycleLengthOutsideApp),
+          isNull,
+          reason: 'a cleared/rejected shortest value deletes its row',
+        );
+      }
+      for (final earliest in [null, 0, -1]) {
+        await store.persistEarliestFirstHigherCycleDayOutsideApp(14);
+        await store.persistEarliestFirstHigherCycleDayOutsideApp(earliest);
+        expect(
+          await store.readSetting(
+            SettingKeys.earliestFirstHigherCycleDayOutsideApp,
+          ),
+          isNull,
+          reason: 'a cleared/rejected cycle-day value deletes its row',
+        );
+      }
+      // Round-trip again after the deletes: a fresh valid value is stored,
+      // not blocked by the cleared state.
+      await store.persistShortestCycleLengthOutsideApp(26);
+      expect((await store.load()).shortestCycleLengthOutsideApp, 26);
+    });
+
+    test(
+      'out-of-range, non-integer and corrupt rows fall back to null',
+      () async {
+        for (final raw in [
+          '0', // outside the allowed range (int >= 1)
+          '-1', // negative
+          '"21"', // JSON string, not an integer
+          '21.5', // JSON double
+          'true', // JSON bool
+          'garbage{', // not JSON at all
+        ]) {
+          await seedRaw(SettingKeys.shortestCycleLengthOutsideApp, raw);
+          await seedRaw(SettingKeys.earliestFirstHigherCycleDayOutsideApp, raw);
+          final snapshot = await store.load();
+          expect(
+            snapshot.shortestCycleLengthOutsideApp,
+            isNull,
+            reason: 'corrupt stored value "$raw" must not surface an error',
+          );
+          expect(
+            snapshot.earliestFirstHigherCycleDayOutsideApp,
+            isNull,
+            reason: 'corrupt stored value "$raw" must not surface an error',
+          );
+        }
+      },
+    );
+
+    test('the snapshot equality covers the paper values', () {
+      expect(
+        PersistedSettings(shortestCycleLengthOutsideApp: 21),
+        isNot(PersistedSettings.defaults()),
+      );
+      expect(
+        PersistedSettings(earliestFirstHigherCycleDayOutsideApp: 14),
+        isNot(PersistedSettings.defaults()),
+      );
+      expect(
+        PersistedSettings(shortestCycleLengthOutsideApp: 21),
+        PersistedSettings(shortestCycleLengthOutsideApp: 21),
+      );
+    });
+  });
+
   group('onboarding completion flag (first-start gate)', () {
     test('an empty table loads to not completed', () async {
       final snapshot = await store.load();

@@ -167,6 +167,14 @@ final class PdfExportModel {
   /// therefore always carries null and the renderer shows "—". The
   /// lengths measure each earlier cycle to its direct successor in the
   /// WHOLE record (never a between-cycles distance in a subset).
+  ///
+  /// The shortest of the cycles observed OUTSIDE this app (the settings
+  /// pane's paper-history card) min-combines into every page's value: the
+  /// paper history predates every in-app cycle, so the paper figure was
+  /// already part of the observed record when the first in-app page
+  /// printed — and being constant it can never break the idempotency
+  /// above (see [buildPdfExportModel]). The first cycle's page therefore
+  /// prints the paper figure instead of "—" when one was given.
   final List<int?> shortestCycleLengths;
 
   /// The per-cycle earliest-first-higher fact, PARALLEL to [cycles]: the
@@ -180,6 +188,11 @@ final class PdfExportModel {
   /// real first higher"). The generator prefers `afterMucusPeak` and
   /// falls back to `any`; null when no cycle in the prefix carries a
   /// qualifying mark.
+  ///
+  /// The paper-history earliest first higher (both variants at once — the
+  /// paper form saw the rise but did not record its mucus-peak relation
+  /// as data) min-combines into both variants of every page for the same
+  /// constant-before-the-first-cycle reason as [shortestCycleLengths].
   final List<({int? any, int? afterMucusPeak})> earliestFirstHigherCycleDays;
 
   /// The display ordinal ("Zyklus N") of the exported cycle at 0-based
@@ -225,6 +238,17 @@ final class PdfExportModel {
 /// [birthDate] may carry time-of-day noise; it is normalized to the
 /// calendar day (DateOnly convention) so header formatting stays exact.
 ///
+/// [shortestCycleLengthOutsideApp] and [earliestFirstHigherCycleDayOutsideApp]
+/// are the optional paper-history constants of the settings pane's
+/// paper-history card (null = not given). They fold into EVERY exported
+/// cycle's per-cycle stats below, and that fold never breaks print
+/// idempotency: the paper history predates ALL in-app cycles, so these
+/// facts were already known and counted when the FIRST in-app cycle was
+/// printed on the paper form — a constant that never changes with later
+/// cycles can never rewrite an earlier page's paper-derived figure (a
+/// freshly tracked cycle only ever adds in-app data, which stays
+/// truncated at the printed cycle).
+///
 /// [temperatureRange] is the settings card's display range, echoed into
 /// the model for the curve block's fixed y scale (default:
 /// [TemperatureRange.defaults] — the provider's starting window).
@@ -238,6 +262,8 @@ PdfExportModel buildPdfExportModel({
   int observedCyclesOutsideApp = 0,
   String? name,
   DateTime? birthDate,
+  int? shortestCycleLengthOutsideApp,
+  int? earliestFirstHigherCycleDayOutsideApp,
   DateTime? exportStartsUpTo,
   Set<DateTime>? selectedStartDates,
   TemperatureRange temperatureRange = TemperatureRange.defaults,
@@ -338,10 +364,20 @@ PdfExportModel buildPdfExportModel({
       );
       if (shortest == null || gap < shortest) shortest = gap;
     }
-    shortestCycleLengths.add(shortest);
-    earliestFirstHigherCycleDays.add(
-      earliestFirstHigherCycleDay(all.sublist(0, i + 1)),
+    shortestCycleLengths.add(
+      _minPaperFact(shortest, shortestCycleLengthOutsideApp),
     );
+    final inAppFirstHigher = earliestFirstHigherCycleDay(all.sublist(0, i + 1));
+    earliestFirstHigherCycleDays.add((
+      any: _minPaperFact(
+        inAppFirstHigher.any,
+        earliestFirstHigherCycleDayOutsideApp,
+      ),
+      afterMucusPeak: _minPaperFact(
+        inAppFirstHigher.afterMucusPeak,
+        earliestFirstHigherCycleDayOutsideApp,
+      ),
+    ));
   }
 
   final trimmedName = name?.trim();
@@ -362,6 +398,18 @@ PdfExportModel buildPdfExportModel({
     ),
     temperatureRange: temperatureRange,
   );
+}
+
+/// The SMALLER of an in-app-derived figure and a paper-history constant —
+/// the fold rule of the paper history into in-app statistics: the paper
+/// values were recorded BEFORE any in-app cycle existed, so they compete
+/// in every cycle's point of view, and a minimum of observed facts never
+/// flips upward. null folds to the other side's value (a missing paper
+/// fact adds nothing — the in-app figure stands alone).
+int? _minPaperFact(int? inAppValue, int? paperValue) {
+  if (inAppValue == null) return paperValue;
+  if (paperValue == null) return inAppValue;
+  return inAppValue < paperValue ? inAppValue : paperValue;
 }
 
 /// The cycle's full CALENDAR span as the overlay window's day count:

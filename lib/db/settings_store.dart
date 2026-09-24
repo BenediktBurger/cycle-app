@@ -1,7 +1,7 @@
 // The typed settings layer over the raw key-value DAO (settings_dao.dart):
 // named keys, generic JSON encode/decode and typed helpers for the
-// persisted general settings (language, theme mode, temperature range,
-// outside-app cycle count).
+// persisted general settings (language, theme mode, temperature range, the
+// outside-app cycle triple).
 //
 // Adding a future setting (e.g. a PDF export option) is deliberately boring:
 // a new constant in [SettingKeys] plus one typed helper — no schema change,
@@ -44,6 +44,23 @@ abstract final class SettingKeys {
   /// count only the mark-opened cycles recorded in this database.
   static const observedCyclesOutsideApp = 'observedCyclesOutsideApp';
 
+  /// The LENGTH IN DAYS of the shortest cycle the user observed OUTSIDE
+  /// this app (the paper-history family next to
+  /// [observedCyclesOutsideApp] — the three outside-app facts live
+  /// together), as a plain JSON integer >= 1. Nothing stored (or a corrupt
+  /// row) means "not given" (null) — the value feeds statistics and the
+  /// PDF export as an optional constant.
+  static const shortestCycleLengthOutsideApp =
+      'cyclesOutsideApp.shortestCycleLength';
+
+  /// The CYCLE-DAY NUMBER (counting from 1) of the earliest first higher
+  /// measurement the user observed OUTSIDE this app, as a plain JSON
+  /// integer >= 1. Nothing stored (or a corrupt row) means "not given"
+  /// (null) — the value feeds statistics and the PDF export like
+  /// [shortestCycleLengthOutsideApp].
+  static const earliestFirstHigherCycleDayOutsideApp =
+      'cyclesOutsideApp.earliestFirstHigherCycleDay';
+
   /// First-start gate of the welcome/about page: the flag is a plain JSON
   /// boolean. NOTHING stored (or a corrupt row) means "not completed", so
   /// the shell shows the onboarding page next start; a stored true keeps
@@ -76,6 +93,8 @@ final class PersistedSettings {
     this.themeMode = ThemeMode.system,
     this.temperatureRange = TemperatureRange.defaults,
     this.observedCyclesOutsideApp = 0,
+    this.shortestCycleLengthOutsideApp,
+    this.earliestFirstHigherCycleDayOutsideApp,
     this.onboardingCompleted = false,
     this.pdfExportName,
     this.pdfExportBirthDate,
@@ -95,6 +114,17 @@ final class PersistedSettings {
 
   /// The stored count of cycles observed outside this app (>= 0).
   final int observedCyclesOutsideApp;
+
+  /// The shortest cycle length (>= 1, in days) observed outside this app,
+  /// or null when not given. One recorded paper fact — statistics and the
+  /// PDF export min-combine it with the in-app figures.
+  final int? shortestCycleLengthOutsideApp;
+
+  /// The earliest first higher measurement's cycle-day number (>= 1,
+  /// counting from 1) observed outside this app, or null when not given.
+  /// One recorded paper fact — statistics and the PDF export min-combine
+  /// it with the in-app figures (both documented variants).
+  final int? earliestFirstHigherCycleDayOutsideApp;
 
   /// Whether the onboarding page has been confirmed ("Weiter" tapped at
   /// least once). The absence of a row — this field's default — is also the
@@ -119,6 +149,9 @@ final class PersistedSettings {
       other.themeMode == themeMode &&
       other.temperatureRange == temperatureRange &&
       other.observedCyclesOutsideApp == observedCyclesOutsideApp &&
+      other.shortestCycleLengthOutsideApp == shortestCycleLengthOutsideApp &&
+      other.earliestFirstHigherCycleDayOutsideApp ==
+          earliestFirstHigherCycleDayOutsideApp &&
       other.onboardingCompleted == onboardingCompleted &&
       other.pdfExportName == pdfExportName &&
       other.pdfExportBirthDate == pdfExportBirthDate;
@@ -129,6 +162,8 @@ final class PersistedSettings {
     themeMode,
     temperatureRange,
     observedCyclesOutsideApp,
+    shortestCycleLengthOutsideApp,
+    earliestFirstHigherCycleDayOutsideApp,
     onboardingCompleted,
     pdfExportName,
     pdfExportBirthDate,
@@ -155,6 +190,8 @@ final class SettingsStore {
     var themeMode = ThemeMode.system;
     var temperatureRange = TemperatureRange.defaults;
     var observedCyclesOutsideApp = 0;
+    int? shortestCycleLengthOutsideApp;
+    int? earliestFirstHigherCycleDayOutsideApp;
     var onboardingCompleted = false;
     String? pdfExportName;
     DateTime? pdfExportBirthDate;
@@ -176,6 +213,12 @@ final class SettingsStore {
             }
           case SettingKeys.observedCyclesOutsideApp:
             observedCyclesOutsideApp = _observedCyclesFromStored(decoded);
+          case SettingKeys.shortestCycleLengthOutsideApp:
+            shortestCycleLengthOutsideApp = _paperHistoryIntFromStored(decoded);
+          case SettingKeys.earliestFirstHigherCycleDayOutsideApp:
+            earliestFirstHigherCycleDayOutsideApp = _paperHistoryIntFromStored(
+              decoded,
+            );
           case SettingKeys.onboardingCompleted:
             onboardingCompleted = _onboardingFromStored(decoded);
           case SettingKeys.pdfExportName:
@@ -193,6 +236,9 @@ final class SettingsStore {
       themeMode: themeMode,
       temperatureRange: temperatureRange,
       observedCyclesOutsideApp: observedCyclesOutsideApp,
+      shortestCycleLengthOutsideApp: shortestCycleLengthOutsideApp,
+      earliestFirstHigherCycleDayOutsideApp:
+          earliestFirstHigherCycleDayOutsideApp,
       onboardingCompleted: onboardingCompleted,
       pdfExportName: pdfExportName,
       pdfExportBirthDate: pdfExportBirthDate,
@@ -254,6 +300,26 @@ final class SettingsStore {
     return writeSetting(SettingKeys.observedCyclesOutsideApp, cycles);
   }
 
+  /// Persists the paper shortest-cycle value (>= 1, in days):
+  /// [writeSetting] writes the plain JSON integer, null deletes the row. A
+  /// value < 1 is not a plausible paper fact (the field validates >= 1) and
+  /// is treated like null: deleted, so "absent" and "cleared/rejected" read
+  /// the same (the persistPdfExportName pattern — both paper-history
+  /// helpers share it).
+  Future<void> persistShortestCycleLengthOutsideApp(int? value) => writeSetting(
+    SettingKeys.shortestCycleLengthOutsideApp,
+    (value == null || value < 1) ? null : value,
+  );
+
+  /// Persists the paper earliest-first-higher value (>= 1, the cycle-day
+  /// number counting from 1) with the same null/< 1 deletes semantics as
+  /// [persistShortestCycleLengthOutsideApp].
+  Future<void> persistEarliestFirstHigherCycleDayOutsideApp(int? value) =>
+      writeSetting(
+        SettingKeys.earliestFirstHigherCycleDayOutsideApp,
+        (value == null || value < 1) ? null : value,
+      );
+
   /// Persists the onboarding completion flag as a plain JSON boolean. Only
   /// the "continue" action writes true in practice; the absent row is the
   /// "not completed" state, so nothing rewrites it on a plain start.
@@ -301,6 +367,14 @@ ThemeMode _themeModeFromStored(Object? decoded) {
 /// corrupt or hostile row keeps the default, never an error.
 int _observedCyclesFromStored(Object? decoded) =>
     decoded is int && decoded >= 0 ? decoded : 0;
+
+/// Paper-history decode (shortest cycle length AND earliest first higher's
+/// cycle day share the validation): JSON integers >= 1 only. Non-integers
+/// (strings, doubles, bools, null) and values < 1 decode to null, "not
+/// given" — a corrupt or hostile row keeps the optional fact absent, never
+/// an error.
+int? _paperHistoryIntFromStored(Object? decoded) =>
+    decoded is int && decoded >= 1 ? decoded : null;
 
 /// Onboarding-flag decode: explicit JSON true only. Anything else (false,
 /// null, strings, numbers) decodes to not-completed — the welcome page then

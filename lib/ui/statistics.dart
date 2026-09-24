@@ -12,7 +12,12 @@
 // the total observed cycles from the mark-opened cycles recorded in the
 // app plus the "observed cycles outside this app" settings value — the
 // card's caption names that composition on the surface ("in this app: n"
-// and, when the user has set it, "outside: n"). Missing values render as
+// and, when the user has set it, "outside: n"). The paper-history values
+// (shortest cycle, earliest first higher — both optional settings) fold
+// into the shortest/earliest surfaces as plain MIN-combination, since
+// they were recorded before every in-app cycle; they stay OUT of the
+// lengths list, the distribution and the per-cycle table (single
+// recorded facts, not distribution entries). Missing values render as
 // the "—" dash.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,6 +87,39 @@ class StatistikScreen extends ConsumerWidget {
           );
           final earliest = earliestFirstHigherCycleDay(evaluations);
 
+          // The paper history folds in as plain MIN-combination at the
+          // shortest/earliest surfaces: the paper figures were recorded
+          // BEFORE every in-app cycle, so they are known facts at this
+          // screen's point of view and a minimum of observed facts never
+          // flips upward. They are single recorded facts — they do NOT
+          // enter the lengths list, the distribution or the per-cycle
+          // table (in-app-only surfaces below stay gated on `lengths`).
+          final paperShortest = ref.watch(
+            shortestCycleLengthOutsideAppProvider,
+          );
+          final paperEarliest = ref.watch(
+            earliestFirstHigherCycleDayOutsideAppProvider,
+          );
+          final shortestOverall = _minFact(paperShortest, summary.shortest);
+          final lengthDetailWithPaper = DescriptiveSummary(
+            minimum: _minFact(paperShortest, lengthDetail.minimum),
+            maximum: lengthDetail.maximum,
+            average: lengthDetail.average,
+            standardDeviation: lengthDetail.standardDeviation,
+          );
+          final earliestWithPaper = (
+            any: _minFact(paperEarliest, earliest.any),
+            afterMucusPeak: _minFact(paperEarliest, earliest.afterMucusPeak),
+          );
+
+          // The average/shortest/longest row renders with ONLY a paper
+          // shortest present too (in-app lengths empty): a paper-only
+          // user must see her recorded shortest figure instead of a
+          // hidden row. The average and longest cells then dash — the
+          // paper value is one fact, not a lengths distribution.
+          final hasShortestRow =
+              summary.lengths.isNotEmpty || paperShortest != null;
+
           // The upstream statistics rework's aggregate + per-cycle table
           // data: the fact rows and the first-higher-until-cycle-end
           // metric keep upstream's counting rule (each fact's span counts
@@ -136,13 +174,19 @@ class StatistikScreen extends ConsumerWidget {
               if (summary.lengths.isNotEmpty) ...[
                 _lengthsListCard(context, l10n, summary.lengths),
                 const SizedBox(height: 8),
-                _averageShortestLongestRow(context, summary),
+              ],
+              if (hasShortestRow) ...[
+                _averageShortestLongestRow(
+                  context,
+                  summary,
+                  shortestOverride: shortestOverall,
+                ),
                 const SizedBox(height: 8),
               ],
               _MetricCard(
                 key: const ValueKey('statisticsCard-cycleLength'),
                 title: l10n.statisticsMetricCycleLength,
-                detail: lengthDetail,
+                detail: lengthDetailWithPaper,
               ),
               const SizedBox(height: 8),
               _MetricCard(
@@ -171,11 +215,11 @@ class StatistikScreen extends ConsumerWidget {
                   children: [
                     _ValueRow(
                       label: l10n.statisticsFirstHigherReal,
-                      value: cycleDayText(earliest.afterMucusPeak),
+                      value: cycleDayText(earliestWithPaper.afterMucusPeak),
                     ),
                     _ValueRow(
                       label: l10n.statisticsFirstHigherAny,
-                      value: cycleDayText(earliest.any),
+                      value: cycleDayText(earliestWithPaper.any),
                     ),
                     if (earliest.afterMucusPeak == null && earliest.any != null)
                       Text(
@@ -255,8 +299,12 @@ Widget _lengthsListCard(
 
 Widget _averageShortestLongestRow(
   BuildContext context,
-  CycleLengthSummary summary,
-) {
+  CycleLengthSummary summary, {
+  // The min-combined shortest figure (paper fold included — see the
+  // build method's fold comment); average and longest stay in-app-only
+  // (single recorded facts never become distribution members).
+  required int? shortestOverride,
+}) {
   final l10n = AppLocalizations.of(context);
   return Row(
     children: [
@@ -275,7 +323,7 @@ Widget _averageShortestLongestRow(
         child: _StatCard(
           key: const ValueKey('statisticsCard-shortest'),
           title: l10n.statisticsShortest,
-          child: _headlineText(context, summary.shortest),
+          child: _headlineText(context, shortestOverride),
         ),
       ),
       const SizedBox(width: 8),
@@ -448,6 +496,15 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
       average: summary.average,
       standardDeviation: summary.stdDev,
     );
+
+/// The smallest of an optional paper-history constant and an optional
+/// in-app figure — null folds to the other side (a missing fact adds
+/// nothing). The MIN rule of the paper fold: see the build method.
+int? _minFact(int? paperValue, int? inAppValue) {
+  if (paperValue == null) return inAppValue;
+  if (inAppValue == null) return paperValue;
+  return paperValue < inAppValue ? paperValue : inAppValue;
+}
 
 /// The per-cycle table card: a simple bordered table (equal-width columns,
 /// headers wrap) with the four exact columns the roadmap names: cycle

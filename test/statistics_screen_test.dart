@@ -68,12 +68,20 @@ Widget harness({
   List<DailyEntry> entries = const [],
   List<CycleMark> marks = const [],
   int observedOutsideApp = 0,
+  int? paperShortestCycleLength,
+  int? paperEarliestFirstHigherCycleDay,
   Locale locale = const Locale('en'),
 }) => ProviderScope(
   overrides: [
     dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
     marksProvider.overrideWith((ref) => Stream.value(marks)),
     observedCyclesOutsideAppProvider.overrideWith((ref) => observedOutsideApp),
+    shortestCycleLengthOutsideAppProvider.overrideWith(
+      (ref) => paperShortestCycleLength,
+    ),
+    earliestFirstHigherCycleDayOutsideAppProvider.overrideWith(
+      (ref) => paperEarliestFirstHigherCycleDay,
+    ),
   ],
   child: MaterialApp(
     theme: ThemeData(colorSchemeSeed: const Color(0xFF6750A4)),
@@ -662,5 +670,237 @@ void main() {
         reason: '$id is a lengths surface, untouched by the one-cycle case',
       );
     }
+  });
+
+  testWidgets('a paper-only shortest value renders on the shortest card '
+      'even with no in-app lengths (paper-only user)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(
+        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+        marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
+        paperShortestCycleLength: 21,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // One open in-app cycle: no countable length yet — the paper figure
+    // stands alone and the average/shortest/longest row must RENDER for
+    // it (the lengths gate no longer hides it).
+    expect(oldCard('shortest'), findsOneWidget);
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      findsOneWidget,
+      reason: 'the paper shortest is the surfaced minimum',
+    );
+    expect(
+      find.descendant(of: oldCard('average'), matching: find.text('—')),
+      findsOneWidget,
+      reason:
+          'the in-app average stays empty — the paper value is a '
+          'single recorded fact, not a distribution entry',
+    );
+    expect(
+      find.descendant(of: oldCard('longest'), matching: find.text('—')),
+      findsOneWidget,
+    );
+    // The same paper minimum feeds the cycle-length metric card's
+    // minimum row (max/average/std-dev stay in-app-only).
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('21 days'),
+      ),
+      findsOneWidget,
+      reason: 'the paper value min-combines into the minimum row',
+    );
+    expect(
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('—')),
+      findsNWidgets(3),
+      reason: 'max/average/std-dev keep their no-data dashes',
+    );
+    // Single recorded facts do NOT enter the distribution machinery.
+    expect(
+      find.byKey(const ValueKey('statisticsCard-distribution')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('statisticsCard-lengthsList')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('the paper shortest min-combines with the in-app minimum '
+      '(in-app data wins when smaller, no flip-up)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // In-app minimum is 28: paper 21 beats it on the shortest card ...
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: screenMarks(),
+        paperShortestCycleLength: 21,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      findsOneWidget,
+    );
+    // ... and the metric card's minimum carries the same fold, maximum
+    // untouched.
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('21 days'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Maximum'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('28 days'),
+      ),
+      findsNWidgets(1),
+      reason:
+          'the max row keeps the in-app value (the minimum row carries '
+          'the folded paper 21 now)',
+    );
+  });
+
+  testWidgets('a paper shortest ABOVE the in-app minimum never flips the '
+      'surfaced minimum upward', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // Paper 30 loses against the in-app 28: no paper value is ever
+    // surfaced above the recorded minimum.
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: screenMarks(),
+        paperShortestCycleLength: 30,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+      findsOneWidget,
+      reason: 'the smaller in-app minimum wins the fold',
+    );
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('30')),
+      findsNothing,
+    );
+    // With the paper 30 folded out, min and max both read the in-app 28.
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('28 days'),
+      ),
+      findsNWidgets(2),
+      reason: 'minimum and maximum duplicate the single value again',
+    );
+  });
+
+  testWidgets('the paper earliest first higher min-combines into BOTH '
+      'variant rows', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // In-app both variants are cycle day 14; a paper rise on cycle day 5
+    // is the earlier fact for both rows.
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: screenMarks(),
+        paperEarliestFirstHigherCycleDay: 5,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final rows = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: earliestCard(),
+            matching: find.textContaining('cycle day '),
+          ),
+        )
+        .map((t) => t.data!)
+        .toList();
+    expect(
+      rows,
+      everyElement('cycle day 5'),
+      reason:
+          'both variant rows '
+          'carry the min: the paper form\'s fact predates the in-app data '
+          'and was visible in both readings',
+    );
+  });
+
+  testWidgets('a divergent in-app record: each variant row takes the '
+      'minimum of its own value space with the paper fact', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // The divergent in-app record (any = 1, real = 14) with paper 5:
+    // "any" keeps the smaller in-app 1, the real variant folds to the
+    // paper 5.
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: divergentMarks(),
+        paperEarliestFirstHigherCycleDay: 5,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final mixedRows = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: earliestCard(),
+            matching: find.textContaining('cycle day '),
+          ),
+        )
+        .map((t) => t.data!)
+        .toList();
+    expect(
+      mixedRows,
+      contains('cycle day 1'),
+      reason:
+          'the in-app "any" '
+          'minimum of 1 is still the earliest',
+    );
+    expect(
+      mixedRows,
+      contains('cycle day 5'),
+      reason:
+          'the real variant '
+          'folds the paper fact in',
+    );
+    expect(
+      mixedRows,
+      isNot(contains('cycle day 14')),
+      reason:
+          'the paper '
+          '5 replaced the in-app 14 in the real variant',
+    );
+  });
+
+  testWidgets('without surface data the paper values change nothing '
+      '(default null keeps the no-data screen)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(harness());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('statisticsCard-shortest')),
+      findsNothing,
+      reason: 'no paper value set — the empty case keeps its gate',
+    );
   });
 }

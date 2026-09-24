@@ -108,6 +108,10 @@ void main() {
       (WidgetTester tester) async {
         useDeviceLocales(tester, const [Locale('de')]);
 
+        // The switcher sits below the pane's top cards (lazy ListView —
+        // enlarge the surface so the whole card list is built).
+        await tester.binding.setSurfaceSize(const Size(900, 2400));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
         await tester.pumpWidget(_appScope());
         await tester.pumpAndSettle();
         // Tap through the shared navigation finder: all tabs stay mounted

@@ -646,6 +646,153 @@ void main() {
     });
   });
 
+  group('the paper-history constants fold into every exported page', () {
+    /// Marks variant: cycle 2's rise sits on its own start day, on the
+    /// SAME day as its peak (not the "real" variant) — same shape as the
+    /// earliest-first-higher group's fixture.
+    List<CycleMark> divergentMarks() => [
+      ...modelMarks(),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+    ];
+
+    test('the paper shortest is the every-page minimum against the prefix '
+        'minimum (first page: it replaces the "—")', () {
+      // Paper 21 beats the in-app 28-day minimum on every page, including
+      // the first one whose in-app-only value is null.
+      final winningPaper = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        shortestCycleLengthOutsideApp: 21,
+      );
+      expect(
+        winningPaper.shortestCycleLengths,
+        [21, 21, 21],
+        reason:
+            'the paper figure predates every in-app cycle, so it '
+            'belongs in every cycle\'s point of view — the first page '
+            'prints the paper figure instead of "—" and the later pages '
+            'keep the smaller paper minimum over their in-app 28',
+      );
+      // Paper 30 loses against the recorded in-app minimum of 28: a paper
+      // value never flips a surfaced minimum upward.
+      final losingPaper = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        shortestCycleLengthOutsideApp: 30,
+      );
+      expect(losingPaper.shortestCycleLengths, [30, 28, 28]);
+    });
+
+    test('the paper earliest first higher min-combines into BOTH variants '
+        'of every page', () {
+      // divergentMarks: cycle 2's rise on its own start day (cycle day 1,
+      // NOT strictly after its same-day peak). Paper 10 undercuts cycle 1's
+      // in-app 14 in both variants; page 2/3's "any" keeps the smaller
+      // in-app 1 while the real variant folds to the paper 10.
+      final paper10 = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: divergentMarks(),
+        earliestFirstHigherCycleDayOutsideApp: 10,
+      );
+      expect(paper10.earliestFirstHigherCycleDays, [
+        (any: 10, afterMucusPeak: 10),
+        (any: 1, afterMucusPeak: 10),
+        (any: 1, afterMucusPeak: 10),
+      ]);
+
+      // Paper 16 is beaten everywhere by in-app values (14 in the real
+      // variant from page 1 on): the paper constant never inflates a page.
+      final paper16 = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: divergentMarks(),
+        earliestFirstHigherCycleDayOutsideApp: 16,
+      );
+      expect(paper16.earliestFirstHigherCycleDays, [
+        (any: 14, afterMucusPeak: 14),
+        (any: 1, afterMucusPeak: 14),
+        (any: 1, afterMucusPeak: 14),
+      ]);
+    });
+
+    test('the paper constants add no later-cycle dependence: printing an '
+        'early cycle alone (paper figure in) is idempotent across the '
+        'record growing', () {
+      // The print-idempotency test's split, now WITH paper constants:
+      // whatever the record does later, the paper figure is constant, so
+      // the page's paper-derived values may not move either.
+      final cut = d(3, 29);
+      bool earlier(DateTime date) =>
+          DateOnly.normalize(date).isBefore(DateOnly.normalize(cut));
+      final earlyEntries = [
+        for (final e in modelEntries())
+          if (earlier(e.date)) e,
+      ];
+      final earlyMarks = [
+        for (final m in modelMarks())
+          if (earlier(m.date)) m,
+      ];
+      final laterEntries = [
+        for (final e in modelEntries())
+          if (!earlier(e.date)) e,
+      ];
+      final laterMarks = [
+        for (final m in modelMarks())
+          if (!earlier(m.date)) m,
+      ];
+      final selection = {d(3, 1)};
+
+      final before = buildPdfExportModel(
+        entries: earlyEntries,
+        marks: earlyMarks,
+        observedCyclesOutsideApp: 4,
+        shortestCycleLengthOutsideApp: 21,
+        earliestFirstHigherCycleDayOutsideApp: 10,
+        selectedStartDates: selection,
+      );
+      expect(before.cycles.length, 1);
+      expect(
+        before.shortestCycleLengths,
+        [21],
+        reason:
+            'no completed in-app cycle exists yet — the paper figure '
+            'stands alone instead of the "—" the paperless build prints',
+      );
+      expect(before.earliestFirstHigherCycleDays, [
+        (any: 10, afterMucusPeak: 10),
+      ], reason: 'the paper rise on cycle day 10 beats cycle 1\'s own 14');
+
+      final after = buildPdfExportModel(
+        entries: [...earlyEntries, ...laterEntries],
+        marks: [...earlyMarks, ...laterMarks],
+        observedCyclesOutsideApp: 4,
+        shortestCycleLengthOutsideApp: 21,
+        earliestFirstHigherCycleDayOutsideApp: 10,
+        selectedStartDates: selection,
+      );
+      expect(
+        after.shortestCycleLengths.single,
+        21,
+        reason:
+            'later cycles changed nothing: the paper part of the '
+            'value is constant — the page prints identically however '
+            'late it is reprinted',
+      );
+      expect(after.earliestFirstHigherCycleDays.single, (
+        any: 10,
+        afterMucusPeak: 10,
+      ));
+      // Cross-check against the paperless builds of the same shapes: the
+      // first-cycle page difference is exactly the paper figure.
+      final paperlessBefore = buildPdfExportModel(
+        entries: earlyEntries,
+        marks: earlyMarks,
+        selectedStartDates: selection,
+      );
+      expect(paperlessBefore.shortestCycleLengths, [null]);
+    });
+  });
+
   group('per-cycle overlays for the PDF', () {
     test('the evaluated cycle exposes its derived display artifacts', () {
       final model = buildPdfExportModel(
