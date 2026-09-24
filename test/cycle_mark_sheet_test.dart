@@ -92,9 +92,8 @@ Future<(CycleDatabase, ProviderContainer)> _pumpAt(
 /// `DateFormat.yMMMEd` the header uses (English, the harness's pinned
 /// locale) instead of being hardcoded — the assertion stays independent of
 /// the concrete date formatting.
-String dayLabelOf(int day) => DateFormat.yMMMEd(
-  'en',
-).format(DateOnly.normalize(scenarioDay(day)).toLocal());
+String dayLabelOf(int day) =>
+    DateFormat.yMMMEd('en').format(DateOnly.normalize(scenarioDay(day)));
 
 /// The day header's close button (the explicit panel close affordance).
 Finder panelCloseButton() => find.byKey(const ValueKey('cycleDayPanelClose'));

@@ -2,8 +2,8 @@
 // the whole family in one file: the measured-time picker (conditional
 // visibility, prefill, round-trip, clearing, day-tile display), the
 // previous/next day chevrons (with their edit-discard semantics) and the
-// cycle-start suggestion prompt (the disturbance flags' analysis-exclusion
-// marking works without any auto behavior — see
+// entry form's explicit cycle-start switch (the disturbance flags'
+// analysis-exclusion marking works without any auto behavior — see
 // test/diary_temperature_exclude_group_test.dart's manual exclude switch).
 //
 // Each section below (kicked off by a `════ former` banner) carries
@@ -91,46 +91,53 @@ String _bbtText(WidgetTester tester) => tester
     .controller!
     .text;
 
+// No host-timezone shifting: the label is host-TZ-independent because the
+// diary formats the UTC-midnight dates verbatim, each read by its own
+// fields.
 String _dayLabel(DateTime day) =>
-    DateFormat.yMd('de').format(DateOnly.normalize(day).toLocal());
+    DateFormat.yMd('de').format(DateOnly.normalize(day));
 
 /// The navigation IconButton for [icon] — widgetWithIcon so the cast sees
 /// the IconButton itself, not the bare Icon inside it.
 IconButton _chevron(WidgetTester tester, IconData icon) =>
     tester.widget<IconButton>(find.widgetWithIcon(IconButton, icon));
 
-// Widget tests for the cycle-start suggestion on the Tagebuch screen: after
-// saving a day whose bleeding SUGGESTS a cycle start (menstruation-level
-// bleeding on a not-interrupted day that does not continue the previous
-// day's menstruation-level bleeding — see isSuggestedCycleStart in
-// lib/domain/cycle_grouping.dart), the app asks "Neuen Zyklus beginnen?" /
-// "Start new cycle?" and, on confirmation, places the authoritative
-// cycleStart mark through the MarksDao. Bleeding never creates a boundary
-// by itself — the user still places the mark (ADR-0008).
+// Widget tests for the ENTRY FORM'S EXPLICIT CYCLE-START SWITCH on the
+// Tagebuch screen: the switch (shared "Zyklusbeginn" label) is the
+// diary-side writer of the authoritative cycleStart mark — toggling it on
+// and saving places the mark (author 'user'), toggling it off and saving
+// removes it, and the switch seeds from the day's existing mark so an
+// untouched save keeps it (same contract as the exclude switch — see
+// test/diary_temperature_exclude_group_test.dart). Bleeding never implies
+// or asks for a cycle start on the diary anymore: saving a
+// menstruation-level day WITHOUT touching the switch places no mark and
+// shows no dialog.
 //
-// Covered: the prompt appears only for a SUGGESTED menstruation-level day
-// (level >= 2), confirming persists the user-authored mark, dismissing
-// persists nothing, a level-1 day (spotting) prompts nothing, a
-// menstruation-level day that continues the previous day's bleeding
-// (mid-flow) prompts nothing, the prompt is keyed PURELY to bleeding
-// continuity: the ignoreTemperature mark does NOT suppress it any more
-// (owner decision 2026-09-18 — the mark is temperature-evaluation-scoped;
-// a marked bleeding day still prompts and still places the cycleStart),
-// and a day that ALREADY carries the cycleStart mark re-saves without the
-// prompt re-firing (the mark decides the cycle boundary — no repeat ask).
+// Covered: the switch is labeled "Zyklusbeginn" in the form, the
+// on/off -> mark write/remove in both directions, the seeding from an
+// externally placed (pre-seeded) mark, the no-mark no-dialog regression
+// pin on a suggested bleeding day, and the coexistence with an
+// ignoreTemperature mark (both marks survive one save).
 //
 // The database is an in-memory override, same pattern as the
 // measured-time section; the German locale is pinned so the
-// dialog wording assertions stay deterministic.
+// switch-label assertion stays deterministic.
 
 // Selected calendar day of the entry form.
 final _day = DateTime.utc(2026, 9, 15);
-final _previousDay = DateTime.utc(2026, 9, 14);
 
-final _promptHarness = DiaryHarness(
+final _toggleHarness = DiaryHarness(
   now: DateTime(2026, 9, 15, 10, 30),
   selectedDay: _day,
 );
+
+/// The cycle-start switch of the entry form (test-visible key).
+Finder get _cycleStartSwitch =>
+    find.byKey(const ValueKey('diaryCycleStartSwitch'));
+
+/// The current value of the cycle-start switch, read from its widget.
+bool _cycleStartSwitchValue(WidgetTester tester) =>
+    tester.widget<SwitchListTile>(_cycleStartSwitch).value;
 
 void main() {
   // ═══════════ measured time ═══════════
@@ -597,192 +604,204 @@ void main() {
     expect(stored2!.bbtC, 36.9);
   });
 
-  // ═══════════ cycle-start prompt ═══════════
-  // former test/diary_cycle_start_prompt_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
+  // ═══════════ cycle-start switch ═══════════
+  // former test/diary_cycle_start_prompt_test.dart — rewritten: the
+  // bleeding-suggested confirm dialog is replaced by the form's explicit
+  // cycle-start switch (see the section comment above).
 
-  testWidgets('a suggested menstruation-level day prompts for the cycle start; '
-      'confirming places the cycleStart mark', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope());
+  testWidgets('the form offers a "Zyklusbeginn" switch, off on a fresh day', (
+    tester,
+  ) async {
+    _toggleHarness.tallSurface(tester);
+    await tester.pumpWidget(_toggleHarness.scope());
     await tester.pumpAndSettle();
 
-    // First recorded day, bleeding "leicht" (level 2): already
-    // menstruation-level, so the suggestion predicate flags it as a cycle
-    // start — the prompt does not wait for the central levels.
-    await _promptHarness.saveWithBleeding(tester, Bleeding.light);
-
     expect(
-      find.byType(AlertDialog),
+      _cycleStartSwitch,
+      findsOneWidget,
+      reason: 'the entry form carries the explicit cycle-start switch',
+    );
+    expect(
+      find.descendant(
+        of: _cycleStartSwitch,
+        matching: find.text('Zyklusbeginn'),
+      ),
       findsOneWidget,
       reason:
-          'a suggested menstruation-level day asks for the cycle '
-          'start instead of placing the mark silently',
+          'the switch reuses the shared surface name "Zyklusbeginn" '
+          '(the day sheet\'s mark chip label) in the pinned locale',
     );
     expect(
-      find.text('Neuen Zyklus beginnen?'),
-      findsOneWidget,
-      reason: 'the prompt names the suggestion in the pinned locale',
+      _cycleStartSwitchValue(tester),
+      isFalse,
+      reason: 'a fresh day without a cycleStart mark loads the switch off',
     );
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Zyklusbeginn setzen'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byType(AlertDialog),
-      findsNothing,
-      reason: 'confirming closes the prompt',
-    );
-    final marks = await _promptHarness.db!.marksDao.marksForDay(_day);
-    expect(
-      marks.map((m) => m.markType),
-      contains(CycleMarkTypes.cycleStart),
-      reason:
-          'the confirmed suggestion places the authoritative '
-          'cycle-boundary mark through the MarksDao',
-    );
-    final mark = marks.singleWhere(
-      (m) => m.markType == CycleMarkTypes.cycleStart,
-    );
-    expect(
-      mark.author,
-      'user',
-      reason: 'the confirmed placement is user-authored',
-    );
-  });
-
-  testWidgets('dismissing the prompt places no mark', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope());
-    await tester.pumpAndSettle();
-
-    await _promptHarness.saveWithBleeding(tester, Bleeding.heavy);
-
-    expect(find.byType(AlertDialog), findsOneWidget);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Nicht jetzt'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byType(AlertDialog),
-      findsNothing,
-      reason: 'dismissing closes the prompt',
-    );
-    expect(
-      await _promptHarness.storedMarkTypes(_day),
-      isEmpty,
-      reason:
-          'dismissing must not place the mark — bleeding only '
-          'suggests, the user decides',
-    );
-  });
-
-  testWidgets('a spotting day (level 1) shows no prompt', (tester) async {
-    _promptHarness.tallSurface(tester);
-    await tester.pumpWidget(_promptHarness.scope());
-    await tester.pumpAndSettle();
-
-    await _promptHarness.saveWithBleeding(tester, Bleeding.spotting);
-
-    expect(
-      find.byType(AlertDialog),
-      findsNothing,
-      reason:
-          'only menstruation-level bleeding (level >= 2) suggests a '
-          'cycle start — spotting does not',
-    );
-    expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
   });
 
   testWidgets(
-    'a menstruation-level day continuing the previous day\'s bleeding '
-    '(mid-flow) shows no prompt',
+    'toggling the switch on and saving places a user-authored cycleStart '
+    'mark',
     (tester) async {
-      _promptHarness.tallSurface(tester);
-      await tester.pumpWidget(
-        _promptHarness.scope(
-          seed: (db) async {
-            // The previous calendar day already carries an uninterrupted
-            // menstruation-level bleeding day: the saved day is mid-flow.
-            await db.entriesDao.upsertDaily(
-              DailyEntry(date: _previousDay, bleeding: Bleeding.medium),
-            );
-          },
-        ),
-      );
+      _toggleHarness.tallSurface(tester);
+      await tester.pumpWidget(_toggleHarness.scope());
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, Bleeding.heavy);
-
       expect(
-        find.byType(AlertDialog),
-        findsNothing,
-        reason:
-            'fresh menstruation starts after a break or on the first '
-            'day — a continuous menstruation is mid-flow, not a new start',
+        await _toggleHarness.storedMarkTypes(_day),
+        isEmpty,
+        reason: 'guard: a fresh day carries no marks',
       );
-      expect(await _promptHarness.storedMarkTypes(_day), isEmpty);
+
+      await tester.tap(_cycleStartSwitch);
+      await tester.pumpAndSettle();
+      await tester.tap(diarySaveButton());
+      await tester.pumpAndSettle();
+
+      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
+      expect(
+        marks.map((m) => m.markType),
+        contains(CycleMarkTypes.cycleStart),
+        reason:
+            'the switched-on save writes the authoritative '
+            'cycle-boundary mark through the MarksDao',
+      );
+      final mark = marks.singleWhere(
+        (m) => m.markType == CycleMarkTypes.cycleStart,
+      );
+      expect(
+        mark.author,
+        'user',
+        reason:
+            'the diary save is user-placed data — the mark is '
+            'user-authored',
+      );
     },
   );
 
+  testWidgets('toggling the switch off and saving REMOVES a pre-existing '
+      'cycleStart mark (both directions)', (tester) async {
+    _toggleHarness.tallSurface(tester);
+    await tester.pumpWidget(
+      _toggleHarness.scope(
+        seed: (db) async {
+          await db.marksDao.addMark(
+            _day,
+            CycleMarkTypes.cycleStart,
+            author: 'user',
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      _cycleStartSwitchValue(tester),
+      isTrue,
+      reason: 'the switch seeds from the day\'s existing cycleStart mark',
+    );
+
+    await tester.tap(_cycleStartSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(diarySaveButton());
+    await tester.pumpAndSettle();
+
+    expect(
+      await _toggleHarness.storedMarkTypes(_day),
+      isEmpty,
+      reason:
+          'the switch off -> save removes the mark in the same save '
+          'the on-direction writes it (the explicit toggle decides, '
+          'never an auto rule)',
+    );
+  });
+
   testWidgets(
-    'a suggested day that already carries the cycleStart mark shows no '
-    'prompt (no re-fire on re-save)',
+    'a pre-seeded cycleStart mark loads the switch on and an untouched '
+    'save keeps the mark exactly as it was',
     (tester) async {
-      _promptHarness.tallSurface(tester);
+      _toggleHarness.tallSurface(tester);
       await tester.pumpWidget(
-        _promptHarness.scope(
+        _toggleHarness.scope(
           seed: (db) async {
-            // The user already confirmed the cycle start on this day: re-saving
-            // the still-suggested bleeding day must not ask again — the mark is
-            // the authoritative boundary and stays untouched.
             await db.marksDao.addMark(
               _day,
               CycleMarkTypes.cycleStart,
-              author: 'user',
+              author: 'import',
             );
           },
         ),
       );
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, Bleeding.light);
-
       expect(
-        find.byType(AlertDialog),
-        findsNothing,
+        _cycleStartSwitchValue(tester),
+        isTrue,
         reason:
-            'the cycleStart mark is already on the day — the prompt '
-            'must not re-fire on a re-save',
+            'an externally placed cycleStart mark (day sheet, import) '
+            'shows up as the switched-on state',
+      );
+
+      await tester.tap(diarySaveButton());
+      await tester.pumpAndSettle();
+
+      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
+      expect(
+        marks.map((m) => m.markType),
+        [CycleMarkTypes.cycleStart],
+        reason:
+            'the untouched switch neither removes nor duplicates the '
+            'pre-existing mark',
       );
       expect(
-        await _promptHarness.storedMarkTypes(_day),
-        equals([CycleMarkTypes.cycleStart]),
-        reason: 'the pre-existing cycleStart mark stays exactly as it was',
+        marks.single.author,
+        'import',
+        reason: 'the pre-existing mark\'s provenance stays untouched',
       );
     },
   );
 
   testWidgets(
-    'an ignoreTemperature mark on the day does NOT suppress the prompt '
-    '(a marked bleeding day still suggests)',
+    'saving a suggested menstruation-level bleeding day WITHOUT touching '
+    'the switch places no mark and shows no dialog',
     (tester) async {
-      _promptHarness.tallSurface(tester);
+      _toggleHarness.tallSurface(tester);
+      await tester.pumpWidget(_toggleHarness.scope());
+      await tester.pumpAndSettle();
+
+      // First recorded day, bleeding "leicht" (level 2): the shared
+      // suggestion predicate would flag this day as a cycle start — the
+      // old prompt fired here. Bleeding no longer implies or asks for a
+      // cycle start on the diary.
+      await _toggleHarness.saveWithBleeding(tester, Bleeding.light);
+
+      expect(
+        find.byType(AlertDialog),
+        findsNothing,
+        reason:
+            'no cycle-start prompt ever appears — bleeding only '
+            'suggested, and the diary no longer asks',
+      );
+      expect(
+        await _toggleHarness.storedMarkTypes(_day),
+        isEmpty,
+        reason:
+            'a plain bleeding save places no cycleStart mark — only the '
+            'explicit switch does',
+      );
+    },
+  );
+
+  testWidgets(
+    'an ignoreTemperature-seeded day plus the switch toggled on keeps '
+    'BOTH marks after one save (no coupling in either direction)',
+    (tester) async {
+      _toggleHarness.tallSurface(tester);
       await tester.pumpWidget(
-        _promptHarness.scope(
+        _toggleHarness.scope(
           seed: (db) async {
-            // The day already carries the temperature-ignore mark: that mark is
-            // scoped to the temperature evaluation and must not swallow the
-            // cycle-start suggestion — the suppression is keyed purely to
-            // bleeding continuity.
+            // The day already carries the temperature-ignore mark: it is
+            // scoped to the temperature evaluation and must not couple
+            // with the cycle-start switch in either direction.
             await db.marksDao.addMark(
               _day,
               CycleMarkTypes.ignoreTemperature,
@@ -793,24 +812,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _promptHarness.saveWithBleeding(tester, Bleeding.light);
-
-      expect(
-        find.byType(AlertDialog),
-        findsOneWidget,
-        reason:
-            'the ignoreTemperature mark no longer suppresses the '
-            'suggestion — the marked bleeding day still asks',
-      );
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Zyklusbeginn setzen'),
-        ),
-      );
+      await tester.tap(_cycleStartSwitch);
+      await tester.pumpAndSettle();
+      await tester.tap(diarySaveButton());
       await tester.pumpAndSettle();
 
-      final marks = await _promptHarness.db!.marksDao.marksForDay(_day);
+      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
       expect(
         marks.map((m) => m.markType),
         unorderedEquals([
@@ -818,10 +825,9 @@ void main() {
           CycleMarkTypes.cycleStart,
         ]),
         reason:
-            'confirming places the cycleStart mark; the pre-existing '
-            'ignoreTemperature mark stays untouched (the form\'s exclude '
-            'switch seeds from the existing mark, so the plain save keeps '
-            'it — no auto behavior in either direction)',
+            'toggling the cycle-start on persists both marks — the '
+            'cycleStart write neither removes the ignoreTemperature mark '
+            'nor vice versa',
       );
       final start = marks.singleWhere(
         (m) => m.markType == CycleMarkTypes.cycleStart,
@@ -829,9 +835,7 @@ void main() {
       expect(
         start.author,
         'user',
-        reason:
-            'the confirmed placement is user-authored even on a '
-            'marked day',
+        reason: 'the switch-placed cycleStart mark is user-authored',
       );
     },
   );

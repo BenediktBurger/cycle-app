@@ -5,7 +5,7 @@
 //      an in-memory database with the locale pinned, plus the saved-day
 //      readback through the same database provider the form writes with;
 //  (b) the pinned-clock tests (measured time, day navigation, cycle-start
-//      prompt, disturbance auto-mark): an in-memory (optionally seeded)
+//      switch, disturbance auto-mark): an in-memory (optionally seeded)
 //      database, the clock pinned through nowProvider, the form's day pinned
 //      through selectedDateProvider, the German locale pinned — plus the
 //      wide test surface (the form's save button sits below the default

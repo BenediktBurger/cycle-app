@@ -227,7 +227,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // Both options offered on the entry form (German labels, per the
-    // pinned locale), each carrying its letter code.
+    // pinned locale), each carrying its letter code. The pain block has
+    // its own section header above the chips — the same section shape as
+    // the sex block and its neighbors.
+    expect(
+      find.text('Schmerzen'),
+      findsOneWidget,
+      reason: 'the pain section header must sit above the pain chips',
+    );
     expect(
       find.text('Brustschmerz (B)'),
       findsOneWidget,

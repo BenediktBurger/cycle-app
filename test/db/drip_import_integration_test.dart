@@ -419,9 +419,9 @@ void main() {
         'with their author column (nothing re-derives)', () async {
       // Hand-authored document: one cycleStart mark with author 'import'
       // (as a foreign drip import writes it) and one with author 'user'
-      // (as the diary prompt writes it), each on its own tracked day. The
-      // document is profile-free v5 shape: no `profile_id` keys, no
-      // `profiles` list.
+      // (as the diary's cycle-start toggle writes it), each on its own
+      // tracked day. The document is profile-free v5 shape: no
+      // `profile_id` keys, no `profiles` list.
       final doc = buildExportJson(
         ExportBlob(
           entries: const [
