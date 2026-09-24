@@ -1,0 +1,1 @@
+The app is functionally unchanged: this version was rebuilt with a hardened, pinned build toolchain (NDK r28c, aligned pub cache) so that F-Droid's byte-reproducibility verification of this same code passes reliably. App behavior is identical to v0.2.2.

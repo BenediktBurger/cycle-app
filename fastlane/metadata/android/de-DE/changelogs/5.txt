@@ -1,0 +1,1 @@
+Die App bleibt funktional unverändert: Diese Version wurde mit einer gehärteten, versionsfest gepinnten Build-Umgebung (NDK r28c, einheitlicher Pub-Cache) erstellt, damit die F-Droid-Byte-Reproduzierbarkeit dieser Codeversion verlässlich prüfbar ist. Das App-Verhalten ist identisch zu v0.2.2.
