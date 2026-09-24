@@ -219,11 +219,6 @@ void main() {
           await tester.tapAt(const Offset(10, 10));
           await tester.pumpAndSettle();
           expect(find.byType(AlertDialog), findsNothing);
-          // The import summary snackbar floats above the bottom navigation
-          // for its display duration (standard Material behavior); advance
-          // the clock past it before tapping navigation destinations.
-          await tester.pump(const Duration(seconds: 5));
-          await tester.pumpAndSettle();
           // The shell must survive the raced dismissal: the home route with
           // the whole IndexedStack is still intact and navigable.
           await tester.tap(navLabel('Tagebuch'));
@@ -361,11 +356,6 @@ void main() {
           await tester.tapAt(const Offset(10, 10));
           await tester.pumpAndSettle();
           expect(find.byType(AlertDialog), findsNothing);
-          // The import summary snackbar floats above the bottom navigation
-          // for its display duration (standard Material behavior); advance
-          // the clock past it before tapping navigation destinations.
-          await tester.pump(const Duration(seconds: 5));
-          await tester.pumpAndSettle();
           await openImportDialog(tester, buttonLabel: 'CSV importieren');
           expect(
             find.byType(AlertDialog),

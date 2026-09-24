@@ -4,6 +4,10 @@
 //
 // `flutter test` runs gen-l10n automatically (l10n.yaml), so the generated
 // AppLocalizations import resolves on first run.
+import 'package:cycle_app/ui/cycle.dart';
+import 'package:cycle_app/ui/diary.dart';
+import 'package:cycle_app/ui/settings.dart';
+import 'package:cycle_app/ui/statistics.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -219,6 +223,29 @@ void main() {
     expect(find.byKey(const ValueKey('mucusQualityRow')), findsNothing);
   });
 
+  /// The (label, screen-type) pairs of the shell's four destinations in
+  /// navigation order — [navLabel] taps and the visible-screen pin follow
+  /// the same vocabulary.
+  const tabs = <(String, Type)>[
+    ('Tagebuch', TagebuchScreen),
+    ('Zyklus', ZyklusScreen),
+    ('Statistik', StatistikScreen),
+    ('Einstellungen', EinstellungenScreen),
+  ];
+
+  /// Drives the real diary save path (AppBar action) far enough that the
+  /// confirmation snackbar is fully shown: one pump starts the async save,
+  /// the next flags it in, the timed pump lets the entrance animation run
+  /// out so the final rect is the docked one. The snackbar's seconds-long
+  /// display timer keeps running — deliberately, the scenarios below act
+  /// WHILE it is visible.
+  Future<void> showDiarySavedSnackbar(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey('diarySaveAction')));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   testWidgets('PIN lock stub is visible and non-interactive', (
     WidgetTester tester,
   ) async {
@@ -241,4 +268,91 @@ void main() {
     expect(pinSwitch.value, isFalse);
     expect(pinSwitch.onChanged, isNull);
   });
+
+  testWidgets('phone portrait: the save snackbar never drapes the bottom '
+      'NavigationBar and tabs stay tappable while it shows', (
+    WidgetTester tester,
+  ) async {
+    useViewportSize(tester, const Size(480, 800));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
+    await tester.pumpAndSettle();
+
+    await showDiarySavedSnackbar(tester);
+
+    expect(
+      find.byType(SnackBar),
+      findsOneWidget,
+      reason: 'the save flow shows its confirmation snackbar',
+    );
+    // The geometric invariant: the NavigationBar's top edge sits at or
+    // below the snackbar's bottom edge — the bar is never covered by the
+    // snackbar's rect, so its destination taps cannot be intercepted.
+    final barTop = tester.getRect(find.byType(NavigationBar)).top;
+    final snackbarBottom = tester.getRect(find.byType(SnackBar)).bottom;
+    expect(
+      barTop,
+      greaterThanOrEqualTo(snackbarBottom),
+      reason:
+          'the snackbar must dock at or above the NavigationBar '
+          '(bar top $barTop vs snackbar bottom $snackbarBottom)',
+    );
+
+    // Behavioral invariant on top: with the snackbar still on screen, a
+    // destination tap really lands on the NavigationBar.
+    // Sequential snackbars: saving again while the first one shows must
+    // not re-drape the bar either (the second save queues or replaces —
+    // either way the visible snackbar keeps the dock-above geometry).
+    await showDiarySavedSnackbar(tester);
+    expect(
+      tester.getRect(find.byType(NavigationBar)).top,
+      greaterThanOrEqualTo(tester.getRect(find.byType(SnackBar)).bottom),
+      reason: 'a second save must not re-drape the NavigationBar',
+    );
+
+    await tester.tap(navLabel('Zyklus'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(ZyklusScreen),
+      findsOneWidget,
+      reason: 'the Cycle tab is tappable while the snackbar shows',
+    );
+    expect(
+      find.byType(TagebuchScreen),
+      findsNothing,
+      reason: 'the tap must have actually switched the shown tab',
+    );
+  });
+
+  testWidgets(
+    'wide shell with rail: all four destinations stay tappable while the '
+    'save snackbar shows',
+    (WidgetTester tester) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(appScope(locale: const Locale('de')));
+      await tester.pumpAndSettle();
+
+      await showDiarySavedSnackbar(tester);
+
+      expect(
+        find.byType(SnackBar),
+        findsOneWidget,
+        reason: 'the save flow shows its confirmation snackbar',
+      );
+
+      // The rail groups its destinations near the top, far above the
+      // snackbar's bottom strip, so every destination must carry through
+      // while the snackbar is visible.
+      for (final (label, screenType) in tabs) {
+        await tester.tap(navLabel(label));
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(screenType),
+          findsOneWidget,
+          reason:
+              'rail destination "$label" is tappable while the snackbar '
+              'shows',
+        );
+      }
+    },
+  );
 }

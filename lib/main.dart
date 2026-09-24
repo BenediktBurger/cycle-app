@@ -221,40 +221,48 @@ void _persistSetting(
 /// settings hydration: a simple loading splash while the (possibly
 /// wasm/OPFS-side) open is in flight — kept up while the persisted-settings
 /// snapshot loads from the freshly opened database — and a retrying error
-/// screen so users can recover from, e.g., an OPFS hiccup.
+/// screen so users can recover from, e.g., an OPFS hiccup. The waiting
+/// branches bring their own Scaffold; on the interactive paths the shell's
+/// own Scaffold must be the topmost one in the messenger's scope.
 class _DatabaseGate extends ConsumerWidget {
   const _DatabaseGate();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dbAsync = ref.watch(databaseProvider);
-    return Scaffold(
-      body: dbAsync.when(
-        loading: () => const _SplashLoading(),
-        error: (error, stackTrace) => _DatabaseError(
+    return dbAsync.when(
+      loading: () => const Scaffold(body: _SplashLoading()),
+      error: (error, stackTrace) => Scaffold(
+        body: _DatabaseError(
           error: error,
           retry: () => ref.invalidate(databaseProvider),
         ),
-        data: (CycleDatabase db) {
-          // The shell opens on the persisted-settings snapshot, not on the
-          // bare database: hydration (CycleApp.initState) applies the
-          // snapshot into the settings providers — the onboarding-completed
-          // flag among them — the moment this value arrives, so waiting
-          // here lets a returning user's hydrated state drive the first
-          // shell frame instead of flashing the first-start page while the
-          // settings are still in flight.
-          final settingsAsync = ref.watch(persistedSettingsProvider);
-          return settingsAsync.when(
-            loading: () => const _SplashLoading(),
-            // Fail-open: a broken settings read renders the shell so a
-            // faulty settings source never bricks the app. Effectively a
-            // db-level path only — SettingsStore.load() already degrades
-            // corrupt per-key values (catch-per-row).
-            error: (error, stackTrace) => const _HomeGate(),
-            data: (_) => const _HomeGate(),
-          );
-        },
       ),
+      // NO wrapper Scaffold here: the interactive branches return their
+      // content unwrapped so the shell's own Scaffold (and the about
+      // page's) is the topmost Scaffold in the root messenger's scope —
+      // SnackBars then dock above the shell's bottom NavigationBar / rail
+      // instead of draping it and blocking destination taps while they
+      // show. Only the waiting branches need a Scaffold of their own.
+      data: (CycleDatabase db) {
+        // The shell opens on the persisted-settings snapshot, not on the
+        // bare database: hydration (CycleApp.initState) applies the
+        // snapshot into the settings providers — the onboarding-completed
+        // flag among them — the moment this value arrives, so waiting
+        // here lets a returning user's hydrated state drive the first
+        // shell frame instead of flashing the first-start page while the
+        // settings are still in flight.
+        final settingsAsync = ref.watch(persistedSettingsProvider);
+        return settingsAsync.when(
+          loading: () => const Scaffold(body: _SplashLoading()),
+          // Fail-open: a broken settings read renders the shell so a
+          // faulty settings source never bricks the app. Effectively a
+          // db-level path only — SettingsStore.load() already degrades
+          // corrupt per-key values (catch-per-row).
+          error: (error, stackTrace) => const _HomeGate(),
+          data: (_) => const _HomeGate(),
+        );
+      },
     );
   }
 }
