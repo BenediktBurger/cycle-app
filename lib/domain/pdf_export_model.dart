@@ -101,12 +101,11 @@ final class PdfExportModel {
     required this.cycles,
     required this.markOpenedIndexes,
     required this.overlays,
-    required this.observedCycleCount,
     required this.observedCyclesOutsideApp,
     required this.name,
     required this.birthDate,
-    required this.shortestCycleLength,
-    required this.earliestFirstHigherCycleDay,
+    required this.shortestCycleLengths,
+    required this.earliestFirstHigherCycleDays,
     this.temperatureRange = TemperatureRange.defaults,
   });
 
@@ -122,8 +121,9 @@ final class PdfExportModel {
   /// pre-mark group excluded, same as the count). [ordinalOf] routes
   /// through it so an exported cycle always prints its REAL number from
   /// the whole record — a subset export never re-indexes the selected
-  /// set (the same spirit as [shortestCycleLength], which also reads the
-  /// whole record).
+  /// set, and that same real number is the page's observed-cycle count
+  /// (the paper form counts up until the count reaches the cycle's own
+  /// number).
   final List<int> markOpenedIndexes;
 
   /// The per-cycle evaluation overlays, PARALLEL to [cycles]
@@ -155,39 +155,43 @@ final class PdfExportModel {
   /// date-only normalized, or null when unset.
   final DateTime? birthDate;
 
-  /// The shortest cycle length among the EXPORTED cycles in whole days:
-  /// each exported cycle's gap to its direct successor's start in the
-  /// WHOLE mark-opened cycle list (its real length — unaffected by the
-  /// subset selection, even when the successor is a cycle that was not
-  /// exported); a cycle without a successor (the last one) has an open
-  /// end and contributes no length. Null when fewer than two exported
-  /// starts.
-  final int? shortestCycleLength;
+  /// The per-cycle shortest-cycle fact, PARALLEL to [cycles]: the length
+  /// of the shortest COMPLETED cycle known at `cycles[i]`'s point of view
+  /// — the minimum over the mark-opened cycles STRICTLY EARLIER in the
+  /// whole record. The running cycle's own length is deliberately
+  /// excluded: a cycle's length is only known once a LATER cycle exists,
+  /// so counting it would make an early page's number change when it is
+  /// reprinted after later cycles were tracked (the paper form counts up
+  /// as cycles accumulate — an export must reproduce the sheet exactly as
+  /// it looked at that cycle's time). The first cycle of a record
+  /// therefore always carries null and the renderer shows "—". The
+  /// lengths measure each earlier cycle to its direct successor in the
+  /// WHOLE record (never a between-cycles distance in a subset).
+  final List<int?> shortestCycleLengths;
 
-  /// The earliest cycle-day of the cycles' marked first higher
-  /// measurement across the exported cycles, as the documented two-variant
-  /// record of `earliestFirstHigherCycleDay` (lib/domain/statistics.dart):
-  /// `any` — the pure minimum; `afterMucusPeak` — the minimum over only
-  /// the first-higher marks lying STRICTLY after the cycle's marked mucus
-  /// peak ("the real first higher"). The generator prefers
-  /// `afterMucusPeak` and falls back to `any`; null when no exported
-  /// cycle carries a qualifying mark.
-  final ({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay;
+  /// The per-cycle earliest-first-higher fact, PARALLEL to [cycles]: the
+  /// documented two-variant record of `earliestFirstHigherCycleDay`
+  /// (lib/domain/statistics.dart) computed over the evaluation list
+  /// truncated AT `cycles[i]` (its own rise INCLUDED — from that cycle's
+  /// point of view its rise is part of its own observation, and its marks
+  /// exist in the record whenever it is printed). `any` — the pure
+  /// minimum; `afterMucusPeak` — the minimum over only the first-higher
+  /// marks lying STRICTLY after their cycle's marked mucus peak ("the
+  /// real first higher"). The generator prefers `afterMucusPeak` and
+  /// falls back to `any`; null when no cycle in the prefix carries a
+  /// qualifying mark.
+  final List<({int? any, int? afterMucusPeak})> earliestFirstHigherCycleDays;
 
   /// The display ordinal ("Zyklus N") of the exported cycle at 0-based
   /// [index] — the cycle's REAL number: its mark-opened index in the
   /// whole record ([markOpenedIndexes]) through [cycleOrdinalNumber], so
   /// the page header names the cycle exactly as the selection list and
-  /// the cycle page do, whatever subset was exported.
+  /// the cycle page do, whatever subset was exported. This is ALSO the
+  /// page's "Beobachtete Zyklen" count: on the paper form the count-up
+  /// reaches the cycle's own number when it is printed, so both header
+  /// lines carry the same figure and cannot drift.
   int ordinalOf(int index) =>
       cycleOrdinalNumber(markOpenedIndexes[index], observedCyclesOutsideApp);
-
-  /// The total observed cycles the header reports: the WHOLE record's
-  /// mark-opened cycles PLUS the outside-app cycles the settings count
-  /// shifts in ahead of them ("Zyklus' gesamt") — a subset export still
-  /// reports the user's full observed history, never the exported pages'
-  /// count.
-  final int observedCycleCount;
 }
 
 /// Builds the [PdfExportModel] for one export run.
@@ -207,14 +211,16 @@ final class PdfExportModel {
 /// from the data). NOTE: a selection that drops interior cycles makes the
 /// exported list SHORTER than the observed record — but the exported
 /// cycles keep their REAL numbers from the whole record (each carries its
-/// mark-opened index; see [PdfExportModel.markOpenedIndexes]) and the
-/// header's observed-cycle count is the WHOLE record's count plus the
-/// outside-app count, so a subset export never re-indexes the user's
-/// history. In the same spirit the header's shortest-cycle fact stays
-/// truthful regardless: each exported cycle's length is its gap to its
-/// direct successor in the WHOLE record (see
-/// [PdfExportModel.shortestCycleLength]), never the distance between
-/// non-neighboring exported starts.
+/// mark-opened index; see [PdfExportModel.markOpenedIndexes]):
+/// every running header fact is computed from the record PREFIX truncated
+/// at the printed cycle, from the paper form's point of view — an
+/// exported page is identical however late it is printed (print
+/// idempotency). In the same view the per-cycle shortest-cycle fact and
+/// earliest-higher fact stay truthful regardless of the subset: they read
+/// the whole record up to the printed cycle (see
+/// [PdfExportModel.shortestCycleLengths] and
+/// [PdfExportModel.earliestFirstHigherCycleDays]), never the exported
+/// pages alone.
 ///
 /// [birthDate] may carry time-of-day noise; it is normalized to the
 /// calendar day (DateOnly convention) so header formatting stays exact.
@@ -259,9 +265,8 @@ PdfExportModel buildPdfExportModel({
   // so an exported cycle's position in it matters — same call shape the
   // chart uses, one overlay per exported cycle). The same loop counts the
   // record's mark-opened cycles, so every exported cycle records its REAL
-  // 0-based mark-opened index alongside (ordinal shift included in the
-  // ordinal, not here) and the whole-record mark-opened count is known
-  // even when only a subset is exported.
+  // 0-based mark-opened index alongside (the outside-app shift is part of
+  // the ordinal, not of this index).
   final exportedIndexes = <int>[];
   final markOpenedIndexes = <int>[];
   var markOpenedCount = 0;
@@ -299,28 +304,44 @@ PdfExportModel buildPdfExportModel({
       ),
   ];
 
-  // Shortest length: each EXPORTED cycle's gap to its direct successor's
-  // start in the WHOLE cycle list `all` — the next cycle, always
-  // mark-opened by the grouping's opening rule (only the LEADING group,
-  // which opens at no mark and is never exported, can be
-  // non-mark-opened) — so an exported cycle's REAL length is known even
-  // when the following exported cycle is not its successor: a
-  // non-contiguous subset export must never print a between-cycles
-  // distance as a cycle length. A cycle with no successor (the list's
-  // last one) has an open end and contributes none. Calendar-day gaps via
-  // DateOnly (DST-immune; see lib/domain/date_only.dart).
-  int? shortestCycleLength;
-  if (exported.length >= 2) {
-    int? best;
-    for (final index in exportedIndexes) {
-      if (index + 1 >= all.length) continue;
+  // The per-cycle header statistics, parallel to `exported`, each
+  // computed from the record's point of view AT that cycle so a page is
+  // idempotent however late it is printed:
+  //
+  // - Shortest cycle (EXCLUSIVE of the running cycle): the minimum over
+  //   the COMPLETED lengths of the strictly earlier mark-opened cycles
+  //   (indexes 0..m-1). Earlier cycles' lengths are known from the record
+  //   whenever the page prints, so they cannot change it; the running
+  //   cycle's own length needs a LATER cycle to exist and would rewrite
+  //   the page once it did — excluded. The first cycle of a record has no
+  //   completed earlier cycle and carries null (the renderer's "—").
+  //
+  // - Earliest first higher (INCLUSIVE of the running cycle): the shared
+  //   two-variant helper over the evaluation PREFIX — `all` truncated at
+  //   the cycle's own position (a slice of the already-built list, so the
+  //   per-cycle anchored fields are the identical objects). The helper's
+  //   own rules (skip non-mark-opened, ignore the leading pre-mark group)
+  //   keep applying on the slice; unexported earlier cycles count too —
+  //   the paper form counted them.
+  final shortestCycleLengths = <int?>[];
+  final earliestFirstHigherCycleDays = <({int? any, int? afterMucusPeak})>[];
+  for (var e = 0; e < exportedIndexes.length; e++) {
+    final i = exportedIndexes[e];
+    int? shortest;
+    for (var p = 0; p < i; p++) {
+      // Only mark-opened cycles are observed cycles the paper form
+      // counts; their successor all[p + 1] always exists (p < i).
+      if (!all[p].cycle.startsAtMenstruation) continue;
       final gap = DateOnly.daysBetween(
-        all[index + 1].cycle.startDate,
-        all[index].cycle.startDate,
+        all[p + 1].cycle.startDate,
+        all[p].cycle.startDate,
       );
-      if (best == null || gap < best) best = gap;
+      if (shortest == null || gap < shortest) shortest = gap;
     }
-    shortestCycleLength = best;
+    shortestCycleLengths.add(shortest);
+    earliestFirstHigherCycleDays.add(
+      earliestFirstHigherCycleDay(all.sublist(0, i + 1)),
+    );
   }
 
   final trimmedName = name?.trim();
@@ -329,18 +350,16 @@ PdfExportModel buildPdfExportModel({
     cycles: List.unmodifiable(exported),
     markOpenedIndexes: List.unmodifiable(markOpenedIndexes),
     overlays: List.unmodifiable(overlays),
-    // The header count is the WHOLE record's count (see the class doc):
-    // the subset selection may drop cycles from the pages, never from
-    // the user's observed history.
-    observedCycleCount: markOpenedCount + observedCyclesOutsideApp,
     observedCyclesOutsideApp: observedCyclesOutsideApp,
     // The name is trimmed HERE, at the model entry point, so the model can
     // never carry padding — persistPdfExportName and the settings UI trim
     // the same way, and blank (whitespace-only) input stays null.
     name: (trimmedName != null && trimmedName.isNotEmpty) ? trimmedName : null,
     birthDate: birthDate == null ? null : DateOnly.normalize(birthDate),
-    shortestCycleLength: shortestCycleLength,
-    earliestFirstHigherCycleDay: earliestFirstHigherCycleDay(exported),
+    shortestCycleLengths: List.unmodifiable(shortestCycleLengths),
+    earliestFirstHigherCycleDays: List.unmodifiable(
+      earliestFirstHigherCycleDays,
+    ),
     temperatureRange: temperatureRange,
   );
 }

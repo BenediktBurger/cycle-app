@@ -25,14 +25,13 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 
 const _fakeModel = PdfExportModel(
   cycles: [],
-  markOpenedIndexes: [],
+  markOpenedIndexes: [0],
   overlays: [],
-  observedCycleCount: 3,
   observedCyclesOutsideApp: 3,
   name: 'Maria Muster',
   birthDate: null,
-  shortestCycleLength: 27,
-  earliestFirstHigherCycleDay: (any: 14, afterMucusPeak: 14),
+  shortestCycleLengths: [27],
+  earliestFirstHigherCycleDays: [(any: 14, afterMucusPeak: 14)],
 );
 
 /// Fixture data: two mark-opened cycles (Mar 1..28: 28 days; Mar 29..Apr 28:
@@ -165,12 +164,18 @@ void main() {
 
   group('header facts (pure)', () {
     test('a named export shows the identifying values and the numbers', () {
-      final facts = pdfHeaderFacts(model: _fakeModel, anonymized: false);
+      final facts = pdfHeaderFacts(
+        model: _fakeModel,
+        anonymized: false,
+        cycleIndex: 0,
+      );
 
       expect(valueOf(facts, 'Name'), 'Maria Muster');
       // No birth date stored: the "—" convention.
       expect(valueOf(facts, 'Geburtsdatum'), '—');
-      expect(valueOf(facts, 'Beobachtete Zyklen'), '3');
+      // The count is the page's ordinal (the "Zyklus" line's exact source
+      // figure): outside-app 3 + this cycle's 0-based index 0 + 1.
+      expect(valueOf(facts, 'Beobachtete Zyklen'), '4');
       expect(valueOf(facts, 'Kürzester Zyklus'), '27 Tage');
       expect(valueOf(facts, 'Früheste erste höhere Messung'), 'Zyklustag 14');
     });
@@ -178,27 +183,37 @@ void main() {
     test('a stored birth date is formatted as the German calendar date', () {
       final model = PdfExportModel(
         cycles: const [],
-        markOpenedIndexes: const [],
+        markOpenedIndexes: const [0],
         overlays: const [],
-        observedCycleCount: 0,
         observedCyclesOutsideApp: 0,
         name: null,
         birthDate: DateTime.utc(1980, 12, 24),
-        shortestCycleLength: null,
-        earliestFirstHigherCycleDay: (any: null, afterMucusPeak: null),
+        shortestCycleLengths: [null],
+        earliestFirstHigherCycleDays: [(any: null, afterMucusPeak: null)],
       );
-      final facts = pdfHeaderFacts(model: model, anonymized: false);
+      final facts = pdfHeaderFacts(
+        model: model,
+        anonymized: false,
+        cycleIndex: 0,
+      );
 
       expect(valueOf(facts, 'Name'), '—');
       expect(valueOf(facts, 'Geburtsdatum'), '24.12.1980');
-      expect(valueOf(facts, 'Beobachtete Zyklen'), '0');
+      // The count-up can never be empty: it IS the cycle's ordinal (≥ 1).
+      expect(valueOf(facts, 'Beobachtete Zyklen'), '1');
+      // A first cycle has no completed earlier cycle and no earlier rise:
+      // the "—" convention on both statistics.
       expect(valueOf(facts, 'Kürzester Zyklus'), '—');
       expect(valueOf(facts, 'Früheste erste höhere Messung'), '—');
     });
 
     test('the anonymize toggle hides name and birth date REGARDLESS of the '
         'stored settings and marks the document', () {
-      final facts = pdfHeaderFacts(model: _fakeModel, anonymized: true);
+      final facts = pdfHeaderFacts(
+        model: _fakeModel,
+        anonymized: true,
+        cycleIndex: 0,
+      );
 
       expect(
         valueOf(facts, 'Name'),
@@ -228,17 +243,67 @@ void main() {
         'variant and falls back to any', () {
       final model = PdfExportModel(
         cycles: const [],
-        markOpenedIndexes: const [],
+        markOpenedIndexes: const [0],
         overlays: const [],
-        observedCycleCount: 0,
         observedCyclesOutsideApp: 0,
         name: null,
         birthDate: null,
-        shortestCycleLength: 28,
-        earliestFirstHigherCycleDay: (any: 1, afterMucusPeak: 14),
+        shortestCycleLengths: [28],
+        earliestFirstHigherCycleDays: [(any: 1, afterMucusPeak: 14)],
       );
-      final facts = pdfHeaderFacts(model: model, anonymized: false);
+      final facts = pdfHeaderFacts(
+        model: model,
+        anonymized: false,
+        cycleIndex: 0,
+      );
       expect(valueOf(facts, 'Früheste erste höhere Messung'), 'Zyklustag 14');
+    });
+
+    test('the three cumulative facts are read PER CYCLE at the given '
+        'cycleIndex (the paper-form count-up point of view)', () {
+      final model = PdfExportModel(
+        cycles: const [],
+        markOpenedIndexes: const [0, 1],
+        overlays: const [],
+        observedCyclesOutsideApp: 0,
+        name: null,
+        birthDate: null,
+        shortestCycleLengths: [27, 25],
+        earliestFirstHigherCycleDays: [
+          (any: 14, afterMucusPeak: 14),
+          (any: 12, afterMucusPeak: 12),
+        ],
+      );
+      final first = pdfHeaderFacts(
+        model: model,
+        anonymized: false,
+        cycleIndex: 0,
+      );
+      final second = pdfHeaderFacts(
+        model: model,
+        anonymized: false,
+        cycleIndex: 1,
+      );
+      expect(valueOf(first, 'Beobachtete Zyklen'), '1');
+      expect(valueOf(first, 'Kürzester Zyklus'), '27 Tage');
+      expect(valueOf(first, 'Früheste erste höhere Messung'), 'Zyklustag 14');
+      expect(valueOf(second, 'Beobachtete Zyklen'), '2');
+      expect(valueOf(second, 'Kürzester Zyklus'), '25 Tage');
+      expect(valueOf(second, 'Früheste erste höhere Messung'), 'Zyklustag 12');
+    });
+
+    test('"Beobachtete Zyklen" is the SAME source figure as the "Zyklus N" '
+        'header line: model.ordinalOf(cycleIndex) — the count and the '
+        'cycle number cannot drift', () {
+      final facts = pdfHeaderFacts(
+        model: _fakeModel,
+        anonymized: false,
+        cycleIndex: 0,
+      );
+      expect(
+        valueOf(facts, 'Beobachtete Zyklen'),
+        '${_fakeModel.ordinalOf(0)}',
+      );
     });
 
     group('the observation window fact (Zykluszeitraum)', () {
@@ -246,6 +311,7 @@ void main() {
         final facts = pdfHeaderFacts(
           model: _fakeModel,
           anonymized: false,
+          cycleIndex: 0,
           cycleWindow: (
             first: DateTime.utc(2026, 3, 1),
             last: DateTime.utc(2026, 3, 28),
@@ -259,6 +325,7 @@ void main() {
         final facts = pdfHeaderFacts(
           model: _fakeModel,
           anonymized: true,
+          cycleIndex: 0,
           cycleWindow: (
             first: DateTime.utc(2026, 3, 29),
             last: DateTime.utc(2026, 5, 2),
@@ -269,7 +336,11 @@ void main() {
       });
 
       test('a page outside any cycle facts (degenerate) keeps the "—"', () {
-        final facts = pdfHeaderFacts(model: _fakeModel, anonymized: false);
+        final facts = pdfHeaderFacts(
+          model: _fakeModel,
+          anonymized: false,
+          cycleIndex: 0,
+        );
         expect(
           facts.any((f) => f.label == 'Zykluszeitraum'),
           isFalse,

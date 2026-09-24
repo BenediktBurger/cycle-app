@@ -82,11 +82,16 @@
 //   when the handwriting runs out of room); there is no overflow marker
 //   and no follow-to-next-page rendering — extending that is future work,
 //   deliberately out of scope.
-// - HEADER PER PAGE: page-constant paper-form facts (identifying values,
-//   the cycle count, the shortest cycle, the earliest first higher, each
-//   under the anonymize rules) plus the per-cycle observation window
-//   ("Zykluszeitraum", with the year — anonymization does NOT hide it)
-//   and the per-page facts: app identifier, the exported cycle number
+// - HEADER PER PAGE: the identifying paper-form facts (name, birth date,
+//   each under the anonymize rules) plus the CUMULATIVE ones, which are
+//   per-cycle: "Beobachtete Zyklen" is the page's own cycle number (the
+//   paper form counts up until the count reaches the printed cycle's
+//   number — "Zyklus N" and the count carry the same figure), and the
+//   shortest-cycle / earliest-first-higher statistics are truncated at
+//   the printed cycle, so an exported page is identical however late it
+//   is reprinted (print idempotency). Then the per-cycle observation
+//   window ("Zykluszeitraum", with the year — anonymization does NOT
+//   hide it) and the per-page facts: app identifier, the cycle number
 //   ("Zyklus N", "Blatt k/n" while a cycle continues over pages) and the
 //   export date. The window fact and the export date put the year on the
 //   document.
@@ -165,8 +170,17 @@ final class PdfExportOptions {
 }
 
 /// The header facts as ready-to-label rows, one record per line: the pure
-/// mapping from model + per-export anonymize toggle to the paper-form
-/// info. Every missing value becomes the "—" convention.
+/// mapping from model + per-cycle index + per-export anonymize toggle to
+/// the paper-form info. Every missing value becomes the "—" convention.
+///
+/// The cumulative facts ("Beobachtete Zyklen", "Kürzester Zyklus",
+/// "Früheste erste höhere Messung") are read at [cycleIndex] — the printed
+/// cycle's point of view, never the whole record's: on the paper form
+/// these numbers are counted up as cycles accumulate, so a page must show
+/// the state as of ITS cycle (print idempotency). The count is the page's
+/// ordinal itself ([PdfExportModel.ordinalOf] — one shared rule behind
+/// "Zyklus N" and the count), the two statistics come straight from the
+/// model's parallel lists. The renderer indexes; it never re-derives.
 ///
 /// The anonymize mapping (decided): the stored name and birth date NEVER
 /// reach the document when the toggle was on — the name line itself reads
@@ -179,28 +193,28 @@ final class PdfExportOptions {
 List<({String label, String value})> pdfHeaderFacts({
   required PdfExportModel model,
   required bool anonymized,
+  required int cycleIndex,
   ({DateTime first, DateTime last})? cycleWindow,
 }) {
   final birthDate = model.birthDate == null
       ? null
       : _formatDate(DateOnly.normalize(model.birthDate!));
-  final earliestHigher =
-      model.earliestFirstHigherCycleDay.afterMucusPeak ??
-      model.earliestFirstHigherCycleDay.any;
+  final earliest =
+      model.earliestFirstHigherCycleDays[cycleIndex].afterMucusPeak ??
+      model.earliestFirstHigherCycleDays[cycleIndex].any;
+  final shortest = model.shortestCycleLengths[cycleIndex];
   return [
     if (anonymized) (label: 'Anonymisierung', value: 'anonymisiert'),
     (label: 'Name', value: anonymized ? 'anonymisiert' : (model.name ?? '—')),
     (label: 'Geburtsdatum', value: anonymized ? '—' : (birthDate ?? '—')),
-    (label: 'Beobachtete Zyklen', value: '${model.observedCycleCount}'),
+    (label: 'Beobachtete Zyklen', value: '${model.ordinalOf(cycleIndex)}'),
     (
       label: 'Kürzester Zyklus',
-      value: model.shortestCycleLength == null
-          ? '—'
-          : '${model.shortestCycleLength} Tage',
+      value: shortest == null ? '—' : '$shortest Tage',
     ),
     (
       label: 'Früheste erste höhere Messung',
-      value: earliestHigher == null ? '—' : 'Zyklustag $earliestHigher',
+      value: earliest == null ? '—' : 'Zyklustag $earliest',
     ),
     if (cycleWindow != null)
       (
@@ -315,6 +329,11 @@ Future<List<int>> generatePdfBytes({
               facts: pdfHeaderFacts(
                 model: model,
                 anonymized: options.anonymized,
+                // The page's point of view: the printed cycle's position
+                // among the exported cycles — every cumulative header
+                // fact reads the model AT this cycle (print idempotency;
+                // see pdfHeaderFacts).
+                cycleIndex: window.cycleIndex,
                 // This page's cycle's observation window (first–last tracked
                 // day), carried WITH the year into the header facts.
                 cycleWindow: (

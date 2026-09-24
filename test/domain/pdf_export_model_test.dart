@@ -108,13 +108,11 @@ void main() {
       );
       expect(model.cycles, isEmpty);
       expect(
-        model.observedCycleCount,
-        3,
-        reason: 'the outside-app count stands on its own',
+        model.shortestCycleLengths,
+        isEmpty,
+        reason: 'the per-cycle stats lists stay parallel to the cycles',
       );
-      expect(model.shortestCycleLength, isNull);
-      expect(model.earliestFirstHigherCycleDay.any, isNull);
-      expect(model.earliestFirstHigherCycleDay.afterMucusPeak, isNull);
+      expect(model.earliestFirstHigherCycleDays, isEmpty);
       expect(model.name, 'Ada');
       expect(model.birthDate, DateTime.utc(1990, 1, 2));
     });
@@ -132,7 +130,20 @@ void main() {
         3,
         reason: 'the three mark-opened cycles, none filtered out',
       );
-      expect(model.observedCycleCount, 3);
+      // The page's observed-cycle count IS its ordinal (the shared
+      // numbering rule behind "Zyklus N") — the paper form counts up
+      // until the count reaches the cycle's own number.
+      final counts = [
+        for (var i = 0; i < model.cycles.length; i++) model.ordinalOf(i),
+      ];
+      expect(
+        counts,
+        [1, 2, 3],
+        reason:
+            'each page counts itself up: "Beobachtete Zyklen" is the '
+            'same number as the "Zyklus N" line (one shared rule), so '
+            'the two cannot drift apart',
+      );
       final ordinals = [
         for (var i = 0; i < model.cycles.length; i++)
           cycleOrdinalNumber(i, model.observedCyclesOutsideApp),
@@ -151,10 +162,16 @@ void main() {
         marks: modelMarks(),
         observedCyclesOutsideApp: 4,
       );
+      final counts = [
+        for (var i = 0; i < model.cycles.length; i++) model.ordinalOf(i),
+      ];
       expect(
-        model.observedCycleCount,
-        7,
-        reason: '4 paper cycles before the app + 3 recorded here',
+        counts,
+        [5, 6, 7],
+        reason:
+            'each page counts ITSELF up through the outside-app shift '
+            '(the count IS its ordinal); no page carries a number '
+            'counted beyond its own cycle',
       );
       final ordinals = [
         for (var i = 0; i < model.cycles.length; i++)
@@ -173,10 +190,15 @@ void main() {
         observedCyclesOutsideApp: 4,
       );
       expect(model.cycles.length, 3, reason: 'three MARK-OPENED cycles');
+      final counts = [
+        for (var i = 0; i < model.cycles.length; i++) model.ordinalOf(i),
+      ];
       expect(
-        model.observedCycleCount,
-        7,
-        reason: 'the pre-mark group is not one of them',
+        counts,
+        [5, 6, 7],
+        reason:
+            'the pre-mark group shifts nothing; the page count is '
+            'its ordinal',
       );
       final ordinals = [
         for (var i = 0; i < model.cycles.length; i++)
@@ -199,12 +221,18 @@ void main() {
         exportStartsUpTo: d(3, 29),
       );
       expect(upToSecond.cycles.length, 2);
+      final counts = [
+        for (var i = 0; i < upToSecond.cycles.length; i++)
+          upToSecond.ordinalOf(i),
+      ];
       expect(
-        upToSecond.observedCycleCount,
-        7,
+        counts,
+        [5, 6],
         reason:
-            'the WHOLE record: 4 outside-app cycles + 3 recorded here — '
-            'not the exported subset\'s size',
+            'per-cycle count-up: a page\'s "Beobachtete Zyklen" is its '
+            'own ordinal — even inside a "up to" export where the pair '
+            'of numbers coincide, the paper form never counts ahead of '
+            'the printed cycle',
       );
       final ordinals = [
         for (var i = 0; i < upToSecond.cycles.length; i++)
@@ -307,12 +335,12 @@ void main() {
         7,
         reason:
             'the record\'s third mark-opened cycle, shifted by the 4 '
-            'outside-app cycles — never the subset\'s re-indexed "1"',
-      );
-      expect(
-        model.observedCycleCount,
-        7,
-        reason: '4 outside-app cycles + 3 recorded in the app',
+            'outside-app cycles — never the subset\'s re-indexed "1"; '
+            'the page\'s "Beobachtete Zyklen" reads the SAME 7 (the '
+            'count is the ordinal, both routes through the shared rule) '
+            '— here, where the paper cycles 4–6 were never exported '
+            'either, the count-up still reaches 7 because the observed '
+            'history the user counts on paper includes them',
       );
 
       // The report's scenario with a larger paper history: 10 observed
@@ -324,7 +352,6 @@ void main() {
         selectedStartDates: {d(4, 26)},
       );
       expect(tenPaper.ordinalOf(0), 13);
-      expect(tenPaper.observedCycleCount, 13);
     });
 
     test('the selection is the normalized cycle-START identity: time-of-day '
@@ -372,74 +399,171 @@ void main() {
     });
   });
 
-  group('shortest cycle length', () {
-    test('minimum of the gaps between consecutive exported starts; the '
-        'open last cycle contributes none', () {
+  group('print idempotency (the paper-form point of view)', () {
+    test('appending later cycles to the record changes NO earlier exported '
+        'cycle\'s page values', () {
+      // Split the fixture at cycle 2's start mark: the pre-mark entry plus
+      // cycle 1 (with its marks) vs cycles 2 and 3 from Mar 29 on.
+      final cut = d(3, 29);
+      bool earlier(DateTime date) =>
+          DateOnly.normalize(date).isBefore(DateOnly.normalize(cut));
+      final earlyEntries = [
+        for (final e in modelEntries())
+          if (earlier(e.date)) e,
+      ];
+      final laterEntries = [
+        for (final e in modelEntries())
+          if (!earlier(e.date)) e,
+      ];
+      final earlyMarks = [
+        for (final m in modelMarks())
+          if (earlier(m.date)) m,
+      ];
+      final laterMarks = [
+        for (final m in modelMarks())
+          if (!earlier(m.date)) m,
+      ];
+      final selection = {d(3, 1)};
+
+      // First print: the record ends with cycle 1 and it is exported
+      // alone — exactly the shape of printing it while it was the latest
+      // observed cycle.
+      final before = buildPdfExportModel(
+        entries: earlyEntries,
+        marks: earlyMarks,
+        observedCyclesOutsideApp: 4,
+        selectedStartDates: selection,
+      );
+      expect(before.cycles.length, 1);
+      final beforeOrdinal = before.ordinalOf(0);
+      final beforeShortest = before.shortestCycleLengths.single;
+      final beforeEarliest = before.earliestFirstHigherCycleDays.single;
+      expect(
+        beforeOrdinal,
+        5,
+        reason: '4 paper cycles + this record\'s first cycle',
+      );
+      expect(
+        beforeShortest,
+        isNull,
+        reason: 'no completed cycle exists before it yet',
+      );
+      expect(beforeEarliest, (
+        any: 14,
+        afterMucusPeak: 14,
+      ), reason: 'its own rise is part of its own observation');
+
+      // Later print: cycles 2 and 3 exist in the record now; the SAME
+      // cycle 1 is exported with the SAME selection. Its page must print
+      // the identical numbers and stats — nothing may be recomputed from
+      // data that did not exist when the page was first printed.
+      final after = buildPdfExportModel(
+        entries: [...earlyEntries, ...laterEntries],
+        marks: [...earlyMarks, ...laterMarks],
+        observedCyclesOutsideApp: 4,
+        selectedStartDates: selection,
+      );
+      expect(after.cycles.length, 1);
+      expect(
+        after.ordinalOf(0),
+        beforeOrdinal,
+        reason: 'an exported subset never re-indexes the selected set',
+      );
+      expect(
+        after.shortestCycleLengths.single,
+        beforeShortest,
+        reason:
+            'cycle 1 has a completed 28-day length only once a later '
+            'cycle exists — the page keeps the "—" it printed then',
+      );
+      expect(
+        after.earliestFirstHigherCycleDays.single,
+        beforeEarliest,
+        reason:
+            'later cycles carry no earlier rise here, and even if one '
+            'did, the truncation at cycle 1 would keep them out',
+      );
+    });
+  });
+
+  group('per-cycle shortest cycle length (the prefix truncation)', () {
+    test('the shortest COMPLETED length counts up per cycle: none for the '
+        'first, later cycles excluded (print idempotency)', () {
       final model = buildPdfExportModel(
         entries: modelEntries(),
         marks: modelMarks(),
       );
-      // Starts: Mar 1 -> Mar 29 (28), Mar 29 -> Apr 26 (28).
-      expect(model.shortestCycleLength, 28);
+      // Starts: Mar 1 -> Mar 29 (28) -> Apr 26 (28). Cycle 1 has no
+      // completed EARLIER cycle; cycles 2 and 3 each see cycle 1's
+      // finished 28 — every page's own (not-yet-completed) length stays
+      // out, so printing an early cycle after later ones exist cannot
+      // change its number.
+      expect(model.shortestCycleLengths, [null, 28, 28]);
 
       final truncated = buildPdfExportModel(
         entries: modelEntries(),
         marks: modelMarks(),
         exportStartsUpTo: d(4, 26),
       );
-      expect(
-        truncated.shortestCycleLength,
+      expect(truncated.shortestCycleLengths, [
+        null,
         28,
-        reason: 'the last start has no known follow-up length',
-      );
+        28,
+      ], reason: 'the facts read the record prefix, not the exported subset');
     });
 
-    test('a NON-CONTIGUOUS subset reports the exported cycles\' REAL '
-        'lengths: each exported cycle is measured to its direct successor '
-        'in the WHOLE cycle list', () {
-      // Cycles 1 and 3 of 3: cycle 1's successor is the UNSELECTED cycle 2
-      // (Mar 29 -> 28 days). The consecutive-EXPORTED distance (Mar 1 ->
-      // Apr 26 = 56) is a between-cycles distance, not a cycle length, and
-      // must never print as "Kürzester Zyklus".
+    test('a NON-CONTIGUOUS subset counts the unexported cycles too: the '
+        'prefix runs over the WHOLE record up to the printed cycle', () {
+      // Cycles 1 and 3 of 3: cycle 3's page sees cycle 1's completed
+      // length (to the successor Mar 29) AND the unexported cycle 2's
+      // completed length (Mar 29 -> Apr 26, 28) — the paper form would
+      // have counted both. The consecutive-EXPORTED distance (Mar 1 ->
+      // Apr 26 = 56) is a between-cycles distance and must never appear.
       final subset = buildPdfExportModel(
         entries: modelEntries(),
         marks: modelMarks(),
         selectedStartDates: {d(3, 1), d(4, 26)},
       );
       expect(subset.cycles.length, 2);
-      expect(
-        subset.shortestCycleLength,
-        28,
-        reason:
-            'cycle 1\'s real length (to its successor in the marked '
-            'cycle list), not the 56 the exported starts would suggest',
-      );
+      expect(subset.shortestCycleLengths, [null, 28]);
     });
 
-    test('a CONSECUTIVE selection keeps its minimum: each exported cycle '
-        'has its successor among the exported ones, too', () {
+    test('a CONSECUTIVE selection keeps the same per-cycle values as the '
+        'export-all case', () {
       final subset = buildPdfExportModel(
         entries: modelEntries(),
         marks: modelMarks(),
         selectedStartDates: {d(3, 1), d(3, 29)},
       );
-      expect(
-        subset.shortestCycleLength,
-        28,
-        reason:
-            'the min over the exported cycles\' successor gaps — the '
-            'same value the consecutive-exported computation gave',
-      );
+      expect(subset.shortestCycleLengths, [null, 28]);
     });
 
-    test('fewer than two exported starts: no length at all', () {
+    test('a single exported cycle (the first): no completed earlier cycle, '
+        'so the page falls back to the "—" convention', () {
       final single = buildPdfExportModel(
         entries: modelEntries(),
         marks: modelMarks(),
         exportStartsUpTo: d(3, 1),
       );
       expect(single.cycles.length, 1);
-      expect(single.shortestCycleLength, isNull);
+      expect(single.shortestCycleLengths, [null]);
+    });
+
+    test('a single exported cycle (the LAST): its own completed length is '
+        'known only once later cycles exist, so it is excluded and the '
+        'earlier ones still count', () {
+      final last = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        selectedStartDates: {d(4, 26)},
+      );
+      expect(
+        last.shortestCycleLengths,
+        [28],
+        reason:
+            'cycle 1\'s completed 28, not cycle 3\'s own open-ended '
+            'span (which would make the page non-idempotent)',
+      );
     });
   });
 
@@ -453,7 +577,8 @@ void main() {
       CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
     ];
 
-    test('minimum over the exported mark-opened cycles, both variants', () {
+    test('computed per cycle over the record prefix truncated AT the '
+        'printed cycle (its own rise included), both variants', () {
       final model = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
@@ -462,16 +587,43 @@ void main() {
       // Cycle 1: rise marked Mar 14, start Mar 1 -> cycle day 14, strictly
       // after the peak (Mar 12). Cycle 2: rise on the start day itself ->
       // cycle day 1, NOT strictly after the same-day peak.
-      expect(model.earliestFirstHigherCycleDay.any, 1);
+      expect(model.earliestFirstHigherCycleDays.length, 2);
+      expect(model.earliestFirstHigherCycleDays[0], (
+        any: 14,
+        afterMucusPeak: 14,
+      ));
       expect(
-        model.earliestFirstHigherCycleDay.afterMucusPeak,
-        14,
-        reason: 'the "real" first higher stays cycle 1\'s late rise',
+        model.earliestFirstHigherCycleDays[1],
+        (any: 1, afterMucusPeak: 14),
+        reason:
+            'cycle 2\'s page sees its own day-1 rise in the "any" '
+            'variant while the "real" variant stays cycle 1\'s late rise',
       );
     });
 
-    test('delegates to the documented two-variant helper — the statistics '
-        'screen and the PDF header cannot drift', () {
+    test('a later cycle can never rewrite an earlier page: cycle 1\'s '
+        'earliest stays its own 14 with the divergent cycles 2 and 3 '
+        'present in the record', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: divergentMarks(),
+      );
+      expect(
+        model.earliestFirstHigherCycleDays,
+        [
+          (any: 14, afterMucusPeak: 14),
+          (any: 1, afterMucusPeak: 14),
+          (any: 1, afterMucusPeak: 14),
+        ],
+        reason:
+            'the statistic is truncated at the printed cycle, so '
+            'later data never leaks into earlier pages',
+      );
+    });
+
+    test('delegates to the documented two-variant helper — per cycle over '
+        'the record prefix, so the statistics screen and the PDF header '
+        'cannot drift', () {
       final evaluations = evaluateCycles(
         modelEntries(),
         divergentMarks(),
@@ -481,10 +633,16 @@ void main() {
         marks: divergentMarks(),
         exportStartsUpTo: d(3, 29),
       );
-      expect(
-        model.earliestFirstHigherCycleDay,
-        earliestFirstHigherCycleDay(evaluations),
-      );
+      for (var i = 0; i < model.cycles.length; i++) {
+        final prefix = evaluations.sublist(0, model.markOpenedIndexes[i] + 1);
+        expect(
+          model.earliestFirstHigherCycleDays[i],
+          earliestFirstHigherCycleDay(prefix),
+          reason:
+              'page ${i + 1}: the shared helper over the record up to '
+              'that cycle, never over more',
+        );
+      }
     });
   });
 
