@@ -169,6 +169,22 @@ Finder settingsImportJsonButton() =>
 Finder settingsImportDripButton() =>
     find.byKey(const ValueKey('settingsImportDripButton'));
 
+/// The PDF export card's generate button (the card carries the summary
+/// line, the anonymize switch and this action; the selection sub-page's
+/// confirm button is separate).
+Finder pdfExportButton() => find.byKey(const ValueKey('pdfExportButton'));
+
+/// The PDF export card's anonymize switch (card-local state; it never
+/// writes a provider or settings row).
+Finder pdfExportAnonymizeSwitch() =>
+    find.byKey(const ValueKey('pdfExportAnonymizeSwitch'));
+
+/// The cycle-selection sub-page's confirm button: applies the toggled
+/// selection back onto the card — distinct from the All/None shortcuts
+/// that only change the page's rows.
+Finder pdfExportSelectionConfirmButton() =>
+    find.byKey(const ValueKey('pdfExportSelectionConfirmButton'));
+
 /// The color-scheme brightness actually materialized by the running app,
 /// taken from the shell's Scaffold (below the MaterialApp theme wiring).
 Brightness materializedBrightness(WidgetTester tester) {

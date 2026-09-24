@@ -26,6 +26,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/finders.dart';
+
 DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 
 const List<int> fakePdfBytes = [
@@ -131,6 +133,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Pumps [widget] into the tester and then runs one settling cycle — the
+  /// standard (pumpWidget, pumpAndSettle) pair every card test opens with.
+  ///
+  /// A test that needs extra intermediate frames (route transitions,
+  /// snackbar dismissal) keeps its explicit pumps and calls this first, then
+  /// pumps those frames itself.
+  Future<void> pumpCard(WidgetTester tester, Widget widget) async {
+    await tester.pumpWidget(widget);
+    await tester.pumpAndSettle();
+  }
+
   // The selection page's checkbox rows: keyed per row (the row index in
   // the page's visible order — MOST-RECENT-FIRST, so row 0 is the newest
   // cycle).
@@ -148,10 +161,10 @@ void main() {
     'button',
     (WidgetTester tester) async {
       await enlargeViewport(tester);
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         harness(entries: cardEntries(), marks: cardMarks()),
       );
-      await tester.pumpAndSettle();
 
       // The checkbox rows do not render on the card anymore (they moved
       // onto the selection page).
@@ -172,7 +185,7 @@ void main() {
       expect(find.text('3 of 3 cycles selected'), findsOneWidget);
 
       final anonymize = tester.widget<SwitchListTile>(
-        find.byKey(const ValueKey('pdfExportAnonymizeSwitch')).first,
+        pdfExportAnonymizeSwitch().first,
       );
       expect(anonymize.value, isFalse, reason: 'anonymize defaults to off');
     },
@@ -183,10 +196,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await enlargeViewport(tester);
-    await tester.pumpWidget(
-      harness(entries: cardEntries(), marks: cardMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpCard(tester, harness(entries: cardEntries(), marks: cardMarks()));
     await openSelectionPage(tester);
 
     // Pinned controls at the top of the page.
@@ -198,10 +208,7 @@ void main() {
       find.byKey(const ValueKey('pdfExportCycleSelectNone')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
-      findsOneWidget,
-    );
+    expect(pdfExportSelectionConfirmButton(), findsOneWidget);
     // Rows newest-first: the page's row 0 is the newest cycle, the
     // ordinal-row labels keep the shared wording (reversed order).
     expect(
@@ -231,14 +238,14 @@ void main() {
     // built (default viewport would hide the card itself instead).
     const cycles = 80;
     await enlargeViewport(tester);
-    await tester.pumpWidget(
+    await pumpCard(
+      tester,
       harness(
         entries: manyEntries(cycles),
         marks: manyMarks(cycles),
         today: DateTime.utc(2030, 1, 1),
       ),
     );
-    await tester.pumpAndSettle();
     await openSelectionPage(tester);
 
     // The newest cycle (row 0) is onscreen without scrolling.
@@ -267,10 +274,10 @@ void main() {
       return true;
     };
     addTearDown(() => saveFileBytesOverride = null);
-    await tester.pumpWidget(
+    await pumpCard(
+      tester,
       harness(entries: cardEntries(), marks: cardMarks(), runSink: [run]),
     );
-    await tester.pumpAndSettle();
     await openSelectionPage(tester);
 
     // Unselect cycle 2 (the newest-first page's row 1: the middle
@@ -282,15 +289,13 @@ void main() {
     // so the finder matches twice here).
     expect(find.text('2 of 3 cycles selected'), findsWidgets);
 
-    await tester.tap(
-      find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
-    );
+    await tester.tap(pdfExportSelectionConfirmButton());
     await tester.pumpAndSettle();
 
     // The applied selection lands on the card.
     expect(find.text('2 of 3 cycles selected'), findsOneWidget);
     // …and reaches the generation model (builder stub capture).
-    await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+    await tester.tap(pdfExportButton());
     await tester.pumpAndSettle();
     expect(run.model, isNotNull);
     expect(run.model!.cycles.map((e) => e.cycle.startDate).toList(), [
@@ -312,14 +317,14 @@ void main() {
       await enlargeViewport(tester);
       saveFileBytesOverride = (filename, bytes) async => true;
       addTearDown(() => saveFileBytesOverride = null);
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         harness(
           entries: cardEntries(),
           marks: cardMarks(),
           onExport: () => runs++,
         ),
       );
-      await tester.pumpAndSettle();
 
       await openSelectionPage(tester);
       await tester.tap(find.byKey(const ValueKey('pdfExportCycleSelectNone')));
@@ -328,14 +333,12 @@ void main() {
       for (var i = 0; i < 3; i++) {
         expect(rowWidget(tester, i).value, isFalse);
       }
-      await tester.tap(
-        find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
-      );
+      await tester.tap(pdfExportSelectionConfirmButton());
       await tester.pumpAndSettle();
       // The card's summary shows the empty selection.
       expect(find.text('0 of 3 cycles selected'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+      await tester.tap(pdfExportButton());
       await tester.pumpAndSettle();
       expect(
         runs,
@@ -352,9 +355,7 @@ void main() {
       for (var i = 0; i < 3; i++) {
         expect(rowWidget(tester, i).value, isTrue);
       }
-      await tester.tap(
-        find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
-      );
+      await tester.tap(pdfExportSelectionConfirmButton());
       await tester.pumpAndSettle();
       expect(find.text('3 of 3 cycles selected'), findsOneWidget);
     },
@@ -377,7 +378,8 @@ void main() {
       });
       entriesCtrl.add(cardEntries());
       marksCtrl.add(cardMarks());
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         ProviderScope(
           overrides: [
             dailyEntriesProvider.overrideWith((ref) => entriesCtrl.stream),
@@ -394,7 +396,6 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
 
       // Toggle a row to materialize the selection (the first press
       // materializes the implicit all into an explicit set), then toggle
@@ -406,9 +407,7 @@ void main() {
       await tester.tap(row(0), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.text('3 of 3 cycles selected'), findsWidgets);
-      await tester.tap(
-        find.byKey(const ValueKey('pdfExportSelectionConfirmButton')),
-      );
+      await tester.tap(pdfExportSelectionConfirmButton());
       await tester.pumpAndSettle();
       expect(find.text('3 of 3 cycles selected'), findsOneWidget);
 
@@ -440,10 +439,10 @@ void main() {
       await enlargeViewport(tester);
       saveFileBytesOverride = (filename, bytes) async => true;
       addTearDown(() => saveFileBytesOverride = null);
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         harness(entries: cardEntries(), marks: cardMarks(), runSink: [run]),
       );
-      await tester.pumpAndSettle();
       await openSelectionPage(tester);
 
       // Toggle a row off, then leave the page WITHOUT confirming (the
@@ -456,7 +455,7 @@ void main() {
       await tester.pumpAndSettle();
       // Page closed; the card still reads the untouched default all.
       expect(find.text('3 of 3 cycles selected'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+      await tester.tap(pdfExportButton());
       await tester.pumpAndSettle();
       expect(run.model!.cycles, hasLength(3));
     },
@@ -480,12 +479,12 @@ void main() {
         return true;
       };
       addTearDown(() => saveFileBytesOverride = null);
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         harness(entries: cardEntries(), marks: cardMarks(), runSink: runs),
       );
-      await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+      await tester.tap(pdfExportButton());
       await tester.pumpAndSettle();
       expect(firstRun.model, isNotNull);
       expect(
@@ -520,9 +519,9 @@ void main() {
       messenger.clearSnackBars();
       await tester.pump();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('pdfExportAnonymizeSwitch')));
+      await tester.tap(pdfExportAnonymizeSwitch());
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+      await tester.tap(pdfExportButton());
       await tester.pumpAndSettle();
       expect(
         secondRun.options!.anonymized,
@@ -538,13 +537,12 @@ void main() {
     saveFileBytesOverride = (filename, bytes) async => false;
     addTearDown(() => saveFileBytesOverride = null);
 
-    await tester.pumpWidget(
-      harness(entries: cardEntries(), marks: cardMarks()),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+    await pumpCard(tester, harness(entries: cardEntries(), marks: cardMarks()));
+    await tester.tap(pdfExportButton());
     await tester.pumpAndSettle();
 
+    // Status wording pin (retained text find): the exact SnackBar message
+    // is what the failure path promises the user.
     expect(find.text('Saving the file failed.'), findsOneWidget);
   });
 
@@ -563,15 +561,17 @@ void main() {
     };
     addTearDown(() => saveFileBytesOverride = null);
 
-    await tester.pumpWidget(
+    await pumpCard(
+      tester,
       harness(entries: cardEntries(), marks: cardMarks(), runSink: [run]),
     );
-    await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('pdfExportAnonymizeSwitch')));
+    await tester.tap(pdfExportAnonymizeSwitch());
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+    await tester.tap(pdfExportButton());
     await tester.pumpAndSettle();
+    // Status wording pin (retained text find): the exact SnackBar message
+    // is what the success path promises the user.
     expect(find.text('File saved.'), findsOneWidget);
     expect(saveNames.single, pdfExportFileName(run.options!.exportDate!));
 
@@ -590,7 +590,8 @@ void main() {
       saveFileBytesOverride = (filename, bytes) async => true;
       addTearDown(() => saveFileBytesOverride = null);
       const range = TemperatureRange(min: 36.5, max: 37.5);
-      await tester.pumpWidget(
+      await pumpCard(
+        tester,
         harness(
           entries: cardEntries(),
           marks: cardMarks(),
@@ -598,11 +599,10 @@ void main() {
           temperatureRange: range,
         ),
       );
-      await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('pdfExportAnonymizeSwitch')));
+      await tester.tap(pdfExportAnonymizeSwitch());
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+      await tester.tap(pdfExportButton());
       await tester.pumpAndSettle();
 
       expect(run.model, isNotNull);
@@ -627,9 +627,8 @@ void main() {
       'message shows, the builder never runs', (WidgetTester tester) async {
     var runs = 0;
     await enlargeViewport(tester);
-    await tester.pumpWidget(harness(onExport: () => runs++));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('pdfExportButton')));
+    await pumpCard(tester, harness(onExport: () => runs++));
+    await tester.tap(pdfExportButton());
     await tester.pumpAndSettle();
 
     expect(
