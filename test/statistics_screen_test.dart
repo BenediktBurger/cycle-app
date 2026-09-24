@@ -890,6 +890,80 @@ void main() {
     );
   });
 
+  testWidgets('the missing-real-variant note keys on the DISPLAYED (folded) '
+      'variants: a paper-genuine fold keeps the note hidden', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // The narrow combination: the in-app rise sits ON its peak day (both
+    // marks on one day), so the in-app "any" variant is cycle day 1 while
+    // the real variant qualifies nowhere — and a paper earliest value
+    // folds in. The displayed real row then carries the paper figure
+    // (single recorded fact, min-combined), so the note claiming a
+    // missing real variant must NOT render.
+    await tester.pumpWidget(
+      harness(
+        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+        marks: [
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.firstHigherMeasurement),
+        ],
+        paperEarliestFirstHigherCycleDay: 5,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: earliestCard(),
+        matching: find.textContaining('cycle day 5'),
+      ),
+      findsOneWidget,
+      reason: 'the real row shows the paper-genuine fold, not a dash',
+    );
+    expect(
+      find.descendant(
+        of: earliestCard(),
+        matching: find.textContaining('no first higher measurement'),
+      ),
+      findsNothing,
+      reason:
+          'the note must not claim a missing real variant while the '
+          'displayed row carries the folded paper figure',
+    );
+  });
+
+  testWidgets('without a paper value the same in-app shape genuinely lacks '
+      'the real variant, and the note states exactly that', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    // The in-app rise sits ON its peak day again, but no paper fact folds
+    // in: the real row dashes and the missing-variant note is true.
+    await tester.pumpWidget(
+      harness(
+        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+        marks: [
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.mucusPeakDay),
+          CycleMark(date: m(3, 1), type: CycleMarkTypes.firstHigherMeasurement),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: earliestCard(), matching: find.text('—')),
+      findsOneWidget,
+      reason: 'the real row genuinely dashes without the paper value',
+    );
+    expect(
+      find.descendant(
+        of: earliestCard(),
+        matching: find.textContaining('no first higher measurement'),
+      ),
+      findsOneWidget,
+      reason: 'the note appears only for the genuinely missing real variant',
+    );
+  });
+
   testWidgets('without surface data the paper values change nothing '
       '(default null keeps the no-data screen)', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));

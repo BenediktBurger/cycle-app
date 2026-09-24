@@ -87,29 +87,36 @@ class StatistikScreen extends ConsumerWidget {
           );
           final earliest = earliestFirstHigherCycleDay(evaluations);
 
-          // The paper history folds in as plain MIN-combination at the
+          // The paper history folds in through the shared MIN-combination
+          // rule (minRecordedFact, lib/domain/statistics.dart) at the
           // shortest/earliest surfaces: the paper figures were recorded
           // BEFORE every in-app cycle, so they are known facts at this
-          // screen's point of view and a minimum of observed facts never
-          // flips upward. They are single recorded facts — they do NOT
-          // enter the lengths list, the distribution or the per-cycle
-          // table (in-app-only surfaces below stay gated on `lengths`).
+          // screen's point of view. They are single recorded facts — they
+          // do NOT enter the lengths list, the distribution or the
+          // per-cycle table (in-app-only surfaces below stay gated on
+          // `lengths`).
           final paperShortest = ref.watch(
             shortestCycleLengthOutsideAppProvider,
           );
           final paperEarliest = ref.watch(
             earliestFirstHigherCycleDayOutsideAppProvider,
           );
-          final shortestOverall = _minFact(paperShortest, summary.shortest);
+          final shortestOverall = minRecordedFact(
+            paperShortest,
+            summary.shortest,
+          );
           final lengthDetailWithPaper = DescriptiveSummary(
-            minimum: _minFact(paperShortest, lengthDetail.minimum),
+            minimum: minRecordedFact(paperShortest, lengthDetail.minimum),
             maximum: lengthDetail.maximum,
             average: lengthDetail.average,
             standardDeviation: lengthDetail.standardDeviation,
           );
           final earliestWithPaper = (
-            any: _minFact(paperEarliest, earliest.any),
-            afterMucusPeak: _minFact(paperEarliest, earliest.afterMucusPeak),
+            any: minRecordedFact(paperEarliest, earliest.any),
+            afterMucusPeak: minRecordedFact(
+              paperEarliest,
+              earliest.afterMucusPeak,
+            ),
           );
 
           // The average/shortest/longest row renders with ONLY a paper
@@ -142,8 +149,12 @@ class StatistikScreen extends ConsumerWidget {
           // The earliest first higher, two documented variants: the
           // "real" one (strictly after the mucus peak) is the primary row;
           // the over-all-cycles minimum is the fallback row. When the real
-          // variant qualifies nowhere, the dash + the missing-variant
-          // caption state that fact.
+          // variant is genuinely missing in the DISPLAYED pair, the dash +
+          // the missing-variant caption state that fact. The caption's gate
+          // reads the paper-folded pair, not the raw in-app values: the rows
+          // display the fold, so gating on the raw values would claim a
+          // missing real variant while the row actually carries the paper
+          // figure (in-app real missing + paper value present).
           String cycleDayText(int? n) =>
               n == null ? _missing : l10n.statisticsCycleDay(n);
 
@@ -221,7 +232,8 @@ class StatistikScreen extends ConsumerWidget {
                       label: l10n.statisticsFirstHigherAny,
                       value: cycleDayText(earliestWithPaper.any),
                     ),
-                    if (earliest.afterMucusPeak == null && earliest.any != null)
+                    if (earliestWithPaper.afterMucusPeak == null &&
+                        earliestWithPaper.any != null)
                       Text(
                         l10n.statisticsFirstHigherRealMissing,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -496,15 +508,6 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
       average: summary.average,
       standardDeviation: summary.stdDev,
     );
-
-/// The smallest of an optional paper-history constant and an optional
-/// in-app figure — null folds to the other side (a missing fact adds
-/// nothing). The MIN rule of the paper fold: see the build method.
-int? _minFact(int? paperValue, int? inAppValue) {
-  if (paperValue == null) return inAppValue;
-  if (inAppValue == null) return paperValue;
-  return paperValue < inAppValue ? paperValue : inAppValue;
-}
 
 /// The per-cycle table card: a simple bordered table (equal-width columns,
 /// headers wrap) with the four exact columns the roadmap names: cycle

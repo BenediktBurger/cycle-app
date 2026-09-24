@@ -38,7 +38,7 @@ void main() {
   /// The pane's card widgets in tree order. Called only when the enlarged
   /// surface has built the whole list (see the per-test enlargeViewport).
   Iterable<Card> cards(WidgetTester tester) =>
-      tester.widgetList<Card>(find.byType(Card)).whereType<Card>();
+      tester.widgetList<Card>(find.byType(Card));
 
   /// The settings pane's cards sit flat (no nested Cards), so a keyed
   /// descendant resolves each card unambiguously.

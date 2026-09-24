@@ -227,6 +227,21 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
   return (any: earliestAny, afterMucusPeak: earliestAfterPeak);
 }
 
+/// The smaller of two optional recorded facts, or null when both are:
+/// null folds to the other side (a missing fact adds nothing — the other
+/// side's value stands alone) and a minimum of observed facts never flips
+/// upward. THE shared MIN-combination rule behind the paper-history fold
+/// (the settings pane's figures recorded before this app existed — the
+/// outside-app shortest cycle and earliest first higher): they are known
+/// at every statistic surface's point of view, so they compete there
+/// through this fold (lib/ui/statistics.dart and
+/// lib/domain/pdf_export_model.dart).
+int? minRecordedFact(int? first, int? second) {
+  if (first == null) return second;
+  if (second == null) return first;
+  return first < second ? first : second;
+}
+
 /// Cycle lengths in days: differences between consecutive mark-driven
 /// cycle starts (see lib/domain/cycle_grouping.dart — grouping opens a
 /// group at every user-placed cycleStart mark, and the start date is that

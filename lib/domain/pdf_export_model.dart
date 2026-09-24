@@ -241,8 +241,10 @@ final class PdfExportModel {
 /// [shortestCycleLengthOutsideApp] and [earliestFirstHigherCycleDayOutsideApp]
 /// are the optional paper-history constants of the settings pane's
 /// paper-history card (null = not given). They fold into EVERY exported
-/// cycle's per-cycle stats below, and that fold never breaks print
-/// idempotency: the paper history predates ALL in-app cycles, so these
+/// cycle's per-cycle stats below through the shared MIN-combination rule
+/// ([minRecordedFact], lib/domain/statistics.dart), and that fold never
+/// breaks print idempotency: the paper history predates ALL in-app
+/// cycles, so these
 /// facts were already known and counted when the FIRST in-app cycle was
 /// printed on the paper form — a constant that never changes with later
 /// cycles can never rewrite an earlier page's paper-derived figure (a
@@ -365,15 +367,15 @@ PdfExportModel buildPdfExportModel({
       if (shortest == null || gap < shortest) shortest = gap;
     }
     shortestCycleLengths.add(
-      _minPaperFact(shortest, shortestCycleLengthOutsideApp),
+      minRecordedFact(shortest, shortestCycleLengthOutsideApp),
     );
     final inAppFirstHigher = earliestFirstHigherCycleDay(all.sublist(0, i + 1));
     earliestFirstHigherCycleDays.add((
-      any: _minPaperFact(
+      any: minRecordedFact(
         inAppFirstHigher.any,
         earliestFirstHigherCycleDayOutsideApp,
       ),
-      afterMucusPeak: _minPaperFact(
+      afterMucusPeak: minRecordedFact(
         inAppFirstHigher.afterMucusPeak,
         earliestFirstHigherCycleDayOutsideApp,
       ),
@@ -398,18 +400,6 @@ PdfExportModel buildPdfExportModel({
     ),
     temperatureRange: temperatureRange,
   );
-}
-
-/// The SMALLER of an in-app-derived figure and a paper-history constant —
-/// the fold rule of the paper history into in-app statistics: the paper
-/// values were recorded BEFORE any in-app cycle existed, so they compete
-/// in every cycle's point of view, and a minimum of observed facts never
-/// flips upward. null folds to the other side's value (a missing paper
-/// fact adds nothing — the in-app figure stands alone).
-int? _minPaperFact(int? inAppValue, int? paperValue) {
-  if (inAppValue == null) return paperValue;
-  if (paperValue == null) return inAppValue;
-  return inAppValue < paperValue ? inAppValue : paperValue;
 }
 
 /// The cycle's full CALENDAR span as the overlay window's day count:
