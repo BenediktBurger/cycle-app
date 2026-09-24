@@ -86,3 +86,49 @@ jobs:
 
       - name: Build Android (debug)
         run: flutter build apk --debug
+
+  # Re-runs the date-label tests on a UTC-negative host: date labels are
+  # computed from UTC-midnight dates formatted verbatim, so nothing may
+  # shift them into the host timezone (a toLocal() there reads the wrong
+  # day). The main job's runner runs on UTC and never sees that failure,
+  # so a dedicated job feeds Etc/GMT+5 through the environment. Only the
+  # files that assert rendered date labels run here: the rest of the
+  # suite is DateOnly-integer arithmetic and timezone-neutral by
+  # construction, so running the full hostname-agnostic suite twice would
+  # be wasteful. Duplicating checkout, Flutter setup and pub get is
+  # cheaper than a second step in the main job, which also builds web and
+  # Android — none of that is timezone-sensitive.
+  test-on-utc-negative-host:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Etc/GMT+5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
+        id: flutter-pin
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          [ -n "$pinned" ] || { echo "tool/flutter-version has no non-comment version line"; exit 1; }
+          [[ "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tool/flutter-version pins '$pinned', expected a bare X.Y.Z version (inline-comment contamination or whitespace/CRLF?)"; exit 1; }
+          echo "Resolved Flutter pin: $pinned"   # informational, not a gate
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test
+        run: >
+          flutter test --no-pub -r expanded
+          test/diary_time_and_navigation_test.dart
+          test/diary_cycle_day_label_test.dart
+          test/diary_bleeding_marker_test.dart
+          test/cycle_mark_sheet_test.dart
+          test/dialog_and_shell_lifecycle_test.dart
+          test/statistics_screen_test.dart
+          test/domain/pdf_export_model_test.dart
