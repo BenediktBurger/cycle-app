@@ -268,7 +268,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   }
 
   String _formatDay(DateTime d, String locale) =>
-      DateFormat.yMd(locale).format(DateOnly.normalize(d).toLocal());
+      // The date-only convention is UTC-normalized midnights; DateFormat
+      // reads the value's OWN fields, so print it verbatim — a .toLocal()
+      // would show the PREVIOUS day on UTC-negative hosts.
+      DateFormat.yMd(locale).format(DateOnly.normalize(d));
 
   /// Locale-aware two-decimal temperature display ("36,65" in German).
   String _formatBbt(double bbt, String locale) =>
@@ -780,7 +783,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             ),
           ];
         }
-        final cycles = groupIntoCycles(entries, marks);
+        final cycles = groupIntoCycles(
+          entries,
+          marks,
+          // The grouping's injected clock (last-cycle span rule — the
+          // nowProvider seam, pinned in tests).
+          today: ref.read(nowProvider)(),
+        );
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
             _cycleTile(l10n, cycles[i]),

@@ -234,6 +234,58 @@
   "statisticsCycleTable": "Cycle table",
   "statisticsTableLength": "Length",
   "statisticsDistribution": "Distribution",
+  "statisticsObservedCyclesTitle": "Observed cycles",
+  "@statisticsObservedCyclesTitle": {
+    "description": "Card title of the cycle-count surface on the statistics screen: all observed cycles. The card's caption names the composition (in this app + the observed-cycles-outside-app setting value)."
+  },
+  "statisticsCyclesInApp": "in this app: {n}",
+  "@statisticsCyclesInApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles recorded IN this app (mark-opened cycles). Numbers only — the compositional meaning of the total."
+  },
+  "statisticsCyclesOutsideApp": "outside: {n}",
+  "@statisticsCyclesOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles observed outside this app (the settings value), shown when it is non-zero."
+  },
+  "statisticsStandardDeviation": "Standard deviation",
+  "@statisticsStandardDeviation": {
+    "description": "Population standard deviation (std-dev over the whole observed set, not an N-1 sample estimate) — descriptive fact only."
+  },
+  "statisticsMetricBleedingDuration": "Bleeding duration",
+  "statisticsMetricRiseSpan": "First higher measurement → cycle end",
+  "@statisticsMetricRiseSpan": {
+    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
+  },
+  "statisticsCycleDay": "cycle day {n}",
+  "@statisticsCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+  },
+  "statisticsFirstHigherReal": "strictly after the mucus peak",
+  "@statisticsFirstHigherReal": {
+    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+  },
+  "statisticsFirstHigherAny": "over all cycles",
+  "@statisticsFirstHigherAny": {
+    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
+  },
+  "statisticsFirstHigherRealMissing": "no first higher measurement marked strictly after the mucus peak",
+  "@statisticsFirstHigherRealMissing": {
+    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+  },
   "settingsLanguage": "Language",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
@@ -250,6 +302,10 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "How many cycles you observed before using this app (e.g. on paper). The cycle numbers on the cycle page only start counting after this value.",
   "settingsObservedCyclesOutsideAppError": "Please enter a whole number ≥ 0",
+  "settingsObservedCyclesOutsideAppCount": "Number of observed cycles",
+  "@settingsObservedCyclesOutsideAppCount": {
+    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
+  },
   "cycleOrdinal": "Cycle {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -370,6 +426,58 @@
   "@deleteDataFailed": {
     "description": "Failure message for the whole delete-data flow: shown when opening the database, the confirmation dialog's count reads, or the wipe itself fails. The wipe is one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors importFailed."
   },
+  "settingsPdfExport": "PDF export",
+  "settingsPdfExportName": "Name (paper form)",
+  "settingsPdfExportBirthDate": "Birth date",
+  "settingsPdfExportBirthDateFormat": "YYYY-MM-DD",
+  "settingsPdfExportBirthDateError": "Enter a real calendar date in the form YYYY-MM-DD.",
+  "settingsPdfExportNote": "Name and birth date appear in the header of every PDF export; the export's anonymize switch hides both for the respective export without changing what is stored. The observed-cycle count in the PDF includes the value of the \u201cCycles observed outside this app\u201d card.",
+  "pdfExportCycleOption": "Cycle {n}, from {day}",
+  "@pdfExportCycleOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "day": {
+        "type": "String"
+      }
+    },
+    "description": "One checkbox row of the export card's cycle-selection list: the shared cycle ordinal plus the cycle's start date (ISO). (Formerly the dropdown rows' label of the \"up to\" selector — the list row reuses the wording.)"
+  },
+  "pdfExportCyclesAll": "All",
+  "@pdfExportCyclesAll": {
+    "description": "Bulk button of the export card's cycle-selection list: selects every exportable cycle."
+  },
+  "pdfExportCyclesNone": "None",
+  "@pdfExportCyclesNone": {
+    "description": "Bulk button of the export card's cycle-selection list: deselects every cycle (the empty selection keeps the export behind the empty-data guard)."
+  },
+  "pdfExportCyclesSelectedSummary": "{n} of {total} cycles selected",
+  "@pdfExportCyclesSelectedSummary": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    },
+    "description": "Summary line: how many of the exportable cycles are currently selected. Shown on the export card and (live) on the cycle-selection page — the card itself has no checkboxes, the checkbox rows live on the selection page."
+  },
+  "pdfExportSelectCycles": "Select cycles…",
+  "@pdfExportSelectCycles": {
+    "description": "Button of the PDF-export card: opens the full-screen cycle-selection page. (The card itself keeps only the summary line — the formerly inline checkbox list grew unmanageable with many cycles.)"
+  },
+  "pdfExportSelectionTitle": "Select cycles for the export",
+  "@pdfExportSelectionTitle": {
+    "description": "Title of the pushed full-screen cycle-selection page above the PDF export."
+  },
+  "pdfExportSelectionConfirm": "Confirm selection",
+  "@pdfExportSelectionConfirm": {
+    "description": "Pinned confirm button of the cycle-selection page (top, alongside the All/None bulk buttons): applies the selection back into the export card and closes the page. Leaving the page without confirming changes nothing."
+  },
+  "pdfExportAnonymize": "Anonymize",
+  "pdfExportExportButton": "Export",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",
@@ -452,5 +560,12 @@
   "@cycleDayPanelClose": {
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
-  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)"
+  "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)",
+  "statisticsCycles": "Cycle lengths",
+  "statisticsOnsets": "Cycle starts",
+  "@statisticsOnsets": {
+    "description": "Card title of the statistics screen's list of the mark-driven cycle starts (the recorded dates of the user-placed cycleStart marks that opened a cycle group). The key mirrors the domain function menstruationOnsetDates on purpose, to keep one name across the boundary."
+  },
+  "statisticsShortest": "Shortest",
+  "statisticsLongest": "Longest"
 }

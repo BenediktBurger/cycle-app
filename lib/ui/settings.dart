@@ -14,14 +14,22 @@
 // into an export document that goes through the existing
 // importJsonToDatabase (merge policy for free).
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/export_adapter.dart';
+import '../db/settings_store.dart';
+import '../domain/date_only.dart';
 import '../domain/drip_import.dart';
 import '../domain/export_import.dart';
+import '../domain/marks.dart';
+import '../domain/models.dart';
+import '../domain/pdf_export_model.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
+import '../pdf/cycle_pdf.dart'
+    show pdfExportFileName, pdfFontAsset, PdfExportOptions;
 import '../providers.dart';
 import 'about.dart';
 import 'file_transfer.dart';
@@ -119,6 +127,103 @@ final class _NonNegativeIntegerFieldState
             // state (empty text included): the validation, not a formatter.
             l10n.settingsObservedCyclesOutsideAppError,
             key: const ValueKey('observedCyclesOutsideAppFieldError'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The settings pane's plain text/date fields, same wiring shape as the
+/// outside-app integer field below: an UNCONTROLLED text field (controller
+/// initialized once, never re-synced from the provider on rebuilds —
+/// hydration lands before any screen is reachable behind the database
+/// gate), free-text entry validated per keystroke — a VALID entry writes
+/// through immediately via [onChanged], an invalid one only shows the
+/// keyed error line and leaves the stored value untouched. The PDF-export
+/// name and birth-date fields share this shape.
+final class _ValidatedSettingsField extends StatefulWidget {
+  const _ValidatedSettingsField({
+    required this.fieldKey,
+    required this.initialValue,
+    required this.labelText,
+    this.errorText,
+    this.errorKey,
+    this.hintText,
+    this.validator,
+    this.onChanged,
+  });
+
+  final Key fieldKey;
+  final String initialValue;
+  final String labelText;
+
+  /// The validation rejection line, shown while [validator] rejects the
+  /// current text (the text stays local; nothing writes).
+  final String? errorText;
+  final Key? errorKey;
+
+  /// The empty-content hint (e.g. the ISO date shape).
+  final String? hintText;
+
+  /// Returns true when the entry is acceptable; null = everything is.
+  final bool Function(String raw)? validator;
+
+  /// Fires for a VALID entry per keystroke (same write-through cadence as
+  /// the outside-app integer field); rejected entries fire nothing.
+  final ValueChanged<String>? onChanged;
+
+  @override
+  State<_ValidatedSettingsField> createState() =>
+      _ValidatedSettingsFieldState();
+}
+
+final class _ValidatedSettingsFieldState
+    extends State<_ValidatedSettingsField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool _valid(String raw) => widget.validator == null || widget.validator!(raw);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          key: widget.fieldKey,
+          controller: _controller,
+          keyboardType: TextInputType.text,
+          decoration: InputDecoration(
+            labelText: widget.labelText,
+            hintText: widget.hintText,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (raw) {
+            // The rejection line, visible for every invalid intermediate
+            // state — the validation, not a formatter.
+            setState(() {});
+            if (_valid(raw)) widget.onChanged?.call(raw);
+          },
+        ),
+        if (widget.validator != null && !_valid(_controller.text))
+          Text(
+            widget.errorText ?? '',
+            key: widget.errorKey,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.error,
             ),
@@ -421,6 +526,73 @@ class EinstellungenScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // --- PDF export: identifying values --------------------------
+          // The "identifying source" values the generated PDF's paper-form
+          // header carries: name and birth date (the birth date field is a
+          // strict ISO date with validation — impossible days never
+          // pass). Each export's "Anonymisieren" toggle decides PER EXPORT
+          // whether the document shows these values or hides them (the
+          // per-export toggle is intentionally NOT persisted — see the
+          // export card below). The helper cross-references the
+          // outside-app cycle count, which feeds the PDF's observed-cycle
+          // header fact.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsPdfExport,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportNameField'),
+                    initialValue: ref.watch(pdfExportNameProvider) ?? '',
+                    labelText: l10n.settingsPdfExportName,
+                    onChanged: (raw) {
+                      final trimmed = raw.trim();
+                      ref.read(pdfExportNameProvider.notifier).state =
+                          trimmed.isEmpty ? null : trimmed;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _ValidatedSettingsField(
+                    fieldKey: const ValueKey('pdfExportBirthDateField'),
+                    initialValue: ref.watch(pdfExportBirthDateProvider) == null
+                        ? ''
+                        : formatIsoDate(ref.watch(pdfExportBirthDateProvider)!),
+                    labelText: l10n.settingsPdfExportBirthDate,
+                    hintText: l10n.settingsPdfExportBirthDateFormat,
+                    errorText: l10n.settingsPdfExportBirthDateError,
+                    errorKey: const ValueKey('pdfExportBirthDateFieldError'),
+                    // One strict parse shared with the settings store's
+                    // decode (tryParseIsoDate): correct shape AND a real
+                    // calendar day.
+                    validator: (raw) => raw.isEmpty
+                        ? true
+                        : tryParseIsoDate(raw.trim()) != null,
+                    onChanged: (raw) {
+                      final parsed = raw.trim().isEmpty
+                          ? null
+                          : tryParseIsoDate(raw.trim());
+                      if (parsed != null || raw.trim().isEmpty) {
+                        ref.read(pdfExportBirthDateProvider.notifier).state =
+                            parsed;
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.settingsPdfExportNote,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // --- PIN lock stub -------------------------------------------
           // Disabled ON PURPOSE: flipping it on would falsely signal that a
           // lock exists. At-rest encryption of the database is already
@@ -489,6 +661,19 @@ class EinstellungenScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // --- PDF export action card ----------------------------------
+          // Generates the paper-form PDF for chosen exportable cycles: a
+          // card with a summary line + a "select cycles" button that opens
+          // the full-screen cycle-selection page at click time (the
+          // formerly inline checkbox list grew unmanageable with many
+          // cycles), the per-export anonymize toggle (card-local state,
+          // never persisted) and the Export action. The pipeline: export
+          // model (the selection intersected by cycle-start identity) ->
+          // document builder provider (stubbed in tests) -> saveFileBytes
+          // seam, reported through the same SnackBar pattern as the JSON
+          // export card above.
+          const PdfExportCard(),
           const SizedBox(height: 8),
           // --- privacy / GDPR notice -----------------------------------
           // The same string the about/onboarding page shows (one source,
@@ -845,6 +1030,452 @@ class EinstellungenScreen extends ConsumerWidget {
         dialogContext,
       ).showSnackBar(SnackBar(content: Text(l10n.importFailed)));
     }
+  }
+}
+
+/// The PDF-export action card: a summary line plus a "select cycles"
+/// button that opens the full-screen [_CycleSelectionPage] (with the
+/// Alle/Keine bulk buttons and per-cycle checkboxes — moved there because
+/// the inline list grew unmanageable with many cycles), the anonymize
+/// toggle and the Export button — see the call-site comment in the pane
+/// for the pipeline.
+///
+/// SELECTION FLOW: the selection lives in THIS card's state. The page is
+/// seeded from the card's current selection, holds its own editing copy
+/// while open, and on CONFIRM the final selection is popped back and
+/// applied via [State.setState]; any other way out (back button, back
+/// gesture, no confirm) leaves the card's state untouched. The
+/// `Set<DateOnly>`-materialized null-means-all logic stays exactly as
+/// before: null = every exportable cycle (the default, matching the
+/// card's former export-all behavior), the explicit set = the chosen
+/// subset.
+///
+/// Card-local state (the cycle selection set and the anonymize flag) is a
+/// deliberate choice OVER persisted settings: both are per-run view
+/// choices (a new app start exports everything again unless re-chosen),
+/// and the anonymize toggle is per-export by definition (flipping it must
+/// never rewrite the stored identifying values — the tests pin that). The
+/// settings store's `pdfExport.*` keys carry identifying source data; a
+/// selection row would naturally extend there, but no existing consumer
+/// needs the choice to survive a restart.
+final class PdfExportCard extends ConsumerStatefulWidget {
+  const PdfExportCard({super.key});
+
+  @override
+  ConsumerState<PdfExportCard> createState() => _PdfExportCardState();
+}
+
+final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
+  /// The selected cycles' normalized (DateOnly) start dates — the export's
+  /// cycle identity passed into [buildPdfExportModel] — or null while
+  /// NOTHING was chosen differently yet: null = "all exportable cycles" (the
+  /// default, matching the card's former export-all behavior). Written
+  /// back from the selection page on confirm (see the class doc).
+  /// Card-local like the anonymize toggle (a per-run view choice, not a
+  /// persisted setting; the settings store's pdfExport.* rows carry
+  /// identifying source data, not a selection).
+  Set<DateTime>? _selection;
+  var _anonymized = false;
+  var _running = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // The selector rows come from the live tracked data; a still-loading
+    // stream reads as "no data" (the card then only explains why there
+    // would be nothing to export).
+    final entries =
+        ref.watch(dailyEntriesProvider).value ?? const <DailyEntry>[];
+    final marks = ref.watch(marksProvider).value ?? const <CycleMark>[];
+    final outside = ref.watch(observedCyclesOutsideAppProvider);
+    final choices = exportableCycles(
+      entries,
+      marks,
+      observedCyclesOutsideApp: outside,
+      // The grouping's injected clock (see nowProvider — test seam): read
+      // fresh (the same NON-reactive convention as every choice call site —
+      // the data streams above already drive the rebuild).
+      today: ref.read(nowProvider)(),
+    );
+    // The SELECTION is the export card's cycle choice, shown as the
+    // summary line: the set of chosen cycles' start dates (DateOnly
+    // identity), or null = "everything" (the pre-interaction default,
+    // matching the card's former "up to the latest" all-export behavior
+    // and today's users). The member state stays card-local like the
+    // anonymize toggle — a per-run view choice, never persisted (see the
+    // class doc).
+    final selectedCount = _selection == null
+        ? choices.length
+        : _shownSelection(choices).length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.settingsPdfExport,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            if (choices.isEmpty)
+              Text(
+                l10n.exportNothing,
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              Text(
+                l10n.pdfExportCyclesSelectedSummary(
+                  selectedCount,
+                  choices.length,
+                ),
+                key: const ValueKey('pdfExportSelectedSummary'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            // The cycle choice moved OFF the card: the summary above +
+            // this button is all the card shows; the button opens the
+            // full-screen selection page AT CLICK TIME (the page's rows
+            // are seeded from the card's current selection). Disabled in
+            // the "no cycles" state — the guard message above explains.
+            FilledButton.tonalIcon(
+              key: const ValueKey('pdfExportSelectCyclesButton'),
+              onPressed: choices.isEmpty
+                  ? null
+                  : () => _openCycleSelection(context, choices),
+              icon: const Icon(Icons.checklist),
+              label: Text(l10n.pdfExportSelectCycles),
+            ),
+            SwitchListTile.adaptive(
+              key: const ValueKey('pdfExportAnonymizeSwitch'),
+              value: _anonymized,
+              onChanged: (value) => setState(() => _anonymized = value),
+              title: Text(l10n.pdfExportAnonymize),
+            ),
+            FilledButton.icon(
+              key: const ValueKey('pdfExportButton'),
+              onPressed: _running ? null : () => _runExport(context),
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(l10n.pdfExportExportButton),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The current selected set seen through the LIVE choices: null means
+  /// "everything", otherwise the explicit set intersected with the live
+  /// choices' normalized start dates — a stale member (a start no longer
+  /// among the live choices) drops out, so the summary line and the export
+  /// always count selected cycles the data still shows (the model builder
+  /// intersects by the same start-day identity; pruning here keeps the
+  /// summary, the seeded selection page and the model consistent).
+  Set<DateTime> _shownSelection(
+    List<({int ordinal, DateTime startDate})> choices,
+  ) {
+    if (_selection == null) {
+      return {
+        for (final choice in choices) DateOnly.normalize(choice.startDate),
+      };
+    }
+    return {
+      for (final member in _selection!)
+        if (choices.any(
+          (choice) => DateOnly.normalize(choice.startDate) == member,
+        ))
+          member,
+    };
+  }
+
+  /// Opens the full-screen cycle-selection page (see [_CycleSelectionPage]
+  /// for the surface): the page is seeded with the card's current choice
+  /// — null = all kept AS the all state (the explicit materialization
+  /// happens inside the page only per row) — and edits its own copy until
+  /// Confirm pops the page with the final selection.
+  ///
+  /// Confirmed result: `(confirmed: true, selected: …)` where `selected`
+  /// is null for the Alle state (matching [_selection]'s null-means-all
+  /// semantics) or the explicit set. Any other exit pops WITHOUT a record
+  /// (`null` here) — the card state stays untouched, exactly the
+  /// owner-specified "confirm applies, back cancels" flow.
+  Future<void> _openCycleSelection(
+    BuildContext context,
+    List<({int ordinal, DateTime startDate})> choices,
+  ) async {
+    final outcome = await Navigator.of(context)
+        .push<({bool confirmed, Set<DateTime>? selected})>(
+          MaterialPageRoute(
+            builder: (_) => _CycleSelectionPage(
+              choices: choices,
+              startAll: _selection == null,
+              startSelected: _shownSelection(choices),
+            ),
+          ),
+        );
+    if (outcome == null || !outcome.confirmed) return;
+    // The settings pane can be gone by the time the page pops (the app
+    // navigated away in between) — setState only while this State lives.
+    if (!mounted) return;
+    setState(() => _selection = outcome.selected);
+  }
+
+  /// The export pipeline for one run: build the model from the LIVE data
+  /// (read fresh — watching streams made the card rebuild mid-run is not a
+  /// concern here), generate via the builder provider, then save through
+  /// the bytes seam. The empty-data guard mirrors the JSON export's: an
+  /// empty document is never generated, the message explains instead.
+  Future<void> _runExport(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final entries =
+        ref.read(dailyEntriesProvider).value ?? const <DailyEntry>[];
+    final marks = ref.read(marksProvider).value ?? const <CycleMark>[];
+    final outside = ref.read(observedCyclesOutsideAppProvider);
+    final choices = exportableCycles(
+      entries,
+      marks,
+      observedCyclesOutsideApp: outside,
+      today: ref.read(nowProvider)(),
+    );
+    if (choices.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      return;
+    }
+    // The chosen selection (null = the default, everything):
+    final selected = _selection == null ? null : _shownSelection(choices);
+
+    final model = buildPdfExportModel(
+      entries: entries,
+      marks: marks,
+      observedCyclesOutsideApp: outside,
+      name: ref.read(pdfExportNameProvider),
+      birthDate: ref.read(pdfExportBirthDateProvider),
+      // The cycle selection is the model-level cycle filter (the
+      // builder intersects by start-day identity — see its doc); the
+      // former "up to the chosen cycle" seam is retired from this UI.
+      selectedStartDates: selected,
+      // The settings card's display range is the PDF curve block's fixed
+      // y scale — the same echo the chart reads (never rescaled for data).
+      temperatureRange: ref.read(temperatureRangeProvider),
+      today: ref.read(nowProvider)(),
+    );
+    if (model.cycles.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+      return;
+    }
+
+    setState(() => _running = true);
+    try {
+      final now = DateTime.now();
+      final fontData = await rootBundle.load(pdfFontAsset);
+      final builder = ref.read(pdfDocumentBuilderProvider);
+      final bytes = await builder(
+        model,
+        PdfExportOptions(anonymized: _anonymized, exportDate: now),
+        fontData.buffer.asUint8List(
+          fontData.offsetInBytes,
+          fontData.lengthInBytes,
+        ),
+      );
+      final ok = await saveFileBytes(pdfExportFileName(now), bytes);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? l10n.exportSaved : l10n.exportSaveFailed)),
+      );
+    } catch (_) {
+      // Generation problems (e.g. a broken font asset) land on the same
+      // failure surface as a failed save — nothing was written either way.
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSaveFailed)));
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+}
+
+/// Full-screen cycle-selection page for the PDF export — the surface the
+/// card's "Zyklen auswählen…" button pushes (same Scaffold + AppBar
+/// scaffolding shape as the JSON export's [_ExportPreviewPage]).
+///
+/// Requirements (the many-cycles reality, ~400 rows):
+///
+/// - CONTROLS PINNED AT THE TOP: the Alle/Keine bulk buttons and the
+///   confirm button ("Auswahl bestätigen") sit in the non-scrolling head
+///   next to a live count summary, together with the MOST-RECENT cycle
+///   row visible without scrolling — only scrolling reveals older
+///   cycles.
+/// - ROWS SORTED MOST-RECENT-FIRST (the newest cycle at the top — the
+///   common case is adjusting what is tracked now), rendered by a
+///   [ListView.builder] so a long list never builds all tiles eagerly.
+///   Row label builder: the same shared wording as before
+///   ([AppLocalizations.pdfExportCycleOption]). ROW KEYS: the names stay
+///   stable (`pdfExportCycleCheckboxRow$i`) but the index now counts the
+///   page's VISIBLE order (newest-first), so `Row0` is the most recent
+///   cycle — the former card listed them oldest-first.
+/// - STATE: a page-local editing copy, seeded from the card's selection
+///   (`null` = the all state, kept as null — nothing materializes until a
+///   row toggles or Keine picks the empty set). Confirm pops with
+///   `(confirmed: true, selected: the copy)`; the Alle button restores
+///   null inside the copy so a confirmed Alle reverts the card to the
+///   all state. The copy is applied by the CARD's caller (see the card
+///   class doc); Confirm is the only way the toggling leaves the page —
+///   the back button/gesture closes without effect.
+final class _CycleSelectionPage extends StatefulWidget {
+  const _CycleSelectionPage({
+    required this.choices,
+    required this.startAll,
+    required this.startSelected,
+  });
+
+  /// The exportable cycles in observation order (oldest→newest, shared
+  /// output of [exportableCycles]); the display reverses it.
+  final List<({int ordinal, DateTime startDate})> choices;
+
+  /// Whether the card's current choice is the null "all" state.
+  final bool startAll;
+
+  /// The card's materialized selection (only meaningful when
+  /// [startAll] is false).
+  final Set<DateTime> startSelected;
+
+  @override
+  State<_CycleSelectionPage> createState() => _CycleSelectionPageState();
+}
+
+final class _CycleSelectionPageState extends State<_CycleSelectionPage> {
+  /// The page-local copy of the selection (null = "every cycle"), seeded
+  /// in [State.initState] from the pushed-in card state.
+  Set<DateTime>? _selection;
+
+  /// The display rows, most-recent-first (built once — the choices are a
+  /// pushed-in snapshot, not a stream).
+  late final List<({int ordinal, DateTime startDate})> _rows = widget
+      .choices
+      .reversed
+      .toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = widget.startAll ? null : {...widget.startSelected};
+  }
+
+  bool _isShownSelected(int displayIndex) =>
+      // null = all → every row shows checked; otherwise row membership
+      // against the row's normalized start date (the same DateOnly
+      // identity the card and the model builder use).
+      _selection?.contains(DateOnly.normalize(_rows[displayIndex].startDate)) ??
+      true;
+
+  /// The materialized all-selected state: every choice's normalized
+  /// start date — what a row toggle's FIRST press converts the implicit
+  /// null (= all) into, before flipping the row.
+  Set<DateTime> _allStarts() => {
+    for (final choice in widget.choices) DateOnly.normalize(choice.startDate),
+  };
+
+  /// Toggles display row [i]: the FIRST toggle materializes the implicit
+  /// all-selected state into the explicit set, then flips the row (the
+  /// same per-run semantics the card's old inline list had).
+  void _toggle(int displayIndex, bool checked) {
+    final current = _selection ?? _allStarts();
+    final start = DateOnly.normalize(_rows[displayIndex].startDate);
+    setState(() {
+      final next = {...current};
+      if (checked) {
+        next.add(start);
+      } else {
+        next.remove(start);
+      }
+      _selection = next;
+    });
+  }
+
+  void _confirm() =>
+      Navigator.of(context).pop((confirmed: true, selected: _selection));
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // The pinned head's summary: the same shared wording the card shows
+    // (counted against the page's own editing copy).
+    final shownCount = _selection == null
+        ? _rows.length
+        : _rows
+              .where(
+                (row) =>
+                    _selection!.contains(DateOnly.normalize(row.startDate)),
+              )
+              .length;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.pdfExportSelectionTitle)),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The PINNED control head: bulk buttons + confirm + a live
+          // count, one row above the list — visible (with the newest
+          // cycle row below it) without scrolling.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton(
+                  key: const ValueKey('pdfExportCycleSelectAll'),
+                  onPressed: () => setState(() => _selection = null),
+                  child: Text(l10n.pdfExportCyclesAll),
+                ),
+                TextButton(
+                  key: const ValueKey('pdfExportCycleSelectNone'),
+                  onPressed: () => setState(() => _selection = const {}),
+                  child: Text(l10n.pdfExportCyclesNone),
+                ),
+                Text(
+                  l10n.pdfExportCyclesSelectedSummary(shownCount, _rows.length),
+                  key: const ValueKey('pdfExportSelectionSummary'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('pdfExportSelectionConfirmButton'),
+                  onPressed: _confirm,
+                  icon: const Icon(Icons.check),
+                  label: Text(l10n.pdfExportSelectionConfirm),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // The lazy list: with ~400 cycles only the visible tiles build.
+          Expanded(
+            child: ListView.builder(
+              itemCount: _rows.length,
+              itemBuilder: (context, index) => CheckboxListTile(
+                key: ValueKey('pdfExportCycleCheckboxRow$index'),
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                value: _isShownSelected(index),
+                title: Text(
+                  l10n.pdfExportCycleOption(
+                    _rows[index].ordinal,
+                    formatIsoDate(_rows[index].startDate),
+                  ),
+                ),
+                onChanged: (checked) => _toggle(index, checked ?? false),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -181,7 +181,7 @@ Widget _dayLabelsHarness({
 // other rows — while plain days render nothing. The letters are the raw
 // TempDisturbance tokens of the day's tempDisturbances mask, read
 // through a single letter-mapping seam (see the comment on
-// disturbanceLetters in lib/ui/cycle.dart). The interrupted curve
+// disturbanceLetters in lib/domain/disturbances.dart). The interrupted curve
 // rendering is keyed to the ignoreTemperature MARK, not this mask —
 // pinned by the temperature-curve section below.
 //
@@ -548,7 +548,7 @@ List<DailyEntry> _flatEntries() => [
 Finder _rail() => find.byKey(const ValueKey('leftRail'));
 
 /// The rail's temperature-scale label texts, in top-down (descending
-/// value) order.
+/// value) order — with the rendered °C unit suffix.
 List<String> _scaleLabels(WidgetTester tester) {
   final labelFinder = find.descendant(
     of: _rail(),
@@ -565,6 +565,11 @@ List<String> _scaleLabels(WidgetTester tester) {
   ]..sort((a, b) => a.rect.top.compareTo(b.rect.top));
   return [for (final e in entries) e.text];
 }
+
+/// The scale labels' numeric part (the labels carry a " °C" unit suffix
+/// whose formatting is asserted separately).
+double _scaleLabelValue(String label) =>
+    double.parse(label.replaceFirst(RegExp(r' ?°C$'), ''));
 
 Widget _leftRailHarness({
   required List<DailyEntry> entries,
@@ -3655,7 +3660,7 @@ void main() {
         final span = data.maxY - data.minY;
         expect(span, greaterThan(0), reason: 'a usable y domain');
         for (final label in _scaleLabels(tester)) {
-          final value = double.parse(label);
+          final value = _scaleLabelValue(label);
           final expectedY =
               chartRect.top + (data.maxY - value) / span * chartRect.height;
           final labelCenter = tester
@@ -3675,20 +3680,22 @@ void main() {
 
     testWidgets(
       'the scale keeps the 0.5 °C interval and the two-scale numbering '
-      '(integers plain, halves with one decimal)',
+      '(integers plain, halves with one decimal), with the °C unit on '
+      'EVERY label (mirrors the PDF rail)',
       (tester) async {
         await tester.pumpWidget(_leftRailHarness(entries: _leftRailEntries));
         await tester.pumpAndSettle();
 
         // The fixed settings range 36..38 supplies the bounds (not the
         // data rounding anymore): every half-degree tick between them,
-        // top-down 38 .. 36.
+        // top-down 38 .. 36 — each carrying the unit suffix.
         expect(
           _scaleLabels(tester),
-          ['38', '37.5', '37', '36.5', '36'],
+          ['38 °C', '37.5 °C', '37 °C', '36.5 °C', '36 °C'],
           reason:
               'half-degree ticks over the default range, integers '
-              'plain and halves one-decimal',
+              'plain and halves one-decimal, unit suffix on every label '
+              '(the standalone "°C" caption row is removed accordingly)',
         );
       },
     );
@@ -3886,11 +3893,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_scaleLabels(tester), [
-        '38',
-        '37.5',
-        '37',
-        '36.5',
-        '36',
+        '38 °C',
+        '37.5 °C',
+        '37 °C',
+        '36.5 °C',
+        '36 °C',
       ], reason: 'a single-value record still renders a half-degree scale');
       final data = tester.widget<LineChart>(find.byType(LineChart)).data;
       final chartRect = tester.getRect(find.byType(LineChart));
@@ -3898,7 +3905,7 @@ void main() {
           chartRect.top +
           (data.maxY - 36.5) / (data.maxY - data.minY) * chartRect.height;
       final midCenter = tester
-          .getRect(find.descendant(of: _rail(), matching: find.text('36.5')))
+          .getRect(find.descendant(of: _rail(), matching: find.text('36.5 °C')))
           .center
           .dy;
       expect(
@@ -3931,7 +3938,17 @@ void main() {
       );
       expect(
         _scaleLabels(tester),
-        ['39', '38.5', '38', '37.5', '37', '36.5', '36', '35.5', '35'],
+        [
+          '39 °C',
+          '38.5 °C',
+          '38 °C',
+          '37.5 °C',
+          '37 °C',
+          '36.5 °C',
+          '36 °C',
+          '35.5 °C',
+          '35 °C',
+        ],
         reason:
             'every half-degree tick between the overridden bounds '
             'renders in the rail',

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
+import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/statistics.dart';
@@ -17,15 +18,18 @@ DailyEntry d(
   int month,
   int day, {
   Bleeding bleeding = Bleeding.none,
+  double? bbtC,
 }) {
-  return DailyEntry(date: DateTime(year, month, day), bleeding: bleeding);
+  return DailyEntry(
+    date: DateTime(year, month, day),
+    bleeding: bleeding,
+    bbtC: bbtC,
+  );
 }
 
 // start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).
 
-/// A user-placed mucus-peak mark on (year, month, day) — the statistics
-/// layer only consumes it to pick the earliest candidate strictly after the
-/// peak (never as a fertility statement).
+/// A user-placed mucus-peak mark on (year, month, day).
 CycleMark mucusPeak(int year, int month, int day) => CycleMark(
   date: DateTime(year, month, day),
   type: CycleMarkTypes.mucusPeakDay,
@@ -99,18 +103,22 @@ void main() {
         d(2026, 4, 4),
         d(2026, 4, 5),
       ];
-      // The last mark has NO tracked day on/after it: it opens no group and
-      // contributes neither an onset nor a length.
+      // The last mark has NO tracked day on/after it: under the span rule
+      // it opens its own DATA-LESS cycle, so the interval from the previous
+      // marked start (Apr 4) to it IS a counted length (that cycle really
+      // ended at the fresh mark).
       final marks = [start(2026, 3, 2), start(2026, 4, 4), start(2026, 6, 1)];
 
       // Length = mark date to mark date: Mar 2 → Apr 4 = 33 days, even
-      // though the first tracked day of the cycle is Mar 4.
-      expect(cycleLengthsInDays(entries, marks), [33]);
+      // though the first tracked day of the cycle is Mar 4; Apr 4 → Jun 1
+      // = 58 days into the fresh, data-less cycle.
+      expect(cycleLengthsInDays(entries, marks), [33, 58]);
       // The onsets are the mark dates themselves (the Mar 2 onset is an
-      // untracked gap day).
+      // untracked gap day; the Jun 1 onset is the data-less fresh mark).
       expect(menstruationOnsetDates(entries, marks), [
         DateOnly.normalize(DateTime(2026, 3, 2)),
         DateOnly.normalize(DateTime(2026, 4, 4)),
+        DateOnly.normalize(DateTime(2026, 6, 1)),
       ]);
     });
 
@@ -371,6 +379,326 @@ void main() {
         18,
       );
       expect(stats.earliestFirstHigherDayOfCycle, 19);
+    });
+  });
+
+  // The per-cycle statistics scenario: three marked cycles
+  //   cycle 1: start Mar 1 — bleeding Mar 1-4 with an interruption on Mar 3
+  //            (4 bleeding-window days, interruption counts through), first
+  //            higher Mar 14, mucus peak Mar 12
+  //   cycle 2: start Mar 29 — no bleeding day, first higher Mar 31, mucus
+  //            peak Mar 30
+  //   cycle 3: start Apr 27 — bleeding Apr 27-28, no first-higher mark
+  // (Mar 3 clear: shows the interruption counting through the span.)
+  List<DailyEntry> perCycleEntries() => [
+    d(2026, 3, 1, bleeding: Bleeding.heavy),
+    d(2026, 3, 2, bleeding: Bleeding.medium),
+    d(2026, 3, 3),
+    d(2026, 3, 4, bleeding: Bleeding.light),
+    d(2026, 3, 29, bleeding: Bleeding.none),
+    d(2026, 4, 27, bleeding: Bleeding.medium),
+    d(2026, 4, 28, bleeding: Bleeding.medium),
+  ];
+
+  List<CycleMark> perCycleMarks() => [
+    start(2026, 3, 1),
+    start(2026, 3, 29),
+    start(2026, 4, 27),
+    mucusPeak(2026, 3, 12),
+    firstHigher(2026, 3, 14),
+    mucusPeak(2026, 3, 30),
+    firstHigher(2026, 3, 31),
+  ];
+
+  List<CycleEvaluation> perCycleEvaluations() => evaluateCycles(
+    perCycleEntries(),
+    perCycleMarks(),
+    today: DateTime(2026, 6, 1),
+  );
+
+  group('markDrivenCycleCount', () {
+    test('counts the mark-opened cycles of the grouping', () {
+      // The threeCycleData scenario has FOUR mark-opened groups (starts
+      // Mar 2 / Mar 30 / Apr 27 / May 25 — the last one is the still-open
+      // cycle, hence 3 lengths but 4 observed cycles).
+      expect(markDrivenCycleCount(threeCycleData(), threeCycleStarts()), 4);
+      expect(markDrivenCycleCount(perCycleEntries(), perCycleMarks()), 3);
+    });
+
+    test('no marks -> zero cycles', () {
+      expect(markDrivenCycleCount(threeCycleData(), const []), 0);
+      expect(markDrivenCycleCount(const [], const []), 0);
+    });
+
+    test('the leading pre-mark group is not counted', () {
+      final entries = [
+        d(2026, 2, 25, bleeding: Bleeding.spotting),
+        d(2026, 2, 27),
+        ...threeCycleData(),
+      ];
+      // Five groups form, but only the four mark-opened ones count —
+      // the leading group (Feb 25-27, before the first cycleStart mark)
+      // carries startsAtMenstruation == false.
+      expect(markDrivenCycleCount(entries, threeCycleStarts()), 4);
+    });
+  });
+
+  group('summarizeInts', () {
+    test('min, max, average and population std-dev over the list', () {
+      // Mean 6; population variance ((4-6)² + 0 + (8-6)² + 0) / 4 = 2,
+      // std-dev = sqrt(2). Population (divide by N), because the observed
+      // cycles are the whole recorded data set here — a descriptive
+      // fact, not a sample-of-a-population estimate.
+      final summary = summarizeInts(const [4, 6, 8, 6]);
+      expect(summary.minimum, 4);
+      expect(summary.maximum, 8);
+      expect(summary.average, closeTo(6.0, 0.0001));
+      expect(summary.standardDeviation, closeTo(1.4142135, 0.0001));
+    });
+
+    test('a single value has zero std-dev', () {
+      final summary = summarizeInts(const [28]);
+      expect(summary.minimum, 28);
+      expect(summary.maximum, 28);
+      expect(summary.average, closeTo(28.0, 0.0001));
+      expect(summary.standardDeviation, closeTo(0.0, 0.0001));
+    });
+
+    test('empty input yields nulls without throwing', () {
+      final summary = summarizeInts(const []);
+      expect(summary.minimum, isNull);
+      expect(summary.maximum, isNull);
+      expect(summary.average, isNull);
+      expect(summary.standardDeviation, isNull);
+    });
+  });
+
+  group('bleedingSpanInDays (the per-window helper, directly)', () {
+    test('first-to-last inclusive span; null without a bleeding day', () {
+      // The helper is the one documented definition behind the per-cycle
+      // statistics (see the docstring); these thin asserts pin its
+      // contract at the direct call level — the statistics screen passes
+      // evaluateCycles() windows in [cycleBleedingDurationsInDays] below.
+      // 1st gap case: Mar 1, 2 and 4 bleed, Mar 3 does not — the span is
+      // 4 (interruption counts through, "Mensbeginn -> Mensende"); the
+      // interruption-free single-day case stays 1.
+      expect(
+        bleedingSpanInDays([
+          d(2026, 3, 1, bleeding: Bleeding.medium),
+          d(2026, 3, 2, bleeding: Bleeding.light),
+          d(2026, 3, 3, bleeding: Bleeding.none),
+          d(2026, 3, 4, bleeding: Bleeding.heavy),
+        ]),
+        4,
+      );
+      expect(bleedingSpanInDays([d(2026, 3, 2, bleeding: Bleeding.medium)]), 1);
+      expect(
+        bleedingSpanInDays([d(2026, 3, 2, bleeding: Bleeding.none)]),
+        isNull,
+      );
+    });
+  });
+
+  group('cycleBleedingDurationsInDays (per marked cycle over the spans)', () {
+    test('first to last bleeding day, interruptions count through', () {
+      // Mar 1, 2, 4 bleed; Mar 3 does not — the span Mar 1..Mar 4 is an
+      // INCLUSIVE calendar-day count of 4 (like "Mensbeginn -> Mensende",
+      // first-to-last days, not the number of bleeding days itself).
+      final summary = summarizeInts(
+        cycleBleedingDurationsInDays(
+          evaluateCycles(perCycleEntries(), perCycleMarks()),
+        ).nonNulls.toList(),
+      );
+      // Cycle 1: 4, cycle 2: no bleeding -> dropped from the aggregate.
+      expect(summary.minimum, 2);
+      expect(summary.maximum, 4);
+      expect(summary.average, closeTo(3.0, 0.0001));
+    });
+
+    test('a cycle without any bleeding day contributes null', () {
+      // perCycleEvaluations(): the third cycle is filtered out above; test
+      // the nulls directly. The bleeding day rule: level >= 1 (spotting
+      // included) — level 0 (none) is not a bleeding day.
+      final durations = cycleBleedingDurationsInDays(perCycleEvaluations());
+      expect(durations, [4, null, 2]);
+    });
+
+    test('the leading pre-mark group never contributes', () {
+      final entries = [
+        d(2026, 2, 25, bleeding: Bleeding.heavy),
+        d(2026, 2, 26, bleeding: Bleeding.heavy),
+        d(2026, 3, 1, bleeding: Bleeding.light),
+        d(2026, 3, 29),
+      ];
+      final marks = [start(2026, 3, 1)];
+      // Exactly ONE mark-driven cycle: the leading group's bleeding
+      // (Feb 25-26) is not a numbered cycle, exactly as the cycle page's
+      // evaluation table shows the dash for it; the Mar 1 group spans the
+      // rest (Mar 1..Mar 29, only Mar 1 bleeds -> duration 1).
+      expect(cycleBleedingDurationsInDays(evaluateCycles(entries, marks)), [1]);
+    });
+  });
+
+  group('riseToEndDurationsInDays', () {
+    test('first higher mark to the last day before the next cycle start', () {
+      // Cycle 1: rise Mar 14, next start Mar 29 -> cycle end Mar 28,
+      // INCLUSIVE span Mar 14..Mar 28 = 15 days. Calendar-honest: untracked
+      // gap days count through (cycle 2 has no tracked Mar 1..28 tail days).
+      final durations = riseToEndDurationsInDays(perCycleEvaluations());
+      // Cycle 2: rise Mar 31, next start Apr 27 -> Apr 26, span 27 days.
+      // Cycle 3 has no first-higher mark; nothing after.
+      expect(durations, [15, 27, null]);
+    });
+
+    test('the last mark-driven cycle has no known end -> null', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+      ];
+      final marks = [
+        start(2026, 3, 2),
+        start(2026, 3, 30),
+        firstHigher(2026, 3, 5),
+      ];
+      // Two marked cycles; the second one is the last group (no follow-up
+      // start), so its window has no cycle end. Cycle 1: rise Mar 5, next
+      // start Mar 30 -> cycle end Mar 29, INCLUSIVE span = 25 days.
+      expect(
+        riseToEndDurationsInDays(
+          evaluateCycles(entries, marks, today: DateTime(2026, 4, 2)),
+        ),
+        [25, null],
+      );
+    });
+  });
+
+  group('the data-span extension (cycle runs to the next mark / today)', () {
+    // The grouping extends every cycle across its data-less tail; these
+    // tests pin what the STATISTICS make of the appended empty entries.
+    test('bleeding statistics are untouched by the appended data-less days '
+        '(empty entries bleed nothing)', () {
+      // perCycleEvaluations pins the clock at Jun 1: cycle 3 (start Apr 27,
+      // tracked to Apr 28) extends across data-less Apr 29..May 31 — still
+      // a bleeding-free cycle, contributing null.
+      expect(cycleBleedingDurationsInDays(perCycleEvaluations()), [4, null, 2]);
+    });
+
+    test('a trailing FRESH mark (no data after it) counts its interval: '
+        'the previous cycle ran to it, lengths and counts grow', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+      ];
+      final marks = [start(2026, 3, 2), start(2026, 3, 30), start(2026, 5, 10)];
+
+      // The fresh May 10 mark opens a data-less cycle; onsets now include
+      // it, so one more length is counted (mark-to-mark, Mar 2 -> May 10).
+      expect(cycleLengthsInDays(entries, marks), [28, 41]);
+      expect(markDrivenCycleCount(entries, marks), 3);
+    });
+
+    test('the cycle before a fresh mark gets a rise-to-end span to the day '
+        'before that mark', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+        d(2026, 3, 31, bbtC: 36.8),
+      ];
+      final marks = [
+        start(2026, 3, 2),
+        start(2026, 3, 30),
+        start(2026, 5, 10),
+        firstHigher(2026, 3, 5),
+        firstHigher(2026, 3, 31),
+      ];
+
+      // Cycle 1: rise Mar 5 -> next start Mar 30: 25 days (unchanged).
+      // Cycle 2: rise Mar 31 -> next (fresh) start May 10: ends May 9,
+      // span 40 days — before the extension rule this was null (no known
+      // follow-up start). The fresh cycle itself: no rise, null.
+      expect(
+        riseToEndDurationsInDays(
+          evaluateCycles(entries, marks, today: DateTime(2026, 5, 12)),
+        ),
+        [25, 40, null],
+      );
+    });
+  });
+
+  group('earliestFirstHigherCycleDay', () {
+    test('cycle-day minimum, both variants (any and strictly after peak)', () {
+      // Cycle 1: rise Mar 14 on cycle day 14 (start Mar 1 = day 1; the peak
+      // Mar 12 lies before it -> the "real" variant counts 14 too).
+      // Cycle 2: rise Mar 31 on cycle day 3 (start Mar 29 = day 1; the peak
+      // Mar 30 lies before it -> qualifies strictly-after-peak).
+      final earliest = earliestFirstHigherCycleDay(perCycleEvaluations());
+      expect(earliest.any, 3);
+      expect(earliest.afterMucusPeak, 3);
+    });
+
+    test('both variants differ: a first higher BEFORE the mucus peak does '
+        'not qualify for the real variant', () {
+      // Cycle 1: rise Mar 4 (cycle day 4), peak Mar 6 — the rise is NOT
+      // strictly after the peak, so the real variant ignores it.
+      // Cycle 2: rise Apr 6 (cycle day 9; start Mar 29 = day 1), peak
+      // Apr 2 — qualifies.
+      final entries = [
+        d(2026, 3, 1),
+        d(2026, 3, 29, bleeding: Bleeding.spotting),
+        d(2026, 4, 2),
+      ];
+      final marks = [
+        start(2026, 3, 1),
+        start(2026, 3, 29),
+        mucusPeak(2026, 3, 6),
+        firstHigher(2026, 3, 4),
+        mucusPeak(2026, 4, 2),
+        firstHigher(2026, 4, 6),
+      ];
+      final earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(entries, marks),
+      );
+      expect(earliest.any, 4, reason: 'the minimum over all cycles');
+      expect(
+        earliest.afterMucusPeak,
+        9,
+        reason: 'only the strictly-after-peak rise qualifies',
+      );
+    });
+
+    test('null variants when nothing qualifies', () {
+      // No first-higher marks at all: both variants null.
+      var earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(threeCycleData(), threeCycleStarts()),
+      );
+      expect(earliest.any, isNull);
+      expect(earliest.afterMucusPeak, isNull);
+
+      // A rise before the peak in every marked cycle: any stays, real null.
+      earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(
+          [DailyEntry(date: DateTime(2026, 3, 1))],
+          [start(2026, 3, 1), firstHigher(2026, 3, 3), mucusPeak(2026, 3, 5)],
+        ),
+      );
+      expect(earliest.any, 3);
+      expect(earliest.afterMucusPeak, isNull);
+    });
+
+    test('the leading pre-mark group is ignored', () {
+      final entries = [d(2026, 2, 20), d(2026, 3, 1)];
+      final marks = [
+        // A first-higher mark BEFORE the first cycleStart mark belongs to
+        // the leading group (startsAtMenstruation == false): no cycle day,
+        // so it must not contribute (the cycle day would be undefined).
+        firstHigher(2026, 2, 25),
+        start(2026, 3, 1),
+      ];
+      final earliest = earliestFirstHigherCycleDay(
+        evaluateCycles(entries, marks),
+      );
+      expect(earliest.any, isNull);
+      expect(earliest.afterMucusPeak, isNull);
     });
   });
 }

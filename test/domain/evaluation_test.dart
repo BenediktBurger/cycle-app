@@ -74,11 +74,13 @@ CycleMark rise(int year, int month, int day) => CycleMark(
 CycleEvaluation evalFor(
   List<DailyEntry> entries,
   List<CycleMark> marks,
-  DateTime start,
-) {
+  DateTime start, {
+  DateTime? today,
+}) {
   return evaluateCycles(
     entries,
     marks,
+    today: today,
   ).firstWhere((e) => DateOnly.sameDay(e.cycle.startDate, start));
 }
 
@@ -1919,6 +1921,51 @@ void main() {
         gapMarked.firstHigherDay,
         DateOnly.normalize(DateTime(2026, 3, 11)),
       );
+    });
+  });
+
+  group('the data-span extension (a cycle runs past its data)', () {
+    test('the appended data-less days after the last tracked data never '
+        'stop the evaluation and derive nothing of their own', () {
+      // Baseline window Mar 3–8 (highest = Mar 6, 36.4), peak Mar 9,
+      // rise marked Mar 10: every candidate Mar 10–12 is strictly after
+      // the peak (circles); rule D fires on the 3rd circle (Mar 12) —
+      // and every calendar day BEYOND Mar 13 is untracked, now materialized
+      // as data-less span-extension days by the grouping (cycle through
+      // Mar 25). Neither the walk's lengthened bound nor those days create
+      // candidates, numbers or a stop — the sequence ran out of DATA, it
+      // did not break in the middle.
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 3, t: 36.2),
+        d(2026, 3, 4, t: 36.1),
+        d(2026, 3, 5, t: 36.3),
+        d(2026, 3, 6, t: 36.4),
+        d(2026, 3, 7, t: 36.2),
+        d(2026, 3, 8, t: 36.3),
+        d(2026, 3, 9, t: 36.2),
+        d(2026, 3, 10, t: 36.8),
+        d(2026, 3, 11, t: 36.9),
+        d(2026, 3, 12, t: 37.0),
+        d(2026, 3, 13, t: 36.95),
+      ];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(
+        entries,
+        marks,
+        DateTime(2026, 3, 2),
+        today: DateTime(2026, 3, 25),
+      );
+
+      expect(e.cycle.endDate, DateOnly.normalize(DateTime(2026, 3, 25)));
+      expect(e.higherMeasurements.map((h) => h.date.day), [10, 11, 12]);
+      expect(e.evaluationStopped, isFalse);
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 12)));
+      expect(e.numberedLows.map((l) => l.date.day), [9, 8, 7, 6, 5, 4]);
+      // The baseline segment ends at the trigger day, never in the span
+      // extension.
+      expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 12)));
     });
   });
 }

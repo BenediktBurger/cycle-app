@@ -25,7 +25,8 @@
 // low #6 to the last marked candidate (R10) and the user-placed SUZ bars
 // (sicher unfruchtbare Zeit; ONLY user-placed marks render — the computed
 // suzBegins drives the sheet's suggestion instead).
-// lib/ui/cycle_marks.dart over evaluateCycles. No derived artifact is
+// lib/domain/evaluation_overlay.dart over evaluateCycles, painted by
+// lib/ui/cycle_marks.dart. No derived artifact is
 // persisted; the SUZ arithmetic stays domain-only and a manual SUZ mark
 // never alters it (see lib/domain/evaluation.dart).
 //
@@ -58,7 +59,9 @@ import 'package:intl/intl.dart';
 import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/disturbances.dart';
 import '../domain/evaluation.dart';
+import '../domain/evaluation_overlay.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
@@ -131,7 +134,13 @@ class ZyklusScreen extends ConsumerWidget {
           final temperatureRange = ref.watch(temperatureRangeProvider);
           final marks =
               ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
-          final evaluations = evaluateCycles(entries, marks);
+          final evaluations = evaluateCycles(
+            entries,
+            marks,
+            // The grouping's injected clock (last-cycle span rule — the
+            // nowProvider seam, pinned in tests).
+            today: ref.read(nowProvider)(),
+          );
           // The "cycles observed outside this app" setting: watched here so
           // a settings change renumbers the chart's boundary ordinals in
           // the same rebuild — exactly why the chart takes the value as
@@ -742,14 +751,10 @@ final class _CycleChartState extends State<_CycleChart> {
     // border by a fixed [suzBarHangSpanDegrees] drop, and the arrow glyph
     // anchors [suzArrowTopInsetDegrees] below that border (inside the hung
     // band), so the whole glyph sits below the sex row above the plot.
-    // TODO(user-review): both values are owner-eyeball rendering details,
-    // not settled rules. TODO(user-review): top-border collision — a
-    // temperature dot near the scale top (especially a dot exactly AT the
-    // boundary yMax) can visually meet the top arrow; accepted for now, no
-    // avoidance logic.
-    const suzBarHangSpanDegrees = 0.5;
-    const suzArrowTopInsetDegrees = 0.25;
-
+    // The constants live in cycle_marks.dart, shared with the PDF export
+    // (lib/pdf/cycle_pdf.dart anchors its mirror-rendered glyph in degrees
+    // through the PdfCurveAxis too). TODO(user-review): both values are
+    // owner-eyeball rendering details, not settled rules.
     // Ignored (marked) TEMPERATURES read lighter: the scheme color at the
     // shared lighter alpha (owner decision 2026-09-19: the
     // ignoreTemperature mark is the rendering key). The dark scheme's
@@ -1561,7 +1566,8 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
       style: TextStyle(fontSize: 10, color: scheme.onSurface),
     ),
     // Sample disturbance glyph: the first letter code of today's
-    // vocabulary (disturbanceLetters below) — the per-day cells stack one
+    // vocabulary (disturbanceLetters, domain/disturbances.dart) — the
+    // per-day cells stack one
     // code per set temperature-disturbance flag (diary-entered).
     _SignalKind.disturbance => Text(
       'kr',
@@ -1588,25 +1594,6 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
 // TODO(user-review): the threshold is a tuned display heuristic, not a
 // rule from the cheat sheet.
 const double _timeCellMinColumnWidth = 32;
-
-/// The temperature-disturbance letter codes of a day, one per set
-/// disturbance flag, in the render order the disturbance row stacks them:
-/// the NER vocabulary's tokens — late to bed → "sp", night awakening →
-/// "a", alcohol → "alk", illness → "kr" (Reise is not representable in
-/// this vocabulary, so it never appears).
-///
-/// THE single seam for the letter vocabulary: nothing on the chart
-/// interprets the letters; they are raw-observation display only
-/// (ADR-0001). Both the chart's disturbance row and the glossary sample
-/// draw through this function.
-/// TODO(user-review): the letter vocabulary mirrors the paper sheet's
-/// disturbance codes; the experts may want different ones.
-List<String> disturbanceLetters(DailyEntry? day) => day == null
-    ? const []
-    : [
-        for (final disturbance in TempDisturbance.values)
-          if (day.tempDisturbances & disturbance.bit != 0) disturbance.token,
-      ];
 
 /// One signal's recording row: the window's day cells only — the row's
 /// name glyph lives in the frozen left rail (see _LeftRail), at this row's
@@ -2263,9 +2250,13 @@ final class _TemperatureScale {
     for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5,
   ];
 
-  /// The two-scale label for a tick: integers plain ("37"), halves with one
-  /// decimal ("36.5") — the numbering the chart's own axis titles used.
-  String labelFor(double value) => _formatHalfDegree(value);
+  /// The two-scale label for a tick, WITH the °C unit on every label
+  /// (mirrors the PDF's axis-label convention): the decimal formatting
+  /// stays unlocalized ("37.5", a period — the rail's current rendering;
+  /// the wiki-facing German comma lives in the PDF, which is a German
+  /// document). TODO(user-review): a locale-aware comma ("37,5 °C" in de)
+  /// is the open refinement question for the app side.
+  String labelFor(double value) => '${_formatHalfDegree(value)} °C';
 }
 
 // --- frozen left rail --------------------------------------------------------
@@ -2353,6 +2344,13 @@ final class _LeftRail extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
+                  // The scale labels: EVERY tick carries the °C unit
+                  // (mirroring the PDF's axis labels exactly — the old
+                  // standalone "°C" caption above the scale is redundant
+                  // and removed; width check: the widest label
+                  // "37.5 °C" ≈ 34 px at the 10 px type fits the frozen
+                  // rail's 44 px with the 3 px right inset, so the rail
+                  // width stays as-is).
                   for (final value in scale.ticks)
                     Positioned(
                       left: 0,
@@ -2431,9 +2429,10 @@ final class _LeftRail extends StatelessWidget {
 
 // --- half-degree formatting ---------------------------------------------------
 
-/// The rail's tick labels: integers plain ("37"), halves with one decimal
-/// ("36.5") — the numbering behaves exactly like the paper sheet's margin
-/// scale values.
+/// The rail's tick-label numerals: integers plain ("37"), halves with one
+/// decimal ("36.5") — the numbering behaves exactly like the paper sheet's
+/// margin scale values. The °C unit is appended by [_TemperatureScale
+/// .labelFor] (in lib/ui/cycle.dart's scale class), NOT here.
 String _formatHalfDegree(double value) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0

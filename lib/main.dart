@@ -93,6 +93,15 @@ class _CycleAppState extends ConsumerState<CycleApp> {
         ref.read(observedCyclesOutsideAppProvider.notifier).state =
             snapshot.observedCyclesOutsideApp;
       }
+      final pdfName = ref.read(pdfExportNameProvider);
+      if (pdfName == null && snapshot.pdfExportName != null) {
+        ref.read(pdfExportNameProvider.notifier).state = snapshot.pdfExportName;
+      }
+      final pdfBirthDate = ref.read(pdfExportBirthDateProvider);
+      if (pdfBirthDate == null && snapshot.pdfExportBirthDate != null) {
+        ref.read(pdfExportBirthDateProvider.notifier).state =
+            snapshot.pdfExportBirthDate;
+      }
       // One-directional by nature: the onboarding flag can only flip
       // not-completed → completed, and hydration applies only that flip (a
       // persisted completion must never be re-set to false).
@@ -126,6 +135,12 @@ class _CycleAppState extends ConsumerState<CycleApp> {
         ref,
         (store) => store.persistObservedCyclesOutsideApp(current),
       );
+    });
+    ref.listen<String?>(pdfExportNameProvider, (previous, current) {
+      _persistSetting(ref, (store) => store.persistPdfExportName(current));
+    });
+    ref.listen<DateTime?>(pdfExportBirthDateProvider, (previous, current) {
+      _persistSetting(ref, (store) => store.persistPdfExportBirthDate(current));
     });
     ref.listen<bool>(onboardingCompletedProvider, (previous, current) {
       _persistSetting(

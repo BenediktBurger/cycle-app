@@ -179,6 +179,58 @@
   "statisticsCycleTable": "Zyklen-Tabelle",
   "statisticsTableLength": "Länge",
   "statisticsDistribution": "Verteilung",
+  "statisticsObservedCyclesTitle": "Beobachtete Zyklen",
+  "@statisticsObservedCyclesTitle": {
+    "description": "Card title of the cycle-count surface on the statistics screen: all observed cycles. The card's caption names the composition (in this app + the observed-cycles-outside-app setting value)."
+  },
+  "statisticsCyclesInApp": "in dieser App: {n}",
+  "@statisticsCyclesInApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles recorded IN this app (mark-opened cycles). Numbers only — the compositional meaning of the total."
+  },
+  "statisticsCyclesOutsideApp": "außerhalb: {n}",
+  "@statisticsCyclesOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Count-card caption part naming the cycles observed outside this app (the settings value), shown when it is non-zero."
+  },
+  "statisticsStandardDeviation": "Standardabweichung",
+  "@statisticsStandardDeviation": {
+    "description": "Population standard deviation (StdAbw über die gesamte beobachtete Menge, kein N-1-Schätzwert) — beschreibender Rechenwert."
+  },
+  "statisticsMetricBleedingDuration": "Blutungsdauer",
+  "statisticsMetricRiseSpan": "Erste höhere Messung → Zyklusende",
+  "@statisticsMetricRiseSpan": {
+    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
+  },
+  "statisticsCycleDay": "Zyklustag {n}",
+  "@statisticsCycleDay": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+  },
+  "statisticsFirstHigherReal": "streng nach dem Schleimhöhepunkt",
+  "@statisticsFirstHigherReal": {
+    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+  },
+  "statisticsFirstHigherAny": "über alle Zyklen",
+  "@statisticsFirstHigherAny": {
+    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
+  },
+  "statisticsFirstHigherRealMissing": "keine erste höhere Messung streng nach dem Schleimhöhepunkt markiert",
+  "@statisticsFirstHigherRealMissing": {
+    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+  },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",
@@ -195,6 +247,10 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "Wie viele Zyklen du vor dieser App beobachtet hast (z. B. auf Papier). Die Zyklus-Nummern auf der Zyklusseite fangen erst nach dieser Zahl an zu zählen.",
   "settingsObservedCyclesOutsideAppError": "Bitte eine ganze Zahl ≥ 0 eingeben",
+  "settingsObservedCyclesOutsideAppCount": "Anzahl der beobachteten Zyklen",
+  "@settingsObservedCyclesOutsideAppCount": {
+    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
+  },
   "cycleOrdinal": "Zyklus {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -312,6 +368,82 @@
   "@deleteDataFailed": {
     "description": "Fehlermeldung für den gesamten Lösch-Ablauf: erscheint, wenn das Öffnen der Datenbank, die Vorab-Zählung für den Bestätigungsdialog oder das eigentliche Löschen fehlschlägt. Das Löschen ist eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu importFailed)."
   },
+  "settingsPdfExport": "PDF-Export",
+  "@settingsPdfExport": {
+    "description": "Settings card + export flow title: the PDF export feature. Mirrors the paper form the NFR teacher knows."
+  },
+  "settingsPdfExportName": "Name (Papierformular)",
+  "@settingsPdfExportName": {
+    "description": "Free-text field label for the export name: printed in the PDF header, hideable per export via anonymize."
+  },
+  "settingsPdfExportBirthDate": "Geburtsdatum",
+  "@settingsPdfExportBirthDate": {
+    "description": "Date field label for the export birth date: printed in the PDF header, hideable per export via anonymize."
+  },
+  "settingsPdfExportBirthDateFormat": "JJJJ-MM-TT",
+  "@settingsPdfExportBirthDateFormat": {
+    "description": "Hint under/in the birth-date field: the strict ISO date shape this field exchanges."
+  },
+  "settingsPdfExportBirthDateError": "Bitte ein echtes Kalenderdatum der Form JJJJ-MM-TT eintragen.",
+  "@settingsPdfExportBirthDateError": {
+    "description": "Validation error of the birth-date field (also for impossible days like 1990-02-30)."
+  },
+  "settingsPdfExportNote": "Name und Geburtsdatum erscheinen im Kopfbereich jedes PDF-Exports; der Anonymisieren-Schalter im Export blendet beide für den jeweiligen Export aus, ohne die Speicherung zu ändern. Die Zahl der beobachteten Zyklen im PDF schließt den Wert der Karte \u201eBeobachtete Zyklen außerhalb dieser App\u201c ein.",
+  "@settingsPdfExportNote": {
+    "description": "Helper note of the PDF-export card: names where the values land, points to the per-export anonymize toggle and cross-references the outside-app cycle count that feeds the PDF's observed-cycle header fact."
+  },
+  "pdfExportCycleOption": "Zyklus {n}, ab {day}",
+  "@pdfExportCycleOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "day": {
+        "type": "String"
+      }
+    },
+    "description": "One checkbox row of the export card's cycle-selection list: the shared cycle ordinal plus the cycle's start date (ISO)."
+  },
+  "pdfExportCyclesAll": "Alle",
+  "@pdfExportCyclesAll": {
+    "description": "Bulk button of the export card's cycle-selection list: selects every exportable cycle."
+  },
+  "pdfExportCyclesNone": "Keine",
+  "@pdfExportCyclesNone": {
+    "description": "Bulk button of the export card's cycle-selection list: deselects every cycle (the empty selection keeps the export behind the empty-data guard)."
+  },
+  "pdfExportCyclesSelectedSummary": "{n} von {total} Zyklen ausgewählt",
+  "@pdfExportCyclesSelectedSummary": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    },
+    "description": "Summary line: how many of the exportable cycles are currently selected. Shown on the export card and (live) on the cycle-selection page — the card itself has no checkboxes, the checkbox rows live on the selection page."
+  },
+  "pdfExportSelectCycles": "Zyklen auswählen…",
+  "@pdfExportSelectCycles": {
+    "description": "Button of the PDF-export card: opens the full-screen cycle-selection page. (The card itself keeps only the summary line — the formerly inline checkbox list grew unmanageable with many cycles.)"
+  },
+  "pdfExportSelectionTitle": "Zyklen für den Export auswählen",
+  "@pdfExportSelectionTitle": {
+    "description": "Title of the pushed full-screen cycle-selection page above the PDF export."
+  },
+  "pdfExportSelectionConfirm": "Auswahl bestätigen",
+  "@pdfExportSelectionConfirm": {
+    "description": "Pinned confirm button of the cycle-selection page (top, alongside the All/None bulk buttons): applies the selection back into the export card and closes the page. Das Verlassen der Seite ohne Bestätigung ändert nichts."
+  },
+  "pdfExportAnonymize": "Anonymisieren",
+  "@pdfExportAnonymize": {
+    "description": "Per-export switch: hides the stored name and birth date in THIS generated document (not persisted)."
+  },
+  "pdfExportExportButton": "Exportieren",
+  "@pdfExportExportButton": {
+    "description": "Button of the PDF-export card: generates the document and saves it via the file-transfer seam."
+  },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "JSON-Export",
@@ -372,5 +504,9 @@
   "@cycleDayPanelClose": {
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
-  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)"
+  "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
+  "statisticsCycles": "Zykluslängen",
+  "statisticsOnsets": "Zyklusbeginne",
+  "statisticsShortest": "Kürzester",
+  "statisticsLongest": "Längster"
 }

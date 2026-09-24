@@ -1,294 +1,666 @@
-// Statistics screen end-to-end: the reworked Statistik screen over the REAL
-// app surface — a cycle count card, one uniform detailed presentation
-// (Minimum/Streuung/Maximum/Durchschnitt) for the three metrics (cycle
-// length, bleeding days, first higher until end of cycle), the earliest
-// first higher measurement as a day-of-cycle number, and below ALL other
-// statistics a per-cycle table (start, bleeding days, first higher,
-// length). The in-memory ProviderScope harness mirrors
-// test/settings_persistence_test.dart: entries and marks are seeded through
-// the real DAOs before the UI builds.
-//
-// Scenario (German device locale, German labels): four mark-opened cycles
-// Mar 2 / Mar 30 / Apr 27 / May 25 2026 — lengths 28, 28, 28 (+ trailing);
-// bleeding days 2 / 1 / 0 / 2; a first-higher mark on Mar 20 (day-of-cycle
-// 19, ten days until the cycle end), no other first higher.
-import 'package:cycle_app/db/cycle_database.dart';
+// Widget tests of the Statistik screen: the aggregate statistics live here
+// (concentrated, since the cycle tab's evaluation table is the paper-form
+// evaluation, not aggregates). Each metric group is covered by a
+// min/max/average/std-dev card plus the "earliest first higher" rows; the
+// cycle-count surface handles the observed-cycles-outside-app setting
+// (the count card shows the total with the "in this app" meaning on
+// its surface). The old surfaces (cycle-length list, average/shortest/
+// longest, cycle starts, distribution) stay. Numbers only — no
+// interpretation, mirroring the domain's hard rule.
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
+import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/statistics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
 
-import 'support/database.dart';
-import 'support/finders.dart';
-import 'support/viewport.dart';
+DateTime m(int month, int day) => DateTime.utc(2026, month, day);
 
-Future<void> _seed(CycleDatabase db) async {
-  final entries = [
-    DailyEntry(date: DateTime(2026, 3, 2), bleeding: Bleeding.medium),
-    DailyEntry(date: DateTime(2026, 3, 3), bleeding: Bleeding.medium),
-    DailyEntry(date: DateTime(2026, 3, 4)),
-    DailyEntry(date: DateTime(2026, 3, 20), bbtC: 36.4),
-    DailyEntry(date: DateTime(2026, 3, 30), bleeding: Bleeding.medium),
-    DailyEntry(date: DateTime(2026, 4, 27)),
-    DailyEntry(date: DateTime(2026, 5, 25), bleeding: Bleeding.medium),
-    DailyEntry(date: DateTime(2026, 5, 26), bleeding: Bleeding.medium),
-  ];
-  for (final entry in entries) {
-    await db.entriesDao.upsertDaily(entry);
-  }
-  const starts = [(2026, 3, 2), (2026, 3, 30), (2026, 4, 27), (2026, 5, 25)];
-  for (final (y, m, d) in starts) {
-    await db.marksDao.addMark(DateTime(y, m, d), CycleMarkTypes.cycleStart);
-  }
-  await db.marksDao.addMark(
-    DateTime(2026, 3, 20),
-    CycleMarkTypes.firstHigherMeasurement,
-  );
-}
+/// Two marked cycles, 2026:
+///   cycle 1: start Mar 1 — bleeding Mar 1-3 (span 3), six measured low
+///            days 36.4 from Mar 4, mucus-peak mark Mar 12, first-higher
+///            mark Mar 14 (measured 36.7 Mar 14-16), cycle 2 starts Mar 29
+///            -> rise span Mar 14..Mar 28 = 15 days; length 28
+///   cycle 2: start Mar 29 — bleeding Mar 29-30 (span 2), open (no
+///            follow-up start)
+List<DailyEntry> screenEntries() => [
+  DailyEntry(date: m(3, 1), bbtC: 36.4, bleeding: Bleeding.heavy),
+  DailyEntry(date: m(3, 2), bbtC: 36.4, bleeding: Bleeding.medium),
+  DailyEntry(date: m(3, 3), bbtC: 36.4, bleeding: Bleeding.light),
+  DailyEntry(date: m(3, 4), bbtC: 36.4),
+  DailyEntry(date: m(3, 5), bbtC: 36.4),
+  DailyEntry(date: m(3, 6), bbtC: 36.4),
+  DailyEntry(date: m(3, 7), bbtC: 36.4),
+  DailyEntry(date: m(3, 8), bbtC: 36.4),
+  DailyEntry(date: m(3, 14), bbtC: 36.7),
+  DailyEntry(date: m(3, 15), bbtC: 36.7),
+  DailyEntry(date: m(3, 16), bbtC: 36.7),
+  DailyEntry(date: m(3, 29), bbtC: 36.4, bleeding: Bleeding.medium),
+  DailyEntry(date: m(3, 30), bbtC: 36.4, bleeding: Bleeding.light),
+];
 
-String _dateLabel(DateTime day) => DateFormat.yMd(
-  'de',
-).format(DateTime.utc(day.year, day.month, day.day).toLocal());
+List<CycleMark> screenMarks() => [
+  CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: m(3, 12), type: CycleMarkTypes.mucusPeakDay),
+  CycleMark(date: m(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+];
 
-/// Pumps the real app (German device locale → German labels) against the
-/// in-memory database and opens the statistics tab.
-Future<void> pumpStatisticsScreen(WidgetTester tester) async {
-  useDeviceLocales(tester, const [Locale('de')]);
-  await tester.pumpWidget(appScope(locale: const Locale('de'), seed: _seed));
-  await tester.pumpAndSettle();
+/// Variant of [screenMarks] adding a first-higher mark ON cycle 2's first
+/// day (Mar 29, cycle day 1) with the peak on the SAME day — a rise NOT
+/// strictly after the peak: it changes the "over all cycles" variant
+/// (minimum cycle day 1) but not the real one (cycle day 14 stays).
+List<CycleMark> divergentMarks() => [
+  ...screenMarks(),
+  CycleMark(date: m(3, 29), type: CycleMarkTypes.mucusPeakDay),
+  CycleMark(date: m(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+];
 
-  await tester.tap(navLabel('Statistik'));
-  await tester.pumpAndSettle();
-}
+Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
+Finder metricCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
+Finder oldCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
+Finder earliestCard() =>
+    find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
 
-final countCard = find.byKey(const ValueKey('statisticsCycleCountCard'));
-final earliestEntry = find.byKey(
-  const ValueKey('statisticsEarliestFirstHigher'),
-);
-final table = find.byKey(const ValueKey('statisticsCycleTable'));
-Finder tableCell(String prefix, int index) =>
-    find.byKey(ValueKey('$prefix-$index'));
-Finder insideMetric(String id, Finder inner) => find.descendant(
-  of: find.byKey(ValueKey('statisticsMetric-$id')),
-  matching: inner,
+Widget harness({
+  List<DailyEntry> entries = const [],
+  List<CycleMark> marks = const [],
+  int observedOutsideApp = 0,
+  Locale locale = const Locale('en'),
+}) => ProviderScope(
+  overrides: [
+    dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
+    marksProvider.overrideWith((ref) => Stream.value(marks)),
+    observedCyclesOutsideAppProvider.overrideWith((ref) => observedOutsideApp),
+  ],
+  child: MaterialApp(
+    theme: ThemeData(colorSchemeSeed: const Color(0xFF6750A4)),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    locale: locale,
+    home: const Scaffold(body: StatistikScreen()),
+  ),
 );
 
 void main() {
-  testWidgets('the cycle-count card shows the number of mark-opened cycles', (
-    tester,
-  ) async {
-    await pumpStatisticsScreen(tester);
+  testWidgets('the cycle-count card totals in-app and outside-app cycles '
+      'with the meaning on the surface', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: screenMarks(),
+        observedOutsideApp: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
 
+    // The card title and the total: 2 mark-opened cycles in the app + the
+    // 3 outside-app cycles from the setting = 5 observed cycles.
     expect(
-      countCard,
+      find.descendant(of: countCard(), matching: find.text('Observed cycles')),
       findsOneWidget,
-      reason: 'the count card is one of the topmost statistics',
     );
     expect(
-      find.descendant(of: countCard, matching: find.text('4')),
+      find.descendant(of: countCard(), matching: find.text('5')),
       findsOneWidget,
-      reason: 'the card shows just the count of the four mark-opened cycles',
+    );
+    // The meaning stays on the surface: how the total is composed (one
+    // composed caption line: "in this app: n · outside: m").
+    expect(
+      find.descendant(
+        of: countCard(),
+        matching: find.textContaining('in this app: 2'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: countCard(),
+        matching: find.textContaining('outside: 3'),
+      ),
+      findsOneWidget,
     );
   });
 
-  testWidgets('the three metrics share the uniform '
-      'minimum/streuung/maximum/durchschnitt presentation', (tester) async {
-    await pumpStatisticsScreen(tester);
+  testWidgets('per-metric min/max/average/std-dev cards for cycle length, '
+      'bleeding duration and rise span', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(entries: screenEntries(), marks: screenMarks()),
+    );
+    await tester.pumpAndSettle();
 
-    // Cycle lengths [28, 28, 28] (the trailing cycle has no length yet).
-    expect(insideMetric('cycleLength', find.text('Minimum')), findsOneWidget);
-    expect(insideMetric('cycleLength', find.text('Maximum')), findsOneWidget);
-    expect(insideMetric('cycleLength', find.text('Streuung')), findsOneWidget);
+    // Cycle length: one counted length (28 days, the open cycle 2 has
+    // none) -> min/max 28, average 28.0, std-dev of one value 0.0.
+    expect(metricCard('cycleLength'), findsOneWidget);
     expect(
-      insideMetric('cycleLength', find.text('Durchschnitt')),
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Cycle length'),
+      ),
       findsOneWidget,
     );
-    expect(insideMetric('cycleLength', find.text('28')), findsNWidgets(2));
-    expect(insideMetric('cycleLength', find.text('0,0')), findsOneWidget);
-    expect(insideMetric('cycleLength', find.text('28,0')), findsOneWidget);
-
-    // Bleeding days [2, 1, 0, 2]: minimum 0, maximum 2, average 1.25,
-    // population std ≈ 0.829.
-    expect(insideMetric('bleedingDays', find.text('0')), findsOneWidget);
-    expect(insideMetric('bleedingDays', find.text('2')), findsOneWidget);
-    expect(insideMetric('bleedingDays', find.text('0,8')), findsOneWidget);
-    expect(insideMetric('bleedingDays', find.text('1,3')), findsOneWidget);
-
-    // First higher until end of cycle [10]: min/max duplicate 10, the
-    // spread is 0, the average 10,0.
-    expect(insideMetric('firstHigherUntilEnd', find.text('-')), findsNothing);
     expect(
-      insideMetric('firstHigherUntilEnd', find.text('10')),
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Minimum'),
+      ),
+      findsOneWidget,
+      reason: 'the minimum row is present',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Maximum'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Average'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Standard deviation'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('28 days'),
+      ),
+      findsNWidgets(2),
+      reason: 'min and max both carry the value',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('28.0'),
+      ),
+      findsOneWidget,
+      reason: 'the average value',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('0.0'),
+      ),
+      findsOneWidget,
+      reason: 'the std-dev of the single value',
+    );
+
+    // Bleeding duration: spans 3 (cycle 1) and 2 (cycle 2) -> min 2, max 3,
+    // average 2.5, POPULATION std-dev 0.5.
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('Bleeding duration'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('2 days'),
+      ),
+      findsOneWidget,
+      reason: 'the minimum span',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('3 days'),
+      ),
+      findsOneWidget,
+      reason: 'the maximum span',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('2.5'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('0.5'),
+      ),
+      findsOneWidget,
+      reason: 'population std-dev: sqrt(0.25)',
+    );
+
+    // Rise span: first higher (Mar 14) to the day before the next start
+    // (Mar 28) = 15 days, single value -> all scalars "no spread".
+    expect(
+      find.descendant(
+        of: metricCard('riseSpan'),
+        matching: find.text('First higher measurement → cycle end'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: metricCard('riseSpan'),
+        matching: find.text('15 days'),
+      ),
       findsNWidgets(2),
     );
     expect(
-      insideMetric('firstHigherUntilEnd', find.text('0,0')),
+      find.descendant(of: metricCard('riseSpan'), matching: find.text('15.0')),
       findsOneWidget,
     );
     expect(
-      insideMetric('firstHigherUntilEnd', find.text('10,0')),
+      find.descendant(of: metricCard('riseSpan'), matching: find.text('0.0')),
       findsOneWidget,
     );
   });
 
-  testWidgets('the earliest first higher measurement entry names its '
-      'day-of-cycle number', (tester) async {
-    // A tall surface: the entry sits with the metrics high on the list,
-    // but the lazy list must build it for the finder to see it at all.
-    useTallSurface(tester);
-    await pumpStatisticsScreen(tester);
+  testWidgets(
+    'the shared first-higher-until-cycle-end metric keeps the upstream '
+    'counting rule on the shared card shape',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: screenMarks()),
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      earliestEntry,
-      findsOneWidget,
-      reason: 'the earliest-first-higher entry sits with the metrics',
-    );
-    expect(
-      find.descendant(of: earliestEntry, matching: find.text('Zyklustag 19')),
-      findsOneWidget,
-      reason: 'Mar 20 is day 19 of the cycle starting Mar 2',
-    );
-  });
+      // The upstream metric: cycle 1's first higher (Mar 14) counts to the
+      // NEXT marked start (Mar 29) -> 15 — the same inclusive rule the
+      // cycle table's column uses, so the metric and the table cannot
+      // disagree. The trailing cycle has no known end here -> no value.
+      final untilEnd = find.byKey(
+        const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+      );
+      expect(untilEnd, findsOneWidget);
+      expect(
+        find.descendant(
+          of: untilEnd,
+          matching: find.text('First higher measurement to end of cycle'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('15 days')),
+        findsNWidgets(2),
+        reason: 'min and max duplicate the single span',
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('15.0')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('0.0')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('the per-cycle table renders below all other statistics', (
     tester,
   ) async {
-    // A tall surface: the lazy list only builds what the viewport holds,
-    // so position assertions need the whole content on stage.
-    useTallSurface(tester);
-    await pumpStatisticsScreen(tester);
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(entries: screenEntries(), marks: screenMarks()),
+    );
+    await tester.pumpAndSettle();
 
+    final table = find.byKey(const ValueKey('statisticsCycleTable'));
     expect(table, findsOneWidget);
-    // Four rows: one per mark-opened cycle (start-cell keyed).
-    expect(tableCell('statisticsRowStart', 0), findsOneWidget);
-    expect(tableCell('statisticsRowStart', 3), findsOneWidget);
-    expect(tableCell('statisticsRowStart', 4), findsNothing);
+    // Two rows: one per mark-opened cycle (start-cell keyed).
+    expect(find.byKey(const ValueKey('statisticsRowStart-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowStart-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowStart-2')), findsNothing);
 
     // Column headers: cycle start, bleeding days, first higher, length.
-    expect(
-      find.descendant(of: table, matching: find.text('Zyklusbeginn')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: table, matching: find.text('Blutungstage')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: table, matching: find.text('Erste höhere Messung')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: table, matching: find.text('Länge')),
-      findsOneWidget,
-    );
+    for (final header in [
+      'Cycle start',
+      'Bleeding days',
+      'First higher measurement',
+      'Length',
+    ]) {
+      expect(
+        find.descendant(of: table, matching: find.text(header)),
+        findsOneWidget,
+      );
+    }
 
-    // Row 1 (cycle Mar 2..Mar 29): bleeding days 2, first higher on day 19
-    // of the cycle, length 28 days.
+    // Row 0 (cycle Mar 1..Mar 28): bleeding days 3 (Mar 1-3), first
+    // higher on day 14 of the cycle, length 28 days.
     expect(
       find.descendant(
-        of: tableCell('statisticsRowStart', 0),
-        matching: find.text(_dateLabel(DateTime(2026, 3, 2))),
+        of: find.byKey(const ValueKey('statisticsRowStart-0')),
+        matching: find.text('3/1/2026'),
       ),
       findsOneWidget,
       reason: 'the start column carries the cycle start date',
     );
     expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('statisticsRowBleeding-0')))
+          .data,
+      '3',
+    );
+    expect(
       find.descendant(
-        of: tableCell('statisticsRowFirstHigher', 0),
-        matching: find.text('Zyklustag 19'),
+        of: find.byKey(const ValueKey('statisticsRowFirstHigher-0')),
+        matching: find.text('Cycle day 14'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: tableCell('statisticsRowLength', 0),
-        matching: find.text('28 Tage'),
+        of: find.byKey(const ValueKey('statisticsRowLength-0')),
+        matching: find.text('28 days'),
       ),
       findsOneWidget,
     );
 
-    // Row 4 (the trailing cycle): no length, no first higher yet. The
+    // Row 1 (the trailing cycle): no length, no first higher yet. The
     // other cells carry their values (bleeding days 2, start date).
     expect(
       find.descendant(
-        of: tableCell('statisticsRowFirstHigher', 3),
-        matching: find.text('-'),
+        of: find.byKey(const ValueKey('statisticsRowStart-1')),
+        matching: find.text('3/29/2026'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('statisticsRowBleeding-1')))
+          .data,
+      '2',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowFirstHigher-1')),
+        matching: find.text('—'),
       ),
       findsOneWidget,
       reason: 'the trailing cycle carries no first higher yet',
     );
     expect(
       find.descendant(
-        of: tableCell('statisticsRowLength', 3),
-        matching: find.text('-'),
+        of: find.byKey(const ValueKey('statisticsRowLength-1')),
+        matching: find.text('—'),
       ),
       findsOneWidget,
       reason: 'the trailing cycle carries no length yet',
     );
 
-    // Below ALL other statistics: the table sits lower than the count card
-    // and lower than the last metric card.
-    expect(
-      tester.getTopLeft(table).dy,
-      greaterThan(tester.getTopLeft(countCard).dy),
+    // Below ALL other statistics: the table sits lower than the count
+    // card and lower than the first-higher-until-end metric card.
+    final countCardTop = tester.getTopLeft(
+      find.byKey(const ValueKey('statisticsCard-cyclesCount')),
     );
-    expect(
-      tester.getTopLeft(table).dy,
-      greaterThan(
-        tester
-            .getTopLeft(
-              find.byKey(
-                const ValueKey('statisticsMetric-firstHigherUntilEnd'),
-              ),
-            )
-            .dy,
-      ),
+    final untilEndTop = tester.getTopLeft(
+      find.byKey(const ValueKey('statisticsMetric-firstHigherUntilEnd')),
     );
+    expect(tester.getTopLeft(table).dy, greaterThan(countCardTop.dy));
+    expect(tester.getTopLeft(table).dy, greaterThan(untilEndTop.dy));
   });
 
-  testWidgets('the old per-cycle lists and the shortest/longest trio are '
-      'gone', (tester) async {
-    useTallSurface(tester);
-    await pumpStatisticsScreen(tester);
+  testWidgets(
+    'the earliest first higher rows: both variants, real one primary',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: screenMarks()),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Zykluslängen'), findsNothing);
-    expect(find.text('Zyklusbeginne'), findsNothing);
-    expect(find.text('Kürzester'), findsNothing);
-    expect(find.text('Längster'), findsNothing);
-  });
-
-  testWidgets('the empty state speaks the updated wording', (tester) async {
-    // Entries but no marks: no mark-opened cycle, no statistics.
-    useDeviceLocales(tester, const [Locale('de')]);
-    await tester.pumpWidget(
-      appScope(
-        locale: const Locale('de'),
-        seed: (db) => db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 3, 2), bleeding: Bleeding.medium),
+      // The real (strictly after the mucus peak) variant: cycle 1's rise
+      // Mar 14, start Mar 1 -> cycle day 14; the peak lies before the rise,
+      // so both variants equal here.
+      expect(
+        find.descendant(
+          of: earliestCard(),
+          matching: find.textContaining('strictly after'),
         ),
+        findsOneWidget,
+        reason: 'the real variant row is labeled',
+      );
+      expect(
+        find.descendant(
+          of: earliestCard(),
+          matching: find.textContaining('cycle day 14'),
+        ),
+        findsNWidgets(2),
+        reason: 'both variants equal here: cycle day 14',
+      );
+      expect(
+        find.descendant(
+          of: earliestCard(),
+          matching: find.textContaining('over all cycles'),
+        ),
+        findsOneWidget,
+        reason: 'the fallback variant row is labeled',
+      );
+    },
+  );
+
+  testWidgets(
+    'when the variants differ the real one stays the primary row and the '
+    '"over all cycles" row shows its own minimum',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: divergentMarks()),
+      );
+      await tester.pumpAndSettle();
+
+      // Cycle 2's rise mark sits on its first day (cycle day 1) but on the
+      // SAME day as its mucus peak — not strictly after, so the real variant
+      // keeps cycle day 14 while the "any" minimum drops to cycle day 1.
+      final rows = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: earliestCard(),
+              matching: find.textContaining('cycle day '),
+            ),
+          )
+          .map((t) => t.data!)
+          .toList();
+      expect(rows, contains('cycle day 14'), reason: 'the real one (primary)');
+      expect(rows, contains('cycle day 1'), reason: 'the own "any" minimum');
+    },
+  );
+
+  testWidgets('the German wording renders on the de surface', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(
+        entries: screenEntries(),
+        marks: screenMarks(),
+        observedOutsideApp: 3,
+        locale: const Locale('de'),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(navLabel('Statistik'));
+
+    for (final label in [
+      'Beobachtete Zyklen',
+      'in dieser App: 2',
+      'außerhalb: 3',
+      'Zykluslänge',
+      'Blutungsdauer',
+      'Standardabweichung',
+      'Früheste erste höhere Messung',
+      'Zyklustag 14',
+    ]) {
+      expect(find.textContaining(label), findsWidgets, reason: 'de: "$label"');
+    }
+  });
+
+  testWidgets(
+    'the old surfaces remain: lengths list, average/shortest/longest, '
+    'cycle starts, distribution',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: screenMarks()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: oldCard('lengthsList'),
+          matching: find.text('Cycle lengths'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldCard('lengthsList'),
+          matching: find.text('28 days'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldCard('average'), matching: find.text('Average')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldCard('average'), matching: find.text('28.0')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldCard('shortest'),
+          matching: find.text('Shortest'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldCard('longest'), matching: find.text('Longest')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldCard('onsets'),
+          matching: find.text('Cycle starts'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldCard('onsets'), matching: find.text('3/1/2026')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldCard('distribution'),
+          matching: find.text('Distribution'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('no data: the dash surfaces and the zero cycle count', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(harness());
     await tester.pumpAndSettle();
 
+    // The upstream wording: the mark-driven statistics appear from the
+    // first recorded cycle start, not from two.
     expect(
-      find.text(
-        'Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier '
-        'Statistiken.',
+      find.textContaining('once a first cycle start'),
+      findsOneWidget,
+      reason: 'the no-data note speaks the reworked wording',
+    );
+    expect(
+      find.descendant(of: countCard(), matching: find.text('0')),
+      findsOneWidget,
+    );
+    for (final id in ['cycleLength', 'bleedingDuration', 'riseSpan']) {
+      expect(
+        find.descendant(of: metricCard(id), matching: find.text('Minimum')),
+        findsOneWidget,
+        reason: '$id keeps its rows',
+      );
+      // All four metric rows render the dash.
+      expect(
+        find.descendant(of: metricCard(id), matching: find.text('—')),
+        findsNWidgets(4),
+      );
+    }
+    expect(
+      find.descendant(of: earliestCard(), matching: find.text('—')),
+      findsNWidgets(2),
+      reason: 'both earliest-first-higher rows dash',
+    );
+    // The fact-gated surfaces: no cycle start recorded, no onset card and
+    // no per-cycle table (with ANY later data the table's row count is the
+    // recorded-count gate, never the lengths').
+    expect(find.byKey(const ValueKey('statisticsCard-onsets')), findsNothing);
+    expect(find.byKey(const ValueKey('statisticsCycleTable')), findsNothing);
+  });
+
+  testWidgets('ONE recorded cycle: the onset card and the table row show, '
+      'but no no-data note and nothing about lengths', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(
+        entries: [
+          DailyEntry(date: m(3, 1), bbtC: 36.4, bleeding: Bleeding.heavy),
+          DailyEntry(date: m(3, 2), bbtC: 36.4, bleeding: Bleeding.medium),
+        ],
+        marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The recorded start shows in BOTH fact surfaces: onset list + table
+    // row (one mark-opened cycle — the table's rule).
+    expect(
+      find.descendant(
+        of: oldCard('onsets'),
+        matching: find.text('Cycle starts'),
       ),
       findsOneWidget,
-      reason: 'statistics appear once a cycle start (with data) exists',
     );
     expect(
-      find.text(
-        'Sobald zwei Zyklusbeginne erfasst sind, erscheinen '
-        'Zykluslängen.',
-      ),
-      findsNothing,
-      reason: 'the outdated two-starts wording must not render',
+      find.descendant(of: oldCard('onsets'), matching: find.text('3/1/2026')),
+      findsOneWidget,
     );
-    expect(countCard, findsNothing);
+    expect(find.byKey(const ValueKey('statisticsRowStart-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('statisticsRowLength-0')), findsOneWidget);
+    // No "no-data" note: a cycle start IS recorded — the note's own
+    // wording promises exactly that threshold.
+    expect(find.textContaining('once a first cycle start'), findsNothing);
+    // The lengths surfaces stay hidden: the still-open cycle has no
+    // countable length yet (lengths, av/sc/lo, distribution).
+    for (final id in ['lengthsList', 'average', 'shortest', 'distribution']) {
+      expect(
+        find.byKey(ValueKey('statisticsCard-$id')),
+        findsNothing,
+        reason: '$id is a lengths surface, untouched by the one-cycle case',
+      );
+    }
   });
 }

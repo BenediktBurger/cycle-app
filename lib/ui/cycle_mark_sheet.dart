@@ -63,11 +63,11 @@ import 'package:intl/intl.dart';
 
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
+import '../domain/evaluation_overlay.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
-import 'cycle_mark_window.dart';
 
 /// One chip column's width inside the shared [Wrap] whose row fits
 /// [columns] columns with the 8 dp wrap spacing between them (two columns
@@ -255,7 +255,7 @@ final class CycleDayPanel extends ConsumerWidget {
 
   /// Whether a user SUZ mark (either variant) exists inside [evaluation]'s
   /// cycle window — the shared attribution of isDayInCycleWindow (see
-  /// cycle_mark_window.dart).
+  /// lib/domain/evaluation_overlay.dart).
   bool _cycleHasSuzMark(
     List<CycleEvaluation> evaluations,
     int index,
@@ -486,9 +486,11 @@ final class CycleDayPanel extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    DateFormat.yMMMEd(
-                      locale,
-                    ).format(DateOnly.normalize(day).toLocal()),
+                    // The date-only convention is UTC-normalized
+                    // midnights; DateFormat reads the value's OWN fields —
+                    // print it verbatim (a .toLocal() would show the
+                    // PREVIOUS day on UTC-negative hosts).
+                    DateFormat.yMMMEd(locale).format(DateOnly.normalize(day)),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),

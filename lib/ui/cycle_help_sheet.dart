@@ -316,9 +316,9 @@ final class _HelpEntry extends StatelessWidget {
       ),
       // Sample disturbance glyphs: the stacked letter codes of the
       // disturbance vocabulary (the TempDisturbance tokens that
-      // disturbanceLetters in cycle.dart emits) — stacked in the same
-      // render order as a real two-disturbance day (values order:
-      // alk before kr).
+      // disturbanceLetters in domain/disturbances.dart emits) — stacked
+      // in the same render order as a real two-disturbance day (values
+      // order: alk before kr).
       _HelpEntryShape.disturbance => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

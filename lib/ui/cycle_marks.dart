@@ -1,23 +1,26 @@
-// Computed evaluation marks on the cycle chart (Mode M, ADR-0001).
+// Chart painters for the computed evaluation marks (Mode M, ADR-0001).
 //
 // The USER places the mucus peak, the first higher measurement and the SUZ
 // start (sicher unfruchtbare Zeit, from a morning or from an evening).
-// Everything rendered from this file is DERIVED at render time — the
-// candidate circles/arrows and the 1–6 numbering and the baseline segment
-// from evaluateCycles (lib/domain/evaluation.dart); the solid peak dots and
-// the SUZ bars straight from the MARKS STREAM. Nothing is persisted:
-// the rings around the circled higher measurements (candidates strictly
-// AFTER the mucus peak day), the arrow-up glyph for the arrow-marked
-// candidates (candidate day at or before the peak day, or the peak unset —
-// R4, decided PER CANDIDATE by the domain), the 1–6 numbering under the six
-// low days, the baseline SEGMENT (R10: from the left edge of low #6's day
-// column to half a day past the last marked candidate's column, from the
-// domain's baselineSpan; a cycle with no marked candidate draws no segment)
-// and the solid peak dot ABOVE the mucus entry in the mucus row (R6 — the
-// peak no longer touches the temperature curve; EVERY placed peak renders,
-// driven from the marks stream so peaks render even when no evaluation
-// exists). The SUZ renders ONLY user-placed marks (a vertical bar hanging
-// down from the temperature chart's top border plus a right-pointing arrow
+// The DERIVATION of what the chart paints lives in
+// lib/domain/evaluation_overlay.dart — shared with the PDF export so both
+// draw layers can never drift — and arrives here as an [EvaluationOverlay];
+// this file contains the GLYPHS: the dot painters (rings around the
+// circled higher measurements — candidates strictly AFTER the mucus peak
+// day, R4 — and the arrow-up glyph for the arrow-marked candidates), the
+// dot-painter selection per day ([dotPainterForDay]) and the SUZ arrow
+// glyphs. The derivation semantics below stay true of what these painters
+// receive: the rings wrap circled candidates (R4, decided PER CANDIDATE by
+// the domain), the 1–6 numbering under the six low days, the baseline
+// SEGMENT (R10: from the left edge of low #6's day column to half a day
+// past the last marked candidate's column, mapped by the overlay from the
+// domain's baselineSpan; a cycle with no marked candidate draws no
+// segment) and the solid peak dot ABOVE the mucus entry in the mucus row
+// (R6 — the peak never touches the temperature curve; EVERY placed peak
+// renders, driven from the marks stream so peaks render even when no
+// evaluation exists). The SUZ renders ONLY user-placed marks (a vertical
+// bar hanging down from the temperature chart's top border plus a
+// right-pointing arrow
 // just below it); the computed
 // suzBegins drives the sheet's suggestion instead — clean
 // compute-only/manual separation. Rendered across fl_chart's dot painters +
@@ -44,10 +47,11 @@
 //   paints candidate ordinals; the day panel's circle-numbering line is
 //   the only ordinal surface (circles-only, see cycle_mark_sheet.dart).
 //   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
-//   from the temperature chart's top border by a fixed °C drop and the
-//   arrow anchors just below that border — is an owner-eyeball placement,
-//   not a settled rule (the constants live beside the chart's SUZ bar
-//   code in cycle.dart; the old baseline anchor is retired). A
+//   from the temperature chart's top border by suzBarHangSpanDegrees of
+//   the scale and the arrow anchors suzArrowTopInsetDegrees just below
+//   that border — is an owner-eyeball placement, not a settled rule (the
+//   constants live beside the SUZ glyph section below, shared with the
+//   PDF export's mirroring renderer in lib/pdf/cycle_pdf.dart). A
 //   temperature dot near the scale top can visually meet the top arrow —
 //   accepted, no avoidance logic.
 //   (The glyph's SIZE is chosen: shaft 8 px, head 7 x 11 px — see
@@ -60,201 +64,14 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
-import '../domain/date_only.dart';
-import '../domain/evaluation.dart';
-import '../domain/marks.dart';
-import 'cycle_mark_window.dart';
+import '../domain/evaluation_overlay.dart';
 
-/// One drawn baseline segment, mapped onto the chart's day-index space
-/// (R10). The chart draws it from the LEFT EDGE of [startIndex]'s day
-/// column to HALF A DAY past [endIndex]'s column, clamped to the recorded
-/// range; the extent itself comes straight from the domain's
-/// [BaselineSpan] (no-candidate cycles carry no segment).
-final class BaselineSegment {
-  const BaselineSegment({
-    required this.startIndex,
-    required this.endIndex,
-    required this.value,
-  });
-
-  /// Day index of the segment's start day (low #6 when six lows exist; the
-  /// domain's fallback applies otherwise — see its file-header TODO).
-  final int startIndex;
-
-  /// Day index of the segment's end day (the last marked candidate of the
-  /// cycle's sequence).
-  final int endIndex;
-
-  /// The baseline y-value the segment runs through.
-  final double value;
-}
-
-/// One user-placed SUZ mark, mapped onto the chart's day-index space. The
-/// chart draws a VERTICAL bar hanging down from the temperature chart's
-/// top border (x = column START `dayIndex − 0.5` for `suzMorning`, column
-/// MIDDLE `dayIndex` for `suzEvening`) plus a right-pointing arrow whose
-/// base starts at the bar, just below that border. Only the x anchoring
-/// and the morning/evening VARIANT live here — the vertical placement is
-/// the chart's top-anchored constants (see the SUZ bar code in cycle.dart).
-final class SuzOverlayMark {
-  const SuzOverlayMark({required this.dayIndex, required this.morning});
-
-  /// The marked day's chart index (the bar's x anchor derives from it: see
-  /// [morning]).
-  final int dayIndex;
-
-  /// True for `suzMorning` (bar at the column START, x − 0.5), false for
-  /// `suzEvening` (bar at the column MIDDLE, x).
-  final bool morning;
-
-  /// The bar/arrow x anchor in the chart's day-index space: the column
-  /// START (dayIndex − 0.5) for suzMorning, the column MIDDLE (dayIndex)
-  /// for suzEvening. The chart clamps it to the recorded range.
-  double get barX => morning ? dayIndex - 0.5 : dayIndex.toDouble();
-}
-
-/// The per-day evaluation artifacts, mapped onto the chart's day-index
-/// space (day index 0 = the first recorded day, see _ChartDays in
-/// cycle.dart). Anything the arithmetic could not derive for a day is
-/// simply absent from these collections — partial evaluations render
-/// partially.
-final class EvaluationOverlay {
-  const EvaluationOverlay({
-    this.peakIndexes = const {},
-    this.circledIndexes = const {},
-    this.arrowIndexes = const {},
-    this.numbersByIndex = const {},
-    this.baselineSegments = const [],
-    this.suzMarks = const [],
-  });
-
-  /// Day indexes carrying a mucus-peak mark. R6: the peak renders as a
-  /// solid dot ABOVE the mucus glyph in the symbol row — the curve never
-  /// rings the peak day (the curve's rings wrap only circled candidates).
-  /// Driven from the MARKS STREAM (every placed peak), not from the
-  /// evaluation's single anchored peak, so multiple peaks (delayed
-  /// ovulation) all render — even when no evaluation exists (no rise
-  /// marked).
-  final Set<int> peakIndexes;
-  final Set<int> circledIndexes;
-  final Set<int> arrowIndexes;
-  final Map<int, int> numbersByIndex;
-
-  /// The baseline segments (R10), one per evaluated cycle with a marked
-  /// candidate; a cycle without candidates has none.
-  final List<BaselineSegment> baselineSegments;
-
-  /// The user-placed SUZ marks (suzMorning/suzEvening), one overlay entry
-  /// per mark inside an evaluated cycle. ONLY user-placed SUZ marks are
-  /// listed — the computed suzBegins drives the sheet's suggestion
-  /// and never renders here.
-  final List<SuzOverlayMark> suzMarks;
-}
-
-/// Flattens [evaluations] (one per cycle group) plus the raw [marks] stream
-/// into per-day-index artifacts for the chart overlay. Dates outside the
-/// recorded range [firstDay, firstDay + dayCount) are skipped defensively.
-EvaluationOverlay buildEvaluationOverlay({
-  required List<CycleEvaluation> evaluations,
-  required List<CycleMark> marks,
-  required DateTime firstDay,
-  required int dayCount,
-}) {
-  int? indexFor(DateTime date) {
-    final i = DateOnly.daysBetween(date, firstDay);
-    return i >= 0 && i < dayCount ? i : null;
-  }
-
-  final peaks = <int>{};
-  final circled = <int>{};
-  final arrows = <int>{};
-  final numbers = <int, int>{};
-  final segments = <BaselineSegment>[];
-  final suz = <SuzOverlayMark>[];
-
-  // The peak dots come straight from the marks stream: EVERY placed
-  // mucus-peak mark renders as a solid dot (multiple peaks arise from
-  // delayed ovulation), independent of any evaluation.
-  for (final mark in marks) {
-    if (mark.type != CycleMarkTypes.mucusPeakDay) continue;
-    final i = indexFor(mark.date);
-    if (i != null) peaks.add(i);
-  }
-
-  for (var e = 0; e < evaluations.length; e++) {
-    final evaluation = evaluations[e];
-    // The SUZ marks belong to the cycle whose attribution window contains
-    // them (isDayInCycleWindow — the shared UI-side helper). Their
-    // vertical placement is the chart's top anchoring, so the evaluation
-    // only decides WHICH marks render — their y no longer derives from
-    // the cycle's baseline.
-    for (final mark in marks) {
-      final isSuz =
-          mark.type == CycleMarkTypes.suzEvening ||
-          mark.type == CycleMarkTypes.suzMorning;
-      if (!isSuz) continue;
-      if (!isDayInCycleWindow(evaluations, e, mark.date)) continue;
-      final day = DateOnly.normalize(mark.date);
-      final i = indexFor(day);
-      if (i == null) continue;
-      suz.add(
-        SuzOverlayMark(
-          dayIndex: i,
-          morning: mark.type == CycleMarkTypes.suzMorning,
-        ),
-      );
-    }
-
-    for (final low in evaluation.numberedLows) {
-      final i = indexFor(low.date);
-      if (i != null) numbers[i] = low.number;
-    }
-    for (final higher in evaluation.higherMeasurements) {
-      final i = indexFor(higher.date);
-      if (i == null) continue;
-      // The mark kind is decided PER CANDIDATE by the domain (R4: arrow
-      // at or before the peak day or with the peak unset, circle strictly
-      // after it) — the UI carries no decision logic of its own and maps
-      // the kind onto the matching painter. Beyond-cap candidates carry a
-      // null ordinal but stay in the sequence: they render as the same
-      // mark, just unnumbered (the curve paints no candidate ordinals).
-      switch (higher.markKind) {
-        case MarkKind.circle:
-          circled.add(i);
-        case MarkKind.arrow:
-          arrows.add(i);
-      }
-    }
-    // R10: the baseline SEGMENT extent comes straight from the domain
-    // (start = low #6, end = the last marked candidate, defensively
-    // clamped there; null when the cycle has no marked candidate) — the
-    // overlay only maps the span's days onto the chart's day-index space.
-    final span = evaluation.baselineSpan;
-    final baseline = evaluation.baseline;
-    if (span != null && baseline != null) {
-      final start = indexFor(span.startDay);
-      final end = indexFor(span.endDay);
-      if (start != null && end != null) {
-        segments.add(
-          BaselineSegment(
-            startIndex: start,
-            endIndex: end,
-            value: baseline.value,
-          ),
-        );
-      }
-    }
-  }
-
-  return EvaluationOverlay(
-    peakIndexes: peaks,
-    circledIndexes: circled,
-    arrowIndexes: arrows,
-    numbersByIndex: numbers,
-    baselineSegments: segments,
-    suzMarks: suz,
-  );
-}
+// The glyph's anchoring constants (suzBarHangSpanDegrees /
+// suzArrowTopInsetDegrees) live in suz_glyph.dart — pure Dart, shared with
+// the PDF export's mirroring renderer (lib/pdf/cycle_pdf.dart) — and are
+// re-exported here for the chart surfaces (cycle.dart reads them through
+// this import).
+export 'suz_glyph.dart' show suzArrowTopInsetDegrees, suzBarHangSpanDegrees;
 
 // --- dot painters -----------------------------------------------------------
 
@@ -383,7 +200,6 @@ FlDotPainter dotPainterForDay({
 }
 
 // --- SUZ mark glyph ----------------------------------------------------------
-
 /// Paints a RIGHT-POINTING arrow whose base starts at [base]: an 8 px
 /// horizontal shaft followed by a triangular head (7 px long, 11 px high),
 /// used as the companion glyph of the SUZ vertical bar (the bar marks the

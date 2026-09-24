@@ -16,6 +16,7 @@ import 'dart:ui' show Locale;
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../domain/date_only.dart';
 import '../domain/temperature_range.dart';
 import 'cycle_database.dart';
 
@@ -45,11 +46,24 @@ abstract final class SettingKeys {
 
   /// First-start gate of the welcome/about page: the flag is a plain JSON
   /// boolean. NOTHING stored (or a corrupt row) means "not completed", so
-  /// the shell shows the onboarding page next start; a stored true keeps the
-  /// shell direct. Only true is ever written in practice (the "continue"
+  /// the shell shows the onboarding page next start; a stored true keeps
+  /// the shell direct. Only true is ever written in practice (the "continue"
   /// action on the onboarding page) — an explicit false row simply reads
   /// like the absence of one.
   static const onboardingCompleted = 'onboardingCompleted';
+
+  /// The user's NAME for the PDF export's paper-form header ("identifying
+  /// source" value), as a plain JSON string. A whitespace-only or corrupt
+  /// row decodes to null — no name in the document then. The per-export
+  /// anonymize toggle hides this value in the generated document without
+  /// touching the stored row.
+  static const pdfExportName = 'pdfExport.name';
+
+  /// The user's BIRTH DATE for the PDF export's paper-form header, as the
+  /// plain ISO date string ('1990-01-02'). A nonexistent day, a non-date
+  /// string or a corrupt row decodes to null. Hidden by the per-export
+  /// anonymize toggle exactly like [pdfExportName].
+  static const pdfExportBirthDate = 'pdfExport.birthDate';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -63,6 +77,8 @@ final class PersistedSettings {
     this.temperatureRange = TemperatureRange.defaults,
     this.observedCyclesOutsideApp = 0,
     this.onboardingCompleted = false,
+    this.pdfExportName,
+    this.pdfExportBirthDate,
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -85,6 +101,17 @@ final class PersistedSettings {
   /// "not answered yet" state.
   final bool onboardingCompleted;
 
+  /// The stored name for the PDF export header (`pdfExport.name` family),
+  /// or null when unset/blank. Written through from the settings pane's
+  /// PDF-export card; hidden in the generated document by the per-export
+  /// anonymize toggle.
+  final String? pdfExportName;
+
+  /// The stored birth date for the PDF export header
+  /// (`pdfExport.birthDate`), date-only normalized (UTC midnight), or null
+  /// when unset. Hidden in the generated document like [pdfExportName].
+  final DateTime? pdfExportBirthDate;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
@@ -92,7 +119,9 @@ final class PersistedSettings {
       other.themeMode == themeMode &&
       other.temperatureRange == temperatureRange &&
       other.observedCyclesOutsideApp == observedCyclesOutsideApp &&
-      other.onboardingCompleted == onboardingCompleted;
+      other.onboardingCompleted == onboardingCompleted &&
+      other.pdfExportName == pdfExportName &&
+      other.pdfExportBirthDate == pdfExportBirthDate;
 
   @override
   int get hashCode => Object.hash(
@@ -101,6 +130,8 @@ final class PersistedSettings {
     temperatureRange,
     observedCyclesOutsideApp,
     onboardingCompleted,
+    pdfExportName,
+    pdfExportBirthDate,
   );
 }
 
@@ -125,6 +156,8 @@ final class SettingsStore {
     var temperatureRange = TemperatureRange.defaults;
     var observedCyclesOutsideApp = 0;
     var onboardingCompleted = false;
+    String? pdfExportName;
+    DateTime? pdfExportBirthDate;
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -145,6 +178,10 @@ final class SettingsStore {
             observedCyclesOutsideApp = _observedCyclesFromStored(decoded);
           case SettingKeys.onboardingCompleted:
             onboardingCompleted = _onboardingFromStored(decoded);
+          case SettingKeys.pdfExportName:
+            pdfExportName = _pdfExportNameFromStored(decoded);
+          case SettingKeys.pdfExportBirthDate:
+            pdfExportBirthDate = _pdfExportBirthDateFromStored(decoded);
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -157,6 +194,8 @@ final class SettingsStore {
       temperatureRange: temperatureRange,
       observedCyclesOutsideApp: observedCyclesOutsideApp,
       onboardingCompleted: onboardingCompleted,
+      pdfExportName: pdfExportName,
+      pdfExportBirthDate: pdfExportBirthDate,
     );
   }
 
@@ -220,6 +259,25 @@ final class SettingsStore {
   /// "not completed" state, so nothing rewrites it on a plain start.
   Future<void> persistOnboardingCompleted(bool completed) =>
       writeSetting(SettingKeys.onboardingCompleted, completed);
+
+  /// Persists the PDF-export name as a plain JSON string. A null or blank
+  /// name deletes the row instead of storing an implicit "no name" —
+  /// whitespace is not identity data.
+  Future<void> persistPdfExportName(String? name) {
+    final value = name?.trim();
+    if (value == null || value.isEmpty) {
+      return writeSetting(SettingKeys.pdfExportName, null);
+    }
+    return writeSetting(SettingKeys.pdfExportName, value);
+  }
+
+  /// Persists the PDF-export birth date as the plain ISO date string
+  /// (yyyy-MM-dd); null deletes the row. The date-only normalization keeps
+  /// time-of-day noise out of the document header.
+  Future<void> persistPdfExportBirthDate(DateTime? birthDate) => writeSetting(
+    SettingKeys.pdfExportBirthDate,
+    birthDate == null ? null : formatIsoDate(birthDate),
+  );
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code
@@ -248,3 +306,38 @@ int _observedCyclesFromStored(Object? decoded) =>
 /// null, strings, numbers) decodes to not-completed — the welcome page then
 /// replays at worst, never getting silently skipped.
 bool _onboardingFromStored(Object? decoded) => decoded is bool && decoded;
+
+/// PDF-export name decode: a JSON string with actual (non-whitespace)
+/// content only. Everything else — numbers, booleans, null, blank strings,
+/// corrupt rows — decodes to null, "no name given".
+String? _pdfExportNameFromStored(Object? decoded) {
+  final value = decoded is String ? decoded.trim() : null;
+  return value == null || value.isEmpty ? null : value;
+}
+
+DateTime? _pdfExportBirthDateFromStored(Object? decoded) =>
+    decoded is String ? tryParseIsoDate(decoded) : null;
+
+/// The ISO date string ('yyyy-MM-dd') of a calendar day — the EXACT shape
+/// the birth-date field exchanges and the store's persist helper writes.
+/// One definition so the field's echoed initial value and the stored rows
+/// use the same form.
+String formatIsoDate(DateTime date) =>
+    DateOnly.normalize(date).toIso8601String().substring(0, 10);
+
+/// The STRICT ISO date parse ('yyyy-MM-dd' only) behind the birth-date
+/// decode AND the settings field's live validation — one definition so the
+/// field and the store cannot drift. Returns the UTC-midnight calendar day
+/// (DateOnly convention) or null: a non-string-shape day, a wrong shape,
+/// a wrong form (Dart's lenient parser otherwise rolls impossible days
+/// over, e.g. '1990-02-30' → 1990-03-02) all decode to null.
+DateTime? tryParseIsoDate(String raw) {
+  if (raw.length != 10 || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(raw)) {
+    return null;
+  }
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  final normalized = DateOnly.normalize(parsed);
+  final iso = normalized.toIso8601String().substring(0, 10);
+  return iso == raw ? normalized : null;
+}
