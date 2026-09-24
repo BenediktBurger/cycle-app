@@ -422,21 +422,6 @@ Future<void> main() async {
     'a mark in an untracked gap anchors the start on the mark date',
   );
 
-  // Suggestion suppression is keyed PURELY to bleeding continuity
-  // (temperature-only semantics): raw disturbance flags and the
-  // ignoreTemperature mark are both invisible to the predicate.
-  check(
-    isSuggestedCycleStart(
-      d(2026, 4, 1, bleeding: Bleeding.medium, tempDisturbances: 15),
-      null,
-    ),
-    'raw disturbance flags never reach the suggestion predicate',
-  );
-  check(
-    isSuggestedCycleStart(d(2026, 4, 1, bleeding: Bleeding.medium), null),
-    'an ignoreTemperature-marked day still suggests a cycle start',
-  );
-
   // --- statistics ---------------------------------------------------------
   // The marked starts (3 onsets within the entry range) -> 2 lengths; add a
   // 4th mark to exercise the third interval (mirrors threeCycleData in the

@@ -76,7 +76,6 @@ the sections above track planned work, git history keeps the record (see
 - Fahrenheit unterstützen: Wie Daten speichern?
 - Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
 - export as password protected zip
-- drip import: how to handle excluded bleeding values and auto-calculation of new cycles?
 - add (optional) reminder (e.g. every year) to do a backup of your data
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)

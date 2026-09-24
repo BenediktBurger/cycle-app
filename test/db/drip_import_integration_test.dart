@@ -106,9 +106,10 @@ void main() {
       expect(mucusDay.tempDisturbances, 0);
 
       // 2026-07-09: bleeding value 1 (light) with bleeding.exclude=true →
-      // the level is the +1-shifted stored level (light); the PER-SYMPTOM
-      // exclusion is dropped (no storage), no mask bits and no exclusion
-      // mark come from it.
+      // the level is the +1-shifted stored level (light). The exclusion is
+      // dropped from STORAGE: no mask bits and no exclusion mark come from
+      // it, and the stored level stays — it only skips the day in the
+      // cycleStart replay (it cannot open, continue or suppress).
       final bleedingDay = await dayRow('2026-07-09');
       expect(bleedingDay.bleeding, Bleeding.light);
       expect(
@@ -467,6 +468,40 @@ void main() {
       expect(starts[0].author, 'import');
       expect(formatIsoDay(starts[1].entryDate), '2026-02-01');
       expect(starts[1].author, 'user');
+    });
+
+    test('an excluded bleeding day neither opens nor continues the row '
+        '(round trip)', () async {
+      // bleeding.exclude is a replay-skip flag: 01-02 (drip 1 → stored
+      // level 2) derives no mark, cannot continue 01-01's row of
+      // bleedings and cannot suppress 01-03 — the next non-excluded
+      // bleeding day is a fresh onset. The stored entry keeps its
+      // bleeding level and derives NO ignoreTemperature mark (that mark
+      // is temperature-only).
+      final csv = [
+        'date,bleeding.value,bleeding.exclude',
+        '2026-01-01,2,',
+        '2026-01-02,1,true',
+        '2026-01-03,1,',
+      ].join('\n');
+      final mapping = dripCsvToExportJson(csv);
+      final summary = await importJsonToDatabase(db, mapping.json);
+      expect(summary.entriesWritten, 3);
+      expect(summary.marksNew, 2, reason: 'one cycleStart per fresh onset');
+
+      final starts = await storedCycleStarts(db);
+      expect(
+        starts.map((m) => formatIsoDay(m.entryDate)).toList(),
+        ['2026-01-01', '2026-01-03'],
+        reason:
+            'the excluded day derives no mark and does not '
+            'suppress the following bleeding day',
+      );
+
+      // The exclusion affects only the cycleStart replay: the bleeding
+      // LEVEL is stored unchanged and no ignoreTemperature mark exists.
+      expect((await dayRow('2026-01-02')).bleeding, Bleeding.light);
+      expect(await db.marksDao.marksForDay(DateTime(2026, 1, 2)), isEmpty);
     });
   });
 }

@@ -607,8 +607,10 @@ final class CycleDayPanel extends ConsumerWidget {
                     // marked day's temperature is excluded from the
                     // evaluation arithmetic (the day behaves like an
                     // unmeasured one — see lib/domain/evaluation.dart);
-                    // the mark does NOT affect cycle-start suggestions
-                    // (bleeding continuity only), and it IS the temperature
+                    // the mark does NOT affect the foreign-import
+                    // cycleStart replay (drip-local bleeding continuity,
+                    // any level — see lib/domain/drip_import.dart), and
+                    // it IS the temperature
                     // curve's rendering key (marked days render lighter —
                     // owner decision 2026-09-19).
                     SizedBox(
