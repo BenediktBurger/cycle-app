@@ -473,8 +473,10 @@ Do **not** start until Android went through Phases B–F at least once.
    assets. Then the verification loop: the per-versionCode JSONs under
    `https://verification.f-droid.org/io.github.benediktburger.cycleapp_<versionCode>.apk.json`
    must report verified; on a mismatch iterate on the CI side only (JDK /
-   build-tools / NDK alignment; the `-Wl,--build-id=none` suppressor is a
-   documented last resort for the `libdartjni.so` build-id diff) and
+   build-tools / NDK alignment; the `libdartjni.so` build-id diff is
+   already suppressed — the Android Gradle config appends
+   `-Wl,--build-id=none` to the jni plugin's CMake shared-linker flags, so
+   only the remaining knobs above are open) and
    rerun the loop: re-dispatch → re-sign → re-attach → re-verify.
 9. **Distribute & observe** — sideload to testers first; Play internal
    track when involved (its AAB is built locally,
