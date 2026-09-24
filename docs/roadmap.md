@@ -49,7 +49,6 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
-- [ ] title bar takes a lot of space in horizontal mode (cycle tab)
 - how to mark a pregnancy: replace cycle start with pregnancy start or add a "conception" mark -> calculate probable bith?
   - move edit between date and X in order to save space
   - checkmark overlaps the icon - do we need the checkmark at all?
