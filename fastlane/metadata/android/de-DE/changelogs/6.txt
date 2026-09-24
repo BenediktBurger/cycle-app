@@ -1,0 +1,4 @@
+Neu: Als druckfertiges PDF exportieren – mit Temperaturkurve, Zeichen und frei wählbaren Zyklen, auf Wunsch ohne persönliche Angaben.
+Statistik: Zykluslänge, Blutungsdauer, erster höherer Tag und mehr mit Höchst-, Kleinst- und Durchschnittswert, dazu eine Tabelle je Zyklus.
+Zyklen reichen nun automatisch bis zum nächsten Zyklusbeginn, auch bei Tagen ohne Einträge.
+Tagebuch: eigener Bereich für Schmerzen, Zyklusbeginn direkt im Formular schaltbar, Zyklustagsnummer an jedem Tag.

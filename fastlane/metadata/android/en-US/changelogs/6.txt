@@ -1,0 +1,4 @@
+New: export your cycle as a print-ready PDF – with temperature curve, signs and chosen cycles, optionally without personal details.
+Statistics: cycle length, bleeding duration, first higher day and more with highest, lowest and average values, plus a table per cycle.
+Cycles now automatically extend to the next cycle start, even with days without entries in between.
+Diary: its own section for pain, cycle start toggled in the entry form, and the cycle-day number on every day.
