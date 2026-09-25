@@ -740,4 +740,138 @@ void main() {
       expect(menstruationOnsetDates(const [], const []), isEmpty);
     });
   });
+
+  group('groupIntoCycles — the synthetic span is bounded at the lookback '
+      'floor', () {
+    // The window under test derives from the domain constant, so the
+    // contract follows the number the implementation materializes with.
+    final lookback = syntheticSpanLookbackDays;
+    // The lookback floor under this pinned today — derived with the same
+    // DateOnly arithmetic the implementation must use (DST-immune).
+    final today = DateTime(2026, 9, 25);
+
+    test('a year-2000 data-less mark cycle keeps its span but materializes '
+        'placeholders only within the lookback window', () {
+      final cycles = groupIntoCycles(const <DailyEntry>[], [
+        start(2000, 1, 1),
+      ], today: today);
+
+      expect(cycles, hasLength(1));
+      final cycle = cycles.single;
+      // The SPAN is unchanged: the still-running cycle reaches today; only
+      // the browsable day list is bounded (the far-past part renders as a
+      // silent gap).
+      expect(cycle.startDate, DateOnly.normalize(DateTime(2000, 1, 1)));
+      expect(cycle.endDate, DateOnly.normalize(today));
+      expect(cycle.trackedEndDate, isNull);
+
+      expect(cycle.days, hasLength(lookback));
+      expect(cycle.days.first.date, DateOnly.addDays(today, -(lookback - 1)));
+      expect(cycle.days.last.date, DateOnly.normalize(today));
+      expect(cycle.days, everyElement(hasNoData));
+    });
+
+    test('a data-heavy cycle whose tracked days end years before today keeps '
+        'its tracked days and gains only post-floor placeholders', () {
+      final entries = [
+        d(2020, 1, 1),
+        d(2020, 1, 2),
+        d(2020, 1, 3),
+        d(2020, 1, 10),
+        d(2020, 1, 11),
+        d(2020, 1, 12),
+      ];
+      final marks = [start(2020, 1, 10)];
+
+      final cycles = groupIntoCycles(entries, marks, today: today);
+
+      expect(cycles, hasLength(2));
+      // The leading group's whole span predates the floor: exactly its
+      // tracked days, no extension day materializes.
+      expect(cycles[0].startsAtMenstruation, isFalse);
+      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
+      expect(
+        cycles[0].trackedEndDate,
+        DateOnly.normalize(DateTime(2020, 1, 3)),
+      );
+      expect(cycles[0].endDate, DateOnly.normalize(DateTime(2020, 1, 9)));
+
+      // The mark-opened cycle: tracked days pass through untouched; the
+      // extension toward today is trimmed at the floor.
+      expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(
+        cycles[1].trackedEndDate,
+        DateOnly.normalize(DateTime(2020, 1, 12)),
+      );
+      expect(cycles[1].endDate, DateOnly.normalize(today));
+      expect(cycles[1].days, hasLength(3 + lookback));
+      expect(cycles[1].days.take(3).map((e) => e.date.day), [10, 11, 12]);
+      final extension = cycles[1].days.skip(3).toList();
+      expect(extension.first.date, DateOnly.addDays(today, -(lookback - 1)));
+      expect(extension.last.date, DateOnly.normalize(today));
+      expect(extension, everyElement(hasNoData));
+    });
+
+    test('a data-less cycle whose WHOLE span lies before the floor is still '
+        'emitted — with an empty day list (onsets keep counting it)', () {
+      final marks = [start(2000, 1, 1), start(2000, 6, 1)];
+
+      final cycles = groupIntoCycles(const <DailyEntry>[], marks, today: today);
+
+      expect(cycles, hasLength(2));
+      final trimmed = cycles[0];
+      expect(trimmed.startsAtMenstruation, isTrue);
+      expect(trimmed.startDate, DateOnly.normalize(DateTime(2000, 1, 1)));
+      // The span end survives the trimmed day list — no crash, no retraction.
+      expect(trimmed.endDate, DateOnly.normalize(DateTime(2000, 5, 31)));
+      expect(trimmed.trackedEndDate, isNull);
+      expect(trimmed.days, isEmpty);
+
+      // The onsets — the anchors for lengths, ordinals and the statistics
+      // cycle count — are unchanged by the empty day list.
+      expect(menstruationOnsetDates(const <DailyEntry>[], marks), [
+        DateOnly.normalize(DateTime(2000, 1, 1)),
+        DateOnly.normalize(DateTime(2000, 6, 1)),
+      ]);
+    });
+
+    test('regression guard: within-lookback day lists stay exactly as the '
+        'span rule pins them', () {
+      // Tracked Mar 1-3, extension out to the pinned today Mar 9 — all
+      // inside the lookback window: nothing trims.
+      final early = groupIntoCycles(
+        [d(2026, 3, 1), d(2026, 3, 2), d(2026, 3, 3)],
+        [start(2026, 3, 1)],
+        today: DateTime(2026, 3, 9),
+      );
+      expect(early.single.days.map((e) => e.date.day), [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+      ]);
+      expect(early.single.endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
+
+      // A data-less mark cycle of a couple of years that still fits the
+      // window: every day materializes.
+      final inside = groupIntoCycles(const <DailyEntry>[], [
+        start(2025, 3, 1),
+      ], today: today);
+      expect(inside, hasLength(1));
+      expect(
+        inside.single.days,
+        hasLength(DateOnly.daysBetween(today, DateTime(2025, 3, 1)) + 1),
+      );
+      expect(
+        inside.single.days.first.date,
+        DateOnly.normalize(DateTime(2025, 3, 1)),
+      );
+      expect(inside.single.days.last.date, DateOnly.normalize(today));
+    });
+  });
 }

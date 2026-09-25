@@ -32,6 +32,15 @@
 //   - the LAST cycle (the still-running one): max(last tracked day of the
 //     WHOLE data set, today) — never earlier than its own start.
 //
+// The SYNTHETIC part of that span is bounded (a misplaced far-past mark must
+// not scale the materialization): placeholder days are built only within a
+// fixed lookback window behind `today` (see the constant below); older
+// placeholders are silently skipped and the far-past gap renders as a plain
+// empty gap. Tracked days are never trimmed, and a data-less cycle whose
+// whole span predates the floor is still emitted — with an empty day list
+// (its end date, and with it every onset/ordinal/statistics count, derives
+// from the span, not from the day list).
+//
 // Untracked days BETWEEN a cycle's own tracked days are NOT backfilled:
 // they stay out of the day list, keeping the gap-day conventions intact
 // (marks on untracked days drop out of the curves; lib/domain/
@@ -48,21 +57,35 @@ import 'date_only.dart';
 import 'marks.dart';
 import 'models.dart';
 
+/// How far back from `today` the span rule materializes SYNTHETIC days at
+/// most (calendar days): the placeholder lists stay bounded no matter how
+/// far in the past a cycleStart mark sits, while real tracked days are
+/// never trimmed.
+// TODO(user-review): the concrete 730 is a planning assumption (the longest
+// still-running span a placeholder list should cover — pregnancy-length
+// cycles) — reconsider the number, not the bounded-lookback shape.
+const int syntheticSpanLookbackDays = 730;
+
 /// One cycle = all tracked days between two consecutive cycle starts,
 /// extended with data-less placeholder days out to the next cycle-start
-/// mark (or the last-cycle rule — see the span rule in the file header).
+/// mark (or the last-cycle rule — see the span rule in the file header,
+/// including its lookback bound on the placeholder days).
 final class Cycle {
   const Cycle({
     required this.days,
     required this.startsAtMenstruation,
     required this.startDate,
     required this.trackedEndDate,
+    required this.spanEnd,
   });
 
-  /// The cycle's days, ordered ascending by date: the tracked days plus
-  /// the data-less span-extension days after them (none inside — untracked
-  /// gaps BETWEEN tracked days are not backfilled; see the file header).
-  /// Held non-empty by the grouping algorithm.
+  /// The cycle's tracked days plus its data-less span-extension days,
+  /// ordered ascending by date — with two silent exceptions (see the file
+  /// header): untracked gaps BETWEEN tracked days are not backfilled, and
+  /// synthetic days older than the lookback floor are not materialized. An
+  /// EMPTY list is possible for a data-less cycle whose whole span predates
+  /// the floor — such a cycle is still emitted (onsets/ordinals/statistics
+  /// keep counting it); [endDate] stays valid via [spanEnd].
   final List<DailyEntry> days;
 
   /// True when the group opened at a user-placed cycleStart mark (the
@@ -91,10 +114,18 @@ final class Cycle {
   /// extension days must not shift a statistics count.
   final DateTime? trackedEndDate;
 
+  /// The cycle's span end — the day the last-cycle rule / the next cycle
+  /// boundary fixes as the group's last calendar day ([endDate] exposes
+  /// it normalized). Kept separate from the (possibly trimmed) day list,
+  /// so the cycle's calendar reach survives the empty-[days] edge case.
+  final DateTime spanEnd;
+
   /// Last day of the group — the span-extension end (day before the next
   /// cycle-start mark, or the last-cycle rule), data-less when extended
-  /// beyond the tracked data.
-  DateTime get endDate => days.last.date;
+  /// beyond the tracked data. Derived from the cycle's SPAN end ([spanEnd]),
+  /// not from the (possibly trimmed) day list — valid for an empty [days]
+  /// list too.
+  DateTime get endDate => DateOnly.normalize(spanEnd);
 }
 
 /// Dates of the mark-driven cycle starts — the anchors for cycle-length
@@ -130,13 +161,20 @@ List<DateTime> menstruationOnsetDates(
 /// opening cycleStart mark; the LAST cycle — and any mark without tracked
 /// data after it ("just created the cycle mark") — extends to
 /// [today] (wall clock by default) but never before the last tracked day
-/// of the whole data set, and never before the cycle's own start.
+/// of the whole data set, and never before the cycle's own start. The
+/// synthetic days materialize only within the lookback window behind
+/// [today] (see the file header and the constant).
 List<Cycle> groupIntoCycles(
   List<DailyEntry> entries,
   List<CycleMark> marks, {
   DateTime? today,
 }) {
   final now = DateOnly.normalize(today ?? DateTime.now());
+
+  // The lookback floor for synthetic placeholder days (see the span rule in
+  // the file header): extension and data-less cycles materialize nothing
+  // on/before it — tracked days are untouched by construction.
+  final syntheticFloor = DateOnly.addDays(now, -syntheticSpanLookbackDays);
 
   // The cycleStart marks (marks of other types never create boundaries),
   // as pairs of the normalized day (comparisons/sorting key) and the
@@ -179,16 +217,21 @@ List<Cycle> groupIntoCycles(
 
   /// Materializes one cycle: the tracked days plus data-less extension
   /// entries for every calendar day after the last tracked day up to
-  /// [end] (inclusive). Untracked days BEFORE the last tracked day are
-  /// not touched — they stay silent gaps (see the file header).
+  /// [end] (inclusive) that lies INSIDE the lookback window. Untracked
+  /// days BEFORE the last tracked day are not touched — they stay silent
+  /// gaps (see the file header).
   Cycle materialize(
     List<DailyEntry> tracked,
     bool startsAtMenstruation,
     DateTime end,
     DateTime startDate,
   ) {
+    final trackedLast = DateOnly.normalize(tracked.last.date);
     final extras = <DailyEntry>[];
-    var day = DateOnly.addDays(tracked.last.date, 1);
+    // The first candidate day is the day after the floor when the tracked
+    // body ends before it — the trim never retracts the tracked days.
+    var day = DateOnly.addDays(trackedLast, 1);
+    if (!day.isAfter(syntheticFloor)) day = DateOnly.addDays(syntheticFloor, 1);
     while (!day.isAfter(end)) {
       extras.add(DailyEntry(date: day));
       day = DateOnly.addDays(day, 1);
@@ -197,10 +240,14 @@ List<Cycle> groupIntoCycles(
       days: List.unmodifiable([...tracked, ...extras]),
       startsAtMenstruation: startsAtMenstruation,
       startDate: startDate,
+      // The span end keeps the cycle's full calendar end even when the
+      // extension is entirely trimmed (the tracked end is never earlier
+      // than the materialized days' end).
+      spanEnd: end.isAfter(trackedLast) ? DateOnly.normalize(end) : trackedLast,
       // The tracked list is never empty here: materialize always receives
       // the group's tracked body (leading group, mark-opened group) — the
       // data-less case never routes through materialize.
-      trackedEndDate: DateOnly.normalize(tracked.last.date),
+      trackedEndDate: trackedLast,
     );
   }
 
@@ -340,21 +387,26 @@ List<Cycle> groupIntoCycles(
 
   // Marks with no tracked day after them (placed beyond the recorded
   // data): each opens a DATA-LESS cycle at the mark day itself — at least
-  // cycle day 1 exists. Consecutive such marks bound each other; the last
-  // one runs by the last-cycle rule.
+  // cycle day 1 exists within the lookback window (a fully pre-floor one
+  // still exists as a cycle with an empty day list). Consecutive such
+  // marks bound each other; the last one runs by the last-cycle rule.
   for (var i = cursor; i < cycleStartMarks.length; i++) {
     final start = cycleStartMarks[i];
     final end = i + 1 < cycleStartMarks.length
         ? DateOnly.previousDay(cycleStartMarks[i + 1].day)
         : lastCycleEnd(start.day);
-    final days = <DailyEntry>[];
-    for (
-      var day = start.day;
-      !day.isAfter(end);
-      day = DateOnly.addDays(day, 1)
-    ) {
-      days.add(DailyEntry(date: day));
+    // Bounded like every synthetic list: the days on/before the floor are
+    // skipped, and a cycle whose whole span predates the floor is still
+    // emitted — with an EMPTY day list (onsets/ordinals/statistics keep
+    // counting it; the span end stays the mark arithmetic's result).
+    var day = start.day;
+    if (day.isBefore(DateOnly.addDays(syntheticFloor, 1))) {
+      day = DateOnly.addDays(syntheticFloor, 1);
     }
+    final days = <DailyEntry>[
+      for (; !day.isAfter(end); day = DateOnly.addDays(day, 1))
+        DailyEntry(date: day),
+    ];
     cycles.add(
       Cycle(
         days: List.unmodifiable(days),
@@ -364,6 +416,7 @@ List<Cycle> groupIntoCycles(
         startDate: start.day,
         // A data-less mark cycle observes nothing by definition.
         trackedEndDate: null,
+        spanEnd: end,
       ),
     );
   }

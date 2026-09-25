@@ -52,6 +52,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   /// observed: the capture above always precedes the first load.)
   String _displayLocale = 'en';
 
+  /// The cycles whose day list is currently expanded, keyed by the
+  /// normalized cycle start date (the same key the header tile carries).
+  /// Ordinary widget state: the day rows build and unbuild through it, so
+  /// expansions survive the list's regular data-driven rebuilds but not
+  /// leaving the screen.
+  final Set<DateTime> _expandedCycleStarts = <DateTime>{};
+
   Bleeding _bleeding = Bleeding.none;
   int _tempDisturbances = 0;
   bool _excludeTemperature = false;
@@ -341,21 +348,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // label and the grouping compute like the masked read did (without
     // marks); the form's per-field writes do not depend on marks.
     final marksAsync = ref.watch(marksProvider);
-    final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
-    // The cycle groups are computed ONCE per build and shared by both
-    // consumers — the entry form's day-of-cycle label and the grouped list
-    // (which re-used to group the same entries a second time). While the
-    // entry stream is still loading there is nothing to group yet.
-    final entries = entriesAsync.valueOrNull;
-    final cycles = entries == null
-        ? const <Cycle>[]
-        : groupIntoCycles(
-            entries,
-            marks,
-            // The grouping's injected clock (last-cycle span rule — the
-            // nowProvider seam, pinned in tests).
-            today: ref.read(nowProvider)(),
-          );
+    // The cycle groups come from the ONE derived pass shared by Tagebuch,
+    // Zyklus and Statistik (see derivedCycleDataProvider): no grouping of
+    // its own per build — while the entry stream is still loading the
+    // pass groups an empty snapshot, which is nothing to show yet.
+    final cycles = ref.watch(derivedCycleDataProvider).cycles;
 
     return Scaffold(
       appBar: AppBar(
@@ -374,22 +371,31 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          _buildForm(l10n, locale, selected, cycles),
-          const SizedBox(height: 16),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            sliver: SliverToBoxAdapter(
+              child: _buildForm(l10n, locale, selected, cycles),
+            ),
+          ),
           // The list slot: a marks error takes precedence — only a healthy
           // marks stream lets the entries-driven list render, with its own
           // retry surface when the entries stream fails. The form above
           // stays intact either way.
           if (marksAsync.hasError)
-            StreamLoadError(
-              scope: 'marks',
-              onRetry: () => ref.invalidate(marksProvider),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+              sliver: SliverToBoxAdapter(
+                child: StreamLoadError(
+                  scope: 'marks',
+                  onRetry: () => ref.invalidate(marksProvider),
+                ),
+              ),
             )
           else
-            ..._buildCycleList(l10n, entriesAsync, cycles),
+            ..._buildCycleSlivers(l10n, entriesAsync, cycles),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 12)),
         ],
       ),
     );
@@ -902,46 +908,100 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
   }
 
-  List<Widget> _buildCycleList(
+  List<Widget> _buildCycleSlivers(
     AppLocalizations l10n,
     AsyncValue<List<DailyEntry>> entriesAsync,
     List<Cycle> cycles,
   ) {
     return entriesAsync.when(
-      loading: () => <Widget>[const SizedBox.shrink()],
+      loading: () => const <Widget>[],
       error: (e, s) => <Widget>[
-        StreamLoadError(
-          scope: 'entries',
-          onRetry: () => ref.invalidate(dailyEntriesProvider),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverToBoxAdapter(
+            child: StreamLoadError(
+              scope: 'entries',
+              onRetry: () => ref.invalidate(dailyEntriesProvider),
+            ),
+          ),
         ),
       ],
       data: (entries) {
         if (entries.isEmpty) {
           return [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                l10n.noEntriesYet,
-                style: Theme.of(context).textTheme.bodyMedium,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    l10n.noEntriesYet,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
               ),
             ),
           ];
         }
-        // The groups arrive pre-computed from build (see the comment
-        // there) — one grouping pass per build, shared with the form.
+        // The groups arrive pre-computed from the shared derived pass
+        // (see the comment in build) — the pass is cached, not rebuilt
+        // per screen. Most recent work stays at the top of the list.
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
-            _cycleTile(l10n, cycles[i], cycles),
+            ..._cycleSlivers(l10n, cycles[i]),
         ];
       },
     );
   }
 
-  Widget _cycleTile(AppLocalizations l10n, Cycle cycle, List<Cycle> cycles) {
-    final locale = Localizations.localeOf(context).toString();
+  /// One cycle as slivers: the header tile plus — only while expanded — the
+  /// lazily-built day list. The day rows deliberately do NOT live inside
+  /// the header tile as expansion children: an expanded [ExpansionTile]
+  /// builds its whole children column in one pass, so a cycle whose true
+  /// span covers years of days would construct every tile on the first
+  /// expansion. The builder-driven sliver list below the header instead
+  /// builds only the rows the viewport (plus its cache extent) lays out.
+  List<Widget> _cycleSlivers(AppLocalizations l10n, Cycle cycle) {
+    final start = DateOnly.normalize(cycle.startDate);
+    final expanded = _expandedCycleStarts.contains(start);
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        sliver: SliverToBoxAdapter(child: _cycleHeader(l10n, cycle)),
+      ),
+      if (expanded)
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverList.builder(
+            // Index 0 carries the tap-to-edit caption; indexes 1.. walk the
+            // cycle's days newest first.
+            itemCount: cycle.days.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    l10n.cycleTapToEdit,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                );
+              }
+              return _dayTile(
+                l10n,
+                cycle.days[cycle.days.length - index],
+                cycle,
+              );
+            },
+          ),
+        ),
+    ];
+  }
+
+  Widget _cycleHeader(AppLocalizations l10n, Cycle cycle) {
     // The start label is the opening cycleStart mark's own date for
     // mark-opened cycles — which may sit on an untracked gap day before the
     // first tracked day, so the day count can span untracked gap days too.
+    final locale = Localizations.localeOf(context).toString();
     final startLabel = _formatDay(cycle.startDate, locale);
     final endLabel = _formatDay(cycle.endDate, locale);
     final title = cycle.startsAtMenstruation
@@ -949,30 +1009,34 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         // Leading group predates the first cycleStart mark: title shows
         // the range END, since the begin is unknown.
         : l10n.cycleGroupLeading(endLabel);
+    // The count reports the cycle's TRUE calendar span (start → end,
+    // silent gaps included) even where the day list below shows only the
+    // built portion of it.
     final dayCount = DateOnly.daysBetween(cycle.endDate, cycle.startDate) + 1;
 
     return ExpansionTile(
-      // Most recent work stays at the top of the list.
+      // The key anchors the expansion state to THIS cycle across the list's
+      // data-driven rebuilds, in sync with _expandedCycleStarts.
+      key: ValueKey(DateOnly.normalize(cycle.startDate)),
       title: Text(title),
       subtitle: Text(l10n.termCycleDays(dayCount)),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            l10n.cycleTapToEdit,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        for (final day in cycle.days.reversed) _dayTile(l10n, day, cycles),
-      ],
+      onExpansionChanged: (isExpanded) => setState(() {
+        if (isExpanded) {
+          _expandedCycleStarts.add(DateOnly.normalize(cycle.startDate));
+        } else {
+          _expandedCycleStarts.remove(DateOnly.normalize(cycle.startDate));
+        }
+      }),
     );
   }
 
-  Widget _dayTile(AppLocalizations l10n, DailyEntry day, List<Cycle> cycles) {
+  Widget _dayTile(AppLocalizations l10n, DailyEntry day, Cycle cycle) {
     final locale = Localizations.localeOf(context).toString();
-    // The day's position inside its cycle, 1-based (null before the first
-    // group start) — shown as a small label under the tile's date.
-    final cycleDay = dayOfCycleFor(day.date, cycles);
+    // The day's position inside its cycle, 1-based — shown as a small label
+    // under the tile's date. The containing cycle is [cycle] itself: a day
+    // of the list never falls beyond the next cycle's start, so the
+    // dayOfCycleFor scan over all cycles resolves to the same number.
+    final cycleDay = dayOfCycleFor(day.date, [cycle]);
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
