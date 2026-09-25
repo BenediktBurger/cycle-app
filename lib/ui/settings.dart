@@ -991,24 +991,34 @@ class EinstellungenScreen extends ConsumerWidget {
 
   Future<void> _openExport(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
-    final db = await ref.read(databaseProvider.future);
-    final json = await exportDatabaseToJson(db);
-    // An export without any content is not useful as a file; communicate
-    // instead of producing an empty document in the user's Downloads.
-    final doc = parseExportJson(json);
-    if (doc.entries.isEmpty && doc.marks.isEmpty) {
+    try {
+      final db = await ref.read(databaseProvider.future);
+      final json = await exportDatabaseToJson(db);
+      // An export without any content is not useful as a file; communicate
+      // instead of producing an empty document in the user's Downloads.
+      final doc = parseExportJson(json);
+      if (doc.entries.isEmpty && doc.marks.isEmpty) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
+        return;
+      }
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => _ExportPreviewPage(json: json),
+        ),
+      );
+    } catch (_) {
+      // A failure anywhere in the export build changes nothing (the flow
+      // only reads): report that instead of crashing, on the settings
+      // screen context.
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
-      return;
+      ).showSnackBar(SnackBar(content: Text(l10n.exportFailed)));
     }
-    if (!context.mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => _ExportPreviewPage(json: json),
-      ),
-    );
   }
 
   /// Opens the self-contained JSON import dialog (see [_ImportDialog]).

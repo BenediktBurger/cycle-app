@@ -25,21 +25,6 @@ the sections above track planned work, git history keeps the record (see
 
 #### Stability (audit 2026-09-25)
 
-- [ ] Diary save is not one write and swallows nothing: `_save` (lib/ui/diary.dart)
-  runs the entry upsert plus the ignoreTemperature and cycle-start mark writes as
-  three independent awaits with no try/catch — a database failure is an unhandled
-  zone error, saving looks silently lost (no success AND no error snackbar), and a
-  crash mid-save leaves the day's entry and marks inconsistent. Wrap the trio in
-  one `db.transaction` and surface failure like the other write paths.
-- [ ] Silent fire-and-forget DB writes: the mark writes in
-  lib/ui/cycle_mark_sheet.dart (`_writeMark`, `_writeSuzMark`,
-  `_writeFirstHigherMark`) and the export flow in lib/ui/settings.dart
-  (`_openExport`) discard their Futures without error handling — a failed write
-  shows as "nothing happened" and an export failure as an unhandled error. Catch
-  and report using the snackbars other write paths already use.
-- [ ] `_jumpToDate` (lib/ui/cycle.dart) touches the scroll controller after the
-  date-picker await without a mounted re-check — if the chart unmounted while the
-  picker was open, animating a disposed controller throws.
 - [ ] Marks-stream errors are silently masked everywhere: every screen reads
   `ref.watch(marksProvider).valueOrNull ?? const []` (lib/ui/cycle.dart,
   lib/ui/diary.dart, lib/ui/statistics.dart, lib/ui/cycle_mark_sheet.dart), so a
@@ -205,25 +190,14 @@ rows themselves; a package merely bounds the scope. When a package lands,
 its rows go (per the backlog convention) and the package entry is removed.
 
 Parallelization rules: A4 is file-disjoint from everything else and can
-run anytime in parallel; A1 goes first among the A-packages, A2 and A3
-after it, A5 last (sharing lib/ui/settings.dart with A1). The refactor
-packages come after their serialization points described in their
-entries below. Remaining rules of thumb:
+run anytime in parallel. The refactor packages come after their
+serialization points described in their entries below. Remaining rules
+of thumb:
 
-- lib/ui/diary.dart is shared by A1 (save flow) and A3 (list building) —
-  different regions, land A1 first.
-- lib/ui/statistics.dart / lib/ui/cycle.dart are shared by A1/A2 (error
-  branches) and A3 (recompute + span) — land A2/A3 after A1, A3 after A2.
+- lib/ui/statistics.dart / lib/ui/cycle.dart are shared by A2 (error
+  branches) and A3 (recompute + span) — land A3 after A2.
 - Every package: fresh worktree, `flutter pub get`, full gate per
   CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
-
-- **WP-A1 — write-path robustness** (bugs: save/marks/export/JumpToDate rows)
-  Scope: lib/ui/diary.dart `_save` (one transaction + error snackbar),
-  lib/ui/cycle_mark_sheet.dart mark-write error handling,
-  lib/ui/settings.dart `_openExport` (try/catch + snackbar), lib/ui/cycle.dart
-  `_jumpToDate` (mounted re-check after the picker await). Tests to guide:
-  test/diary_app_bar_save_test.dart, test/cycle_mark_sheet_test.dart,
-  test/export_share_test.dart. Does NOT touch schema, streams or grouping.
 
 - **WP-A2 — stream & schema resiliency** (bugs: marks masking, entries retry,
   bleeding CHECK rows)

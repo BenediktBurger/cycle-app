@@ -232,32 +232,50 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           ? null
           : _notesController.text.trim(),
     );
-    final db = await ref.read(databaseProvider.future);
-    await db.entriesDao.upsertDaily(entry);
-    // The analysis-exclusion mark follows the EXCLUDE SWITCH alone (owner
-    // decision 2026-09-19: manual-only coupling — the old flag-driven
-    // auto-set is deleted): a flagged save without the switch does not
-    // exclude the day, and the switch toggles the mark in BOTH directions
-    // (addMark is idempotent, deleteMark no-ops when nothing is there).
-    // The switch seeds from the day's existing mark (see _loadEntry), so
-    // an untouched switch keeps an externally placed mark (sheet toggle,
-    // imports) in place.
-    if (_excludeTemperature) {
-      await db.marksDao.addMark(date, CycleMarkTypes.ignoreTemperature);
-    } else {
-      await db.marksDao.deleteMark(date, CycleMarkTypes.ignoreTemperature);
-    }
-    // The cycleStart mark follows the explicit CYCLE-START SWITCH alone
-    // (manual-only coupling — bleeding never implies or asks for a cycle
-    // start): the switch toggles the mark in BOTH directions (addMark is
-    // idempotent, deleteMark no-ops when nothing is there). The switch
-    // seeds from the day's existing mark (see _loadEntry), so an
-    // untouched switch keeps an externally placed mark (day sheet,
-    // imports) in place.
-    if (_cycleStartMarked) {
-      await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
-    } else {
-      await db.marksDao.deleteMark(date, CycleMarkTypes.cycleStart);
+    try {
+      final db = await ref.read(databaseProvider.future);
+      // The three writes are ONE transaction: a failure anywhere rolls the
+      // whole save back, so a day is stored either completely or not at
+      // all (never an entry without its marks, never marks without the
+      // entry).
+      await db.transaction(() async {
+        await db.entriesDao.upsertDaily(entry);
+        // The analysis-exclusion mark follows the EXCLUDE SWITCH alone
+        // (owner decision 2026-09-19: manual-only coupling — the old
+        // flag-driven auto-set is deleted): a flagged save without the
+        // switch does not exclude the day, and the switch toggles the
+        // mark in BOTH directions (addMark is idempotent, deleteMark
+        // no-ops when nothing is there). The switch seeds from the day's
+        // existing mark (see _loadEntry), so an untouched switch keeps an
+        // externally placed mark (sheet toggle, imports) in place.
+        if (_excludeTemperature) {
+          await db.marksDao.addMark(date, CycleMarkTypes.ignoreTemperature);
+        } else {
+          await db.marksDao.deleteMark(date, CycleMarkTypes.ignoreTemperature);
+        }
+        // The cycleStart mark follows the explicit CYCLE-START SWITCH
+        // alone (manual-only coupling — bleeding never implies or asks
+        // for a cycle start): the switch toggles the mark in BOTH
+        // directions (addMark is idempotent, deleteMark no-ops when
+        // nothing is there). The switch seeds from the day's existing
+        // mark (see _loadEntry), so an untouched switch keeps an
+        // externally placed mark (day sheet, imports) in place.
+        if (_cycleStartMarked) {
+          await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
+        } else {
+          await db.marksDao.deleteMark(date, CycleMarkTypes.cycleStart);
+        }
+      });
+    } catch (_) {
+      // Failure anywhere in the write phase — the transaction was rolled
+      // back and never committed, so nothing was changed: report that
+      // instead of leaking an unhandled async error (same posture as the
+      // delete-data and import flows).
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.saveFailed)));
+      return;
     }
     // No explicit provider invalidation needed: dailyEntriesProvider sits
     // on a drift `.watch()` stream, which re-emits after this write.

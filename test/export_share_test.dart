@@ -2,7 +2,9 @@
 // the share action that hands a real, export-named file to the system
 // share sheet, its success and failure snackbars, and the save-as-dialog
 // path (file_picker's save dialog on every native target now, Android SAF
-// included) the share work must not regress.
+// included) the share work must not regress, and the export-BUILD failure
+// path (fault-injected database, the delete-data test's pattern) whose
+// failure must surface as a localized snackbar instead of a silent abort.
 //
 // Harness notes: the tests pin the German locale and use the in-memory
 // drift database override (test/support/database.dart) with a seeded
@@ -14,7 +16,8 @@
 // path — Settings › JSON-Export › preview page. The German literals below
 // (button, snackbars) must stay in step with the localization entries
 // (exportShare / exportShared / exportShareFailed / exportSaved /
-// exportSaveFailed) they exercise.
+// exportSaveFailed / exportFailed) they exercise.
+import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show canSaveFile, saveFileOverride, shareFileOverride;
@@ -24,6 +27,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart' show DatabaseConnection;
+import 'package:drift/native.dart';
 
 import 'support/database.dart';
 import 'support/fixtures.dart';
@@ -37,14 +42,56 @@ const shareFailedSnackbarLabel = 'Teilen fehlgeschlagen.';
 const saveFileButtonLabel = 'Als Datei speichern';
 const savedSnackbarLabel = 'Datei gespeichert.';
 const saveFailedSnackbarLabel = 'Speichern fehlgeschlagen.';
+const exportFailedSnackbarLabel = 'Export fehlgeschlagen.';
 const previewTitleLabel = 'JSON-Vorschau';
 const exportButtonLabel = 'JSON-Export';
 
+/// Fault injection for the export build: the real in-memory database whose
+/// data reads can be armed to fail AFTER the harness was pumped — the test
+/// flips the flag at exactly the point the fault should occur. The export
+/// reads through the DAOs, so arming the entries read covers the build.
+class _FaultyDatabase extends CycleDatabase {
+  _FaultyDatabase(super.executor);
+
+  bool failReads = false;
+
+  late final _FaultyEntriesDao _faultyEntriesDao = _FaultyEntriesDao(this);
+
+  @override
+  EntriesDao get entriesDao => _faultyEntriesDao;
+}
+
+class _FaultyEntriesDao extends EntriesDao {
+  _FaultyEntriesDao(this._faulty) : super(_faulty);
+
+  final _FaultyDatabase _faulty;
+
+  @override
+  Future<List<CycleEntry>> allEntries() {
+    if (_faulty.failReads) {
+      throw StateError('injected read failure');
+    }
+    return super.allEntries();
+  }
+}
+
+_FaultyDatabase _faultyDatabase() {
+  return _FaultyDatabase(
+    DatabaseConnection(
+      NativeDatabase.memory(),
+      closeStreamsSynchronously: true,
+    ),
+  );
+}
+
 /// The settings screen with the exact MaterialApp configuration of the app
-/// shell (sans the shell itself) over the in-memory database.
-Widget settingsHarness() => ProviderScope(
+/// shell (sans the shell itself) over the in-memory database. [builder]
+/// swaps the database subclass for fault injection, like the delete-data
+/// tests build theirs.
+Widget settingsHarness({CycleDatabase Function()? builder}) => ProviderScope(
   overrides: [
     inMemoryDatabase(
+      builder: builder,
       seed: (db) async {
         await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
       },
@@ -95,6 +142,53 @@ Future<void> pumpToExportPreview(WidgetTester tester) async {
 }
 
 void main() {
+  group('export open: failure surfacing', () {
+    testWidgets('a failing export build reports the failure snackbar and '
+        'keeps the settings screen (no preview page, no unhandled error)', (
+      WidgetTester tester,
+    ) async {
+      final faulty = _faultyDatabase();
+      await tester.pumpWidget(settingsHarness(builder: () => faulty));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, exportButtonLabel),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(EinstellungenScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+
+      faulty.failReads = true;
+      await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the export flow must catch its own failures — nothing may '
+            'leak into the zone as an unhandled error',
+      );
+      expect(
+        find.text(exportFailedSnackbarLabel),
+        findsOneWidget,
+        reason:
+            'a failure building the export (the database reads the JSON '
+            'is assembled from) is reported via the localized failure '
+            'snackbar, mirroring the other settings flows',
+      );
+      expect(
+        find.text(previewTitleLabel),
+        findsNothing,
+        reason: 'the preview page does not open when the export failed',
+      );
+    });
+  });
+
   group('export preview: share action', () {
     testWidgets('the preview page offers the share button', (
       WidgetTester tester,

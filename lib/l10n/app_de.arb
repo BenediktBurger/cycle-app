@@ -55,6 +55,10 @@
   "dbErrorHint": "Auf Web wird die Datenbank im Browser (OPFS/IndexedDB) gespeichert. Bei privatem Modus oder fehlenden Asset-Dateien schlägt das Öffnen fehl.",
   "save": "Speichern",
   "saved": "Gespeichert.",
+  "saveFailed": "Speichern fehlgeschlagen — die Daten wurden nicht geändert.",
+  "@saveFailed": {
+    "description": "Fehlermeldung für das Speichern eines Tagebuchtages: erscheint, wenn der Eintrag-UPSERT oder eine der beiden Markierungs-Schreibvorgänge fehlschlägt. Alle drei Schreibvorgänge sind eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu deleteDataFailed/importFailed)."
+  },
   "noEntriesYet": "Noch keine Einträge. Trage oben deinen ersten Tag ein.",
   "loadFailed": "Laden fehlgeschlagen",
   "bleedingNone": "keine",
@@ -488,6 +492,10 @@
   "exportShare": "Teilen",
   "exportShared": "Datei geteilt.",
   "exportShareFailed": "Teilen fehlgeschlagen.",
+  "exportFailed": "Export fehlgeschlagen.",
+  "@exportFailed": {
+    "description": "Fehlermeldung für den gesamten Export-Ablauf: erscheint, wenn das Öffnen der Datenbank oder der Aufbau des Export-JSON fehlschlägt. Der Export ist rein lesend, deshalb keine Versicherung, dass nichts geändert wurde (anders als bei deleteDataFailed/importFailed)."
+  },
   "exportNativeHint": "Text oben kopieren — Speichern und Teilen gibt es auf dieser Plattform nicht.",
   "exportNothing": "Datenbank ist leer — nichts zu exportieren.",
   "importTitle": "JSON einfügen",

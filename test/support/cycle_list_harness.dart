@@ -44,12 +44,17 @@ final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
 /// created database for STORED-state assertions and the container for
 /// explicit provider reads (e.g. after a navigation write). Callers that
 /// only need one destructure the other as `_`.
+///
+/// [builder] passes a subclassed database through (fault injection —
+/// the same seam the appScope and DiaryHarness tests use); the default
+/// stays the plain in-memory instance.
 Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   WidgetTester tester, {
   required List<DailyEntry> entries,
   List<CycleMark> seedMarks = const [],
   DateTime? selectedDate,
   int initialTab = 0,
+  CycleDatabase Function()? builder,
 }) async {
   final initialSelected = DateOnly.normalize(selectedDate ?? scenarioDay(1));
   CycleDatabase? db;
@@ -65,6 +70,7 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
             );
           }
         },
+        builder: builder,
         onCreated: (created) => db = created,
       ),
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),

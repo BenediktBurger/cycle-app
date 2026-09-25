@@ -108,37 +108,77 @@ final class CycleDayPanel extends ConsumerWidget {
   /// added), remove through [MarksDao.deleteMark] (present -> deleted).
   /// No provider invalidation: marksProvider sits on a drift watch stream,
   /// which re-emits after the write (same pattern as the diary's saves).
-  Future<void> _writeMark(
+  ///
+  /// Returns whether the write completed. A failure shows the localized
+  /// failure SnackBar instead of leaking an unhandled async error — the
+  /// established posture of the save/delete/import flows: nothing was
+  /// changed, and the caller must not build follow-up UI on the failed
+  /// write.
+  Future<bool> _writeMark(
+    BuildContext context,
     WidgetRef ref, {
     required String type,
     required bool remove,
   }) async {
-    final db = await ref.read(databaseProvider.future);
-    if (remove) {
-      await db.marksDao.deleteMark(day, type);
-    } else {
-      await db.marksDao.toggleMark(day, type);
+    // Captured before the write-await (nothing derived from context after
+    // an async gap).
+    final l10n = AppLocalizations.of(context);
+    try {
+      final db = await ref.read(databaseProvider.future);
+      if (remove) {
+        await db.marksDao.deleteMark(day, type);
+      } else {
+        await db.marksDao.toggleMark(day, type);
+      }
+    } catch (_) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.saveFailed)));
+      return false;
     }
+    return true;
   }
 
   /// The SUZ mark-writing action: set through [MarksDao.addMark] (after
   /// removing the OTHER variant on the same day — the two variants are
   /// mutually exclusive: placing one removes the other), remove through
   /// [MarksDao.deleteMark]. Same no-invalidation pattern as [_writeMark].
-  Future<void> _writeSuzMark(
+  ///
+  /// The variant-switch delete and the add are ONE all-or-nothing
+  /// transaction: a failure rolls both back, so the previous variant stays
+  /// standing — never a day that lost its variant without gaining the new
+  /// one. Failure reporting works like [_writeMark].
+  Future<bool> _writeSuzMark(
+    BuildContext context,
     WidgetRef ref, {
     required String type,
     required String otherType,
     required bool remove,
   }) async {
-    final db = await ref.read(databaseProvider.future);
-    if (remove) {
-      await db.marksDao.deleteMark(day, type);
-      return;
+    // Captured before the write-await (nothing derived from context after
+    // an async gap).
+    final l10n = AppLocalizations.of(context);
+    try {
+      final db = await ref.read(databaseProvider.future);
+      if (remove) {
+        await db.marksDao.deleteMark(day, type);
+      } else {
+        // Variant switch first, then the add — never two variants on one
+        // day.
+        await db.transaction(() async {
+          await db.marksDao.deleteMark(day, otherType);
+          await db.marksDao.addMark(day, type);
+        });
+      }
+    } catch (_) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.saveFailed)));
+      return false;
     }
-    // Variant switch first, then the add — never two variants on one day.
-    await db.marksDao.deleteMark(day, otherType);
-    await db.marksDao.addMark(day, type);
+    return true;
   }
 
   /// The first-higher mark-writing action with the owner consistency
@@ -164,12 +204,15 @@ final class CycleDayPanel extends ConsumerWidget {
     // pattern — nothing derived from context after an async gap).
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toString();
-    await _writeMark(
+    final written = await _writeMark(
+      context,
       ref,
       type: CycleMarkTypes.firstHigherMeasurement,
       remove: remove,
     );
-    if (remove) return;
+    // The consistency check reads from the just-written mark — nothing to
+    // check when the write failed (its failure is reported by [_writeMark]).
+    if (!written || remove) return;
 
     // The mark is written; the provider stream re-emits asynchronously, so
     // the check evaluates the exact post-write inputs (the placed mark
@@ -233,6 +276,7 @@ final class CycleDayPanel extends ConsumerWidget {
                 Navigator.of(dialogContext).pop();
                 // Remove goes through the existing mark-toggle path.
                 await _writeMark(
+                  context,
                   ref,
                   type: CycleMarkTypes.firstHigherMeasurement,
                   remove: true,
@@ -552,7 +596,14 @@ final class CycleDayPanel extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: LayoutBuilder(
-              builder: (context, constraints) {
+              // The builder's own context is NOT used for the chip closures:
+              // the grid element is recomputed whenever the info-line count
+              // above it changes (unkeyed Column children shift), so a
+              // closure capturing THAT context could dereference a defunct
+              // element later (the consistency dialog's Remove fires after
+              // exactly such a rebuild). The closures use the panel's own
+              // context instead — stable while the panel is open.
+              builder: (_, constraints) {
                 final chipWidth = _gridChipWidth(constraints.maxWidth);
                 return Wrap(
                   spacing: 8,
@@ -571,6 +622,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       icon: Icons.flag_outlined,
                       key: const ValueKey('cycleSheetChip-cycleStart'),
                       (wanted) => _writeMark(
+                        context,
                         ref,
                         type: CycleMarkTypes.cycleStart,
                         remove: !wanted,
@@ -583,6 +635,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       icon: Icons.circle,
                       key: const ValueKey('cycleSheetChip-mucusPeakDay'),
                       (wanted) => _writeMark(
+                        context,
                         ref,
                         type: CycleMarkTypes.mucusPeakDay,
                         remove: !wanted,
@@ -621,6 +674,7 @@ final class CycleDayPanel extends ConsumerWidget {
                         icon: Icons.visibility_off_outlined,
                         key: const ValueKey('cycleSheetChip-ignoreTemperature'),
                         (wanted) => _writeMark(
+                          context,
                           ref,
                           type: CycleMarkTypes.ignoreTemperature,
                           remove: !wanted,
@@ -657,6 +711,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       icon: Icons.nightlight_outlined,
                       key: const ValueKey('cycleSheetChip-suzEvening'),
                       (wanted) => _writeSuzMark(
+                        context,
                         ref,
                         type: CycleMarkTypes.suzEvening,
                         otherType: CycleMarkTypes.suzMorning,
@@ -670,6 +725,7 @@ final class CycleDayPanel extends ConsumerWidget {
                       icon: Icons.wb_sunny_outlined,
                       key: const ValueKey('cycleSheetChip-suzMorning'),
                       (wanted) => _writeSuzMark(
+                        context,
                         ref,
                         type: CycleMarkTypes.suzMorning,
                         otherType: CycleMarkTypes.suzEvening,
