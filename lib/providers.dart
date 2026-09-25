@@ -201,6 +201,26 @@ final selectedDateProvider = StateProvider<DateTime>(
   (ref) => DateOnly.normalize(DateTime.now()),
 );
 
+/// The calendar day the app was last seen alive-and-in-foreground on: the
+/// lifecycle observer in main.CycleApp records it when the app goes deeper
+/// away from the foreground (inactive/hidden/paused on the way down — see
+/// main.dart's direction-aware lifecycle observer; resume-path intermediates
+/// can't clobber the stored day), and on the wake-up it decides between the
+/// "morning jump"
+/// (the first foreground of a NEW calendar day resets the shell to today's
+/// entry form on the diary tab) and a plain resume that keeps everything
+/// where the user left off. Null until the first backgrounding — the very
+/// first foreground after launch compares against nothing and stays a
+/// no-op, because the provider defaults (tab + selected date) already show
+/// today's diary form on a fresh start.
+///
+/// In-memory only ON PURPOSE: it must survive exactly as long as the process
+/// does. A killed (cold) start re-derives "today" from
+/// [selectedDateProvider]'s default, so persisting or hydrating this value
+/// is unnecessary — and would reintroduce exactly the cold-start jump the
+/// defaults make impossible.
+final lastForegroundDayProvider = StateProvider<DateTime?>((ref) => null);
+
 /// The cycle chart's jump-to-date affordance. The button lives in the Zyklus
 /// AppBar's actions (next to the info action — a row of its own above the
 /// chart wasted vertical space), but the jump logic needs the chart's scroll
