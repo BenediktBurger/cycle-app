@@ -75,7 +75,9 @@ class $CycleEntriesTable extends CycleEntries
         false,
         type: DriftSqlType.int,
         requiredDuringInsert: false,
-        defaultValue: const Constant(0),
+        $customConstraints:
+            'NOT NULL DEFAULT 0 CHECK (bleeding BETWEEN 0 AND 5)',
+        defaultValue: const CustomExpression('0'),
       ).withConverter<Bleeding>($CycleEntriesTable.$converterbleeding);
   static const VerificationMeta _mucusSignMeta = const VerificationMeta(
     'mucusSign',
@@ -493,6 +495,12 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// never from the declaration index; an unknown stored number throws so
   /// corrupt data is surfaced instead of silently mapped. The default 0
   /// stores an explicit `none` (a day with no observation still has a value).
+  /// customConstraint replaces drift's own constraints, so NOT NULL and
+  /// the default 0 are written out explicitly inside the constraint string.
+  /// The engine-level CHECK mirrors the converter's 0..5 vocabulary so
+  /// foreign data (e.g. a future import path) cannot even write an
+  /// impossible level — the fail-loud converter stays as the read-side
+  /// guard on top.
   final Bleeding bleeding;
 
   /// Fertility sign recorded on the day: NULL when no observation, else one

@@ -28,9 +28,11 @@ import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
+import '../domain/models.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'stream_error.dart';
 
 /// The shared missing-value marker of this screen, mirroring the cycle
 /// page's evaluation table's dash — a neutral glyph, not language text.
@@ -42,234 +44,247 @@ class StatistikScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final locale = Localizations.localeOf(context).toString();
     final entriesAsync = ref.watch(dailyEntriesProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navStatistics)),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text(l10n.loadFailed)),
+        error: (e, s) => StreamLoadError(
+          scope: 'entries',
+          onRetry: () => ref.invalidate(dailyEntriesProvider),
+        ),
         data: (entries) {
-          final marks =
-              ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
-          final lengths = cycleLengthsInDays(entries, marks);
-          final summary = summarizeCycleLengths(lengths);
-          final buckets = cycleLengthDistribution(lengths);
-          final onsets = menstruationOnsetDates(entries, marks);
-          String day(DateTime d) => DateFormat.yMd(locale).format(
-            // A date-only value is already UTC-normalized midnights (the
-            // DateOnly convention); DateFormat reads the value's OWN
-            // fields, so it must be printed verbatim — a .toLocal() would
-            // show the PREVIOUS day on UTC-negative hosts.
-            DateOnly.normalize(d),
-          );
-
-          // The per-cycle evaluations feed everything beyond the plain
-          // cycle lengths (pure render-time arithmetic per ADR-0001).
-          final evaluations = evaluateCycles(
-            entries,
-            marks,
-            // The grouping's injected clock (last-cycle span rule — the
-            // nowProvider seam, pinned in tests).
-            today: ref.read(nowProvider)(),
-          );
-          // Each descriptive detail card aggregates the metric's values
-          // over the mark-driven cycles; a cycle contributing no value
-          // (no bleeding day, no rise mark, an open cycle) simply does
-          // not feed the aggregate — the "—" card rows are for the
-          // all-empty case.
-          final lengthDetail = summarizeInts(lengths);
-          final bleedingDetail = summarizeInts(
-            cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
-          );
-          final riseDetail = summarizeInts(
-            riseToEndDurationsInDays(evaluations).nonNulls.toList(),
-          );
-          final earliest = earliestFirstHigherCycleDay(evaluations);
-
-          // The paper history folds in through the shared MIN-combination
-          // rule (minRecordedFact, lib/domain/statistics.dart) at the
-          // shortest/earliest surfaces: the paper figures were recorded
-          // BEFORE every in-app cycle, so they are known facts at this
-          // screen's point of view. They are single recorded facts — they
-          // do NOT enter the lengths list, the distribution or the
-          // per-cycle table (in-app-only surfaces below stay gated on
-          // `lengths`).
-          final paperShortest = ref.watch(
-            shortestCycleLengthOutsideAppProvider,
-          );
-          final paperEarliest = ref.watch(
-            earliestFirstHigherCycleDayOutsideAppProvider,
-          );
-          final shortestOverall = minRecordedFact(
-            paperShortest,
-            summary.shortest,
-          );
-          final lengthDetailWithPaper = DescriptiveSummary(
-            minimum: minRecordedFact(paperShortest, lengthDetail.minimum),
-            maximum: lengthDetail.maximum,
-            average: lengthDetail.average,
-            standardDeviation: lengthDetail.standardDeviation,
-          );
-          final earliestWithPaper = (
-            any: minRecordedFact(paperEarliest, earliest.any),
-            afterMucusPeak: minRecordedFact(
-              paperEarliest,
-              earliest.afterMucusPeak,
+          // The marks watch is kept unmasked: on a failed stream the screen
+          // must not silently render aggregates computed from an empty
+          // marks list. While the stream is still loading, the render
+          // computes like the masked read did (with no marks yet).
+          final marksAsync = ref.watch(marksProvider);
+          return marksAsync.when(
+            loading: () => _statisticsView(context, ref, entries, const []),
+            error: (e, s) => StreamLoadError(
+              scope: 'marks',
+              onRetry: () => ref.invalidate(marksProvider),
             ),
-          );
-
-          // The average/shortest/longest row renders with ONLY a paper
-          // shortest present too (in-app lengths empty): a paper-only
-          // user must see her recorded shortest figure instead of a
-          // hidden row. The average and longest cells then dash — the
-          // paper value is one fact, not a lengths distribution.
-          final hasShortestRow =
-              summary.lengths.isNotEmpty || paperShortest != null;
-
-          // The upstream statistics rework's aggregate + per-cycle table
-          // data: the fact rows and the first-higher-until-cycle-end
-          // metric keep upstream's counting rule (each fact's span counts
-          // to the next marked start; the trailing observed end is one
-          // day past the last TRACKED day — see cycleFacts), rendered on
-          // the shared card shape below.
-          final stats = cycleStatistics(entries, marks);
-
-          // The cycle-count surface: the mark-opened cycles recorded in
-          // this app plus the outside-app count from the settings value.
-          final cyclesInApp = markDrivenCycleCount(entries, marks);
-          final cyclesOutsideApp = ref.watch(observedCyclesOutsideAppProvider);
-          final cyclesTotal = cyclesInApp + cyclesOutsideApp;
-          var countCaption = l10n.statisticsCyclesInApp(cyclesInApp);
-          if (cyclesOutsideApp > 0) {
-            countCaption +=
-                ' · ${l10n.statisticsCyclesOutsideApp(cyclesOutsideApp)}';
-          }
-
-          // The earliest first higher, two documented variants: the
-          // "real" one (strictly after the mucus peak) is the primary row;
-          // the over-all-cycles minimum is the fallback row. When the real
-          // variant is genuinely missing in the DISPLAYED pair, the dash +
-          // the missing-variant caption state that fact. The caption's gate
-          // reads the paper-folded pair, not the raw in-app values: the rows
-          // display the fold, so gating on the raw values would claim a
-          // missing real variant while the row actually carries the paper
-          // figure (in-app real missing + paper value present).
-          String cycleDayText(int? n) =>
-              n == null ? _missing : l10n.statisticsCycleDay(n);
-
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              Text(
-                l10n.statisticsNote,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              _countCard(
-                context,
-                l10n,
-                cyclesTotal: cyclesTotal,
-                caption: countCaption,
-              ),
-              const SizedBox(height: 8),
-              if (onsets.isEmpty) ...[
-                // The no-data note keys on the FACT that no cycle start is
-                // recorded yet (the first recorded start is the note's own
-                // threshold) — never on the length count: a single still-
-                // open cycle has recorded starts but no countable lengths
-                // yet, and the lengths surfaces below stay hidden for it.
-                Text(l10n.statisticsNoData),
-                const SizedBox(height: 8),
-              ],
-              if (summary.lengths.isNotEmpty) ...[
-                _lengthsListCard(context, l10n, summary.lengths),
-                const SizedBox(height: 8),
-              ],
-              if (hasShortestRow) ...[
-                _averageShortestLongestRow(
-                  context,
-                  summary,
-                  shortestOverride: shortestOverall,
-                ),
-                const SizedBox(height: 8),
-              ],
-              _MetricCard(
-                key: const ValueKey('statisticsCard-cycleLength'),
-                title: l10n.statisticsMetricCycleLength,
-                detail: lengthDetailWithPaper,
-              ),
-              const SizedBox(height: 8),
-              _MetricCard(
-                key: const ValueKey('statisticsCard-bleedingDuration'),
-                title: l10n.statisticsMetricBleedingDuration,
-                detail: bleedingDetail,
-              ),
-              const SizedBox(height: 8),
-              _MetricCard(
-                key: const ValueKey('statisticsCard-riseSpan'),
-                title: l10n.statisticsMetricRiseSpan,
-                detail: riseDetail,
-              ),
-              const SizedBox(height: 8),
-              _MetricCard(
-                key: const ValueKey('statisticsMetric-firstHigherUntilEnd'),
-                title: l10n.statisticsMetricFirstHigherUntilEnd,
-                detail: _descriptiveDetail(stats.firstHigherUntilCycleEnd),
-              ),
-              const SizedBox(height: 8),
-              _StatCard(
-                key: const ValueKey('statisticsCard-earliestFirstHigher'),
-                title: l10n.statisticsEarliestFirstHigher,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ValueRow(
-                      label: l10n.statisticsFirstHigherReal,
-                      value: cycleDayText(earliestWithPaper.afterMucusPeak),
-                    ),
-                    _ValueRow(
-                      label: l10n.statisticsFirstHigherAny,
-                      value: cycleDayText(earliestWithPaper.any),
-                    ),
-                    if (earliestWithPaper.afterMucusPeak == null &&
-                        earliestWithPaper.any != null)
-                      Text(
-                        l10n.statisticsFirstHigherRealMissing,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // The fact-gated surfaces (the recorded data's own count —
-              // not the lengths'): the onset list shows whenever a cycle
-              // start is recorded, the per-cycle table whenever fact rows
-              // exist; only the DISTRIBUTION card stays glued to the
-              // lengths (it buckets lengths).
-              if (onsets.isNotEmpty) ...[
-                _onsetsCard(context, onsets, day),
-                const SizedBox(height: 8),
-              ],
-              if (summary.lengths.isNotEmpty) ...[
-                _distributionCard(context, buckets),
-                const SizedBox(height: 8),
-              ],
-              if (stats.facts.isNotEmpty)
-                // The table sits below ALL other statistics: one row per
-                // mark-opened cycle keeps the numbers auditable against
-                // the mark-driven boundaries without adding any
-                // evaluation (the upstream rework's placement — kept).
-                _CycleTableCard(
-                  key: const ValueKey('statisticsCycleTable'),
-                  facts: stats.facts,
-                  day: day,
-                ),
-            ],
+            data: (marks) => _statisticsView(context, ref, entries, marks),
           );
         },
       ),
+    );
+  }
+
+  /// The rendered statistics of one entries+marks snapshot — the body the
+  /// `data:` branch below the two stream watches renders for the real data
+  /// (and, while the marks stream is in flight, for an empty marks list).
+  Widget _statisticsView(
+    BuildContext context,
+    WidgetRef ref,
+    List<DailyEntry> entries,
+    List<CycleMark> marks,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toString();
+    final lengths = cycleLengthsInDays(entries, marks);
+    final summary = summarizeCycleLengths(lengths);
+    final buckets = cycleLengthDistribution(lengths);
+    final onsets = menstruationOnsetDates(entries, marks);
+    String day(DateTime d) => DateFormat.yMd(locale).format(
+      // A date-only value is already UTC-normalized midnights (the
+      // DateOnly convention); DateFormat reads the value's OWN
+      // fields, so it must be printed verbatim — a .toLocal() would
+      // show the PREVIOUS day on UTC-negative hosts.
+      DateOnly.normalize(d),
+    );
+
+    // The per-cycle evaluations feed everything beyond the plain
+    // cycle lengths (pure render-time arithmetic per ADR-0001).
+    final evaluations = evaluateCycles(
+      entries,
+      marks,
+      // The grouping's injected clock (last-cycle span rule — the
+      // nowProvider seam, pinned in tests).
+      today: ref.read(nowProvider)(),
+    );
+    // Each descriptive detail card aggregates the metric's values
+    // over the mark-driven cycles; a cycle contributing no value
+    // (no bleeding day, no rise mark, an open cycle) simply does
+    // not feed the aggregate — the "—" card rows are for the
+    // all-empty case.
+    final lengthDetail = summarizeInts(lengths);
+    final bleedingDetail = summarizeInts(
+      cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
+    );
+    final riseDetail = summarizeInts(
+      riseToEndDurationsInDays(evaluations).nonNulls.toList(),
+    );
+    final earliest = earliestFirstHigherCycleDay(evaluations);
+
+    // The paper history folds in through the shared MIN-combination
+    // rule (minRecordedFact, lib/domain/statistics.dart) at the
+    // shortest/earliest surfaces: the paper figures were recorded
+    // BEFORE every in-app cycle, so they are known facts at this
+    // screen's point of view. They are single recorded facts — they
+    // do NOT enter the lengths list, the distribution or the
+    // per-cycle table (in-app-only surfaces below stay gated on
+    // `lengths`).
+    final paperShortest = ref.watch(shortestCycleLengthOutsideAppProvider);
+    final paperEarliest = ref.watch(
+      earliestFirstHigherCycleDayOutsideAppProvider,
+    );
+    final shortestOverall = minRecordedFact(paperShortest, summary.shortest);
+    final lengthDetailWithPaper = DescriptiveSummary(
+      minimum: minRecordedFact(paperShortest, lengthDetail.minimum),
+      maximum: lengthDetail.maximum,
+      average: lengthDetail.average,
+      standardDeviation: lengthDetail.standardDeviation,
+    );
+    final earliestWithPaper = (
+      any: minRecordedFact(paperEarliest, earliest.any),
+      afterMucusPeak: minRecordedFact(paperEarliest, earliest.afterMucusPeak),
+    );
+
+    // The average/shortest/longest row renders with ONLY a paper
+    // shortest present too (in-app lengths empty): a paper-only
+    // user must see her recorded shortest figure instead of a
+    // hidden row. The average and longest cells then dash — the
+    // paper value is one fact, not a lengths distribution.
+    final hasShortestRow = summary.lengths.isNotEmpty || paperShortest != null;
+
+    // The upstream statistics rework's aggregate + per-cycle table
+    // data: the fact rows and the first-higher-until-cycle-end
+    // metric keep upstream's counting rule (each fact's span counts
+    // to the next marked start; the trailing observed end is one
+    // day past the last TRACKED day — see cycleFacts), rendered on
+    // the shared card shape below.
+    final stats = cycleStatistics(entries, marks);
+
+    // The cycle-count surface: the mark-opened cycles recorded in
+    // this app plus the outside-app count from the settings value.
+    final cyclesInApp = markDrivenCycleCount(entries, marks);
+    final cyclesOutsideApp = ref.watch(observedCyclesOutsideAppProvider);
+    final cyclesTotal = cyclesInApp + cyclesOutsideApp;
+    var countCaption = l10n.statisticsCyclesInApp(cyclesInApp);
+    if (cyclesOutsideApp > 0) {
+      countCaption += ' · ${l10n.statisticsCyclesOutsideApp(cyclesOutsideApp)}';
+    }
+
+    // The earliest first higher, two documented variants: the
+    // "real" one (strictly after the mucus peak) is the primary row;
+    // the over-all-cycles minimum is the fallback row. When the real
+    // variant is genuinely missing in the DISPLAYED pair, the dash +
+    // the missing-variant caption state that fact. The caption's gate
+    // reads the paper-folded pair, not the raw in-app values: the rows
+    // display the fold, so gating on the raw values would claim a
+    // missing real variant while the row actually carries the paper
+    // figure (in-app real missing + paper value present).
+    String cycleDayText(int? n) =>
+        n == null ? _missing : l10n.statisticsCycleDay(n);
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Text(l10n.statisticsNote, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 16),
+        _countCard(
+          context,
+          l10n,
+          cyclesTotal: cyclesTotal,
+          caption: countCaption,
+        ),
+        const SizedBox(height: 8),
+        if (onsets.isEmpty) ...[
+          // The no-data note keys on the FACT that no cycle start is
+          // recorded yet (the first recorded start is the note's own
+          // threshold) — never on the length count: a single still-
+          // open cycle has recorded starts but no countable lengths
+          // yet, and the lengths surfaces below stay hidden for it.
+          Text(l10n.statisticsNoData),
+          const SizedBox(height: 8),
+        ],
+        if (summary.lengths.isNotEmpty) ...[
+          _lengthsListCard(context, l10n, summary.lengths),
+          const SizedBox(height: 8),
+        ],
+        if (hasShortestRow) ...[
+          _averageShortestLongestRow(
+            context,
+            summary,
+            shortestOverride: shortestOverall,
+          ),
+          const SizedBox(height: 8),
+        ],
+        _MetricCard(
+          key: const ValueKey('statisticsCard-cycleLength'),
+          title: l10n.statisticsMetricCycleLength,
+          detail: lengthDetailWithPaper,
+        ),
+        const SizedBox(height: 8),
+        _MetricCard(
+          key: const ValueKey('statisticsCard-bleedingDuration'),
+          title: l10n.statisticsMetricBleedingDuration,
+          detail: bleedingDetail,
+        ),
+        const SizedBox(height: 8),
+        _MetricCard(
+          key: const ValueKey('statisticsCard-riseSpan'),
+          title: l10n.statisticsMetricRiseSpan,
+          detail: riseDetail,
+        ),
+        const SizedBox(height: 8),
+        _MetricCard(
+          key: const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+          title: l10n.statisticsMetricFirstHigherUntilEnd,
+          detail: _descriptiveDetail(stats.firstHigherUntilCycleEnd),
+        ),
+        const SizedBox(height: 8),
+        _StatCard(
+          key: const ValueKey('statisticsCard-earliestFirstHigher'),
+          title: l10n.statisticsEarliestFirstHigher,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ValueRow(
+                label: l10n.statisticsFirstHigherReal,
+                value: cycleDayText(earliestWithPaper.afterMucusPeak),
+              ),
+              _ValueRow(
+                label: l10n.statisticsFirstHigherAny,
+                value: cycleDayText(earliestWithPaper.any),
+              ),
+              if (earliestWithPaper.afterMucusPeak == null &&
+                  earliestWithPaper.any != null)
+                Text(
+                  l10n.statisticsFirstHigherRealMissing,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // The fact-gated surfaces (the recorded data's own count —
+        // not the lengths'): the onset list shows whenever a cycle
+        // start is recorded, the per-cycle table whenever fact rows
+        // exist; only the DISTRIBUTION card stays glued to the
+        // lengths (it buckets lengths).
+        if (onsets.isNotEmpty) ...[
+          _onsetsCard(context, onsets, day),
+          const SizedBox(height: 8),
+        ],
+        if (summary.lengths.isNotEmpty) ...[
+          _distributionCard(context, buckets),
+          const SizedBox(height: 8),
+        ],
+        if (stats.facts.isNotEmpty)
+          // The table sits below ALL other statistics: one row per
+          // mark-opened cycle keeps the numbers auditable against
+          // the mark-driven boundaries without adding any
+          // evaluation (the upstream rework's placement — kept).
+          _CycleTableCard(
+            key: const ValueKey('statisticsCycleTable'),
+            facts: stats.facts,
+            day: day,
+          ),
+      ],
     );
   }
 }

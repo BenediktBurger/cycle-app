@@ -48,6 +48,10 @@ final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
 /// [builder] passes a subclassed database through (fault injection —
 /// the same seam the appScope and DiaryHarness tests use); the default
 /// stays the plain in-memory instance.
+///
+/// [marksStreamFactory] replaces the real marks stream: invoked once per
+/// provider (re-)subscription, so a stream-error retry test can hand out a
+/// failing stream on the first attempt and a valid one afterwards.
 Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   WidgetTester tester, {
   required List<DailyEntry> entries,
@@ -55,6 +59,7 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   DateTime? selectedDate,
   int initialTab = 0,
   CycleDatabase Function()? builder,
+  Stream<List<CycleMark>> Function()? marksStreamFactory,
 }) async {
   final initialSelected = DateOnly.normalize(selectedDate ?? scenarioDay(1));
   CycleDatabase? db;
@@ -74,6 +79,8 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
         onCreated: (created) => db = created,
       ),
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
+      if (marksStreamFactory != null)
+        marksProvider.overrideWith((ref) => marksStreamFactory()),
       selectedDateProvider.overrideWith((ref) => initialSelected),
       tabIndexProvider.overrideWith((ref) => initialTab),
     ],
@@ -94,6 +101,10 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
     ),
   );
   await tester.pumpAndSettle();
+  // A test that overrides BOTH stream providers never touches the real
+  // database through them — materialize the instance here so callers that
+  // destructure it always get it.
+  await container.read(databaseProvider.future);
   return (db!, container);
 }
 

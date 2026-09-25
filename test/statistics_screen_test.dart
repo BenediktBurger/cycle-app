@@ -71,10 +71,16 @@ Widget harness({
   int? paperShortestCycleLength,
   int? paperEarliestFirstHigherCycleDay,
   Locale locale = const Locale('en'),
+  Stream<List<DailyEntry>> Function()? entriesStreamFactory,
+  Stream<List<CycleMark>> Function()? marksStreamFactory,
 }) => ProviderScope(
   overrides: [
-    dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
-    marksProvider.overrideWith((ref) => Stream.value(marks)),
+    dailyEntriesProvider.overrideWith(
+      (ref) => entriesStreamFactory?.call() ?? Stream.value(entries),
+    ),
+    marksProvider.overrideWith(
+      (ref) => marksStreamFactory?.call() ?? Stream.value(marks),
+    ),
     observedCyclesOutsideAppProvider.overrideWith((ref) => observedOutsideApp),
     shortestCycleLengthOutsideAppProvider.overrideWith(
       (ref) => paperShortestCycleLength,
@@ -1024,5 +1030,102 @@ void main() {
       findsNothing,
       reason: 'no paper value set — the empty case keeps its gate',
     );
+  });
+
+  group('stream error retry surfaces', () {
+    testWidgets('a marks stream error shows the retry surface instead of '
+        'the statistics cards, and retry restores them', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      var attempt = 0;
+      await tester.pumpWidget(
+        harness(
+          entries: screenEntries(),
+          marks: screenMarks(),
+          marksStreamFactory: () {
+            attempt++;
+            return attempt == 1
+                ? Stream<List<CycleMark>>.error(StateError('injected error'))
+                : Stream.value(screenMarks());
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // NOT the statistics cards computed with silently-empty marks.
+      expect(countCard(), findsNothing);
+      expect(find.text('Loading failed'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('marksStreamRetryButton')),
+        findsOneWidget,
+        reason: 'the error branch carries a retry affordance',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('marksStreamRetryButton')));
+      await tester.pumpAndSettle();
+
+      expect(
+        countCard(),
+        findsOneWidget,
+        reason:
+            'the retry re-subscribed '
+            'the provider and the real content rendered',
+      );
+      expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
+    });
+
+    testWidgets('an entries stream error gains the retry affordance, and '
+        'retry restores the cards', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      var attempt = 0;
+      await tester.pumpWidget(
+        harness(
+          entries: screenEntries(),
+          marks: screenMarks(),
+          entriesStreamFactory: () {
+            attempt++;
+            return attempt == 1
+                ? Stream<List<DailyEntry>>.error(StateError('injected error'))
+                : Stream.value(screenEntries());
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(countCard(), findsNothing);
+      expect(find.text('Loading failed'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('entriesStreamRetryButton')),
+        findsOneWidget,
+        reason: 'the error branch carries a retry affordance',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('entriesStreamRetryButton')));
+      await tester.pumpAndSettle();
+
+      expect(countCard(), findsOneWidget);
+      expect(attempt, 2);
+    });
+
+    testWidgets('the retry surface speaks the German wording in the de '
+        'locale', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(
+          entries: screenEntries(),
+          marks: screenMarks(),
+          locale: const Locale('de'),
+          marksStreamFactory: () =>
+              Stream<List<CycleMark>>.error(StateError('injected error')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The German wording is authoritative (language policy).
+      expect(find.text('Laden fehlgeschlagen'), findsOneWidget);
+      expect(find.text('Erneut versuchen'), findsOneWidget);
+    });
   });
 }

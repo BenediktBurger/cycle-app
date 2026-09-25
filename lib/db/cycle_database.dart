@@ -1,4 +1,4 @@
-// The app's drift database (schema version 11, profile-free).
+// The app's drift database (schema version 12, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // settings_dao.dart) are
@@ -54,7 +54,7 @@ class CycleDatabase extends _$CycleDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -81,8 +81,20 @@ class CycleDatabase extends _$CycleDatabase {
       // level-5 member at the converter level, and the bleeding column's
       // INTEGER DDL is unchanged (ADR-0010) — nothing to migrate.
 
+      if (from < 12) {
+        // The `bleeding` column joins the engine-CHECK-guarded columns:
+        // SQLite cannot add a CHECK to a column in place, so drift
+        // recreates the table from the new definition and copies the rows
+        // (the column set is unchanged, and the unique index is
+        // re-established with the table). A pre-existing out-of-range row
+        // makes the copy fail loudly — no clamping, no dropped row: the
+        // fail-loud reading of such corrupt data is the settled posture
+        // (ADR-0005, update 2026-09-25).
+        await m.alterTable(TableMigration(cycleEntries));
+      }
+
       // Each future schema-version bump adds its own guarded block here
-      // (e.g. `if (from < 12) { ... }`), using Migrator helpers only
+      // (e.g. `if (from < 13) { ... }`), using Migrator helpers only
       // (createTable, addColumn, customStatement, …); disruptive table
       // shape changes copy data into the new table instead of dropping
       // anything. Skipped steps (from several versions behind) run every

@@ -25,22 +25,6 @@ the sections above track planned work, git history keeps the record (see
 
 #### Stability (audit 2026-09-25)
 
-- [ ] Marks-stream errors are silently masked everywhere: every screen reads
-  `ref.watch(marksProvider).valueOrNull ?? const []` (lib/ui/cycle.dart,
-  lib/ui/diary.dart, lib/ui/statistics.dart, lib/ui/cycle_mark_sheet.dart), so a
-  session-long marks error renders wrong evaluations (missing marks, wrong SUZ
-  states) with no error surface and no retry. Render the error branch like the
-  entries streams do.
-- [ ] Entries-stream error branches (same three screens) show a static "load
-  failed" text with no retry affordance — recovery relies on the next write
-  re-emitting. Add a retry (ref.invalidate of dailyEntriesProvider).
-- [ ] The `bleeding` column has no CHECK constraint (lib/db/tables.dart, unlike
-  `temp_disturbances`/`sex_timings`) while its converter throws on out-of-range
-  values at READ time (lib/db/converters.dart): one corrupt row turns every data
-  stream into a permanent app-wide "load failed". Add the CHECK via a schema
-  migration; whether the read side should additionally degrade corrupt values
-  gracefully (instead of the deliberate fail-loud conversion) needs a decision —
-  see the packages section.
 - [ ] Unbounded cycle-span materialization can hang the app: the span rule
   extends the last cycle to "today" at every grouping call and the diary list is
   a non-lazy widget list over all those days (`lib/ui/diary.dart`), so one
@@ -177,22 +161,11 @@ Parallelization rules: The refactor packages come after their
 serialization points described in their entries below. Remaining rules
 of thumb:
 
-- lib/ui/statistics.dart / lib/ui/cycle.dart are shared by A2 (error
-  branches) and A3 (recompute + span) — land A3 after A2.
+- lib/ui/statistics.dart / lib/ui/cycle.dart are A3's surfaces (recompute + span)
+  — the error-branches package they also carried has landed; land A3
+  after it.
 - Every package: fresh worktree, `flutter pub get`, full gate per
   CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
-
-- **WP-A2 — stream & schema resiliency** (bugs: marks masking, entries retry,
-  bleeding CHECK rows)
-  Scope: error branches for the marks stream on all four screens +
-  `valueOrNull`-unmasking, retry affordances (`ref.invalidate`) for both
-  streams, `bleeding` CHECK constraint via a drift schema migration
-  (lib/db/tables.dart + cycle_database.dart migration + generated code via
-  build_runner) and a test seeding an out-of-range row directly through the
-  raw sqlite3 binding. Gated decision (ask the owner first): whether the read
-  side should degrade a corrupt value gracefully or keep the deliberate
-  fail-loud converter — the CHECK constraint makes the degradation
-  less necessary either way.
 
 - **WP-A3 — span & rendering cost** (bugs: unbounded span, statistics recompute
   rows)

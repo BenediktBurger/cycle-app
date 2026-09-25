@@ -72,6 +72,10 @@
   },
   "noEntriesYet": "No entries yet. Enter your first day above.",
   "loadFailed": "Loading failed",
+  "retry": "Try again",
+  "@retry": {
+    "description": "Label of the retry button on an inline stream error surface (a data screen whose live stream failed). Distinct from dbErrorRetry, which belongs to the startup database gate."
+  },
   "bleedingNone": "none",
   "bleedingSpotting": "spotting",
   "bleedingLight": "light",
