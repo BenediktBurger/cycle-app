@@ -3,11 +3,14 @@
 // date pre-selected in the entry form).
 //
 // The persisted general settings (locale, theme mode, temperature range,
-// the outside-app cycle-count family) are persisted in the app_settings
-// key-value table of the drift database: they load into the StateProviders below
-// right after the database opens ([persistedSettingsProvider], hydration
-// wiring in main.CycleApp) and every change is written back through to
-// that table (also main.CycleApp). The providers stay plain in-memory
+// the outside-app cycle family, PDF export, onboarding) live in the
+// app_settings key-value table of the drift database. The hydration
+// registrar in this file is their single wiring point: one declarative
+// table of settings entries, driven in both directions — the root widget
+// (main.CycleApp) calls [hydratePersistedSettings] in initState to fill
+// still-untouched providers from [persistedSettingsProvider]'s snapshot,
+// and [registerSettingsWriteThrough] in build to write every provider
+// change back to that table. The providers stay plain in-memory
 // StateProviders — all overrides and call sites keep working unchanged.
 //
 // The PIN lock stub (Settings screen) is non-functional and local.
@@ -85,9 +88,9 @@ final tabIndexProvider = StateProvider<int>((ref) => 0);
 /// English — for any other device language (ADR-0007; the list lives in
 /// main.dart and the resolution story in its comment).
 ///
-/// Persisted: hydrated from the local app_settings table once the database
-/// opens — before any screen that could change it is reachable (the
-/// database gate) — and written through on every change (main.CycleApp).
+/// Persisted: an entry in the hydration registrar's table (below) fills
+/// this provider from the app_settings snapshot and echoes every change
+/// back to the table.
 final localeProvider = StateProvider<Locale?>((ref) => null);
 
 /// Theme mode of the whole app: `ThemeMode.system` (the default) follows the
@@ -95,9 +98,7 @@ final localeProvider = StateProvider<Locale?>((ref) => null);
 /// switcher wins over the platform. The light/dark `ThemeData`s themselves
 /// live in `main.CycleApp` (both derived from one seed color).
 ///
-/// Persisted, mirroring [localeProvider]: hydrated from the local
-/// app_settings table once the database opens and written through on every
-/// change (main.CycleApp).
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 /// The cycle chart's temperature display range ("Temperaturbereich"
@@ -107,9 +108,8 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 /// curve's drawable line pieces clip at the boundary crossings (see
 /// lib/ui/cycle_curve.dart); the scale never stretches to fit an outlier.
 ///
-/// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
-/// the local app_settings table once the database opens and written through
-/// on every change (main.CycleApp). The °C unit stays the unit of record —
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+/// The °C unit stays the unit of record —
 /// a later Fahrenheit display conversion would happen above this provider.
 final temperatureRangeProvider = StateProvider<TemperatureRange>(
   (ref) => TemperatureRange.defaults,
@@ -122,9 +122,7 @@ final temperatureRangeProvider = StateProvider<TemperatureRange>(
 /// database, so numbering continues seamlessly across the migration
 /// (lib/domain/cycle_grouping.dart's shared ordinal rule).
 ///
-/// Persisted, mirroring [localeProvider]/[themeModeProvider]: hydrated from
-/// the local app_settings table once the database opens and written through
-/// on every change (main.CycleApp).
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
 final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 
 /// The shortest cycle's LENGTH IN DAYS (>= 1) observed outside this app
@@ -133,9 +131,7 @@ final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 /// export min-combine it with the in-app figures (a paper fact predates
 /// every in-app cycle).
 ///
-/// Persisted, mirroring the other general settings: hydrated from the
-/// local app_settings table once the database opens and written through
-/// on every change (main.CycleApp).
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
 final shortestCycleLengthOutsideAppProvider = StateProvider<int?>(
   (ref) => null,
 );
@@ -145,9 +141,7 @@ final shortestCycleLengthOutsideAppProvider = StateProvider<int?>(
 /// Statistics (both documented variants) and the PDF export min-combine
 /// it with the in-app figures like [shortestCycleLengthOutsideAppProvider].
 ///
-/// Persisted, mirroring the other general settings: hydrated from the
-/// local app_settings table once the database opens and written through
-/// on every change (main.CycleApp).
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
 final earliestFirstHigherCycleDayOutsideAppProvider = StateProvider<int?>(
   (ref) => null,
 );
@@ -157,34 +151,30 @@ final earliestFirstHigherCycleDayOutsideAppProvider = StateProvider<int?>(
 /// database is open; the continue action flips it to true, and the shell
 /// takes over (main._HomeGate reads this provider).
 ///
-/// Persisted, mirroring the other general settings: hydrated from the local
-/// app_settings table once the database opens (absent row = not completed,
-/// for existing installs too, so the welcome page shows once after the
-/// update) and written through on every change (main.CycleApp).
+/// Persisted exactly as [localeProvider] (registrar-table entry below): an
+/// absent row means not completed, for existing installs too, so the
+/// welcome page shows once after the update.
 final onboardingCompletedProvider = StateProvider<bool>((ref) => false);
 
 /// The user's NAME for the PDF export header (settings card "PDF-Export");
 /// null means "not given". The per-export "anonymize" toggle NEVER writes
 /// through this provider — it only changes what the generated document
-/// shows. Persisted, mirroring the other general settings: hydrated from
-/// the local app_settings table once the database opens and written
-/// through on every change (main.CycleApp).
+/// shows. Persisted exactly as [localeProvider] (registrar-table entry
+/// below).
 final pdfExportNameProvider = StateProvider<String?>((ref) => null);
 
 /// The user's BIRTH DATE for the PDF export header (date-only normalized);
 /// null means "not given". Hidden by the per-export anonymize toggle like
-/// [pdfExportNameProvider]. Persisted, mirroring the other general
-/// settings (hydration + write-through in main.CycleApp).
+/// [pdfExportNameProvider]. Persisted exactly as [localeProvider]
+/// (registrar-table entry below).
 final pdfExportBirthDateProvider = StateProvider<DateTime?>((ref) => null);
 
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
-/// main.CycleApp's hydration listener applies each snapshot into
-/// [localeProvider], [themeModeProvider], [temperatureRangeProvider],
-/// [observedCyclesOutsideAppProvider], [onboardingCompletedProvider],
-/// [pdfExportNameProvider], [pdfExportBirthDateProvider],
-/// [shortestCycleLengthOutsideAppProvider] and
-/// [earliestFirstHigherCycleDayOutsideAppProvider].
+/// The hydration registrar's driver ([hydratePersistedSettings], called
+/// from main.CycleApp's snapshot listener) applies each snapshot into the
+/// providers of the table below — the shared fill rule lives on that
+/// table.
 /// Non-autoDispose like [databaseProvider] — the load keeps the database
 /// open for the app lifetime.
 final persistedSettingsProvider = FutureProvider<PersistedSettings>((
@@ -193,6 +183,153 @@ final persistedSettingsProvider = FutureProvider<PersistedSettings>((
   final db = await ref.watch(databaseProvider.future);
   return SettingsStore(db.settingsDao).load();
 });
+
+/// Write-through seam for the registrar: one call per provider change with
+/// a write closure holding that change's typed store upsert. The root
+/// widget supplies the sink (its fire-and-forget per-change persistence,
+/// silent storage failures) so the error policy stays a root-widget
+/// concern and the registrar stays policy-free.
+typedef SettingsWriteSink =
+    void Function(Future<void> Function(SettingsStore store) write);
+
+/// One table entry of the hydration registrar: a persisted setting bound
+/// to its in-memory [StateProvider], its untouched sentinel and the typed
+/// store write. The generic [PersistedSetting.bind] keeps the nine
+/// heterogeneous value types out of the drivers — both iterate the plain
+/// entries below without knowing `T`.
+final class PersistedSetting {
+  const PersistedSetting._(this._applyOnUntouched, this._listenWriteThrough);
+
+  /// Fills the entry's provider from [snapshot] when (and only when) the
+  /// provider still holds its untouched sentinel and the snapshot differs
+  /// from it.
+  final void Function(WidgetRef ref, PersistedSettings snapshot)
+  _applyOnUntouched;
+
+  /// Registers one write-through listener for the entry's provider.
+  final void Function(WidgetRef ref, SettingsWriteSink sink)
+  _listenWriteThrough;
+
+  /// Binds one persisted setting: its provider, the untouched sentinel
+  /// (also the provider's declared default) and the typed persist helper.
+  /// The binding captures `T` inside the two driver-facing closures, so
+  /// the table itself is type-safe while the drivers stay generic.
+  static PersistedSetting bind<T>({
+    required StateProvider<T> provider,
+    required T untouched,
+    required T Function(PersistedSettings snapshot) fromSnapshot,
+    required Future<void> Function(SettingsStore store, T value) persist,
+  }) {
+    return PersistedSetting._(
+      (ref, snapshot) {
+        final value = fromSnapshot(snapshot);
+        if (ref.read(provider) == untouched && value != untouched) {
+          ref.read(provider.notifier).state = value;
+        }
+      },
+      (ref, sink) => ref.listen<T>(
+        provider,
+        (_, value) => sink((store) => persist(store, value)),
+      ),
+    );
+  }
+}
+
+/// The hydration registrar's table — EVERY persisted setting as exactly
+/// one entry. Adding a persisted setting means adding one entry here:
+/// hydration AND write-through follow it.
+///
+/// The shared fill rule (applied per entry by [hydratePersistedSettings])
+/// is fill-if-untouched:
+/// - A live choice always wins: a provider whose state still equals its
+///   untouched sentinel takes the snapshot value; an already-set provider
+///   (user choice, test override) is never clobbered.
+/// - A snapshot default equals the sentinel and is skipped as a no-op —
+///   for the onboarding flag this is the whole one-way flip: the snapshot
+///   value only ever completes the flag, a false/absent row never re-sets
+///   a completed one.
+/// - A hydration assignment echoes back through the (already or about to
+///   be) registered write-through listener as the same-content upsert —
+///   storing a hydrated value again is idempotent, so hydrated values
+///   need no special-casing there.
+final _persistedSettings = <PersistedSetting>[
+  PersistedSetting.bind(
+    provider: localeProvider,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.locale,
+    persist: (store, value) => store.persistLocale(value),
+  ),
+  PersistedSetting.bind(
+    provider: themeModeProvider,
+    untouched: ThemeMode.system,
+    fromSnapshot: (snapshot) => snapshot.themeMode,
+    persist: (store, value) => store.persistThemeMode(value),
+  ),
+  PersistedSetting.bind(
+    provider: temperatureRangeProvider,
+    untouched: TemperatureRange.defaults,
+    fromSnapshot: (snapshot) => snapshot.temperatureRange,
+    persist: (store, value) => store.persistTemperatureRange(value),
+  ),
+  PersistedSetting.bind(
+    provider: observedCyclesOutsideAppProvider,
+    untouched: 0,
+    fromSnapshot: (snapshot) => snapshot.observedCyclesOutsideApp,
+    persist: (store, value) => store.persistObservedCyclesOutsideApp(value),
+  ),
+  PersistedSetting.bind(
+    provider: shortestCycleLengthOutsideAppProvider,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.shortestCycleLengthOutsideApp,
+    persist: (store, value) =>
+        store.persistShortestCycleLengthOutsideApp(value),
+  ),
+  PersistedSetting.bind(
+    provider: earliestFirstHigherCycleDayOutsideAppProvider,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.earliestFirstHigherCycleDayOutsideApp,
+    persist: (store, value) =>
+        store.persistEarliestFirstHigherCycleDayOutsideApp(value),
+  ),
+  PersistedSetting.bind(
+    provider: pdfExportNameProvider,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.pdfExportName,
+    persist: (store, value) => store.persistPdfExportName(value),
+  ),
+  PersistedSetting.bind(
+    provider: pdfExportBirthDateProvider,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.pdfExportBirthDate,
+    persist: (store, value) => store.persistPdfExportBirthDate(value),
+  ),
+  PersistedSetting.bind(
+    provider: onboardingCompletedProvider,
+    untouched: false,
+    fromSnapshot: (snapshot) => snapshot.onboardingCompleted,
+    persist: (store, value) => store.persistOnboardingCompleted(value),
+  ),
+];
+
+/// The hydration direction: applies the table's fill rule entry by entry
+/// into the plain StateProviders. Called from main.CycleApp's
+/// [persistedSettingsProvider] listener (initState) with each loaded
+/// snapshot.
+void hydratePersistedSettings(WidgetRef ref, PersistedSettings snapshot) {
+  for (final setting in _persistedSettings) {
+    setting._applyOnUntouched(ref, snapshot);
+  }
+}
+
+/// The write-through direction: registers one [WidgetRef.listen] per table
+/// entry, feeding each change through [sink]. Must be called synchronously
+/// from the root widget's build (Riverpod binds listeners only inside the
+/// build frame); a helper invocation is fine.
+void registerSettingsWriteThrough(WidgetRef ref, SettingsWriteSink sink) {
+  for (final setting in _persistedSettings) {
+    setting._listenWriteThrough(ref, sink);
+  }
+}
 
 /// The day currently pre-selected in the entry form (Tagebuch). Chart taps
 /// on the Zyklus screen write here; the entry form reloads its fields when

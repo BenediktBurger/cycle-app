@@ -23,6 +23,55 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
+#### Stability (audit 2026-09-25)
+
+- [ ] Diary save is not one write and swallows nothing: `_save` (lib/ui/diary.dart)
+  runs the entry upsert plus the ignoreTemperature and cycle-start mark writes as
+  three independent awaits with no try/catch — a database failure is an unhandled
+  zone error, saving looks silently lost (no success AND no error snackbar), and a
+  crash mid-save leaves the day's entry and marks inconsistent. Wrap the trio in
+  one `db.transaction` and surface failure like the other write paths.
+- [ ] Silent fire-and-forget DB writes: the mark writes in
+  lib/ui/cycle_mark_sheet.dart (`_writeMark`, `_writeSuzMark`,
+  `_writeFirstHigherMark`) and the export flow in lib/ui/settings.dart
+  (`_openExport`) discard their Futures without error handling — a failed write
+  shows as "nothing happened" and an export failure as an unhandled error. Catch
+  and report using the snackbars other write paths already use.
+- [ ] `_jumpToDate` (lib/ui/cycle.dart) touches the scroll controller after the
+  date-picker await without a mounted re-check — if the chart unmounted while the
+  picker was open, animating a disposed controller throws.
+- [ ] Marks-stream errors are silently masked everywhere: every screen reads
+  `ref.watch(marksProvider).valueOrNull ?? const []` (lib/ui/cycle.dart,
+  lib/ui/diary.dart, lib/ui/statistics.dart, lib/ui/cycle_mark_sheet.dart), so a
+  session-long marks error renders wrong evaluations (missing marks, wrong SUZ
+  states) with no error surface and no retry. Render the error branch like the
+  entries streams do.
+- [ ] Entries-stream error branches (same three screens) show a static "load
+  failed" text with no retry affordance — recovery relies on the next write
+  re-emitting. Add a retry (ref.invalidate of dailyEntriesProvider).
+- [ ] The `bleeding` column has no CHECK constraint (lib/db/tables.dart, unlike
+  `temp_disturbances`/`sex_timings`) while its converter throws on out-of-range
+  values at READ time (lib/db/converters.dart): one corrupt row turns every data
+  stream into a permanent app-wide "load failed". Add the CHECK via a schema
+  migration; whether the read side should additionally degrade corrupt values
+  gracefully (instead of the deliberate fail-loud conversion) needs a decision —
+  see the packages section.
+- [ ] Unbounded cycle-span materialization can hang the app: the span rule
+  extends the last cycle to "today" at every grouping call and the diary list is
+  a non-lazy widget list over all those days (`lib/ui/diary.dart`), so one
+  accidental cycle-start mark dated far in the past (the date picker reaches year
+  2000) materializes thousands of synthetic days per build. Cap the
+  materialized/day-built range (grouping semantics stay; the cap needs defining)
+  and build the diary list lazily.
+- [ ] Statistics recomputes the full grouping about five times per state change
+  (cycle lengths, onsets, evaluation, statistics, mark-driven count each call
+  into grouping/evaluation; lib/ui/statistics.dart + lib/domain/statistics.dart)
+  — also while the tab is offstage in the IndexedStack — and
+  `domain/statistics.dart` `cycleFacts` carries a build-path
+  StateError("cycle/evaluation count mismatch") that degrades to a grey screen if
+  it ever trips. Memoize the derived values and replace the invariant throw with
+  degradation.
+
 #### Android
 
 - Verify the entry-form date row on a real device and at large system
@@ -35,6 +84,56 @@ the sections above track planned work, git history keeps the record (see
   byte-reproduced under test conditions.
 
 ### Necessary
+
+#### Security & privacy hardening (audit 2026-09-25)
+
+- [ ] Android backup rules: no `allowBackup`/`dataExtractionRules`/
+  `fullBackupContent` exists anywhere under android/, so Auto Backup and
+  device-to-device migration carry the encrypted database AND the
+  flutter_secure_storage preference file — and same-platform D2D can carry the
+  keystore-wrapped key along, contradicting ADR-005's device-bound key. Add
+  explicit rules excluding the database file and the secure-storage preferences
+  (the JSON export stays the sanctioned user backup).
+- [ ] Screen capture is not blocked: no FLAG_SECURE anywhere (Android) — diary
+  text, curve and the full-screen JSON export are visible in screenshots,
+  recordings and the recents thumbnail. Set FLAG_SECURE while the app is
+  foregrounded.
+- [ ] Shared exports stay in the temp directory forever: `shareFile` and
+  `shareFileBytes` (lib/ui/file_transfer_io.dart) stage the plaintext JSON
+  export / PDF under the platform temp dir and never delete the file after the
+  share sheet resolves. Delete after hand-off (or sweep on start).
+- [ ] Release builds silently fall back to the DEBUG signing key when
+  `key.properties` is absent (android/app/build.gradle.kts, release block): the
+  fallback makes a debug-signed release artifact ship-able by mistake. Fail the
+  release build instead of falling back (document the provisioning requirement).
+
+#### Import & backup safety
+
+- [ ] Import overwrite safety: the documented "overwrite" merge policy silently
+  replaces same-day local data, with no preview and no snapshot — a bad or older
+  document destroys current-day values irrecoverably. Wire the already-existing
+  preview (`planDatabaseImport`, lib/db/export_adapter.dart — currently "not
+  wired into the UI yet") into the import dialog ("N days will be overwritten")
+  and/or write an auto-export snapshot before applying.
+
+#### Refactors (decided 2026-09-25, startable)
+
+- [ ] Screen split, settings side: turn lib/ui/settings.dart (~1.9k lines) into
+  real per-feature-card libraries under `lib/ui/settings/` (locale, theme,
+  temperature range, paper-history, PDF export, export/import, data wipe — the
+  seams already exist as card widgets). Sequencing: AFTER the WP-A packages
+  (A1 and A5 both touch settings.dart) — behavior-changing fixes first,
+  behavior-preserving movement second, one branch so the diff verifies as
+  near-pure moves. As decided, cycle_pdf.dart stays OUT of scope (its cohesive
+  parts — pdf_curve/symbols/axis/layout — are already separate files; the
+  remainder is a single-document orchestrator) and lib/ui/cycle.dart is split
+  with part files first, not libraries (S2 below).
+- [ ] Screen split, cycle side: split lib/ui/cycle.dart (~2.4k lines) into
+  `part`/`part of` files ONLY (zero import/API churn; the chart's internals —
+  scroll controller, day mapping, jump registration, panel interaction — are
+  too entangled for real libraries pre-WP-A3). Sequencing: after A1–A3 land,
+  with the option to promote the parts to libraries later once A3's
+  memoization/span-cap has thinned what they share.
 
 #### Building the app (to be clarified with INER)
 
@@ -95,3 +194,93 @@ the sections above track planned work, git history keeps the record (see
   storage, conversion happens at the display edge (existing seams:
   temperature_range, settings pickers, PDF axis); German decimal comma in
   the PDF is handled separately under Bugs
+
+### Work packages — audit 2026-09-25
+
+Packages for the audit findings above (stability, security, architecture —
+including the decided refactor rows). The `WP-A`/`WP-S` families are
+defined HERE in this file. Each package is self-contained and meant for one
+agent in one worktree/branch. Agents still pick work only from the checkbox
+rows themselves; a package merely bounds the scope. When a package lands,
+its rows go (per the backlog convention) and the package entry is removed.
+
+Parallelization rules: A4 is file-disjoint from everything else and can
+run anytime in parallel; A1 goes first among the A-packages, A2 and A3
+after it, A5 last (sharing lib/ui/settings.dart with A1). The refactor
+packages come after their serialization points described in their
+entries below. Remaining rules of thumb:
+
+- lib/ui/diary.dart is shared by A1 (save flow) and A3 (list building) —
+  different regions, land A1 first.
+- lib/ui/statistics.dart / lib/ui/cycle.dart are shared by A1/A2 (error
+  branches) and A3 (recompute + span) — land A2/A3 after A1, A3 after A2.
+- Every package: fresh worktree, `flutter pub get`, full gate per
+  CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
+
+- **WP-A1 — write-path robustness** (bugs: save/marks/export/JumpToDate rows)
+  Scope: lib/ui/diary.dart `_save` (one transaction + error snackbar),
+  lib/ui/cycle_mark_sheet.dart mark-write error handling,
+  lib/ui/settings.dart `_openExport` (try/catch + snackbar), lib/ui/cycle.dart
+  `_jumpToDate` (mounted re-check after the picker await). Tests to guide:
+  test/diary_app_bar_save_test.dart, test/cycle_mark_sheet_test.dart,
+  test/export_share_test.dart. Does NOT touch schema, streams or grouping.
+
+- **WP-A2 — stream & schema resiliency** (bugs: marks masking, entries retry,
+  bleeding CHECK rows)
+  Scope: error branches for the marks stream on all four screens +
+  `valueOrNull`-unmasking, retry affordances (`ref.invalidate`) for both
+  streams, `bleeding` CHECK constraint via a drift schema migration
+  (lib/db/tables.dart + cycle_database.dart migration + generated code via
+  build_runner) and a test seeding an out-of-range row directly through the
+  raw sqlite3 binding. Gated decision (ask the owner first): whether the read
+  side should degrade a corrupt value gracefully or keep the deliberate
+  fail-loud converter — the CHECK constraint makes the degradation
+  less necessary either way.
+
+- **WP-A3 — span & rendering cost** (bugs: unbounded span, statistics recompute
+  rows)
+  Scope: lib/domain/cycle_grouping.dart (bound the materialized span; define
+  the cap with the owner if the obvious one — e.g. a bounded-lookback plus an
+  explicit "cycle starts very far in the past" state — changes display
+  semantics), lazy diary list building in lib/ui/diary.dart, memoized
+  statistics derivation in lib/ui/statistics.dart +
+  lib/domain/statistics.dart (single grouping/evaluation pass, degrading
+  `cycleFacts` instead of throwing). Tests: test/statistics_screen_test.dart,
+  test/cycle_chart_test.dart, test/cycle_ordinal_test.dart.
+
+- **WP-A4 — native/privacy hardening** (Necessary: backup rules, FLAG_SECURE,
+  temp deletion, signing gate)
+  Scope: android/app/src/main/AndroidManifest.xml + new backup-rule XMLs,
+  android/.../MainActivity.kt (FLAG_SECURE), lib/ui/file_transfer_io.dart
+  (delete staged files after share), android/app/build.gradle.kts (release
+  signing gate). File-disjoint from A1–A3 — safe to run in parallel with
+  anything. Tests: test/export_share_test.dart; device behavior can only be
+  smoke-verified, state so in the commit.
+
+- **WP-A5 — import safety** (Necessary: import overwrite safety row)
+  Scope: lib/ui/settings.dart import dialog (wire the plan-based preview into
+  the confirm dialog) and optionally an auto-snapshot export before applying
+  (decision: snapshot always vs preview only — quick owner question). Merge
+  AFTER A1 (both touch lib/ui/settings.dart). Tests:
+  test/import_dialog_test.dart, test/export_share_test.dart.
+
+- **WP-S1 — settings screen split into libraries** (Refactors: settings row,
+  decided 2026-09-25)
+  Scope: lib/ui/settings.dart → `lib/ui/settings/` real per-card libraries,
+  the settings.dart file becomes a thin shell reassembling the cards; behavior
+  must not change beyond the mechanical import moves. Merge AFTER A1 AND A5
+  (both touch lib/ui/settings.dart) — last of the settings touchers. Tests:
+  test/settings_layout_test.dart, test/settings_*.dart,
+  test/theme_mode_setting_test.dart, test/temperature_range_setting_test.dart
+  (expect mechanical import tweaks only).
+
+- **WP-S2 — cycle screen part split** (Refactors: cycle row, decided
+  2026-09-25)
+  Scope: lib/ui/cycle.dart → `part`/`part of` files (chart, marks/panel,
+  day mapping), no import/API changes, no logic movement — the diff should
+  verify as near-pure relocation. Merge AFTER A1–A3 have landed (A1's
+  `_jumpToDate` fix and A2's error branches move into the parts as-is;
+  A3 may thin the chart's shared internals first, changing where the natural
+  part boundaries sit). Promotion of the parts to real libraries is a later
+  call, NOT part of this package. Tests: test/cycle_*.dart suites,
+  test/cycle_tab_roundtrip_test.dart.
