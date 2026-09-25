@@ -23,11 +23,8 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-- pdf export (at least on web) does not render a temperature graph, does not show mucus signs, does not show any marks... It should be like the cycle tab
-
 #### Android
 
-- [ ] pdf export fails with "Speichern fehlgeschlagen"
 - The entry-form date row in `lib/ui/diary.dart` overflows at narrow widths
   (about 70–110 px at 320–360 dp under widget-test fallback font metrics; the
   new narrow-viewport tests waive it with a documented justification) —
@@ -40,11 +37,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-- [x] Consolidate the chart widget-test suite by merging duplicated scenarios
-  into parameterized tests — kept within the conservative cap (20 of the
-  suite's 148 tests merged, chart suite now at 128); further consolidation
-  beyond that cap needs owner sign-off first.
-
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
@@ -54,15 +46,13 @@ the sections above track planned work, git history keeps the record (see
 
 #### Domain / UI
 
+- how to mark pregnancy and breast-feeding cycles -> they should not enter into statistics of "normal" cycles
 - how to mark a pregnancy: replace cycle start with pregnancy start or add a "conception" mark -> calculate probable bith?
   - move edit between date and X in order to save space
   - checkmark overlaps the icon - do we need the checkmark at all?
   - comments should be in one column as well (not spanning the whole sheet)
   - strange distribution: one column with 3, the other one with 2 marks and then on the bottom joined another mark. All marks (and/or comments) should be distributed among columns. Maybe even more columns on wider screen?
-- how to mark pregnancy and breast-feeding cycles -> they should not enter into statistics of "normal" cycles
-- order settings: everything related should be together, e.g pdf related (name, birth date) should be near pdf export. Don't show the datenschutz entry on the settings page
 - should we add the birth bleeding (Wochenbett, marked as ~)?
-- show cycle start mark on journal like temp?
 - render observations inside temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
 
 - proof read German texts and let translate changes to english
@@ -73,17 +63,24 @@ the sections above track planned work, git history keeps the record (see
       (native files are now always-on encrypted, ADR-005); what a
       user-facing passphrase would additionally protect, and how it
       interacts with the device-bound key, needs discussion.
-- Fahrenheit unterstützen: Wie Daten speichern?
-- Messmethode speichern (rektal...) als Event (wenn man es ändert). In the "marks" table – but it is raw data (but not per day)?.
+- save measurement method + thermometer as changeover marks
+      (decided 2026-09-24, sketch only — the ADR is written together with
+      the implementation):
+  - two mark types placed by one "measurement setup" form on the changeover
+    date: `method.rectal|vaginal|oral` (closed vocabulary, in `markType`)
+    and `thermometer` with the free-text model name → needs a nullable
+    `value TEXT` column on `user_marks` (graceful migration)
+  - effective method/thermometer for a day = the latest mark ≤ that day
+    (same derive-from-dated-events pattern as cycle start); the choice is
+    prompted when the first temperature is entered and written as a mark
+    on that date
+  - day view shows only the mark chip — no auto-note, notes stay
+    user-owned; temperature disturbances stay untouched
+  - PDF renders the method in effect at the chart's start date
 - export as password protected zip
 - add (optional) reminder (e.g. every year) to do a backup of your data
 
 - Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
-
-### Nitpicks
-
-Small polish notes — not startable without a decision about whether each is
-worth doing at all.
 
 - German count strings in the app read "1 Tagebucheinträge" for singular
   counts (gen-l10n plural support would fix all such surfaces at once).
@@ -91,10 +88,11 @@ worth doing at all.
   while the cards are titled „JSON-Export" / „JSON-Import".
 - The about-page feedback notice phrasing mixes "an die Issues … oder per
   E-Mail" awkwardly.
-- On a returning app start the onboarding/about gate can flash for one frame
-  until settings hydration applies (same single-frame pattern as other
-  hydrated settings).
-- Some test files carry historical section banners from a former cleanup
-  pass ("former test/… (bodies concatenated verbatim)") that now only
-  document section origin — the wording could mislead a reader into
-  thinking dedup is still pending there.
+
+### Deferred for later
+
+- more translations (Polish, Italian)
+- Fahrenheit — decided: only a UI concern; °C stays the unit of record in
+  storage, conversion happens at the display edge (existing seams:
+  temperature_range, settings pickers, PDF axis); German decimal comma in
+  the PDF is handled separately under Bugs

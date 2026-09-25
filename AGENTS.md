@@ -102,4 +102,14 @@ failures only surface in a summary at the end. Instead:
 
 ## Coding Style
 
-- Use comments only to describe the why.
+- Use comments only to describe the **why**: a non-obvious constraint, a
+  convention, a tradeoff, or a danger. If a comment restates the code or
+  lists what the code does, delete it.
+- **Never narrate a change.** Comments describe how the code behaves *now* —
+  no "was/were removed/dropped", no "old" vs "new", no listing call sites.
+  Git records the history; this applies to `reason:` strings on test
+  assertions too.
+- **Don't duplicate durable references.** Stated limitations and
+  measurements live in `docs/roadmap.md`; a code comment gets one line and
+  a pointer, not the prose — and the same justification is not repeated
+  at every occurrence, only where it isn't inferable from the code.

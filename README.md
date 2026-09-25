@@ -1,6 +1,9 @@
 # NER Cycle App (Arbeitstitel)
 
+[![GitHub Release](https://img.shields.io/github/v/release/BenediktBurger/cycle-app)](https://github.com/BenediktBurger/cycle-app/releases)
 [![CI](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml/badge.svg)](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml)
+
+---
 
 A local-first, open-source mobile app (Android + iOS, PWA bonus) for tracking
 menstrual-cycle symptoms and manually evaluating them per **NER rules
@@ -18,8 +21,11 @@ decision-maker.
 > owner's, **not endorsed by INER**.
 > For the full picture read [docs/product/vision.md](docs/product/vision.md).
 
-> **⚠️ This is an alpha version — do NOT rely on its data. Data might get
-> lost.**
+> **This app is in beta.** A beta can still lose data, so export your data
+> **regularly and before every update** — via the JSON export in the
+> settings screen. Everything is stored locally on your device, and the
+> JSON export is the one backup path on all platforms (see
+> [Backup, migration & recovery](#backup-migration--recovery)).
 
 - **Package name `cycle_app`** is an explicit **PLACEHOLDER** (ADR-0002) —
   rename is a one-line `pubspec.yaml` change later.
@@ -31,11 +37,16 @@ decision-maker.
 - Local-first: no cloud, no analytics; data stays on the device
   (drift/SQLite, encrypted on native platforms later — ADR-0005).
 
-## Trying it out (testers)
+## Installation
 
-This section is for people who just want to install the app on an **Android**
-device — no Flutter SDK, no development setup needed. (An iOS build does not
-exist yet.)
+Install the app on an **Android** device — no Flutter SDK, no development
+setup needed. (An iOS build does not exist yet.)
+
+What to expect: the app supports observing and computing/visualizing only —
+it does not interpret your data, advise, or give a fertility verdict.
+Knowing the method (book or course) is a prerequisite for reliable
+interpretation; see the "The app supports, it never decides" block above
+for the full posture.
 
 ### Where to get it
 
@@ -76,14 +87,65 @@ Download the most recent APK for your device's architecture (the same one
 you installed before) from the releases page and install it over the
 existing version. Because the signing certificate stays the same, Android
 updates the app in place instead of treating it as a new install, and your
-data stays. That said: this is an alpha — data loss is not ruled out, so
-exporting your data (JSON export in the Einstellungen screen) before
-updating is wise.
+data stays. That said: this is a beta — data loss is not ruled out, so
+exporting your data (JSON export in the settings screen) before updating is
+necessary, and exporting regularly while you use the app is wise.
 
 ### Privacy note
 
 The app is fully offline: no network access, no analytics. All data stays on
 your device.
+
+Found an issue or have a suggestion? Please open an issue at
+[github.com/BenediktBurger/cycle-app/issues](https://github.com/BenediktBurger/cycle-app/issues)
+— feedback is very welcome.
+
+## Installation (Deutsch)
+
+Deutsche Fassung des Wichtigsten für deutschsprachige Nutzer —
+Installationsweg, Beta- und Backup-Hinweis, Charakter der App, Feedback:
+
+Die App unterstützt die Beobachtung des Zyklus: Sie erfassen jeden Tag Ihre
+Daten, und die App rechnet und zeigt an — sie schlägt nichts vor und
+entscheidet nichts. Methodenkenntnisse (aus einem Lehrbuch oder einer
+Schulung) sind Voraussetzung für eine zuverlässige Beurteilung.
+
+**Beta-Hinweis:** Die App befindet sich in der Beta-Phase. Datenverlust ist
+nicht ausgeschlossen — exportieren Sie Ihre Daten deshalb **regelmäßig und
+vor jedem Update** über den JSON-Export in den Einstellungen. Alle Daten
+liegen lokal auf dem Gerät; der JSON-Export ist auf allen Plattformen der
+einzige Backup-Weg (Einzelheiten: [Backup, migration & recovery
+(auf Englisch)](#backup-migration--recovery)).
+
+**Installation (Android):** Eine iOS-Version gibt es noch nicht.
+
+1. Laden Sie die zu Ihrem Gerät passende APK von der
+   [GitHub-Releases-Seite](https://github.com/BenediktBurger/cycle-app/releases)
+   herunter. Jedes Release enthält drei APKs — eine pro Gerätearchitektur:
+
+   - `cycle-app-<version>-arm64-v8a.apk` — moderne Telefone (die richtige
+     Wahl für die meisten Geräte),
+   - `cycle-app-<version>-armeabi-v7a.apk` — ältere 32-Bit-Geräte,
+   - `cycle-app-<version>-x86_64.apk` — hauptsächlich Emulatoren.
+
+2. Öffnen Sie die heruntergeladene Datei auf dem Gerät und bestätigen Sie
+   die Warnung zum Installieren aus einer externen Quelle (Sideload /
+   „unbekannte Quellen“).
+3. Ein zusätzlicher Play-Protect-Hinweis („unbekannter Entwickler“) ist zu
+   erwarten: Die App ist mit dem eigenen Schlüssel des Projekts signiert
+   und wird über keinen Store verteilt — das ist normal und kein Zeichen
+   für ein Problem.
+
+### Aktualisierung
+
+Laden Sie die neueste APK für dieselbe Architektur herunter und
+installieren Sie sie über die bestehende Version. Da der
+Signaturschlüssel gleich bleibt, wird die App an Ort und Stelle
+aktualisiert und Ihre Daten bleiben erhalten — aber: exportieren Sie
+vorher (siehe Beta-Hinweis oben).
+
+Fehler gefunden oder Verbesserungsvorschlag? Bitte öffnen Sie ein Issue auf
+[GitHub](https://github.com/BenediktBurger/cycle-app/issues).
 
 ## Getting started
 
