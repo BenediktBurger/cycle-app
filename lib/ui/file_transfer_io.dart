@@ -85,13 +85,34 @@ Future<bool> saveFile(String filename, String content) async {
   }
 }
 
+/// Opens the share sheet for the file staged at [file], then removes the
+/// staged file again: the sheet is closed by the time `share` resolves,
+/// and the plaintext export / PDF must not linger in the platform temp
+/// directory — no matter how the sharing went (user dismissal included).
+/// Deletion failures are ignored: a stuck temp file is cosmetically
+/// regrettable, but turning the cleanup into an error would surface in
+/// the UI for the wrong event.
+Future<void> _shareAndUnstage(File file) async {
+  try {
+    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+  } finally {
+    try {
+      await file.delete();
+    } on Exception {
+      // Ignore — see the doc comment.
+    }
+  }
+}
+
 /// Stages [content] under [filename] in the platform's temporary directory
 /// and opens the system share sheet with that file (the user then picks
 /// the target: Files/Drive/mail on Android, whatever the desktop offers).
 /// True when the hand-off to the share sheet happened; false on any
 /// staging or platform error (the caller reports only via snackbar, so
 /// failures surface as "not shared", never as a crash). The share sheet
-/// being dismissed by the user is still a hand-off, not a failure.
+/// being dismissed by the user is still a hand-off, not a failure. The
+/// staged file is deleted again once the share resolves — see
+/// [_shareAndUnstage].
 Future<bool> shareFile(String filename, String content) async {
   final override = shareFileOverride;
   if (override != null) return override(filename, content);
@@ -100,7 +121,7 @@ Future<bool> shareFile(String filename, String content) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$filename');
     await file.writeAsString(content);
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    await _shareAndUnstage(file);
     return true;
   } catch (_) {
     // The plugin's channel, the platform temp directory or the staging
@@ -114,7 +135,8 @@ Future<bool> shareFile(String filename, String content) async {
 /// under [filename] in the platform's temporary directory and opens the
 /// system share sheet with that file. The bool contract matches
 /// [shareFile]'s — a dismissed share sheet is a hand-off (true), false on
-/// any staging or platform error.
+/// any staging or platform error. The staged file is deleted again once
+/// the share resolves — see [_shareAndUnstage].
 Future<bool> shareFileBytes(String filename, List<int> bytes) async {
   final override = shareFileBytesOverride;
   if (override != null) return override(filename, bytes);
@@ -123,7 +145,7 @@ Future<bool> shareFileBytes(String filename, List<int> bytes) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$filename');
     await file.writeAsBytes(bytes);
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    await _shareAndUnstage(file);
     return true;
   } catch (_) {
     // The plugin's channel, the platform temp directory or the staging

@@ -161,9 +161,12 @@ The leaner default is the command-line-tools route below (no IDE install).
    debugging). Emulator alternative: create with `avdmanager`; usable speed
    requires KVM (`ls -la /dev/kvm`, `sudo apt install cpu-checker && kvm-ok`).
 
-Gate for local builds: `flutter build apk --release` in the repo root
-succeeds (debug-signed is fine without `key.properties`; release signing is
-maintainer business — [`docs/release.md`](docs/release.md), Phase C).
+Gate for local builds: `flutter build apk --debug` in the repo root
+succeeds. Release APKs additionally need the maintainer signing
+provisioning (`android/key.properties`; the release build fails without
+it so that a debug-signed release artifact can never be produced by
+accident) — release signing is maintainer business —
+[`docs/release.md`](docs/release.md), Phase C.
 
 ### Running on your own Android device
 
@@ -174,14 +177,14 @@ it:
 ```sh
 flutter devices                        # connected devices / emulators
 flutter run -d <device-id>             # debug build with hot reload
-flutter run --release -d <device-id>   # closer to production behaviour
+flutter run --release -d <device-id>   # closer to production behaviour (also needs the signing provisioning; a debug run avoids that)
 ```
 
 To install without a running session, build an APK once and either install
 via adb or sideload manually:
 
 ```sh
-flutter build apk --release            # universal APK; debug-signed locally is fine for testing
+flutter build apk --release            # universal APK — requires the maintainer signing provisioning (android/key.properties); without it the build fails by design, use the debug variant for quick local testing
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 

@@ -105,13 +105,24 @@ release APK both build.
 Current state: the release keystore exists at
 `~/keystores/cycleapp-release.jks` (alias `cycleapp-release`), and the
 signing wiring is committed in `android/app/build.gradle.kts` — it reads
-the gitignored `android/key.properties` and falls back to debug signing
-when that file is absent (the CI release build relies on exactly that
-fallback; those debug signature blocks are replaced entirely by the local
-apksigner step and never reach the published assets).
+the gitignored `android/key.properties`. **Release builds fail without
+that provisioning**: the Gradle signing gate raises instead of ever
+signing a release artifact with the debug key. The one opt-in is
+`-PallowDebugSigning` (the release workflow's CI build passes it —
+see the invariants
+["Keystore never on GitHub"](#keystore-never-on-github) — because the CI
+run has no keystore; its debug key signature blocks are replaced entirely
+by the local apksigner step and never reach the published assets). Any
+other source build without `key.properties` (e.g. a future F-Droid
+buildserver recipe) needs the same explicit opt-in in its Gradle
+invocation.
+
 **Still outstanding before the first signed build:** fill the two literal
 `CHANGE-ME` passwords in `android/key.properties` from the password
-manager. The release certificate fingerprint is pinned in the committed
+manager. Also check `storeFile`: the signing gate verifies the keystore
+path exists at build time, and the keystore itself lives outside the
+repo (`~/keystores/cycleapp-release.jks`, absolute path in
+`key.properties`). The release certificate fingerprint is pinned in the committed
 `tool/release_fingerprint.txt`; the
 [download-and-sign script](#per-release-checklist-every-distribution-update)
 refuses to attach any APK whose certificate does not match that pin (see
@@ -238,6 +249,12 @@ on a mismatch F-Droid silently skips publishing that version).
    define recipes in `fdroiddata` *at submission time* (conventions move;
    find a recent Flutter app's yaml as the blueprint — do not copy a stale
    one from memory). Decide there between universal APK and ABI splits.
+   The buildserver's Gradle invocation must pass `allowDebugSigning=true`
+   as an Android project argument (`flutter build apk …
+   --android-project-arg allowDebugSigning=true`): the signing gate fails
+   release builds without `key.properties`, and the buildserver will not
+   have one — the same opt-in the release workflow passes
+   (`.github/workflows/release.yml`).
    The exact pin lives in `tool/flutter-version` — both CI workflows and
    the F-Droid buildserver read that same file, parsed the same way (the
    recipe parses it from the built commit, which is the commit the
@@ -500,10 +517,12 @@ Do **not** start until Android went through Phases B–F at least once.
   copying, hence the hard cap; the download-and-sign script resolves the
   newest qualifying directory under `$ANDROID_HOME/build-tools` and
   aborts loudly when none qualifies.
-- **Keystore never on GitHub** — CI only produces **unsigned** artifacts
-  (the Gradle release build's documented debug-signing fallback is
-  exactly the CI case); apksigner replaces those signature blocks during
-  local signing, so they never reach the published assets. Custody rules:
+- **Keystore never on GitHub** — CI only produces debug-keyed artifacts
+  via the Gradle signing gate's explicit `-PallowDebugSigning` opt-in
+  (without it, a release build fails rather than silently falling back to
+  the debug key; the fingerprint pin below is the real publish gate);
+  apksigner replaces those signature blocks during local signing, so they
+  never reach the published assets. Custody rules:
   Phase C.
 - **Checkout-path invariant (byte-equality load-bearing for
   `libapp.so`):** the CI checkout path and the fdroiddata build path must

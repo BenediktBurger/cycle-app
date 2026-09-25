@@ -39,9 +39,10 @@
 //    step cannot handle (fdroiddata#3299) — the affected build would not be
 //    flagged but silently skipped, hence the hard cap.
 //
-// The signing key never touches CI: the CI artifacts carry the documented
-// debug-signing fallback signature, and apksigner REPLACES those signature
-// blocks during signing — they never reach the published assets. Keystore
+// The signing key never touches CI: the CI artifacts are debug-keyed via
+// the signing gate's explicit -PallowDebugSigning opt-in, and apksigner
+// REPLACES those signature blocks during signing — they never reach the
+// published assets. Keystore
 // passwords come from the APKSIGNER_STORE_PASSWORD / APKSIGNER_KEY_PASSWORD
 // environment variables or from the gitignored android/key.properties (the
 // same file the Gradle release signing android/app/build.gradle.kts reads);

@@ -70,28 +70,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-#### Security & privacy hardening (audit 2026-09-25)
-
-- [ ] Android backup rules: no `allowBackup`/`dataExtractionRules`/
-  `fullBackupContent` exists anywhere under android/, so Auto Backup and
-  device-to-device migration carry the encrypted database AND the
-  flutter_secure_storage preference file — and same-platform D2D can carry the
-  keystore-wrapped key along, contradicting ADR-005's device-bound key. Add
-  explicit rules excluding the database file and the secure-storage preferences
-  (the JSON export stays the sanctioned user backup).
-- [ ] Screen capture is not blocked: no FLAG_SECURE anywhere (Android) — diary
-  text, curve and the full-screen JSON export are visible in screenshots,
-  recordings and the recents thumbnail. Set FLAG_SECURE while the app is
-  foregrounded.
-- [ ] Shared exports stay in the temp directory forever: `shareFile` and
-  `shareFileBytes` (lib/ui/file_transfer_io.dart) stage the plaintext JSON
-  export / PDF under the platform temp dir and never delete the file after the
-  share sheet resolves. Delete after hand-off (or sweep on start).
-- [ ] Release builds silently fall back to the DEBUG signing key when
-  `key.properties` is absent (android/app/build.gradle.kts, release block): the
-  fallback makes a debug-signed release artifact ship-able by mistake. Fail the
-  release build instead of falling back (document the provisioning requirement).
-
 #### Import & backup safety
 
 - [ ] Import overwrite safety: the documented "overwrite" merge policy silently
@@ -146,6 +124,12 @@ the sections above track planned work, git history keeps the record (see
       (native files are now always-on encrypted, ADR-005); what a
       user-facing passphrase would additionally protect, and how it
       interacts with the device-bound key, needs discussion.
+- User-visible FLAG_SECURE/privacy toggle (postponed to v1): release
+      builds block screenshots/recents hard since the native hardening;
+      testers currently send annotated screenshots from debug builds.
+      Decide whether v1 adds a settings toggle or keeps the build-type
+      split (and what tester feedback workflows look like when testers
+      run only release artifacts).
 - save measurement method + thermometer as changeover marks
       (decided 2026-09-24, sketch only — the ADR is written together with
       the implementation):
@@ -189,8 +173,7 @@ agent in one worktree/branch. Agents still pick work only from the checkbox
 rows themselves; a package merely bounds the scope. When a package lands,
 its rows go (per the backlog convention) and the package entry is removed.
 
-Parallelization rules: A4 is file-disjoint from everything else and can
-run anytime in parallel. The refactor packages come after their
+Parallelization rules: The refactor packages come after their
 serialization points described in their entries below. Remaining rules
 of thumb:
 
@@ -221,15 +204,6 @@ of thumb:
   lib/domain/statistics.dart (single grouping/evaluation pass, degrading
   `cycleFacts` instead of throwing). Tests: test/statistics_screen_test.dart,
   test/cycle_chart_test.dart, test/cycle_ordinal_test.dart.
-
-- **WP-A4 — native/privacy hardening** (Necessary: backup rules, FLAG_SECURE,
-  temp deletion, signing gate)
-  Scope: android/app/src/main/AndroidManifest.xml + new backup-rule XMLs,
-  android/.../MainActivity.kt (FLAG_SECURE), lib/ui/file_transfer_io.dart
-  (delete staged files after share), android/app/build.gradle.kts (release
-  signing gate). File-disjoint from A1–A3 — safe to run in parallel with
-  anything. Tests: test/export_share_test.dart; device behavior can only be
-  smoke-verified, state so in the commit.
 
 - **WP-A5 — import safety** (Necessary: import overwrite safety row)
   Scope: lib/ui/settings.dart import dialog (wire the plan-based preview into
