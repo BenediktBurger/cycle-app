@@ -131,3 +131,23 @@ network-free and self-contained (no extra libraries), which also keeps
 an F-Droid build-from-source recipe free of scanignore carve-outs
 (docs/release.md Phase E). Provenance, licensing, and refresh steps:
 `native/sqlite3mc/README.md`.
+
+## Update 2026-09-25: bleeding column gets an engine-level CHECK; converter stays fail-loud
+
+**Status: Accepted (owner decision 2026-09-25; refines the migration
+consequence above).** The `bleeding` column's range guard lives at BOTH
+the write and the read edge:
+
+- **Write edge:** schema v12 adds the engine-level CHECK
+  (`bleeding BETWEEN 0 AND 5`) via a table-recreation migration that
+  preserves the rows and the day-keyed unique index. The CHECK is the
+  corrupt-data guard for foreign data (e.g. a future import path);
+  the other constrained columns already had it.
+- **Read edge: unchanged.** The owner decision keeps the deliberate
+  fail-loud `BleedingLevelConverter` — an unknown stored level still
+  throws. There is NO read-side graceful degradation (no clamping, no
+  mapping-to-nearest), not even during the migration: if a
+  pre-existing out-of-range row exists in an old database, the table
+  copy fails loudly and the open surfaces the error on the startup
+  database gate, which is consistent with the fail-loud posture —
+  such a row means the converter-driven streams were already broken.

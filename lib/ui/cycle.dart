@@ -75,6 +75,7 @@ import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';
 import 'cycle_marks.dart';
 import 'mucus_symbol.dart';
+import 'stream_error.dart';
 
 class ZyklusScreen extends ConsumerWidget {
   const ZyklusScreen({super.key});
@@ -112,7 +113,10 @@ class ZyklusScreen extends ConsumerWidget {
       ),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text(l10n.loadFailed)),
+        error: (e, s) => StreamLoadError(
+          scope: 'entries',
+          onRetry: () => ref.invalidate(dailyEntriesProvider),
+        ),
         data: (entries) {
           if (entries.isEmpty) {
             return Center(
@@ -122,67 +126,99 @@ class ZyklusScreen extends ConsumerWidget {
               ),
             );
           }
-          // The chart overlay's input: the entries plus the user-placed
-          // marks, evaluated at render time (ADR-0001). Watching the marks
-          // stream here makes a mark change rebuild the whole screen — the
-          // overlay recomputes, nothing is persisted. This is the screen's
-          // ONLY marks watch: the evaluations and the raw marks are
-          // computed once and handed to the chart overlay.
-          // The temperature display range ("Temperaturbereich" settings
-          // card): watched here so a settings change rebuilds the chart
-          // with the new fixed bounds — constructor data like
-          // entries/marks, the chart keeps no riverpod dependency.
-          final temperatureRange = ref.watch(temperatureRangeProvider);
-          final marks =
-              ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
-          final evaluations = evaluateCycles(
-            entries,
-            marks,
-            // The grouping's injected clock (last-cycle span rule — the
-            // nowProvider seam, pinned in tests).
-            today: ref.read(nowProvider)(),
-          );
-          // The "cycles observed outside this app" setting: watched here so
-          // a settings change renumbers the chart's boundary ordinals in
-          // the same rebuild — exactly why the chart takes the value as
-          // constructor data.
-          final observedCyclesOutsideApp = ref.watch(
-            observedCyclesOutsideAppProvider,
-          );
-          // The tapped day whose options the screen hosts below the chart
-          // (null provider value = no panel).
-          final panelDay = ref.watch(cycleDayPanelProvider);
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              _CycleChart(
-                entries: entries,
-                marks: marks,
-                evaluations: evaluations,
-                range: temperatureRange,
-                observedCyclesOutsideApp: observedCyclesOutsideApp,
-              ),
-              const SizedBox(height: 12),
-              // The tapped day's options as a NON-MODAL panel in a fixed
-              // slot below the chart (never a route): a chart tap retargets
-              // it in place, the close button clears it — see
-              // cycleDayPanelProvider (null = no panel).
-              if (panelDay != null)
-                CycleDayPanel(
-                  key: const ValueKey('cycleDayPanel'),
-                  day: panelDay,
-                  onClose: () =>
-                      ref.read(cycleDayPanelProvider.notifier).state = null,
-                ),
-              if (panelDay != null) const SizedBox(height: 12),
-              Text(
-                l10n.cycleArithmeticNote,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          );
+          // The marks watch is kept unmasked so a failed stream can
+          // surface in place of the chart block; the panel below stays
+          // mounted and surfaces its own state (see _liveCycleList).
+          final marksAsync = ref.watch(marksProvider);
+          return _liveCycleList(context, ref, entries, marksAsync);
         },
       ),
+    );
+  }
+
+  /// The live list of one recorded range — chart, day-options panel and
+  /// the evaluation note, computed from one entries+marks snapshot. The
+  /// marks state is kept whole: while the stream is still loading the
+  /// chart renders like the masked read did (with no marks yet), and on a
+  /// failed stream the chart block is replaced by the retry surface
+  /// instead of painting an evaluation overlay from silently-empty data.
+  Widget _liveCycleList(
+    BuildContext context,
+    WidgetRef ref,
+    List<DailyEntry> entries,
+    AsyncValue<List<CycleMark>> marksAsync,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
+    // The chart overlay's input: the entries plus the user-placed
+    // marks, evaluated at render time (ADR-0001). Watching the marks
+    // stream here makes a mark change rebuild the whole screen — the
+    // overlay recomputes, nothing is persisted. This is the screen's
+    // ONLY marks watch: the evaluations and the raw marks are
+    // computed once and handed to the chart overlay.
+    // The temperature display range ("Temperaturbereich" settings
+    // card): watched here so a settings change rebuilds the chart
+    // with the new fixed bounds — constructor data like
+    // entries/marks, the chart keeps no riverpod dependency.
+    final temperatureRange = ref.watch(temperatureRangeProvider);
+    final evaluations = evaluateCycles(
+      entries,
+      marks,
+      // The grouping's injected clock (last-cycle span rule — the
+      // nowProvider seam, pinned in tests).
+      today: ref.read(nowProvider)(),
+    );
+    // The "cycles observed outside this app" setting: watched here so
+    // a settings change renumbers the chart's boundary ordinals in the
+    // same rebuild — exactly why the chart takes the value as
+    // constructor data.
+    final observedCyclesOutsideApp = ref.watch(
+      observedCyclesOutsideAppProvider,
+    );
+    // The tapped day whose options the screen hosts below the chart
+    // (null provider value = no panel).
+    final panelDay = ref.watch(cycleDayPanelProvider);
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        marksAsync.when(
+          loading: () => _CycleChart(
+            entries: entries,
+            marks: marks,
+            evaluations: evaluations,
+            range: temperatureRange,
+            observedCyclesOutsideApp: observedCyclesOutsideApp,
+          ),
+          error: (e, s) => StreamLoadError(
+            scope: 'marks',
+            onRetry: () => ref.invalidate(marksProvider),
+          ),
+          data: (markers) => _CycleChart(
+            entries: entries,
+            marks: markers,
+            evaluations: evaluations,
+            range: temperatureRange,
+            observedCyclesOutsideApp: observedCyclesOutsideApp,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // The tapped day's options as a NON-MODAL panel in a fixed
+        // slot below the chart (never a route): a chart tap retargets
+        // it in place, the close button clears it — see
+        // cycleDayPanelProvider (null = no panel).
+        if (panelDay != null)
+          CycleDayPanel(
+            key: const ValueKey('cycleDayPanel'),
+            day: panelDay,
+            onClose: () =>
+                ref.read(cycleDayPanelProvider.notifier).state = null,
+          ),
+        if (panelDay != null) const SizedBox(height: 12),
+        Text(
+          l10n.cycleArithmeticNote,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }

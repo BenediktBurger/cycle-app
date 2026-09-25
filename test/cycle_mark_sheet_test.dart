@@ -41,6 +41,7 @@ import 'dart:ui' show Tristate;
 
 import 'support/cycle_list_harness.dart';
 import 'support/finders.dart';
+import 'support/fixtures.dart';
 import 'support/viewport.dart';
 
 /// A tall-enough test surface for every pump: the Zyklus list is lazy and
@@ -58,6 +59,7 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
   DateTime? selectedDate,
   int initialTab = 0,
   CycleDatabase Function()? builder,
+  Stream<List<CycleMark>> Function()? marksStreamFactory,
 }) async {
   useTallSurface(tester);
   return pumpCycleList(
@@ -67,6 +69,7 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
     selectedDate: selectedDate,
     initialTab: initialTab,
     builder: builder,
+    marksStreamFactory: marksStreamFactory,
   );
 }
 
@@ -2040,6 +2043,72 @@ void main() {
           );
         },
       );
+    },
+  );
+
+  // ═══════════ marks stream error retry surface ═══════════
+
+  testWidgets(
+    'a marks stream error shows the retry surface in the panel instead of '
+    'the all-unselected chip grid, and retry restores the chips',
+    (tester) async {
+      var attempt = 0;
+      final (_, container) = await _pump(
+        tester,
+        entries: scenarioEntries,
+        marksStreamFactory: () {
+          attempt++;
+          return attempt == 1
+              ? Stream<List<CycleMark>>.error(StateError('injected error'))
+              : Stream.value(evaluationScenarioMarks());
+        },
+      );
+
+      // The panel is opened by writing its targeting provider directly —
+      // the chart is replaced by its own retry surface, so no marks-row
+      // cell is tappable.
+      container.read(cycleDayPanelProvider.notifier).state = scenarioDay(10);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: cycleDayPanel(),
+          matching: find.byKey(const ValueKey('marksStreamRetryButton')),
+        ),
+        findsOneWidget,
+        reason: 'the grid area carries the retry affordance',
+      );
+      expect(
+        find.descendant(
+          of: cycleDayPanel(),
+          matching: find.text('Loading failed'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: cycleDayPanel(), matching: find.byType(FilterChip)),
+        findsNothing,
+        reason: 'no all-unselected chip grid on a failed marks stream',
+      );
+
+      // Two marks retry surfaces coexist (the chart slot's and the
+      // panel's own grid-area surface): the retry taps the panel's.
+      await tester.tap(
+        find.descendant(
+          of: cycleDayPanel(),
+          matching: find.byKey(const ValueKey('marksStreamRetryButton')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        cycleSheetChip('mucusPeakDay'),
+        findsOneWidget,
+        reason:
+            'the retry re-subscribed the marks provider and the chips '
+            'render from the real data',
+      );
+      expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
     },
   );
 }

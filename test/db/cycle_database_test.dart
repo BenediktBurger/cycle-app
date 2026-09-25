@@ -19,6 +19,7 @@ import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
+import 'package:cycle_app/db/converters.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
@@ -342,16 +343,55 @@ void main() {
       },
     );
 
+    test('the engine-level bleeding CHECK rejects levels outside 0..5, raw SQL '
+        'path', () async {
+      // Raw SQL (e.g. a future import path) bypasses the Dart converter:
+      // the column's own CHECK is what keeps an impossible level out of
+      // the table.
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO cycle_entries (date, bleeding) '
+          'VALUES (20000, 6)',
+        ),
+        throwsA(isA<Exception>()),
+      );
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO cycle_entries (date, bleeding) '
+          'VALUES (20001, -1)',
+        ),
+        throwsA(isA<Exception>()),
+      );
+      // Sanity: every level of the shared 6-step scale goes through the
+      // raw SQL path.
+      for (final level in Bleeding.values) {
+        await db.customStatement(
+          'INSERT INTO cycle_entries (date, bleeding) '
+          'VALUES (${20002 + level.level}, ${level.level})',
+        );
+        await expectLater(
+          db.entriesDao.entryFor(DateTime(2024, 10, 6 + level.level)),
+          completion(
+            predicate<CycleEntry>((row) => row.bleeding.level == level.level),
+          ),
+        );
+      }
+    });
+
     test('an unknown stored level is surfaced as an error, not silently '
         'mapped', () async {
       // 6 is the smallest out-of-range level now that the scale tops out
-      // at 5; anything above it must fail the same way.
-      await db.customStatement(
-        'INSERT INTO cycle_entries (date, bleeding) '
-        'VALUES (20001, 6)',
+      // at 5; anything above it must fail the same way. The engine CHECK
+      // already rejects writing such a value (pinned above), so the pin
+      // here is the converter itself: the fail-loud read side stays for
+      // rows that could enter by another path — no graceful degradation,
+      // ever.
+      expect(
+        () => const BleedingLevelConverter().fromSql(6),
+        throwsA(isA<ArgumentError>()),
       );
-      await expectLater(
-        db.entriesDao.entryFor(DateTime(2024, 10, 5)), // day 20001
+      expect(
+        () => const BleedingLevelConverter().fromSql(-1),
         throwsA(isA<ArgumentError>()),
       );
     });
@@ -426,18 +466,18 @@ void main() {
 
   group('schema & migration (v10, v11): app_settings key-value store', () {
     test(
-      'the schema version is 11 (the maximum bleeding level bump)',
+      'the schema version is 12 (the engine-level bleeding CHECK)',
       () async {
         final version = await db
             .customSelect('PRAGMA user_version')
             .getSingle();
         expect(
           version.data['user_version'],
-          11,
+          12,
           reason:
-              'v11 extends the bleeding scale vocabulary to level 5 '
-              '(maximum); no SQL changed in that step, so no incremental '
-              'migration is needed',
+              'v12 adds the bleeding column\'s CHECK constraint; the '
+              'table is recreated with data preserved, so the step is a '
+              'real migration',
         );
       },
     );
@@ -574,25 +614,36 @@ void main() {
     });
 
     /// Builds a temp-file database stamped with the stale [from]
-    /// user_version, whose DDL is the CURRENT schema (dumped in setUp):
-    /// per the documented history, a v9/v10-shaped file is structurally the
-    /// current DDL — v9→v10 adds only `app_settings` and v10→v11 changes no
-    /// SQL at all — so the only deltas the fixture controls are the
-    /// presence of `app_settings` and the version stamp. The seeded user
-    /// data is written with raw SQL and explicit created_at/updated_at
-    /// values so the rows are individually identifiable (a table recreated
-    /// from the current schema cannot answer them, which is what makes the
-    /// data-preservation pin meaningful).
+    /// user_version, whose DDL is the CURRENT schema (dumped in setUp) with
+    /// ONE rewrite: pre-v12 files do not carry the bleeding column's
+    /// engine-level CHECK, so the replayed `cycle_entries` statement is
+    /// stripped back to the plain `NOT NULL DEFAULT 0` column (the regex
+    /// matches the column definition up to the next comma, whatever the
+    /// rest of the statement looks like). Per the documented history, the
+    /// remaining DDL of a v9/v10/v11-shaped file is the current DDL — v9→v10
+    /// adds only `app_settings`, v10→v11 changes no SQL and v11→v12 touches
+    /// only the bleeding column — so these deltas are all the fixture
+    /// controls. The seeded user data is written with raw SQL and explicit
+    /// created_at/updated_at values so the rows are individually
+    /// identifiable (a table recreated from the current schema cannot
+    /// answer them, which is what makes the data-preservation pin
+    /// meaningful).
     Future<CycleDatabase> openMigrationFixture(
       int from, {
       required bool withAppSettings,
+      int seedBleeding = 4,
     }) async {
       final statements = [
         for (final r in currentDdl)
           if (withAppSettings || r['name'] != 'app_settings')
             (
               tableFirst: r['type'] == 'table' ? 0 : 1,
-              sql: r['sql']! as String,
+              sql: r['type'] == 'table' && r['name'] == 'cycle_entries'
+                  ? (r['sql']! as String).replaceAllMapped(
+                      RegExp(r'"bleeding" INTEGER[^,]*'),
+                      (_) => '"bleeding" INTEGER NOT NULL DEFAULT 0',
+                    )
+                  : r['sql']! as String,
             ),
       ]..sort((a, b) => a.tableFirst - b.tableFirst); // tables before indexes
       final raw = sqlite3.open(dbFile.path);
@@ -605,8 +656,8 @@ void main() {
           'measured_at_minutes, bleeding, mucus_sign, mucus_quality, '
           'cervix_position, cervix_opening, cervix_firmness, pain_breast, '
           'pain_mittelschmerz, sex_timings, notes, created_at, updated_at) '
-          "VALUES (20000, 5, 36.55, 405, 4, 's', 'ew', 'high', 'middle', "
-          "'soft', 1, 0, 5, 'seeded row', 1767225600, 1767229200)",
+          "VALUES (20000, 5, 36.55, 405, $seedBleeding, 's', 'ew', 'high', "
+          "'middle', 'soft', 1, 0, 5, 'seeded row', 1767225600, 1767229200)",
         );
         raw.execute(
           "INSERT INTO user_marks (entry_date, mark_type, author) "
@@ -618,17 +669,19 @@ void main() {
       }
       final db = CycleDatabase(NativeDatabase(dbFile));
       upgraded = db;
-      // Opening a query forces the executor to open, which runs the
-      // incremental upgrade before the first statement completes.
-      await db.entriesDao.allEntries();
+      // The migration runs lazily on the first query, so the caller forces
+      // the open (or — in the migration-failure test — asserts on the
+      // thrown failure) itself.
       return db;
     }
 
     Future<void> expectPreserved(CycleDatabase db) async {
+      // The first query forces the executor open, which runs the
+      // incremental upgrade before the statement completes.
       final version = await db.customSelect('PRAGMA user_version').getSingle();
       expect(
         version.data['user_version'],
-        11,
+        12,
         reason: 'drift records the migration run',
       );
 
@@ -658,6 +711,46 @@ void main() {
         row.updatedAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1, 1)),
         isTrue,
         reason: 'the explicit updated_at survives the migration verbatim',
+      );
+
+      // The table recreation must not lose the unique index the EntriesDao
+      // upsert path relies on.
+      final indexNames = [
+        for (final r
+            in await db
+                .customSelect(
+                  "SELECT name FROM sqlite_master WHERE type = 'index' AND "
+                  "name = 'cycle_entries_date_unique'",
+                )
+                .get())
+          r.data['name']! as String,
+      ];
+      expect(
+        indexNames,
+        hasLength(1),
+        reason: 'the day-keyed unique index survives the table recreation',
+      );
+
+      // A day upsert after the upgrade still replaces the row IN PLACE: it
+      // must hit the surviving unique index (no second row, stable id).
+      final updated = await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2024, 10, 4), bleeding: Bleeding.spotting),
+      );
+      expect(
+        updated.id,
+        row.id,
+        reason:
+            'the upsert keyed by the surviving unique index replaces '
+            'the same row',
+      );
+      expect(
+        await db.entriesDao.allEntries(),
+        hasLength(1),
+        reason: 'no second row appeared for the already-tracked day',
+      );
+      expect(
+        (await db.entriesDao.entryFor(DateTime(2024, 10, 4)))!.bleeding,
+        Bleeding.spotting,
       );
 
       // The seeded mark survives too.
@@ -717,6 +810,23 @@ void main() {
       // Settings storage works immediately after the upgrade.
       await db.settingsDao.writeValue('themeMode', 'dark');
       expect(await db.settingsDao.readValue('themeMode'), 'dark');
+    });
+
+    test('a pre-existing out-of-range bleeding row fails the migration '
+        'loudly', () async {
+      // The old-shape file admits such a corrupt row (its bleeding column
+      // still carries no CHECK). The migration copies the rows into the
+      // CHECK-shaped table and must FAIL on the corrupt one — no clamping,
+      // no dropping, no silent continuation: the streams reading that
+      // converter were already broken, so surfacing the failure on the
+      // database gate is the consistent posture.
+      final db = await openMigrationFixture(
+        10,
+        withAppSettings: true,
+        seedBleeding: 6,
+      );
+      // The first query forces the open; the upgrade must reject it there.
+      await expectLater(db.entriesDao.allEntries(), throwsA(isA<Exception>()));
     });
   });
 

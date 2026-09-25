@@ -25,7 +25,10 @@ const chartSeedColor = Color(0xFF6750A4);
 ///  - [entries], [marks] and [selectedDate] (default: [entries]' first day)
 ///    are pinned as fixed streams;
 ///  - [entriesStream] replaces the fixed daily-entries stream wholesale
-///    (e.g. an emitting stream controller);
+///    (e.g. an emitting stream controller); [entriesStreamFactory] is
+///    invoked once per provider (re-)subscription, so a stream-error retry
+///    test can hand out a failing stream on the first attempt and a valid
+///    one afterwards (the same pattern for [marksStreamFactory] and marks);
 ///  - [locale] defaults to English;
 ///  - [darkTheme] adds the app-shaped dark colorScheme (the dark-scheme
 ///    tests; ThemeMode.system stays in place so the dispatcher's test
@@ -50,6 +53,8 @@ Widget chartHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
   Stream<List<DailyEntry>>? entriesStream,
+  Stream<List<DailyEntry>> Function()? entriesStreamFactory,
+  Stream<List<CycleMark>> Function()? marksStreamFactory,
   Locale locale = const Locale('en'),
   bool darkTheme = false,
   bool themed = true,
@@ -62,9 +67,14 @@ Widget chartHarness({
 }) {
   final overrides = [
     dailyEntriesProvider.overrideWith(
-      (ref) => entriesStream ?? Stream.value(entries),
+      (ref) =>
+          entriesStreamFactory?.call() ??
+          entriesStream ??
+          Stream.value(entries),
     ),
-    marksProvider.overrideWith((ref) => Stream.value(marks)),
+    marksProvider.overrideWith(
+      (ref) => marksStreamFactory?.call() ?? Stream.value(marks),
+    ),
     selectedDateProvider.overrideWith(
       (ref) => selectedDate ?? entries.first.date,
     ),

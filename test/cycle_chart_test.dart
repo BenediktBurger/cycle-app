@@ -6640,4 +6640,74 @@ void main() {
       );
     },
   );
+
+  // ═══════════ stream error retry surfaces ═══════════
+
+  testWidgets('a marks stream error replaces the chart with the retry '
+      'surface, and retry re-renders the chart', (tester) async {
+    var attempt = 0;
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: _evaluationEntries,
+        marks: _marks,
+        marksStreamFactory: () {
+          attempt++;
+          return attempt == 1
+              ? Stream<List<CycleMark>>.error(StateError('injected error'))
+              : Stream.value(_marks);
+        },
+      ),
+    );
+
+    expect(
+      find.byType(LineChart),
+      findsNothing,
+      reason:
+          'the chart must not render marks-driven content from the '
+          'silently-empty marks list',
+    );
+    expect(find.text('Loading failed'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('marksStreamRetryButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('marksStreamRetryButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LineChart), findsOneWidget);
+    expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
+  });
+
+  testWidgets('an entries stream error gains the retry affordance, and '
+      'retry restores the chart', (tester) async {
+    var attempt = 0;
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: _evaluationEntries,
+        marks: _marks,
+        entriesStreamFactory: () {
+          attempt++;
+          return attempt == 1
+              ? Stream<List<DailyEntry>>.error(StateError('injected error'))
+              : Stream.value(_evaluationEntries);
+        },
+      ),
+    );
+
+    expect(find.byType(LineChart), findsNothing);
+    expect(find.text('Loading failed'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('entriesStreamRetryButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entriesStreamRetryButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LineChart), findsOneWidget);
+    expect(attempt, 2);
+  });
 }

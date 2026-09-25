@@ -25,6 +25,7 @@ import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'bleeding_symbol.dart';
 import 'mucus_symbol.dart';
+import 'stream_error.dart';
 
 class TagebuchScreen extends ConsumerStatefulWidget {
   const TagebuchScreen({super.key});
@@ -333,7 +334,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
     final entriesAsync = ref.watch(dailyEntriesProvider);
     final selected = ref.watch(selectedDateProvider);
-    final marks = ref.watch(marksProvider).valueOrNull ?? const <CycleMark>[];
+    // The marks watch is kept unmasked so a failed stream can surface in
+    // the cycle-list area instead of rendering the list from a silently
+    // empty marks list. While the stream is still loading — and while it
+    // is in error, see the list slot below — the form's day-of-cycle
+    // label and the grouping compute like the masked read did (without
+    // marks); the form's per-field writes do not depend on marks.
+    final marksAsync = ref.watch(marksProvider);
+    final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
     // The cycle groups are computed ONCE per build and shared by both
     // consumers — the entry form's day-of-cycle label and the grouped list
     // (which re-used to group the same entries a second time). While the
@@ -371,7 +379,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         children: [
           _buildForm(l10n, locale, selected, cycles),
           const SizedBox(height: 16),
-          ..._buildCycleList(l10n, entriesAsync, cycles),
+          // The list slot: a marks error takes precedence — only a healthy
+          // marks stream lets the entries-driven list render, with its own
+          // retry surface when the entries stream fails. The form above
+          // stays intact either way.
+          if (marksAsync.hasError)
+            StreamLoadError(
+              scope: 'marks',
+              onRetry: () => ref.invalidate(marksProvider),
+            )
+          else
+            ..._buildCycleList(l10n, entriesAsync, cycles),
         ],
       ),
     );
@@ -891,7 +909,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   ) {
     return entriesAsync.when(
       loading: () => <Widget>[const SizedBox.shrink()],
-      error: (e, s) => <Widget>[Text(l10n.loadFailed)],
+      error: (e, s) => <Widget>[
+        StreamLoadError(
+          scope: 'entries',
+          onRetry: () => ref.invalidate(dailyEntriesProvider),
+        ),
+      ],
       data: (entries) {
         if (entries.isEmpty) {
           return [
