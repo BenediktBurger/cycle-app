@@ -465,8 +465,9 @@ void main() {
   //
   // The framework error collector is installed only after the shell has
   // pumped and the form is scrolled to the sign row: the other shell tabs
-  // stay mounted and laid out (IndexedStack), so anything overflowing
-  // elsewhere must not be attributed to this row.
+  // stay mounted and laid out (IndexedStack), so the collector's window
+  // covers just the row's interactions — the pump-time state is asserted
+  // separately below.
 
   testWidgets(
     'the mucus sign row renders every sign without overflow at a narrow '
@@ -481,16 +482,13 @@ void main() {
       await tester.ensureVisible(caption);
       await tester.pumpAndSettle();
 
-      // Waive the pump-time record: at this forced width, widget-test font
-      // metrics (square fallback glyphs, wider than device fonts) can
-      // overflow OTHER rows of the tall form once at the initial layout —
-      // e.g. the date row. That single pump-time pass is not what this test
-      // measures; everything that fails from here on, on any interaction
-      // with the sign row, belongs to the row and must stay silent.
-      // (Take the record, not assert on it: render details of OTHER rows
-      // are irrelevant to this repro; any row failure during the taps below
-      // is still collected and fails the test.)
-      tester.takeException();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the whole form, date row included, pumps overflow-free '
+            'at 320x800',
+      );
 
       await expectNoFrameworkErrors(tester, () async {
         // Walk every option of the row, including the two-glyph f/S: the
@@ -566,8 +564,7 @@ void main() {
   // part, so this check pumps the shell at the same 320 x 800 dp viewport
   // as the sign-row repro above and walks the recorded tiles with the
   // framework error collector installed: any overflow here would be a real
-  // tile defect, not one of the entry form. (Pump-time noise from the
-  // other shell tabs is waived the same way the sign-row repro waives it.)
+  // tile defect, not one of the entry form.
 
   testWidgets('the day tile renders its mucus chip beside temperature and time '
       'without overflow at a narrow width', (WidgetTester tester) async {
@@ -605,11 +602,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Waive the pump-time record: at this forced width, widget-test font
-    // metrics can overflow OTHER rows of the shell once at the initial
-    // layout. Everything that fails from here on, while the tiles build
-    // and lay out, belongs to the tile and must stay silent.
-    tester.takeException();
+    expect(
+      tester.takeException(),
+      isNull,
+      reason:
+          'the whole shell, tiles included, pumps overflow-free '
+          'at 320x800',
+    );
 
     await expectNoFrameworkErrors(
       tester,

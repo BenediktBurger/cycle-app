@@ -111,16 +111,19 @@ void main() {
     'phone-portrait shell (480x800) keeps the bottom NavigationBar and '
     'no rail',
     (WidgetTester tester) async {
-      // Not a narrow phone width on purpose: the diary's date row still
-      // overflows under widget-test font metrics at 320–412 dp (the
-      // documented narrow-width bug, docs/roadmap.md Bugs section — a plain
-      // bullet, out of scope here). The shell test only pins the SHELL
-      // surface; 480x800 is above the tab's own overflow threshold and far
-      // below the rail's breakpoint.
+      // Phone-portrait width on purpose: 480x800 pins the SHELL surface
+      // (bottom NavigationBar, no rail — far below the rail breakpoint).
       useViewportSize(tester, const Size(480, 800));
       await tester.pumpWidget(appScope(locale: const Locale('de')));
       await tester.pumpAndSettle();
 
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the whole shell, diary date row included, pumps '
+            'overflow-free at 480x800',
+      );
       expect(
         find.byType(NavigationBar),
         findsOneWidget,
@@ -289,6 +292,13 @@ void main() {
     useViewportSize(tester, const Size(480, 800));
     await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
+    expect(
+      tester.takeException(),
+      isNull,
+      reason:
+          'the shell pumps overflow-free at 480x800, so the '
+          'snackbar geometry below is attributed to the snackbar alone',
+    );
 
     await showDiarySavedSnackbar(tester);
 
