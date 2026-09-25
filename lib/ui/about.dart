@@ -35,6 +35,37 @@ Future<void> _openContactUrl(String url) async {
   }
 }
 
+/// Tap target of the license-details row: opens Flutter's in-app license
+/// page, where the bundled license texts are collected. The metadata lookup
+/// is swallowed BY DESIGN like the contact-row launch failures: a device
+/// that cannot answer the package-info call must never crash the about page
+/// — the page still opens; only its version line stays empty (the body
+/// still names the two bundled licenses).
+Future<void> _showLicenseDetails(
+  BuildContext context,
+  AppLocalizations l10n,
+) async {
+  PackageInfo? info;
+  try {
+    info = await PackageInfo.fromPlatform();
+  } catch (error) {
+    // Metadata, not the page: the lookup failure only loses the version
+    // line (see the doc comment above).
+  }
+  if (!context.mounted) {
+    return;
+  }
+  showLicensePage(
+    context: context,
+    applicationName: l10n.appTitle,
+    applicationVersion: info?.version,
+    // The attribution prefix both locales' aboutLicenseBody shows —
+    // locale-independent license facts, not prose, hence a literal
+    // instead of an arb string.
+    applicationLegalese: '© 2026 Benedikt Burger — Apache-2.0.',
+  );
+}
+
 class AboutPage extends ConsumerWidget {
   const AboutPage({super.key, this.onboarding = false});
 
@@ -131,15 +162,31 @@ class AboutPage extends ConsumerWidget {
           Text(l10n.aboutPosture, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 24),
           // The license/copyright section: Apache-2.0 with its copyright
-          // holder — the full license text lives in the repository's
-          // LICENSE file, so the section points there instead of
-          // reproducing it. SELECTABLE: the embedded repository URL is
-          // copyable.
+          // holder. The FULL license texts are bundled (Apache-2.0 plus the
+          // Noto Sans font license) and shown through the tappable
+          // license-details row below — offline redistribution obligations
+          // (Apache-2.0 §4, SIL OFL 1.1) require shipping readable texts
+          // with the app, and the in-app license page is that affordance.
+          // SELECTABLE: the embedded repository URL is copyable.
           Text(l10n.aboutLicenseHeading, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           SelectableText(
             l10n.aboutLicenseBody,
             style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          // The details row: its OWN card and handler (navigation, not a URL
+          // launch) — deliberately outside the contact rows' URL loop, whose
+          // per-locale targets and open-in-new affordances do not apply.
+          Card(
+            child: ListTile(
+              onTap: () => _showLicenseDetails(context, l10n),
+              title: Text(
+                l10n.aboutLicenseDetailsRow,
+                style: theme.textTheme.titleSmall,
+              ),
+              trailing: const Icon(Icons.description),
+            ),
           ),
           const SizedBox(height: 24),
           // The privacy/DSGVO notice — the same string the settings pane's

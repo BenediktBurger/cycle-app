@@ -19,9 +19,12 @@
 // contact channel, next to the INER method-contact rows): its URL is an
 // app-fact, not an INER fact, so it is identical in every locale.
 import 'package:cycle_app/l10n/app_localizations.dart';
+import 'package:cycle_app/licenses.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:url_launcher_platform_interface/link.dart';
@@ -94,6 +97,71 @@ void main() {
     );
   });
 
+  /// Same exception as the first test: the harness's PackageInfo mock values
+  /// cannot be cleared again, so this failure-path test pumps the app
+  /// directly and must keep its place BEFORE any harness-pumping test of
+  /// this file.
+  testWidgets('the license-details row still opens the license page when the '
+      'package-info lookup fails', (WidgetTester tester) async {
+    const packageInfoChannel = MethodChannel(
+      'dev.fluttercommunity.plus/package_info',
+    );
+    // The platform channel answers with an error instead of values — the
+    // closest model of a broken/unanswerable device install (the unmocked
+    // channel would just never answer in the test loop, which exercises no
+    // failure path at all).
+    try {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        packageInfoChannel,
+        (call) async => throw MissingPluginException(
+          'no package metadata on this (test) device',
+        ),
+      );
+      useDeviceLocales(tester, const [Locale('de')]);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inMemoryDatabase(),
+            onboardingCompletedProvider.overrideWith((ref) => false),
+          ],
+          child: const CycleApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The version line hides (same failure posture as the first test), but
+      // the license-details row must still work: the page opening is only
+      // decorated with the metadata, never made dependent on it.
+      await tester.dragUntilVisible(
+        find.text('Lizenzdetails'),
+        find.byType(ListView),
+        const Offset(0, -200),
+      );
+      final listTile = find.ancestor(
+        of: find.text('Lizenzdetails'),
+        matching: find.byType(ListTile),
+      );
+      await tester.ensureVisible(listTile);
+      await tester.pumpAndSettle();
+      await tester.tap(listTile);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(LicensePage),
+        findsOneWidget,
+        reason:
+            'a failing package-info lookup must not skip opening the license '
+            'page — it only loses the version line',
+      );
+      expect(find.textContaining('0.1.0'), findsNothing);
+    } finally {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        packageInfoChannel,
+        null,
+      );
+    }
+  });
+
   /// Opens the app on the settings pane (German device locale, seeded
   /// onboarding flag — same pattern as notices_test.dart) and pushes the
   /// about page from the settings pane's app bar info action.
@@ -153,15 +221,15 @@ void main() {
           'feedback path',
     );
 
-    // The privacy/DSGVO notice on the about page.
-    expect(find.text('Datenschutz'), findsOneWidget);
-    expect(
-      find.textContaining('ausschließlich lokal'),
-      findsOneWidget,
-      reason: 'the local-only storage statement is the notice\'s core',
+    // The license/copyright section sits below the warning-posture prose:
+    // bring it into the lazy ListView's built range before asserting (the
+    // sections are asserted in top-down scroll order for that reason).
+    await tester.dragUntilVisible(
+      find.text('Lizenz'),
+      find.byType(ListView),
+      const Offset(0, -200),
     );
-
-    // The license/copyright section.
+    await tester.pumpAndSettle();
     expect(
       find.text('Lizenz'),
       findsOneWidget,
@@ -181,6 +249,79 @@ void main() {
       find.textContaining('Benedikt Burger'),
       findsOneWidget,
       reason: 'the copyright holder (LICENSE line)',
+    );
+
+    // The simplified body: the font license is no longer named in the body
+    // (its text ships in the binary and is readable via the details row);
+    // bundled fonts and the Flutter engine are the named examples.
+    expect(
+      find.textContaining('Schriftlizenz'),
+      findsNothing,
+      reason:
+          'the body no longer names the Noto Sans font license — the '
+          'license text ships in the binary and is shown via the '
+          'license-details row, so the in-body enumeration is obsolete',
+    );
+    expect(
+      find.textContaining('gebündelte Schriften'),
+      findsOneWidget,
+      reason: 'bundled fonts are named as an example of the in-app texts',
+    );
+    expect(
+      find.textContaining('Flutter-Engine'),
+      findsOneWidget,
+      reason: 'the Flutter engine is named as an example of the in-app texts',
+    );
+    // The build auto-collects the pub packages' and the app's root-package
+    // license texts into the NOTICES file, so they are readable in-app too —
+    // not just in the repository (ADR-0011).
+    expect(
+      find.textContaining('Pub-Pakete'),
+      findsOneWidget,
+      reason:
+          'the pub packages\' licenses are readable in-app via the '
+          'license-details row (auto-collected into the built NOTICES)',
+    );
+    expect(
+      find.textContaining('im Repository gesammelt'),
+      findsNothing,
+      reason:
+          'the obsolete framing that pub-package licenses are only '
+          'collected in the repository is gone',
+    );
+    expect(
+      find.textContaining('Datei LICENSE'),
+      findsNothing,
+      reason:
+          'the old repository-FILE pointer wording is replaced by '
+          'the in-app reading',
+    );
+
+    // The license-details row: its own tappable row below the body.
+    await tester.dragUntilVisible(
+      find.text(l10n.aboutLicenseDetailsRow),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(l10n.aboutLicenseDetailsRow),
+      findsOneWidget,
+      reason: 'the bundled license texts get their own details row',
+    );
+
+    // The privacy/DSGVO notice on the about page.
+    await tester.dragUntilVisible(
+      find.text('Datenschutz'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Datenschutz'), findsOneWidget);
+    expect(
+      find.textContaining('ausschließlich lokal'),
+      findsOneWidget,
+      reason: 'the local-only storage statement is the notice\'s core',
     );
 
     // The feedback footer: send-nothing stance plus the issue tracker,
@@ -260,6 +401,85 @@ void main() {
       findsOneWidget,
     );
 
+    // The license/copyright section: same top-down scroll order as the
+    // German case.
+    await tester.dragUntilVisible(
+      find.text('License'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('License'), findsOneWidget);
+    expect(find.textContaining('Apache-2.0'), findsOneWidget);
+    expect(find.textContaining('© 2026'), findsOneWidget);
+    expect(find.textContaining('Benedikt Burger'), findsOneWidget);
+
+    // The simplified body: the font license is no longer named in the body
+    // (its text ships in the binary and is readable via the details row);
+    // bundled fonts and the Flutter engine are the named examples.
+    expect(
+      find.textContaining('Open Font License'),
+      findsNothing,
+      reason:
+          'the body no longer names the Noto Sans font license — the '
+          'license text ships in the binary and is shown via the '
+          'license-details row, so the in-body enumeration is obsolete',
+    );
+    expect(
+      find.textContaining('bundled fonts'),
+      findsOneWidget,
+      reason: 'bundled fonts are named as an example of the in-app texts',
+    );
+    expect(
+      find.textContaining('Flutter engine'),
+      findsOneWidget,
+      reason: 'the Flutter engine is named as an example of the in-app texts',
+    );
+    // The build auto-collects the pub packages' and the app's root-package
+    // license texts into the NOTICES file, so they are readable in-app too —
+    // not just in the repository (ADR-0011).
+    expect(
+      find.textContaining('pub packages'),
+      findsOneWidget,
+      reason:
+          'the pub packages\' licenses are readable in-app via the '
+          'license-details row (auto-collected into the built NOTICES)',
+    );
+    expect(
+      find.textContaining('collected in the repository'),
+      findsNothing,
+      reason:
+          'the obsolete framing that pub-package licenses are only '
+          'collected in the repository is gone',
+    );
+    expect(
+      find.textContaining("repository's LICENSE file"),
+      findsNothing,
+      reason:
+          'the old repository-FILE pointer wording is replaced by '
+          'the in-app reading',
+    );
+
+    // The license-details row: its own tappable row below the body.
+    await tester.dragUntilVisible(
+      find.text(l10n.aboutLicenseDetailsRow),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(l10n.aboutLicenseDetailsRow),
+      findsOneWidget,
+      reason: 'the bundled license texts get their own details row',
+    );
+
+    // The privacy/DSGVO notice on the about page.
+    await tester.dragUntilVisible(
+      find.text('Privacy'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Privacy'), findsOneWidget);
     expect(
       find.textContaining('exclusively locally'),
@@ -268,11 +488,6 @@ void main() {
           'the English notice carries the same local-only '
           'statement',
     );
-
-    expect(find.text('License'), findsOneWidget);
-    expect(find.textContaining('Apache-2.0'), findsOneWidget);
-    expect(find.textContaining('© 2026'), findsOneWidget);
-    expect(find.textContaining('Benedikt Burger'), findsOneWidget);
 
     // (Same duplication rule as the German case: the footer-unique
     // parenthesized URL substring, because the tappable issue row now
@@ -296,6 +511,59 @@ void main() {
       find.textContaining('exclusively locally'),
       findsNothing,
       reason: 'popping must leave the pushed about page',
+    );
+  });
+
+  testWidgets('the license-details row opens the in-app license page', (
+    WidgetTester tester,
+  ) async {
+    final l10n = lookupAppLocalizations(const Locale('de'));
+    // Register the same collector production registers in main(): this suite
+    // pumps the CycleApp widget directly (main() never runs), so the
+    // license page's registry collection has the bundled entries.
+    LicenseRegistry.addLicense(extraLicenses);
+    await openGermanAboutPage(tester);
+
+    // The row sits below the license body; bring it into the built range.
+    await tester.dragUntilVisible(
+      find.text(l10n.aboutLicenseDetailsRow),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutLicenseDetailsRow));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(LicensePage),
+      findsOneWidget,
+      reason: 'the details row opens the in-app license page',
+    );
+    expect(
+      find.text(l10n.appTitle),
+      findsOneWidget,
+      reason: 'the license page carries the app name (l10n.appTitle)',
+    );
+    expect(
+      find.text('0.1.0'),
+      findsOneWidget,
+      reason:
+          'the license page carries the version of the installed binary '
+          '(the PackageInfo mock the harness seeds)',
+    );
+
+    // Back navigation: the license page pops back onto the about page.
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(LicensePage),
+      findsNothing,
+      reason: 'popping the license page returns to the about page',
+    );
+    expect(
+      find.text(l10n.aboutLicenseDetailsRow),
+      findsOneWidget,
+      reason: 'the about page is back after the license page',
     );
   });
 

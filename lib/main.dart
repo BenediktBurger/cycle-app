@@ -6,6 +6,7 @@
 // table).
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import 'db/settings_store.dart';
 import 'domain/date_only.dart';
 import 'domain/temperature_range.dart';
 import 'l10n/app_localizations.dart';
+import 'licenses.dart';
 import 'providers.dart';
 import 'ui/about.dart';
 import 'ui/cycle.dart';
@@ -37,6 +39,10 @@ ThemeData _buildTheme(ColorScheme scheme) => ThemeData(
 );
 
 void main() {
+  // LicenseRegistry registration is synchronous and cheap: `extraLicenses`
+  // is only registered as a collector — the license texts (bundled assets)
+  // are read lazily, whenever a license page pulls the stream.
+  LicenseRegistry.addLicense(extraLicenses);
   runApp(const ProviderScope(child: CycleApp()));
 }
 

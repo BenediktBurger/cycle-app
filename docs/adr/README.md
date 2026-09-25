@@ -37,3 +37,4 @@ question remains visible wherever the ADR marks unresolved assumptions.
 | [0008](0008-cycle-start-as-mark.md) | Cycle start is a user-owned mark; bleeding only suggests | Accepted |
 | [0009](0009-release-pipeline-and-signing.md) | Release pipeline — Android-first publishing, signing custody, store accounts | Accepted |
 | [0010](0010-settings-key-value-table.md) | General settings persist in a drift key-value table (`app_settings`) | Accepted |
+| [0011](0011-license-bundling.md) | License texts bundled as assets behind the in-app license page (package licenses auto-collected) | Accepted |
