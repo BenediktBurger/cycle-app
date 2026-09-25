@@ -308,6 +308,38 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "How many cycles you observed before using this app (e.g. on paper). The cycle numbers on the cycle page only start counting after this value.",
   "settingsObservedCyclesOutsideAppError": "Please enter a whole number ≥ 0",
+  "settingsPaperHistory": "Paper history (cycles outside this app)",
+  "@settingsPaperHistory": {
+    "description": "Settings card title grouping the three values the user observed outside this app: the count of cycles, the shortest cycle length and the earliest first higher measurement."
+  },
+  "settingsPaperHistoryHelper": "Optional — values from your paper charts (or an earlier tracker). All three feed the statistics and the PDF export.",
+  "@settingsPaperHistoryHelper": {
+    "description": "Caption under the paper-history card title stating that the entries are optional, come from the paper charts and feed statistics and the PDF export."
+  },
+  "settingsPaperShortestCycleLength": "Shortest cycle",
+  "@settingsPaperShortestCycleLength": {
+    "description": "Label of the paper-history card's shortest-cycle field."
+  },
+  "settingsPaperShortestCycleLengthError": "Please enter a whole number ≥ 1",
+  "@settingsPaperShortestCycleLengthError": {
+    "description": "Validation error of the paper shortest-cycle field (a paper cycle has at least one day)."
+  },
+  "settingsPaperShortestCycleLengthHelper": "The shortest cycle from your paper charts, as a length in days.",
+  "@settingsPaperShortestCycleLengthHelper": {
+    "description": "Caption naming the unit of the paper shortest-cycle value (a length in days)."
+  },
+  "settingsPaperEarliestFirstHigher": "Earliest first higher measurement",
+  "@settingsPaperEarliestFirstHigher": {
+    "description": "Label of the paper-history card's earliest-first-higher field."
+  },
+  "settingsPaperEarliestFirstHigherError": "Please enter a whole number ≥ 1",
+  "@settingsPaperEarliestFirstHigherError": {
+    "description": "Validation error of the paper earliest-first-higher field (a cycle-day number counts from 1)."
+  },
+  "settingsPaperEarliestFirstHigherHelper": "The earliest first higher measurement from your paper charts, as a cycle-day number (counting from 1).",
+  "@settingsPaperEarliestFirstHigherHelper": {
+    "description": "Caption naming the unit of the paper earliest-first-higher value (a 1-based cycle-day number)."
+  },
   "settingsObservedCyclesOutsideAppCount": "Number of observed cycles",
   "@settingsObservedCyclesOutsideAppCount": {
     "description": "Label of the settings card's integer field: distinct from the card title directly above it."
@@ -433,11 +465,22 @@
     "description": "Failure message for the whole delete-data flow: shown when opening the database, the confirmation dialog's count reads, or the wipe itself fails. The wipe is one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors importFailed."
   },
   "settingsPdfExport": "PDF export",
-  "settingsPdfExportName": "Name (paper form)",
+  "settingsGeneralInformation": "General information",
+  "@settingsGeneralInformation": {
+    "description": "Settings card title of the general-information card: the user's optional details (name, birth date) gathered under their own heading, next to the paper-history card. The old identifying-values card was titled \"PDF export\" like the action card — the new title ends that double naming."
+  },
+  "settingsGeneralInformationNote": "Optional. The entries are used for the export functionality and the statistics.",
+  "@settingsGeneralInformationNote": {
+    "description": "Caption of the general-information card, directly under the title: the entries are optional and what they are used for (the anonymization explanation that used to sit at the data entry moved to the anonymize switch instead)."
+  },
+  "settingsPdfExportName": "Name",
   "settingsPdfExportBirthDate": "Birth date",
   "settingsPdfExportBirthDateFormat": "YYYY-MM-DD",
   "settingsPdfExportBirthDateError": "Enter a real calendar date in the form YYYY-MM-DD.",
-  "settingsPdfExportNote": "Name and birth date appear in the header of every PDF export; the export's anonymize switch hides both for the respective export without changing what is stored. The observed-cycle count in the PDF includes the value of the \u201cCycles observed outside this app\u201d card.",
+  "pdfExportAnonymizeNote": "When on, name and birth date are hidden from the header of the respective export without changing what is stored.",
+  "@pdfExportAnonymizeNote": {
+    "description": "Helper note of the PDF-export card, sitting directly under the anonymize switch (the control it explains — previously the note lived on the data-entry card): what the per-export toggle does."
+  },
   "pdfExportCycleOption": "Cycle {n}, from {day}",
   "@pdfExportCycleOption": {
     "placeholders": {
@@ -483,7 +526,7 @@
     "description": "Pinned confirm button of the cycle-selection page (top, alongside the All/None bulk buttons): applies the selection back into the export card and closes the page. Leaving the page without confirming changes nothing."
   },
   "pdfExportAnonymize": "Anonymize",
-  "pdfExportExportButton": "Export",
+  "pdfExportSaveButton": "Save",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
   "settingsExport": "JSON export",

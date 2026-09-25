@@ -256,15 +256,28 @@ void main() {
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
-    // The settings list has grown (the temperature-range card sits first):
-    // the PIN stub can start below the scroll's initial cache extent, so
-    // bring the list down until the stub renders.
-    await tester.drag(find.byType(ListView).first, const Offset(0, -400));
-    await tester.pumpAndSettle();
+    // The settings list keeps growing with the data it carries: the PIN
+    // stub can sit below the scroll's initial cache extent, so bring the
+    // list down until the stub renders instead of pinning a drag amount.
+    var guard = 0;
+    while (tester
+            .widgetList<SwitchListTile>(find.byType(SwitchListTile))
+            .length <
+        2) {
+      guard++;
+      assert(
+        guard < 10,
+        'the settings pane never revealed the PIN stub surface',
+      );
+      await tester.drag(find.byType(ListView).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
+    }
 
-    final pinSwitch = tester.widget<SwitchListTile>(
-      find.byType(SwitchListTile),
-    );
+    // The PIN stub is the FIRST switch on the pane (the PDF-export card's
+    // anonymize toggle renders after the data-entry cards).
+    final pinSwitch = tester
+        .widgetList<SwitchListTile>(find.byType(SwitchListTile))
+        .first;
     expect(pinSwitch.value, isFalse);
     expect(pinSwitch.onChanged, isNull);
   });

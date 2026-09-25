@@ -51,6 +51,11 @@ Future<bool> _triggerDownload(String filename, html.Blob blob) async {
 // export compiles with the same surface.
 Future<bool> shareFile(String filename, String content) async => false;
 
+/// Binary share variant for the PDF export document: dead on web like
+/// [shareFile] above (the browser download is the hand-off there); kept
+/// only for the conditional export's equal surface.
+Future<bool> shareFileBytes(String filename, List<int> bytes) async => false;
+
 /// Opens a file picker filtered by [accept] (an HTML accept list such as
 /// `application/json,.json` or `.csv,text/csv`) and reads the chosen file's
 /// text; null when the user cancelled or no file was chosen.

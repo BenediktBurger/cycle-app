@@ -1,8 +1,9 @@
 // The DSGVO/privacy notice (the drafted German paragraph from the roadmap's
 // "add necessary DSGVO notice" item): states the app's data-control reality —
 // local-only storage, nothing ever sent, GDPR rights exercisable directly in
-// the app. Two surfaces share one string source: the settings pane's
-// "Datenschutz" card and the about/onboarding content page.
+// the app. Its single surface is the about/onboarding content page (reached
+// via the settings pane's AppBar info action); the settings pane itself
+// carries no notice card anymore (the settings layout test pins that).
 //
 // German device locale mirrors the app's German-first posture.
 import 'package:cycle_app/db/cycle_database.dart';
@@ -17,7 +18,14 @@ import 'support/viewport.dart';
 void main() {
   /// German device + seeded onboarding flag: the shell is reachable and the
   /// settings pane is the navigation surface both groups start from.
+  ///
+  /// The pane is a lazy ListView: an "absent from the pane" pin must enlarge
+  /// the surface so the whole card list is BUILT in one viewport (otherwise
+  /// the not-there assertion would pass vacuously while the card merely sat
+  /// below the fold unbuilt).
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     useDeviceLocales(tester, const [Locale('de')]);
 
     Future<void> seed(CycleDatabase db) =>
@@ -39,24 +47,30 @@ void main() {
 
   group('DSGVO notice', () {
     testWidgets(
-      'the settings pane shows the Datenschutz card with the notice',
+      'the privacy text appears only on the about page — the settings '
+      'pane carries no Datenschutz card anymore',
       (WidgetTester tester) async {
         await pumpGermanSettingsPane(tester);
 
-        // The card sits below the fold together with the later cards.
-        await tester.dragUntilVisible(
+        // The pane's dedicated card is gone: no Datenschutz heading anywhere
+        // on the settings surface (asserted BEFORE the about page is pushed,
+        // so later finds cannot spill over from the pushed page).
+        expect(
           find.text('Datenschutz'),
-          find.byType(ListView),
-          const Offset(0, -200),
+          findsNothing,
+          reason:
+              'the standalone privacy card is removed from the settings '
+              'pane — the notice lives on the about page only',
         );
-        await tester.pumpAndSettle();
+
+        await openAboutPage(tester);
 
         expect(
           find.text('Datenschutz'),
           findsOneWidget,
           reason:
-              'the settings pane carries the privacy notice as its own '
-              '"Datenschutz" card',
+              'with the card gone, the about page stays the notice\'s '
+              'home, heading included',
         );
         expect(
           find.textContaining('ausschließlich lokal'),

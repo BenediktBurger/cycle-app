@@ -20,7 +20,8 @@ import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/pdf/cycle_pdf.dart'
     show PdfExportOptions, pdfExportFileName;
 import 'package:cycle_app/providers.dart';
-import 'package:cycle_app/ui/file_transfer_io.dart' show saveFileBytesOverride;
+import 'package:cycle_app/ui/file_transfer_io.dart'
+    show saveFileBytesOverride, shareFileBytesOverride;
 import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,6 +87,12 @@ void main() {
     VoidCallback? onExport,
     TemperatureRange? temperatureRange,
     DateTime? today,
+
+    /// Holds one generation run open until completed: the disabled-state
+    /// pin needs a frame where a run is IN FLIGHT (an immediate stub would
+    /// finish the run inside the same pump).
+    Completer<void>? generationGate,
+    bool generationFails = false,
   }) {
     return ProviderScope(
       overrides: [
@@ -112,6 +119,10 @@ void main() {
             run?.model = model;
             run?.options = options;
             onExport?.call();
+            if (generationGate != null) await generationGate.future;
+            if (generationFails) {
+              throw StateError('stubbed document builder failure');
+            }
             return fakePdfBytes;
           },
         ),
@@ -620,6 +631,229 @@ void main() {
             'the flipped switch still maps onto the per-export '
             'anonymize option (unchanged behavior, re-asserted)',
       );
+    },
+  );
+
+  testWidgets(
+    'the export card offers BOTH hand-offs in one wrap row: the renamed '
+    'Save action renders left of the Share action (save keeps the key '
+    'pdfExportButton and the primary styling — the mirror of the JSON '
+    'export page\'s save+share row)',
+    (WidgetTester tester) async {
+      await enlargeViewport(tester);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      shareFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => shareFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(entries: cardEntries(), marks: cardMarks()),
+      );
+
+      expect(find.text('Save'), findsOneWidget);
+      expect(find.text('Share'), findsOneWidget);
+      // Both sit in the SAME Wrap (the JSON page's hand-off-row idiom);
+      // the innermost Wrap of the save button is that row.
+      final row = find
+          .ancestor(of: pdfExportButton(), matching: find.byType(Wrap))
+          .first;
+      expect(
+        find.descendant(of: row, matching: pdfExportShareButton()),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(pdfExportButton()).left,
+        lessThan(tester.getRect(pdfExportShareButton()).left),
+        reason: 'save is the primary hand-off and renders first (left)',
+      );
+    },
+  );
+
+  testWidgets(
+    'the share press hands the generated document to the share seam alone: '
+    'same bytes and export-date filename as the save route, save seam '
+    'untouched (one press, one hand-off)',
+    (WidgetTester tester) async {
+      final run = CapturedRun();
+      final shares = <(String, List<int>)>[];
+      final saves = <(String, List<int>)>[];
+      await enlargeViewport(tester);
+      shareFileBytesOverride = (filename, bytes) async {
+        shares.add((filename, bytes));
+        return true;
+      };
+      addTearDown(() => shareFileBytesOverride = null);
+      saveFileBytesOverride = (filename, bytes) async {
+        saves.add((filename, bytes));
+        return true;
+      };
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(entries: cardEntries(), marks: cardMarks(), runSink: [run]),
+      );
+
+      await tester.tap(pdfExportShareButton());
+      await tester.pumpAndSettle();
+
+      expect(
+        shares.single.$1,
+        pdfExportFileName(run.options!.exportDate!),
+        reason:
+            'the share route names the document like the save route '
+            '(the ISO export date of the same run)',
+      );
+      expect(
+        shares.single.$2,
+        fakePdfBytes,
+        reason: 'the SHARED payload is the generated document itself',
+      );
+      expect(saves, isEmpty, reason: 'sharing must not silently also save');
+      expect(find.text('File shared.'), findsOneWidget);
+      expect(find.text('File saved.'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a failed share (the share seam reporting false) shows the share-failure '
+    'message, never a success or save wording',
+    (WidgetTester tester) async {
+      final shares = <(String, List<int>)>[];
+      await enlargeViewport(tester);
+      shareFileBytesOverride = (filename, bytes) async {
+        shares.add((filename, bytes));
+        return false;
+      };
+      addTearDown(() => shareFileBytesOverride = null);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(entries: cardEntries(), marks: cardMarks()),
+      );
+
+      await tester.tap(pdfExportShareButton());
+      await tester.pumpAndSettle();
+
+      expect(
+        shares,
+        hasLength(1),
+        reason:
+            'the press did reach the seam — '
+            'the FALSE result is the failure, not a skipped hand-off',
+      );
+      expect(find.text('Sharing failed.'), findsOneWidget);
+      expect(find.text('File shared.'), findsNothing);
+      expect(find.text('Saving the file failed.'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the anonymize switch flows into the SHARED generation like it does '
+    'into the saved one; the stored identifying settings survive the '
+    'anonymized share run',
+    (WidgetTester tester) async {
+      final run = CapturedRun();
+      final shares = <(String, List<int>)>[];
+      await enlargeViewport(tester);
+      shareFileBytesOverride = (filename, bytes) async {
+        shares.add((filename, bytes));
+        return true;
+      };
+      addTearDown(() => shareFileBytesOverride = null);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(entries: cardEntries(), marks: cardMarks(), runSink: [run]),
+      );
+
+      await tester.tap(pdfExportAnonymizeSwitch());
+      await tester.pumpAndSettle();
+      await tester.tap(pdfExportShareButton());
+      await tester.pumpAndSettle();
+
+      expect(run.options!.anonymized, isTrue);
+      expect(shares, hasLength(1));
+      expect(find.text('File shared.'), findsOneWidget);
+      // Both hand-offs consume the SAME anonymize decision; it stays
+      // card-local — the stored identifying field keeps its value.
+      expect(find.text('Maria Muster'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a generation failure during a SHARE press reports the share verb\'s '
+    'failure message — and never reaches either seam',
+    (WidgetTester tester) async {
+      final shares = <(String, List<int>)>[];
+      final saves = <(String, List<int>)>[];
+      await enlargeViewport(tester);
+      shareFileBytesOverride = (filename, bytes) async {
+        shares.add((filename, bytes));
+        return true;
+      };
+      addTearDown(() => shareFileBytesOverride = null);
+      saveFileBytesOverride = (filename, bytes) async {
+        saves.add((filename, bytes));
+        return true;
+      };
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(
+          entries: cardEntries(),
+          marks: cardMarks(),
+          generationFails: true,
+        ),
+      );
+
+      await tester.tap(pdfExportShareButton());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sharing failed.'), findsOneWidget);
+      expect(find.text('File shared.'), findsNothing);
+      expect(shares, isEmpty);
+      expect(saves, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'both hand-off buttons disable while a run is in flight: the gate '
+    'holds the generation open mid-press and the disabled states are '
+    'pinned, then the gated run finishes normally',
+    (WidgetTester tester) async {
+      final gate = Completer<void>();
+      await enlargeViewport(tester);
+      shareFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => shareFileBytesOverride = null);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(
+          entries: cardEntries(),
+          marks: cardMarks(),
+          generationGate: gate,
+        ),
+      );
+
+      await tester.tap(pdfExportButton());
+      await tester.pump();
+      expect(
+        tester.widget<FilledButton>(pdfExportButton()).onPressed,
+        isNull,
+        reason: 'save is disabled mid-run — no second generation',
+      );
+      expect(
+        tester.widget<FilledButton>(pdfExportShareButton()).onPressed,
+        isNull,
+        reason: 'share is disabled mid-run — one run serves one hand-off',
+      );
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('File saved.'), findsOneWidget);
     },
   );
 

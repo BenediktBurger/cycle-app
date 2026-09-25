@@ -59,6 +59,7 @@ import 'package:intl/intl.dart';
 import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/disturbances.dart';
 import '../domain/evaluation.dart';
 import '../domain/evaluation_overlay.dart';
@@ -744,6 +745,7 @@ final class _CycleChartState extends State<_CycleChart> {
       min: yMin,
       max: yMax,
       plotHeight: chartHeight,
+      locale: Localizations.localeOf(context).toString(),
     );
 
     // The SUZ glyph's top anchoring (°C value units — independent of the
@@ -2225,6 +2227,7 @@ final class _TemperatureScale {
     required this.min,
     required this.max,
     required this.plotHeight,
+    required this.locale,
   });
 
   /// The chart's lower y bound in °C: the settings range's min (within the
@@ -2237,6 +2240,11 @@ final class _TemperatureScale {
 
   /// The plot area's height in pixels.
   final double plotHeight;
+
+  /// The resolved display locale (carried from the chart build's
+  /// `Localizations.localeOf`) — the rail labels format decimals through
+  /// it, so the rail and the rest of the app cannot disagree.
+  final String locale;
 
   /// The pixel y (measured from the plot's TOP edge) of a temperature
   /// value: the same linear map fl_chart's painter applies
@@ -2251,12 +2259,15 @@ final class _TemperatureScale {
   ];
 
   /// The two-scale label for a tick, WITH the °C unit on every label
-  /// (mirrors the PDF's axis-label convention): the decimal formatting
-  /// stays unlocalized ("37.5", a period — the rail's current rendering;
-  /// the wiki-facing German comma lives in the PDF, which is a German
-  /// document). TODO(user-review): a locale-aware comma ("37,5 °C" in de)
-  /// is the open refinement question for the app side.
-  String labelFor(double value) => '${_formatHalfDegree(value)} °C';
+  /// (mirrors the PDF's axis-label convention): the decimal part follows
+  /// the effective display locale ("37,5 °C" in de / "37.5 °C" in en,
+  /// via the shared display formatter) while whole degrees stay plain —
+  /// half-degree labels carry the fraction, whole ones don't (the scale's
+  /// two-tier shape, unchanged). The PDF's always-German comma lives by
+  /// the same rule's documented exception (see
+  /// lib/domain/decimal_display.dart).
+  String labelFor(double value) =>
+      '${_formatHalfDegree(value, locale: locale)} °C';
 }
 
 // --- frozen left rail --------------------------------------------------------
@@ -2430,16 +2441,17 @@ final class _LeftRail extends StatelessWidget {
 // --- half-degree formatting ---------------------------------------------------
 
 /// The rail's tick-label numerals: integers plain ("37"), halves with one
-/// decimal ("36.5") — the numbering behaves exactly like the paper sheet's
-/// margin scale values. The °C unit is appended by [_TemperatureScale
+/// decimal following the locale ("36.5" en / "36,5" de — the shared
+/// display formatter) — the numbering behaves exactly like the paper
+/// sheet's margin scale values. The °C unit is appended by [_TemperatureScale
 /// .labelFor] (in lib/ui/cycle.dart's scale class), NOT here.
-String _formatHalfDegree(double value) {
+String _formatHalfDegree(double value, {required String locale}) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0
       ? rounded.toStringAsFixed(0)
-      : rounded.toStringAsFixed(1);
+      : formatDecimal(rounded, locale: locale, decimalDigits: 1);
 }
-// TODO(user-review): Fahrenheit stays out of scope — [_formatHalfDegree]
-// (and the settings pickers' 0.5 °C step unit) are the cheap °C-coupled
-// seams a later conversion would hook into; the range/provider/curve math
-// stays in °C domain units.
+// Fahrenheit stays out of scope — [_formatHalfDegree]'s locale seam (and
+// the settings pickers' 0.5 °C step unit) are the cheap °C-coupled seams a
+// later conversion would hook into; the range/provider/curve math stays
+// in °C domain units.

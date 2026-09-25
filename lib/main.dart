@@ -93,6 +93,23 @@ class _CycleAppState extends ConsumerState<CycleApp> {
         ref.read(observedCyclesOutsideAppProvider.notifier).state =
             snapshot.observedCyclesOutsideApp;
       }
+      // The nullable paper-history values follow the pdfExport pattern:
+      // null means "not given" (the default), so only a non-null snapshot
+      // value fills an untouched provider.
+      final paperShortest = ref.read(shortestCycleLengthOutsideAppProvider);
+      if (paperShortest == null &&
+          snapshot.shortestCycleLengthOutsideApp != null) {
+        ref.read(shortestCycleLengthOutsideAppProvider.notifier).state =
+            snapshot.shortestCycleLengthOutsideApp;
+      }
+      final paperEarliest = ref.read(
+        earliestFirstHigherCycleDayOutsideAppProvider,
+      );
+      if (paperEarliest == null &&
+          snapshot.earliestFirstHigherCycleDayOutsideApp != null) {
+        ref.read(earliestFirstHigherCycleDayOutsideAppProvider.notifier).state =
+            snapshot.earliestFirstHigherCycleDayOutsideApp;
+      }
       final pdfName = ref.read(pdfExportNameProvider);
       if (pdfName == null && snapshot.pdfExportName != null) {
         ref.read(pdfExportNameProvider.notifier).state = snapshot.pdfExportName;
@@ -134,6 +151,24 @@ class _CycleAppState extends ConsumerState<CycleApp> {
       _persistSetting(
         ref,
         (store) => store.persistObservedCyclesOutsideApp(current),
+      );
+    });
+    ref.listen<int?>(shortestCycleLengthOutsideAppProvider, (
+      previous,
+      current,
+    ) {
+      _persistSetting(
+        ref,
+        (store) => store.persistShortestCycleLengthOutsideApp(current),
+      );
+    });
+    ref.listen<int?>(earliestFirstHigherCycleDayOutsideAppProvider, (
+      previous,
+      current,
+    ) {
+      _persistSetting(
+        ref,
+        (store) => store.persistEarliestFirstHigherCycleDayOutsideApp(current),
       );
     });
     ref.listen<String?>(pdfExportNameProvider, (previous, current) {

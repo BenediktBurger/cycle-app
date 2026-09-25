@@ -3,8 +3,8 @@
 // date pre-selected in the entry form).
 //
 // The persisted general settings (locale, theme mode, temperature range,
-// the outside-app cycle count) are persisted in the app_settings key-value
-// table of the drift database: they load into the StateProviders below
+// the outside-app cycle-count family) are persisted in the app_settings
+// key-value table of the drift database: they load into the StateProviders below
 // right after the database opens ([persistedSettingsProvider], hydration
 // wiring in main.CycleApp) and every change is written back through to
 // that table (also main.CycleApp). The providers stay plain in-memory
@@ -127,6 +127,31 @@ final temperatureRangeProvider = StateProvider<TemperatureRange>(
 /// on every change (main.CycleApp).
 final observedCyclesOutsideAppProvider = StateProvider<int>((ref) => 0);
 
+/// The shortest cycle's LENGTH IN DAYS (>= 1) observed outside this app
+/// (the paper-history family next to [observedCyclesOutsideApp]); null
+/// means "not given" — the value is optional. Statistics and the PDF
+/// export min-combine it with the in-app figures (a paper fact predates
+/// every in-app cycle).
+///
+/// Persisted, mirroring the other general settings: hydrated from the
+/// local app_settings table once the database opens and written through
+/// on every change (main.CycleApp).
+final shortestCycleLengthOutsideAppProvider = StateProvider<int?>(
+  (ref) => null,
+);
+
+/// The earliest first higher measurement's CYCLE-DAY NUMBER (>= 1,
+/// counting from 1) observed outside this app; null means "not given".
+/// Statistics (both documented variants) and the PDF export min-combine
+/// it with the in-app figures like [shortestCycleLengthOutsideAppProvider].
+///
+/// Persisted, mirroring the other general settings: hydrated from the
+/// local app_settings table once the database opens and written through
+/// on every change (main.CycleApp).
+final earliestFirstHigherCycleDayOutsideAppProvider = StateProvider<int?>(
+  (ref) => null,
+);
+
 /// Whether the onboarding page has been completed ("Weiter" tapped). The
 /// default false shows the shared about-content page full-page once the
 /// database is open; the continue action flips it to true, and the shell
@@ -157,7 +182,9 @@ final pdfExportBirthDateProvider = StateProvider<DateTime?>((ref) => null);
 /// main.CycleApp's hydration listener applies each snapshot into
 /// [localeProvider], [themeModeProvider], [temperatureRangeProvider],
 /// [observedCyclesOutsideAppProvider], [onboardingCompletedProvider],
-/// [pdfExportNameProvider] and [pdfExportBirthDateProvider].
+/// [pdfExportNameProvider], [pdfExportBirthDateProvider],
+/// [shortestCycleLengthOutsideAppProvider] and
+/// [earliestFirstHigherCycleDayOutsideAppProvider].
 /// Non-autoDispose like [databaseProvider] — the load keeps the database
 /// open for the app lifetime.
 final persistedSettingsProvider = FutureProvider<PersistedSettings>((

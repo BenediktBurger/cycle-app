@@ -62,6 +62,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
 import '../domain/evaluation_overlay.dart';
 import '../domain/marks.dart';
@@ -275,12 +276,11 @@ final class CycleDayPanel extends ConsumerWidget {
   /// Locale-formatted temperature value (two fraction digits — the same
   /// mechanism the entry form and the info lines use), shared by the info
   /// lines and the rise-consistency dialog. Takes the locale string (not
-  /// the context) so callers can format across an async gap.
+  /// the context) so callers can format across an async gap; routed through
+  /// the shared display formatter (single-sourced like every other decimal
+  /// surface).
   String _formatValue(String locale, double value) =>
-      NumberFormat.decimalPatternDigits(
-        locale: locale,
-        decimalDigits: 2,
-      ).format(value);
+      formatDecimal(value, locale: locale, decimalDigits: 2);
 
   /// The computed info lines for [day], in evaluation order: the 1-6 low
   /// number, the baseline value (the day the baseline runs through), and —

@@ -22,7 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/database.dart';
 import 'support/finders.dart';
 
-ProviderScope _appScope() => appScope();
+ProviderScope _appScope({Locale? locale}) => appScope(locale: locale);
 
 /// The running app's ProviderScope container (for direct provider reads).
 ProviderContainer _container(WidgetTester tester) =>
@@ -48,10 +48,18 @@ DropdownButton<double> _picker(WidgetTester tester, Finder field) =>
     );
 
 void main() {
-  testWidgets('with no override the provider defaults to 36.0..38.0 °C and the '
-      'card renders the two pickers on it', (WidgetTester tester) async {
+  Future<void> pumpApp(WidgetTester tester) async {
+    // The range card sits below the pane's top cards (lazy ListView —
+    // enlarge the surface so the whole card list is built).
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(_appScope());
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('with no override the provider defaults to 36.0..38.0 °C and the '
+      'card renders the two pickers on it', (WidgetTester tester) async {
+    await pumpApp(tester);
 
     final range = _container(tester).read(temperatureRangeProvider);
     expect(range.min, 36.0, reason: 'no override → the default 36–38 °C range');
@@ -80,8 +88,7 @@ void main() {
     'changing the lower limit updates the provider immediately and the '
     'picker shows the half-degree steps',
     (WidgetTester tester) async {
-      await tester.pumpWidget(_appScope());
-      await tester.pumpAndSettle();
+      await pumpApp(tester);
       await _openSettings(tester);
 
       await tester.tap(_minField());
@@ -104,8 +111,7 @@ void main() {
       'values strictly on its side of the other bound', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(_appScope());
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
     await _openSettings(tester);
 
     final minDrop = _picker(tester, _minField());
@@ -143,5 +149,44 @@ void main() {
       38.0,
       reason: 'with min 37.5 the max picker starts at 38.0 (min < max)',
     );
+  });
+
+  testWidgets('device locale de: the half-degree steps render the German comma '
+      'separator (display only — the stored double is unchanged)', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_appScope(locale: const Locale('de')));
+    await tester.pumpAndSettle();
+
+    // German device: the nav label itself is German (navLabel is a text
+    // finder — localized labels are matched by their locale string).
+    await tester.tap(navLabel('Einstellungen'));
+    await tester.pumpAndSettle();
+
+    // The closed lower picker shows the selected default 36.0 already
+    // comma-formatted; the item itself proves the dropdown list follows.
+    expect(
+      find.text('36,0 °C'),
+      findsWidgets,
+      reason: 'the selected half-degree step renders comma in de',
+    );
+
+    // Selecting a German-labeled step writes the SAME double as before
+    // (the localization is display-only, the range math stays untouched).
+    await tester.tap(_minField());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('35,5 °C').last);
+    await tester.pumpAndSettle();
+
+    final range = _container(tester).read(temperatureRangeProvider);
+    expect(
+      range.min,
+      35.5,
+      reason: 'the comma-labeled step selects the same double value',
+    );
+    expect(range.max, 38.0, reason: 'the upper limit stays untouched');
+    expect(_picker(tester, _minField()).value, 35.5);
   });
 }

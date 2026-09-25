@@ -12,7 +12,12 @@
 // the total observed cycles from the mark-opened cycles recorded in the
 // app plus the "observed cycles outside this app" settings value — the
 // card's caption names that composition on the surface ("in this app: n"
-// and, when the user has set it, "outside: n"). Missing values render as
+// and, when the user has set it, "outside: n"). The paper-history values
+// (shortest cycle, earliest first higher — both optional settings) fold
+// into the shortest/earliest surfaces as plain MIN-combination, since
+// they were recorded before every in-app cycle; they stay OUT of the
+// lengths list, the distribution and the per-cycle table (single
+// recorded facts, not distribution entries). Missing values render as
 // the "—" dash.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +25,7 @@ import 'package:intl/intl.dart';
 
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
+import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
 import '../domain/marks.dart';
 import '../domain/statistics.dart';
@@ -82,6 +88,46 @@ class StatistikScreen extends ConsumerWidget {
           );
           final earliest = earliestFirstHigherCycleDay(evaluations);
 
+          // The paper history folds in through the shared MIN-combination
+          // rule (minRecordedFact, lib/domain/statistics.dart) at the
+          // shortest/earliest surfaces: the paper figures were recorded
+          // BEFORE every in-app cycle, so they are known facts at this
+          // screen's point of view. They are single recorded facts — they
+          // do NOT enter the lengths list, the distribution or the
+          // per-cycle table (in-app-only surfaces below stay gated on
+          // `lengths`).
+          final paperShortest = ref.watch(
+            shortestCycleLengthOutsideAppProvider,
+          );
+          final paperEarliest = ref.watch(
+            earliestFirstHigherCycleDayOutsideAppProvider,
+          );
+          final shortestOverall = minRecordedFact(
+            paperShortest,
+            summary.shortest,
+          );
+          final lengthDetailWithPaper = DescriptiveSummary(
+            minimum: minRecordedFact(paperShortest, lengthDetail.minimum),
+            maximum: lengthDetail.maximum,
+            average: lengthDetail.average,
+            standardDeviation: lengthDetail.standardDeviation,
+          );
+          final earliestWithPaper = (
+            any: minRecordedFact(paperEarliest, earliest.any),
+            afterMucusPeak: minRecordedFact(
+              paperEarliest,
+              earliest.afterMucusPeak,
+            ),
+          );
+
+          // The average/shortest/longest row renders with ONLY a paper
+          // shortest present too (in-app lengths empty): a paper-only
+          // user must see her recorded shortest figure instead of a
+          // hidden row. The average and longest cells then dash — the
+          // paper value is one fact, not a lengths distribution.
+          final hasShortestRow =
+              summary.lengths.isNotEmpty || paperShortest != null;
+
           // The upstream statistics rework's aggregate + per-cycle table
           // data: the fact rows and the first-higher-until-cycle-end
           // metric keep upstream's counting rule (each fact's span counts
@@ -104,8 +150,12 @@ class StatistikScreen extends ConsumerWidget {
           // The earliest first higher, two documented variants: the
           // "real" one (strictly after the mucus peak) is the primary row;
           // the over-all-cycles minimum is the fallback row. When the real
-          // variant qualifies nowhere, the dash + the missing-variant
-          // caption state that fact.
+          // variant is genuinely missing in the DISPLAYED pair, the dash +
+          // the missing-variant caption state that fact. The caption's gate
+          // reads the paper-folded pair, not the raw in-app values: the rows
+          // display the fold, so gating on the raw values would claim a
+          // missing real variant while the row actually carries the paper
+          // figure (in-app real missing + paper value present).
           String cycleDayText(int? n) =>
               n == null ? _missing : l10n.statisticsCycleDay(n);
 
@@ -136,13 +186,19 @@ class StatistikScreen extends ConsumerWidget {
               if (summary.lengths.isNotEmpty) ...[
                 _lengthsListCard(context, l10n, summary.lengths),
                 const SizedBox(height: 8),
-                _averageShortestLongestRow(context, summary),
+              ],
+              if (hasShortestRow) ...[
+                _averageShortestLongestRow(
+                  context,
+                  summary,
+                  shortestOverride: shortestOverall,
+                ),
                 const SizedBox(height: 8),
               ],
               _MetricCard(
                 key: const ValueKey('statisticsCard-cycleLength'),
                 title: l10n.statisticsMetricCycleLength,
-                detail: lengthDetail,
+                detail: lengthDetailWithPaper,
               ),
               const SizedBox(height: 8),
               _MetricCard(
@@ -171,13 +227,14 @@ class StatistikScreen extends ConsumerWidget {
                   children: [
                     _ValueRow(
                       label: l10n.statisticsFirstHigherReal,
-                      value: cycleDayText(earliest.afterMucusPeak),
+                      value: cycleDayText(earliestWithPaper.afterMucusPeak),
                     ),
                     _ValueRow(
                       label: l10n.statisticsFirstHigherAny,
-                      value: cycleDayText(earliest.any),
+                      value: cycleDayText(earliestWithPaper.any),
                     ),
-                    if (earliest.afterMucusPeak == null && earliest.any != null)
+                    if (earliestWithPaper.afterMucusPeak == null &&
+                        earliestWithPaper.any != null)
                       Text(
                         l10n.statisticsFirstHigherRealMissing,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -255,8 +312,12 @@ Widget _lengthsListCard(
 
 Widget _averageShortestLongestRow(
   BuildContext context,
-  CycleLengthSummary summary,
-) {
+  CycleLengthSummary summary, {
+  // The min-combined shortest figure (paper fold included — see the
+  // build method's fold comment); average and longest stay in-app-only
+  // (single recorded facts never become distribution members).
+  required int? shortestOverride,
+}) {
   final l10n = AppLocalizations.of(context);
   return Row(
     children: [
@@ -265,7 +326,7 @@ Widget _averageShortestLongestRow(
           key: const ValueKey('statisticsCard-average'),
           title: l10n.statisticsAverage,
           child: Text(
-            _scalarText(summary.average),
+            _scalarText(context, summary.average),
             style: Theme.of(context).textTheme.headlineSmall,
           ),
         ),
@@ -275,7 +336,7 @@ Widget _averageShortestLongestRow(
         child: _StatCard(
           key: const ValueKey('statisticsCard-shortest'),
           title: l10n.statisticsShortest,
-          child: _headlineText(context, summary.shortest),
+          child: _headlineText(context, shortestOverride),
         ),
       ),
       const SizedBox(width: 8),
@@ -398,11 +459,11 @@ final class _MetricCard extends StatelessWidget {
           ),
           _ValueRow(
             label: l10n.statisticsAverage,
-            value: _scalarText(detail.average),
+            value: _scalarText(context, detail.average),
           ),
           _ValueRow(
             label: l10n.statisticsStandardDeviation,
-            value: _scalarText(detail.standardDeviation),
+            value: _scalarText(context, detail.standardDeviation),
           ),
         ],
       ),
@@ -411,10 +472,17 @@ final class _MetricCard extends StatelessWidget {
 }
 
 /// ONE scalar formatting rule for fractional descriptive values (average,
-/// standard deviation): one decimal digit, or the "—" dash. Shared by the
-/// metric cards and the old average card so they cannot drift.
-String _scalarText(double? value) =>
-    value == null ? _missing : value.toStringAsFixed(1);
+/// standard deviation): one decimal digit following the effective locale
+/// ("28,0" in de / "28.0" in en, via the shared display formatter), or the
+/// "—" dash. Shared by the metric cards and the old average card so they
+/// cannot drift.
+String _scalarText(BuildContext context, double? value) => value == null
+    ? _missing
+    : formatDecimal(
+        value,
+        locale: Localizations.localeOf(context).toString(),
+        decimalDigits: 1,
+      );
 
 /// One label/value line inside a statistics card (numbers only — the
 /// label names WHAT is counted, never how to read it).

@@ -3718,6 +3718,31 @@ void main() {
       },
     );
 
+    testWidgets(
+      'the scale labels follow the device locale: de renders the German '
+      'comma, the en default keeps the dot (same ticks, separator only)',
+      (tester) async {
+        await pumpChart(
+          tester,
+          KeyedSubtree(
+            key: UniqueKey(),
+            child: _leftRailHarness(
+              entries: _leftRailEntries,
+              locale: const Locale('de'),
+            ),
+          ),
+        );
+
+        expect(
+          _scaleLabels(tester),
+          ['38 °C', '37,5 °C', '37 °C', '36,5 °C', '36 °C'],
+          reason:
+              'the rail\'s decimal display follows the effective '
+              'locale — integers stay plain, halves comma-formatted in de',
+        );
+      },
+    );
+
     testWidgets('the six row-name glyphs render IN the rail, each vertically '
         'aligned with its signal row', (tester) async {
       await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));

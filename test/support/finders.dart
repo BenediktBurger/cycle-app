@@ -169,10 +169,16 @@ Finder settingsImportJsonButton() =>
 Finder settingsImportDripButton() =>
     find.byKey(const ValueKey('settingsImportDripButton'));
 
-/// The PDF export card's generate button (the card carries the summary
-/// line, the anonymize switch and this action; the selection sub-page's
-/// confirm button is separate).
+/// The PDF export card's save button (generates the document and hands it
+/// to the save-as dialog; the card carries the summary line, the anonymize
+/// switch and the save+share action row — see [pdfExportShareButton]).
 Finder pdfExportButton() => find.byKey(const ValueKey('pdfExportButton'));
+
+/// The PDF export card's share button (the second hand-off next to the
+/// save button: same generated document, system share sheet instead of the
+/// save-as dialog).
+Finder pdfExportShareButton() =>
+    find.byKey(const ValueKey('pdfExportShareButton'));
 
 /// The PDF export card's anonymize switch (card-local state; it never
 /// writes a provider or settings row).

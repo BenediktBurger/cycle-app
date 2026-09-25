@@ -107,7 +107,14 @@ Future<void> main() async {
     today: d(9, 21),
   );
   check(model.cycles.length == 3, 'three mark-opened cycles exported');
-  check(model.observedCycleCount == 7, 'count includes 4 outside-app cycles');
+  // The header's observed-cycle count IS the page's ordinal (one shared
+  // rule): the last page counts up to 7 — the record's three cycles plus
+  // the 4 outside-app paper cycles. Earlier pages count only themselves.
+  check(
+    model.ordinalOf(model.cycles.length - 1) == 7,
+    'the last page\'s observed-cycle count equals its ordinal 7 '
+    '(3 recorded + 4 outside-app cycles)',
+  );
   // The extension: the last cycle's day list gains the data-less days
   // from its last tracked day (Aug 23) out to the pinned today.
   check(

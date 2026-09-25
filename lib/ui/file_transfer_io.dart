@@ -51,6 +51,12 @@ Future<bool> Function(String filename, String content)? saveFileOverride;
 /// opening the real save-as dialog. Always null in production code.
 Future<bool> Function(String filename, List<int> bytes)? saveFileBytesOverride;
 
+/// Test-only seam mirroring [shareFileOverride] for the byte shares (the
+/// PDF document): when set, `shareFileBytes` delegates here instead of
+/// staging the file and opening the real system share sheet. Always null
+/// in production code.
+Future<bool> Function(String filename, List<int> bytes)? shareFileBytesOverride;
+
 /// Opens the save-as dialog, pre-filled with [filename], and lets
 /// `file_picker` write [content] as application/json to the chosen
 /// destination. True when the save destination was chosen and written;
@@ -94,6 +100,29 @@ Future<bool> shareFile(String filename, String content) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$filename');
     await file.writeAsString(content);
+    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    return true;
+  } catch (_) {
+    // The plugin's channel, the platform temp directory or the staging
+    // write can each fail per platform; the snackbar contract means the
+    // error lands in the UI, not in the crash log.
+    return false;
+  }
+}
+
+/// The binary twin of [shareFile] for the PDF document: stages [bytes]
+/// under [filename] in the platform's temporary directory and opens the
+/// system share sheet with that file. The bool contract matches
+/// [shareFile]'s — a dismissed share sheet is a hand-off (true), false on
+/// any staging or platform error.
+Future<bool> shareFileBytes(String filename, List<int> bytes) async {
+  final override = shareFileBytesOverride;
+  if (override != null) return override(filename, bytes);
+
+  try {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}${Platform.pathSeparator}$filename');
+    await file.writeAsBytes(bytes);
     await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
     return true;
   } catch (_) {

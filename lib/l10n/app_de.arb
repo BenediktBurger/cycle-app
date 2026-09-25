@@ -256,6 +256,14 @@
   },
   "settingsObservedCyclesOutsideAppHelper": "Wie viele Zyklen du vor dieser App beobachtet hast (z. B. auf Papier). Die Zyklus-Nummern auf der Zyklusseite fangen erst nach dieser Zahl an zu zählen.",
   "settingsObservedCyclesOutsideAppError": "Bitte eine ganze Zahl ≥ 0 eingeben",
+  "settingsPaperHistory": "Papierhistorie (Zyklen außerhalb dieser App)",
+  "settingsPaperHistoryHelper": "Optional — Werte aus deinem Papierformular (oder einem früheren Tracker). Alle drei fließen in die Statistik und den PDF-Export ein.",
+  "settingsPaperShortestCycleLength": "Kürzester Zyklus",
+  "settingsPaperShortestCycleLengthError": "Bitte eine ganze Zahl ≥ 1 eingeben",
+  "settingsPaperShortestCycleLengthHelper": "Der kürzeste Zyklus aus deinem Papierformular, als Länge in Tagen.",
+  "settingsPaperEarliestFirstHigher": "Früheste erste höhere Messung",
+  "settingsPaperEarliestFirstHigherError": "Bitte eine ganze Zahl ≥ 1 eingeben",
+  "settingsPaperEarliestFirstHigherHelper": "Die früheste erste höhere Messung aus deinem Papierformular, als Zyklustag (Zählung ab 1).",
   "settingsObservedCyclesOutsideAppCount": "Anzahl der beobachteten Zyklen",
   "@settingsObservedCyclesOutsideAppCount": {
     "description": "Label of the settings card's integer field: distinct from the card title directly above it."
@@ -381,9 +389,17 @@
   "@settingsPdfExport": {
     "description": "Settings card + export flow title: the PDF export feature. Mirrors the paper form the NFR teacher knows."
   },
-  "settingsPdfExportName": "Name (Papierformular)",
+  "settingsGeneralInformation": "Allgemeine Angaben",
+  "@settingsGeneralInformation": {
+    "description": "Titel der Allgemeine-Angaben-Karte: die optionalen Benutzerangaben (Name, Geburtsdatum) unter eigener Überschrift, direkt neben der Papierhistorie-Karte. Die bisherige identifying-Karte hieß wie die Export-Aktionskarte „PDF-Export“ — der neue Titel beendet diese Doppelbenennung."
+  },
+  "settingsGeneralInformationNote": "Optional. Die Angaben werden für die Exportfunktion und die Statistik verwendet.",
+  "@settingsGeneralInformationNote": {
+    "description": "Hinweis direkt unter dem Titel der Allgemeine-Angaben-Karte: die Einträge sind optional und wofür sie genutzt werden. (Der Anonymisieren-Hinweis ist zur Schalterposition in der Exportkarte umgezogen.)"
+  },
+  "settingsPdfExportName": "Name",
   "@settingsPdfExportName": {
-    "description": "Free-text field label for the export name: printed in the PDF header, hideable per export via anonymize."
+    "description": "Freitext-Feld in der Allgemeine-Angaben-Karte: erscheint im PDF-Kopfbereich, pro Export anonymisierbar. Der Zusatz „(Papierformular)“ ist mit dem Umzug aus der PDF-Karte entfallen — die Karte selbst sagt, wofür die Angaben genutzt werden."
   },
   "settingsPdfExportBirthDate": "Geburtsdatum",
   "@settingsPdfExportBirthDate": {
@@ -397,9 +413,9 @@
   "@settingsPdfExportBirthDateError": {
     "description": "Validation error of the birth-date field (also for impossible days like 1990-02-30)."
   },
-  "settingsPdfExportNote": "Name und Geburtsdatum erscheinen im Kopfbereich jedes PDF-Exports; der Anonymisieren-Schalter im Export blendet beide für den jeweiligen Export aus, ohne die Speicherung zu ändern. Die Zahl der beobachteten Zyklen im PDF schließt den Wert der Karte \u201eBeobachtete Zyklen außerhalb dieser App\u201c ein.",
-  "@settingsPdfExportNote": {
-    "description": "Helper note of the PDF-export card: names where the values land, points to the per-export anonymize toggle and cross-references the outside-app cycle count that feeds the PDF's observed-cycle header fact."
+  "pdfExportAnonymizeNote": "Blendet eingeschaltet Name und Geburtsdatum aus dem Kopfbereich des jeweiligen Exports aus, ohne die Speicherung zu ändern.",
+  "@pdfExportAnonymizeNote": {
+    "description": "Hinweis der PDF-Exportkarte, unmittelbar unter dem Anonymisieren-Schalter (an dem Steuer, das er erklärt — früher stand er bei der Dateneingabe): was der Export-Anonymisierer tut."
   },
   "pdfExportCycleOption": "Zyklus {n}, ab {day}",
   "@pdfExportCycleOption": {
@@ -449,9 +465,9 @@
   "@pdfExportAnonymize": {
     "description": "Per-export switch: hides the stored name and birth date in THIS generated document (not persisted)."
   },
-  "pdfExportExportButton": "Exportieren",
-  "@pdfExportExportButton": {
-    "description": "Button of the PDF-export card: generates the document and saves it via the file-transfer seam."
+  "pdfExportSaveButton": "Speichern",
+  "@pdfExportSaveButton": {
+    "description": "Save button of the PDF-export card's action row: generates the document and saves it via the file-transfer seam — the share hand-off next to it reuses the shared exportShare/exportShared/exportShareFailed wording."
   },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
