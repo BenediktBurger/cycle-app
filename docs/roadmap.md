@@ -25,11 +25,10 @@ the sections above track planned work, git history keeps the record (see
 
 #### Android
 
-- The entry-form date row in `lib/ui/diary.dart` overflows at narrow widths
-  (about 70–110 px at 320–360 dp under widget-test fallback font metrics; the
-  new narrow-viewport tests waive it with a documented justification) —
-  verify on a real device and at large system font scales before treating it
-  as a real defect and fixing it.
+- Verify the entry-form date row on a real device and at large system
+  font scales — under widget-test fallback metrics it now lays out
+  overflow-free at every pumped width (down to 320 dp), but those are not
+  device fonts or font scales.
 - Confirm on device that the `_dependents.isEmpty` framework assertion no
   longer occurs: the underlying import-dialog dismissal race is fixed and
   guarded by widget tests, but the literal assertion text could not be

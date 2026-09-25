@@ -42,7 +42,7 @@
     "description": "Überschrift des Schmerz-Chips-Blocks (Brustschmerz, Mittelschmerz) im Tagebuch-Eingabeformular. TODO(user-review): Formulierung — prüfen, ob ein passenderer Titel passt."
   },
   "termSex": "Sex",
-  "entryDate": "Datum",
+  "todayDate": "Heute, {date}",
   "entryPreviousDay": "Voriger Tag",
   "entryNextDay": "Nächster Tag",
   "temperature": "Temperatur",

@@ -27,8 +27,7 @@ void useViewportSize(WidgetTester tester, Size logicalSize) {
 }
 
 /// Forces a 320x800 dp Android-class SMALL phone viewport — the minimum
-/// usable width the date-row/narrow-width repros pump at; restored at test
-/// end.
+/// usable width the narrow-viewport repros pump at; restored at test end.
 void useNarrowPhoneViewport(WidgetTester tester) {
   useViewportSize(tester, const Size(320, 800));
 }

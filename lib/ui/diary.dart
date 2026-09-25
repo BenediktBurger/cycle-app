@@ -273,6 +273,28 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       // would show the PREVIOUS day on UTC-negative hosts.
       DateFormat.yMd(locale).format(DateOnly.normalize(d));
 
+  // The HEADER date button's label differs from the list date above in
+  // two ways, so it gets its own formatter instead of touching _formatDay
+  // (whose compact yMd output the cycle-group list and day tiles keep):
+  //  1. Mark-sheet style: the longer yMMMEd ("Fr., 10. Apr. 2026") that
+  //     the cycle day sheet prints in its header — the two header areas
+  //     look and read alike.
+  //  2. On today a localized prefix removes the ambiguity between "the
+  //     form happens to sit on some date" and "this is today" (todayDate
+  //     key). No runtime concatenation: the locale's full composite
+  //     ("Heute, Fr., 10. Apr. 2026") lives in the ARB.
+  String _headerDayLabel(
+    AppLocalizations l10n, {
+    required DateTime selected,
+    required DateTime now,
+    required String locale,
+  }) {
+    final date =
+        // Same verbatim UTC-midnight convention as _formatDay above.
+        DateFormat.yMMMEd(locale).format(DateOnly.normalize(selected));
+    return DateOnly.sameDay(selected, now) ? l10n.todayDate(date) : date;
+  }
+
   /// Locale-aware two-decimal temperature display ("36,65" in German) —
   /// routed through the shared display formatter (single-sourced like
   /// every other decimal surface).
@@ -365,12 +387,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // --- date ---------------------------------------------------
               // Previous/next flank the date button and step through the
               // same window the date picker offers (bounds computed above).
+              // Left alignment keeps the date button and the day chevrons together.
+              //
+              // The date button is flexed so its label constrains to the row
+              // instead of overflowing it.
               Row(
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  const Icon(Icons.event_outlined),
-                  const SizedBox(width: 8),
-                  Text(l10n.entryDate),
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: previousDay.isBefore(DateTime.utc(2000))
@@ -378,9 +401,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                         : () => _moveDay(-1),
                     tooltip: l10n.entryPreviousDay,
                   ),
-                  OutlinedButton(
-                    onPressed: _pickDate,
-                    child: Text(_formatDay(selected, locale)),
+                  Flexible(
+                    child: OutlinedButton(
+                      onPressed: _pickDate,
+                      child: Text(
+                        _headerDayLabel(
+                          l10n,
+                          selected: selected,
+                          now: now(),
+                          locale: locale,
+                        ),
+                      ),
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
@@ -392,10 +424,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               // The day-of-cycle of the SELECTED day, small type in its
-              // own line below the navigation row. Not inside the row:
-              // that row is already the recorded narrow-width overflow
-              // case (see the temperature/time row comment) and the
-              // label would widen a line that is too tight as it is.
+              // own line below the navigation row, not inside it: the row
+              // already carries the longest label of the form (the
+              // yMMMEd date, often with the "Heute, " prefix) and a
+              // narrow-width test pins that this label line stays
+              // overflow-free (see diary_cycle_day_label_test.dart).
               if (selectedCycleDay != null) ...[
                 const SizedBox(height: 4),
                 Text(

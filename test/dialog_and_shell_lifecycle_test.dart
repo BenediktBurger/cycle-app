@@ -51,6 +51,7 @@
 // selected date changed through the provider while the diary tab is hidden).
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart' show pickFileTextOverride;
@@ -87,19 +88,25 @@ Future<List<FlutterErrorDetails>> collectLifecycleErrors(
   return errors;
 }
 
-/// The German yMd day label exactly as the diary renders it (same formatter
-/// and locale as the screen itself).
-String germanDayLabel(DateTime day) =>
-    DateFormat.yMd('de').format(DateOnly.normalize(day));
+/// The German header day label exactly as the diary renders it.
+///
+/// No host-timezone shifting: the screen formats the UTC-midnight dates
+/// verbatim, each read by its own fields.
+String germanDayLabel(DateTime day, {DateTime? today}) {
+  final date = DateFormat.yMMMEd('de').format(DateOnly.normalize(day));
+  final isToday =
+      today != null &&
+      DateOnly.sameDay(DateOnly.normalize(day), DateOnly.normalize(today));
+  return isToday
+      ? lookupAppLocalizations(const Locale('de')).todayDate(date)
+      : date;
+}
 
 /// Pumps the real app shell (in-memory database, German pin, every tab
-/// mounted) and settles it, DISCHARGING the one-time pump-time layout
-/// record: under widget-test font metrics the diary date row overflows
-/// exactly once at the forced narrow initial layout (documented in the
-/// narrow-width harness note of diary_entry_form_test.dart; on real device
-/// fonts it does not) — that single record is not what these tests measure.
-/// Everything after this call, on any interaction and at teardown, belongs
-/// to the lifecycle scenarios and must stay silent. [seedDays] seeds one
+/// mounted) and settles it; the pump must stay overflow-free, which the
+/// no-exception check below pins. Everything after this call, on any
+/// interaction and at teardown, belongs to the lifecycle scenarios and is
+/// additionally collected by [collectLifecycleErrors]. [seedDays] seeds one
 /// plain temperature-only entry per UTC date so the diary's cycle list has
 /// a group with day tiles.
 Future<void> pumpShell(
@@ -119,7 +126,13 @@ Future<void> pumpShell(
     ),
   );
   await tester.pumpAndSettle();
-  tester.takeException();
+  expect(
+    tester.takeException(),
+    isNull,
+    reason:
+        'the shell pump must stay overflow-free before the lifecycle '
+        'scenario starts',
+  );
 }
 
 /// Scrolls the settings list until the given import card button is visible

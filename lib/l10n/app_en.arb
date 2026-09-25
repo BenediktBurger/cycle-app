@@ -45,7 +45,15 @@
     "description": "Section header of the pain chips (breast pain, Mittelschmerz) on the diary entry form. TODO(user-review): wording — check whether a more specific title fits."
   },
   "termSex": "Sex",
-  "entryDate": "Date",
+  "todayDate": "Today, {date}",
+  "@todayDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "The diary entry form's header date button while the selected day IS today: the today prefix followed by the mark-sheet-formatted date (yMMMEd, e.g. 'Today, Fri, Apr 10, 2026'). Other days show the plain date without the prefix."
+  },
   "entryPreviousDay": "Previous day",
   "entryNextDay": "Next day",
   "temperature": "Temperature",

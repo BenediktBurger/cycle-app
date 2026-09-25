@@ -18,6 +18,7 @@
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'support/diary_harness.dart';
+import 'support/database.dart';
 import 'support/finders.dart';
 import 'support/viewport.dart';
 import 'support/error_collector.dart';
@@ -91,11 +93,22 @@ String _bbtText(WidgetTester tester) => tester
     .controller!
     .text;
 
+// The header date button's German label, exactly as the diary renders it.
 // No host-timezone shifting: the label is host-TZ-independent because the
 // diary formats the UTC-midnight dates verbatim, each read by its own
 // fields.
-String _dayLabel(DateTime day) =>
-    DateFormat.yMd('de').format(DateOnly.normalize(day));
+String _dayLabel(DateTime day, {DateTime? today}) {
+  final date = DateFormat.yMMMEd('de').format(DateOnly.normalize(day));
+  final isToday =
+      today != null &&
+      DateOnly.sameDay(DateOnly.normalize(day), DateOnly.normalize(today));
+  // The de prefix value mirrors the ARB ("todayDate" de) — resolved
+  // through the real bundle so a wording change breaks the test, not the
+  // user.
+  return isToday
+      ? lookupAppLocalizations(const Locale('de')).todayDate(date)
+      : date;
+}
 
 /// The navigation IconButton for [icon] — widgetWithIcon so the cast sees
 /// the IconButton itself, not the bare Icon inside it.
@@ -221,13 +234,13 @@ void main() {
       await tester.pumpWidget(_measuredTimeHarness.scope());
       await tester.pumpAndSettle();
 
-      // Waive the pump-time record: at this forced width, widget-test font
-      // metrics can overflow OTHER rows of the tall form once at the initial
-      // layout — e.g. the date row (a documented, still-open narrow-width
-      // defect of that row, not this one). Everything that fails from here
-      // on, during the temperature/time interaction, belongs to the one-line
-      // row and must stay silent.
-      tester.takeException();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the whole form, date row included, pumps overflow-free '
+            'at 320x800',
+      );
 
       await expectNoFrameworkErrors(
         tester,
@@ -606,6 +619,103 @@ void main() {
       reason: 'navigation must not write the unsaved edit',
     );
     expect(stored2!.bbtC, 36.9);
+  });
+
+  testWidgets(
+    'the header date button: mark-sheet label, "Heute" prefix on today, '
+    'no event icon and no static date label',
+    (WidgetTester tester) async {
+      // No explicit selectedDay: the harness defaults it to the pinned
+      // "now" (2026-04-10), so the today branch fires deterministically
+      // through the nowProvider seam.
+      await tester.pumpWidget(_dayNavHarness.scope());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.widgetWithText(
+          OutlinedButton,
+          _dayLabel(_dayNavNow, today: _dayNavNow),
+        ),
+        findsOneWidget,
+        reason:
+            'the selected day == pinned now, so the button shows the '
+            '"Heute, <mark-sheet date>" composite (yMMMEd)',
+      );
+
+      expect(
+        find.byIcon(Icons.event_outlined),
+        findsNothing,
+        reason: 'the row\'s label is the yMMMEd date; no separate icon',
+      );
+      expect(
+        find.text('Datum'),
+        findsNothing,
+        reason:
+            'no separate "Datum" label; the button\'s date carries the '
+            'meaning alone',
+      );
+
+      // Checked on the picker window's edge too: tomorrow, "measured
+      // just after midnight" is still not today.
+      for (final day in [_day1, DateOnly.addDays(_dayNavNow, 1)]) {
+        final plain = _dayLabel(day);
+        expect(
+          plain,
+          isNot(contains('Heute')),
+          reason: 'guard: ${_dayLabel(day)} must not carry the today prefix',
+        );
+        // Full teardown in between: repumping a ProviderScope over an
+        // existing one updates the same element in place and the old
+        // selected-date override would stick — a plain empty frame forces
+        // a fresh mount (and a fresh container).
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(_dayNavScope(selectedDay: day));
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(OutlinedButton, plain),
+          findsOneWidget,
+          reason:
+              'a non-today day keeps the plain yMMMEd date, '
+              'without the "Heute" prefix',
+        );
+        expect(
+          find.widgetWithText(
+            OutlinedButton,
+            _dayLabel(_dayNavNow, today: _dayNavNow),
+          ),
+          findsNothing,
+          reason:
+              'the "Heute" composite of the pinned now is gone '
+              'once the selection moves off today',
+        );
+      }
+    },
+  );
+
+  testWidgets('the header date prefix localizes: en shows "Today, <date>"', (
+    WidgetTester tester,
+  ) async {
+    // One en assertion guards the template/fallback ordering of the
+    // todayDate key.
+    await tester.pumpWidget(
+      appScope(
+        locale: const Locale('en'),
+        now: () => _dayNavNow,
+        selectedDay: _dayNavNow,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(
+        OutlinedButton,
+        lookupAppLocalizations(const Locale('en')).todayDate(
+          DateFormat.yMMMEd('en').format(DateOnly.normalize(_dayNavNow)),
+        ),
+      ),
+      findsOneWidget,
+      reason: 'the en locale shows "Today, Fri, Apr 10, 2026" on today',
+    );
   });
 
   // ═══════════ cycle-start switch ═══════════

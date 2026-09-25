@@ -153,11 +153,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Waive the pump-time record: the date navigation row itself is the
-    // documented, still-open narrow-width overflow case (see the
-    // narrow-viewport test in the diary navigation tests). Everything
-    // from here on is the NEW label line and must stay silent.
-    tester.takeException();
+    expect(
+      tester.takeException(),
+      isNull,
+      reason:
+          'the whole form, date navigation row included, pumps '
+          'overflow-free at 320x800',
+    );
 
     await expectNoFrameworkErrors(
       tester,
