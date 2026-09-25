@@ -293,6 +293,21 @@ report the full analyzer/test output back so issues can be fixed promptly.
   [`docs/adr/`](docs/adr/README.md) — one numbered Markdown file with the
   sections Title / Date / Status / Context / Decision / Consequences; the
   status vocabulary (Accepted / Hypothesis / Proposed) is defined there.
+- **Adding a persisted setting** (one row of the app_settings key-value
+  table hydrated into a provider and written back on change) is
+  deliberately boring — four steps, no schema change:
+  1. `lib/db/settings_store.dart`: a `SettingKeys` constant, a typed
+     persist helper, a `PersistedSettings` field and a `load()` decode
+     case. The file header documents the per-key corrupt-row rule.
+  2. `lib/providers.dart`: declare the `StateProvider`; its default is
+     the untouched sentinel used by the registrar's fill rule.
+  3. `lib/providers.dart`: add ONE entry to the hydration registrar's
+     table — hydration and write-through both follow it; nothing else
+     needs wiring (`flutter analyze` catches type mismatches).
+  4. [`test/settings_persistence_test.dart`](test/settings_persistence_test.dart)
+     is the pattern file: each persisted setting has a hydration case, a
+     write-through case and — where relevant — a live-choice-precedence
+     case there.
 - **Localization** is German-first via `flutter gen-l10n` (`l10n.yaml`,
   `lib/l10n/`), with English mirrored. Add new UI strings to both
   `.arb` files: new keys start in `app_en.arb` (it is the gen-l10n

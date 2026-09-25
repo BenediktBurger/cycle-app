@@ -134,20 +134,6 @@ the sections above track planned work, git history keeps the record (see
   too entangled for real libraries pre-WP-A3). Sequencing: after A1–A3 land,
   with the option to promote the parts to libraries later once A3's
   memoization/span-cap has thinned what they share.
-- [ ] Hydration/write-through registrar table: replace the per-field
-  hydration block (lib/main.dart `initState`, ~9 fill-if-untouched stanzas)
-  and the 9 write-through `ref.listen` stanzas with ONE declarative table
-  (storage key, codec, provider, fill rule incl. the one-way onboarding flag)
-  that drives both directions; lib/main.dart keeps only the table wiring.
-  DECIDED AND PRESERVED, unchanged behavior: the 9 `StateProvider`s stay the
-  public API (no settings Notifier, no `select` migration of call sites), the
-  single-frame defaults flash keeps its nitpick status, hydration keeps its
-  idempotent write-back echoes, and a write failure stays deliberately
-  silent-in-memory-standing (main.dart's documented trade-off). Contract kept:
-  fill-if-untouched with live-precedence, defaults skipped as no-ops,
-  onboarding flips only false → true. Parallel-safe at any time — no WP-A
-  package touches lib/main.dart/providers.dart; adding a persisted setting
-  afterwards becomes one table entry (document the recipe in CONTRIBUTING).
 
 #### Building the app (to be clarified with INER)
 
@@ -212,17 +198,17 @@ the sections above track planned work, git history keeps the record (see
 ### Work packages — audit 2026-09-25
 
 Packages for the audit findings above (stability, security, architecture —
-including the decided refactor rows). The `WP-A`/`WP-H`/`WP-S` families are
+including the decided refactor rows). The `WP-A`/`WP-S` families are
 defined HERE in this file. Each package is self-contained and meant for one
 agent in one worktree/branch. Agents still pick work only from the checkbox
 rows themselves; a package merely bounds the scope. When a package lands,
 its rows go (per the backlog convention) and the package entry is removed.
 
-Parallelization rules: A4 and the hydration package WP-H are file-disjoint
-from everything else and can run anytime in parallel; A1 goes first among
-the A-packages, A2 and A3 after it, A5 last (sharing lib/ui/settings.dart
-with A1). The refactor packages come after their serialization points
-described in their entries below. Remaining rules of thumb:
+Parallelization rules: A4 is file-disjoint from everything else and can
+run anytime in parallel; A1 goes first among the A-packages, A2 and A3
+after it, A5 last (sharing lib/ui/settings.dart with A1). The refactor
+packages come after their serialization points described in their
+entries below. Remaining rules of thumb:
 
 - lib/ui/diary.dart is shared by A1 (save flow) and A3 (list building) —
   different regions, land A1 first.
@@ -277,18 +263,6 @@ described in their entries below. Remaining rules of thumb:
   (decision: snapshot always vs preview only — quick owner question). Merge
   AFTER A1 (both touch lib/ui/settings.dart). Tests:
   test/import_dialog_test.dart, test/export_share_test.dart.
-
-- **WP-H — hydration registrar table** (Refactors: hydration row, decided
-  2026-09-25)
-  Scope: lib/main.dart (initState hydration block + write-through listens)
-  and a new registrar in lib/providers.dart — one declarative table driving
-  both directions over the KEPT StateProviders; behavior-identical by
-  decision (silent write failures, idempotent echo-upserts, fill-if-untouched,
-  one-way onboarding). File-disjoint from A1–A5 — startable anytime in
-  parallel. Tests: test/settings_persistence_test.dart,
-  test/locale_test.dart, test/theme_mode_setting_test.dart must pass
-  UNCHANGED (mechanical import/list moves in main.dart only); record the
-  "adding a setting" recipe (one table entry) in CONTRIBUTING.md.
 
 - **WP-S1 — settings screen split into libraries** (Refactors: settings row,
   decided 2026-09-25)

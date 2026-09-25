@@ -1,9 +1,10 @@
 // Root widget: Material app, German-first localization whose language
 // follows the system until overridden in the settings screen, a theme mode
 // that likewise follows the device brightness until overridden, the
-// database gating shell, and the persistence wiring for the persisted
+// database gating shell, and the two registrar call sites of the persisted
 // general settings (hydration from / write-through to the app_settings
-// table).
+// table — the table and its rules live in providers.dart; only the
+// lifecycle wiring of the two directions is here).
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -14,7 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'db/cycle_database.dart';
 import 'db/settings_store.dart';
 import 'domain/date_only.dart';
-import 'domain/temperature_range.dart';
 import 'l10n/app_localizations.dart';
 import 'licenses.dart';
 import 'providers.dart';
@@ -67,11 +67,9 @@ class _CycleAppState extends ConsumerState<CycleApp>
     WidgetsBinding.instance.addObserver(this);
     // Hydration: every persisted snapshot (loaded by
     // persistedSettingsProvider the moment the database opens) is applied
-    // into the settings providers. Fill-if-untouched — only a provider
-    // still holding its default takes the snapshot value, so a live choice
-    // (made in between, or coming from a test override) is never clobbered,
-    // and snapshot defaults are skipped as no-ops. The snapshot lands
-    // shortly after the first frame: the MaterialApp
+    // into the settings providers by the registrar's fill rule — the
+    // apply-per-entry rule lives on the table in providers.dart, not here.
+    // The snapshot lands shortly after the first frame: the MaterialApp
     // skeleton renders one frame in defaults until then — accepted
     // trade-off, the database gate keeps every screen behind the open
     // database, so nothing can write a contradicting choice in between.
@@ -88,59 +86,7 @@ class _CycleAppState extends ConsumerState<CycleApp>
       // fail-open to the shell below.
       final snapshot = next.valueOrNull; // null while loading/in error
       if (snapshot == null) return;
-      final locale = ref.read(localeProvider);
-      if (locale == null && snapshot.locale != null) {
-        ref.read(localeProvider.notifier).state = snapshot.locale;
-      }
-      final themeMode = ref.read(themeModeProvider);
-      if (themeMode == ThemeMode.system &&
-          snapshot.themeMode != ThemeMode.system) {
-        ref.read(themeModeProvider.notifier).state = snapshot.themeMode;
-      }
-      final range = ref.read(temperatureRangeProvider);
-      if (range == TemperatureRange.defaults &&
-          snapshot.temperatureRange != TemperatureRange.defaults) {
-        ref.read(temperatureRangeProvider.notifier).state =
-            snapshot.temperatureRange;
-      }
-      final observedCycles = ref.read(observedCyclesOutsideAppProvider);
-      if (observedCycles == 0 && snapshot.observedCyclesOutsideApp != 0) {
-        ref.read(observedCyclesOutsideAppProvider.notifier).state =
-            snapshot.observedCyclesOutsideApp;
-      }
-      // The nullable paper-history values follow the pdfExport pattern:
-      // null means "not given" (the default), so only a non-null snapshot
-      // value fills an untouched provider.
-      final paperShortest = ref.read(shortestCycleLengthOutsideAppProvider);
-      if (paperShortest == null &&
-          snapshot.shortestCycleLengthOutsideApp != null) {
-        ref.read(shortestCycleLengthOutsideAppProvider.notifier).state =
-            snapshot.shortestCycleLengthOutsideApp;
-      }
-      final paperEarliest = ref.read(
-        earliestFirstHigherCycleDayOutsideAppProvider,
-      );
-      if (paperEarliest == null &&
-          snapshot.earliestFirstHigherCycleDayOutsideApp != null) {
-        ref.read(earliestFirstHigherCycleDayOutsideAppProvider.notifier).state =
-            snapshot.earliestFirstHigherCycleDayOutsideApp;
-      }
-      final pdfName = ref.read(pdfExportNameProvider);
-      if (pdfName == null && snapshot.pdfExportName != null) {
-        ref.read(pdfExportNameProvider.notifier).state = snapshot.pdfExportName;
-      }
-      final pdfBirthDate = ref.read(pdfExportBirthDateProvider);
-      if (pdfBirthDate == null && snapshot.pdfExportBirthDate != null) {
-        ref.read(pdfExportBirthDateProvider.notifier).state =
-            snapshot.pdfExportBirthDate;
-      }
-      // One-directional by nature: the onboarding flag can only flip
-      // not-completed → completed, and hydration applies only that flip (a
-      // persisted completion must never be re-set to false).
-      final onboarded = ref.read(onboardingCompletedProvider);
-      if (!onboarded && snapshot.onboardingCompleted) {
-        ref.read(onboardingCompletedProvider.notifier).state = true;
-      }
+      hydratePersistedSettings(ref, snapshot);
     });
   }
 
@@ -227,58 +173,14 @@ class _CycleAppState extends ConsumerState<CycleApp>
 
   @override
   Widget build(BuildContext context) {
-    // Write-through: every provider change (settings screen, future call
-    // sites) is echoed into app_settings as a fire-and-forget upsert on
-    // the open database. Hydration assignments echo their just-loaded
-    // values back — same row content, an idempotent upsert. A storage
-    // failure cannot undo the in-memory change — it only reverts the
-    // choice to its default on the next start — so the write error is
-    // deliberately ignored, see [_persistSetting].
-    ref.listen<Locale?>(localeProvider, (previous, current) {
-      _persistSetting(ref, (store) => store.persistLocale(current));
-    });
-    ref.listen<ThemeMode>(themeModeProvider, (previous, current) {
-      _persistSetting(ref, (store) => store.persistThemeMode(current));
-    });
-    ref.listen<TemperatureRange>(temperatureRangeProvider, (previous, current) {
-      _persistSetting(ref, (store) => store.persistTemperatureRange(current));
-    });
-    ref.listen<int>(observedCyclesOutsideAppProvider, (previous, current) {
-      _persistSetting(
-        ref,
-        (store) => store.persistObservedCyclesOutsideApp(current),
-      );
-    });
-    ref.listen<int?>(shortestCycleLengthOutsideAppProvider, (
-      previous,
-      current,
-    ) {
-      _persistSetting(
-        ref,
-        (store) => store.persistShortestCycleLengthOutsideApp(current),
-      );
-    });
-    ref.listen<int?>(earliestFirstHigherCycleDayOutsideAppProvider, (
-      previous,
-      current,
-    ) {
-      _persistSetting(
-        ref,
-        (store) => store.persistEarliestFirstHigherCycleDayOutsideApp(current),
-      );
-    });
-    ref.listen<String?>(pdfExportNameProvider, (previous, current) {
-      _persistSetting(ref, (store) => store.persistPdfExportName(current));
-    });
-    ref.listen<DateTime?>(pdfExportBirthDateProvider, (previous, current) {
-      _persistSetting(ref, (store) => store.persistPdfExportBirthDate(current));
-    });
-    ref.listen<bool>(onboardingCompletedProvider, (previous, current) {
-      _persistSetting(
-        ref,
-        (store) => store.persistOnboardingCompleted(current),
-      );
-    });
+    // Write-through: the registrar's listeners (one per table entry) echo
+    // every provider change — a settings-screen choice or a hydration
+    // assignment, see the table in providers.dart — into app_settings as a
+    // fire-and-forget upsert on the open database. A storage failure
+    // cannot undo the in-memory change — it only reverts the choice to its
+    // default on the next start — so the write error is deliberately
+    // ignored, see [_persistSetting].
+    registerSettingsWriteThrough(ref, (write) => _persistSetting(ref, write));
 
     // null (the localeProvider default) = follow the system language: the
     // platform's locale list is then resolved against supportedLocales,
