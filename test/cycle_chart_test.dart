@@ -866,7 +866,12 @@ const _columnWidth = 24.0;
 Widget _windowingHarness({
   required List<DailyEntry> entries,
   Stream<List<DailyEntry>>? entriesStream,
-}) => chartHarness(entries: entries, entriesStream: entriesStream);
+  bool emptyHome = false,
+}) => chartHarness(
+  entries: entries,
+  entriesStream: entriesStream,
+  emptyHome: emptyHome,
+);
 
 // A regression test for the chart's window-rebuild pace: the built day
 // window parks with an extra screen-width of margin past the visible
@@ -6365,6 +6370,53 @@ void main() {
         reason: 'the window jumped away from where it was',
       );
     });
+
+    testWidgets(
+      'jump-to-date: picking a date after the chart unmounted disposes '
+      'quietly, with no reach into the disposed state',
+      (tester) async {
+        await pumpChart(tester, _windowingHarness(entries: _manyEntries()));
+
+        // The picker opens on the leftmost visible day, so the January
+        // date grid is on screen (day cells of other months stay off it —
+        // see the picking test above).
+        await tester.drag(chartScrollView(), const Offset(3000, 0));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('calendarJumpButton')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(DatePickerDialog),
+          findsOneWidget,
+          reason: 'the affordance opens the material date picker',
+        );
+
+        // Unmount the screen body while the picker stays open (a real tab
+        // change does the same): the chart state and its scroll hooks are
+        // disposed under the still-open dialog.
+        await tester.pumpWidget(
+          _windowingHarness(entries: _manyEntries(), emptyHome: true),
+        );
+        await tester.pump();
+        expect(
+          find.byType(DatePickerDialog),
+          findsOneWidget,
+          reason:
+              'the picker rides the root navigator and survives the '
+              'body swap',
+        );
+
+        // Confirming the pick resolves the picker future inside the
+        // disposed chart's continuation — which must return without
+        // touching the disposed state (no unhandled error, no crash).
+        await tester.tap(find.text('20').last, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('OK'), warnIfMissed: false);
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
       'tapping the curve in the scrolled window opens the day sheet',

@@ -41,6 +41,11 @@ const chartSeedColor = Color(0xFF6750A4);
 ///    range / y-bounds tests); default null keeps the provider default.
 ///  - [observedCyclesOutsideApp] pins the prior-cycles count setting (the
 ///    cycle-page ordinal numbering tests); default 0 keeps the default.
+///  - [emptyHome] renders an EMPTY Scaffold body instead of the
+///    ZyklusScreen. Routes pushed on the root navigator (the date picker
+///    the AppBar's jump affordance opens) survive the body's unmount, which
+///    disposes the chart state while the dialog stays open — the shape the
+///    jump-to-date unmount test needs.
 Widget chartHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
@@ -53,6 +58,7 @@ Widget chartHarness({
   DateTime? selectedDate,
   TemperatureRange? temperatureRange,
   int observedCyclesOutsideApp = 0,
+  bool emptyHome = false,
 }) {
   final overrides = [
     dailyEntriesProvider.overrideWith(
@@ -70,7 +76,7 @@ Widget chartHarness({
       ),
   ];
   final screen = withScaffold
-      ? const Scaffold(body: ZyklusScreen())
+      ? Scaffold(body: emptyHome ? null : const ZyklusScreen())
       : const ZyklusScreen();
   final materialApp = MaterialApp(
     themeMode: themed ? ThemeMode.system : null,

@@ -655,6 +655,10 @@ final class _CycleChartState extends State<_CycleChart> {
       lastDate: lastDay,
     );
     if (picked == null) return;
+    // The dialog rides the root navigator while the screen body (and this
+    // state) can unmount above it — a resolved pick may still arrive after
+    // the dispose.
+    if (!mounted) return;
     final index = DateOnly.daysBetween(
       DateOnly.normalize(picked),
       firstDay,

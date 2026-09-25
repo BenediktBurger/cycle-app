@@ -60,11 +60,16 @@ class DiaryHarness {
   /// database future (the form, reading through databaseProvider.future,
   /// sees the seeded day); a per-call [selectedDay] overrides the harness
   /// default.
+  /// [builder] passes a subclassed database through (fault injection —
+  /// the same seam delete-data tests use); the default stays the plain
+  /// in-memory instance.
   ProviderScope scope({
     Future<void> Function(CycleDatabase db)? seed,
     DateTime? selectedDay,
+    CycleDatabase Function()? builder,
   }) => appScope(
     seed: seed,
+    builder: builder,
     onCreated: (db) => this.db = db,
     now: () => now,
     selectedDay: selectedDay ?? this.selectedDay,

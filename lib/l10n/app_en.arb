@@ -66,6 +66,10 @@
   "dbErrorHint": "On web the database is stored in the browser (OPFS/IndexedDB). In private mode or with missing asset files, opening fails.",
   "save": "Save",
   "saved": "Saved.",
+  "saveFailed": "Saving failed — the data was not changed.",
+  "@saveFailed": {
+    "description": "Failure message for saving a diary day: shown when the entry upsert or either of the two mark writes fails. All three writes run as one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors deleteDataFailed/importFailed."
+  },
   "noEntriesYet": "No entries yet. Enter your first day above.",
   "loadFailed": "Loading failed",
   "bleedingNone": "none",
@@ -554,6 +558,10 @@
   "exportShare": "Share",
   "exportShared": "File shared.",
   "exportShareFailed": "Sharing failed.",
+  "exportFailed": "Exporting failed.",
+  "@exportFailed": {
+    "description": "Failure message for the whole export flow: shown when opening the database or building the export JSON fails. The export is read-only, so no reassurance clause (nothing was changed), unlike deleteDataFailed/importFailed."
+  },
   "exportNativeHint": "Copy the text above — saving and sharing are not available on this platform.",
   "exportNothing": "Database is empty — nothing to export.",
   "importTitle": "Paste JSON",
