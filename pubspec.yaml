@@ -168,12 +168,20 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  # The bundled Noto Sans Regular TTF: the PDF export registers it in the
-  # generated document so free-form note text (symbols, arrows, non-Latin-1
-  # glyphs) renders beyond the CoreFonts' Latin-1 coverage. License of the
-  # font: SIL Open Font License 1.1 — assets/fonts/LICENSE-NotoSans.txt.
+  # Bundled license texts (offline-readable, registered with LicenseRegistry)
+  # alongside the bundled Noto Sans Regular TTF:
+  # - `LICENSE` (the app's own Apache-2.0 text): Apache-2.0 §4 makes giving
+  #   every recipient a copy of the license a redistribution obligation.
+  # - `assets/fonts/LICENSE-NotoSans.txt` (SIL Open Font License 1.1):
+  #   redistributions of the font software must ship the OFL text alongside
+  #   the font files.
+  # The Noto Sans TTF itself: the PDF export registers it in the generated
+  # document so free-form note text (symbols, arrows, non-Latin-1 glyphs)
+  # renders beyond the CoreFonts' Latin-1 coverage.
   assets:
+    - LICENSE
     - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/LICENSE-NotoSans.txt
   # Required by Flutter 3.47: makes `flutter pub get`/`flutter test`/build run
   # `gen-l10n` automatically using l10n.yaml, so the real generated files under
   # lib/l10n (output configured in l10n.yaml) are produced before compile.

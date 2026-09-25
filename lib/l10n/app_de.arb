@@ -303,9 +303,13 @@
   },
   "aboutContinue": "Weiter",
   "aboutLicenseHeading": "Lizenz",
-  "aboutLicenseBody": "© 2026 Benedikt Burger — Apache-2.0. Den Lizenztext findest du in der Datei LICENSE des Repositories (github.com/BenediktBurger/cycle-app).",
+  "aboutLicenseBody": "© 2026 Benedikt Burger — Apache-2.0. Weitere Lizenztexte — etwa für gebündelte Schriften und die Flutter-Engine — und die Lizenzen der verwendeten Pub-Pakete sind in der App unter „Lizenzdetails“ lesbar. Das Repository (github.com/BenediktBurger/cycle-app) ist eine weitere Referenz.",
   "@aboutLicenseBody": {
-    "description": "License/copyright section, drafted German-first: the chosen license (Apache-2.0, set 2026-09) and its copyright holder, with a pointer to the LICENSE file in the repository rather than the reproduced text."
+    "description": "License/copyright section, drafted German-first: the chosen license (Apache-2.0, set 2026-09) and its copyright holder. Further license texts — e.g. for bundled fonts and the Flutter engine — and the licenses of the used pub packages are readable in-app via the license-details row (offline redistribution obligations, ADR-0011): the build auto-collects the packages' license texts (NOTICES), the bundled font's license ships as an asset. The body deliberately does not enumerate individual licenses because their texts ship in the binary; the repository is the additional, deeper reference (full sources), not a substitute for the in-app texts."
+  },
+  "aboutLicenseDetailsRow": "Lizenzdetails",
+  "@aboutLicenseDetailsRow": {
+    "description": "Tappable row label after the license/copyright section: opens the in-app license page showing the bundled license texts (the app's Apache-2.0 and the Noto Sans font license)."
   },
   "aboutBackupHint": "Sicherung, Umzug auf ein anderes Gerät und Wiederherstellung laufen nur über den JSON-Export/-Import in den Einstellungen — die Datenbankdatei selbst kann nicht kopiert werden, weil ihr Schlüssel an dieses Gerät gebunden ist.",
   "@aboutBackupHint": {
