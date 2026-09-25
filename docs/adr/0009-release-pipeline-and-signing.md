@@ -2,12 +2,14 @@
 
 - **Date:** 2026-09-18
 - **Status:** Accepted
-  (amended in place four times, 2026-09: first to local-only releases with
+  (amended in place five times, 2026-09: first to local-only releases with
   the tag-triggered pipeline parked, then to an unsigned tag-triggered CI
   build, then to a tagless branch-triggered CI build with the tag and
-  release authored at publish time, and finally to a two-script split of
+  release authored at publish time, then to a two-script split of
   the local release helper with the CI Flutter pin read directly from
-  `tool/flutter-version`; see decision #6 and its amendment notes)
+  `tool/flutter-version`, and finally to a release signing gate that
+  fails the build without the provisioned keystore — see decision #6 and
+  its amendment notes)
 
 ## Context
 
@@ -161,6 +163,21 @@ sideload/F-Droid, so key custody is a governance question in itself.
    release helper is gone with it, mirror input lines remain in no
    workflow, and a malformed pin fails loudly in both workflows' resolve
    steps. [`docs/release.md`](../release.md) stays the authority.
+
+   **Amended a fifth time in place (2026-09-25):** the Gradle release
+   build no longer falls back to the debug signing key when
+   `android/key.properties` is absent — it fails the build instead. The
+   fallback was the CI case, but it also made a debug-signed release
+   artifact silently buildable (and shippable) — the exact mistake this
+   decision guards against. The one opt-in is an explicit Android
+   project argument `-PallowDebugSigning`: the release workflow passes
+   it (unchanged in substance — CI artifacts are still debug-keyed and
+   apksigner signs them locally against the pinned fingerprint), and a
+   future F-Droid buildserver recipe needs the same opt-in in its own
+   invocation. The provisioning requirement
+   (`key.properties` + existing keystore path) is documented in Phase C
+   of [`docs/release.md`](../release.md), which stays the authority for
+   the gate's mechanics.
 
 ## Consequences
 

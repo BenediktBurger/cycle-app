@@ -29,9 +29,11 @@ name: Release
 # The fdroiddata recipe's checkout-path invariant above is unaffected: it
 # checks out a commit, regardless of how that commit is addressed.
 #
-# The Gradle release build uses the documented debug-signing fallback
-# (android/key.properties absent); apksigner replaces those signature blocks
-# during local signing — they never reach the published assets.
+# The Gradle release build fails without the signing provisioning
+# (android/key.properties absent); the -PallowDebugSigning opt-in below is
+# the workflow's explicit way to build debug-keyed artifacts, whose
+# signature blocks apksigner replaces during local signing — they never
+# reach the published assets.
 
 on:
   push:
@@ -113,8 +115,10 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
       - name: Build split APKs
-        # NO --target-platform (see header comment); debug-signing fallback is fine.
-        run: flutter build apk --release --split-per-abi
+        # NO --target-platform (see header comment); -PallowDebugSigning is
+        # the explicit opt-in to the debug key that the signing gate requires
+        # (key.properties never exists on CI).
+        run: flutter build apk --release --split-per-abi --android-project-arg allowDebugSigning=true
 
       # Verifies the hook-built libs (libsqlite3.so from the sqlite3
       # native-assets hook, libdartjni.so from Gradle/CMake) were compiled

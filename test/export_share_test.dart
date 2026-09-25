@@ -17,13 +17,21 @@
 // (button, snackbars) must stay in step with the localization entries
 // (exportShare / exportShared / exportShareFailed / exportSaved /
 // exportSaveFailed / exportFailed) they exercise.
+import 'dart:io';
+
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show canSaveFile, saveFileOverride, shareFileOverride;
+    show
+        canSaveFile,
+        saveFileOverride,
+        shareFile,
+        shareFileBytes,
+        shareFileOverride;
 import 'package:cycle_app/ui/settings.dart'
     show EinstellungenScreen, exportFileName;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,6 +148,12 @@ Future<void> pumpToExportPreview(WidgetTester tester) async {
     reason: 'the user path must reach the export preview page',
   );
 }
+
+/// The path_provider channel whose getTemporaryDirectory answer decides
+/// where [shareFile]/[shareFileBytes] stage their files; and the
+/// share_plus channel the staged hand-off goes through.
+const _pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+const _sharePlusChannel = MethodChannel('dev.fluttercommunity.plus/share');
 
 void main() {
   group('export open: failure surfacing', () {
@@ -337,6 +351,150 @@ void main() {
             'bool contract cannot tell cancel from failure)',
       );
       expect(find.text(savedSnackbarLabel), findsNothing);
+    });
+  });
+
+  // These tests drive the real share implementation (not the widget-test
+  // override seams) over mocked platform channels, so the filesystem side
+  // effect — the staged plaintext export / PDF under the platform temp
+  // directory and its removal after the share sheet resolves — is
+  // observable hermetically.
+  group('share staging: temp file cleanup', () {
+    late Directory stagingDir;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      stagingDir = Directory.systemTemp.createTempSync('share_stage_test');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_pathProviderChannel, (call) async {
+            return switch (call.method) {
+              'getTemporaryDirectory' => stagingDir.path,
+              _ => null,
+            };
+          });
+    });
+
+    /// Asserts [filename]'s staged copy under the temp dir is gone; every
+    /// share outcome (sheet resolved, user dismissed, channel failure) is
+    /// expected to end with the file removed.
+    void expectStagedFileGone(String filename) {
+      final staged = File(
+        '${stagingDir.path}${Platform.pathSeparator}$filename',
+      );
+      expect(
+        staged.existsSync(),
+        isFalse,
+        reason:
+            'the staged share file $filename must be deleted once the '
+            'share call resolves — it stays behind otherwise '
+            '(platform temp dir: ${stagingDir.path})',
+      );
+    }
+
+    void registerShareHandler({
+      bool throwPlatformException = false,
+      void Function(String stagedPath)? onHandoff,
+    }) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_sharePlusChannel, (call) async {
+            expect(call.method, 'share');
+            final paths = List<String>.from(call.arguments['paths'] as List);
+            expect(paths, hasLength(1), reason: 'share action stages one file');
+            onHandoff?.call(paths.single);
+            if (throwPlatformException) {
+              throw PlatformException(code: 'test', message: 'share failed');
+            }
+            return 'test-action';
+          });
+    }
+
+    test(
+      'shareFile stages the JSON under the temp dir, hands the staged '
+      'path to the share sheet, and deletes it after the sheet resolves',
+      () async {
+        String? stagedPath;
+        registerShareHandler(
+          onHandoff: (path) {
+            stagedPath = path;
+            // While the share sheet reads the file, it is still there.
+            final staged = File(path);
+            expect(
+              staged.existsSync(),
+              isTrue,
+              reason:
+                  'the share target must be able to read the staged '
+                  'file at hand-off time',
+            );
+            expect(
+              staged.readAsStringSync(),
+              '{"schema_version":1}',
+              reason: 'the staged file carries the export content',
+            );
+          },
+        );
+
+        final shared = await shareFile(
+          'cycle_export_test.json',
+          '{"schema_version":1}',
+        );
+
+        expect(shared, isTrue, reason: 'a resolved sheet is a hand-off');
+        expect(
+          stagedPath,
+          '${stagingDir.path}${Platform.pathSeparator}cycle_export_test.json',
+          reason: 'the staged file lands in the platform temp directory',
+        );
+        expectStagedFileGone('cycle_export_test.json');
+      },
+    );
+
+    test(
+      'shareFile also deletes the staged file when the share fails',
+      () async {
+        registerShareHandler(throwPlatformException: true);
+
+        final shared = await shareFile(
+          'cycle_export_test.json',
+          '{"schema_version":1}',
+        );
+
+        expect(shared, isFalse, reason: 'a channel failure is not a hand-off');
+        expectStagedFileGone('cycle_export_test.json');
+      },
+    );
+
+    test('shareFileBytes stages the PDF bytes and deletes the file after '
+        'the sheet resolves', () async {
+      final bytes = <int>[0x25, 0x50, 0x44, 0x46]; // "%PDF"
+      String? stagedPath;
+      registerShareHandler(
+        onHandoff: (path) {
+          stagedPath = path;
+          final staged = File(path);
+          expect(
+            staged.readAsBytesSync(),
+            bytes,
+            reason: 'the staged file carries the PDF content',
+          );
+        },
+      );
+
+      final shared = await shareFileBytes('cycle_pdf_test.pdf', bytes);
+
+      expect(shared, isTrue, reason: 'a resolved sheet is a hand-off');
+      expect(
+        stagedPath,
+        '${stagingDir.path}${Platform.pathSeparator}cycle_pdf_test.pdf',
+        reason: 'the staged file lands in the platform temp directory',
+      );
+      expectStagedFileGone('cycle_pdf_test.pdf');
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        ..setMockMethodCallHandler(_pathProviderChannel, null)
+        ..setMockMethodCallHandler(_sharePlusChannel, null);
+      stagingDir.deleteSync(recursive: true);
     });
   });
 }

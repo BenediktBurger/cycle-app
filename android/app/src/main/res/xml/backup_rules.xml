@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cloud Auto Backup scheme (Android 6–11; replaced by data_extraction_rules
+  on Android 12+ — keep both files in step). Backup stays enabled for the
+  app's remaining data, but the two privacy-sensitive pieces stay out:
+  the encrypted database (drift/SQLite, stored under the app's
+  app_flutter/ documents directory together with its journal files) and
+  the flutter_secure_storage preferences holding the database encryption
+  key (ADR-005: device-bound — a backup that carried both the database
+  and the key would contradict that).
+-->
+<full-backup-content>
+    <exclude
+        domain="root"
+        path="app_flutter/" />
+    <exclude
+        domain="sharedpref"
+        path="FlutterSecureStorage.xml" />
+    <exclude
+        domain="sharedpref"
+        path="FlutterSecureKeyStorage.xml" />
+</full-backup-content>

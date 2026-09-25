@@ -35,6 +35,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        // MainActivity keys its FLAG_SECURE gate on BuildConfig.DEBUG; AGP
+        // no longer generates the BuildConfig class by default.
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "io.github.benediktburger.cycleapp"
         // You can update the following values to match your application needs.
@@ -49,13 +55,19 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // debug fallback keeps `flutter build apk --release` runnable
-                // on machines without key.properties (CI, fresh clones)
-                signingConfigs.getByName("debug")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (providers.gradleProperty("allowDebugSigning").isPresent) {
+                // The release workflow's CI run has no keystore: it opts into
+                // debug-keyed artifacts explicitly, and the local apksigner
+                // step replaces those signature blocks before anything ships
+                // (docs/release.md Phase C + per-release checklist).
+                signingConfig = signingConfigs.getByName("debug")
             }
+            // Without key.properties and without the explicit opt-in the
+            // signing config stays unset: the task-graph gate below fails
+            // the build, so no release artifact leaves this module
+            // debug-signed (or unsigned) by accident.
         }
     }
 
@@ -78,6 +90,35 @@ android.applicationVariants.configureEach {
         if (abiVersionCode != null) {
             (output as ApkVariantOutputImpl).versionCodeOverride = variant.versionCode * 10 + abiVersionCode
         }
+    }
+}
+
+// Release signing gate (docs/release.md Phase C): a release build without
+// the provisioned keystore must fail at the task graph instead of silently
+// producing a debug-signed (or unsigned) artifact that is easy to ship by
+// mistake. The `-PallowDebugSigning` opt-in is for the release workflow's
+// CI run, whose artifacts are re-signed locally with apksigner.
+gradle.taskGraph.whenReady {
+    if (allTasks.none { it.name.contains("Release") }) return@whenReady
+
+    if (keystorePropertiesFile.exists()) {
+        val storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+        if (storeFile == null || !storeFile.exists()) {
+            throw GradleException(
+                "key.properties must name an existing release keystore via " +
+                    "storeFile (current value: " +
+                    "${keystoreProperties.getProperty("storeFile")}); see " +
+                    "docs/release.md Phase C for the provisioning.",
+            )
+        }
+    } else if (!providers.gradleProperty("allowDebugSigning").isPresent) {
+        throw GradleException(
+            "Release builds fail without the signing provisioning: point " +
+                "android/key.properties at the release keystore (docs/release.md " +
+                "Phase C). The release workflow's CI build passes " +
+                "-PallowDebugSigning instead (its artifacts are re-signed " +
+                "locally with apksigner).",
+        )
     }
 }
 
