@@ -30,6 +30,73 @@ import 'evaluation.dart';
 import 'marks.dart';
 import 'models.dart';
 
+/// One grouping + one evaluation pass over a single entries+marks snapshot:
+/// everything the statistics surfaces read (cycle groups, per-cycle
+/// evaluations) in one derivation the caller may cache and reuse. Evaluate-or-
+/// group callers reusing this bundle render from ONE calibration of the
+/// grouping instead of re-running it per metric.
+///
+/// The cycles and the evaluations are index-aligned by construction: the
+/// evaluation pass derives its own cycle groups, and each
+/// [CycleEvaluation.cycle] is exactly the group it evaluated. The cycle list
+/// lives on [DerivedCycleData] so the grouping-only consumers (lengths,
+/// onsets, count) stay free of evaluation work when read through a cache.
+final class DerivedCycleData {
+  const DerivedCycleData({required this.cycles, required this.evaluations});
+
+  /// The cycle groups, index-aligned with [evaluations].
+  final List<Cycle> cycles;
+
+  /// The per-cycle evaluations of [cycles], in the same order.
+  final List<CycleEvaluation> evaluations;
+}
+
+/// Derives [DerivedCycleData] from a fresh grouping + evaluation pass over
+/// [entries]/[marks] (the last-cycle span rule uses [today]; production
+/// passes the wall clock, tests pin it).
+///
+/// One pass means: one evaluation call, which groups internally exactly
+/// once — the bundle then re-exposes that same grouping.
+DerivedCycleData deriveCycleData(
+  List<DailyEntry> entries,
+  List<CycleMark> marks, {
+  DateTime? today,
+}) {
+  final evaluations = evaluateCycles(entries, marks, today: today);
+  return DerivedCycleData(
+    cycles: [for (final evaluation in evaluations) evaluation.cycle],
+    evaluations: evaluations,
+  );
+}
+
+/// The [menstruationOnsetDates] rule over a precomputed cycle list.
+List<DateTime> menstruationOnsetDatesFrom(List<Cycle> cycles) => [
+  for (final cycle in cycles)
+    if (cycle.startsAtMenstruation) DateOnly.normalize(cycle.startDate),
+];
+
+/// The [cycleLengthsInDays] rule over a precomputed cycle list.
+List<int> cycleLengthsInDaysFrom(List<Cycle> cycles) =>
+    _lengthsBetweenOnsets(menstruationOnsetDatesFrom(cycles));
+
+/// Differences of consecutive ascending onsets — the raw cycle-length
+/// arithmetic.
+List<int> _lengthsBetweenOnsets(List<DateTime> onsets) {
+  final lengths = <int>[];
+  for (var i = 0; i + 1 < onsets.length; i++) {
+    // Day-component arithmetic (not DateTime.difference): difference()
+    // would lose a day across DST changes; onsets are UTC-normalized so
+    // the epoch difference IS the calendar-day count.
+    // Onsets are sorted ascending, so onsets[i+1] - onsets[i] > 0.
+    lengths.add(DateOnly.daysBetween(onsets[i + 1], onsets[i]));
+  }
+  return lengths;
+}
+
+/// The [markDrivenCycleCount] rule over a precomputed cycle list.
+int markDrivenCycleCountFrom(List<Cycle> cycles) =>
+    cycles.where((c) => c.startsAtMenstruation).length;
+
 /// The number of mark-driven cycles: cycle groups that opened at a
 /// user-placed cycleStart mark (`startsAtMenstruation == true` — the
 /// leading pre-mark group, which predates the first cycleStart mark, is
@@ -39,7 +106,7 @@ import 'models.dart';
 /// screen's "N cycles" line (add the observed-cycles-outside-app setting
 /// value on top of it there, never here).
 int markDrivenCycleCount(List<DailyEntry> entries, List<CycleMark> marks) =>
-    groupIntoCycles(entries, marks).where((c) => c.startsAtMenstruation).length;
+    markDrivenCycleCountFrom(groupIntoCycles(entries, marks));
 
 /// Descriptive scalars (min, max, mean, standard deviation) over a list
 /// of ints — used for cycle lengths, bleeding durations and rise-to-end
@@ -253,18 +320,8 @@ int? minRecordedFact(int? first, int? second) {
 /// the previous marked start to it IS a counted length (that previous
 /// cycle really ended at the mark — the span rule). One very long such
 /// interval behaves like the pregnancy-span case below.
-List<int> cycleLengthsInDays(List<DailyEntry> entries, List<CycleMark> marks) {
-  final onsets = menstruationOnsetDates(entries, marks);
-  final lengths = <int>[];
-  for (var i = 0; i + 1 < onsets.length; i++) {
-    // Day-component arithmetic (not DateTime.difference): difference()
-    // would lose a day across DST changes; onsets are UTC-normalized so
-    // the epoch difference IS the calendar-day count.
-    // Onsets are sorted ascending, so onsets[i+1] - onsets[i] > 0.
-    lengths.add(DateOnly.daysBetween(onsets[i + 1], onsets[i]));
-  }
-  return lengths;
-}
+List<int> cycleLengthsInDays(List<DailyEntry> entries, List<CycleMark> marks) =>
+    _lengthsBetweenOnsets(menstruationOnsetDates(entries, marks));
 
 /// Summary scalars over a list of cycle lengths (days).
 ///
@@ -424,13 +481,19 @@ final class CycleFact {
 /// excluded — it is not a cycle start). Starts sorted ascending, as the
 /// grouping produces them.
 List<CycleFact> cycleFacts(List<DailyEntry> entries, List<CycleMark> marks) {
-  final cycles = groupIntoCycles(entries, marks);
-  final evaluations = evaluateCycles(entries, marks);
-  if (cycles.length != evaluations.length) {
-    // Defensive only — evaluateCycles evaluates every group exactly once.
-    throw StateError('cycle/evaluation count mismatch');
-  }
+  final derived = deriveCycleData(entries, marks);
+  return cycleFactsFromCycles(derived.cycles, derived.evaluations);
+}
 
+/// The [cycleFacts] rule over a precomputed cycle list and its index-aligned
+/// evaluations. Pairs cycles and evaluations strictly BY INDEX — a call site
+/// rift (an evaluation list shorter than the cycle list) degrades to data-only
+/// rows instead of an exception: the cycles themselves are the pairing, no
+/// caller hand-matching can desynchronize rows.
+List<CycleFact> cycleFactsFromCycles(
+  List<Cycle> cycles,
+  List<CycleEvaluation> evaluations,
+) {
   // The mark-opened starts in observation order: the length of one cycle
   // runs until the next mark-opened start, skipping the leading group.
   final starts = <DateTime>[];
@@ -455,7 +518,12 @@ List<CycleFact> cycleFacts(List<DailyEntry> entries, List<CycleMark> marks) {
       if (day.bleeding.level >= 1) bleedingDays++;
     }
 
-    final firstHigher = _resolveFirstHigher(evaluations[i]);
+    // The evaluation the row pairs with; a row beyond the evaluation list
+    // keeps its data-only facts (no first-higher resolution without its
+    // evaluation).
+    final firstHigher = i < evaluations.length
+        ? _resolveFirstHigher(evaluations[i])
+        : null;
     // Two end notions share this spot, both anchored in their owner rules:
     // a cycle WITH a follow-up start ends at that start (the mark-driven
     // length rule); the trailing cycle's observed end is one day past its
@@ -577,7 +645,18 @@ CycleStatistic cycleStatistics(
   List<DailyEntry> entries,
   List<CycleMark> marks,
 ) {
-  final facts = cycleFacts(entries, marks);
+  final derived = deriveCycleData(entries, marks);
+  return cycleStatisticsFromCycles(derived.cycles, derived.evaluations);
+}
+
+/// The [cycleStatistics] rule over a precomputed cycle list and its
+/// index-aligned evaluations (see [cycleFactsFromCycles] for the pairing
+/// semantics, degradation included).
+CycleStatistic cycleStatisticsFromCycles(
+  List<Cycle> cycles,
+  List<CycleEvaluation> evaluations,
+) {
+  final facts = cycleFactsFromCycles(cycles, evaluations);
   final lengths = [
     for (final fact in facts)
       if (fact.lengthDays != null) fact.lengthDays!,

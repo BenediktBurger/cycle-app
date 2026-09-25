@@ -23,24 +23,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Bugs
 
-#### Stability (audit 2026-09-25)
-
-- [ ] Unbounded cycle-span materialization can hang the app: the span rule
-  extends the last cycle to "today" at every grouping call and the diary list is
-  a non-lazy widget list over all those days (`lib/ui/diary.dart`), so one
-  accidental cycle-start mark dated far in the past (the date picker reaches year
-  2000) materializes thousands of synthetic days per build. Cap the
-  materialized/day-built range (grouping semantics stay; the cap needs defining)
-  and build the diary list lazily.
-- [ ] Statistics recomputes the full grouping about five times per state change
-  (cycle lengths, onsets, evaluation, statistics, mark-driven count each call
-  into grouping/evaluation; lib/ui/statistics.dart + lib/domain/statistics.dart)
-  — also while the tab is offstage in the IndexedStack — and
-  `domain/statistics.dart` `cycleFacts` carries a build-path
-  StateError("cycle/evaluation count mismatch") that degrades to a grey screen if
-  it ever trips. Memoize the derived values and replace the invariant throw with
-  degradation.
-
 #### Android
 
 - Verify the entry-form date row on a real device and at large system
@@ -76,11 +58,11 @@ the sections above track planned work, git history keeps the record (see
   remainder is a single-document orchestrator) and lib/ui/cycle.dart is split
   with part files first, not libraries (S2 below).
 - [ ] Screen split, cycle side: split lib/ui/cycle.dart (~2.4k lines) into
-  `part`/`part of` files ONLY (zero import/API churn; the chart's internals —
-  scroll controller, day mapping, jump registration, panel interaction — are
-  too entangled for real libraries pre-WP-A3). Sequencing: after A1–A3 land,
-  with the option to promote the parts to libraries later once A3's
-  memoization/span-cap has thinned what they share.
+  `part`/`part of` files ONLY (zero import/API churn). The chart's internals
+  (scroll controller, day mapping, jump registration, panel interaction) were
+  thinned by the memoized/bounded-span pass but stay below library
+  granularity. Promotion of the parts to real libraries is a later call
+  (S2 below).
 
 #### Building the app (to be clarified with INER)
 
@@ -161,22 +143,8 @@ Parallelization rules: The refactor packages come after their
 serialization points described in their entries below. Remaining rules
 of thumb:
 
-- lib/ui/statistics.dart / lib/ui/cycle.dart are A3's surfaces (recompute + span)
-  — the error-branches package they also carried has landed; land A3
-  after it.
 - Every package: fresh worktree, `flutter pub get`, full gate per
   CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
-
-- **WP-A3 — span & rendering cost** (bugs: unbounded span, statistics recompute
-  rows)
-  Scope: lib/domain/cycle_grouping.dart (bound the materialized span; define
-  the cap with the owner if the obvious one — e.g. a bounded-lookback plus an
-  explicit "cycle starts very far in the past" state — changes display
-  semantics), lazy diary list building in lib/ui/diary.dart, memoized
-  statistics derivation in lib/ui/statistics.dart +
-  lib/domain/statistics.dart (single grouping/evaluation pass, degrading
-  `cycleFacts` instead of throwing). Tests: test/statistics_screen_test.dart,
-  test/cycle_chart_test.dart, test/cycle_ordinal_test.dart.
 
 - **WP-A5 — import safety** (Necessary: import overwrite safety row)
   Scope: lib/ui/settings.dart import dialog (wire the plan-based preview into
@@ -201,7 +169,7 @@ of thumb:
   day mapping), no import/API changes, no logic movement — the diff should
   verify as near-pure relocation. Merge AFTER A1–A3 have landed (A1's
   `_jumpToDate` fix and A2's error branches move into the parts as-is;
-  A3 may thin the chart's shared internals first, changing where the natural
-  part boundaries sit). Promotion of the parts to real libraries is a later
-  call, NOT part of this package. Tests: test/cycle_*.dart suites,
-  test/cycle_tab_roundtrip_test.dart.
+  the memoized/bounded-span pass in A3 thinned the chart's shared
+  internals, changing where the natural part boundaries sit). Promotion of
+  the parts to real libraries is a later call, NOT part of this package.
+  Tests: test/cycle_*.dart suites, test/cycle_tab_roundtrip_test.dart.

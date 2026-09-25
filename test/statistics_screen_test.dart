@@ -1032,6 +1032,63 @@ void main() {
     );
   });
 
+  group('memoized derived data', () {
+    testWidgets('the derived-data provider holds one pass across an '
+        'unrelated rebuild', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(entries: screenEntries(), marks: screenMarks()),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(StatistikScreen)),
+      );
+      final before = container.read(derivedCycleDataProvider);
+
+      // An unrelated surface change (a setting on the count card's
+      // caption) rebuilds everything that watches it without re-deriving.
+      container.read(observedCyclesOutsideAppProvider.notifier).state = 3;
+      await tester.pumpAndSettle();
+
+      final after = container.read(derivedCycleDataProvider);
+      expect(identical(before, after), isTrue);
+    });
+
+    testWidgets('a year-2000 cycle-start mark settles with sane totals '
+        'and no exception', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        harness(
+          entries: [
+            DailyEntry(
+              date: DateTime(2000, 1, 5),
+              bbtC: 36.4,
+              bleeding: Bleeding.medium,
+            ),
+          ],
+          marks: [
+            CycleMark(
+              date: DateTime(2000, 1, 5),
+              type: CycleMarkTypes.cycleStart,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The screen settles into the count card with the one recorded
+      // mark-driven cycle — no grey screen, no far-past blow-up.
+      expect(countCard(), findsOneWidget);
+      expect(
+        find.descendant(of: countCard(), matching: find.text('1')),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('stream error retry surfaces', () {
     testWidgets('a marks stream error shows the retry surface instead of '
         'the statistics cards, and retry restores them', (tester) async {

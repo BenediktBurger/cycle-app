@@ -445,6 +445,21 @@ void main() {
     await tester.tap(find.byType(ExpansionTile).first);
     await tester.pumpAndSettle();
 
+    // The day list builds only the tiles it lays out; the recorded tile is
+    // the list's last one, several viewports below the expansion — walk the
+    // scroll until it enters the built range.
+    final list = find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    for (var i = 0; i < 100 && find.text('06:47').evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -500));
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pumpAndSettle();
+
     expect(
       find.text('06:47'),
       findsOneWidget,

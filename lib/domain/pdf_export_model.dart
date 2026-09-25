@@ -409,10 +409,12 @@ PdfExportModel buildPdfExportModel({
 /// days sit between the tracked days (they are not in the day list), so
 /// marks beyond a gap (e.g. on the last tracked day) still map to the
 /// correct calendar offset (the draw layers map offsets onto tracked
-/// positions; see lib/pdf/pdf_curve.dart).
+/// positions; see lib/pdf/pdf_curve.dart). Anchored on [Cycle.endDate]
+/// rather than the day list, which can be shorter than the span (or empty
+/// — see the span rule's lookback bound).
 int _calendarSpanDays(Cycle cycle) =>
     DateOnly.daysBetween(
-      DateOnly.normalize(cycle.days.last.date),
+      DateOnly.normalize(cycle.endDate),
       DateOnly.normalize(cycle.startDate),
     ) +
     1;

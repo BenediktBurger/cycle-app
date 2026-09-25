@@ -701,4 +701,204 @@ void main() {
       expect(earliest.afterMucusPeak, isNull);
     });
   });
+
+  group('the one-pass derived bundle', () {
+    // The evaluation clock the per-cycle scenario pins (its own longer
+    // span extension could otherwise shift nothing, but pinning keeps the
+    // derived pass deterministic anyway).
+    final perCycleToday = DateTime(2026, 6, 1);
+
+    // CycleFact has no structural equality, so the equivalence assertions
+    // pair against plain field records (records compare structurally).
+    List<
+      ({
+        DateTime start,
+        int bleedingDays,
+        DateTime? firstHigherDay,
+        int? lengthDays,
+        int? firstHigherUntilCycleEndDays,
+      })
+    >
+    factRecords(List<CycleFact> facts) => [
+      for (final fact in facts)
+        (
+          start: fact.cycleStart,
+          bleedingDays: fact.bleedingDays,
+          firstHigherDay: fact.firstHigherDay,
+          lengthDays: fact.lengthDays,
+          firstHigherUntilCycleEndDays: fact.firstHigherUntilCycleEndDays,
+        ),
+    ];
+
+    test('lengths, onsets, count, facts and aggregates equal the '
+        'whole-stream functions', () {
+      for (final (entries, marks) in <(List<DailyEntry>, List<CycleMark>)>[
+        (threeCycleData(), threeCycleStarts()),
+        (
+          threeCycleData(),
+          [
+            ...threeCycleStarts(),
+            firstHigher(2026, 3, 20),
+            firstHigher(2026, 5, 1),
+          ],
+        ),
+        (perCycleEntries(), perCycleMarks()),
+        (
+          evaluationScenarioEntries(),
+          [start(2026, 9, 6), mucusPeak(2026, 9, 15), firstHigher(2026, 9, 14)],
+        ),
+      ]) {
+        final derived = deriveCycleData(entries, marks, today: perCycleToday);
+        final lengths = cycleLengthsInDaysFrom(derived.cycles);
+        expect(
+          lengths,
+          cycleLengthsInDays(entries, marks),
+          reason: 'lengths derive from the one pass',
+        );
+        expect(
+          menstruationOnsetDatesFrom(derived.cycles),
+          menstruationOnsetDates(entries, marks),
+          reason: 'onsets derive from the one pass',
+        );
+        expect(
+          markDrivenCycleCountFrom(derived.cycles),
+          markDrivenCycleCount(entries, marks),
+          reason: 'the count derives from the one pass',
+        );
+        expect(
+          factRecords(
+            cycleFactsFromCycles(derived.cycles, derived.evaluations),
+          ),
+          factRecords(cycleFacts(entries, marks)),
+          reason: 'fact rows pair with the one pass',
+        );
+
+        final whole = cycleStatistics(entries, marks);
+        final fromPass = cycleStatisticsFromCycles(
+          derived.cycles,
+          derived.evaluations,
+        );
+        expect(fromPass.cycleCount, whole.cycleCount);
+        expect(
+          factRecords(fromPass.facts),
+          factRecords(whole.facts),
+          reason: 'the aggregates share the whole pass',
+        );
+        expect(
+          (
+            fromPass.cycleLengths.min,
+            fromPass.cycleLengths.max,
+            fromPass.cycleLengths.average,
+            fromPass.cycleLengths.stdDev,
+          ),
+          (
+            whole.cycleLengths.min,
+            whole.cycleLengths.max,
+            whole.cycleLengths.average,
+            whole.cycleLengths.stdDev,
+          ),
+          reason: 'the cycle-length aggregates',
+        );
+        expect(
+          (
+            fromPass.bleedingDays.min,
+            fromPass.bleedingDays.max,
+            fromPass.bleedingDays.average,
+            fromPass.bleedingDays.stdDev,
+          ),
+          (
+            whole.bleedingDays.min,
+            whole.bleedingDays.max,
+            whole.bleedingDays.average,
+            whole.bleedingDays.stdDev,
+          ),
+          reason: 'the bleeding-day aggregates',
+        );
+        expect(
+          (
+            fromPass.firstHigherUntilCycleEnd.min,
+            fromPass.firstHigherUntilCycleEnd.max,
+            fromPass.firstHigherUntilCycleEnd.average,
+            fromPass.firstHigherUntilCycleEnd.stdDev,
+          ),
+          (
+            whole.firstHigherUntilCycleEnd.min,
+            whole.firstHigherUntilCycleEnd.max,
+            whole.firstHigherUntilCycleEnd.average,
+            whole.firstHigherUntilCycleEnd.stdDev,
+          ),
+          reason: 'the first-higher-until-end aggregates',
+        );
+        expect(
+          fromPass.earliestFirstHigherDayOfCycle,
+          whole.earliestFirstHigherDayOfCycle,
+        );
+      }
+    });
+  });
+
+  group('the index-paired fact rows (graceful degradation, no throw)', () {
+    test('a shorter evaluation list degrades the missing rows to '
+        'data-only facts', () {
+      final entries = threeCycleData();
+      final marks = threeCycleStarts();
+      final cycles = groupIntoCycles(entries, marks);
+      final evaluations = evaluateCycles(entries, marks);
+      expect(cycles, hasLength(4));
+      expect(evaluations, hasLength(4));
+
+      final facts = cycleFactsFromCycles(cycles, evaluations.sublist(0, 2));
+      expect(facts, hasLength(4));
+      // Unaffected rows keep the full values their evaluations resolve.
+      expect(facts[0].cycleStart, DateTime.utc(2026, 3, 2));
+      expect(facts[0].bleedingDays, 2);
+      expect(facts[0].lengthDays, 28);
+      expect(facts[1].cycleStart, DateTime.utc(2026, 3, 30));
+      expect(facts[1].bleedingDays, 2);
+      expect(facts[1].lengthDays, 28);
+      // Missing rows keep the data-only facts: bleeding days and length
+      // still derive from the cycles; the evaluation-based facts stay null.
+      expect(facts[2].cycleStart, DateTime.utc(2026, 4, 27));
+      expect(facts[2].bleedingDays, 1);
+      expect(facts[2].lengthDays, 28);
+      expect(facts[2].firstHigherDay, isNull);
+      expect(facts[2].firstHigherUntilCycleEndDays, isNull);
+      expect(facts[3].cycleStart, DateTime.utc(2026, 5, 25));
+      expect(facts[3].bleedingDays, 2);
+      expect(facts[3].lengthDays, isNull);
+      expect(facts[3].firstHigherDay, isNull);
+    });
+
+    test('a longer evaluation list adds no rows and drops the surplus', () {
+      final entries = threeCycleData();
+      final marks = threeCycleStarts();
+      final cycles = groupIntoCycles(entries, marks);
+      final evaluations = evaluateCycles(entries, marks);
+      final padded = [...evaluations, evaluations.first];
+
+      final facts = cycleFactsFromCycles(cycles, padded);
+      expect(facts, hasLength(4));
+      // The surviving rows equal the full-pass pairing of the same fixture.
+      final full = [
+        for (final fact in cycleFactsFromCycles(cycles, evaluations))
+          (
+            start: fact.cycleStart,
+            bleedingDays: fact.bleedingDays,
+            firstHigherDay: fact.firstHigherDay,
+            lengthDays: fact.lengthDays,
+          ),
+      ];
+      expect(
+        facts.map(
+          (fact) => (
+            start: fact.cycleStart,
+            bleedingDays: fact.bleedingDays,
+            firstHigherDay: fact.firstHigherDay,
+            lengthDays: fact.lengthDays,
+          ),
+        ),
+        full,
+      );
+    });
+  });
 }
