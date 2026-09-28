@@ -5,6 +5,29 @@ Guidance for coding agents (and human contributors). Start with
 conventions; open work lives in [`docs/roadmap.md`](docs/roadmap.md),
 decisions in [`docs/adr/`](docs/adr/README.md).
 
+## Coding Style
+
+- Write code that explains itself: good names, small functions, tight
+  types. A comment is only for what a careful reader would otherwise
+  misunderstand — a non-obvious constraint, a convention, a tradeoff, a
+  danger. The test: if you cannot finish the sentence "without this
+  comment, a reader would wrongly conclude …", delete the comment.
+- A multi-sentence comment is a smell, and a multi-paragraph comment is
+  not a comment at all: that explanation belongs in
+  [`docs/dev-notes.md`](docs/dev-notes.md), the relevant ADR, or better
+  names in the code — in that order of preference.
+- **Don't copy local density.** An existing file's comment mass is not a
+  precedent; while editing a block, delete comments that restate the code.
+- **Never narrate a change.** Comments describe how the code behaves
+  *now* — no "was/were removed/dropped", no "old" vs "new", no listing
+  call sites. Git records the history; this applies to `reason:` strings
+  on test assertions too.
+- **Don't duplicate durable references.** Stated limitations and
+  measurements live in [`docs/roadmap.md`](docs/roadmap.md); a code
+  comment gets one line and a pointer, not the prose — and the same
+  justification is not repeated at every occurrence, only where it isn't
+  inferable from the code.
+
 ## Improvement notes: three destinations, never lost
 
 Issues, dislikes, and improvement ideas go where they can actually take
@@ -74,7 +97,10 @@ failures only surface in a summary at the end. Instead:
   `dart format --output=none --set-exit-if-changed .`, then
   `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
   suite still runs. All three are judged by exit code only (the format
-  check exits non-zero when any file would be reformatted).
+  check exits non-zero when any file would be reformatted). Before
+  declaring done, also do the **comment self-review**: list every comment
+  added in the change and name the misunderstanding it prevents (see
+  Coding Style); delete the rest.
 - **Judge by the exit code, not the text.** `flutter test` exits non-zero on
   failure; a green-looking log tail can still hide a failure (and packages
   like `libsqlite3-dev` missing on Linux fail the `test/db/` suite at load
@@ -99,17 +125,3 @@ failures only surface in a summary at the end. Instead:
 - `docs/adr/` — one ADR per decision; unresolved working assumptions stay
   marked (e.g. `TODO(user-review)`) and are questions for INER experts, not
   settled behavior.
-
-## Coding Style
-
-- Use comments only to describe the **why**: a non-obvious constraint, a
-  convention, a tradeoff, or a danger. If a comment restates the code or
-  lists what the code does, delete it.
-- **Never narrate a change.** Comments describe how the code behaves *now* —
-  no "was/were removed/dropped", no "old" vs "new", no listing call sites.
-  Git records the history; this applies to `reason:` strings on test
-  assertions too.
-- **Don't duplicate durable references.** Stated limitations and
-  measurements live in `docs/roadmap.md`; a code comment gets one line and
-  a pointer, not the prose — and the same justification is not repeated
-  at every occurrence, only where it isn't inferable from the code.

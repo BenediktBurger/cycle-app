@@ -82,6 +82,19 @@ the sections above track planned work, git history keeps the record (see
   with the option to promote the parts to libraries later once A3's
   memoization/span-cap has thinned what they share.
 
+#### Comment density (ready 2026-09-28)
+
+- [ ] One-time comment diet on the densest hand-written files
+  (`lib/ui/cycle.dart`, `lib/domain/evaluation.dart`,
+  `lib/ui/settings.dart`, `lib/pdf/cycle_pdf.dart`, …): agents imitate the
+  comment mass of the file they edit, so no AGENTS.md wording outranks
+  ~900 essay-comment lines in situ (the generated
+  `lib/l10n/app_localizations.dart` is out of scope). Delete comments
+  that restate code or narrate changes outright; where a comment carries
+  a real decision or constraint, keep it to one short line and move any
+  longer prose into `docs/dev-notes.md` or the ADR. Do it file-by-file in
+  one branch so the diff verifies as comment-only.
+
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
