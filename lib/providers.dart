@@ -25,6 +25,7 @@ import 'domain/date_only.dart';
 import 'domain/marks.dart';
 import 'domain/models.dart';
 import 'domain/pdf_export_model.dart';
+import 'domain/statistics.dart';
 import 'domain/temperature_range.dart';
 import 'pdf/cycle_pdf.dart';
 
@@ -70,6 +71,32 @@ final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.marksDao.watchAll().map(
     (rows) => rows.map(cycleMarkFromDrift).toList(),
+  );
+});
+
+/// The one derived grouping+evaluation pass behind the Tagebuch, Zyklus and
+/// Statistik screens: each faces its data through the SAME
+/// [DerivedCycleData] instance, so a mark write or entry write re-derives it
+/// once and the passing tabs (kept mounted in the app shell) read the cached
+/// result instead of each re-grouping per build.
+///
+/// Masked stream reads: a stream still loading (or failed) drains as empty
+/// data here — the same shape the screens' own masked reads consume.
+/// The marks ERROR itself stays a render concern of the screens — they keep
+/// their own unmasked [marksProvider] watches to surface the retry.
+///
+/// The derivation pins the clock at derivation time (`nowProvider`), so the
+/// "today" of the span extension is refreshed on every entries/marks
+/// emission; until the next emission the value can lag the wall clock by up
+/// to one calendar day — an accepted staleness window, not worth timer
+/// machinery.
+final derivedCycleDataProvider = Provider<DerivedCycleData>((ref) {
+  final entries = ref.watch(dailyEntriesProvider).valueOrNull;
+  final marks = ref.watch(marksProvider).valueOrNull;
+  return deriveCycleData(
+    entries ?? const <DailyEntry>[],
+    marks ?? const <CycleMark>[],
+    today: ref.watch(nowProvider)(),
   );
 });
 

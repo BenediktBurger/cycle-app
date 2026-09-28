@@ -615,12 +615,12 @@ void main() {
       () async {
         // The cycle-group tiles start collapsed; bring the list into view
         // and expand every group so the recorded days' tiles build and lay
-        // out at the narrow width. The ListView is lazy, so the group
-        // headers only exist once the scroll reaches them.
-        final listView = find
+        // out at the narrow width. The list scroll view is lazy, so the
+        // group headers only exist once the scroll reaches them.
+        final list = find
             .descendant(
-              of: find.byType(TagebuchScreen),
-              matching: find.byType(ListView),
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
             )
             .first;
         final groupTiles = find.descendant(
@@ -628,7 +628,7 @@ void main() {
           matching: find.byType(ExpansionTile),
         );
         for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
-          await tester.drag(listView, const Offset(0, -200));
+          await tester.drag(list, const Offset(0, -200));
           await tester.pump(const Duration(milliseconds: 50));
         }
         await tester.pumpAndSettle();
@@ -640,6 +640,14 @@ void main() {
           await tester.tap(groupTiles.at(i), warnIfMissed: false);
           await tester.pumpAndSettle();
         }
+
+        // The lazy day list builds only the tiles it lays out: the recorded
+        // days sit at the list's bottom, so walk the scroll there first.
+        for (var i = 0; i < 50 && find.text('06:47').evaluate().isEmpty; i++) {
+          await tester.drag(list, const Offset(0, -300));
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        await tester.pumpAndSettle();
 
         // The recorded tiles render their full content: temperature, the
         // measured time, and the two mucus chips (one per recorded day).

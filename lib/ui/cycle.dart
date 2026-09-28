@@ -137,11 +137,13 @@ class ZyklusScreen extends ConsumerWidget {
   }
 
   /// The live list of one recorded range — chart, day-options panel and
-  /// the evaluation note, computed from one entries+marks snapshot. The
-  /// marks state is kept whole: while the stream is still loading the
-  /// chart renders like the masked read did (with no marks yet), and on a
-  /// failed stream the chart block is replaced by the retry surface
-  /// instead of painting an evaluation overlay from silently-empty data.
+  /// the evaluation note, computed from the shared derived pass (see
+  /// derivedCycleDataProvider): the evaluations drive the chart overlay
+  /// and the cached cycle groups map the chart's day columns. The marks
+  /// state is kept whole: on a failed stream the chart block is replaced
+  /// by the retry surface instead of painting an evaluation overlay from
+  /// silently-empty data (the loading state renders like the masked read
+  /// did, with no marks yet).
   Widget _liveCycleList(
     BuildContext context,
     WidgetRef ref,
@@ -150,24 +152,17 @@ class ZyklusScreen extends ConsumerWidget {
   ) {
     final l10n = AppLocalizations.of(context);
     final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
-    // The chart overlay's input: the entries plus the user-placed
-    // marks, evaluated at render time (ADR-0001). Watching the marks
-    // stream here makes a mark change rebuild the whole screen — the
-    // overlay recomputes, nothing is persisted. This is the screen's
-    // ONLY marks watch: the evaluations and the raw marks are
-    // computed once and handed to the chart overlay.
+    // Watching the marks stream here makes a mark change rebuild the
+    // whole screen — the overlay recomputes from the re-derived pass,
+    // nothing is persisted. This is the screen's ONLY marks watch: the
+    // evaluations and the raw marks are computed once and handed to the
+    // chart overlay.
     // The temperature display range ("Temperaturbereich" settings
     // card): watched here so a settings change rebuilds the chart
     // with the new fixed bounds — constructor data like
     // entries/marks, the chart keeps no riverpod dependency.
     final temperatureRange = ref.watch(temperatureRangeProvider);
-    final evaluations = evaluateCycles(
-      entries,
-      marks,
-      // The grouping's injected clock (last-cycle span rule — the
-      // nowProvider seam, pinned in tests).
-      today: ref.read(nowProvider)(),
-    );
+    final derived = ref.watch(derivedCycleDataProvider);
     // The "cycles observed outside this app" setting: watched here so
     // a settings change renumbers the chart's boundary ordinals in the
     // same rebuild — exactly why the chart takes the value as
@@ -185,7 +180,8 @@ class ZyklusScreen extends ConsumerWidget {
           loading: () => _CycleChart(
             entries: entries,
             marks: marks,
-            evaluations: evaluations,
+            evaluations: derived.evaluations,
+            cycles: derived.cycles,
             range: temperatureRange,
             observedCyclesOutsideApp: observedCyclesOutsideApp,
           ),
@@ -196,7 +192,8 @@ class ZyklusScreen extends ConsumerWidget {
           data: (markers) => _CycleChart(
             entries: entries,
             marks: markers,
-            evaluations: evaluations,
+            evaluations: derived.evaluations,
+            cycles: derived.cycles,
             range: temperatureRange,
             observedCyclesOutsideApp: observedCyclesOutsideApp,
           ),
@@ -228,6 +225,7 @@ final class _ChartDays {
   _ChartDays(
     List<DailyEntry> entries,
     List<CycleMark> marks,
+    List<Cycle> cycles,
     this.observedCyclesOutsideApp,
   ) {
     final sorted = [...entries]
@@ -244,23 +242,22 @@ final class _ChartDays {
         if (mark.type == CycleMarkTypes.ignoreTemperature)
           DateOnly.daysBetween(DateOnly.normalize(mark.date), firstDay),
     };
-    // Cycle mapping over the whole index range, from the domain's cycle
-    // grouping (same groups the Tagebuch list and the evaluation use):
-    // every calendar day counts in the cycle whose start is the LATEST
-    // group start on or before it — a cycle only ends at the next cycle
-    // start, so untracked gap days keep counting from the last start. A
-    // group opens at the first tracked day on/after a user-placed
-    // cycleStart mark, and its boundary anchor is the MARK's own date:
-    // the untracked gap days between the mark and the group's first
-    // tracked day count toward the mark-opening cycle. The first
+    // Cycle mapping over the whole index range, from the cycle groups the
+    // screen shares with Tagebuch/Statistik (the cached derived pass —
+    // [derivedCycleDataProvider]). Every calendar day counts in the cycle
+    // whose start is the LATEST group start on or before it — a cycle only
+    // ends at the next cycle start, so untracked gap days keep counting
+    // from the last start. A group opens at the first tracked day on/after
+    // a user-placed cycleStart mark, and its boundary anchor is the MARK's
+    // own date: the untracked gap days between the mark and the group's
+    // first tracked day count toward the mark-opening cycle. The first
     // (leading) group starts at the first recorded day before the first
     // mark, so every index is covered.
-    final groups = groupIntoCycles(sorted, marks);
-    final starts = [for (final g in groups) DateOnly.normalize(g.startDate)];
+    final starts = [for (final g in cycles) DateOnly.normalize(g.startDate)];
     cycleStartDates = {
       // Only mark-opened groups are cycle boundaries; the leading group
       // (predating the first cycleStart mark) is not.
-      for (final g in groups)
+      for (final g in cycles)
         if (g.startsAtMenstruation) DateOnly.normalize(g.startDate),
     };
     // The ordinals at the boundaries: each mark-opened group carries its
@@ -269,7 +266,7 @@ final class _ChartDays {
     // pre-mark group is skipped (it is not mark-opened).
     var markOpenedIndex = 0;
     cycleOrdinalByStart = {
-      for (final g in groups)
+      for (final g in cycles)
         if (g.startsAtMenstruation)
           DateOnly.normalize(g.startDate): cycleOrdinalNumber(
             markOpenedIndex++,
@@ -354,19 +351,25 @@ final class _CycleChart extends StatefulWidget {
     required this.entries,
     required this.marks,
     required this.evaluations,
+    required this.cycles,
     required this.range,
     required this.observedCyclesOutsideApp,
   });
 
   final List<DailyEntry> entries;
 
-  /// The user-placed marks, evaluated with [evaluations] by the screen (at
-  /// render time, ADR-0001).
+  /// The user-placed marks (at render time, ADR-0001): the ignore-temperature
+  /// keys and the drawn mark glyphs ride on them directly.
   final List<CycleMark> marks;
 
-  /// The per-cycle evaluations the overlay draws its artifacts from —
-  /// computed once per screen build, never re-derived here.
+  /// The per-cycle evaluations the overlay draws its artifacts from — part
+  /// of the shared derived pass the screen watches, never re-derived here.
   final List<CycleEvaluation> evaluations;
+
+  /// The cycle groups of the SAME derived pass as [evaluations] (they are
+  /// index-aligned): the day/cycle mapping data (starts, ordinals) comes
+  /// from them instead of a grouping of its own.
+  final List<Cycle> cycles;
 
   /// The settings-selected temperature display range: the chart's FIXED
   /// y bounds (and, via the shared scale, the rail's labels); out-of-range
@@ -514,6 +517,7 @@ final class _CycleChartState extends State<_CycleChart> {
     _days = _ChartDays(
       widget.entries,
       widget.marks,
+      widget.cycles,
       widget.observedCyclesOutsideApp,
     );
     _scrollController.addListener(_onScrolled);
@@ -532,10 +536,12 @@ final class _CycleChartState extends State<_CycleChart> {
     // changed boundary mark) re-windows instead of rendering stale data.
     if (!identical(oldWidget.entries, widget.entries) ||
         !identical(oldWidget.marks, widget.marks) ||
+        !identical(oldWidget.cycles, widget.cycles) ||
         oldWidget.observedCyclesOutsideApp != widget.observedCyclesOutsideApp) {
       _days = _ChartDays(
         widget.entries,
         widget.marks,
+        widget.cycles,
         widget.observedCyclesOutsideApp,
       );
       // Only the FIRST data frame (an initial auto-scroll still pending)

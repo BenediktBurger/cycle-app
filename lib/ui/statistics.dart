@@ -23,12 +23,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
-import '../domain/evaluation.dart';
-import '../domain/marks.dart';
-import '../domain/models.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
@@ -57,37 +53,38 @@ class StatistikScreen extends ConsumerWidget {
         data: (entries) {
           // The marks watch is kept unmasked: on a failed stream the screen
           // must not silently render aggregates computed from an empty
-          // marks list. While the stream is still loading, the render
-          // computes like the masked read did (with no marks yet).
+          // marks list. While the stream is still loading, the shared
+          // derived pass renders the same no-marks values the masked read
+          // yields.
           final marksAsync = ref.watch(marksProvider);
           return marksAsync.when(
-            loading: () => _statisticsView(context, ref, entries, const []),
+            loading: () => _statisticsView(context, ref),
             error: (e, s) => StreamLoadError(
               scope: 'marks',
               onRetry: () => ref.invalidate(marksProvider),
             ),
-            data: (marks) => _statisticsView(context, ref, entries, marks),
+            data: (marks) => _statisticsView(context, ref),
           );
         },
       ),
     );
   }
 
-  /// The rendered statistics of one entries+marks snapshot — the body the
-  /// `data:` branch below the two stream watches renders for the real data
-  /// (and, while the marks stream is in flight, for an empty marks list).
-  Widget _statisticsView(
-    BuildContext context,
-    WidgetRef ref,
-    List<DailyEntry> entries,
-    List<CycleMark> marks,
-  ) {
+  /// The rendered statistics of one snapshot of the shared derived pass —
+  /// the body the `data:` branch below the two stream watches renders for
+  /// the real data (and, while the marks stream is in flight, for an empty
+  /// marks list). Every number comes from the ONE cached grouping +
+  /// evaluation pass behind [derivedCycleDataProvider]; nothing groups or
+  /// evaluates here during build.
+  Widget _statisticsView(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toString();
-    final lengths = cycleLengthsInDays(entries, marks);
+    final derived = ref.watch(derivedCycleDataProvider);
+    final cycles = derived.cycles;
+    final lengths = cycleLengthsInDaysFrom(cycles);
     final summary = summarizeCycleLengths(lengths);
     final buckets = cycleLengthDistribution(lengths);
-    final onsets = menstruationOnsetDates(entries, marks);
+    final onsets = menstruationOnsetDatesFrom(cycles);
     String day(DateTime d) => DateFormat.yMd(locale).format(
       // A date-only value is already UTC-normalized midnights (the
       // DateOnly convention); DateFormat reads the value's OWN
@@ -96,20 +93,12 @@ class StatistikScreen extends ConsumerWidget {
       DateOnly.normalize(d),
     );
 
-    // The per-cycle evaluations feed everything beyond the plain
-    // cycle lengths (pure render-time arithmetic per ADR-0001).
-    final evaluations = evaluateCycles(
-      entries,
-      marks,
-      // The grouping's injected clock (last-cycle span rule — the
-      // nowProvider seam, pinned in tests).
-      today: ref.read(nowProvider)(),
-    );
     // Each descriptive detail card aggregates the metric's values
     // over the mark-driven cycles; a cycle contributing no value
     // (no bleeding day, no rise mark, an open cycle) simply does
     // not feed the aggregate — the "—" card rows are for the
     // all-empty case.
+    final evaluations = derived.evaluations;
     final lengthDetail = summarizeInts(lengths);
     final bleedingDetail = summarizeInts(
       cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
@@ -156,11 +145,11 @@ class StatistikScreen extends ConsumerWidget {
     // to the next marked start; the trailing observed end is one
     // day past the last TRACKED day — see cycleFacts), rendered on
     // the shared card shape below.
-    final stats = cycleStatistics(entries, marks);
+    final stats = cycleStatisticsFromCycles(cycles, evaluations);
 
     // The cycle-count surface: the mark-opened cycles recorded in
     // this app plus the outside-app count from the settings value.
-    final cyclesInApp = markDrivenCycleCount(entries, marks);
+    final cyclesInApp = markDrivenCycleCountFrom(cycles);
     final cyclesOutsideApp = ref.watch(observedCyclesOutsideAppProvider);
     final cyclesTotal = cyclesInApp + cyclesOutsideApp;
     var countCaption = l10n.statisticsCyclesInApp(cyclesInApp);
