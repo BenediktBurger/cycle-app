@@ -1,24 +1,13 @@
-// Statistik screen: the app's aggregate statistics, all on one tab (the
-// cycle tab's evaluation table is the paper-form evaluation, not aggregates —
-// nothing is moved there).
+// Statistik screen: aggregate statistics, all on one tab (the cycle tab's
+// evaluation table is the paper-form evaluation, not aggregates).
 //
-// HARD PRODUCT RULE (docs/product/vision.md req. 3, lib/domain/statistics.dart):
-// this screen shows RECORDED-DERIVED NUMBERS ONLY — counts, lengths,
-// averages, buckets. No status, no classification, no fertility statements.
-// The caption below states this explicitly in the UI.
-//
-// Everything is computed at render time from the entries + marks streams
-// (ADR-0001: nothing derived is persisted). The cycle-count card composes
-// the total observed cycles from the mark-opened cycles recorded in the
-// app plus the "observed cycles outside this app" settings value — the
-// card's caption names that composition on the surface ("in this app: n"
-// and, when the user has set it, "outside: n"). The paper-history values
-// (shortest cycle, earliest first higher — both optional settings) fold
-// into the shortest/earliest surfaces as plain MIN-combination, since
-// they were recorded before every in-app cycle; they stay OUT of the
-// lengths list, the distribution and the per-cycle table (single
-// recorded facts, not distribution entries). Missing values render as
-// the "—" dash.
+// Recorded-derived numbers only (lib/domain/statistics.dart): counts,
+// lengths, averages, buckets — no classification, no fertility
+// statements. Everything is computed at render time from the entries +
+// marks streams (ADR-0001: nothing derived is persisted); missing values
+// render as the "—" dash. The paper-history settings fold into the
+// shortest/earliest surfaces as a MIN-combination only — see the build
+// method's fold comment.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -30,8 +19,8 @@ import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'stream_error.dart';
 
-/// The shared missing-value marker of this screen, mirroring the cycle
-/// page's evaluation table's dash — a neutral glyph, not language text.
+/// The shared missing-value marker of this screen — a neutral glyph, not
+/// language text.
 const String _missing = '—';
 
 class StatistikScreen extends ConsumerWidget {
@@ -51,11 +40,8 @@ class StatistikScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(dailyEntriesProvider),
         ),
         data: (entries) {
-          // The marks watch is kept unmasked: on a failed stream the screen
-          // must not silently render aggregates computed from an empty
-          // marks list. While the stream is still loading, the shared
-          // derived pass renders the same no-marks values the masked read
-          // yields.
+          // The marks watch stays unmasked: on a failed stream the screen
+          // must not silently render aggregates from an empty marks list.
           final marksAsync = ref.watch(marksProvider);
           return marksAsync.when(
             loading: () => _statisticsView(context, ref),
@@ -70,12 +56,10 @@ class StatistikScreen extends ConsumerWidget {
     );
   }
 
-  /// The rendered statistics of one snapshot of the shared derived pass —
-  /// the body the `data:` branch below the two stream watches renders for
-  /// the real data (and, while the marks stream is in flight, for an empty
-  /// marks list). Every number comes from the ONE cached grouping +
-  /// evaluation pass behind [derivedCycleDataProvider]; nothing groups or
-  /// evaluates here during build.
+  /// The statistics body rendered from one snapshot of the shared derived
+  /// pass: every number comes from the ONE cached grouping + evaluation
+  /// pass behind [derivedCycleDataProvider] — nothing groups or evaluates
+  /// here during build.
   Widget _statisticsView(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toString();
@@ -86,18 +70,14 @@ class StatistikScreen extends ConsumerWidget {
     final buckets = cycleLengthDistribution(lengths);
     final onsets = menstruationOnsetDatesFrom(cycles);
     String day(DateTime d) => DateFormat.yMd(locale).format(
-      // A date-only value is already UTC-normalized midnights (the
-      // DateOnly convention); DateFormat reads the value's OWN
-      // fields, so it must be printed verbatim — a .toLocal() would
-      // show the PREVIOUS day on UTC-negative hosts.
+      // Date-only values are UTC-normalized midnights — print verbatim;
+      // a .toLocal() shows the previous day on UTC-negative hosts.
       DateOnly.normalize(d),
     );
 
-    // Each descriptive detail card aggregates the metric's values
-    // over the mark-driven cycles; a cycle contributing no value
-    // (no bleeding day, no rise mark, an open cycle) simply does
-    // not feed the aggregate — the "—" card rows are for the
-    // all-empty case.
+    // A cycle contributing no value to a card's metric (no bleeding day,
+    // no rise mark, an open cycle) simply does not feed the aggregate —
+    // the "—" rows are for the all-empty case.
     final evaluations = derived.evaluations;
     final lengthDetail = summarizeInts(lengths);
     final bleedingDetail = summarizeInts(
@@ -108,14 +88,11 @@ class StatistikScreen extends ConsumerWidget {
     );
     final earliest = earliestFirstHigherCycleDay(evaluations);
 
-    // The paper history folds in through the shared MIN-combination
-    // rule (minRecordedFact, lib/domain/statistics.dart) at the
-    // shortest/earliest surfaces: the paper figures were recorded
-    // BEFORE every in-app cycle, so they are known facts at this
-    // screen's point of view. They are single recorded facts — they
-    // do NOT enter the lengths list, the distribution or the
-    // per-cycle table (in-app-only surfaces below stay gated on
-    // `lengths`).
+    // The paper-history settings fold in through minRecordedFact at the
+    // shortest/earliest surfaces: figures recorded BEFORE every in-app
+    // cycle are known facts at this screen's point of view. They stay out
+    // of the lengths list, distribution and per-cycle table (in-app-only
+    // surfaces stay gated on `lengths`).
     final paperShortest = ref.watch(shortestCycleLengthOutsideAppProvider);
     final paperEarliest = ref.watch(
       earliestFirstHigherCycleDayOutsideAppProvider,
@@ -132,23 +109,20 @@ class StatistikScreen extends ConsumerWidget {
       afterMucusPeak: minRecordedFact(paperEarliest, earliest.afterMucusPeak),
     );
 
-    // The average/shortest/longest row renders with ONLY a paper
-    // shortest present too (in-app lengths empty): a paper-only
-    // user must see her recorded shortest figure instead of a
-    // hidden row. The average and longest cells then dash — the
-    // paper value is one fact, not a lengths distribution.
+    // Renders with ONLY a paper shortest present (in-app lengths empty):
+    // a paper-only user sees her recorded shortest figure instead of a
+    // hidden row; average and longest dash (the paper value is one fact,
+    // not a lengths distribution).
     final hasShortestRow = summary.lengths.isNotEmpty || paperShortest != null;
 
-    // The upstream statistics rework's aggregate + per-cycle table
-    // data: the fact rows and the first-higher-until-cycle-end
-    // metric keep upstream's counting rule (each fact's span counts
-    // to the next marked start; the trailing observed end is one
-    // day past the last TRACKED day — see cycleFacts), rendered on
-    // the shared card shape below.
+    // Fact rows keep the cycleFacts counting rule (each fact's span counts
+    // to the next marked start; the trailing observed end is one day past
+    // the last TRACKED day — see cycleFacts).
     final stats = cycleStatisticsFromCycles(cycles, evaluations);
 
-    // The cycle-count surface: the mark-opened cycles recorded in
-    // this app plus the outside-app count from the settings value.
+    // The cycle-count surface: the mark-opened cycles recorded in the app
+    // plus the outside-app count from the settings value (the caption
+    // names the composition on the surface).
     final cyclesInApp = markDrivenCycleCountFrom(cycles);
     final cyclesOutsideApp = ref.watch(observedCyclesOutsideAppProvider);
     final cyclesTotal = cyclesInApp + cyclesOutsideApp;
@@ -157,15 +131,12 @@ class StatistikScreen extends ConsumerWidget {
       countCaption += ' · ${l10n.statisticsCyclesOutsideApp(cyclesOutsideApp)}';
     }
 
-    // The earliest first higher, two documented variants: the
-    // "real" one (strictly after the mucus peak) is the primary row;
-    // the over-all-cycles minimum is the fallback row. When the real
-    // variant is genuinely missing in the DISPLAYED pair, the dash +
-    // the missing-variant caption state that fact. The caption's gate
-    // reads the paper-folded pair, not the raw in-app values: the rows
-    // display the fold, so gating on the raw values would claim a
-    // missing real variant while the row actually carries the paper
-    // figure (in-app real missing + paper value present).
+    // The earliest first higher, two variants: "real" (strictly after the
+    // mucus peak) is the primary row, the over-all-cycles minimum the
+    // fallback. The missing-variant caption gates on the paper-FOLDED
+    // pair — the rows display the fold, so gating on the raw in-app
+    // values would claim a missing variant while the row carries the
+    // paper figure.
     String cycleDayText(int? n) =>
         n == null ? _missing : l10n.statisticsCycleDay(n);
 
@@ -182,11 +153,9 @@ class StatistikScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         if (onsets.isEmpty) ...[
-          // The no-data note keys on the FACT that no cycle start is
-          // recorded yet (the first recorded start is the note's own
-          // threshold) — never on the length count: a single still-
-          // open cycle has recorded starts but no countable lengths
-          // yet, and the lengths surfaces below stay hidden for it.
+          // Keys on the FACT that no cycle start is recorded yet, never on
+          // the length count: a single still-open cycle has recorded starts
+          // but no countable lengths yet.
           Text(l10n.statisticsNoData),
           const SizedBox(height: 8),
         ],
@@ -250,11 +219,10 @@ class StatistikScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        // The fact-gated surfaces (the recorded data's own count —
-        // not the lengths'): the onset list shows whenever a cycle
-        // start is recorded, the per-cycle table whenever fact rows
-        // exist; only the DISTRIBUTION card stays glued to the
-        // lengths (it buckets lengths).
+        // The fact-gated surfaces gate on the recorded data's own count —
+        // not the lengths': the onset list shows whenever a cycle start is
+        // recorded, the per-cycle table whenever fact rows exist; only the
+        // distribution card stays glued to the lengths (it buckets lengths).
         if (onsets.isNotEmpty) ...[
           _onsetsCard(context, onsets, day),
           const SizedBox(height: 8),
@@ -264,10 +232,9 @@ class StatistikScreen extends ConsumerWidget {
           const SizedBox(height: 8),
         ],
         if (stats.facts.isNotEmpty)
-          // The table sits below ALL other statistics: one row per
-          // mark-opened cycle keeps the numbers auditable against
-          // the mark-driven boundaries without adding any
-          // evaluation (the upstream rework's placement — kept).
+          // Below ALL other statistics: the one-row-per-cycle table keeps
+          // the numbers auditable against the mark-driven boundaries
+          // without adding any evaluation.
           _CycleTableCard(
             key: const ValueKey('statisticsCycleTable'),
             facts: stats.facts,
@@ -317,9 +284,8 @@ Widget _lengthsListCard(
 Widget _averageShortestLongestRow(
   BuildContext context,
   CycleLengthSummary summary, {
-  // The min-combined shortest figure (paper fold included — see the
-  // build method's fold comment); average and longest stay in-app-only
-  // (single recorded facts never become distribution members).
+  // Min-combined shortest figure (paper fold — see the build method's
+  // fold comment); average and longest stay in-app-only.
   required int? shortestOverride,
 }) {
   final l10n = AppLocalizations.of(context);
@@ -379,8 +345,8 @@ Widget _onsetsCard(
   ),
 );
 
-// The histogram over the cycle lengths — the same fixed buckets the
-// domain derives (bucket edges are a domain question, see there).
+// The histogram over the cycle lengths; the bucket edges are a domain
+// question (lib/domain/statistics.dart).
 Widget _distributionCard(
   BuildContext context,
   List<CycleLengthBucket> buckets,
@@ -431,10 +397,10 @@ Widget _distributionCard(
   );
 }
 
-/// One metric card of the Statistik screen: the descriptive detail set
-/// (minimum, maximum, average, standard deviation) for ONE metric family,
-/// rendered in the shared [_StatCard] card style. Values are numbers
-/// ("n days" / one decimal) or the "—" dash when there is no data.
+/// One metric card: the descriptive detail set (minimum, maximum,
+/// average, standard deviation) for ONE metric family, in the shared
+/// [_StatCard] style. Values are numbers ("n days" / one decimal) or the
+/// "—" dash when there is no data.
 final class _MetricCard extends StatelessWidget {
   const _MetricCard({super.key, required this.title, required this.detail});
 
@@ -476,10 +442,8 @@ final class _MetricCard extends StatelessWidget {
 }
 
 /// ONE scalar formatting rule for fractional descriptive values (average,
-/// standard deviation): one decimal digit following the effective locale
-/// ("28,0" in de / "28.0" in en, via the shared display formatter), or the
-/// "—" dash. Shared by the metric cards and the old average card so they
-/// cannot drift.
+/// standard deviation): one decimal digit in the effective locale, or the
+/// "—" dash.
 String _scalarText(BuildContext context, double? value) => value == null
     ? _missing
     : formatDecimal(
@@ -488,8 +452,8 @@ String _scalarText(BuildContext context, double? value) => value == null
         decimalDigits: 1,
       );
 
-/// One label/value line inside a statistics card (numbers only — the
-/// label names WHAT is counted, never how to read it).
+/// One label/value line inside a statistics card — numbers only; the
+/// label names WHAT is counted, never how to read it.
 final class _ValueRow extends StatelessWidget {
   const _ValueRow({required this.label, required this.value});
 
@@ -510,9 +474,8 @@ final class _ValueRow extends StatelessWidget {
   }
 }
 
-/// Re-expresses the shared cycle statistics' [MetricSummary] on the
-/// screen's descriptive card shape so every metric card renders through
-/// ONE shared class (no card drifts onto its own presentation).
+/// Maps the domain's [MetricSummary] onto the screen's descriptive card
+/// shape so every metric card renders through one shared class.
 DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
     DescriptiveSummary(
       minimum: summary.min,
@@ -521,11 +484,9 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
       standardDeviation: summary.stdDev,
     );
 
-/// The per-cycle table card: a simple bordered table (equal-width columns,
-/// headers wrap) with the four exact columns the roadmap names: cycle
-/// start, number of bleeding days, first higher measurement, length.
-/// (The upstream statistics rework's card — kept verbatim, the shared
-/// [_StatCard] shell rendering its rows.)
+/// The per-cycle table card: a bordered table of equal-width columns
+/// (headers wrap) with the four columns: cycle start, bleeding days,
+/// first higher measurement, length.
 final class _CycleTableCard extends StatelessWidget {
   const _CycleTableCard({super.key, required this.facts, required this.day});
 
@@ -638,8 +599,8 @@ final class _CycleTableCard extends StatelessWidget {
 }
 
 /// One statistics card: a titled Card block (ONE style so the screen's
-/// cards cannot drift visually). `title` is the localized card heading,
-/// `child` its content, `key` the stable surface key used by the tests.
+/// cards cannot drift visually); `key` is the stable surface key the
+/// tests address.
 final class _StatCard extends StatelessWidget {
   const _StatCard({super.key, required this.title, required this.child});
 

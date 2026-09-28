@@ -208,3 +208,56 @@ Layout/design decisions:
 - The curve block has no caption row of its own: the °C lives in every
   scale label, and the temperature naming lives on the below-plot value
   row's rail legend ("Temperatur in °C").
+
+## Drip CSV import format
+
+The input of lib/domain/drip_import.dart is the CSV export of the sibling
+"drip" app: one header row of flattened CycleDay columns like
+`temperature.value`, then one row per calendar day. The format spec is
+drip's own writer (drip: lib/import-export/export-to-csv.js):
+
+- fields are comma-separated; string cells containing `\n`, `\t`, `,`,
+  `;`, `.` or `'` are wrapped in double quotes with inner quotes escaped
+  as `""`,
+- rows are joined with plain `\n` (the parser also tolerates `\r\n`),
+- the header lists the columns of whichever drip version exported the
+  file, so all parsing is header-driven: unknown columns are ignored,
+  known-but-missing columns simply carry no data.
+
+## Cycle day mark sheet (lib/ui/cycle_mark_sheet.dart)
+
+- Mode M applies (ADR-0001): the panel writes nothing derived — mark
+  toggles go through the MarksDao, and everything it shows as evaluation
+  data (the 1–6 numbering, the baseline value, the R7 differences, the R2
+  stopped-evaluation notice, the SUZ suggestion) is recomputed from the
+  entries + marks streams at render time; a write re-emits through
+  marksProvider, so labels, chart overlay and info lines update live.
+- Non-modal: the panel is owned by cycle_day_panel_provider and rendered
+  in a fixed slot below the chart, never pushed as a route. Tapping
+  another chart day retargets it in place — the first day's marks are
+  never deselected by a dismissal — and the close button clears it
+  explicitly.
+- Layout: all six chips (the five mark chips and the temperature-exclusion
+  chip) sit in ONE shared grid of equal column widths — two columns on
+  phone widths, three from 600 dp — so every row completes evenly. Each
+  chip carries a static mark-name label plus the mark type's identifying
+  avatar icon (flag, dot, ring, dusk, sun, crossed-out eye —
+  identification only); the selected state carries set/remove through the
+  Material selected fill, announced as selected to screen readers. The
+  canvas-drawn checkmark is off: it overlapped the scrimmed avatar icon,
+  and the fill plus the announced selection already carry set/remove.
+- No note editing in the panel: notes live in the diary entry form's note
+  row, so there is no comment surface to lay out in columns.
+- SUZ suggestion: on the computed `suzBegins` day the suggestion line
+  names which rule fired with the rule's time of day — rule D the EVENING
+  phrasing (the SUZ begins that evening, "gegen Abendessen"), rule E the
+  MORNING phrasing — while no user SUZ mark exists anywhere in that
+  cycle. The computed SUZ is never persisted and never renders on the
+  chart; a manual SUZ mark in turn never alters the arithmetic
+  (compute-only separation, ADR-0001).
+- Temperature exclusion (owner decisions, 2026-09-19): the exclusion is
+  manual-only and made visible as the grid's third chip; the day's
+  disturbance flags are not shown there (the chart's disturbance row
+  spells them per day), flag editing stays diary-side, and marked days
+  render lighter on the temperature curve. The mark does not affect the
+  drip-import cycleStart replay.

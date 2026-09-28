@@ -43,16 +43,6 @@ the sections above track planned work, git history keeps the record (see
   duplicated verbatim in the export/import card and the drip-import card —
   it could live once (e.g. in import_dialog.dart); needs discussion.
 
-#### Comment density
-
-- [ ] Second pass of the comment diet on the next-densest hand-written
-  files (`lib/ui/cycle_mark_sheet.dart`, `lib/domain/drip_import.dart`,
-  `lib/ui/diary.dart`, `lib/ui/statistics.dart`): same rule — delete
-  comments that restate code or narrate changes outright; where a comment
-  carries a real decision or constraint, keep it to one short line and
-  move any longer prose into `docs/dev-notes.md` or the ADR; file-by-file
-  in one branch so the diff verifies as comment-only.
-
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
