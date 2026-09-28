@@ -1,0 +1,79 @@
+name: Pages
+
+# ADR-0012: ships the web demo to GitHub Pages on every push to main.
+# Manual runs for convenience.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Superseded runs of the same branch are cancelled to save runner minutes.
+concurrency:
+  group: pages-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pinned Flutter version lives in tool/flutter-version (one bare
+      # version line under comments) and is read directly — the same file the
+      # F-Droid build recipe parses from each built commit, with the same
+      # parse. Shell expansion IS possible here: it runs in this run step,
+      # then is rendered into the action input below via ${{ }}; the literal
+      # flutter-version input is gone, so a Flutter bump edits
+      # tool/flutter-version ONLY. (Deliberately no `set -o pipefail`: a
+      # comment-only pin file must fail in the guards below, not abort
+      # silently inside the pipeline.)
+      - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
+        id: flutter-pin
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          [ -n "$pinned" ] || { echo "tool/flutter-version has no non-comment version line"; exit 1; }
+          [[ "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tool/flutter-version pins '$pinned', expected a bare X.Y.Z version (inline-comment contamination or whitespace/CRLF?)"; exit 1; }
+          echo "Resolved Flutter pin: $pinned"   # informational, not a gate
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Both web/ sources are written against a base href of
+      # /cycle-app/app/: the landing docs page owns the Pages root, so the
+      # app must live one level below it or the shared URLs would collide.
+      - name: Build web
+        run: flutter build web --base-href /cycle-app/app/
+
+      # One deployed tree: docs index.html at the Pages root, the built app
+      # shifted into app/. Stale files must never leak into the artifact,
+      # hence the rm -rf before staging.
+      - name: Assemble the Pages artifact
+        run: |
+          rm -rf build/pages
+          mkdir -p build/pages/app
+          cp pages/index.html build/pages/index.html
+          cp -a build/web/. build/pages/app/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NER Cycle App — Web-Demo: Zyklusdaten bleiben in diesem Browser. / Web demo: cycle entries stay in this browser.">
+  <title>NER Cycle App — Web-Demo</title>
+  <style>
+    body {
+      max-width: 44rem;
+      margin: 0 auto;
+      padding: 1rem 1.25rem 3rem;
+      font-family: system-ui, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #ffffff;
+    }
+    a { color: #0b57a4; }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; }
+    li { margin-bottom: 0.4rem; }
+    .hint {
+      border-left: 4px solid #c28700;
+      background: #fdf6e3;
+      padding: 0.75rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>NER Cycle App — Web-Demo</h1>
+
+    <p class="hint"><strong>Die App ist in der Beta-Phase — verlassen Sie
+    sich nicht auf die Daten.</strong> Datenverlust ist nicht
+    ausgeschlossen. Für ernsthafte Nutzung: Android-App aus dem
+    <a href="https://github.com/BenediktBurger/cycle-app/releases">Release-Bereich</a>
+    installieren (eine iOS-Version gibt es noch nicht).</p>
+
+    <p>Die Web-Demo zeigt die App auf dem Web-Ziel der Entwicklung (Details
+    im <a href="https://github.com/BenediktBurger/cycle-app">GitHub-Repository</a>):
+    Zyklusdaten von Hand erfassen — die App rechnet und zeigt die Kurve an,
+    sie entscheidet nichts. Methodenkenntnis (Lehrbuch oder Schulung) bleibt
+    Voraussetzung für eine zuverlässige Deutung.</p>
+
+    <h2>Wo Ihre Daten bleiben</h2>
+    <p>Alle Einträge, die Sie hier erfassen, <strong>bleiben in diesem
+    Browser</strong> (im Browserspeicher OPFS/IndexedDB):</p>
+    <ul>
+      <li>Nichts wird hochgeladen — kein Cloud-Dienst, keine Analyse, keine
+      Nutzungsstatistik.</li>
+      <li>Umgekehrt gibt es <strong>keine Synchronisierung</strong> zwischen
+      Browsern oder Geräten: Jeder Browser und jedes Gerät hält seine eigene
+      Kopie.</li>
+      <li>Gelöscht werden die Daten durch die Browser-Option „Websitedaten
+      löschen“, im privaten Modus verschwinden Einträge mit dem Fenster —
+      und ein Wechsel des Browsers oder Geräts ist ein Neuanfang.</li>
+    </ul>
+
+    <h2>Daten sichern</h2>
+    <p>Über <strong>Einstellungen › JSON-Export</strong> speichern Sie Ihre
+    Einträge als Datei — regelmäßig exportieren ist die einzige Sicherung.
+    Über den JSON-Import spielen Sie sie später wieder ein.</p>
+
+    <h2>Verbleibende Risiken</h2>
+    <p>Der Browserspeicher ist von der App her <strong>nicht
+    verschlüsselt</strong>: Wer (physisch oder per Schadsoftware) Ihr
+    Browserprofil ausliest, kann die Einträge sehen. Zusammen mit der
+    Beta-Phase gilt: Nur Daten eintragen, deren Verlust oder Offenlegung Sie
+    verschmerzen können — Einzelheiten im
+    <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#not-ready-to-install-try-the-web-demo">README
+    (englisch)</a>.</p>
+
+    <p><a href="./app/"><strong>Zur App-Demo</strong></a></p>
+
+    <h2 lang="en">English</h2>
+
+    <p><strong>This app is in beta — do not rely on the data.</strong> Data
+    loss is not ruled out. For serious use, install the Android app from the
+    <a href="https://github.com/BenediktBurger/cycle-app/releases">releases
+    page</a> (an iOS build does not exist yet).</p>
+
+    <p>The web demo shows the app on the web iteration target (details in
+    the
+    <a href="https://github.com/BenediktBurger/cycle-app">GitHub repository</a>):
+    you enter cycle data by hand — the app computes and plots the curve, it
+    never decides anything. Knowing the method (book or course) is a
+    prerequisite for reliable interpretation.</p>
+
+    <h3 lang="en">Where your data stays</h3>
+    <p>Every entry you make here <strong>stays in this browser</strong>
+    (browser-local storage, OPFS/IndexedDB):</p>
+    <ul>
+      <li>Nothing is uploaded — no cloud service, no analytics, no usage
+      statistics.</li>
+      <li>Conversely, there is <strong>no sync</strong> between browsers or
+      devices: every browser and every device holds its own copy.</li>
+      <li>The browser's “clear site data” wipes the entries, private windows
+      discard them on close, and switching browser or device is a fresh
+      start.</li>
+    </ul>
+
+    <h3 lang="en">Getting data out</h3>
+    <p><strong>Einstellungen (settings) › JSON-Export</strong> saves your
+    entries to a file; the JSON-Import brings them back later.</p>
+
+    <h3 lang="en">Residual risks</h3>
+    <p>The browser storage is <strong>not encrypted</strong> by the app:
+    anything that reads your browser profile can read the entries. Combined
+    with the beta status: only enter data whose loss or exposure you can
+    live with — details in the
+    <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#not-ready-to-install-try-the-web-demo">README</a>.</p>
+
+    <p><a href="./app/"><strong>Open the app demo</strong></a></p>
+  </main>
+</body>
+</html>

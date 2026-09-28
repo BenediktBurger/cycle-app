@@ -38,3 +38,4 @@ question remains visible wherever the ADR marks unresolved assumptions.
 | [0009](0009-release-pipeline-and-signing.md) | Release pipeline — Android-first publishing, signing custody, store accounts | Accepted |
 | [0010](0010-settings-key-value-table.md) | General settings persist in a drift key-value table (`app_settings`) | Accepted |
 | [0011](0011-license-bundling.md) | License texts bundled as assets behind the in-app license page (package licenses auto-collected) | Accepted |
+| [0012](0012-public-web-demo-github-pages.md) | Public web demo on GitHub Pages — docs landing at Pages root, app under /app/ | Accepted |

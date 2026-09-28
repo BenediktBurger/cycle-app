@@ -151,3 +151,13 @@ the write and the read edge:
   copy fails loudly and the open surfaces the error on the startup
   database gate, which is consistent with the fail-loud posture —
   such a row means the converter-driven streams were already broken.
+
+## Update 2026-09-28: same storage situation on the public web demo
+
+The web build runs as a
+[public demo on GitHub Pages](0012-public-web-demo-github-pages.md).
+Everything stated above about unencrypted web storage applies there too:
+entries stay in the browser (OPFS/IndexedDB, unencrypted at rest in the
+browser profile, readable by same-origin scripts), nothing is uploaded, and
+the residual-risk acceptance for the demo is an owner decision recorded in
+ADR-0012.
