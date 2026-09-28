@@ -1,35 +1,11 @@
-// Drip CSV import — PURE domain layer, host-VM testable (no drift, no
-// Flutter, no new dependencies).
-//
-// Input is the CSV export of the sibling "drip" app (sibling repository
-// `drip`): one header row of flattened CycleDay columns like
-// `temperature.value`, then one row per calendar day. The format spec is
-// drip's own writer (drip: lib/import-export/export-to-csv.js):
-//
-//  - fields are comma-separated; string cells containing \n \t , ; . '
-//    are wrapped in double quotes with inner quotes escaped as "",
-//  - rows are joined with plain \n (this parser also tolerates \r\n),
-//  - the header lists the columns of whichever drip version exported the
-//    file, so all parsing is header-driven: unknown columns are ignored,
-//    known-but-missing columns simply carry no data.
-//
-// Output is a standard export document of the CURRENT schema version (see
-// lib/domain/export_import.dart) that the write phase feeds through the
-// EXISTING importJsonToDatabase — no second db writer for this feature.
-// On top of the mapped entries the mapper DERIVES marks (author 'import')
-// from the CSV content: cycleStart marks from a drip-local bleeding replay
-// — every first day of a row of bleedings, at ANY bleeding level, derives
-// one; the derived mark is what the mark-driven cycle grouping consumes
-// (see lib/domain/marks.dart) — and ignoreTemperature marks from
-// temperature.exclude (drip's "not usable for fertility detection": the
-// roadmap's "drip excluded temp → a mark, not an observation"). Cycle-app's
-// own export already carries its marks verbatim, so re-importing an app
-// export never re-derives anything: the derivation lives only in this CSV
-// mapping. The produced document (and every row map in it) is profile-free.
-//
-// Mapping decisions live in the mapping table right below; every
-// assumption an INER expert should re-check carries a
-// TODO(user-review) marker.
+// Drip CSV import — a PURE domain mapper, host-VM testable (no drift, no
+// Flutter, no new dependencies). A drip CSV export becomes a
+// current-version export document (see lib/domain/export_import.dart)
+// that the write phase feeds through the EXISTING importJsonToDatabase —
+// no second db writer for this feature. The mapper derives the
+// foreign-import marks (author 'import') from the CSV data —
+// deriveDripMarks below; the CSV file format itself is defined in
+// docs/dev-notes.md ("Drip CSV import format").
 
 import 'cervix.dart';
 import 'date_only.dart';
@@ -40,13 +16,12 @@ import 'models.dart';
 
 // --- CSV tokenizer ---------------------------------------------------------
 
-/// Tokenizes a drip CSV export into rows of string cells.
-///
-/// RFC-4180-style state parsing (drip quotes notes containing commas,
-/// periods or newlines — a naive comma split would corrupt those). A quoted
-/// field may contain `,` and `""`-escaped quotes and may span several
-/// physical lines. `\r\n` line endings are tolerated. A trailing newline
-/// does not produce an extra empty row.
+/// Tokenizes a drip CSV export into rows of string cells: RFC-4180-style
+/// state parsing, because drip quotes notes containing commas, periods or
+/// newlines (a naive comma split would corrupt those). A quoted field may
+/// span several physical lines and carry `""`-escaped quotes; `\r\n` line
+/// endings are tolerated; a trailing newline does not produce an extra
+/// empty row.
 List<List<String>> splitDripCsv(String raw) {
   final rows = <List<String>>[];
   final field = StringBuffer();
@@ -114,10 +89,10 @@ List<List<String>> splitDripCsv(String raw) {
   return rows;
 }
 
-/// Tokenizes [raw] and validates the drip header (the `date` column is the
-/// one column the mapping cannot exist without). Throws a [FormatException]
-/// when the input has no header row or no `date` column — the "this is not
-/// a drip export" signal for the UI.
+/// Tokenizes [raw] and validates the drip header (the `date` column is
+/// the one column the mapping cannot exist without). Throws a
+/// [FormatException] when the input has no header row or no `date`
+/// column — the "this is not a drip export" signal for the UI.
 List<List<String>> parseDripCsv(String raw) {
   final rows = splitDripCsv(raw);
   final hasDate = rows.isNotEmpty && rows.first.contains('date');
@@ -159,41 +134,32 @@ final class DripCsvStats {
       'rowsInvalid: $rowsInvalid)';
 }
 
-/// The result of mapping a drip CSV: the export document as a JSON string
-/// (ready for importJsonToDatabase, lib/db/export_adapter.dart) plus the
+/// The result of mapping a drip CSV: the export document plus the
 /// parser-side statistics.
 final class DripCsvImport {
   const DripCsvImport({required this.json, required this.stats});
 
   /// A current-version export document (see lib/domain/export_import.dart)
-  /// — profile-free: the document root is exactly schema_version /
-  /// exported_at / entries / marks — with the mapped entries and the
-  /// DERIVED marks (author 'import'): cycleStart marks for the first
-  /// bleeding days of every row of bleedings and ignoreTemperature marks
-  /// for the temperature.exclude days (drip has no mark analogue of its
-  /// own, so foreign imports get their cycle boundaries and analysis
-  /// exclusions derived from the imported data).
+  /// with the mapped entries and the DERIVED marks (author 'import') —
+  /// detail in [deriveDripMarks].
   final String json;
 
   final DripCsvStats stats;
 }
 
-/// Maps a raw drip CSV export into a current-version export document (see
-/// lib/domain/export_import.dart for the document shape).
+/// Maps a raw drip CSV export into a current-version export document
+/// (see lib/domain/export_import.dart).
 ///
-/// A row maps to an entry only when at least one MAPPED field carries data;
-/// otherwise it counts as skipped-empty (drip exports a row for every day
-/// it knows, most of which are blank). Only a broken date invalidates a
-/// data row; every other wart degrades field-by-field. Unknown header
-/// columns are ignored, known-but-missing columns carry no data. The row
-/// shape mirrors lib/db/export_adapter.dart's export rows exactly, so the
-/// existing writer/planner gates (bleeding vocabulary, quality-requires-S)
-/// never drop one of these rows — and the derived cycleStart marks ride
-/// the same merge plan (any non-empty mark_type is accepted; the marks
-/// writer adds idempotently).
+/// A row maps to an entry only when at least one MAPPED field carries
+/// data; otherwise it counts as skipped-empty (drip exports a row for
+/// every day it knows, most of which are blank). Only a broken date
+/// invalidates a data row; every other wart degrades field-by-field. The
+/// row shape mirrors lib/db/export_adapter.dart's export rows exactly, so
+/// the existing writer/planner gates (bleeding vocabulary,
+/// quality-requires-S) never drop one of these rows.
 ///
-/// Throws a [FormatException] when [raw] is not a drip CSV at all (no
-/// header row / no `date` column) — see [parseDripCsv].
+/// Throws a [FormatException] when [raw] is not a drip CSV at all — see
+/// [parseDripCsv].
 DripCsvImport dripCsvToExportJson(String raw) {
   final rows = parseDripCsv(raw);
   final header = rows.first;
@@ -234,68 +200,44 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
     final bbtC = _parseBbtC(cell(dataRow, 'temperature.value'));
     // drip's "not usable for fertility detection" (temperature.exclude)
-    // maps to the derived ignoreTemperature MARK (author 'import') —
-    // NOT to an entry flag and NOT to mask bits (drip has no reason
-    // column). The day still counts as a data row (the exclusion is
-    // meaningful data, and the mark needs its day), but the entry itself
-    // carries the neutral mask 0 and no exclude_* key.
+    // maps to the derived ignoreTemperature MARK — not to an entry flag or
+    // mask bits (drip has no reason column); the day still counts as a
+    // data row, its entry keeps the neutral mask 0.
     final excluded = boolCell(dataRow, 'temperature.exclude');
-    // drip records the measurement's time of day in temperature.time as
-    // plain `HH:MM` (24 h). A time belongs to its measurement — hasData
-    // below deliberately does not count a lone time cell as data, and the
-    // time is only mapped when a temperature value exists (the same rule
-    // DailyEntry enforces on storage; the document must not carry a time
-    // this app would never store).
+    // A time belongs to its measurement: a lone time cell is not data, and
+    // the time maps only when a temperature value exists (the same rule
+    // DailyEntry enforces on storage).
     final measuredAtMinutes = bbtC == null
         ? null
         : _parseDripTimeMinutes(cell(dataRow, 'temperature.time'));
     final bleeding = _parseBleeding(cell(dataRow, 'bleeding.value'));
-    // drip ALSO carries bleeding.exclude ("ignored" bleeding, e.g. after
-    // stopping the pill). It is NOT data (a bleeding-exclude-only row is a
-    // blank calendar day, like every dropped flag), but when the row
-    // imports its day feeds the cycleStart replay's skip set — unlike the
-    // other excludes it changes behavior, only not at the storage level:
-    // the entry keeps its bleeding level untouched.
+    // bleeding.exclude ("ignored" bleeding) is not data, but its day feeds
+    // the cycleStart replay's skip set (the entry keeps its bleeding
+    // level).
     final bleedingExcluded = boolCell(dataRow, 'bleeding.exclude');
     final mucus = _mucusObservation(
       nfpNumber: cell(dataRow, 'mucus.value'),
       feeling: cell(dataRow, 'mucus.feeling'),
       texture: cell(dataRow, 'mucus.texture'),
     );
-    // drip ALSO carries the cervix vocabulary indexes (0-based), which map
-    // onto the structured Muttermund fields: position low/medium/high,
-    // opening closed/medium/open, and firmness hard/soft (an out-of-range
-    // firmness index clamps to the nearest valid one). Out-of-range or
-    // non-numeric position/opening indexes map to null per field.
     final cervixObservation = _cervixObservation(
       opening: cell(dataRow, 'cervix.opening'),
       firmness: cell(dataRow, 'cervix.firmness'),
       position: cell(dataRow, 'cervix.position'),
     );
-    // desire.value is DROPPED entirely (Lust is removed everywhere): the
-    // intensity was never storable and the flag is not data any more — a
-    // desire-only row imports nothing (skipped-empty).
+    // desire.value is dropped entirely (Lust is removed everywhere): the
+    // intensity was never storable, so a desire-only row imports nothing.
     // drip tracks sex as activity (solo/partner) plus the contraceptive
-    // methods used (condom, pill, iud, patch, ring, implant, diaphragm,
-    // other — and `none`, the "no contraception used" choice;
-    // drip: components/helpers/labels.js). cycle-app's sex observation
-    // models partner sex WITHOUT contraception, so the mapped variant is
-    // sex.partner=true with no contraceptive method flag true — the
-    // explicit `none` confirmation is NOT required: an unfilled method
-    // column also counts as no contraception (owner decision,
-    // 2026-09-17 — drip is a single non-authoritative import source and
-    // must not force the app's sex model to demand a positive "none"
-    // answer). The stored variant keeps the MIDDLE time of day, because
-    // drip carries no time-of-day for sex. Every other activity variant —
-    // solo sex, a method used, even none=true next to a method — maps to
-    // nothing and is NOT data: a row carrying only such flags is skipped
-    // entirely (see the data rule below). The [sex] note line keeps its
-    // note-driven behavior independent of the flag.
+    // methods (condom, pill, iud, patch, ring, implant, diaphragm, other —
+    // and `none`; drip: components/helpers/labels.js). The stored variant
+    // is partner sex WITHOUT contraception, at the MIDDLE time of day
+    // (drip carries none) — an unfilled method column also counts as no
+    // contraception (owner decision 2026-09-17: drip is a
+    // non-authoritative import source). Every other activity variant maps
+    // to nothing and is not data (see the data rule below); the [sex] note
+    // line stays independent of the flag.
     // TODO(user-review): solo sex and the contraceptive methods have no
-    // storage option; whether solo sex deserves an option of its own. The
-    // middle-of-day choice for the mapped variant is likewise a mapping
-    // convenience: drip is a single non-authoritative import source and
-    // must not force the app's design.
+    // storage option of their own.
     final sexPartner = boolCell(dataRow, 'sex.partner');
     final sexMethod = [
       'sex.condom',
@@ -321,22 +263,17 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // (M) option, tender breasts the breast-pain (B) option.
     final painBreast = boolCell(dataRow, 'pain.tenderBreasts');
     final painMittelschmerz = boolCell(dataRow, 'pain.ovulationPain');
-    // Kinds without a cycle-app option (cramps, headache, …) are dropped
-    // like the other dropped columns — NOT data: a row carrying only such
-    // a flag imports nothing (but the pain note below still does).
+    // Kinds without a cycle-app option (cramps, headache, …) are dropped —
+    // not data: a row carrying only such a flag imports nothing.
     // TODO(user-review): whether the remaining pain kinds deserve options
     // of their own instead of being dropped.
 
-    // A row is only worth an entry when something mappable was recorded.
-    // Dropped columns (bleeding/mucus/cervix excludes, the sex variants
-    // that do not map — solo, a contraceptive method —, unmappable pain
-    // kinds, symptom-flag FALSEs, the dropped mood/desire FLAGS) are NOT
-    // data — otherwise every blank drip day would import. A measured time
-    // belongs to its measurement, so a time cell alone never makes a blank
-    // day an entry. A row carrying ONLY an out-of-range cervix
-    // position/opening index is skipped as well — such an index decodes to
-    // no stored observation (the clamp word the old free-text helper
-    // fabricated was noise).
+    // A row is worth an entry only when something mappable was recorded —
+    // the dropped flags (excludes, unmappable sex variants and pain kinds,
+    // symptom-flag FALSEs, mood flags) are not data, and a time cell alone
+    // never makes a blank day an entry. A row carrying ONLY an
+    // out-of-range cervix position/opening index is skipped as well: such
+    // an index decodes to no stored observation.
     final hasData =
         bbtC != null ||
         excluded ||
@@ -361,8 +298,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       continue;
     }
 
-    // Notes assembly: day note first, then the per-symptom notes in fixed
-    // [temp] → [pain] → [sex] → [mood] order.
+    // Day note first, then the per-symptom notes in fixed order.
     // TODO(user-review): the "[tag] text" note format itself.
     final notes = [
       dayNote,
@@ -416,42 +352,27 @@ DripCsvImport dripCsvToExportJson(String raw) {
 
 // --- vocabulary tables (drip: components/helpers/labels.js, 0-based) -------
 
-/// Derives the foreign-import marks from the mapped entry rows (drip has
-/// no mark analogue of its own, so the cycle-start boundaries and the
-/// analysis exclusions are derived from the imported data; the derivation
-/// replays the exact rows that the export document carries, and the
-/// idempotent marks writer makes a repeated import of the same CSV a
-/// no-op). The rows carry no profile id (there is none).
+/// Derives the foreign-import marks (author 'import') from the mapped
+/// entry rows [entries] carries (replayed verbatim, same rows the export
+/// document has; the idempotent marks writer makes a repeated import a
+/// no-op). Two mark kinds:
 ///
-/// Two mark kinds, both with author 'import':
-/// - `cycleStart`: replayed with the drip-local onset rule (_isDripOnset):
-///   a bleeding day on ANY stored level (1–4; spotting is full-coverage
-///   bleeding) opens a row of bleedings — a mark on the row's first day,
-///   nothing on its continuation days. [bleedingExcludedDays]
-///   (the bleeding.exclude days) are skipped by the replay ONLY — they
-///   cannot open, continue or suppress, while the stored entries keep
-///   their bleeding level.
-/// - `ignoreTemperature`: one per temperature.exclude day — the roadmap's
-///   "drip excluded temp → a mark, not an observation". Drip has no reason
-///   column, so no mask bits come from drip. [ignoreTemperatureDays] feeds
-///   ONLY this mark; a bleeding-excluded day ALONE derives no
-///   ignoreTemperature mark — one that ALSO carries temperature.exclude
-///   derives it like any temperature-excluded day.
+/// - `cycleStart`: the drip-local onset rule (_isDripOnset) — a bleeding
+///   day at ANY stored level opens a row of bleedings, the mark sits on
+///   the row's first day; [bleedingExcludedDays] are skipped by the
+///   replay only (they cannot open, continue or suppress; entries keep
+///   their bleeding level).
+/// - `ignoreTemperature`: one per [ignoreTemperatureDays] day —
+///   bleeding-excluded days alone derive none.
 ///
-/// Replay details (kept in step with the import merge plan):
-/// - the rows are judged in DAY order, not CSV row order (drip exports one
-///   row per calendar day, but the previous-day check of the onset rule
-///   must always see the prior day, wherever it sat in the file);
-/// - duplicated same-day keys keep their FIRST occurrence, like the merge
-///   plan counts them;
-/// - the derived rows are ordered by day, then type (deterministic
-///   document order; the merge is idempotent regardless of order).
+/// Rows are judged in DAY order, not CSV row order (the onset rule's
+/// previous-day check must always see the prior day); duplicated day
+/// keys keep their first occurrence, like the import merge plan counts
+/// them; the derived rows sort deterministically by day, then type.
 ///
-/// Row contract: each entry map carries a parsable `date`, and its
-/// `bleeding` value (when the key is present at all) is a bleeding level
-/// the shared parser accepts — a MISSING key is "no bleeding recorded"
-/// through tryParseBleeding's null rule. [entries] are the SAME row maps
-/// the export document carries (they replay verbatim).
+/// Contract: every entry map's `date` parses as an ISO day, and its
+/// `bleeding` value — when the key exists at all — is a bleeding level
+/// the shared parser accepts (a missing key is "no bleeding recorded").
 List<Map<String, Object?>> deriveDripMarks(
   List<Map<String, Object?>> entries,
   Set<String> ignoreTemperatureDays,
@@ -464,12 +385,8 @@ List<Map<String, Object?>> deriveDripMarks(
     if (iso == null || !seenDates.add(iso)) continue;
     final day = tryParseIsoDay(iso);
     if (day == null) continue;
-    // A MISSING key (JSON null) maps to "no bleeding recorded" itself, and
-    // the mapper above emits only accepted bleeding levels in this field.
-    // A null parse result therefore means outside input (e.g. a
-    // hand-edited document: junk token, bool, double) — surfaced as an
-    // explicit argument error naming the offending value instead of an
-    // opaque null-check crash.
+    // A null parse means outside input (junk token, bool, double) — an
+    // explicit argument error, not an opaque null-check crash.
     final bleedingRaw = row['bleeding'];
     final bleeding = tryParseBleeding(bleedingRaw);
     if (bleeding == null) {
@@ -494,14 +411,10 @@ List<Map<String, Object?>> deriveDripMarks(
         'author': 'import',
       });
     }
-    // The two exclusion sets have separate scopes: [ignoreTemperatureDays]
-    // (the temperature.exclude days) feeds ONLY the ignoreTemperature mark
-    // derivation above; [bleedingExcludedDays] feeds ONLY the onset rule
-    // below (it makes its days invisible to the cycleStart replay). No
-    // set affects the other derivation — a temperature-excluded day still
-    // opens/continues a row of bleedings, and a bleeding-excluded day
-    // ALONE derives no ignoreTemperature mark (only a combined day that
-    // also carries temperature.exclude would).
+    // Separate scopes: [ignoreTemperatureDays] feeds only the mark above;
+    // [bleedingExcludedDays] only makes its days invisible to the onset
+    // rule below — a temperature-excluded day still opens/continues a
+    // bleeding row.
     final previous = i == 0 ? null : replayed[i - 1];
     if (_isDripOnset(entry, previous, bleedingExcludedDays)) {
       marks.add(<String, Object?>{
@@ -521,17 +434,13 @@ List<Map<String, Object?>> deriveDripMarks(
   return marks;
 }
 
-/// The drip-local onset rule of the cycleStart replay: a replayed [entry]
-/// whose day is NOT bleeding-excluded and carries ANY bleeding level
-/// (1–4; spotting is full-coverage bleeding) opens a row of bleedings.
-/// It keeps the row running (deriving nothing) only when the immediately
-/// previous REPLAYED entry exists on the previous CALENDAR day, is
-/// bleeding at any level, and is itself not bleeding-excluded — an
-/// excluded or bleeding-less day between, or a data gap further back than
-/// yesterday, leaves the day a fresh onset. ANY level on purpose: drip
-/// routinely records spotting (its heaviest scale step 0), which is full
-/// bleeding there and must open AND continue rows of bleedings the same
-/// way.
+/// The drip-local onset rule of the cycleStart replay: ANY bleeding level
+/// (1–4; spotting is full-coverage bleeding) on a not-bleeding-excluded
+/// day opens a row, continuing only when the previous REPLAYED entry sits
+/// on the previous CALENDAR day, bleeds, and is itself not excluded — a
+/// gap, an excluded day between, or a bleeding-less day leaves a fresh
+/// onset. ANY level on purpose: drip routinely records spotting, and it
+/// opens and continues rows like heavier bleeding.
 bool _isDripOnset(
   DailyEntry entry,
   DailyEntry? previous,
@@ -553,18 +462,13 @@ bool _isDripOnset(
 /// measurement (dot decimals only, as drip writes them).
 double? _parseBbtC(String? raw) => raw == null ? null : double.tryParse(raw);
 
-/// Parses drip's `temperature.time` cell into minutes since midnight — the
-/// vocabulary of [DailyEntry.measuredAtMinutes] / the export document's
-/// `measured_at_minutes` field.
-///
-/// drip writes plain `HH:MM` (24 h, zero-padded); tolerated on top: a
-/// single-digit hour, optional `:SS` seconds (ignored — minute is the
-/// storage grain), and surrounding whitespace from spreadsheet round-trips.
-/// Anything else — an absent/malformed/out-of-range cell (25:00, 07:60,
-/// no time shape at all, a bare number) — is null: a time is only stored
-/// when drip actually recorded one, never fabricated. Mirrors the
-/// tolerant-parse pattern of [tryParseMeasuredAtMinutes] (lib/domain/
-/// models.dart), which the db writer re-runs on the produced document.
+/// Parses drip's `temperature.time` cell into minutes since midnight —
+/// the vocabulary of [DailyEntry.measuredAtMinutes]. drip writes plain
+/// `HH:MM` (24 h, zero-padded); tolerated on top: a single-digit hour,
+/// optional `:SS` seconds (`minute` is the storage grain), and
+/// surrounding whitespace from spreadsheet round-trips. Anything else —
+/// an absent/malformed/out-of-range cell — is null: a time is stored
+/// only when drip actually recorded one, never fabricated.
 int? _parseDripTimeMinutes(String? raw) {
   final m = RegExp(
     r'^\s*(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*$',
@@ -576,38 +480,25 @@ int? _parseDripTimeMinutes(String? raw) {
   return hour * 60 + minute;
 }
 
-/// Drip's bleeding heaviness scale: 0=spotting, 1=light, 2=medium, 3=heavy.
-/// Maps onto the stored numeric levels shifted by +1 (1=spotting … 4=heavy)
-/// because the export document's scale also stores an explicit none (0);
-/// drip represents "no bleeding" only as an absent CSV cell. Out-of-range
-/// indexes mean no observation (null). The returned values are exactly the
-/// numbers the shared parser accepts (tryParseBleeding, models.dart), so
-/// the writer/planner gates (export_import.dart) can never drop one of
-/// these rows. The stored scale's top level maximum(5) has no drip
-/// equivalent — drip's scale tops out at heavy(4), so a drip import can
-/// never produce it.
+/// Drip's bleeding heaviness scale (0=spotting … 3=heavy) mapped onto the
+/// stored levels +1: the export scale stores an explicit none as 0, which
+/// drip represents only as an absent cell. Out-of-range indexes mean no
+/// observation (null).
 int? _parseBleeding(String? raw) {
   final v = raw == null ? null : int.tryParse(raw);
   if (v == null || v < 0 || v > 3) return null;
   return v + 1; // drip scale → stored level (+1 shift for the explicit none)
 }
 
-/// The mucus observation of a drip row: the stored combined NFP number
-/// (`mucus.value`, 0..4) when present, otherwise the feeling+texture
+/// The mucus observation of a drip row: the stored NFP number
+/// (`mucus.value`, 0..4) when present, otherwise drip's feeling+texture
 /// composite via drip's own getNfpMucus — null unless BOTH parts exist,
-/// exactly like drip (drip: lib/nfp-mucus.js, its spec counts feeling-only
-/// rows as null). Out-of-range numbers/part indexes mean no observation.
-///
-/// The NFP number decodes onto the TWO-COLUMN mucus model (db columns
-/// mucus_sign/mucus_quality, no numeric or feeling mucus field exists):
-/// 0 → t, 1 → nothing, 2 → f, 3 → bare s, 4 → s + ew ("S+ ≙ S EW"). The
-/// returned pair goes through the shared [sanitizeMucusPair], so a quality
-/// can never ride a non-S sign (the SQL CHECK rule).
-/// TODO(user-review): the number-level decode is a 1:1 scale match
-/// (identical letters in both apps) but loses texture nuances drip itself
-/// never stored: NFP 3 written from texture "creamy" would carry quality
-/// `cr` if mapped per token, and NFP 4 written from feeling "slippery"
-/// alone reads as `ew` here though the cheat sheet would say `ns`.
+/// exactly like drip (drip: lib/nfp-mucus.js). The number decodes onto
+/// the TWO-COLUMN mucus model (db columns mucus_sign/mucus_quality):
+/// 0 → t, 1 → nothing, 2 → f, 3 → bare s, 4 → s + ew; the pair goes
+/// through [sanitizeMucusPair] (quality never rides a non-S sign).
+/// TODO(user-review): the decode matches the letters 1:1 but loses
+/// texture nuances drip never stored on the number.
 MucusPair? _mucusObservation({
   required String? nfpNumber,
   required String? feeling,
@@ -629,10 +520,10 @@ MucusPair? _mucusObservation({
   return sanitizeMucusPair(sign: sign, quality: quality);
 }
 
-/// The drip-side NFP number of a row (see [_mucusObservation]): the stored
-/// `mucus.value` when parseable, otherwise drip's getNfpMucus composite —
-/// feeling {0→0, 1→1, 2→2, 3→4}, texture {0→0, 1→3, 2→4}, take the max.
-/// Stored value wins (drip always keeps them consistent).
+/// The drip-side NFP number of a row (see [_mucusObservation]): the
+/// stored `mucus.value` when parseable, otherwise drip's getNfpMucus
+/// composite — feeling {0→0, 1→1, 2→2, 3→4}, texture {0→0, 1→3, 2→4},
+/// take the max.
 int? _resolveNfp({
   required String? nfpNumber,
   required String? feeling,
@@ -651,20 +542,17 @@ int? _resolveNfp({
   return nfpF > nfpT ? nfpF : nfpT; // Math.max
 }
 
-/// Structured Muttermund tokens of a drip row, decoded from drip's 0-based
-/// vocabularies (drip: labels.js): position {0: CervixPosition.low,
-/// 1: medium, 2: high}, opening {0: CervixOpening.closed, 1: middle,
-/// 2: open}, and firmness {0: CervixFirmness.hard, 1: soft} — drip's
-/// two-step firmness scale (hard/soft) has no half-soft analogue, so only
-/// the two outer values map. drip's "medium" opening token maps onto
+/// Structured Muttermund tokens of a drip row, decoded from drip's
+/// 0-based vocabularies (drip: labels.js): position {0: low, 1: medium,
+/// 2: high}, opening {0: closed, 1: middle, 2: open}, firmness {0: hard,
+/// 1: soft} — the two-step firmness scale has no half-soft analogue, so
+/// only the two outer values map. drip's "medium" opening token maps onto
 /// cycle-app's `middle` (same value, different storage name — see
-/// lib/domain/cervix.dart for the deliberate token distinction). A
-/// position/opening index outside the vocabulary means no stored
-/// observation for that dimension; a firmness index outside its two-step
-/// vocabulary CLAMPS to the nearest valid one (the shipped hand-authored
-/// specimen contains `cervix.firmness=2`). TODO(user-review): whether that
-/// clamping asymmetry is acceptable (position/opening null, firmness
-/// clamped).
+/// lib/domain/cervix.dart). An out-of-range position/opening index means
+/// no stored observation for that dimension; an out-of-range firmness
+/// index CLAMPS to the nearest valid one (the shipped specimen carries
+/// `cervix.firmness=2`). TODO(user-review): whether that clamping
+/// asymmetry is acceptable (position/opening null, firmness clamped).
 ({CervixPosition? position, CervixOpening? opening, CervixFirmness? firmness})?
 _cervixObservation({
   required String? opening,
@@ -681,9 +569,7 @@ _cervixObservation({
       ? null
       : CervixOpening.values[o]; // 0, 1, 2 = all three values
   final mappedFirmness = switch (f) {
-    // Clamp both ways, like the free-text `word` helper: drip's vocabulary
-    // is only hard(0)/soft(1), and the specimen's out-of-range 2 lands on
-    // soft exactly as it does in the free text.
+    // Clamped both ways, like the free-text `word` helper.
     null => null,
     final v when v <= 0 => CervixFirmness.hard,
     _ => CervixFirmness.soft, // anything >= 1 clamps to soft

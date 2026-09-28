@@ -1,13 +1,10 @@
-// Tagebuch screen: daily symptom entry form + the cycle-grouped entry list.
-//
-// The form writes one day at a time through EntriesDao.upsertDaily (full
-// replacement of the day; nulls included). The entry form carries the
-// explicit cycle-start switch — the diary-side writer of the authoritative
-// cycleStart mark (bleeding never implies or asks for a cycle start here).
-// The list underneath groups the live entry stream into cycles using the
-// mark-driven boundary rule from lib/domain/cycle_grouping.dart (a cycle
-// starts at a user-placed cycleStart mark) and pre-loads the tapped day
-// back into the form for editing.
+// Tagebuch screen: the daily entry form plus the cycle-grouped entry
+// list. The form writes one day at a time (EntriesDao.upsertDaily, full
+// replacement of the day — nulls included) and carries the explicit
+// manual-only exclude/cycle-start switches (rationale at the _save writes).
+// The list groups the live entry stream by the mark-driven boundary rule
+// from lib/domain/cycle_grouping.dart (a cycle starts at a user-placed
+// cycleStart mark) and pre-loads the tapped day back into the form.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -36,27 +33,23 @@ class TagebuchScreen extends ConsumerStatefulWidget {
 
 final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   /// The minimum one-line width that still shows the printed time-field
-  /// label next to the temperature field; below it the label drops and the
-  /// clock icon carries the meaning (see the narrow-width comment at the
-  /// BBT/time row).
+  /// label next to the temperature field; below it the label drops and
+  /// the clock icon carries the meaning (see the narrow-width note at
+  /// the BBT/time row).
   static const double _timeLabelMinLineWidth = 300;
 
   final _formKey = GlobalKey<FormState>();
   final _bbtController = TextEditingController();
   final _notesController = TextEditingController();
 
-  /// The resolved display locale, captured in [didChangeDependencies] —
+  /// The resolved display locale, captured in [didChangeDependencies]:
   /// entries load async before any build, so the prefill cannot resolve
-  /// `Localizations.localeOf` at write time; it reads this cache instead.
-  /// ('en' matches MaterialApp's first-supported fallback and is never
-  /// observed: the capture above always precedes the first load.)
+  /// the locale at write time and reads this cache instead.
   String _displayLocale = 'en';
 
   /// The cycles whose day list is currently expanded, keyed by the
-  /// normalized cycle start date (the same key the header tile carries).
-  /// Ordinary widget state: the day rows build and unbuild through it, so
-  /// expansions survive the list's regular data-driven rebuilds but not
-  /// leaving the screen.
+  /// normalized cycle start date. Widget state: expansions survive the
+  /// list's data-driven rebuilds but not leaving the screen.
   final Set<DateTime> _expandedCycleStarts = <DateTime>{};
 
   Bleeding _bleeding = Bleeding.none;
@@ -99,11 +92,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   Future<void> _loadEntry(DateTime date) async {
     final db = await ref.read(databaseProvider.future);
     final existing = await db.entriesDao.entryFor(date);
-    // The exclude switch seeds from the day's ACTUAL mark state (not the
-    // disturbance mask): an externally placed ignoreTemperature mark —
-    // day sheet, imports — shows up as "excluded" in the form. The
-    // cycle-start switch seeds the same way from the day's cycleStart
-    // mark.
+    // The switches seed from the day's ACTUAL mark state, so marks placed
+    // elsewhere (day sheet, imports) show up in the form.
     final dayMarks = await db.marksDao.marksForDay(date);
     final excludeMarked = dayMarks.any(
       (m) => m.markType == CycleMarkTypes.ignoreTemperature,
@@ -130,10 +120,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _tempDisturbances = entry?.tempDisturbances ?? 0;
     _excludeTemperature = excludeMarked;
     _cycleStartMarked = cycleStartMarked;
-    // Measured time: a fresh day (nothing stored yet) starts from the
-    // CURRENT time as a convenience; a re-opened day keeps what was stored
-    // — including deliberately cleared days (stored null), which never
-    // re-prefill.
+    // A fresh day prefill the current time; a re-opened day keeps what
+    // was stored — a deliberately cleared day never re-prefills.
     _measuredAt = entry == null
         ? TimeOfDay.fromDateTime(ref.read(nowProvider)())
         : _minutesToTime(entry.measuredAtMinutes);
@@ -148,10 +136,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _sexTimings = entry?.sexTimings ?? 0;
     final bbt = entry?.bbtC;
-    // The prefill follows the display locale ("36,4" in de / "36.4" in en):
-    // what the user sees reinstates what she sees elsewhere. Entry stays
-    // separator-free by rule — parseDecimalInput accepts BOTH separators,
-    // so the comma form saves back identically.
+    // The prefill follows the display locale ("36,4" in de / "36.4" in
+    // en); parseDecimalInput accepts both separators, so the comma form
+    // saves back identically.
     _bbtController.text = bbt == null
         ? ''
         : formatDecimalPrefill(bbt, locale: _displayLocale);
@@ -160,7 +147,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Future<void> _pickDate() async {
     final selected = ref.read(selectedDateProvider);
-    // Window: BBT diaries rarely reach back to 2000; forward only to
+    // Back only to 2000 (BBT diaries rarely reach further); forward to
     // tomorrow so "I measured just after midnight" still works.
     final picked = await showDatePicker(
       context: context,
@@ -172,12 +159,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(picked);
   }
 
-  /// Moves the entry form to the adjacent calendar day ([delta] = -1/+1).
-  /// The write goes through [selectedDateProvider], so the existing
-  /// `ref.listen` in build reloads the day's entry — exactly the path a
-  /// list-tile tap or a chart jump takes. Unsaved edits are discarded by
-  /// that reload (the form only persists on the explicit save button),
-  /// matching the established semantics of every other day change here.
+  /// Moves the entry form to the adjacent calendar day through
+  /// [selectedDateProvider], so the existing `ref.listen` in build
+  /// reloads the day — and unsaved edits are discarded by that reload,
+  /// like every other day change here.
   void _moveDay(int delta) {
     ref.read(selectedDateProvider.notifier).state = DateOnly.addDays(
       ref.read(selectedDateProvider),
@@ -185,8 +170,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
   }
 
-  /// Material time picker dialog. Initial value: the stored (or prefilled)
-  /// time, or — for still-unset days — the current time as a starting point.
+  /// Time picker prefilled from the stored (or, on a fresh day, current)
+  /// time.
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -197,8 +182,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     setState(() => _measuredAt = picked);
   }
 
-  /// Minutes since midnight form-state helper, in both directions
-  /// ([DailyEntry.measuredAtMinutes] vocabulary and [TimeOfDay] inputs).
+  /// Minutes-since-midnight ↔ [TimeOfDay] helper
+  /// ([DailyEntry.measuredAtMinutes] vocabulary).
   TimeOfDay? _minutesToTime(int? minutes) => minutes == null
       ? null
       : TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
@@ -209,16 +194,15 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) return;
     final date = ref.read(selectedDateProvider);
-    // Enforce the domain rule once more at the save boundary: any quality
-    // on a sign other than S collapses to null (mirrors the SQL CHECK).
+    // Enforce the domain rule once more at the save boundary: a quality on
+    // a sign other than S collapses to null (mirrors the SQL CHECK).
     final (:sign, :quality) = sanitizeMucusPair(sign: _sign, quality: _quality);
     final entry = DailyEntry(
       date: date,
       bbtC: parseDecimalInput(_bbtController.text),
       // The domain model drops a time without a temperature (see
-      // DailyEntry.measuredAtMinutes) — the picker row above is only
-      // reachable while a temperature is entered, and a temperature that
-      // was cleared before saving takes the time with it.
+      // DailyEntry.measuredAtMinutes) — clearing the temperature takes
+      // the time with it.
       measuredAtMinutes: _measuredAt == null
           ? null
           : _timeToMinutes(_measuredAt!),
@@ -231,10 +215,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       cervixFirmness: _cervixFirmness,
       painBreast: _painBreast,
       painMittelschmerz: _painMittelschmerz,
-      // The mask is 0..7 by construction: every chip below toggles exactly
-      // one SexTiming bit, so no extra sanitizing is needed here — the
-      // DailyEntry constructor assert remains the single guard (same
-      // pattern as the mucus-quality save path above).
+      // The mask is 0..7 by construction (each chip toggles exactly one
+      // bit); the DailyEntry constructor assert is the single guard.
       sexTimings: _sexTimings,
       notes: _notesController.text.trim().isEmpty
           ? null
@@ -242,32 +224,22 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
     try {
       final db = await ref.read(databaseProvider.future);
-      // The three writes are ONE transaction: a failure anywhere rolls the
-      // whole save back, so a day is stored either completely or not at
-      // all (never an entry without its marks, never marks without the
-      // entry).
+      // The three writes are ONE transaction: a day is stored either
+      // completely or not at all.
       await db.transaction(() async {
         await db.entriesDao.upsertDaily(entry);
-        // The analysis-exclusion mark follows the EXCLUDE SWITCH alone
-        // (owner decision 2026-09-19: manual-only coupling — the old
-        // flag-driven auto-set is deleted): a flagged save without the
-        // switch does not exclude the day, and the switch toggles the
-        // mark in BOTH directions (addMark is idempotent, deleteMark
-        // no-ops when nothing is there). The switch seeds from the day's
-        // existing mark (see _loadEntry), so an untouched switch keeps an
-        // externally placed mark (sheet toggle, imports) in place.
+        // The exclusion mark follows the EXCLUDE SWITCH alone (owner
+        // decision 2026-09-19: manual coupling — a flagged save without
+        // the switch does not exclude the day); the switch toggles in
+        // both directions and seeds from the existing mark (_loadEntry),
+        // so an untouched switch keeps an externally placed mark.
         if (_excludeTemperature) {
           await db.marksDao.addMark(date, CycleMarkTypes.ignoreTemperature);
         } else {
           await db.marksDao.deleteMark(date, CycleMarkTypes.ignoreTemperature);
         }
-        // The cycleStart mark follows the explicit CYCLE-START SWITCH
-        // alone (manual-only coupling — bleeding never implies or asks
-        // for a cycle start): the switch toggles the mark in BOTH
-        // directions (addMark is idempotent, deleteMark no-ops when
-        // nothing is there). The switch seeds from the day's existing
-        // mark (see _loadEntry), so an untouched switch keeps an
-        // externally placed mark (day sheet, imports) in place.
+        // Same manual coupling as the exclude switch above — bleeding
+        // never implies or asks for a cycle start.
         if (_cycleStartMarked) {
           await db.marksDao.addMark(date, CycleMarkTypes.cycleStart);
         } else {
@@ -275,18 +247,16 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         }
       });
     } catch (_) {
-      // Failure anywhere in the write phase — the transaction was rolled
-      // back and never committed, so nothing was changed: report that
-      // instead of leaking an unhandled async error (same posture as the
-      // delete-data and import flows).
+      // The transaction rolled back — nothing changed; report the failure
+      // instead of leaking an unhandled async error.
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.saveFailed)));
       return;
     }
-    // No explicit provider invalidation needed: dailyEntriesProvider sits
-    // on a drift `.watch()` stream, which re-emits after this write.
+    // No provider invalidation: dailyEntriesProvider's drift watch stream
+    // re-emits after this write.
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -294,21 +264,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   }
 
   String _formatDay(DateTime d, String locale) =>
-      // The date-only convention is UTC-normalized midnights; DateFormat
-      // reads the value's OWN fields, so print it verbatim — a .toLocal()
-      // would show the PREVIOUS day on UTC-negative hosts.
+      // Date-only values are UTC-normalized midnights — print verbatim;
+      // a .toLocal() shows the previous day on UTC-negative hosts.
       DateFormat.yMd(locale).format(DateOnly.normalize(d));
 
-  // The HEADER date button's label differs from the list date above in
-  // two ways, so it gets its own formatter instead of touching _formatDay
-  // (whose compact yMd output the cycle-group list and day tiles keep):
-  //  1. Mark-sheet style: the longer yMMMEd ("Fr., 10. Apr. 2026") that
-  //     the cycle day sheet prints in its header — the two header areas
-  //     look and read alike.
-  //  2. On today a localized prefix removes the ambiguity between "the
-  //     form happens to sit on some date" and "this is today" (todayDate
-  //     key). No runtime concatenation: the locale's full composite
-  //     ("Heute, Fr., 10. Apr. 2026") lives in the ARB.
+  // The HEADER date button gets its own formatter (the list keeps the
+  // compact yMd output): the longer yMMMEd style the cycle day sheet's
+  // header prints, plus a localized "Heute, " prefix on today — the full
+  // composite lives in the ARB, not a runtime concatenation.
   String _headerDayLabel(
     AppLocalizations l10n, {
     required DateTime selected,
@@ -321,9 +284,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     return DateOnly.sameDay(selected, now) ? l10n.todayDate(date) : date;
   }
 
-  /// Locale-aware two-decimal temperature display ("36,65" in German) —
-  /// routed through the shared display formatter (single-sourced like
-  /// every other decimal surface).
   String _formatBbt(double bbt, String locale) =>
       formatDecimal(bbt, locale: locale, decimalDigits: 2);
 
@@ -341,27 +301,19 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
     final entriesAsync = ref.watch(dailyEntriesProvider);
     final selected = ref.watch(selectedDateProvider);
-    // The marks watch is kept unmasked so a failed stream can surface in
-    // the cycle-list area instead of rendering the list from a silently
-    // empty marks list. While the stream is still loading — and while it
-    // is in error, see the list slot below — the form's day-of-cycle
-    // label and the grouping compute like the masked read did (without
-    // marks); the form's per-field writes do not depend on marks.
+    // The marks watch stays unmasked: a failed stream must surface in the
+    // cycle-list area below instead of rendering a silently empty list.
     final marksAsync = ref.watch(marksProvider);
-    // The cycle groups come from the ONE derived pass shared by Tagebuch,
-    // Zyklus and Statistik (see derivedCycleDataProvider): no grouping of
-    // its own per build — while the entry stream is still loading the
-    // pass groups an empty snapshot, which is nothing to show yet.
+    // The cycle groups come from the shared derived pass behind
+    // derivedCycleDataProvider — no per-build grouping here.
     final cycles = ref.watch(derivedCycleDataProvider).cycles;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.navDiary),
-        // The Save action lives beside the screen title, so it is reachable
-        // from anywhere in the form — not only at the bottom (where the
-        // form's bottom button stays available in addition). It calls the
-        // same handler, with identical behavior (validation, snackbar, the
-        // mark writes).
+        // The Save action beside the screen title stays reachable from
+        // anywhere in the form (the bottom button remains in addition);
+        // it calls the same handler.
         actions: [
           IconButton(
             key: const ValueKey('diarySaveAction'),
@@ -379,10 +331,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               child: _buildForm(l10n, locale, selected, cycles),
             ),
           ),
-          // The list slot: a marks error takes precedence — only a healthy
-          // marks stream lets the entries-driven list render, with its own
-          // retry surface when the entries stream fails. The form above
-          // stays intact either way.
+          // A marks error takes precedence: only a healthy marks stream
+          // lets the entries-driven list render.
           if (marksAsync.hasError)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
@@ -407,15 +357,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     DateTime selected,
     List<Cycle> cycles,
   ) {
-    // The navigation window matches the date picker's (see _pickDate):
-    // nothing before 2000, nothing beyond tomorrow ("measured just after
-    // midnight") — no unbounded future. "Now" comes from nowProvider so
-    // tests can pin the clock.
+    // Same navigation window as the date picker: nothing before 2000,
+    // nothing beyond tomorrow. "Now" comes from nowProvider so tests can
+    // pin the clock.
     final now = ref.watch(nowProvider);
     final previousDay = DateOnly.addDays(selected, -1);
     final nextDay = DateOnly.addDays(selected, 1);
-    // The selected day's position in its cycle, 1-based (null before the
-    // first group start).
     final selectedCycleDay = dayOfCycleFor(selected, cycles);
     return Card(
       child: Padding(
@@ -427,12 +374,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // --- date ---------------------------------------------------
-              // Previous/next flank the date button and step through the
-              // same window the date picker offers (bounds computed above).
-              // Left alignment keeps the date button and the day chevrons together.
-              //
-              // The date button is flexed so its label constrains to the row
-              // instead of overflowing it.
+              // The chevrons step the same window the date picker offers,
+              // and the flexed date button keeps its label inside the row.
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
@@ -465,12 +408,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                 ],
               ),
-              // The day-of-cycle of the SELECTED day, small type in its
-              // own line below the navigation row, not inside it: the row
-              // already carries the longest label of the form (the
-              // yMMMEd date, often with the "Heute, " prefix) and a
-              // narrow-width test pins that this label line stays
-              // overflow-free (see diary_cycle_day_label_test.dart).
+              // The day-of-cycle of the SELECTED day, small type on its
+              // own line: the navigation row already carries the form's
+              // longest label, and a narrow-width test pins this line
+              // overflow-free (diary_cycle_day_label_test.dart).
               if (selectedCycleDay != null) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -481,24 +422,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               const SizedBox(height: 12),
               // --- BBT + measured time (compact one-line density) --------
               // The measurement time is metadata OF the temperature (the
-              // domain model never stores it without one — see
+              // domain model never stores it without one, see
               // DailyEntry.measuredAtMinutes), so the time control shares
-              // the temperature's visual line instead of stacking a second
-              // row below it. The time control still only shows while a
-              // temperature that can actually be saved is entered: the
-              // same plausibility gate the validator applies
-              // (isWithinBbtRange) — an implausible number like "999"
-              // exposes the control just as little as an unparsable one.
-              // When it shows, a fresh day is prefilled with the current
-              // time (see _applyEntry); explicit clearing sets "not
-              // recorded".
+              // the temperature's visual line and shows only while a
+              // savable temperature is entered — the same range gate the
+              // validator applies. A fresh day prefill the current time
+              // (see _applyEntry).
               //
               // Narrow content widths (small devices, wide font scaling):
-              // the printed "Gemessen um" label is the widest part of the
-              // line, so below ~300 dp of form width it drops and the
-              // clock icon carries the meaning (the value stays on the
-              // button, the clear button stays). A narrow-width test pins
-              // that this line stays overflow-free.
+              // below ~300 dp of form width the printed label drops and
+              // the clock icon carries the meaning; a narrow-width test
+              // pins that this line stays overflow-free.
               LayoutBuilder(
                 builder: (context, lineConstraints) {
                   final showTimeLabel =
@@ -573,16 +507,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- temperature disturbance group (flags + exclude switch)
-              // One labelled group, one decision (owner decision
-              // 2026-09-19: the coupling between the disturbance flags and
-              // the analysis exclusion is MANUAL — each flag chip toggles
-              // its own bit in the day's tempDisturbances mask — raw data,
-              // e.g. the diary list's interrupted-day badge — while the
-              // exclude switch is the only diary-side input that writes
-              // the ignoreTemperature mark on save). No auto behavior in
-              // either direction: flagging never excludes the day, and
-              // clearing the flags never lifts an exclusion. The switch
-              // seeds from the day's existing mark (see _loadEntry).
+              // The flag chips toggle raw tempDisturbances bits
+              // (interrupted-day data); the exclude switch is the only
+              // diary-side input that writes the ignoreTemperature mark on
+              // save (manual-only coupling — see _save).
               // TODO(user-review): the group wording (heading + switch
               // label) is pending the expert review.
               Container(
@@ -639,9 +567,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
-              // All six levels of the numeric scale, none first. Wrap of
-              // ChoiceChips like the mucus quality row below: a six-label
-              // SegmentedButton risks overflowing small phone widths.
+              // Wrap of ChoiceChips: a six-label SegmentedButton risks
+              // overflowing small phone widths.
               Text(l10n.termBleeding),
               const SizedBox(height: 4),
               Wrap(
@@ -669,14 +596,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ],
               ),
               // --- cycle start ------------------------------------------
-              // The explicit cycle-start toggle writes/removes the
-              // authoritative cycleStart mark on save — bleeding never
-              // implies or asks for a cycle start. Same contract as the
-              // exclude switch above: the switch seeds from the day's
-              // existing mark (see _loadEntry) and the save mirrors its
-              // state in both directions (addMark idempotent, deleteMark
-              // no-op). The label reuses the shared "Zyklusbeginn"
-              // string.
+              // The explicit toggle writes/removes the authoritative
+              // cycleStart mark on save — bleeding never implies or asks
+              // for a cycle start; same manual coupling as the exclude
+              // switch above.
               SwitchListTile(
                 key: const ValueKey('diaryCycleStartSwitch'),
                 contentPadding: EdgeInsets.zero,
@@ -687,14 +610,12 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- mucus: fertility sign, quality qualifier only on S -----
-              // Chips as in the bleeding row above: all six sign options
-              // plus the unset chip would divide the width evenly inside a
-              // SegmentedButton, and the two-glyph f/S label reflowed to
-              // two lines on narrow phone widths (growing the row and
-              // painting a partially visible overflow band). The chips show
-              // the cheat-sheet glyphs themselves (t/Ø/f/S/A). A quality
-              // exists only together with S, so the quality picker appears
-              // only while S is selected (hidden otherwise).
+              // Chips as in the bleeding row: a SegmentedButton reflowed
+              // the two-glyph labels to two lines on narrow phone widths
+              // (an overflow band). The chips show the cheat-sheet glyphs
+              // (t/Ø/f/S/A) themselves; a quality exists only together
+              // with S, so the quality picker appears only while S is
+              // selected.
               Text(l10n.termMucus),
               const SizedBox(height: 4),
               Wrap(
@@ -746,9 +667,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ],
               const SizedBox(height: 12),
               // --- Muttermund: position (5), opening (3), firmness (3) --
-              // All three rows are independent pickers; the leading unset
-              // chip ("—") plus the tap-again-deselects rule return to the
-              // no-observation state, like the mucus quality chips.
+              // Independent pickers; the unset chip plus the
+              // tap-again-deselect rule returns to the no-observation
+              // state, like the mucus quality chips.
               Text(l10n.termCervixPosition),
               const SizedBox(height: 4),
               Wrap(
@@ -834,12 +755,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ),
               const SizedBox(height: 12),
               // --- sex times (multi-select) ------------------------------
-              // The three time slots are INDEPENDENT toggles: each tap
-              // sets/clears its own bit in the day's sexTimings mask and
-              // several slots can be selected at once. The mask itself
-              // encodes whether sex happened (no bits = not recorded); a
-              // time-less "sex happened" is deliberately not representable
-              // (see DailyEntry.sexTimings).
+              // Independent toggles: each tap sets/clears its own bit,
+              // several slots at once. No bits = not recorded — a time-less
+              // "sex happened" is deliberately not representable (see
+              // DailyEntry.sexTimings).
               Text(l10n.termSex),
               const SizedBox(height: 4),
               Wrap(
@@ -943,9 +862,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
             ),
           ];
         }
-        // The groups arrive pre-computed from the shared derived pass
-        // (see the comment in build) — the pass is cached, not rebuilt
-        // per screen. Most recent work stays at the top of the list.
+        // The groups arrive pre-computed from the shared derived pass;
+        // the list walks them most recent first.
         return [
           for (var i = cycles.length - 1; i >= 0; i--)
             ..._cycleSlivers(l10n, cycles[i]),
@@ -954,20 +872,19 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     );
   }
 
-  /// One cycle as slivers: the header tile plus — only while expanded — the
-  /// lazily-built day list. The day rows deliberately do NOT live inside
-  /// the header tile as expansion children: an expanded [ExpansionTile]
-  /// builds its whole children column in one pass, so a cycle whose true
-  /// span covers years of days would construct every tile on the first
-  /// expansion. The builder-driven sliver list below the header instead
-  /// builds only the rows the viewport (plus its cache extent) lays out.
+  /// One cycle as slivers: the header tile plus — only while expanded —
+  /// the lazily-built day list. The day rows deliberately do NOT live
+  /// inside the header tile as [ExpansionTile] children: an expanded tile
+  /// builds its whole children column in one pass, so a cycle spanning
+  /// years would construct every tile on the first expansion; the sliver
+  /// list below builds only the rows the viewport lays out.
   List<Widget> _cycleSlivers(AppLocalizations l10n, Cycle cycle) {
     final start = DateOnly.normalize(cycle.startDate);
     final expanded = _expandedCycleStarts.contains(start);
     return [
       // Stable keys: sibling expand/collapse shifts these slivers' positions
       // and positional reconciliation would remount the neighboring header,
-      // resetting its tile state. Header/day-list key prefixes stay distinct.
+      // resetting its tile state.
       SliverPadding(
         key: ValueKey('cycle-header-${start.toIso8601String()}'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1012,24 +929,24 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     required bool initiallyExpanded,
   }) {
     // The start label is the opening cycleStart mark's own date for
-    // mark-opened cycles — which may sit on an untracked gap day before the
-    // first tracked day, so the day count can span untracked gap days too.
+    // mark-opened cycles — which may sit on an untracked gap day before
+    // the first tracked day, so the day count can span untracked gap
+    // days too.
     final locale = Localizations.localeOf(context).toString();
     final startLabel = _formatDay(cycle.startDate, locale);
     final endLabel = _formatDay(cycle.endDate, locale);
     final title = cycle.startsAtMenstruation
         ? l10n.cycleGroupOnset(startLabel)
-        // Leading group predates the first cycleStart mark: title shows
-        // the range END, since the begin is unknown.
+        // The leading group predates the first cycleStart mark, so the
+        // range END stands in the title (the begin is unknown).
         : l10n.cycleGroupLeading(endLabel);
-    // The count reports the cycle's TRUE calendar span (start → end,
-    // silent gaps included) even where the day list below shows only the
-    // built portion of it.
+    // The count reports the cycle's TRUE calendar span (silent gaps
+    // included), even where the list shows only the built portion.
     final dayCount = DateOnly.daysBetween(cycle.endDate, cycle.startDate) + 1;
 
     return ExpansionTile(
-      // The key anchors the expansion state to THIS cycle across the list's
-      // data-driven rebuilds, in sync with _expandedCycleStarts.
+      // The key anchors the expansion state to THIS cycle across the
+      // list's data-driven rebuilds, in sync with _expandedCycleStarts.
       key: ValueKey(DateOnly.normalize(cycle.startDate)),
       initiallyExpanded: initiallyExpanded,
       title: Text(title),
@@ -1046,21 +963,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Widget _dayTile(AppLocalizations l10n, DailyEntry day, Cycle cycle) {
     final locale = Localizations.localeOf(context).toString();
-    // The day's position inside its cycle, 1-based — shown as a small label
-    // under the tile's date. The containing cycle is [cycle] itself: a day
-    // of the list never falls beyond the next cycle's start, so the
-    // dayOfCycleFor scan over all cycles resolves to the same number.
+    // The day's position inside its cycle, 1-based — [cycle] itself is
+    // the containing cycle: a day of the list never falls beyond the next
+    // cycle's start.
     final cycleDay = dayOfCycleFor(day.date, [cycle]);
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       leading: _bleedingMarker(day),
-      // The day label block: date, then the small day-of-cycle label —
-      // NOT in the trailing row: that row already fills the tile with the
-      // widest chip shapes (the recorded narrow-width tile check), and a
-      // ListTile lays its trailing out unbounded, so a fixed extra member
-      // there would overflow the narrow tile instead of wrapping onto the
-      // tile's own second line as this one does.
+      // The label block sits in the title, not the trailing row: the
+      // trailing already fills the narrow tile (the recorded narrow-width
+      // tile check), and a ListTile lays its trailing out unbounded.
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1080,8 +993,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               '${_formatBbt(day.bbtC!, locale)} °C',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-          // Measured time, subtle: only when recorded that day, small type
-          // right after the temperature it belongs to.
           if (day.measuredAtMinutes != null) ...[
             const SizedBox(width: 8),
             Text(
@@ -1123,10 +1034,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   Widget _bleedingMarker(DailyEntry day) {
     final scheme = Theme.of(context).colorScheme;
-    // The shared square-box bleeding symbol at the tile's 18 px size
-    // (bleeding_symbol.dart): a box whose bleed fill is a bottom-anchored
-    // fraction of the height, spotting interrupted into dots — the same
-    // convention the cycle chart's cells and the glossary sample render.
     final marker = day.bleeding == Bleeding.none
         ? Container(
             width: 18,
@@ -1149,9 +1056,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       clipBehavior: Clip.none,
       children: [
         marker,
-        // The raw disturbance flags are the interrupted-day rendering
-        // signal here (the list tile's little warning badge) — the
-        // analysis exclusion is the mark, not this.
+        // The interrupted-day badge reads the RAW disturbance flags —
+        // the analysis exclusion is the ignoreTemperature mark, not this.
         if (day.isInterrupted)
           Positioned(
             right: -6,
