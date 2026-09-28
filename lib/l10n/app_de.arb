@@ -510,6 +510,15 @@
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
   "importSummary": "Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
+  "importOverwriteWarning": "{days, plural, =1{1 Tag wird überschrieben.} other{{days} Tage werden überschrieben.}}",
+  "@importOverwriteWarning": {
+    "description": "Überschreibungs-Vorschau der Import-Dialoge (JSON und Drip-CSV): wie viele Tage, die bereits auf diesem Gerät liegen, das eingefügte Dokument überschreiben würde — angezeigt vor dem Import. ICU-Plural, damit der Singular in beiden Sprachen korrekt liest.",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "dripImportTitle": "Drip-Daten importieren",
   "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Eine ausgeschlossene Temperatur erzeugt eine „vom Auswerten ausschließen“-Markierung; Stimmung- und Lust-Kennzeichen fallen weg (ihre Notizen bleiben erhalten).",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",

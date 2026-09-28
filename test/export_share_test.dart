@@ -20,6 +20,8 @@
 import 'dart:io';
 
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/export_import.dart'
+    show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show
@@ -201,6 +203,82 @@ void main() {
         reason: 'the preview page does not open when the export failed',
       );
     });
+  });
+
+  // The dialog's planned import runs its async read against the same
+  // database the export later reads: cancelling the dialog must leave the
+  // export flow untouched (no cross-flow wreckage from the in-flight/
+  // discarded plan).
+  testWidgets('a cancelled import dialog leaves the export path intact', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(settingsHarness());
+    await tester.pumpAndSettle();
+    final scroller = find
+        .descendant(
+          of: find.byType(EinstellungenScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    const importButton = Key('settingsImportJsonButton');
+    await tester.scrollUntilVisible(
+      find.byKey(importButton),
+      200,
+      scrollable: scroller,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(importButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    // The seeded day (2026-09-06) re-recorded with a different value gives
+    // the dialog something to plan an overwrite for.
+    final conflictDoc = buildExportJson(
+      ExportBlob(
+        exportedAt: DateTime.utc(2026, 9, 20),
+        entries: [
+          {
+            'date': formatIsoDay(evaluationScenarioEntries().first.date),
+            'bbt_c': 37.2,
+          },
+        ],
+        marks: const [],
+      ),
+    );
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      conflictDoc,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('importOverwritePreview')),
+      findsOneWidget,
+      reason: 'the conflicting day must have been planned before cancelling',
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, 'Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+
+    // The export action after the cancelled import opens the preview page
+    // with the seeded entry, exactly as before the dialog existed.
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, exportButtonLabel),
+      200,
+      scrollable: scroller,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(previewTitleLabel),
+      findsOneWidget,
+      reason: 'the export preview page must open after the cancelled import',
+    );
   });
 
   group('export preview: share action', () {
