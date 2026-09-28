@@ -965,12 +965,19 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final start = DateOnly.normalize(cycle.startDate);
     final expanded = _expandedCycleStarts.contains(start);
     return [
+      // Stable keys: sibling expand/collapse shifts these slivers' positions
+      // and positional reconciliation would remount the neighboring header,
+      // resetting its tile state. Header/day-list key prefixes stay distinct.
       SliverPadding(
+        key: ValueKey('cycle-header-${start.toIso8601String()}'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        sliver: SliverToBoxAdapter(child: _cycleHeader(l10n, cycle)),
+        sliver: SliverToBoxAdapter(
+          child: _cycleHeader(l10n, cycle, initiallyExpanded: expanded),
+        ),
       ),
       if (expanded)
         SliverPadding(
+          key: ValueKey('cycle-days-${start.toIso8601String()}'),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           sliver: SliverList.builder(
             // Index 0 carries the tap-to-edit caption; indexes 1.. walk the
@@ -997,7 +1004,13 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     ];
   }
 
-  Widget _cycleHeader(AppLocalizations l10n, Cycle cycle) {
+  /// [initiallyExpanded] restores the set's state only on a remounted tile;
+  /// [_expandedCycleStarts] stays the source of truth via [onExpansionChanged].
+  Widget _cycleHeader(
+    AppLocalizations l10n,
+    Cycle cycle, {
+    required bool initiallyExpanded,
+  }) {
     // The start label is the opening cycleStart mark's own date for
     // mark-opened cycles — which may sit on an untracked gap day before the
     // first tracked day, so the day count can span untracked gap days too.
@@ -1018,6 +1031,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       // The key anchors the expansion state to THIS cycle across the list's
       // data-driven rebuilds, in sync with _expandedCycleStarts.
       key: ValueKey(DateOnly.normalize(cycle.startDate)),
+      initiallyExpanded: initiallyExpanded,
       title: Text(title),
       subtitle: Text(l10n.termCycleDays(dayCount)),
       onExpansionChanged: (isExpanded) => setState(() {

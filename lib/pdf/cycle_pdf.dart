@@ -284,8 +284,12 @@ Future<List<int>> generatePdfBytes({
     theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
   );
 
+  // The planner skips day counts of 0 (nothing to draw), silently dropping
+  // the cycle's sheet — but an empty cycle is still export-selected, so it
+  // counts as one placeholder day.
   final dayCounts = [
-    for (final evaluation in model.cycles) evaluation.cycle.days.length,
+    for (final evaluation in model.cycles)
+      evaluation.cycle.days.isEmpty ? 1 : evaluation.cycle.days.length,
   ];
   final plan = planCyclePages(dayCounts);
   final windowsPerCycle = <int, int>{};
@@ -298,9 +302,17 @@ Future<List<int>> generatePdfBytes({
   for (final window in plan) {
     final evaluation = model.cycles[window.cycleIndex];
     final cycleDays = evaluation.cycle.days;
-    final windowDays = cycleDays
-        .sublist(window.firstDayIndex, window.firstDayIndex + window.dayCount)
-        .toList(growable: false);
+    final emptyCycle = cycleDays.isEmpty;
+    // The placeholder feeds page planning and the form grid only, at the
+    // cycle's start day; the curve draw list stays on the empty tracked list.
+    final windowDays = emptyCycle
+        ? [DailyEntry(date: DateOnly.normalize(evaluation.cycle.startDate))]
+        : cycleDays
+              .sublist(
+                window.firstDayIndex,
+                window.firstDayIndex + window.dayCount,
+              )
+              .toList(growable: false);
     // The page's curve/overlay draw list: the calendar-offset overlay
     // space mapped onto this window's tracked positions (pure Dart).
     final drawing = pdfCurveDrawing(
@@ -336,10 +348,9 @@ Future<List<int>> generatePdfBytes({
                 cycleIndex: window.cycleIndex,
                 // This page's cycle's observation window (first–last tracked
                 // day), carried WITH the year into the header facts.
-                cycleWindow: (
-                  first: cycleDays.first.date,
-                  last: cycleDays.last.date,
-                ),
+                cycleWindow: emptyCycle
+                    ? null
+                    : (first: cycleDays.first.date, last: cycleDays.last.date),
               ),
             ),
             pw.SizedBox(height: 4),
