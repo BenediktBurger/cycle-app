@@ -69,6 +69,17 @@ All three APKs are signed with the same release key. Every release note
 lists each APK's SHA-256 checksum plus the signing certificate's SHA-256
 fingerprint, so you can verify the download if you want to.
 
+### Not ready to install? Try the web demo
+
+There is also a public web demo at
+[BenediktBurger.github.io/cycle-app](https://BenediktBurger.github.io/cycle-app/):
+the app running in your browser, nothing to install. Mind that entries
+made there stay in that browser (no sync, no upload) — the browser storage
+is not encrypted, and as a beta the demo can still lose data, so only
+enter data you are comfortable losing or exposing. The
+[demo page](https://BenediktBurger.github.io/cycle-app/) spells out what
+that means.
+
 ### Installing
 
 1. Download the APK matching your device (see above) from the latest
@@ -212,7 +223,9 @@ nowhere else**:
   [ADR-0005](docs/adr/0005-storage-and-encryption.md)), so a copied file is
   unopenable data on anything else — not a backup.
 - On the **web build** the browser storage (OPFS/IndexedDB) is not encrypted
-  by the app (web stays an unencrypted development tool).
+  by the app (web stays an unencrypted development tool) — the public
+  [web demo](https://BenediktBurger.github.io/cycle-app/) states what that
+  means for demo users.
 
 JSON export/import is the only backup path on **all** platforms — web
 included.

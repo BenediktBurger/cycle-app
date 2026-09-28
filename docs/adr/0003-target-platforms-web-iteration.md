@@ -54,3 +54,12 @@ amendment in [ADR-0005](0005-storage-and-encryption.md). The platform
 iteration decisions here (web as test target, no native-only plugins in
 core code, cheap CI web build) are unaffected. Web storage stays
 unencrypted, as decided.
+
+## Update 2026-09-28: public web demo on GitHub Pages is a bonus, not a promotion
+
+The web build now runs as a public demo at
+[github.io/cycle-app](https://BenediktBurger.github.io/cycle-app/)
+(see [ADR-0012](0012-public-web-demo-github-pages.md)). This is exactly the
+"PWA is a welcome bonus" of the decision above: web remains the **iteration
+target**, Android + iOS remain the **product targets** — the demo does not
+change that.
