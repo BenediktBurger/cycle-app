@@ -576,6 +576,15 @@
   "importFailed": "Import failed — the data was not changed.",
   "importSummary": "Days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
   "importEmpty": "Import: nothing to change (document empty or already identical).",
+  "importOverwriteWarning": "{days, plural, =1{1 day will be overwritten.} other{{days} days will be overwritten.}}",
+  "@importOverwriteWarning": {
+    "description": "Overwrite preview of the import dialogs (JSON and drip CSV): how many days ALREADY on this device the pasted document would overwrite, shown before applying. An ICU plural message so the singular reads correctly in both languages.",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "dripImportTitle": "Import drip data",
   "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. An excluded temperature derives an \"exclude from analysis\" mark; mood and desire flags are dropped (their notes are kept).",
   "dripImportHint": "Paste a drip CSV export here …",

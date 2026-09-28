@@ -901,6 +901,8 @@ class EinstellungenScreen extends ConsumerWidget {
         accept: 'application/json,.json',
         apply: (applyContext, raw) =>
             _applyImport(applyContext, context, ref, raw),
+        plan: (raw) async =>
+            planDatabaseImport(await ref.read(databaseProvider.future), raw),
       ),
     );
   }
@@ -976,6 +978,12 @@ class EinstellungenScreen extends ConsumerWidget {
         accept: '.csv,text/csv',
         apply: (applyContext, raw) =>
             _applyDripImport(applyContext, context, ref, raw),
+        // The drip dialog plans the CSV through the same export-document
+        // mapping the apply path writes with, so preview and import agree.
+        plan: (raw) async => planDatabaseImport(
+          await ref.read(databaseProvider.future),
+          dripCsvToExportJson(raw).json,
+        ),
       ),
     );
   }
@@ -1459,6 +1467,7 @@ final class _ImportDialog extends StatefulWidget {
     required this.applyLabel,
     required this.accept,
     required this.apply,
+    required this.plan,
   });
 
   final String title;
@@ -1473,6 +1482,10 @@ final class _ImportDialog extends StatefulWidget {
   /// success and reports problems itself.
   final Future<void> Function(BuildContext dialogContext, String raw) apply;
 
+  /// Plans the import for a textarea content against the live database
+  /// (counted, no writes); the dialog recomputes it as the text changes.
+  final Future<ImportSummary> Function(String raw) plan;
+
   @override
   State<_ImportDialog> createState() => _ImportDialogState();
 }
@@ -1480,6 +1493,13 @@ final class _ImportDialog extends StatefulWidget {
 final class _ImportDialogState extends State<_ImportDialog> {
   final TextEditingController _controller = TextEditingController();
   bool _running = false;
+
+  /// True while the plan for the current textarea text is still resolving:
+  /// the apply button waits for it so an import cannot preempt the
+  /// overwrite warning the plan would render.
+  bool _planPending = false;
+  ImportSummary? _plan;
+  var _planGeneration = 0;
 
   @override
   void initState() {
@@ -1489,7 +1509,48 @@ final class _ImportDialogState extends State<_ImportDialog> {
     _controller.addListener(_onTextChanged);
   }
 
-  void _onTextChanged() => setState(() {});
+  void _onTextChanged() {
+    // The plan takes async reads to resolve — dropping it here keeps the
+    // warning from lingering for text the field no longer shows.
+    setState(() => _plan = null);
+    _recomputePlan();
+  }
+
+  /// Recomputes the overwrite plan for the current textarea content. The
+  /// generation counter supersedes one plan by the next when the text is
+  /// edited again before a plan's async reads resolve — a superseded plan
+  /// reflects text the field no longer shows and must never render.
+  Future<void> _recomputePlan() async {
+    if (_running) return;
+    final generation = ++_planGeneration;
+    final raw = _controller.text;
+    if (raw.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _plan = null;
+          _planPending = false;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _planPending = true);
+    try {
+      final summary = await widget.plan(raw);
+      if (!mounted || generation != _planGeneration) return;
+      setState(() {
+        _plan = summary;
+        _planPending = false;
+      });
+    } catch (_) {
+      // No plan to preview on any planning failure; the apply path
+      // reports the problem when the user tries to import anyway.
+      if (!mounted || generation != _planGeneration) return;
+      setState(() {
+        _plan = null;
+        _planPending = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -1514,13 +1575,18 @@ final class _ImportDialogState extends State<_ImportDialog> {
     } finally {
       // A scrim dismissal during the import disposes this State — the
       // reset must stay a silent no-op in that case.
-      if (mounted) setState(() => _running = false);
+      if (mounted) {
+        setState(() => _running = false);
+        // The text can change while the import runs — planning waits for it.
+        _recomputePlan();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final applyEnabled = _controller.text.trim().isNotEmpty && !_running;
+    final applyEnabled =
+        _controller.text.trim().isNotEmpty && !_running && !_planPending;
     return AlertDialog(
       scrollable: true,
       title: Text(widget.title),
@@ -1550,6 +1616,16 @@ final class _ImportDialogState extends State<_ImportDialog> {
                 decoration: InputDecoration(hintText: widget.hint),
               ),
             ),
+            if ((_plan?.entriesOverwritten ?? 0) > 0)
+              Text(
+                AppLocalizations.of(
+                  context,
+                ).importOverwriteWarning(_plan!.entriesOverwritten),
+                key: const ValueKey('importOverwritePreview'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
           ],
         ),
       ),

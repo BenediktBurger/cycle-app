@@ -101,9 +101,9 @@ Future<String> exportDatabaseToJson(CycleDatabase db) =>
 // --- import (JSON string -> ExportBlob -> plan -> writes) -----------------
 
 /// Validates the document with [parseExportJson] and COUNTS the import plan
-/// against the current database state (no writes). Useful for showing the
-/// user a summary BEFORE applying (not wired into the UI yet — kept for the
-/// verification flow and tests).
+/// against the current database state (no writes) — the count behind the
+/// import dialogs' overwrite preview (the dialogs recompute it on every
+/// text edit, before the user applies).
 Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
   final doc = parseExportJson(raw);
   final existing = await _existingKeys(db);
