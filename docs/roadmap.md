@@ -6,10 +6,11 @@ git history; *why* it landed that way is in
 ticked only until it is folded into the next release note/commit — unchecked
 items are the queue.
 
-Numbering (`WP1.x`, `WP2.x`) mirrors the internal plan file, which is
-ephemeral and not versioned — this roadmap is therefore the only durable
-record of those IDs. They appear here and nowhere else: not in code
-comments, prose docs, or tool names (see [`AGENTS.md`](../AGENTS.md)).
+Work-package numbering comes from the internal plan file (ephemeral, not
+versioned); the durable record of that numbering is git history, in the
+commit messages tagged with it. Any legacy or remaining IDs are mapped
+here and appear nowhere else: not in code comments, prose docs, or tool
+names (see [`AGENTS.md`](../AGENTS.md)).
 
 ## Backlog — issues & improvements
 
