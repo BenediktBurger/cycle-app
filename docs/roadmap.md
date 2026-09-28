@@ -38,12 +38,6 @@ the sections above track planned work, git history keeps the record (see
 
 #### Refactors (decided 2026-09-25, startable)
 
-- [ ] Screen split, cycle side: split lib/ui/cycle.dart (~2.4k lines) into
-  `part`/`part of` files ONLY (zero import/API churn). The chart's internals
-  (scroll controller, day mapping, jump registration, panel interaction) were
-  thinned by the memoized/bounded-span pass but stay below library
-  granularity. Promotion of the parts to real libraries is a later call
-  (S2 below).
 - Candidate consolidation: the `_popImportDialogWhileCurrent` helper is
   duplicated verbatim in the export/import card and the drip-import card —
   it could live once (e.g. in import_dialog.dart); needs discussion.
@@ -123,30 +117,3 @@ the sections above track planned work, git history keeps the record (see
   storage, conversion happens at the display edge (existing seams:
   temperature_range, settings pickers, PDF axis); German decimal comma in
   the PDF is handled separately under Bugs
-
-### Work packages — audit 2026-09-25
-
-Packages for the audit findings above (stability, security, architecture —
-including the decided refactor rows). The `WP-A`/`WP-S` families are
-defined HERE in this file. Each package is self-contained and meant for one
-agent in one worktree/branch. Agents still pick work only from the checkbox
-rows themselves; a package merely bounds the scope. When a package lands,
-its rows go (per the backlog convention) and the package entry is removed.
-
-Parallelization rules: The refactor packages come after their
-serialization points described in their entries below. Remaining rules
-of thumb:
-
-- Every package: fresh worktree, `flutter pub get`, full gate per
-  CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
-
-- **WP-S2 — cycle screen part split** (Refactors: cycle row, decided
-  2026-09-25)
-  Scope: lib/ui/cycle.dart → `part`/`part of` files (chart, marks/panel,
-  day mapping), no import/API changes, no logic movement — the diff should
-  verify as near-pure relocation. Merge AFTER A1–A3 have landed (A1's
-  `_jumpToDate` fix and A2's error branches move into the parts as-is;
-  the memoized/bounded-span pass in A3 thinned the chart's shared
-  internals, changing where the natural part boundaries sit). Promotion of
-  the parts to real libraries is a later call, NOT part of this package.
-  Tests: test/cycle_*.dart suites, test/cycle_tab_roundtrip_test.dart.
