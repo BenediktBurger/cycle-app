@@ -26,6 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Same pub cache key as ci.yml: one cache entry shared across the
+      # workflows (identical-key saves are skipped, not merged).
+      - name: Restore pub cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}-${{ hashFiles('tool/flutter-version') }}
+          restore-keys: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-
+
       # The pinned Flutter version lives in tool/flutter-version (one bare
       # version line under comments) and is read directly — the same file the
       # F-Droid build recipe parses from each built commit, with the same
@@ -48,6 +57,9 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+          # SDK cache keyed on version+channel: the same pin restores one
+          # shared download across the workflows.
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get

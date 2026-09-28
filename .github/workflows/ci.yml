@@ -22,6 +22,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Classic actions/cache steps: restores here, saves automatically in
+      # the post-job hook, but only when the job succeeds. Key includes the
+      # Flutter pin because an SDK bump can change what pub fetches.
+      - name: Restore pub cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}-${{ hashFiles('tool/flutter-version') }}
+          restore-keys: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-
+
+      # Gradle caches keyed on the lockfile (plugin versions come from the
+      # lockfile's flutter dependencies), the pin, and the Android Gradle
+      # config; restore-keys lets a config-only change still hit partial
+      # dependencies. Not caching `build/`: the Gradle compile itself is
+      # the gate.
+      - name: Restore Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('android/**/gradle-wrapper.properties', 'android/**/*.gradle*', 'android/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
       # The pinned Flutter version lives in tool/flutter-version (one bare
       # version line under comments) and is read directly — the same file the
       # F-Droid build recipe parses from each built commit, with the same
@@ -44,17 +69,32 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+          # SDK cache keyed on version+channel: the same pin restores one
+          # shared download across the workflows.
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
+      # What the vendoring check fetches (the upstream pin script and the
+      # amalgamation archive it names) is fixed by pubspec.lock, so a
+      # lockfile-unchanged run restores the tool's URL-keyed download cache
+      # and skips the network. The comparison itself cannot be masked: the
+      # repo-side vendored files are the checkout's, fresh every run.
+      - name: Restore sqlite3mc fetch cache
+        uses: actions/cache@v4
+        with:
+          path: .dart_tool/sqlite3mc-cache
+          key: sqlite3mc-fetch-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: sqlite3mc-fetch-${{ runner.os }}-
+
       # Feature parity of the vendored sqlite3mc amalgamation (compiled by
       # the build hook) with what the `sqlite3` package pins in its own
       # tooling at the lockfile version — drift here silently changes every
-      # bundled cipher. Needs network (plain dart:io HTTP) and the .dart_tool
-      # download cache created by pub get above. Developer-repo check only:
-      # it is NOT part of the F-Droid buildserver recipe (docs/release.md
-      # Phase E), where builds stay network-free.
+      # bundled cipher. Fetches over plain dart:io HTTP on a cache miss; the
+      # .dart_tool directory itself comes from pub get above. Developer-repo
+      # check only: it is NOT part of the F-Droid buildserver recipe
+      # (docs/release.md Phase E), where builds stay network-free.
       - name: sqlite3mc vendoring check
         run: dart run tool/sqlite3mc.dart check
 
@@ -78,14 +118,15 @@ jobs:
 
       # Android debug build (unsigned, no signing config needed): compiles
       # the upcoming product target so regressions surface in CI, even
-      # though the local Android toolchain is not yet green.
+      # though the local Android toolchain is not yet green. Single ABI:
+      # the release workflow builds the full --split-per-abi set.
       # Accept the SDK licenses non-interactively first, otherwise the
       # build fails on the license prompt.
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
 
       - name: Build Android (debug)
-        run: flutter build apk --debug
+        run: flutter build apk --debug --target-platform android-arm64
 
   # Re-runs the date-label tests on a UTC-negative host: date labels are
   # computed from UTC-midnight dates formatted verbatim, so nothing may
@@ -118,6 +159,9 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+          # SDK cache keyed on version+channel: the same pin restores one
+          # shared download across the workflows.
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
