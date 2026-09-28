@@ -22,14 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Classic actions/cache steps: restores here, saves automatically in
-      # the post-job hook, but only when the job succeeds. Key includes the
-      # Flutter pin because an SDK bump can change what pub fetches.
+      # Restore-keys match by string prefix; the pin hash leads the key so
+      # the prefix can match, and an SDK bump restores nothing by design —
+      # a pub cache built under a different SDK would be stale.
       - name: Restore pub cache
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}-${{ hashFiles('tool/flutter-version') }}
+          key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
           restore-keys: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-
 
       # Gradle caches keyed on the lockfile (plugin versions come from the
@@ -72,6 +72,11 @@ jobs:
           # SDK cache keyed on version+channel: the same pin restores one
           # shared download across the workflows.
           cache: true
+          # The string 'false' disables the action's own pub caching — the
+          # actions/cache step above covers it — while `cache: true` keeps
+          # the SDK cache. An empty value would instead fall back to
+          # enabling the action's pub caching.
+          pub-cache: 'false'
 
       - name: Install dependencies
         run: flutter pub get
@@ -146,6 +151,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Restore pub cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-
+
       - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
         id: flutter-pin
         run: |
@@ -162,6 +174,8 @@ jobs:
           # SDK cache keyed on version+channel: the same pin restores one
           # shared download across the workflows.
           cache: true
+          # Same 'false' pub-cache semantics as the main job.
+          pub-cache: 'false'
 
       - name: Install dependencies
         run: flutter pub get
