@@ -38,23 +38,15 @@ the sections above track planned work, git history keeps the record (see
 
 #### Refactors (decided 2026-09-25, startable)
 
-- [ ] Screen split, settings side: turn lib/ui/settings.dart (~1.9k lines) into
-  real per-feature-card libraries under `lib/ui/settings/` (locale, theme,
-  temperature range, paper-history, PDF export, export/import, data wipe — the
-  seams already exist as card widgets). Sequencing: AFTER the WP-A packages
-  (the jump-to-date fix and the import overwrite preview both touch
-  settings.dart) — behavior-changing fixes first,
-  behavior-preserving movement second, one branch so the diff verifies as
-  near-pure moves. As decided, cycle_pdf.dart stays OUT of scope (its cohesive
-  parts — pdf_curve/symbols/axis/layout — are already separate files; the
-  remainder is a single-document orchestrator) and lib/ui/cycle.dart is split
-  with part files first, not libraries (S2 below).
 - [ ] Screen split, cycle side: split lib/ui/cycle.dart (~2.4k lines) into
   `part`/`part of` files ONLY (zero import/API churn). The chart's internals
   (scroll controller, day mapping, jump registration, panel interaction) were
   thinned by the memoized/bounded-span pass but stay below library
   granularity. Promotion of the parts to real libraries is a later call
   (S2 below).
+- Candidate consolidation: the `_popImportDialogWhileCurrent` helper is
+  duplicated verbatim in the export/import card and the drip-import card —
+  it could live once (e.g. in import_dialog.dart); needs discussion.
 
 #### Comment density
 
@@ -147,17 +139,6 @@ of thumb:
 
 - Every package: fresh worktree, `flutter pub get`, full gate per
   CONTRIBUTING (analyze, format check, `flutter test --no-pub -r expanded`).
-
-- **WP-S1 — settings screen split into libraries** (Refactors: settings row,
-  decided 2026-09-25)
-  Scope: lib/ui/settings.dart → `lib/ui/settings/` real per-card libraries,
-  the settings.dart file becomes a thin shell reassembling the cards; behavior
-  must not change beyond the mechanical import moves. Merge AFTER A1 AND
-  the import overwrite preview (both touch lib/ui/settings.dart) — last of
-  the settings touchers. Tests:
-  test/settings_layout_test.dart, test/settings_*.dart,
-  test/theme_mode_setting_test.dart, test/temperature_range_setting_test.dart
-  (expect mechanical import tweaks only).
 
 - **WP-S2 — cycle screen part split** (Refactors: cycle row, decided
   2026-09-25)

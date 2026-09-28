@@ -6,6 +6,8 @@
 // matter what locale the test runner's system reports (the system-follow
 // default itself is covered by the locale tests, test/locale_test.dart).
 import 'package:cycle_app/ui/settings.dart';
+import 'package:cycle_app/ui/settings/drip_import_card.dart';
+import 'package:cycle_app/ui/settings/export_import_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,19 +16,6 @@ import 'support/database.dart';
 import 'support/finders.dart';
 
 ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
-
-/// Whether the widget [tree] rooted at [w] contains a [Text] with [text]
-/// (walks the plain container widgets the settings cards are made of; enough
-/// for asserting card config, independent of which cards are currently
-/// built in the lazy list).
-bool _hasText(Widget w, String text) {
-  if (w is Text) return w.data == text;
-  if (w is Padding) return w.child != null && _hasText(w.child!, text);
-  if (w is Card) return w.child != null && _hasText(w.child!, text);
-  if (w is Column) return w.children.any((c) => _hasText(c, text));
-  if (w is Row) return w.children.any((c) => _hasText(c, text));
-  return false;
-}
 
 void main() {
   testWidgets('drip import card sits below the JSON import card and its '
@@ -70,13 +59,13 @@ void main() {
     );
     final children =
         (listView.childrenDelegate as SliverChildListDelegate).children;
-    int cardIndex(String text) =>
-        children.indexWhere((w) => w is Card && _hasText(w, text));
-    expect(cardIndex('JSON-Import'), greaterThanOrEqualTo(0));
-    expect(cardIndex('Drip-Daten importieren'), greaterThan(0));
+    final jsonImportIndex = children.indexWhere((w) => w is ExportImportCard);
+    final dripImportIndex = children.indexWhere((w) => w is DripImportCard);
+    expect(jsonImportIndex, greaterThanOrEqualTo(0));
+    expect(dripImportIndex, greaterThanOrEqualTo(0));
     expect(
-      cardIndex('Drip-Daten importieren'),
-      greaterThan(cardIndex('JSON-Import')),
+      dripImportIndex,
+      greaterThan(jsonImportIndex),
       reason: 'The drip card must sit below the JSON import card',
     );
 
