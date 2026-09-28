@@ -23,7 +23,9 @@ import '../providers.dart';
 import 'about.dart';
 import 'file_transfer.dart';
 import 'settings/general_info_card.dart';
+import 'settings/locale_card.dart';
 import 'settings/paper_history_card.dart';
+import 'settings/theme_card.dart';
 
 /// Export file name used by the save/download path.
 const String exportFileName = 'cycle_app_export.json';
@@ -47,7 +49,6 @@ class EinstellungenScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final locale = ref.watch(localeProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -73,107 +74,9 @@ class EinstellungenScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           const PaperHistoryCard(),
           const SizedBox(height: 8),
-          // --- language ------------------------------------------------
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.settingsLanguage,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  // The provider stores null for "System"; the segment
-                  // model uses a string key so all three states fit one
-                  // SegmentedButton (ADR-0007).
-                  SegmentedButton<String>(
-                    key: const ValueKey('languageSwitcher'),
-                    segments: [
-                      ButtonSegment(
-                        value: 'system',
-                        label: Text(
-                          l10n.termSystem,
-                          key: const ValueKey('languageSegment-system'),
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: 'de',
-                        label: Text(
-                          l10n.languageGerman,
-                          key: const ValueKey('languageSegment-de'),
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: 'en',
-                        label: Text(
-                          l10n.languageEnglish,
-                          key: const ValueKey('languageSegment-en'),
-                        ),
-                      ),
-                    ],
-                    selected: {locale == null ? 'system' : locale.languageCode},
-                    onSelectionChanged: (selection) =>
-                        ref
-                            .read(localeProvider.notifier)
-                            .state = selection.first == 'system'
-                        ? null
-                        : Locale(selection.first),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const LanguageCard(),
           const SizedBox(height: 8),
-          // --- theme mode ----------------------------------------------
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.settingsThemeMode,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  // The explicit choices win over the platform; both
-                  // switchers share the `termSystem` label.
-                  SegmentedButton<ThemeMode>(
-                    key: const ValueKey('themeSwitcher'),
-                    segments: [
-                      ButtonSegment(
-                        value: ThemeMode.system,
-                        label: Text(
-                          l10n.termSystem,
-                          key: const ValueKey('themeSegment-system'),
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.light,
-                        label: Text(
-                          l10n.themeLight,
-                          key: const ValueKey('themeSegment-light'),
-                        ),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.dark,
-                        label: Text(
-                          l10n.themeDark,
-                          key: const ValueKey('themeSegment-dark'),
-                        ),
-                      ),
-                    ],
-                    selected: {ref.watch(themeModeProvider)},
-                    onSelectionChanged: (selection) =>
-                        ref.read(themeModeProvider.notifier).state =
-                            selection.first,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const ThemeModeCard(),
           const SizedBox(height: 8),
           // --- temperature range ---------------------------------------
           // The chart's y range: two half-degree pickers; min < max is
