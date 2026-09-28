@@ -64,18 +64,15 @@ the sections above track planned work, git history keeps the record (see
   granularity. Promotion of the parts to real libraries is a later call
   (S2 below).
 
-#### Comment density (ready 2026-09-28)
+#### Comment density
 
-- [ ] One-time comment diet on the densest hand-written files
-  (`lib/ui/cycle.dart`, `lib/domain/evaluation.dart`,
-  `lib/ui/settings.dart`, `lib/pdf/cycle_pdf.dart`, …): agents imitate the
-  comment mass of the file they edit, so no AGENTS.md wording outranks
-  ~900 essay-comment lines in situ (the generated
-  `lib/l10n/app_localizations.dart` is out of scope). Delete comments
-  that restate code or narrate changes outright; where a comment carries
-  a real decision or constraint, keep it to one short line and move any
-  longer prose into `docs/dev-notes.md` or the ADR. Do it file-by-file in
-  one branch so the diff verifies as comment-only.
+- [ ] Second pass of the comment diet on the next-densest hand-written
+  files (`lib/ui/cycle_mark_sheet.dart`, `lib/domain/drip_import.dart`,
+  `lib/ui/diary.dart`, `lib/ui/statistics.dart`): same rule — delete
+  comments that restate code or narrate changes outright; where a comment
+  carries a real decision or constraint, keep it to one short line and
+  move any longer prose into `docs/dev-notes.md` or the ADR; file-by-file
+  in one branch so the diff verifies as comment-only.
 
 #### Building the app (to be clarified with INER)
 

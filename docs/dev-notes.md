@@ -163,7 +163,7 @@ Open questions (`TODO(user-review)` in the file):
 
 ## Paper-form PDF export (lib/pdf/cycle_pdf.dart)
 
-Layout/design decisions, kept out of the code file's comments (2026-09-28):
+Layout/design decisions:
 
 - Print friendliness (the sheet's own rendering principle, applied to
   everything on it): the sheet must survive plain B/W printing — no
