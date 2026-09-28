@@ -59,8 +59,6 @@ void main() {
     );
     final children =
         (listView.childrenDelegate as SliverChildListDelegate).children;
-    // The cards are the extracted per-card widgets now, so the config
-    // lookup goes by widget type instead of a text walk.
     final jsonImportIndex = children.indexWhere((w) => w is ExportImportCard);
     final dripImportIndex = children.indexWhere((w) => w is DripImportCard);
     expect(jsonImportIndex, greaterThanOrEqualTo(0));
