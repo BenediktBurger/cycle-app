@@ -635,6 +635,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     ChoiceChip(
                       key: ValueKey('mucusSignChip-${sign.name}'),
                       label: Text(mucusSignSymbol(sign)),
+                      tooltip: mucusSignTooltip(sign, l10n),
                       selected: _sign == sign,
                       onSelected: (selected) => setState(() {
                         _sign = selected ? sign : null;
@@ -656,6 +657,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                       ChoiceChip(
                         key: ValueKey('mucusQualityChip-${quality.name}'),
                         label: Text(mucusQualityToken(quality)),
+                        tooltip: mucusQualityTooltip(quality, l10n),
                         selected: _quality == quality,
                         onSelected: (selected) => setState(() {
                           // Tapping the selected chip returns to bare S.
@@ -1011,10 +1013,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: MucusSymbolText(
-                display: mucusDisplay(
-                  sign: day.mucusSign,
-                  quality: day.mucusQuality,
-                ),
+                sign: day.mucusSign,
+                quality: day.mucusQuality,
                 color: Theme.of(context).colorScheme.onTertiaryContainer,
               ),
             ),

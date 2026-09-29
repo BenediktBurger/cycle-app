@@ -173,7 +173,7 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
       ),
     ),
     _SignalKind.mucus => MucusSymbolText(
-      display: mucusDisplay(sign: MucusSign.s),
+      sign: MucusSign.s,
       fontSize: 10,
       color: scheme.tertiary,
     ),
@@ -340,10 +340,8 @@ final class _SignalRow extends StatelessWidget {
           child: Align(
             alignment: Alignment.topCenter,
             child: MucusSymbolText(
-              display: mucusDisplay(
-                sign: day.mucusSign,
-                quality: day.mucusQuality,
-              ),
+              sign: day.mucusSign,
+              quality: day.mucusQuality,
               fontSize: 9,
               color: Theme.of(context).colorScheme.tertiary,
             ),
