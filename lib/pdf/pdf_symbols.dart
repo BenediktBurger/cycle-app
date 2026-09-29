@@ -57,10 +57,7 @@ String? cervixLetters(DailyEntry? day) {
       ? null
       : cervixFirmnessSymbol(day.cervixFirmness!);
   if (position == null && firmness == null) return null;
-  return [
-    if (position != null) position,
-    if (firmness != null) firmness,
-  ].join(' ');
+  return [?position, ?firmness].join(' ');
 }
 
 /// The pain row's letter cell: 'B' for breast tenderness (the

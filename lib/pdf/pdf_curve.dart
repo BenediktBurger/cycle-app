@@ -241,7 +241,7 @@ PdfCurveDrawing pdfCurveDrawing({
   final trackedValues = <int, double>{
     for (final MapEntry(key: offset, value: position)
         in trackedPositions.entries)
-      if (days[position].bbtC case final bbt?) offset: bbt,
+      offset: ?days[position].bbtC,
   };
 
   /// An overlay day index (calendar-offset space) mapped onto its
@@ -395,11 +395,10 @@ PdfCurveDrawing pdfCurveDrawing({
   ];
   final lowNumbers = {
     for (final MapEntry(:key, :value) in overlay.numbersByIndex.entries)
-      if (windowPositionOf(key) case final pos?) pos: value,
+      ?windowPositionOf(key): value,
   };
   final peaks = {
-    for (final index in overlay.peakIndexes)
-      if (windowPositionOf(index) case final pos?) pos,
+    for (final index in overlay.peakIndexes) ?windowPositionOf(index),
   };
 
   return PdfCurveDrawing(
