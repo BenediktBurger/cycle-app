@@ -4,6 +4,18 @@ import '../../domain/export_import.dart';
 import '../../l10n/app_localizations.dart';
 import '../file_transfer.dart';
 
+/// Closes an import dialog after a successful import — only while it is
+/// STILL the route on top. `mounted` alone cannot guard the follow-up pop
+/// (the dialog's elements stay connected until the route is finalized),
+/// and the pop would then fire on whatever route is now on top —
+/// collapsing the whole route stack.
+void popDialogRouteWhileCurrent(BuildContext dialogContext) {
+  final route = ModalRoute.of(dialogContext);
+  if (route != null && route.isCurrent) {
+    Navigator.of(dialogContext).pop();
+  }
+}
+
 /// Self-contained import dialog used by both the JSON and the drip CSV
 /// import: a paste textarea everywhere plus a file picker where the
 /// platform provides one ([canPickFile], accept list from the caller).
