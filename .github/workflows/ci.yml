@@ -27,7 +27,7 @@ jobs:
       # the prefix can match, and an SDK bump restores nothing by design —
       # a pub cache built under a different SDK would be stale.
       - name: Restore pub cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
@@ -39,7 +39,7 @@ jobs:
       # dependencies. Not caching `build/`: the Gradle compile itself is
       # the gate.
       - name: Restore Gradle caches
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -99,7 +99,7 @@ jobs:
       # and skips the network. The comparison itself cannot be masked: the
       # repo-side vendored files are the checkout's, fresh every run.
       - name: Restore sqlite3mc fetch cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .dart_tool/sqlite3mc-cache
           key: sqlite3mc-fetch-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
@@ -164,7 +164,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Restore pub cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
