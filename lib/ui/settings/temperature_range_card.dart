@@ -67,8 +67,11 @@ final class TemperatureRangeCard extends ConsumerWidget {
                         ],
                         onChanged: (value) {
                           if (value == null) return;
-                          ref.read(temperatureRangeProvider.notifier).state =
-                              TemperatureRange(min: value, max: range.max);
+                          ref
+                              .read(temperatureRangeProvider.notifier)
+                              .set(
+                                TemperatureRange(min: value, max: range.max),
+                              );
                         },
                       ),
                     ),
@@ -95,8 +98,11 @@ final class TemperatureRangeCard extends ConsumerWidget {
                         ],
                         onChanged: (value) {
                           if (value == null) return;
-                          ref.read(temperatureRangeProvider.notifier).state =
-                              TemperatureRange(min: range.min, max: value);
+                          ref
+                              .read(temperatureRangeProvider.notifier)
+                              .set(
+                                TemperatureRange(min: range.min, max: value),
+                              );
                         },
                       ),
                     ),

@@ -210,8 +210,8 @@ final class CycleDayPanel extends ConsumerWidget {
   /// and clears the panel (no route to pop — the panel is part of the
   /// screen).
   void _editDay(BuildContext context, WidgetRef ref) {
-    ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(day);
-    ref.read(tabIndexProvider.notifier).state = 0; // Tagebuch tab
+    ref.read(selectedDateProvider.notifier).set(DateOnly.normalize(day));
+    ref.read(tabIndexProvider.notifier).set(0); // Tagebuch tab
     onClose();
   }
 

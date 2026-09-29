@@ -27,9 +27,6 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// StateController (the cycleChartJumpProvider registration type) is legacy
-// in Riverpod 3.x, like the StateProviders themselves (providers.dart).
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:intl/intl.dart';
 
 import '../domain/cervix.dart';
@@ -186,8 +183,7 @@ class ZyklusScreen extends ConsumerWidget {
           CycleDayPanel(
             key: const ValueKey('cycleDayPanel'),
             day: panelDay,
-            onClose: () =>
-                ref.read(cycleDayPanelProvider.notifier).state = null,
+            onClose: () => ref.read(cycleDayPanelProvider.notifier).set(null),
           ),
         if (panelDay != null) const SizedBox(height: 12),
         Text(

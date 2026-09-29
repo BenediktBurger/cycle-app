@@ -92,34 +92,44 @@ final class _CycleChartState extends State<_CycleChart> {
   /// [cycleChartJumpProvider] while mounted. Riverpod forbids provider
   /// writes inside the widget life-cycle methods: registration and
   /// unregister run post-frame.
-  StateController<void Function(BuildContext context)?>? _jumpRegistration;
+  CycleChartJumpNotifier? _jumpRegistration;
+  ProviderContainer? _providerContainer;
 
   /// Registers [_jumpToDate] as the AppBar's jump affordance; post-frame so
   /// the provider write happens after the build sweep.
   void _registerJumpAffordance() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final registration = ProviderScope.containerOf(
-        context,
-        listen: false,
-      ).read(cycleChartJumpProvider.notifier);
-      registration.state = _jumpToDate;
+      final container = ProviderScope.containerOf(context, listen: false);
+      final registration = container.read(cycleChartJumpProvider.notifier);
+      registration.set(_jumpToDate);
+      _providerContainer = container;
       _jumpRegistration = registration;
     });
   }
 
   /// Clears the AppBar registration; post-frame so the provider write
   /// happens outside the teardown sweep. The clear is STAMPED: it only
-  /// nulls the registration while it still holds its OWN callback, so a
-  /// later chart that re-registered in between keeps its affordance.
+  /// nulls the registration while it still holds its OWN callback (read
+  /// through the provider), so a later chart that re-registered in between
+  /// keeps its affordance.
   void _unregisterJumpAffordance() {
     final registration = _jumpRegistration;
+    final container = _providerContainer;
     _jumpRegistration = null;
-    if (registration == null) return;
+    _providerContainer = null;
+    if (registration == null || container == null) return;
     final myCallback = _jumpToDate; // tear-off equal to the registered one
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!registration.mounted) return;
-      if (registration.state == myCallback) registration.state = null;
+      // A scope that is already torn down (widget-test teardown frames)
+      // rejects the container read: the whole surface dies together, so
+      // the stamp has nothing left to protect.
+      try {
+        if (container.read(cycleChartJumpProvider) != myCallback) return;
+      } on StateError {
+        return;
+      }
+      registration.set(null);
     });
   }
 
@@ -191,9 +201,7 @@ final class _CycleChartState extends State<_CycleChart> {
     ProviderScope.containerOf(
       context,
       listen: false,
-    ).read(cycleDayPanelProvider.notifier).state = _days.dayAt(
-      index,
-    );
+    ).read(cycleDayPanelProvider.notifier).set(_days.dayAt(index));
   }
 
   /// The leftmost day with any pixel on screen: day cell i spans

@@ -51,7 +51,7 @@ final class ThemeModeCard extends ConsumerWidget {
               ],
               selected: {ref.watch(themeModeProvider)},
               onSelectionChanged: (selection) =>
-                  ref.read(themeModeProvider.notifier).state = selection.first,
+                  ref.read(themeModeProvider.notifier).set(selection.first),
             ),
           ],
         ),

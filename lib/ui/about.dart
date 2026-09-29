@@ -20,7 +20,7 @@ import '../providers.dart';
 /// onboarding flag; the write-through listener and the [_HomeGate] rebuild
 /// take care of the rest — no navigation dance needed.
 void completeOnboarding(WidgetRef ref) {
-  ref.read(onboardingCompletedProvider.notifier).state = true;
+  ref.read(onboardingCompletedProvider.notifier).set(true);
 }
 
 /// Tap target of the contact rows: opens the bound URL in the system

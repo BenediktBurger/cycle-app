@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/viewport.dart';
+import 'support/provider_fixtures.dart';
 
 // Two recorded days, no cycleStart marks — one leading cycle group whose
 // tiles render from entries data alone.
@@ -45,7 +46,7 @@ Widget errorScope({
     marksProvider.overrideWith(
       (ref) => marksStreamFactory?.call() ?? Stream.value(_diaryMarks),
     ),
-    selectedDateProvider.overrideWith((ref) => _diaryDay),
+    selectedDatePin(_diaryDay),
   ],
   child: MaterialApp(
     theme: ThemeData(

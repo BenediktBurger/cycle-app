@@ -91,3 +91,17 @@ The unaffected part stays true, restated positively: `app_settings` is
 version-stable (schema-stable key-based future-proofing), so it itself
 needs no incremental migration; future schema changes follow the
 graceful-migration rule of ADR-0005.
+
+## Update 2026-09-29: provider type
+
+The Context's constraint "the settings providers must stay `StateProvider`s"
+described the contract's origin: the settings screen, the app root widget
+and several tests override/write those providers directly, and that
+contract should not churn. It has stayed fulfilled — only the provider
+mechanism changed. All providers in `lib/providers.dart` are now
+`@riverpod` codegen providers (Notifier classes for the mutable settings,
+functions for the streams/derived data); riverpod 3.4.3 marks its Notifier
+`state` setter `@protected`, so the external write is one uniform `set`
+member per notifier. Defaults, call sites, hydration and write-through
+behavior are unchanged — the table, drivers and fill rule below read the
+same.

@@ -52,12 +52,13 @@ final class LanguageCard extends ConsumerWidget {
                 ),
               ],
               selected: {locale == null ? 'system' : locale.languageCode},
-              onSelectionChanged: (selection) =>
-                  ref
-                      .read(localeProvider.notifier)
-                      .state = selection.first == 'system'
-                  ? null
-                  : Locale(selection.first),
+              onSelectionChanged: (selection) => ref
+                  .read(localeProvider.notifier)
+                  .set(
+                    selection.first == 'system'
+                        ? null
+                        : Locale(selection.first),
+                  ),
             ),
           ],
         ),
