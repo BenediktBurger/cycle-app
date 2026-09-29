@@ -1,0 +1,9 @@
+Sex, mucus and peak now appear inside the temperature curve, on screen and in the PDF export, alongside the cycle day and the M for Mittelschmerz.
+
+Long-press a sign or quality token to see its definition.
+
+The cycle chart reaches today and works with bleeding or mucus alone – no temperature needed. Empty days are tappable.
+
+Import shows how many days would be overwritten before you confirm.
+
+More privacy: screenshots blocked, backups exclude your data, temporary exports wiped after sharing.
