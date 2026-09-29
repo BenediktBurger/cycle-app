@@ -11,11 +11,13 @@
 // dot-painter selection per day ([dotPainterForDay]) and the SUZ arrow
 // glyphs. The derivation semantics below stay true of what these painters
 // receive: the rings wrap circled candidates (R4, decided PER CANDIDATE by
-// the domain), the 1–6 numbering under the six low days, the baseline
+// the domain), the 1–6 numbers of the six low days feed the in-plot
+// bottom-anchored row via the shared per-day placement map
+// (chart_marks.dart), the baseline
 // SEGMENT (R10: from the left edge of low #6's day column to half a day
 // past the last marked candidate's column, mapped by the overlay from the
 // domain's baselineSpan; a cycle with no marked candidate draws no
-// segment) and the solid peak dot ABOVE the mucus entry in the mucus row
+// segment) and the solid peak dot ABOVE the mucus letters row
 // (R6 — the peak never touches the temperature curve; EVERY placed peak
 // renders, driven from the marks stream so peaks render even when no
 // evaluation exists). The SUZ renders ONLY user-placed marks (a vertical
@@ -34,10 +36,10 @@
 // are separate, still-open rendering-detail questions):
 //
 //   TODO(user-review): A peak day without a recorded entry renders NO dot
-//   in the mucus row (the rows show recorded observations only). The
+//   in the plot rows (the rows show recorded observations only). The
 //   old chart-anchored question is gone with the curve ring: the peak
-//   dot lives in the mucus row, where a day without an entry has no
-//   cell content to hang it on.
+//   dot hangs off the recorded mucus row's day cells, where a day
+//   without an entry has no cell content to hang it on.
 //   TODO(user-review): Days after the SUZ trigger or after a
 //   connectedness break render as ordinary temperature dots (the domain
 //   lists exactly the marked candidates; there is no automatic
@@ -58,8 +60,6 @@
 //   paintSuzArrowGlyph; the
 //   original 5 px shaft / 4 px head / Size(9, 8) footprint rendered too
 //   small next to the day columns.)
-
-import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -182,8 +182,8 @@ void paintArrowUpGlyph(Canvas canvas, Offset tip, {required Color color}) {
 /// Chooses the dot painter for one chart day: plain dot, dot with a ring
 /// (circled higher measurement) or dot with an arrow-up glyph (arrowed
 /// candidate). The mucus peak never reaches the curve — it renders as a
-/// solid dot in the symbol row (R6). [dayIndex] and [overlay] indexes
-/// share one space.
+/// solid dot in its own in-plot row (R6). [dayIndex] and [overlay]
+/// indexes share one space.
 FlDotPainter dotPainterForDay({
   required int dayIndex,
   required Color dotColor,
@@ -260,8 +260,8 @@ final class SuzArrowDotPainter extends FlDotPainter {
 /// new cycle's first day; on the recorded range's LEFT edge the mirror
 /// holds: the boundary column — the chart's first day, day index 0 —
 /// thickens its LEFT border, see _ChartDays.isCycleBoundary in cycle.dart).
-/// Shared by every row of the card (day header, signal rows, the 1–6
-/// numbering row) so the vertical lines run through the whole card.
+/// Shared by every row of the card (day header, signal rows) so the
+/// vertical lines run through the whole block.
 BorderSide cycleDayCellBorderSide(
   BuildContext context, {
   required bool isCycleBoundary,
@@ -270,138 +270,6 @@ BorderSide cycleDayCellBorderSide(
   return isCycleBoundary
       ? BorderSide(width: 2, color: onSurface)
       : BorderSide(width: 0.5, color: onSurface.withValues(alpha: 0.12));
-}
-
-/// The 1–6 numbering under the chart: one narrow tappable cell per
-/// calendar day, aligned by the same even day spacing as the chart and
-/// the signal rows (mirrors the rows in cycle.dart). LIKE those rows, only
-/// the scroll window's cells are built (windowStart..windowEnd, inclusive;
-/// a leading spacer keeps them at their global column positions) — day cell
-/// i is centered at (i + 0.5) * cellWidth, exactly where the chart draws
-/// day i's dot. Days outside the six-low windows render an empty
-/// fixed-height slot. The cells carry the card's day-cell separators
-/// (hairline, thickened on cycle boundaries) so the vertical lines run
-/// through the whole card; the numbering semantics themselves stay
-/// untouched (the windowing only decides WHICH cells are built, never which
-/// number a cell carries).
-final class EvaluationMarksRow extends StatelessWidget {
-  const EvaluationMarksRow({
-    super.key,
-    required this.dayCount,
-    required this.cellWidth,
-    required this.numbersByIndex,
-    required this.onDayTap,
-    required this.windowStart,
-    required this.windowEnd,
-    this.isCycleBoundary,
-  });
-
-  final int dayCount;
-
-  /// The row's fixed cell height: the frozen left rail (cycle.dart) keeps
-  /// an empty slot of this height so its segments stay vertically in step
-  /// with the scroll content.
-  static const double cellHeight = 14;
-
-  final double cellWidth;
-  final Map<int, int> numbersByIndex;
-  final void Function(int index) onDayTap;
-
-  /// The built window's inclusive day-index bounds ([windowStart..windowEnd] —
-  /// the caller's scroll window; clamped to the recorded range here). The
-  /// leading window spacer keeps the built cells at their global column
-  /// positions (mirrors the header row's and the signal rows' spacers), so
-  /// a window rebuild only adds/removes cells in place.
-  final int windowStart;
-  final int windowEnd;
-
-  /// The shared cycle-boundary predicate (see _ChartDays.isCycleBoundary
-  /// in cycle.dart): when given, cell i's right border thickens on the
-  /// cell before a cycle start (day i + 1 opens a cycle), and day index 0
-  /// thickens its LEFT border when it opens a cycle itself (the
-  /// domain-edge mirror of that rule).
-  final bool Function(int index)? isCycleBoundary;
-
-  @override
-  Widget build(BuildContext context) {
-    // Local copy so the predicate is nullable-promotable inside build
-    // (the field itself does not promote — non-promo-public-field).
-    final boundaryPredicate = isCycleBoundary;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // The window spacer keeps the cells at their global column
-        // positions (mirrors the header row's and the signal rows'
-        // spacers).
-        if (windowStart > 0) SizedBox(width: windowStart * cellWidth),
-        for (
-          var i = math.max(windowStart, 0);
-          i <= math.min(windowEnd, dayCount - 1);
-          i++
-        )
-          SizedBox(
-            width: cellWidth,
-            child: InkWell(
-              onTap: () => onDayTap(i),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    right: cycleDayCellBorderSide(
-                      context,
-                      isCycleBoundary: isCycleBoundary?.call(i + 1) ?? false,
-                    ),
-                    // The FIRST tracked day thickens its LEFT border when
-                    // it opens a cycle — the mirror of the interior
-                    // right-edge rule (see _ChartDays.isCycleBoundary in
-                    // cycle.dart; a cycle start on the recorded range's
-                    // first day has no extra chart line, the border owns
-                    // that separator).
-                    left: i == 0
-                        ? cycleDayCellBorderSide(
-                            context,
-                            isCycleBoundary:
-                                boundaryPredicate?.call(0) ?? false,
-                          )
-                        : BorderSide.none,
-                  ),
-                ),
-                child: _NumberCell(
-                  key: ValueKey('marksCell-$i'),
-                  number: numbersByIndex[i],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _NumberCell extends StatelessWidget {
-  const _NumberCell({super.key, this.number});
-
-  final int? number;
-
-  @override
-  Widget build(BuildContext context) {
-    // The fixed slot height keeps all cells aligned with and without a
-    // number (same trick as the signal rows' fixed cell heights).
-    return SizedBox(
-      height: EvaluationMarksRow.cellHeight,
-      child: Center(
-        child: number == null
-            ? null
-            : Text(
-                '$number',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-      ),
-    );
-  }
 }
 
 /// The arrow-up glyph as a standalone widget for the legend, painted with

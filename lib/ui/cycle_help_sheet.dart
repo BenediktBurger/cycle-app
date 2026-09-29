@@ -60,8 +60,9 @@ final class _CycleHelpSheet extends StatelessWidget {
             const SizedBox(height: 8),
             // The entries render in the cycle tab's top-down appearance
             // order: the signal rows above the temperature block
-            // (_topSignalKinds, plus the mucus-peak dot above the mucus
-            // glyph), then the temperature-curve group as the plot draws
+            // (_topSignalKinds), then the in-plot glyph rows top-down (the
+            // mucus-peak dot above the mucus letters, the M below them),
+            // then the temperature-curve group as the plot draws
             // it (curve, ignored-temperature rendering, circled higher,
             // premature rise, dashed baseline, SUZ), then the below-chart
             // strip (_belowChartKinds) — glossary and tab cannot drift.
@@ -82,16 +83,16 @@ final class _CycleHelpSheet extends StatelessWidget {
             _HelpEntry(
               color: scheme.tertiary,
               label: l10n.termMucusPeak,
-              // R6: the peak renders as a SOLID dot above the mucus glyph
-              // in the mucus row — the old curve-ring glyph is gone.
+              // R6: the peak renders as a SOLID dot in its own in-plot row
+              // above the mucus letters.
               shape: _HelpEntryShape.dot,
             ),
             _HelpEntry(
               color: scheme.onSurface,
               label: l10n.termMittelschmerz,
               // Sample Mittelschmerz glyph: the M letter, exactly how a
-              // recorded Mittelschmerz day renders in its own row beneath
-              // the mucus row.
+              // recorded Mittelschmerz day renders inside the plot, below
+              // the mucus letters.
               shape: _HelpEntryShape.mittelschmerz,
             ),
             _HelpEntry(
@@ -309,7 +310,7 @@ final class _HelpEntry extends StatelessWidget {
         style: TextStyle(fontSize: 10, color: color),
       ),
       // Sample Mittelschmerz glyph: the M letter, exactly how a recorded
-      // Mittelschmerz day renders in its own row beneath the mucus row.
+      // Mittelschmerz day renders inside the plot, below the mucus letters.
       _HelpEntryShape.mittelschmerz => Text(
         'M',
         style: TextStyle(fontSize: 10, color: color),

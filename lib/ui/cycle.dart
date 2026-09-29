@@ -1,9 +1,11 @@
 // Zyklus screen: the paper-style temperature curve with the day/cycle
-// header above it and the per-day recording rows inside the top of the
-// temperature block (bleeding, mucus with the reserved peak-dot slot, the
-// Mittelschmerz letter M on its own row, sex); under the curve the 1–6
-// numbering and the single below-chart strip (measurement time,
-// disturbance letters, cervix, pain, day-note indicator). The COMPUTED
+// header above it, bleeding as the one recording row above the plot and
+// the raw-observation glyphs INSIDE the temperature plot (sex X marks,
+// mucus sign letters, mucus peak dot, the Mittelschmerz M and the
+// evaluation 1–6 day numbering — chart_marks.dart, _InPlotGlyphRows).
+// Under the curve comes the single below-chart strip (measurement time,
+// disturbance letters, cervix, pain, day-note indicator) — as with every
+// row the raw observations are pure recordings. The COMPUTED
 // evaluation overlay (Mode M, ADR-0001) draws the user's mucus-peak and
 // first-higher marks' derived artifacts for DISPLAY ONLY — never persisted;
 // it is derived in lib/domain/evaluation_overlay.dart over evaluateCycles
@@ -36,11 +38,11 @@ import '../domain/evaluation.dart';
 import '../domain/evaluation_overlay.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
-import '../domain/mucus.dart';
 import '../domain/temperature_range.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'bleeding_symbol.dart';
+import 'chart_marks.dart';
 import 'cycle_curve.dart';
 import 'cycle_help_sheet.dart';
 import 'cycle_mark_sheet.dart';

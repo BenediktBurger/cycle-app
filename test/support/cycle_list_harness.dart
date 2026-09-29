@@ -125,14 +125,15 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   return (db!, container);
 }
 
-/// Taps the chart day at [index] via the marks row cell under that day.
+/// Taps the chart day at [index] via the bleeding row's cell under that
+/// day.
 ///
 /// `warnIfMissed: false` because the tap point may fall on the cell's
-/// Center-with-null-child slot (no number rendered), which does not absorb
-/// hits itself — the enclosing InkWell's pointer listener still receives it.
+/// center (a day without a bleeding rendering), which does not absorb hits
+/// itself — the enclosing InkWell's pointer listener still receives it.
 Future<void> tapCycleDay(WidgetTester tester, int index) async {
   await tester.tap(
-    find.byKey(ValueKey('marksCell-$index')),
+    find.byKey(ValueKey('bleedingCell-$index')),
     warnIfMissed: false,
   );
   await tester.pumpAndSettle();

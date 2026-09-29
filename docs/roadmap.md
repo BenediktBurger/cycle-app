@@ -59,8 +59,6 @@ the sections above track planned work, git history keeps the record (see
   - comments should be in one column as well (not spanning the whole sheet)
   - strange distribution: one column with 3, the other one with 2 marks and then on the bottom joined another mark. All marks (and/or comments) should be distributed among columns. Maybe even more columns on wider screen?
 - should we add the birth bleeding (Wochenbett, marked as ~)?
-- render observations inside temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
-
 - proof read German texts and let translate changes to english
 
 ### Convenience

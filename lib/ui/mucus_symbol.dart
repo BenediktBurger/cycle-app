@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart' show AppLocalizations;
+import 'chart_marks.dart';
 
 /// Tooltip texts of the mucus surfaces, keyed by the domain values — the
 /// single source the picker chips and the display glyphs read, so their
@@ -63,14 +64,21 @@ final class MucusSymbolText extends StatelessWidget {
     super.key,
     this.sign,
     this.quality,
+    this.display,
     required this.color,
     this.fontSize = 11,
     this.fontWeight = FontWeight.w600,
+    this.strokeColor,
   });
 
   final MucusSign? sign;
 
   final MucusQuality? quality;
+
+  /// The pure-Dart record the caller precomputed — the in-plot glyph rows
+  /// read it straight from the pure chart record (chart_marks.dart). When
+  /// given, it renders verbatim and no tooltip is attached.
+  final MucusDisplay? display;
 
   final Color color;
 
@@ -79,18 +87,34 @@ final class MucusSymbolText extends StatelessWidget {
 
   final FontWeight fontWeight;
 
+  /// When set, the whole composite paints as a STROKE pass in this color —
+  /// the halo copy the in-plot glyph rows place behind the ink letter
+  /// (chart_marks.dart's stroke width); all other call sites render ink.
+  final Color? strokeColor;
+
   @override
   Widget build(BuildContext context) {
-    // The sanitizer drops any quality on a non-S sign — the tooltip must
-    // never explain a quality the glyph does not show.
-    final sanitized = sanitizeMucusPair(sign: sign, quality: quality);
-    final display = mucusDisplay(
-      sign: sanitized.sign,
-      quality: sanitized.quality,
-    );
-    final symbol = display.symbol;
+    final MucusSign? displayedSign;
+    final MucusQuality? displayedQuality;
+    final MucusDisplay shown;
+
+    if (display case final record?) {
+      // A precomputed record renders verbatim and carries no tooltip.
+      shown = record;
+      displayedSign = null;
+      displayedQuality = null;
+    } else {
+      // The sanitizer drops any quality on a non-S sign — the tooltip must
+      // never explain a quality the glyph does not show.
+      final sanitized = sanitizeMucusPair(sign: sign, quality: quality);
+      shown = mucusDisplay(sign: sanitized.sign, quality: sanitized.quality);
+      displayedSign = sanitized.sign;
+      displayedQuality = sanitized.quality;
+    }
+
+    final symbol = shown.symbol;
     if (symbol == null) return const SizedBox.shrink();
-    final superscript = display.superscript;
+    final superscript = shown.superscript;
 
     final baseStyle = TextStyle(
       fontSize: fontSize,
@@ -98,35 +122,53 @@ final class MucusSymbolText extends StatelessWidget {
       color: color,
       fontWeight: fontWeight,
     );
+    final stroke = strokeColor == null
+        ? null
+        : (Paint()
+            ..color = strokeColor!
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = chartMarkHaloStrokeWidth);
 
-    return Tooltip(
-      // sanitized.sign can never be null here: the shrink path above
-      // already returned otherwise.
-      message: mucusGlyphTooltip(
-        sanitized.sign!,
-        sanitized.quality,
-        AppLocalizations.of(context),
-      ),
-      child: Text.rich(
-        TextSpan(
-          style: baseStyle,
-          children: [
-            TextSpan(text: symbol),
-            if (superscript != null)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.aboveBaseline,
-                // Current Flutter requires an explicit baseline for spans that
-                // align to one; alphabetic keeps the historical placement of
-                // the superscript next to the base glyph.
-                baseline: TextBaseline.alphabetic,
-                child: Text(
-                  superscript,
-                  style: baseStyle.copyWith(fontSize: fontSize * 0.78),
-                ),
+    Widget result = Text.rich(
+      // A stroke pass changes the STYLE of every span, never the RICH
+      // structure — the two instances over each other share one geometry.
+      TextSpan(
+        style: stroke == null
+            ? baseStyle
+            : baseStyle.copyWith(foreground: stroke),
+        children: [
+          TextSpan(text: symbol),
+          if (superscript != null)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.aboveBaseline,
+              // Current Flutter requires an explicit baseline for spans that
+              // align to one; alphabetic keeps the historical placement of
+              // the superscript next to the base glyph.
+              baseline: TextBaseline.alphabetic,
+              child: Text(
+                superscript,
+                style: stroke == null
+                    ? baseStyle.copyWith(fontSize: fontSize * 0.78)
+                    : baseStyle.copyWith(
+                        fontSize: fontSize * 0.78,
+                        foreground: stroke,
+                      ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
+
+    if (displayedSign != null) {
+      result = Tooltip(
+        message: mucusGlyphTooltip(
+          displayedSign,
+          displayedQuality,
+          AppLocalizations.of(context),
+        ),
+        child: result,
+      );
+    }
+    return result;
   }
 }

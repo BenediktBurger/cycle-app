@@ -446,12 +446,12 @@ void main() {
           'the chip re-renders selected from the marks stream after '
           'the write',
     );
-    // R6: the peak renders as a solid dot in the SYMBOL ROW — not as a
+    // R6: the peak renders as a solid dot INSIDE the plot — not as a
     // ring on the temperature curve.
     expect(
-      find.byKey(const ValueKey('peakDot-6')),
+      find.byKey(const ValueKey('inPlotPeakDot-6')),
       findsOneWidget,
-      reason: 'the symbol row re-renders from the marks stream',
+      reason: 'the in-plot peak dot renders from the marks stream',
     );
     expect(
       dotPainterOrNull(tester, 6),

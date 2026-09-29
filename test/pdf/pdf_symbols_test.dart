@@ -1,14 +1,13 @@
 // Tests of the PDF layer's pure per-day symbol mappings
 // (lib/pdf/pdf_symbols.dart): the display mapping of a recorded day's
-// observations onto the paper form's cell contents — bleeding fill, mucus
-// glyph + quality superscript, sex/cervix/pain/disturbance letters, and
-// the measurement-time text. Every helper DELEGATES to the existing domain
-// display helpers where they exist (mucusDisplay, the cervix symbols, the
-// temperature-disturbance letter vocabulary) — nothing is reworded here.
+// observations onto the paper form's cell contents — bleeding fill,
+// cervix/pain/disturbance letters, and the measurement-time text. Every
+// helper DELEGATES to the existing domain display helpers where they exist
+// (the cervix symbols, the temperature-disturbance letter vocabulary) —
+// nothing is reworded here.
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/disturbances.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/pdf/pdf_symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -59,46 +58,7 @@ void main() {
     });
   });
 
-  group('mucus text (symbol + quality superscript)', () {
-    test('no sign recorded draws nothing', () {
-      expect(mucusText(null).symbol, isNull);
-      expect(mucusText(DailyEntry(date: _d(3, 2))).symbol, isNull);
-    });
-
-    test('quality rides the S sign only — f/S carries no quality', () {
-      final symbol = mucusText(
-        DailyEntry(date: _d(3, 2), mucusSign: MucusSign.fs),
-      );
-      expect(symbol.symbol, 'f/S');
-      expect(
-        symbol.superscript,
-        isNull,
-        reason: 'the quality qualifiers stay exclusive to S',
-      );
-    });
-
-    test('the quality superscript rides beneath an S sign', () {
-      final withQuality = mucusText(
-        DailyEntry(
-          date: _d(3, 2),
-          mucusSign: MucusSign.s,
-          mucusQuality: MucusQuality.ew,
-        ),
-      );
-      expect(withQuality.symbol, 'S');
-      expect(withQuality.superscript, 'EW');
-    });
-  });
-
   group('letter glyphs of the strip rows', () {
-    test('sex draws a single X whenever any time was recorded', () {
-      expect(sexGlyph(null), isNull);
-      expect(sexGlyph(DailyEntry(date: _d(3, 2))), isNull);
-      expect(sexGlyph(DailyEntry(date: _d(3, 2), sexTimings: 1)), 'X');
-      // Multi-bit day (several time slots): still ONE X in the PDF column.
-      expect(sexGlyph(DailyEntry(date: _d(3, 2), sexTimings: 2 | 4)), 'X');
-    });
-
     test('cervix letters combine position and firmness symbols', () {
       expect(cervixLetters(null), isNull);
       expect(
@@ -127,20 +87,15 @@ void main() {
       );
     });
 
-    test('pain letter B (breast) and Mittelschmerz letter M', () {
+    test('pain letter B (breast)', () {
       expect(painLetter(null), isNull);
       expect(painLetter(DailyEntry(date: _d(3, 2), painBreast: true)), 'B');
       expect(
         painLetter(DailyEntry(date: _d(3, 2), painMittelschmerz: true)),
         isNull,
-        reason: 'Mittelschmerz M has its own row beneath the mucus letters',
-      );
-      expect(mittelschmerzLetter(DailyEntry(date: _d(3, 2))), isNull);
-      expect(
-        mittelschmerzLetter(
-          DailyEntry(date: _d(3, 2), painMittelschmerz: true),
-        ),
-        'M',
+        reason:
+            'the pain row carries only the breast letter; the Mittelschmerz '
+            'M renders inside the plot (the in-plot glyph seam)',
       );
     });
 

@@ -443,16 +443,17 @@ final class _CycleChartState extends State<_CycleChart> {
                           ),
                           const SizedBox(height: 4),
                           // The paper sheet's grid rows above the temperature
-                          // body: bleeding, mucus, Mittelschmerz M, sex — no
-                          // gap between the rows and the plot, they read as
-                          // one block.
+                          // body: bleeding. The mucus letters, sex Xs,
+                          // Mittelschmerz M and evaluation day numbers
+                          // render inside the plot (see _InPlotGlyphRows) —
+                          // no gap between the row and the plot, they read
+                          // as one block.
                           _SignalRows(
                             kinds: _topSignalKinds,
                             days: _days,
                             cellWidth: colW,
                             windowStart: winStart,
                             windowEnd: winEnd,
-                            peakIndexes: overlay.peakIndexes,
                             onDayTap: _openDaySheet,
                           ),
                           SizedBox(
@@ -718,6 +719,16 @@ final class _CycleChartState extends State<_CycleChart> {
                                   windowStart: winStart,
                                   windowEnd: winEnd,
                                 ),
+                                _InPlotGlyphRows(
+                                  days: _days,
+                                  cellWidth: colW,
+                                  windowStart: winStart,
+                                  windowEnd: winEnd,
+                                  peakIndexes: overlay.peakIndexes,
+                                  numbersByIndex: overlay.numbersByIndex,
+                                  range: widget.range,
+                                  scale: scale,
+                                ),
                                 // The tap overlay covers the whole scroll
                                 // content and maps taps/long-presses to day
                                 // columns.
@@ -743,28 +754,15 @@ final class _CycleChartState extends State<_CycleChart> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          EvaluationMarksRow(
-                            dayCount: dayCount,
-                            cellWidth: colW,
-                            numbersByIndex: overlay.numbersByIndex,
-                            onDayTap: _openDaySheet,
-                            isCycleBoundary: _days.isCycleBoundary,
-                            windowStart: winStart,
-                            windowEnd: winEnd,
-                          ),
-                          const SizedBox(height: 4),
                           // The below-chart strip: measurement time,
                           // disturbance letters, cervix, pain, day-note
-                          // indicator. TODO(user-review): the experts may
-                          // want the Mittelschmerz M rendered in the pain
-                          // row as well.
+                          // indicator.
                           _SignalRows(
                             kinds: _belowChartKinds,
                             days: _days,
                             cellWidth: colW,
                             windowStart: winStart,
                             windowEnd: winEnd,
-                            peakIndexes: overlay.peakIndexes,
                             onDayTap: _openDaySheet,
                           ),
                         ],
@@ -851,7 +849,8 @@ final class _DayHeaderRow extends StatelessWidget {
                     ),
                   ),
                   // Day of cycle: subtle on-surface ink (the 1–6 numbering
-                  // below is the evaluation artifact in the primary color);
+                  // inside the plot's bottom edge is the evaluation artifact
+                  // in the primary color);
                   // FittedBox squeezes long three-digit numbers in.
                   FittedBox(
                     fit: BoxFit.scaleDown,
@@ -965,6 +964,261 @@ final class _CycleOrdinalBadges extends StatelessWidget {
     }
     return Stack(children: chips);
   }
+}
+
+// --- in-plot observation glyphs (sex X, mucus letters, peak dot, M, day
+// --- numbers) -------------------------------------------------------------
+
+/// The observation glyphs rendered INSIDE the temperature plot — sex X
+/// marks, mucus sign letters, the mucus peak dot, the Mittelschmerz M and
+/// the evaluation day numbers — fed by [chartDayMarks] on the row pitches
+/// chart_marks.dart defines. Sits below the tap overlay in the chart
+/// Stack: the glyphs never intercept gestures.
+///
+/// Every ink text carries a surface-colored stroke pass behind it
+/// (`inPlotHalo*` keys, chartMarkHaloStrokeWidth wide) so a glyph over a
+/// temperature dot stays readable — no avoidance logic, the modest
+/// overprint of ink on ink is accepted.
+final class _InPlotGlyphRows extends StatelessWidget {
+  const _InPlotGlyphRows({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+    required this.peakIndexes,
+    required this.numbersByIndex,
+    required this.range,
+    required this.scale,
+  });
+
+  final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  /// Day indexes carrying the mucus-peak mark (the evaluation overlay's).
+  final Set<int> peakIndexes;
+
+  /// The evaluation day numbers (day index → number, already computed by
+  /// the overlay builder); glyphs render only where the plotted window's
+  /// day exists in the map.
+  final Map<int, int> numbersByIndex;
+
+  /// The settings range, feeding the narrow-range hiding.
+  final TemperatureRange range;
+  final _TemperatureScale scale;
+
+  static const double _glyphHeight = 12;
+
+  static const double _peakDotSize = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final surface = scheme.surface;
+    final sexVisible = chartMarkRowVisible(sexRowCenterOffsetK, range);
+    final peakVisible = chartMarkRowVisible(peakDotCenterOffsetK, range);
+    final mucusVisible = chartMarkRowVisible(mucusRowCenterOffsetK, range);
+    final mVisible = chartMarkRowVisible(mRowCenterOffsetK, range);
+    final numbersVisible = dayNumbersRowVisible(range);
+    if (!sexVisible &&
+        !peakVisible &&
+        !mucusVisible &&
+        !mVisible &&
+        !numbersVisible) {
+      return const SizedBox.shrink();
+    }
+
+    final windowMarks = chartDayMarks(
+      {
+        for (final entry in days.byIndex.entries)
+          if (entry.key >= windowStart && entry.key <= windowEnd)
+            entry.key: entry.value,
+      },
+      peakIndexes: peakIndexes,
+      numbers: numbersByIndex,
+    );
+    final onSurfaceColor = scheme.onSurface.withValues(alpha: chartMarkAlpha);
+    final mucusColor = scheme.tertiary.withValues(alpha: chartMarkAlpha);
+
+    final glyphs = <Widget>[];
+    for (var i = windowStart; i <= windowEnd; i++) {
+      final record = windowMarks[i];
+      if (record == null) continue;
+      if (sexVisible) {
+        for (final slot in record.sexSlots) {
+          glyphs.add(
+            Positioned(
+              left:
+                  i * cellWidth +
+                  slot.columnFraction * cellWidth -
+                  sexGlyphBoxWidth / 2,
+              top: _pitchTop(sexRowCenterOffsetK, _glyphHeight),
+              child: SizedBox(
+                width: sexGlyphBoxWidth,
+                height: _glyphHeight,
+                child: Center(
+                  child: _haloedText(
+                    inkKey: 'inPlotSex-$i-${slot.timing.name}',
+                    haloKey: 'inPlotHaloSex-$i-${slot.timing.name}',
+                    text: 'X',
+                    style: TextStyle(fontSize: 9, color: onSurfaceColor),
+                    haloColor: surface,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+      if (peakVisible && record.mucusPeak) {
+        const haloDotSize = _peakDotSize + 2 * chartMarkHaloStrokeWidth;
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth + (cellWidth - haloDotSize) / 2,
+            top: _pitchTop(peakDotCenterOffsetK, haloDotSize),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  key: ValueKey('inPlotHaloPeakDot-$i'),
+                  width: haloDotSize,
+                  height: haloDotSize,
+                  decoration: BoxDecoration(
+                    color: surface,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Container(
+                  key: ValueKey('inPlotPeakDot-$i'),
+                  width: _peakDotSize,
+                  height: _peakDotSize,
+                  decoration: BoxDecoration(
+                    color: mucusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      final mucus = mucusVisible ? record.mucus : null;
+      if (mucus case final display?) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth,
+            width: cellWidth,
+            top: _pitchTop(mucusRowCenterOffsetK, _glyphHeight),
+            height: _glyphHeight,
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  MucusSymbolText(
+                    key: ValueKey('inPlotHaloMucus-$i'),
+                    display: display,
+                    fontSize: 9,
+                    color: surface,
+                    strokeColor: surface,
+                  ),
+                  MucusSymbolText(
+                    key: ValueKey('inPlotMucus-$i'),
+                    display: display,
+                    fontSize: 9,
+                    color: mucusColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+      if (mVisible && record.mittelschmerz) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth,
+            width: cellWidth,
+            top: _pitchTop(mRowCenterOffsetK, _glyphHeight),
+            height: _glyphHeight,
+            child: Center(
+              child: _haloedText(
+                inkKey: 'inPlotM-$i',
+                haloKey: 'inPlotHaloM-$i',
+                text: 'M',
+                style: TextStyle(fontSize: 9, color: onSurfaceColor),
+                haloColor: surface,
+              ),
+            ),
+          ),
+        );
+      }
+      final dayNumber = numbersVisible ? record.dayNumber : null;
+      if (dayNumber case final number?) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth,
+            width: cellWidth,
+            // The one BOTTOM-anchored row: the value→pixel mapping applied
+            // at `min + offsetK`, unlike every top-anchored row's
+            // `pixelFor(max − offsetK)`.
+            top:
+                scale.pixelFor(scale.min + dayNumbersRowCenterOffsetK) -
+                _glyphHeight / 2,
+            height: _glyphHeight,
+            child: Center(
+              child: _haloedText(
+                inkKey: 'inPlotDayNumber-$i-$number',
+                haloKey: 'inPlotHaloDayNumber-$i-$number',
+                text: '$number',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: scheme.primary,
+                ),
+                haloColor: surface,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    return Stack(children: glyphs);
+  }
+
+  /// One ink text over its surface-colored stroke pass, exactly centered —
+  /// the stack renders/hides together with its row's visibility, so each
+  /// halo follows its ink without separate avoidance logic.
+  static Widget _haloedText({
+    required String inkKey,
+    required String haloKey,
+    required String text,
+    required TextStyle style,
+    required Color haloColor,
+  }) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Text(
+          text,
+          key: ValueKey(haloKey),
+          style: style.copyWith(
+            foreground: Paint()
+              ..color = haloColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = chartMarkHaloStrokeWidth,
+          ),
+        ),
+        Text(text, key: ValueKey(inkKey), style: style),
+      ],
+    );
+  }
+
+  /// The glyph slot's top edge for a row whose CENTER sits [offsetK] °C
+  /// below the scale max — the shared value→pixel mapping applied at
+  /// `yMax − offsetK`, half the slot height above the center.
+  double _pitchTop(double offsetK, double glyphHeight) =>
+      scale.pixelFor(scale.max - offsetK) - glyphHeight / 2;
 }
 // --- temperature scale (chart domain + frozen-rail labels) ------------------
 
@@ -1098,11 +1352,6 @@ final class _LeftRail extends StatelessWidget {
                 ],
               ),
             ),
-            // The marks-row slot: empty in the rail (the 1–6 numbering is
-            // per-day content), kept so the glyph segment below starts
-            // exactly where the below-chart strip starts.
-            const SizedBox(height: 4),
-            SizedBox(height: EvaluationMarksRow.cellHeight),
             const SizedBox(height: 4),
             _railSignalSegment(context, l10n, _belowChartKinds),
           ],

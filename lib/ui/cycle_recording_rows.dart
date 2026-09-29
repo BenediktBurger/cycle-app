@@ -4,16 +4,11 @@
 
 part of 'cycle.dart';
 
-/// The top block's grid rows (paper sheet order): bleeding → mucus →
-/// Mittelschmerz M → sex. TODO(user-review): the M letter's home (own row
-/// beneath the mucus row; clinicians may prefer it in the pain row too) is
-/// an owner-eyeball choice.
-const _topSignalKinds = <_SignalKind>[
-  _SignalKind.bleeding,
-  _SignalKind.mucus,
-  _SignalKind.mittelschmerz,
-  _SignalKind.sex,
-];
+/// The top strip's row (paper sheet order): bleeding is the only one. The
+/// mucus and sex observations, the Mittelschmerz M and the evaluation day
+/// numbers render INSIDE the temperature plot instead (_InPlotGlyphRows,
+/// chart_marks.dart).
+const _topSignalKinds = <_SignalKind>[_SignalKind.bleeding];
 
 /// The below-chart strip's rows (owner-decided order): measurement time →
 /// disturbance → cervix → pain → day-note indicator. TODO(user-review): the
@@ -36,7 +31,6 @@ final class _SignalRows extends StatelessWidget {
     required this.cellWidth,
     required this.windowStart,
     required this.windowEnd,
-    required this.peakIndexes,
     required this.onDayTap,
   });
 
@@ -46,10 +40,6 @@ final class _SignalRows extends StatelessWidget {
   final double cellWidth;
   final int windowStart;
   final int windowEnd;
-
-  /// Day indexes carrying the mucus-peak mark: they render the solid peak
-  /// dot above the mucus glyph.
-  final Set<int> peakIndexes;
 
   final void Function(int index) onDayTap;
 
@@ -67,7 +57,6 @@ final class _SignalRows extends StatelessWidget {
             cellWidth: cellWidth,
             windowStart: windowStart,
             windowEnd: windowEnd,
-            peakIndexes: peakIndexes,
             onDayTap: onDayTap,
           ),
         ),
@@ -81,11 +70,11 @@ final class _SignalRows extends StatelessWidget {
 /// rail's alignment test fails.
 const double _signalRowGap = 2;
 
-/// The fixed height a signal row's day cells occupy: mucus and disturbance
-/// reserve the peak-dot slot / two letter slots respectively; the time row
-/// the height of a vertically written HH:mm text (see _timeContent).
+/// The fixed height a signal row's day cells occupy: disturbance reserves
+/// two letter slots; the time row the height of a vertically written HH:mm
+/// text (see _timeContent).
 double _signalRowHeight(_SignalKind kind) => switch (kind) {
-  _SignalKind.mucus || _SignalKind.disturbance => 24,
+  _SignalKind.disturbance => 24,
   _SignalKind.time => 30,
   _ => 12,
 };
@@ -104,24 +93,11 @@ double _signalSegmentHeight(List<_SignalKind> kinds) =>
     kinds.fold(0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
     (kinds.isEmpty ? 0 : _signalRowGap);
 
-enum _SignalKind {
-  bleeding,
-  mucus,
-  mittelschmerz,
-  sex,
-  time,
-  disturbance,
-  cervix,
-  pain,
-  note,
-}
+enum _SignalKind { bleeding, time, disturbance, cervix, pain, note }
 
 /// Test-visible key prefix of a row's day cells.
 String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCell',
-  _SignalKind.mucus => 'mucusCell',
-  _SignalKind.mittelschmerz => 'mittelschmerzCell',
-  _SignalKind.sex => 'sexCell',
   _SignalKind.cervix => 'cervixCell',
   _SignalKind.pain => 'painCell',
   _SignalKind.disturbance => 'disturbanceCell',
@@ -132,9 +108,6 @@ String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
 /// Test-visible key prefix of a row's 44 px corner slot.
 String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCorner',
-  _SignalKind.mucus => 'mucusCorner',
-  _SignalKind.mittelschmerz => 'mittelschmerzCorner',
-  _SignalKind.sex => 'sexCorner',
   _SignalKind.cervix => 'cervixCorner',
   _SignalKind.pain => 'painCorner',
   _SignalKind.disturbance => 'disturbanceCorner',
@@ -148,9 +121,6 @@ String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
 String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
     switch (kind) {
       _SignalKind.bleeding => l10n.termBleeding,
-      _SignalKind.mucus => l10n.termMucus,
-      _SignalKind.mittelschmerz => l10n.termMittelschmerz,
-      _SignalKind.sex => l10n.termSex,
       _SignalKind.cervix => l10n.cycleRowCervix,
       _SignalKind.pain => l10n.termBreastPain,
       _SignalKind.disturbance => l10n.cycleRowDisturbance,
@@ -172,21 +142,8 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
         borderColor: scheme.error,
       ),
     ),
-    _SignalKind.mucus => MucusSymbolText(
-      sign: MucusSign.s,
-      fontSize: 10,
-      color: scheme.tertiary,
-    ),
     _SignalKind.cervix => Text(
       cervixPositionSymbol(CervixPosition.medium),
-      style: TextStyle(fontSize: 10, color: scheme.onSurface),
-    ),
-    _SignalKind.mittelschmerz => Text(
-      'M',
-      style: TextStyle(fontSize: 10, color: scheme.onSurface),
-    ),
-    _SignalKind.sex => Text(
-      'X',
       style: TextStyle(fontSize: 10, color: scheme.onSurface),
     ),
     _SignalKind.pain => Text(
@@ -223,7 +180,6 @@ final class _SignalRow extends StatelessWidget {
     required this.cellWidth,
     required this.windowStart,
     required this.windowEnd,
-    required this.peakIndexes,
     required this.onDayTap,
   });
 
@@ -233,9 +189,6 @@ final class _SignalRow extends StatelessWidget {
   final double cellWidth;
   final int windowStart;
   final int windowEnd;
-
-  /// Day indexes carrying the mucus-peak mark (only read by the mucus row).
-  final Set<int> peakIndexes;
 
   final void Function(int index) onDayTap;
 
@@ -291,9 +244,6 @@ final class _SignalRow extends StatelessWidget {
       child: Center(
         child: switch (kind) {
           _SignalKind.bleeding => _bleedingContent(context, day),
-          _SignalKind.mucus => _mucusContent(context, index, day),
-          _SignalKind.mittelschmerz => _mittelschmerzContent(context, day),
-          _SignalKind.sex => _sexContent(context, day),
           _SignalKind.cervix => _cervixContent(context, day),
           _SignalKind.pain => _painContent(context, day),
           _SignalKind.disturbance => _disturbanceContent(context, day),
@@ -309,46 +259,6 @@ final class _SignalRow extends StatelessWidget {
   static Widget _bleedingContent(BuildContext context, DailyEntry? day) {
     if (day == null) return const SizedBox.shrink();
     return BleedingSymbol(bleeding: day.bleeding);
-  }
-
-  /// Mucus: the reserved peak-dot slot above the glyph, reserved in every
-  /// cell so the row keeps its rhythm regardless of which day is the peak.
-  Widget _mucusContent(BuildContext context, int index, DailyEntry? day) {
-    if (day == null) return const SizedBox.shrink();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 10,
-          child: peakIndexes.contains(index)
-              ? Center(
-                  child: Container(
-                    key: ValueKey('peakDot-$index'),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.tertiary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                )
-              : null,
-        ),
-        const SizedBox(height: 2),
-        SizedBox(
-          height: 12,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: MucusSymbolText(
-              sign: day.mucusSign,
-              quality: day.mucusQuality,
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.tertiary,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   /// Cervix: position letter, firmness shorthand beside it; the OPENING is
@@ -385,35 +295,6 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 
-  /// Sex: one X glyph per recorded time slot, each at its third of the day
-  /// column (more slots render side by side — "sex happened, time unknown"
-  /// is deliberately not representable, DailyEntry.sexTimings). No
-  /// collision with the disturbance codes: interrupted days render only as
-  /// lighter curve points. TODO(user-review): the X and its thirds
-  /// placement are provisional/eyeball choices.
-  static Widget _sexContent(BuildContext context, DailyEntry? day) {
-    if (day == null || day.sexTimings == 0) return const SizedBox.shrink();
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        for (final timing in SexTiming.values)
-          if (day.sexTimings & timing.bit != 0)
-            Positioned.fill(
-              child: Align(
-                alignment: _sexTimingAlignment(timing),
-                child: Text(
-                  'X',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-      ],
-    );
-  }
-
   /// Pain: the letter B (uppercase, distinguishable from the lowercase
   /// cervix letters; neutral on-surface ink). TODO(user-review): the letter
   /// mirrors the entry-form ("Brustschmerzen (B)") vocabulary — the same
@@ -422,18 +303,6 @@ final class _SignalRow extends StatelessWidget {
     if (day == null || !day.painBreast) return const SizedBox.shrink();
     return Text(
       'B',
-      style: TextStyle(
-        fontSize: 9,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
-    );
-  }
-
-  /// Mittelschmerz: the letter M in its own row beneath the mucus row.
-  static Widget _mittelschmerzContent(BuildContext context, DailyEntry? day) {
-    if (day == null || !day.painMittelschmerz) return const SizedBox.shrink();
-    return Text(
-      'M',
       style: TextStyle(
         fontSize: 9,
         color: Theme.of(context).colorScheme.onSurface,
@@ -508,12 +377,3 @@ final class _SignalRow extends StatelessWidget {
     );
   }
 }
-
-/// Horizontal placement of a sex slot's X glyph: each slot's X sits at the
-/// center of its third of the column (-2/3, 0, +2/3), so slot placement
-/// stays visible and several slots never overlap.
-Alignment _sexTimingAlignment(SexTiming timing) => switch (timing) {
-  SexTiming.start => const Alignment(-2 / 3, 0),
-  SexTiming.middle => Alignment.center,
-  SexTiming.end => const Alignment(2 / 3, 0),
-};
