@@ -16,6 +16,10 @@
 // The PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// The StateProviders (incl. [PersistedSetting.bind]) are legacy in Riverpod
+// 3.x; this import is the sanctioned bridge until the codegen/Notifier
+// adoption (docs/roadmap.md backlog).
+import 'package:flutter_riverpod/legacy.dart';
 
 import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
@@ -91,8 +95,8 @@ final marksProvider = StreamProvider.autoDispose<List<CycleMark>>((ref) async* {
 /// to one calendar day — an accepted staleness window, not worth timer
 /// machinery.
 final derivedCycleDataProvider = Provider<DerivedCycleData>((ref) {
-  final entries = ref.watch(dailyEntriesProvider).valueOrNull;
-  final marks = ref.watch(marksProvider).valueOrNull;
+  final entries = ref.watch(dailyEntriesProvider).value;
+  final marks = ref.watch(marksProvider).value;
   return deriveCycleData(
     entries ?? const <DailyEntry>[],
     marks ?? const <CycleMark>[],

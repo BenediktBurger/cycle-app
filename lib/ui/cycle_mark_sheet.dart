@@ -340,8 +340,8 @@ final class CycleDayPanel extends ConsumerWidget {
     // cycle screen's data branch, so a session-long entries error cannot
     // open it.
     final entries =
-        ref.watch(dailyEntriesProvider).valueOrNull ?? const <DailyEntry>[];
-    final marks = marksAsync.valueOrNull ?? const <CycleMark>[];
+        ref.watch(dailyEntriesProvider).value ?? const <DailyEntry>[];
+    final marks = marksAsync.value ?? const <CycleMark>[];
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
     final hasExcluded = _hasMark(marks, CycleMarkTypes.ignoreTemperature);

@@ -37,8 +37,10 @@ hooks:
 # the android plugin implementation of url_launcher — see the comment on
 # the environment itself:
 #
-# flutter_riverpod: ^2.6.0 is a known-stable 2.x release. Deliberately stays on
-#   the Riverpod 2.x line (3.x changes APIs).
+# flutter_riverpod: ^3.4.3 on the Riverpod 3.x line. The ~14 StateProviders
+#   (all in lib/providers.dart, incl. the hydration registrar's bind<T>) still
+#   come from package:flutter_riverpod/legacy.dart — StateProvider is legacy
+#   in 3.x, pending the codegen/Notifier adoption (docs/roadmap.md backlog).
 # drift / drift_dev: ^2.35.0. Both bumped together in lockstep:
 #   2.35 is also the version whose release ships the vendored web assets
 #   (web/sqlite3.wasm + web/drift_worker.js) — keeping the runtime on the
@@ -97,7 +99,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
-  flutter_riverpod: ^2.6.0
+  flutter_riverpod: ^3.4.3
   drift: ^2.35.0
   drift_flutter: ^0.3.0
   sqlite3_flutter_libs: ^0.6.0
