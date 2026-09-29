@@ -73,7 +73,11 @@ single durable mapping of those IDs. Therefore:
 ## Running tests
 
 In a fresh checkout or git worktree, run `flutter pub get` before any
-`flutter`/`dart` command (`.dart_tool/` is not version-controlled).
+`flutter`/`dart` command (`.dart_tool/` is not version-controlled). Edited
+riverpod/drift annotations need the committed `.g.dart` outputs rebuilt
+(`dart run build_runner build`) before the full gate; `.arb` edits need
+nothing — l10n regenerates automatically — see [CONTRIBUTING.md](CONTRIBUTING.md),
+"Codegen and generated files".
 
 ### Reusable worktrees
 
