@@ -351,6 +351,39 @@ Future<List<int>> generateMarkFixture({TemperatureRange? range}) =>
       compress: false,
     );
 
+// The in-plot day-numbers fixture: six low measurements at 36.2, then the
+// first higher on day 7 (marked) — the evaluation numbers the lows 6…1, and
+// a mucus S on one low day anchors the rows' relative geometry. One page.
+List<DailyEntry> numberFixtureEntries() => [
+  for (var i = 0; i <= 7; i++)
+    DailyEntry(
+      date: d(3, 1 + i),
+      bbtC: i <= 5 ? 36.2 : 36.8,
+      mucusSign: i == 3 ? MucusSign.s : null,
+    ),
+];
+
+List<CycleMark> numberFixtureMarks() => [
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 7), type: CycleMarkTypes.firstHigherMeasurement),
+];
+
+PdfExportModel numberFixtureModel({TemperatureRange? range}) =>
+    buildPdfExportModel(
+      entries: numberFixtureEntries(),
+      marks: numberFixtureMarks(),
+      temperatureRange: range ?? TemperatureRange.defaults,
+      today: d(3, 8),
+    );
+
+Future<List<int>> generateNumberFixture({TemperatureRange? range}) =>
+    generatePdfBytes(
+      model: numberFixtureModel(range: range),
+      fontBytes: fixtureFontBytes(),
+      options: PdfExportOptions(anonymized: false),
+      compress: false,
+    );
+
 void main() {
   group('rail captions (the paper-form row legends)', () {
     test('the below-plot temperature value row\'s rail legend reads exactly '
@@ -682,17 +715,25 @@ void main() {
   });
 
   group(
-    'in-plot chart marks (sex X / mucus letters / peak dot in the plot)',
+    'in-plot chart marks (sex X / mucus letters / peak dot / M / day numbers)',
     () {
-      // The settled geometry: the glyph rows pitch between the 0.1 °C grid
-      // lines, BELOW the plot's top border (offsets −0.15 sex / −0.25 dot /
-      // −0.35 letters from the scale max), at the day columns' x. The page's
-      // pinned row seams frame the plot REGION: the Mittelschmerz row's caption
-      // sits above the plot, the temperature value row's below it. Rail-bound
-      // page x: margin (28) + rail (58) + the day fraction × pdfColumnWidth.
+      // The settled geometry: the text glyph rows pitch between the 0.1 °C
+      // grid lines, BELOW the plot's top border (offsets −0.05 X / −0.15
+      // peak dot / −0.25 letters / −0.35 Mittelschmerz M from the scale
+      // max), while the day numbers anchor from the BOTTOM at
+      // min + 0.05 — all INSIDE the plot. The page's pinned row seams frame
+      // the plot REGION: the bleeding row's caption above, the temperature
+      // value row's below (the sheet's strip rows end at bleeding — the M
+      // and the numbers are in-plot glyphs). Rail-bound page x: margin (28)
+      // + rail (58) + the day fraction × pdfColumnWidth.
       const x0 = 28 + 58;
       const plotHeightPt = 185; // the PDF plot's painted height
       const defaultSpan = 2.0; // the default display range 36–38 °C
+      // The letters center (max − 0.25) sits span − 0.30 above the numbers
+      // center (min + 0.05); the two rows' ink baselines track that gap on
+      // the plot's °C scale.
+      const lettersToNumbersGapPt =
+          (defaultSpan - 0.30) * plotHeightPt / defaultSpan;
 
       double runY(List<PdfTextRun> runs, String exact) => runs
           .firstWhere(
@@ -722,14 +763,51 @@ void main() {
             p,
       ];
 
+      /// The halo backings: paper-white fills behind the in-plot glyphs (the
+      /// PDF's halo equivalent — see the backing's slot comment in
+      /// cycle_pdf.dart).
+      List<PdfFillPath> whiteBackings(List<PdfFillPath> paths) => [
+        for (final p in paths)
+          if (p.color.every((c) => (c - 1.0).abs() < 0.002)) p,
+      ];
+
+      /// Whether a white backing of [paths] sits in [column]'s day column,
+      /// vertically centered on [inkBaselineY] — a text glyph's halo box
+      /// shares the ink's slot center.
+      bool backedIn(List<PdfFillPath> paths, int column, double inkBaselineY) {
+        return whiteBackings(paths).any((p) {
+          final cx = (p.minX + p.maxX) / 2;
+          final cy = (p.minY + p.maxY) / 2;
+          return cx > x0 + column * pdfColumnWidth + 1 &&
+              cx < x0 + (column + 1) * pdfColumnWidth - 1 &&
+              (cy - inkBaselineY).abs() < 3.5;
+        });
+      }
+
+      /// Whether any backing of [paths] sits in [column]'s day column —
+      /// column-only, for the rows whose ink (and backing) must be absent.
+      bool backedInColumn(List<PdfFillPath> paths, int column) {
+        return whiteBackings(paths).any(
+          (p) =>
+              (p.minX + p.maxX) / 2 > x0 + column * pdfColumnWidth + 1 &&
+              (p.minX + p.maxX) / 2 < x0 + (column + 1) * pdfColumnWidth - 1,
+        );
+      }
+
+      /// The evaluation day-number ink runs: the digits 1–6 at the
+      /// low-number band's ink size (the numbers' family in the export).
+      bool isNumberRun(PdfTextRun r) =>
+          {'1', '2', '3', '4', '5', '6'}.contains(r.text) &&
+          (r.fontSize - 5.2).abs() < 0.05;
+
       test(
         'the sex X marks render in the plot at their per-timing slots',
         () async {
           final bytes = await generateMarkFixture();
           final (runs, _) = extractPageContent(bytes);
-          final mitY = runY(runs, 'Mittelschmerz');
+          final blutungY = runY(runs, 'Blutung');
           final tempY = runY(runs, 'Temperatur');
-          bool inPlot(PdfTextRun r) => r.y > tempY && r.y < mitY;
+          bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
           final xRuns = [
             for (final r in runs)
               if (r.text == 'X' && inPlot(r)) r,
@@ -746,7 +824,8 @@ void main() {
           expect(
             xRuns,
             hasLength(4),
-            reason: 'the removed paper-form sex row leaves only the in-plot Xs',
+            reason:
+                'the paper-form sex strip row is gone — only the in-plot Xs remain',
           );
         },
       );
@@ -755,9 +834,9 @@ void main() {
           'its quality superscript, f/S), pitched below the sex row', () async {
         final bytes = await generateMarkFixture();
         final (runs, _) = extractPageContent(bytes);
-        final mitY = runY(runs, 'Mittelschmerz');
+        final blutungY = runY(runs, 'Blutung');
         final tempY = runY(runs, 'Temperatur');
-        bool inPlot(PdfTextRun r) => r.y > tempY && r.y < mitY;
+        bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
         final s = runOf(runs, 'S', 6.5);
         final fs = runOf(runs, 'f/S', 6.5);
         final quality = runOf(runs, 'EW', 4.8);
@@ -781,12 +860,12 @@ void main() {
         // rides raised (the rows' composed glyph, token raised by its offset).
         expect((s.y - fs.y).abs(), lessThan(0.8));
         expect(quality.y, greaterThan(s.y + 0.5));
-        // The settled row pitches: the X row center at max − 0.15, the letters
-        // at max − 0.35 → 0.2 K apart on the plot's °C scale.
+        // The settled row pitches: the X row center at max − 0.05, the letters
+        // at max − 0.25 → 0.2 K apart on the plot's °C scale.
         final sexY = runOf(runs, 'X', 6.5)!.y;
         expect(
           sexY - s.y,
-          closeTo((0.35 - 0.15) * plotHeightPt / defaultSpan, 0.8),
+          closeTo((0.25 - 0.05) * plotHeightPt / defaultSpan, 0.8),
         );
         // The letters center in their day columns (S on day 5, f/S on day 6;
         // the run boxes are width-constrained, so the baselines fall inside
@@ -813,7 +892,7 @@ void main() {
         () async {
           final bytes = await generateMarkFixture();
           final (runs, paths) = extractPageContent(bytes);
-          final mitY = runY(runs, 'Mittelschmerz');
+          final blutungY = runY(runs, 'Blutung');
           final s = runOf(runs, 'S', 6.5);
           final sexY = runOf(runs, 'X', 6.5)!.y;
           final dots = accentDots(paths);
@@ -826,11 +905,11 @@ void main() {
           final centerX = (dot.minX + dot.maxX) / 2;
           final centerY = (dot.minY + dot.maxY) / 2;
           // The dot rides the peak day's column center (day 5), above the letter
-          // row but below the sex row — the shared −0.25 K gap.
+          // row but below the sex row — the shared −0.15 K gap.
           expect(centerX, closeTo(x0 + 5.5 * pdfColumnWidth, 1.2));
           expect(
             centerY,
-            lessThan(mitY),
+            lessThan(blutungY),
             reason: 'the dot renders inside the plot',
           );
           expect(centerY, greaterThan(s!.y + 2));
@@ -838,27 +917,181 @@ void main() {
         },
       );
 
-      test('the paper form drops the mucus band and the sex row — bleeding → '
-          'Mittelschmerz → plot, the rest of the scaffold untouched', () async {
+      test('the Mittelschmerz letter M renders INSIDE the plot at the −0.35 '
+          'pitch, below the mucus letters, centered in its record day\'s '
+          'column', () async {
+        final bytes = await generateMarkFixture();
+        final (runs, _) = extractPageContent(bytes);
+        final blutungY = runY(runs, 'Blutung');
+        final tempY = runY(runs, 'Temperatur');
+        bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
+        final mRuns = [
+          for (final r in runs)
+            if (r.text == 'M' && inPlot(r)) r,
+        ];
+        expect(
+          mRuns,
+          hasLength(1),
+          reason: 'the plot carries exactly one Mittelschmerz M',
+        );
+        final m = mRuns.single;
+        expect(
+          m.fontSize,
+          closeTo(6.5, 0.05),
+          reason: "the M shares the in-plot letters' ink family (_label)",
+        );
+        // The M pitch: 0.1 K below the letters row.
+        final s = runOf(runs, 'S', 6.5)!;
+        expect(
+          s.y - m.y,
+          closeTo((0.35 - 0.25) * plotHeightPt / defaultSpan, 0.8),
+        );
+        expect(
+          m.x,
+          allOf(
+            greaterThan(x0 + 8 * pdfColumnWidth + 0.5),
+            lessThan(x0 + 9 * pdfColumnWidth - 0.5),
+          ),
+          reason: "the M centers in the fixture day's column (day 8)",
+        );
+      });
+
+      test(
+        'the 1–6 evaluation numbers render INSIDE the plot near the '
+        'bottom, one per low column, in the low-number band\'s ink family',
+        () async {
+          final bytes = await generateNumberFixture();
+          final (runs, paths) = extractPageContent(bytes);
+          final blutungY = runY(runs, 'Blutung');
+          final tempY = runY(runs, 'Temperatur');
+          bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
+          final numberRuns = [
+            for (final r in runs)
+              if (isNumberRun(r)) r,
+          ]..sort((a, b) => a.x.compareTo(b.x));
+          expect(
+            numberRuns.map((r) => r.text).toList(),
+            ['6', '5', '4', '3', '2', '1'],
+            reason:
+                'the six low columns number from the first higher '
+                'measurement backwards (the domain numbering, fed to the '
+                'plot unchanged)',
+          );
+          expect(
+            numberRuns.first.fontSize,
+            closeTo(5.2, 0.05),
+            reason: 'the numbers render in the low-number band\'s ink family',
+          );
+          for (final run in numberRuns) {
+            expect(
+              inPlot(run),
+              isTrue,
+              reason: "the number '${run.text}' renders inside the plot region",
+            );
+          }
+          for (final (index, run) in numberRuns.indexed) {
+            expect(
+              run.x,
+              allOf(
+                greaterThan(x0 + index * pdfColumnWidth + 0.5),
+                lessThan(x0 + (index + 1) * pdfColumnWidth - 0.5),
+              ),
+              reason:
+                  "the number '${run.text}' centers in its low day's column",
+            );
+          }
+          // The numbers ride the BOTTOM gridline gap: their ink baseline sits
+          // `(span − 0.30) K` of plot scale below the letters row's baseline.
+          final s = runOf(runs, 'S', 6.5)!;
+          expect(s.y - numberRuns.first.y, closeTo(lettersToNumbersGapPt, 2.5));
+          // On the in-plot seam each glyph renders on its halo backing.
+          for (final (index, run) in numberRuns.indexed) {
+            expect(
+              backedIn(paths, index, run.y),
+              isTrue,
+              reason: "the number '${run.text}' rides its halo backing",
+            );
+          }
+        },
+      );
+
+      test(
+        'a paper-colored halo backing renders behind each in-plot glyph, '
+        'shared with the ink\'s slot (the ink sits exactly over it)',
+        () async {
+          final bytes = await generateMarkFixture();
+          final (runs, paths) = extractPageContent(bytes);
+          final s = runOf(runs, 'S', 6.5)!;
+          final m = [
+            for (final r in runs)
+              if (r.text == 'M') r,
+          ].single;
+          final dot = accentDots(paths).single;
+          expect(
+            backedIn(paths, 5, s.y),
+            isTrue,
+            reason: 'the mucus letters ride a backing in their column',
+          );
+          expect(
+            backedIn(paths, 8, m.y),
+            isTrue,
+            reason: 'the M rides a backing in its column',
+          );
+          // The peak dot's halo circle: bigger than the dot and exactly
+          // centered under it — dot diameter + 2 × the shared halo width.
+          final circle = [
+            for (final p in whiteBackings(paths))
+              if (((p.minX + p.maxX) / 2 - (dot.minX + dot.maxX) / 2).abs() <
+                      1.5 &&
+                  ((p.minY + p.maxY) / 2 - (dot.minY + dot.maxY) / 2).abs() <
+                      1.5)
+                p,
+          ];
+          expect(
+            circle,
+            hasLength(1),
+            reason: 'the dot rides exactly one backing',
+          );
+          expect(
+            circle.single.maxX - circle.single.minX,
+            allOf(greaterThan(dot.maxX - dot.minX), lessThan(11)),
+            reason: 'the halo circle outgrows the ink dot without blotting out',
+          );
+        },
+      );
+
+      test('the paper form drops the mucus band, the sex row, the '
+          'Mittelschmerz row and the Zahl row — bleeding is the last strip '
+          'row above the glyphs inside the plot', () async {
         final bytes = await generateMarkFixture();
         final (runs, _) = extractPageContent(bytes);
         final rendered = runs.map((r) => r.text).toList();
         expect(
           rendered,
           isNot(contains('Zeichen')),
-          reason: 'the mucus band (and its peak-dot slot) renders no more',
+          reason: 'the mucus band renders as in-plot glyphs, not a strip row',
         );
         expect(
           rendered,
           isNot(contains('Sex')),
-          reason: 'the sex row renders no more — the Xs live in the plot',
+          reason: 'the Xs render in the plot, not as a strip row',
+        );
+        expect(
+          rendered,
+          isNot(contains('Mittelschmerz')),
+          reason: 'the M renders in the plot, not as a strip row',
+        );
+        expect(
+          rendered,
+          isNot(contains('Zahl')),
+          reason: 'the day numbers render in the plot, not as a strip row',
         );
         const kept = [
+          // The calendar day-number row: the cycle-day labels above the
+          // plot, distinct from the evaluation numbering inside it.
           'Zyklustag',
           'Datum',
           'Blutung',
-          'Mittelschmerz',
-          'Zahl',
           // The exporter draws words as separate runs; the caption's anchor
           // word is 'Temperatur'.
           'Temperatur',
@@ -878,25 +1111,28 @@ void main() {
       });
 
       test(
-        'a narrow settings range hides the mucus letters and the peak dot '
-        'inside the plot, the sex row stays (each row hides independently)',
+        'a span-0.20 range keeps the sex row AND the peak dot (decoupled '
+        'rows); the mucus letters, the M and their halo backs hide',
         () async {
           final bytes = await generateMarkFixture(
             range: const TemperatureRange(min: 37.8, max: 38.0),
           );
           final (runs, paths) = extractPageContent(bytes);
-          final mitY = runY(runs, 'Mittelschmerz');
+          final blutungY = runY(runs, 'Blutung');
           final tempY = runY(runs, 'Temperatur');
-          bool inPlot(PdfTextRun r) => r.y > tempY && r.y < mitY;
-          // The mucus band's glyphs (in the OLD rendering: the row cells above
-          // the plot) render no more — anywhere on the page.
+          bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
+          // The letters render nowhere on the page when hidden.
           expect(
             runs.where(
               (r) => r.text == 'S' || r.text == 'f/S' || r.text == 'EW',
             ),
             isEmpty,
           );
-          expect(accentDots(paths), isEmpty, reason: 'the peak dot hides with');
+          expect(
+            runs.where((r) => r.text == 'M'),
+            isEmpty,
+            reason: 'the M hides with its own row below the letters',
+          );
           final xRuns = [
             for (final r in runs)
               if (r.text == 'X' && inPlot(r)) r,
@@ -906,8 +1142,65 @@ void main() {
             hasLength(4),
             reason: 'the sex Xs stay, at their timing slots in the plot',
           );
+          expect(
+            accentDots(paths),
+            hasLength(1),
+            reason:
+                'the peak dot keeps ITS OWN row (0.15): at span 0.20 it '
+                'stays visible, decoupled from the letters band',
+          );
+          final dot = accentDots(paths).single;
+          // A hidden row's halo backs follow their glyph's visibility.
+          expect(
+            backedInColumn(paths, 6),
+            isFalse,
+            reason: "the hidden f/S letter's backing hides too",
+          );
+          expect(
+            backedInColumn(paths, 8),
+            isFalse,
+            reason: "the hidden M's backing hides too",
+          );
+          final circle = [
+            for (final p in whiteBackings(paths))
+              if (((p.minX + p.maxX) / 2 - (dot.minX + dot.maxX) / 2).abs() <
+                      1.5 &&
+                  ((p.minY + p.maxY) / 2 - (dot.minY + dot.maxY) / 2).abs() <
+                      1.5)
+                p,
+          ];
+          expect(
+            circle,
+            hasLength(1),
+            reason: 'the visible dot keeps its backing',
+          );
         },
       );
+
+      test('a span below 0.10 hides the bottom-anchored day numbers with '
+          'their row — no number ink and no halo backing anywhere', () async {
+        final bytes = await generateNumberFixture(
+          range: const TemperatureRange(min: 37.9, max: 37.96),
+        );
+        final (runs, paths) = extractPageContent(bytes);
+        expect(
+          runs.where(isNumberRun),
+          isEmpty,
+          reason:
+              'the numbers hide when their center exceeds the top edge '
+              'margin: min + 0.05 ≤ max − 0.05 fails at span 0.06',
+        );
+        expect(
+          whiteBackings(paths),
+          isEmpty,
+          reason: 'the halo backs follow their glyph\'s row visibility',
+        );
+        expect(
+          accentDots(paths),
+          isEmpty,
+          reason: 'the other in-plot rows hide at this span too',
+        );
+      });
     },
   );
 }

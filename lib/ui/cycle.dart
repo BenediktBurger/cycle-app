@@ -1,10 +1,11 @@
 // Zyklus screen: the paper-style temperature curve with the day/cycle
-// header above it and the raw-observation glyphs INSIDE the top of the
-// temperature plot (mucus sign letters, sex X marks, mucus peak dot,
-// chart_marks.dart); the recording rows carry the rest of the top strip
-// (bleeding, the Mittelschmerz letter M) and, under the curve, the 1–6
-// numbering and the single below-chart strip (measurement time,
-// disturbance letters, cervix, pain, day-note indicator). The COMPUTED
+// header above it, bleeding as the one recording row above the plot and
+// the raw-observation glyphs INSIDE the temperature plot (sex X marks,
+// mucus sign letters, mucus peak dot, the Mittelschmerz M and the
+// evaluation 1–6 day numbering — chart_marks.dart, _InPlotGlyphRows).
+// Under the curve comes the single below-chart strip (measurement time,
+// disturbance letters, cervix, pain, day-note indicator) — as with every
+// row the raw observations are pure recordings. The COMPUTED
 // evaluation overlay (Mode M, ADR-0001) draws the user's mucus-peak and
 // first-higher marks' derived artifacts for DISPLAY ONLY — never persisted;
 // it is derived in lib/domain/evaluation_overlay.dart over evaluateCycles

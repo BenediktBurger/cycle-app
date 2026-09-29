@@ -1,8 +1,11 @@
 // Unit tests of the pure in-chart glyph layer (lib/ui/chart_marks.dart):
 // the per-day placement records (sex timing slots, mucus letters, mucus
-// peak flag) and the narrow-range visibility predicate that the cycle
-// chart and the PDF export both consume. The letter vocabulary stays
-// mucusDisplay's — the tests pin that the mapper adds no second mapping.
+// peak flag, Mittelschmerz M flag, evaluation day number), the
+// narrow-range visibility predicates for the top-anchored rows and the
+// bottom-anchored numbers row — all consumed by the cycle chart and the
+// PDF export. The letter vocabulary stays mucusDisplay's — the tests pin
+// that the mapper adds no second mapping, and the numbering stays fed:
+// the mapper carries a passed-in number, it never computes one.
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -14,11 +17,13 @@ DailyEntry _entry(
   MucusSign? sign,
   MucusQuality? quality,
   int sexTimings = 0,
+  bool mittelschmerz = false,
 }) => DailyEntry(
   date: DateTime.utc(2026, 9, 3).add(Duration(days: i)),
   mucusSign: sign,
   mucusQuality: quality,
   sexTimings: sexTimings,
+  painMittelschmerz: mittelschmerz,
 );
 
 void main() {
@@ -137,39 +142,158 @@ void main() {
     });
   });
 
-  group('chartMarkRowVisible — narrow-range hiding', () {
-    test('the default range keeps both rows (and the peak dot) visible', () {
+  group('chartDayMarks — Mittelschmerz M flag', () {
+    test('an entry with painMittelschmerz recorded carries the M', () {
+      final marks = chartDayMarks({0: _entry(0, mittelschmerz: true)});
+      expect(marks[0]!.mittelschmerz, isTrue);
+    });
+
+    test('an entry without the flag carries no M', () {
+      final marks = chartDayMarks({0: _entry(0)});
+      expect(marks[0]!.mittelschmerz, isFalse);
+    });
+
+    test('a day absent from the entries renders no M', () {
+      final marks = chartDayMarks({0: _entry(0, mittelschmerz: true)});
+      expect(marks[1], isNull);
+    });
+  });
+
+  group('chartDayMarks — evaluation day numbers (fed, not computed)', () {
+    test('a day present in the numbers feed carries its number', () {
+      final marks = chartDayMarks({0: _entry(0)}, numbers: {0: 6});
+      expect(marks[0]!.dayNumber, 6);
+    });
+
+    test('an entry day without a number carries nothing', () {
+      final marks = chartDayMarks({0: _entry(0)}, numbers: {1: 5});
+      expect(marks[0]!.dayNumber, isNull);
+    });
+
+    test('the feed defaults to empty — no number anywhere', () {
+      final marks = chartDayMarks({0: _entry(0)});
+      expect(marks[0]!.dayNumber, isNull);
+    });
+
+    test('a number without an entry renders nothing', () {
+      final marks = chartDayMarks({0: _entry(0)}, numbers: {1: 4});
+      expect(marks[1], isNull);
+    });
+  });
+
+  group('chartMarkRowVisible — narrow-range hiding, new pitch', () {
+    test('the default range keeps every row (and the numbers) visible', () {
       final range = TemperatureRange.defaults;
       expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isTrue);
       expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isTrue);
+      expect(dayNumbersRowVisible(range), isTrue);
     });
 
-    test('a span below 0.2 hides both rows', () {
-      final range = TemperatureRange(min: 37.85, max: 38.0);
-      expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isFalse);
-      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
-    });
-
-    test('a span of exactly 0.2 keeps sex, hides mucus', () {
-      final range = TemperatureRange(min: 37.8, max: 38.0);
-      // The sex row center (37.85) sits exactly on the min + 0.05 margin:
-      // boundary values are visible, not dropped.
+    test('span 0.10 — sex AND the numbers sit on the boundary: visible', () {
+      final range = TemperatureRange(min: 37.9, max: 38.0);
+      // Boundary equality stays VISIBLE for both anchored kinds.
       expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
+      expect(dayNumbersRowVisible(range), isTrue);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isFalse);
       expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isFalse);
     });
 
-    test('a span of 0.3 still shows sex, hides mucus and the peak dot', () {
+    test('span 0.20 — sex AND the peak dot, mucus and M hidden', () {
+      final range = TemperatureRange(min: 37.8, max: 38.0);
+      expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
+      // The peak dot hides with ITS OWN row (0.15), decoupled from the
+      // letters band: on this boundary it stays visible.
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isFalse);
+      expect(dayNumbersRowVisible(range), isTrue);
+    });
+
+    test('span 0.30 — mucus joins on the boundary, M still hidden', () {
       final range = TemperatureRange(min: 37.7, max: 38.0);
       expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isFalse);
+      expect(dayNumbersRowVisible(range), isTrue);
+    });
+
+    test('span 0.40 — M joins on the boundary: every row visible', () {
+      final range = TemperatureRange(min: 37.6, max: 38.0);
+      expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isTrue);
+      expect(dayNumbersRowVisible(range), isTrue);
+    });
+
+    test('just below a span of 0.10 everything top-anchored hides', () {
+      final range = TemperatureRange(min: 37.91, max: 38.0);
+      expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isFalse);
+    });
+
+    test('the peak dot hides just below span 0.20 — its own row, alone', () {
+      final range = TemperatureRange(min: 37.81, max: 38.0);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isFalse);
       expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
     });
 
-    test('rows hide independently — a hand-built mixed case', () {
-      // Same 0.3 span as above but at the window floor: hiding is
+    test('rows hide independently — a hand-built mixed case at the floor', () {
+      // Same 0.4 span as above but at the window floor: hiding is
       // min-anchored, not a rule pinned to one absolute scale position.
-      final range = TemperatureRange(min: 34.0, max: 34.3);
+      final range = TemperatureRange(min: 34.0, max: 34.4);
       expect(chartMarkRowVisible(sexRowCenterOffsetK, range), isTrue);
-      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isFalse);
+      expect(chartMarkRowVisible(peakDotCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mucusRowCenterOffsetK, range), isTrue);
+      expect(chartMarkRowVisible(mRowCenterOffsetK, range), isTrue);
+      expect(dayNumbersRowVisible(range), isTrue);
+    });
+  });
+
+  group('dayNumbersRowVisible — bottom-anchored numbers rule', () {
+    test('a span below 0.10 hides the numbers row', () {
+      expect(
+        dayNumbersRowVisible(TemperatureRange(min: 37.91, max: 38.0)),
+        isFalse,
+      );
+      // Not pinned to one absolute position.
+      expect(
+        dayNumbersRowVisible(TemperatureRange(min: 36.0, max: 36.09)),
+        isFalse,
+      );
+    });
+
+    test(
+      'a span of exactly 0.10 keeps the row (boundary equality visible)',
+      () {
+        expect(
+          dayNumbersRowVisible(TemperatureRange(min: 37.9, max: 38.0)),
+          isTrue,
+        );
+        expect(
+          dayNumbersRowVisible(TemperatureRange(min: 34.0, max: 34.1)),
+          isTrue,
+        );
+      },
+    );
+
+    test('every wider span keeps the row visible', () {
+      expect(dayNumbersRowVisible(TemperatureRange.defaults), isTrue);
+      expect(
+        dayNumbersRowVisible(
+          TemperatureRange(
+            min: TemperatureRange.windowLower,
+            max: TemperatureRange.windowUpper,
+          ),
+        ),
+        isTrue,
+      );
     });
   });
 }

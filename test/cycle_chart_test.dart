@@ -50,8 +50,8 @@ import 'support/viewport.dart';
 
 // Widget tests of the cycle chart's grid alignment invariant: day i's
 // temperature dot lands exactly at the horizontal CENTER of its day column
-// — the same center the day-label row, the signal rows and the evaluation
-// marks row use. The chart block's scroll content holds ONLY the day
+// — the same center the day-label row and the signal rows use. The chart
+// block's scroll content holds ONLY the day
 // columns (the temperature scale and the corner prototypes live in the
 // frozen left rail outside the scroll), so column i's cell is centered at
 // (i + 0.5) * cellWidth from the content's left edge; the chart's x domain
@@ -234,8 +234,9 @@ Widget _disturbanceHarness({
 // ADR-0001): the user places the mucus-peak and first-higher marks; the UI
 // derives and renders the candidate circles/arrows (kind decided PER
 // CANDIDATE: arrows at or before the peak day, circles strictly after — R4),
-// the solid peak dot in the mucus row, the 1–6 low numbering and the
-// baseline SEGMENT (low #6 to the last marked candidate — R10). Derived
+// the solid peak dot in its own in-plot row, the 1–6 low numbering inside
+// the plot's bottom edge and the baseline SEGMENT (low #6 to the last
+// marked candidate — R10). Derived
 // artifacts are computed at render time only — these tests pin how the
 // artifacts of lib/domain/evaluation.dart surface on the chart.
 //
@@ -262,6 +263,7 @@ final _marks = evaluationScenarioMarks();
 Widget _harness({
   required List<DailyEntry> entries,
   required List<CycleMark> marks,
+  TemperatureRange? range,
 }) => MaterialApp(
   theme: ThemeData(
     colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
@@ -274,6 +276,7 @@ Widget _harness({
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
       marksProvider.overrideWith((ref) => Stream.value(marks)),
       selectedDateProvider.overrideWith((ref) => entries.first.date),
+      if (range != null) temperatureRangeProvider.overrideWith((ref) => range),
     ],
     child: const Scaffold(body: ZyklusScreen()),
   ),
@@ -316,17 +319,26 @@ List<LineChartBarData> _suzBars(WidgetTester tester) => chartData(tester)
   return null;
 }
 
-/// The number shown in the marks row under [dayIndex], or null when none.
+/// The in-plot day-number glyph under [dayIndex] carrying [number].
+Finder _dayNumberGlyph(int dayIndex, int number) =>
+    find.byKey(ValueKey('inPlotDayNumber-$dayIndex-$number'));
+
+/// The number rendered in-plot at [dayIndex], or null when none: the
+/// glyphs key their value (`inPlotDayNumber-$index-$n`), so absence is a
+/// prefix sweep.
 String? _numberUnder(WidgetTester tester, int dayIndex) {
-  final texts = tester
-      .widgetList<Text>(
-        find.descendant(
-          of: find.byKey(ValueKey('marksCell-$dayIndex')),
-          matching: find.byType(Text),
-        ),
-      )
-      .toList();
-  return texts.isEmpty ? null : texts.single.data;
+  final prefix = 'inPlotDayNumber-$dayIndex-';
+  final numbers = [
+    for (final widget in tester.widgetList(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith(prefix),
+      ),
+    ))
+      (widget.key! as ValueKey<String>).value.substring(prefix.length),
+  ];
+  return numbers.isEmpty ? null : numbers.single;
 }
 
 /// The in-plot mucus-peak dot of [dayIndex].
@@ -401,8 +413,8 @@ final _firstDayBoundaryMarks = <CycleMark>[
 /// cell's decoration border is a non-uniform Border (right side only),
 /// unlike every glyph's own decoration (uniform Border.all or none). The
 /// recording-row cells key the whole cell (the border Container is a
-/// descendant of the key); the numbering row keys the cell CONTENT —
-/// so its border Container sits ABOVE the key. Both are searched.
+/// descendant of the key), but the in-plot glyphs carry no cell borders.
+/// Both search directions stay.
 Border _cellBorder(WidgetTester tester, int index, String row) {
   final cell = chartCell(index, row);
   final containers = [
@@ -630,15 +642,14 @@ final _rowsEntries = nineDayRowsFixture(day: _rowsDay, withMittelschmerz: true);
 
 const _dayCount = 9;
 
-// The chart block's recording rows, top-down in render order: the top
-// block inside the temperature grid (bleeding, Mittelschmerz M — the
-// mucus and sex observations live inside the plot), then the single
-// below-chart strip in the owner-decided order — measurement time first,
-// the disturbance letters, cervix, pain, and at the very bottom (the
-// paper sheet's remarks home) the note indicator.
+// The chart block's recording rows, top-down in render order: the single
+// top strip row (bleeding), then the single below-chart strip in the
+// owner-decided order — measurement time first, the disturbance letters,
+// cervix, pain, and at the very bottom (the paper sheet's remarks home)
+// the note indicator. The mucus letters, sex Xs, Mittelschmerz M and
+// evaluation numbers render inside the plot (the in-plot glyph section).
 const _signalRows = [
   'bleeding',
-  'mittelschmerz',
   'time',
   'disturbance',
   'cervix',
@@ -672,7 +683,8 @@ Finder _bleedingFills(int index) => find.descendant(
 Widget _rowsHarness({
   required List<DailyEntry> entries,
   Locale locale = const Locale('en'),
-}) => chartHarness(entries: entries, locale: locale);
+  TemperatureRange? range,
+}) => chartHarness(entries: entries, locale: locale, temperatureRange: range);
 
 // Widget tests of the temperature curve's connectivity and interruption
 // rendering: the line connects two temperatures ONLY when their calendar
@@ -745,7 +757,7 @@ Widget _temperatureHarness({
 // the sex time slots (one X glyph per SET SexTiming bit, drawn at
 // that slot's third of the day column — multiple bits render multiple X
 // marks), and the letter-coded pain flags B (breast, in the pain row) and
-// M (Mittelschmerz, in its own row beneath the mucus row). Days without
+// M (Mittelschmerz, inside the plot below the mucus letters). Days without
 // the respective fact render nothing.
 
 DateTime _timeSexPainDay(int index) => DateTime.utc(2026, 9, 7 + index);
@@ -840,7 +852,7 @@ Widget _weekendHarness({List<DailyEntry>? entries, DateTime? selected}) =>
 // recorded ranges only the days that fit usefully on screen are rendered
 // (the window PARKS with an extra screen-width of margin past the visible
 // edges and is only rebuilt when the visible edge runs into that margin),
-// the whole chart block scrolls horizontally (curve + signal + numbering
+// the whole chart block scrolls horizontally (curve and signal
 // rows together), the FIRST data frame auto-scrolls so the MOST RECENT days
 // fill the viewport, a later entries re-emit never re-jumps (the user's
 // scrolled position survives), and a jump-to-date affordance moves the
@@ -857,8 +869,25 @@ List<DailyEntry> _shortEntries() => [
   for (var i = 0; i < 5; i++) DailyEntry(date: longRangeDay(i), bbtC: 36.5),
 ];
 
+/// A 149-day range whose TAIL evaluates: days 142..147 sit 0.3 °C under
+/// day 148's marked rise, so the six days before the rise carry the 1–6
+/// numbering while the visible front of the range stays number-free.
+List<DailyEntry> _numberedTailEntries() => [
+  ...longRangeEntries(142),
+  for (var i = 0; i < 6; i++)
+    DailyEntry(date: longRangeDay(142 + i), bbtC: 36.2),
+  DailyEntry(date: longRangeDay(148), bbtC: 36.5),
+];
+
+/// The first-higher mark that anchors _numberedTailEntries's low window.
+final _numberedTailMarks = <CycleMark>[
+  CycleMark(
+    date: longRangeDay(148),
+    type: CycleMarkTypes.firstHigherMeasurement,
+  ),
+];
+
 Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
-Finder _marksCell(int index) => find.byKey(ValueKey('marksCell-$index'));
 
 // The chart's day-column geometry at the test viewport (800 wide, 12 body
 // padding on each side): a 60-day range overflows, so columns render at the
@@ -868,10 +897,12 @@ const _columnWidth = 24.0;
 /// The finder for the horizontal scroll view that carries the chart block.
 Widget _windowingHarness({
   required List<DailyEntry> entries,
+  List<CycleMark> marks = const [],
   Stream<List<DailyEntry>>? entriesStream,
   bool emptyHome = false,
 }) => chartHarness(
   entries: entries,
+  marks: marks,
   entriesStream: entriesStream,
   emptyHome: emptyHome,
 );
@@ -914,8 +945,8 @@ void main() {
   // former test/cycle_chart_alignment_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
 
-  testWidgets('day i\'s chart dot lands at the center of its label, marks and '
-      'symbol cell', (tester) async {
+  testWidgets('day i\'s chart dot lands at the center of its label and '
+      'signal cells', (tester) async {
     await pumpChart(tester, _alignmentHarness(entries: _alignmentEntries(5)));
 
     for (var i = 0; i < 5; i++) {
@@ -929,23 +960,9 @@ void main() {
       );
       expect(
         dotX,
-        closeTo(_cellCenterX(tester, 'mittelschmerzCell-$i'), 0.5),
-        reason:
-            'day $i: the Mittelschmerz row keeps the shared column '
-            'center',
-      );
-      expect(
-        dotX,
         closeTo(_cellCenterX(tester, 'dayLabel-$i'), 0.5),
         reason:
             'day $i: the chart dot must sit at the day label cell\'s '
-            'horizontal center',
-      );
-      expect(
-        dotX,
-        closeTo(_cellCenterX(tester, 'marksCell-$i'), 0.5),
-        reason:
-            'day $i: the chart dot must sit at the marks cell\'s '
             'horizontal center',
       );
       // The below-chart strip's rows keep the shared center too (their
@@ -1806,7 +1823,7 @@ void main() {
     });
 
     testWidgets('the peak renders as a solid dot INSIDE the plot, at the '
-        '0.25 K pitch above the day\'s letter', (tester) async {
+        'peak row\'s own $peakDotCenterOffsetK K pitch', (tester) async {
       await pumpChart(
         tester,
         _harness(entries: _evaluationEntries, marks: _marks),
@@ -1829,18 +1846,19 @@ void main() {
         reason: 'the peak belongs to the mucus color family',
       );
 
-      // The dot sits at the peak-dot row pitch: 0.25 K below the scale max,
-      // pixel-y via the shared linear value->pixel mapping.
+      // The dot sits at the peak-dot row's OWN pitch below the scale max —
+      // decoupled from the letters row — pixel-y via the shared linear
+      // value->pixel mapping.
       final plot = tester.getRect(find.byType(LineChart));
       final data = chartData(tester);
       final span = data.maxY - data.minY;
-      final expectedY = plot.top + 0.25 / span * plot.height;
+      final expectedY = plot.top + peakDotCenterOffsetK / span * plot.height;
       expect(
         tester.getRect(_peakDot(6)).center.dy,
         closeTo(expectedY, 0.5),
         reason:
-            'the peak dot pins at the 0.25 K pitch, like the day\'s '
-            'letter\'s row above it',
+            'the peak dot pins at the peak row\'s own pitch, '
+            'above the letters row',
       );
     });
 
@@ -2031,8 +2049,8 @@ void main() {
   });
 
   group('numbering', () {
-    testWidgets('the six low days carry 1–6, counted back from the first '
-        'higher', (tester) async {
+    testWidgets('the six low days carry 1–6 inside the plot, counted back '
+        'from the first higher', (tester) async {
       await pumpChart(
         tester,
         _harness(entries: _evaluationEntries, marks: _marks),
@@ -2057,6 +2075,68 @@ void main() {
         isNull,
         reason: '9/14: the first higher itself is not a low',
       );
+    });
+
+    testWidgets('the numbers render in the primary color, bold and small', (
+      tester,
+    ) async {
+      await pumpChart(
+        tester,
+        _harness(entries: _evaluationEntries, marks: _marks),
+      );
+
+      final ink = tester.widget<Text>(_dayNumberGlyph(7, 1)).style!;
+      expect(ink.color, chartScheme(tester).primary);
+      expect(ink.fontWeight, FontWeight.bold);
+      expect(ink.fontSize, 9);
+    });
+
+    testWidgets('a surface-colored halo layer renders behind the number '
+        'ink at the same spot', (tester) async {
+      await pumpChart(
+        tester,
+        _harness(entries: _evaluationEntries, marks: _marks),
+      );
+
+      final halo = find.byKey(const ValueKey('inPlotHaloDayNumber-7-1'));
+      expect(halo, findsOneWidget, reason: 'one halo layer behind the ink');
+      expect(
+        tester.getRect(halo).center,
+        tester.getRect(_dayNumberGlyph(7, 1)).center,
+        reason: 'the halo is centered exactly behind its ink glyph',
+      );
+    });
+
+    testWidgets('the numbers sit at the plot\'s bottom edge (min + 0.05) '
+        'and center under their day column', (tester) async {
+      await pumpChart(
+        tester,
+        _harness(entries: _evaluationEntries, marks: _marks),
+      );
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final data = chartData(tester);
+      final span = data.maxY - data.minY;
+      final expectedY =
+          plot.top +
+          (data.maxY - (data.minY + dayNumbersRowCenterOffsetK)) /
+              span *
+              plot.height;
+      for (var i = 2; i <= 7; i++) {
+        final glyph = tester.getRect(
+          find.byKey(ValueKey('inPlotDayNumber-$i-${8 - i}')),
+        );
+        expect(
+          glyph.center.dy,
+          closeTo(expectedY, 0.5),
+          reason: 'day $i: the number pins at the bottom edge margin',
+        );
+        expect(
+          glyph.center.dx,
+          closeTo(_dotX(tester, i), 1),
+          reason: 'day $i: the number centers under its day column',
+        );
+      }
     });
   });
 
@@ -2241,10 +2321,11 @@ void main() {
   group('SUZ marks render (user-placed only)', () {
     // The glyph's top anchoring: the bar hangs DOWN from the chart's top
     // border by a fixed °C drop and the arrow anchors just below that
-    // border, so the whole glyph sits below the sex row above the plot.
-    // The two pinned values (hang span 0.5 °C, arrow inset 0.25 °C) are
-    // owner-eyeball rendering details — update a pin together with its
-    // named constant in lib/ui/cycle.dart.
+    // border, so the whole glyph sits inside the top rows of the plot.
+    // The two pinned values (suzBarHangSpanDegrees /
+    // suzArrowTopInsetDegrees from suz_glyph.dart, shared with the PDF
+    // export) are owner-eyeball rendering details — the tests pin them
+    // through the named constants so bar/glyph/PDF stay in lockstep.
     testWidgets('a suzEvening mark renders a vertical bar hanging from the '
         'chart\'s top border at the column middle, plus a right-pointing '
         'arrow whose base starts at the bar near the top', (tester) async {
@@ -2279,10 +2360,10 @@ void main() {
       );
       expect(
         bar.spots.last.y,
-        data.maxY - 0.5,
+        data.maxY - suzBarHangSpanDegrees,
         reason:
-            'the bar spans a fixed 0.5 °C drop from the top '
-            '(owner-eyeball value, pinned here)',
+            'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
+            'the top (owner-eyeball value, pinned here)',
       );
       expect(
         bar.color,
@@ -2301,10 +2382,11 @@ void main() {
       expect(spot.x, 10.0, reason: 'the arrow base starts at the bar');
       expect(
         spot.y,
-        data.maxY - 0.25,
+        data.maxY - suzArrowTopInsetDegrees,
         reason:
-            'the arrow anchors 0.25 °C below the top border, inside '
-            'the hung band (owner-eyeball value, pinned here)',
+            'the arrow anchors $suzArrowTopInsetDegrees °C below the '
+            'top border, inside the hung band (owner-eyeball value, '
+            'pinned here)',
       );
       expect(painter, isA<SuzArrowDotPainter>());
       expect(
@@ -2345,20 +2427,21 @@ void main() {
       );
       expect(
         bar.spots.last.y,
-        data.maxY - 0.5,
+        data.maxY - suzBarHangSpanDegrees,
         reason:
-            'the bar spans a fixed 0.5 °C drop from the top '
-            '(owner-eyeball value, pinned here)',
+            'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
+            'the top (owner-eyeball value, pinned here)',
       );
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull);
       expect(arrow!.$1.x, 8.5, reason: 'the arrow base starts at the bar');
       expect(
         arrow.$1.y,
-        data.maxY - 0.25,
+        data.maxY - suzArrowTopInsetDegrees,
         reason:
-            'the arrow anchors 0.25 °C below the top border, inside '
-            'the hung band (owner-eyeball value, pinned here)',
+            'the arrow anchors $suzArrowTopInsetDegrees °C below the '
+            'top border, inside the hung band (owner-eyeball value, '
+            'pinned here)',
       );
     });
 
@@ -2398,20 +2481,21 @@ void main() {
         );
         expect(
           bar.spots.last.y,
-          data.maxY - 0.5,
+          data.maxY - suzBarHangSpanDegrees,
           reason:
-              'the bar spans a fixed 0.5 °C drop from the top '
-              '(owner-eyeball value, pinned here)',
+              'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
+              'the top (owner-eyeball value, pinned here)',
         );
         final arrow = _suzArrowSpot(tester);
         expect(arrow, isNotNull);
         expect(arrow!.$1.x, -0.5, reason: 'the arrow base starts at the bar');
         expect(
           arrow.$1.y,
-          data.maxY - 0.25,
+          data.maxY - suzArrowTopInsetDegrees,
           reason:
-              'the arrow anchors 0.25 °C below the top border, inside '
-              'the hung band (owner-eyeball value, pinned here)',
+              'the arrow anchors $suzArrowTopInsetDegrees °C below the '
+              'top border, inside the hung band (owner-eyeball value, '
+              'pinned here)',
         );
       },
     );
@@ -2760,7 +2844,7 @@ void main() {
       // border on the cell before the new cycle. (The chart's extra
       // separator line would sit exactly at the domain's left edge x =
       // −0.5, where its 2 px stroke clamps outside the plot.)
-      const edgeThickRows = ['bleeding', 'cervix', 'pain', 'time', 'marks'];
+      const edgeThickRows = ['bleeding', 'cervix', 'pain', 'time'];
       for (final row in edgeThickRows) {
         final border = _cellBorder(tester, 0, row);
         expect(
@@ -3718,7 +3802,6 @@ void main() {
 
       const rows = [
         'bleeding',
-        'mittelschmerz',
         'cervix',
         'pain',
         'disturbance',
@@ -3757,20 +3840,15 @@ void main() {
         );
 
         // The row name stays attached to the glyph for screen readers and
-        // long-press: a tooltip renders in the rail (the mucus glyph adds
-        // its own cheat-sheet one to the row-name tooltip).
-        final tooltips = tester
-            .widgetList<Tooltip>(
-              find.descendant(of: corner, matching: find.byType(Tooltip)),
-            )
-            .length;
+        // long-press: a tooltip renders in the rail.
         expect(
-          tooltips,
-          row == 'mucus' ? 2 : 1,
-          reason:
-              "row $row's rail glyph keeps "
-              '${row == 'mucus' ? 'two' : 'one'} tooltip${row == 'mucus' ? 's' : ''}'
-              '${row == 'mucus' ? ' (row-name plus the glyph cheat-sheet one)' : ' (row-name)'}',
+          tester
+              .widgetList<Tooltip>(
+                find.descendant(of: corner, matching: find.byType(Tooltip)),
+              )
+              .length,
+          1,
+          reason: 'row $row\'s rail glyph keeps its row-name tooltip',
         );
       }
     });
@@ -4057,22 +4135,20 @@ void main() {
   // former test/cycle_chart_rows_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
 
-  group('paper layout: bleeding and M at the top of the temperature block', () {
-    testWidgets('the top signal rows render INSIDE the chart block above the '
-        'curve; cervix, pain and time stay below it', (tester) async {
+  group('paper layout: bleeding is the one top strip row', () {
+    testWidgets('bleeding is the ONLY top strip row, above the curve; '
+        'cervix, pain and time stay below the block', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
       final chartTop = tester.getRect(find.byType(LineChart)).top;
       final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
-      for (final row in ['bleeding', 'mittelschmerz']) {
-        expect(
-          tester.getRect(chartCell(0, row)).top,
-          lessThan(chartTop),
-          reason:
-              'the $row row renders in the TOP of the temperature '
-              'block, above the curve (paper sheet)',
-        );
-      }
+      expect(
+        tester.getRect(chartCell(0, 'bleeding')).top,
+        lessThan(chartTop),
+        reason:
+            'the bleeding row renders in the TOP of the temperature '
+            'block, above the curve (paper sheet)',
+      );
       for (final row in ['time', 'disturbance', 'cervix', 'pain', 'note']) {
         expect(
           tester.getRect(chartCell(0, row)).top,
@@ -4082,25 +4158,39 @@ void main() {
       }
     });
 
-    testWidgets('the rows render in the paper order — bleeding on top, M '
-        '(Mittelschmerz) beneath it — and the below-chart strip follows '
-        'with time first, notes last', (tester) async {
+    testWidgets('no Mittelschmerz row and no numbering row remain on the '
+        'card: no cells, no corners', (tester) async {
+      await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
+
+      for (var i = 0; i < _dayCount; i++) {
+        expect(
+          find.byKey(ValueKey('mittelschmerzCell-$i')),
+          findsNothing,
+          reason: 'the M renders inside the plot (inPlotM), not as a cell',
+        );
+        expect(
+          find.byKey(ValueKey('marksCell-$i')),
+          findsNothing,
+          reason:
+              'the 1–6 numbering renders inside the plot '
+              '(inPlotDayNumber), not as a cell',
+        );
+      }
+      expect(chartCellCorner('mittelschmerz'), findsNothing);
+    });
+
+    testWidgets('the rows render in the paper order — bleeding alone on '
+        'top — and the below-chart strip follows with time first, notes '
+        'last', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
       double top(String row) => tester.getRect(chartCellCorner(row)).top;
-      expect(
-        ['bleeding', 'mittelschmerz'].map(top).toList(),
-        [
-          ...['bleeding', 'mittelschmerz'].map(top),
-        ]..sort(),
-        reason: 'M sits beneath the bleeding row (paper sheet)',
-      );
       // The below-chart strip keeps the owner-decided order (time first,
       // notes last): time, disturbance, cervix, pain, note after the top
       // segment and the curve.
       expect(
         top('time'),
-        greaterThan(tester.getRect(chartCellCorner('mittelschmerz')).bottom),
+        greaterThan(tester.getRect(chartCellCorner('bleeding')).bottom),
         reason:
             'the below-chart strip starts after the top segment '
             'and the curve',
@@ -4111,40 +4201,58 @@ void main() {
       expect(top('note'), greaterThan(top('pain')));
     });
 
-    testWidgets('the Mittelschmerz letter M renders in its own top row; the '
-        'pain row of the below-chart strip carries only B', (tester) async {
+    testWidgets('the Mittelschmerz M renders INSIDE the plot below the '
+        'mucus letters, column-centered; the pain row carries only B', (
+      tester,
+    ) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
-      // Day 4 = the fixture's Mittelschmerz day (beside its mucus S): the
-      // M letter renders in the mittelschmerz cell.
+      final plot = tester.getRect(find.byType(LineChart));
+      final data = chartData(tester);
+      final span = data.maxY - data.minY;
+      final colW = plot.width / _dayCount;
+      final mRect = tester.getRect(find.byKey(const ValueKey('inPlotM-4')));
+      // Day 4 = the fixture's Mittelschmerz day (beside its mucus S).
       expect(
-        chartCellContent(4, 'mittelschmerz', find.text('M')),
-        findsOneWidget,
-        reason: 'Mittelschmerz renders its M letter in its own top row',
+        mRect.center.dy,
+        closeTo(plot.top + mRowCenterOffsetK / span * plot.height, 0.5),
+        reason: 'the M pins at the $mRowCenterOffsetK K pitch',
       );
+      expect(
+        mRect.center.dx,
+        closeTo(plot.left + (4 + 0.5) * colW, 1),
+        reason: 'the M centers in its day column',
+      );
+      expect(
+        mRect.center.dy,
+        greaterThan(
+          tester.getRect(find.byKey(const ValueKey('inPlotMucus-4'))).bottom,
+        ),
+        reason: 'the M renders below the day\'s mucus letters',
+      );
+      expect(
+        find.byKey(const ValueKey('inPlotHaloM-4')),
+        findsOneWidget,
+        reason: 'the M ink carries its halo layer',
+      );
+      // The other days carry no M; the pain row keeps only B.
+      expect(find.byKey(const ValueKey('inPlotM-7')), findsNothing);
       expect(
         chartCellContent(4, 'pain', find.text('M')),
         findsNothing,
-        reason:
-            'the M letter moved out of the strip\'s pain row — '
-            'flagged with TODO(user-review) in the chart code',
+        reason: 'the pain row never carries the M letter',
       );
       expect(
         chartCellContent(7, 'pain', find.text('B')),
         findsOneWidget,
         reason: 'breast pain B stays in the strip\'s pain row',
       );
-      expect(
-        chartCellContent(7, 'mittelschmerz', find.text('M')),
-        findsNothing,
-        reason: 'no M without the Mittelschmerz flag',
-      );
     });
 
-    testWidgets('tapping a top-block cell opens the day sheet', (tester) async {
+    testWidgets('tapping a top-strip cell opens the day sheet', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
-      await tester.tap(chartCell(4, 'mittelschmerz'), warnIfMissed: false);
+      await tester.tap(chartCell(4, 'bleeding'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       expect(cycleDayPanel(), findsOneWidget);
@@ -4152,18 +4260,14 @@ void main() {
       expect(
         sheet.day,
         _rowsDay(4),
-        reason:
-            'the moved top-block Mittelschmerz cell keeps its tap '
-            'behavior',
+        reason: 'the top-strip bleeding cell keeps its tap behavior',
       );
     });
   });
 
   group('per-signal rows', () {
     testWidgets('every signal row renders for every windowed day, in order '
-        'bleeding, mittelschmerz, time, disturbance, cervix, pain, note', (
-      tester,
-    ) async {
+        'bleeding, time, disturbance, cervix, pain, note', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
       for (var i = 0; i < _dayCount; i++) {
@@ -4179,7 +4283,7 @@ void main() {
       }
 
       // Row ORDER: the corner slots appear top-down bleeding .. note
-      // (paper layout: the first two inside the top of the temperature
+      // (paper layout: bleeding alone inside the top of the temperature
       // block, the rest in the below-chart strip, time first).
       final corners = _signalRows.map(
         (row) => tester.getRect(chartCellCorner(row)),
@@ -4200,7 +4304,6 @@ void main() {
 
       final rowNames = {
         'bleeding': 'Bleeding',
-        'mittelschmerz': 'Mittelschmerz (M)',
         'cervix': 'Cervix',
         'pain': 'Breast pain (B)',
         'disturbance': 'Disturbed measurement',
@@ -4218,13 +4321,9 @@ void main() {
             )
             .map((t) => t.message)
             .toList();
-        // The mucus row's sample is the shared glyph renderer: its own
-        // cheat-sheet tooltip rides along beside the row-name one.
-        expect(
-          tooltips,
-          key == 'mucus' ? contains(value) : [value],
-          reason: 'row $key\'s corner slot carries the localized row name',
-        );
+        expect(tooltips, [
+          value,
+        ], reason: 'row $key\'s corner slot carries the localized row name');
         expect(
           find.descendant(
             of: chartCellCorner(key),
@@ -4239,8 +4338,8 @@ void main() {
         );
       }
 
-      // The sample glyphs: a bleeding box, the Mittelschmerz M, a cervix
-      // letter, and the B pain letter.
+      // The sample glyphs: a bleeding box, a cervix letter, and the B
+      // pain letter.
       expect(
         find.descendant(
           of: chartCellCorner('bleeding'),
@@ -4250,14 +4349,6 @@ void main() {
         reason:
             'the bleeding corner shows the box sample (dotted '
             'spotting, like the row\'s cells render it)',
-      );
-      expect(
-        find.descendant(
-          of: chartCellCorner('mittelschmerz'),
-          matching: find.text('M'),
-        ),
-        findsOneWidget,
-        reason: 'the mittelschmerz corner shows the M sample',
       );
       expect(
         find.descendant(
@@ -4271,8 +4362,8 @@ void main() {
         find.descendant(of: chartCellCorner('pain'), matching: find.text('B')),
         findsOneWidget,
         reason:
-            'the pain corner shows the B sample '
-            '(the Mittelschmerz M has its own row/corner)',
+            'the pain corner shows the B sample (the Mittelschmerz M '
+            'renders inside the plot, not in a rail corner)',
       );
       expect(
         find.descendant(of: chartCellCorner('pain'), matching: find.text('M')),
@@ -4296,7 +4387,6 @@ void main() {
 
       final rowNames = {
         'bleeding': 'Blutung',
-        'mittelschmerz': 'Mittelschmerz (M)',
         'cervix': 'Muttermund',
         'pain': 'Brustschmerz (B)',
         'disturbance': 'Messstörung',
@@ -4313,11 +4403,7 @@ void main() {
             )
             .map((t) => t.message)
             .toList();
-        expect(
-          tooltips,
-          key == 'mucus' ? contains(value) : [value],
-          reason: 'de: row $key is $value',
-        );
+        expect(tooltips, [value], reason: 'de: row $key is $value');
       }
     });
 
@@ -4594,12 +4680,13 @@ void main() {
   });
 
   // ═══════════ in-plot signal glyphs ═══════════
-  // The raw sex/mucus observations and the mucus peak render INSIDE the
-  // temperature plot (mapped by the pure layer in lib/ui/chart_marks.dart)
-  // — in the day's column, at the row pitches −0.15 K (sex X), −0.25 K
-  // (peak dot) and −0.35 K (mucus letter) below the scale max, keyed
-  // `inPlot*` per day. The top strip carries only bleeding and
-  // Mittelschmerz (see the rows section).
+  // The raw sex/mucus observations, the mucus peak and the Mittelschmerz M
+  // render INSIDE the temperature plot (mapped by the pure layer in
+  // lib/ui/chart_marks.dart) — in the day's column, at the row pitches
+  // −0.05 K (sex X), −0.15 K (peak dot), −0.25 K (mucus letter) and −0.35 K
+  // (M) below the scale max, keyed `inPlot*` per day; every ink glyph
+  // carries a `inPlotHalo*` stroke pass behind it. The top strip carries
+  // only bleeding (see the rows section).
 
   DateTime inPlotDay(int index) => DateTime.utc(2026, 9, 7 + index);
 
@@ -4695,13 +4782,13 @@ void main() {
     );
     expect(
       tester.getRect(find.byKey(const ValueKey('inPlotPeakDot-0'))).center.dy,
-      closeTo(expectedCenterY(0.25), 0.5),
-      reason: 'the peak dot pins at the 0.25 K pitch, above the letter',
+      closeTo(expectedCenterY(peakDotCenterOffsetK), 0.5),
+      reason: 'the peak dot pins at its own row pitch, above the letter',
     );
     expect(
       tester.getRect(find.byKey(const ValueKey('inPlotMucus-0'))).center.dy,
-      closeTo(expectedCenterY(0.35), 0.5),
-      reason: 'the mucus letter pins at the 0.35 K pitch',
+      closeTo(expectedCenterY(mucusRowCenterOffsetK), 0.5),
+      reason: 'the mucus letter pins at the letters row pitch',
     );
 
     final fractions = {'start': 1 / 6, 'middle': 0.5, 'end': 5 / 6};
@@ -4713,13 +4800,39 @@ void main() {
       );
       expect(
         tester.getRect(find.byKey(ValueKey('inPlotSex-1-$key'))).center.dy,
-        closeTo(expectedCenterY(0.15), 0.5),
-        reason: 'the sex X pins at the 0.15 K pitch',
+        closeTo(expectedCenterY(sexRowCenterOffsetK), 0.5),
+        reason: 'the sex X pins at the topmost glyph row pitch',
       );
     }
     expect(
       tester.getRect(find.byKey(const ValueKey('inPlotSex-2-start'))).center.dx,
       closeTo(plot.left + (2 + 1 / 6) * colW, 1),
+    );
+  });
+
+  testWidgets('a surface-colored halo layer renders behind the sex, mucus '
+      'and peak-dot glyphs, exactly centered', (tester) async {
+    await pumpChart(tester, inPlotHarness());
+
+    for (final haloKey in const [
+      'inPlotHaloSex-2-start',
+      'inPlotHaloMucus-0',
+      'inPlotHaloPeakDot-0',
+    ]) {
+      final halo = find.byKey(ValueKey(haloKey));
+      expect(halo, findsOneWidget, reason: '$haloKey renders behind its ink');
+    }
+    expect(
+      tester.getRect(find.byKey(const ValueKey('inPlotHaloPeakDot-0'))).center,
+      tester.getRect(_peakDot(0)).center,
+      reason: 'the dot\'s halo backing sits exactly behind the dot',
+    );
+    expect(
+      tester
+          .getRect(find.byKey(const ValueKey('inPlotHaloSex-2-start')))
+          .center,
+      tester.getRect(find.byKey(const ValueKey('inPlotSex-2-start'))).center,
+      reason: 'the X halo sits exactly behind the ink',
     );
   });
 
@@ -4765,8 +4878,8 @@ void main() {
     );
   });
 
-  testWidgets('a narrow settings range hides the mucus letter row and its '
-      'peak dot — the sex row hides independently', (tester) async {
+  testWidgets('a span-0.20 range keeps the sex row AND the peak dot '
+      '(decoupled rows) and hides the mucus letters', (tester) async {
     await pumpChart(
       tester,
       inPlotHarness(range: const TemperatureRange(min: 37.8, max: 38.0)),
@@ -4777,12 +4890,14 @@ void main() {
       findsNothing,
       reason: 'the 0.2 K span leaves no room for the letter row',
     );
+    expect(find.byKey(const ValueKey('inPlotMucus-3')), findsNothing);
     expect(
       _peakDot(0),
-      findsNothing,
-      reason: 'the peak dot hides together with the mucus band',
+      findsOneWidget,
+      reason:
+          'the peak dot is its own row: at span 0.20 its center lands '
+          'exactly on the bottom margin — visible',
     );
-    expect(find.byKey(const ValueKey('inPlotMucus-3')), findsNothing);
     for (final timing in SexTiming.values) {
       expect(
         find.byKey(ValueKey('inPlotSex-1-${timing.name}')),
@@ -4790,6 +4905,108 @@ void main() {
         reason: 'the $timing X stays — the sex row hides independently',
       );
     }
+  });
+
+  testWidgets('at the 0.10 boundary only the sex row (top margin) stays '
+      'visible; below it every top row hides', (tester) async {
+    // min + 0.05 = 37.95, max − 0.05 = 37.95 at the span-0.10 boundary:
+    // the sex row's center lands exactly on the margin (visible), the
+    // peak dot one 0.1-gap below it does not.
+    await pumpChart(
+      tester,
+      inPlotHarness(range: const TemperatureRange(min: 37.9, max: 38.0)),
+    );
+
+    for (final timing in SexTiming.values) {
+      expect(
+        find.byKey(ValueKey('inPlotSex-1-${timing.name}')),
+        findsOneWidget,
+        reason: 'the $timing X stays at the boundary equality',
+      );
+    }
+    expect(_peakDot(0), findsNothing);
+    expect(find.byKey(const ValueKey('inPlotMucus-0')), findsNothing);
+    expect(find.byKey(const ValueKey('inPlotMucus-3')), findsNothing);
+  });
+
+  testWidgets('a span-0.30 range shows the mucus letters at their boundary '
+      'but still hides the M row below', (tester) async {
+    await pumpChart(
+      tester,
+      _rowsHarness(
+        entries: _rowsEntries,
+        range: const TemperatureRange(min: 37.7, max: 38.0),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('inPlotMucus-4')),
+      findsOneWidget,
+      reason: 'the letters row lands exactly on the bottom margin — visible',
+    );
+    expect(
+      find.byKey(const ValueKey('inPlotM-4')),
+      findsNothing,
+      reason: 'the 0.3 K span leaves no room for the M row',
+    );
+  });
+
+  testWidgets('at the 0.40 boundary the M row appears', (tester) async {
+    await pumpChart(
+      tester,
+      _rowsHarness(
+        entries: _rowsEntries,
+        range: const TemperatureRange(min: 37.6, max: 38.0),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('inPlotM-4')),
+      findsOneWidget,
+      reason: 'the M row lands exactly on the bottom margin — visible',
+    );
+  });
+
+  testWidgets('the bottom-anchored day numbers hide when the span drops '
+      'below 0.10 and stay visible at the boundary', (tester) async {
+    // Numbers hidden: the center at min + 0.05 = 36.05 exceeds max − 0.05
+    // = 36.03 when the span is 0.08.
+    await pumpChart(
+      tester,
+      _harness(
+        entries: _evaluationEntries,
+        marks: _marks,
+        range: const TemperatureRange(min: 36.0, max: 36.08),
+      ),
+    );
+    for (var i = 0; i < _evaluationEntries.length; i++) {
+      expect(
+        _numberUnder(tester, i),
+        isNull,
+        reason: 'day $i: the 0.08 K span hides the numbers row',
+      );
+    }
+
+    // Boundary span 0.10: the center at min + 0.05 = max − 0.05 — visible.
+    // Remount the app per iteration: a same-shaped re-pump would only
+    // update the const-canonicalized subtree in place and keep the old
+    // provider range.
+    await pumpChart(
+      tester,
+      KeyedSubtree(
+        key: UniqueKey(),
+        child: _harness(
+          entries: _evaluationEntries,
+          marks: _marks,
+          range: const TemperatureRange(min: 36.0, max: 36.1),
+        ),
+      ),
+    );
+    expect(
+      _numberUnder(tester, 7),
+      '1',
+      reason: 'the numbers row reads the boundary equality as visible',
+    );
   });
 
   testWidgets('the mucus and sex signal rows are gone: no day cells, no '
@@ -4823,9 +5040,9 @@ void main() {
           'in-plot as inPlotPeakDot-*',
     );
 
-    // The complete set of in-plot keys: the fixture's only recorded
-    // observations are day 4's S+EW mucus and day 6's start-slot sex —
-    // no Mittelschmerz letter and no exclusion marks ever reach the plot.
+    // The complete set of in-plot keys: the fixture's recorded
+    // observations are day 4's S+EW mucus plus its Mittelschmerz M and
+    // day 6's start-slot sex — no exclusion marks render in the plot.
     final inPlotKeys = tester
         .widgetList(
           find.byWidgetPredicate(
@@ -4838,9 +5055,16 @@ void main() {
         .toSet();
     expect(
       inPlotKeys,
-      {'inPlotMucus-4', 'inPlotSex-6-start'},
+      {
+        'inPlotMucus-4',
+        'inPlotHaloMucus-4',
+        'inPlotM-4',
+        'inPlotHaloM-4',
+        'inPlotSex-6-start',
+        'inPlotHaloSex-6-start',
+      },
       reason:
-          'only the mucus letters, the X marks and the peak dot '
+          'only the mucus letters, the M, the X marks and their halos '
           'render in the plot',
     );
   });
@@ -5884,8 +6108,8 @@ void main() {
     );
   });
 
-  testWidgets('pain renders B in its row; Mittelschmerz renders M in its '
-      'own top row', (tester) async {
+  testWidgets('pain renders B in its row; Mittelschmerz renders M inside '
+      'the plot', (tester) async {
     await pumpChart(
       tester,
       _timeSexPainHarness(entries: _timeSexPainEntries()),
@@ -5899,21 +6123,17 @@ void main() {
     expect(
       chartCellContent(3, 'pain', find.text('M')),
       findsNothing,
-      reason:
-          'no Mittelschmerz letter without the flag — and the M '
-          'letter home is its own row anyway',
+      reason: 'no Mittelschmerz letter without the flag',
     );
     expect(
-      chartCellContent(4, 'mittelschmerz', find.text('M')),
+      find.byKey(const ValueKey('inPlotM-4')),
       findsOneWidget,
-      reason:
-          'Mittelschmerz shows the M letter in its own top row '
-          '(flagged TODO(user-review) in the chart code)',
+      reason: 'Mittelschmerz shows the M letter inside the plot',
     );
     expect(
       chartCellContent(4, 'pain', find.text('M')),
       findsNothing,
-      reason: 'the M letter no longer renders in the pain row',
+      reason: 'the pain row never carries the M letter',
     );
     expect(
       chartCellContent(4, 'pain', find.text('B')),
@@ -5921,20 +6141,17 @@ void main() {
       reason: 'no breast letter without the flag',
     );
     expect(chartCellContent(5, 'pain', find.text('B')), findsOneWidget);
-    expect(
-      chartCellContent(5, 'mittelschmerz', find.text('M')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('inPlotM-5')), findsOneWidget);
     expect(
       chartCellContent(6, 'pain', find.text('B')),
       findsNothing,
       reason: 'a plain day shows no pain letter',
     );
-    expect(chartCellContent(6, 'mittelschmerz', find.text('M')), findsNothing);
+    expect(find.byKey(const ValueKey('inPlotM-6')), findsNothing);
   });
 
   testWidgets('a combined day carries the sex X marks alongside both pain '
-      'letters (B in the pain row, M in the top strip)', (tester) async {
+      'letters (B in the pain row, M inside the plot)', (tester) async {
     await pumpChart(
       tester,
       _timeSexPainHarness(entries: _timeSexPainEntries()),
@@ -5953,9 +6170,9 @@ void main() {
           'row',
     );
     expect(
-      chartCellContent(5, 'mittelschmerz', find.text('M')),
+      find.byKey(const ValueKey('inPlotM-5')),
       findsOneWidget,
-      reason: 'the Mittelschmerz letter renders in its own top row',
+      reason: 'the Mittelschmerz letter renders inside the plot',
     );
   });
 
@@ -6663,69 +6880,79 @@ void main() {
     });
   });
 
-  group('the 1–6 numbering row is windowed like the signal rows', () {
-    testWidgets('only the scroll window\'s numbering cells render', (
+  group('the in-plot day numbers are windowed like the in-plot glyphs', () {
+    testWidgets('only the scroll window\'s number glyphs render', (
       tester,
     ) async {
-      await pumpChart(tester, _windowingHarness(entries: _manyEntries()));
+      await pumpChart(
+        tester,
+        _windowingHarness(
+          entries: _numberedTailEntries(),
+          marks: _numberedTailMarks,
+        ),
+      );
 
-      // The initial auto-scroll parks the window at the newest days: only
-      // the window's numbering cells are built — a 150-day range must not
-      // keep one cell per calendar day alive off-screen.
+      // The initial auto-scroll parks the window at the newest days: the
+      // tail's low days (indexes 142..147) sit inside the parked window
+      // and the earliest days are outside it.
       expect(
-        _marksCell(149),
+        _dayNumberGlyph(142, 6),
         findsOneWidget,
         reason: 'the newest days fill the window after the first frame',
       );
       expect(
-        _marksCell(0),
-        findsNothing,
-        reason: 'the earliest days are outside the initial window',
+        _numberUnder(tester, 0),
+        isNull,
+        reason: 'the earliest days carry no number',
       );
 
-      // Drag back to the earliest days: the numbering window follows the
-      // scroll, like the signal rows it mirrors.
+      // Drag back to the earliest days: the number glyphs follow the
+      // built window, like every other in-plot glyph.
       await tester.drag(chartScrollView(), const Offset(3000, 0));
       await tester.pumpAndSettle();
       expect(
-        _marksCell(0),
-        findsOneWidget,
-        reason: 'the numbering cells appear once their days scroll in',
-      );
-      expect(
-        _marksCell(149),
-        findsNothing,
-        reason: 'the newest days are outside the window after the drag',
+        _numberUnder(tester, 142),
+        isNull,
+        reason: 'the numbered tail leaves the built window after the drag',
       );
     });
 
     testWidgets(
-      'the windowed numbering cells keep their global column positions',
+      'the windowed number glyphs keep their global column positions',
       (tester) async {
-        await pumpChart(tester, _windowingHarness(entries: _manyEntries()));
+        await pumpChart(
+          tester,
+          _windowingHarness(
+            entries: _numberedTailEntries(),
+            marks: _numberedTailMarks,
+          ),
+        );
 
-        // The window spacer (the signal rows' pattern) keeps cell i at its
-        // global column position: wherever the window starts, the numbering
-        // cell of a day sits exactly at the same column as that day's
-        // signal-row cell.
-        void expectSharedColumn(int index) {
-          final marksX = tester.getTopLeft(_marksCell(index)).dx;
-          final bleedingX = tester.getTopLeft(_bleedingCell(index)).dx;
+        // The window spacer keeps glyph i at its global column position:
+        // wherever the window starts, a day's number centers exactly at
+        // that day's signal-row cell center.
+        void expectSharedColumn(int index, int number) {
+          final numberX = tester
+              .getRect(_dayNumberGlyph(index, number))
+              .center
+              .dx;
+          final bleedingX = tester.getRect(_bleedingCell(index)).center.dx;
           expect(
-            marksX,
+            numberX,
             closeTo(bleedingX, 0.5),
             reason:
-                'numbering cell $index keeps its global column position '
-                '(window spacer, like the signal rows)',
+                'number glyph $index keeps its global column position '
+                '(window spacer, like the in-plot glyphs)',
           );
         }
 
         // The initial window sits at the newest days ...
-        expectSharedColumn(130);
-        // ... and the dragged-to window at the earliest days.
+        expectSharedColumn(142, 6);
+        // ... and the dragged-to window at the earliest days carries no
+        // number glyphs to align.
         await tester.drag(chartScrollView(), const Offset(3000, 0));
         await tester.pumpAndSettle();
-        expectSharedColumn(10);
+        expect(_numberUnder(tester, 142), isNull);
       },
     );
   });
@@ -6978,12 +7205,12 @@ void main() {
       reason: "today's column renders, with its day-of-month label",
     );
     expect(
-      _marksCell(19),
+      find.byKey(const ValueKey('bleedingCell-19')),
       findsNothing,
       reason: 'the span ends at today, not past it',
     );
     expect(
-      _marksCell(15),
+      find.byKey(const ValueKey('bleedingCell-15')),
       findsOneWidget,
       reason:
           'the placeholder days render tap targets, so the extended '

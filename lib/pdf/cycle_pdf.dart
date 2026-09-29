@@ -7,23 +7,26 @@
 //   ("Blatt k/n").
 // - PAPER-FORM SCAFFOLD: left rail with rail legends, 40 day columns, the
 //   row stack top-down: day numbers (calendar cycle days), dates (month +
-//   year on every first-of-month column), the recording rows ABOVE the
-//   plot (bleeding bands, the Mittelschmerz M), the CURVE BLOCK (plot +
-//   the 1–6 low-number row), the numeric temperature values below the plot
-//   (out-of-range readings lose no data), the recorded measurement times
-//   (vertical, narrow-column convention), then disturbance/cervix/pain and
-//   the rotated notes area. Columns the window does not track stay empty.
-//   The sex X marks, the mucus sign letters and the mucus peak dot render
-//   INSIDE the plot (paper-form parity with the cycle tab — no duplicated
-//   recording rows), placed by the shared chart-marks mapper.
-// - The TEMPERATURE CURVE and the evaluation overlay (rings around circled
-//   candidates, arrow-up glyphs hanging clear below their dots, the 1–6
-//   low numbers, the solid peak dot, the user-placed SUZ bar+arrow glyphs)
-//   are painted here from draw lists composed ONCE by lib/pdf/pdf_curve.dart
-//   — this file never re-derives a rule. The computed suzBegins renders as
-//   the suggestion line: a thin solid vertical line plus the rule letter
-//   D/E, visually distinct from the user marks; the chart draws only user
-//   marks, the PDF is for teacher/doctor and adds the line.
+//   year on every first-of-month column), the bleeding bands, the CURVE
+//   BLOCK (the plot with the in-plot glyph row seam), the numeric
+//   temperature values below the plot (out-of-range readings lose no
+//   data), the recorded measurement times (vertical, narrow-column
+//   convention), then disturbance/cervix/pain and the rotated notes area.
+//   Columns the window does not track stay empty. The sex X marks, the
+//   mucus sign letters, the mucus peak dot, the Mittelschmerz M and the
+//   evaluation day numbers render INSIDE the plot (paper-form parity with
+//   the cycle tab — no duplicated recording rows), placed by the shared
+//   chart-marks mapper.
+// - The TEMPERATURE CURVE and the evaluation overlay geometry (rings
+//   around circled candidates, arrow-up glyphs hanging clear below their
+//   dots, the solid peak dot, the user-placed SUZ bar+arrow glyphs) are
+//   painted here from draw lists composed ONCE by lib/pdf/pdf_curve.dart
+//   — this file never re-derives a rule; the overlay's 1–6 low numbers
+//   ride the same draw list onto the in-plot glyph seam. The computed
+//   suzBegins renders as the suggestion line: a thin solid vertical line
+//   plus the rule letter D/E, visually distinct from the user marks; the
+//   chart draws only user marks, the PDF is for teacher/doctor and adds
+//   the line.
 // - INDEX SPACES: the overlay's day indexes are calendar offsets from the
 //   cycle start; lib/pdf/pdf_curve.dart maps them onto the page window's
 //   tracked positions (marks on untracked gap days drop out) and the
@@ -52,8 +55,12 @@ import '../domain/pdf_export_model.dart';
 import '../ui/chart_marks.dart'
     show
         chartDayMarks,
+        chartMarkHaloStrokeWidth,
         chartMarkRowVisible,
+        dayNumbersRowCenterOffsetK,
+        dayNumbersRowVisible,
         mucusRowCenterOffsetK,
+        mRowCenterOffsetK,
         peakDotCenterOffsetK,
         sexGlyphBoxWidth,
         sexRowCenterOffsetK;
@@ -265,12 +272,9 @@ const double _bleedingRowHeight = 12;
 const double _tempValueRowHeight = 12;
 
 /// The curve block's painted plot region (fine scale + curve + overlay
-/// marks + the in-plot glyph rows); the 1–6 numbers band rides inside the
-/// block below it.
+/// marks + the in-plot glyph rows: sex X, mucus letters, peak dot, the
+/// Mittelschmerz M and the evaluation day numbers).
 const double _curvePlotHeight = 185;
-const double _lowNumbersRowHeight = 10;
-
-const double _mittelschmerzRowHeight = 10;
 
 /// The below-plot strip rows.
 const double _timeRowHeight = 15;
@@ -291,6 +295,12 @@ final PdfColor _markAccent = PdfColor.fromInt(0xFF3556A8);
 final PdfColor _bleedingRed = PdfColor.fromInt(0xFFC0392B);
 final PdfColor _gridGray = PdfColor.fromInt(0xFFC4C4C4);
 final PdfColor _ruleGray = PdfColor.fromInt(0xFF8A8A8A);
+
+/// The paper-white the halo backings paint with: a backing erases the ink
+/// behind its glyph — the stand-in for the screen's stroke halo (why a
+/// stroke halo is unavailable: docs/dev-notes.md, "Paper-form PDF
+/// export").
+final PdfColor _paper = PdfColor.fromInt(0xFFFFFFFF);
 
 /// The weekend column band's shade: all-equal LIGHT GRAY — made
 /// print-safe (never a pale COLOR, which would collapse in B/W
@@ -367,10 +377,9 @@ pw.Widget _paperFormGrid({
         _dayNumberRow(cycleStart, windowDays, weekend),
         _dateRow(windowDays.length, windowDays, weekend),
         _bleedingRow(windowDays.length, windowDays, weekend),
-        // The recording rows above the plot: bleeding → Mittelschmerz — the
-        // sex/mucus marks render inside the curve block (paper-form parity
-        // with the cycle tab's in-plot glyph rows).
-        _mittelschmerzRow(windowDays.length, windowDays, weekend),
+        // The strip ends at bleeding: the Mittelschmerz M and the day
+        // numbers render inside the curve block's plot, like the sex/mucus
+        // marks (paper-form parity with the cycle tab's in-plot glyph rows).
         _curveBlock(windowDays, drawing, axis, weekend),
         // The numeric values render BELOW the plot, right above the
         // measured times.
@@ -650,112 +659,113 @@ pw.Widget _tempValueRow(
   );
 }
 
-/// The curve block: the painted plot row (rail = scale labels, day
-/// columns = the painter's canvas + the positioned in-plot glyph seam) and
-/// the plot's 1–6 low-number band below it. The block's boundaries are the
-/// plot's own hairlines.
+/// The curve block: the painted plot row with the in-plot glyph seam (rail
+/// = scale labels, day columns = the painter's canvas + the positioned
+/// glyph widgets). The block's boundaries are the plot's own hairlines.
 pw.Widget _curveBlock(
   List<DailyEntry> windowDays,
   PdfCurveDrawing drawing,
   PdfCurveAxis axis,
   List<int> weekend,
 ) {
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-    children: [
-      pw.Container(
-        height: _curvePlotHeight,
-        decoration: const pw.BoxDecoration(border: pw.Border(top: _hairline)),
-        child: pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-          children: [
-            // The rail: the scale labels positioned exactly at their grid y.
-            pw.SizedBox(
-              width: pdfRailWidth,
-              child: pw.Stack(
-                children: [
-                  for (final label in axis.axisLabels())
-                    pw.Positioned(
-                      left: 2,
-                      right: 3,
-                      top: (axis.yFor(label.value) - 3.4).clamp(
-                        0.0,
-                        _curvePlotHeight - 7,
-                      ),
-                      child: pw.Text(
-                        label.text,
-                        style: _tiny,
-                        textAlign: pw.TextAlign.right,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            pw.Expanded(
-              child: pw.CustomPaint(
-                size: PdfPoint(
-                  pdfGridRightEdge - pdfRailWidth,
-                  _curvePlotHeight,
+  return pw.Container(
+    height: _curvePlotHeight,
+    decoration: const pw.BoxDecoration(border: pw.Border(top: _hairline)),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        // The rail: the scale labels positioned exactly at their grid y.
+        pw.SizedBox(
+          width: pdfRailWidth,
+          child: pw.Stack(
+            children: [
+              for (final label in axis.axisLabels())
+                pw.Positioned(
+                  left: 2,
+                  right: 3,
+                  top: (axis.yFor(label.value) - 3.4).clamp(
+                    0.0,
+                    _curvePlotHeight - 7,
+                  ),
+                  child: pw.Text(
+                    label.text,
+                    style: _tiny,
+                    textAlign: pw.TextAlign.right,
+                  ),
                 ),
-                painter: (canvas, size) => _paintCurveBlock(
-                  canvas,
-                  size.x,
-                  size.y,
-                  drawing,
-                  axis,
-                  weekend,
-                ),
-                child: pw.Stack(
-                  children: [
-                    _inPlotChartMarks(windowDays, drawing, axis),
-                    // The computed SUZ's rule letter rides its line's
-                    // column (a positioned widget above the geometry).
-                    if (drawing.suzLine case final line?)
-                      pw.Positioned(
-                        left: (line.x * pdfColumnWidth - 4).clamp(
-                          0.0,
-                          defaultMaxDaysPerPage * pdfColumnWidth - 8,
-                        ),
-                        top: 0,
-                        child: pw.Text(
-                          line.ruleLetter ?? 'S',
-                          style: _tinyAccent,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-      _lowNumbersRow(windowDays.length, drawing, weekend),
-    ],
+        pw.Expanded(
+          child: pw.CustomPaint(
+            size: PdfPoint(pdfGridRightEdge - pdfRailWidth, _curvePlotHeight),
+            painter: (canvas, size) => _paintCurveBlock(
+              canvas,
+              size.x,
+              size.y,
+              drawing,
+              axis,
+              weekend,
+            ),
+            child: pw.Stack(
+              children: [
+                _inPlotChartMarks(windowDays, drawing, axis),
+                // The computed SUZ's rule letter rides its line's
+                // column (a positioned widget above the geometry).
+                if (drawing.suzLine case final line?)
+                  pw.Positioned(
+                    left: (line.x * pdfColumnWidth - 4).clamp(
+                      0.0,
+                      defaultMaxDaysPerPage * pdfColumnWidth - 8,
+                    ),
+                    top: 0,
+                    child: pw.Text(line.ruleLetter ?? 'S', style: _tinyAccent),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
 /// The in-plot glyph rows on the stack seam: one X per recorded sex timing
 /// at its column slot (1/6 · 1/2 · 5/6), the mucus sign letter (+ the S
-/// quality superscript) centered in the day column, and the peak dot at the
-/// peak day's column center — all placed by the shared mapper
-/// (chartDayMarks). Each row hides independently with the settings range
-/// (chartMarkRowVisible: a narrow range pushes the row's center below the
-/// plot's bottom margin); the peak dot hides with the letter band. The top
-/// offsets sit BELOW the plot top edge: `axis.yFor(value)` runs down from
-/// it (pdf_axis y convention), half the glyph box subtracted to center the
-/// ink.
+/// quality superscript) centered in the day column, the peak dot at the
+/// peak day's column center, the Mittelschmerz M under its column and the
+/// evaluation day numbers — all placed by the shared mapper (chartDayMarks:
+/// the M rides painMittelschmerz, the numbers feed through from
+/// PdfCurveDrawing.lowNumbers). Each row hides independently with the
+/// settings range (chartMarkRowVisible / the numbers' bottom rule
+/// dayNumbersRowVisible: a narrow range pushes a row's center past the plot
+/// edge). The top-anchored rows pitch DOWN from the plot's top edge —
+/// `axis.yFor(value)` runs down from it (pdf_axis y convention), half the
+/// glyph box subtracted to center the ink; the numbers are the one
+/// BOTTOM-anchored row and center on `yFor(min + offset)`.
 pw.Widget _inPlotChartMarks(
   List<DailyEntry> windowDays,
   PdfCurveDrawing drawing,
   PdfCurveAxis axis,
 ) {
   final sexVisible = chartMarkRowVisible(sexRowCenterOffsetK, axis.range);
+  final peakVisible = chartMarkRowVisible(peakDotCenterOffsetK, axis.range);
   final mucusVisible = chartMarkRowVisible(mucusRowCenterOffsetK, axis.range);
-  if (!sexVisible && !mucusVisible) return pw.SizedBox();
+  final mVisible = chartMarkRowVisible(mRowCenterOffsetK, axis.range);
+  final numbersVisible = dayNumbersRowVisible(axis.range);
+  if (!sexVisible &&
+      !peakVisible &&
+      !mucusVisible &&
+      !mVisible &&
+      !numbersVisible) {
+    return pw.SizedBox();
+  }
 
-  final marks = chartDayMarks({
-    for (var i = 0; i < windowDays.length; i++) i: windowDays[i],
-  }, peakIndexes: drawing.peakIndexes);
+  final marks = chartDayMarks(
+    {for (var i = 0; i < windowDays.length; i++) i: windowDays[i]},
+    peakIndexes: drawing.peakIndexes,
+    numbers: drawing.lowNumbers,
+  );
 
   Iterable<pw.Widget> placements() sync* {
     for (var i = 0; i < windowDays.length; i++) {
@@ -763,66 +773,95 @@ pw.Widget _inPlotChartMarks(
       if (record == null) continue;
       if (sexVisible) {
         for (final slot in record.sexSlots) {
-          yield pw.Positioned(
+          yield _haloedSlot(
             left:
                 (i + slot.columnFraction) * pdfColumnWidth -
                 sexGlyphBoxWidth / 2,
+            slotWidth: sexGlyphBoxWidth,
             top:
                 axis.yFor(axis.range.max - sexRowCenterOffsetK) -
                 _glyphBoxHeight / 2,
-            child: pw.SizedBox(
-              width: sexGlyphBoxWidth,
-              height: _glyphBoxHeight,
-              child: pw.Center(child: pw.Text('X', style: _label)),
+            ink: pw.Text('X', style: _label),
+          );
+        }
+      }
+      if (peakVisible && record.mucusPeak) {
+        yield pw.Positioned(
+          left: i * pdfColumnWidth + (pdfColumnWidth - _peakHaloSize) / 2,
+          top:
+              axis.yFor(axis.range.max - peakDotCenterOffsetK) -
+              _peakHaloSize / 2,
+          child: pw.Stack(
+            alignment: pw.Alignment.center,
+            children: [
+              pw.Container(
+                width: _peakHaloSize,
+                height: _peakHaloSize,
+                decoration: pw.BoxDecoration(
+                  color: _paper,
+                  shape: pw.BoxShape.circle,
+                ),
+              ),
+              pw.Container(
+                width: _peakDotSize,
+                height: _peakDotSize,
+                decoration: pw.BoxDecoration(
+                  color: _markAccent,
+                  shape: pw.BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (mucusVisible) {
+        if (record.mucus case final display?) {
+          yield _haloedSlot(
+            left: i * pdfColumnWidth,
+            slotWidth: pdfColumnWidth,
+            top:
+                axis.yFor(axis.range.max - mucusRowCenterOffsetK) -
+                _glyphBoxHeight / 2,
+            haloWidth: _mucusHaloBox,
+            ink: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                // Base glyph + raised superscript: a composed row (pdf's
+                // RichText baseline offset drops the raised token at tiny
+                // sizes).
+                if (display.symbol case final symbol?)
+                  pw.Text(symbol, style: _label),
+                if (display.superscript case final quality?)
+                  pw.Transform.translate(
+                    offset: PdfPoint(0, 2.6),
+                    child: pw.Text(quality, style: _mucusQualityStyle),
+                  ),
+              ],
             ),
           );
         }
       }
-      if (!mucusVisible) continue;
-      if (record.mucus case final display?) {
-        yield pw.Positioned(
+      if (mVisible && record.mittelschmerz) {
+        yield _haloedSlot(
           left: i * pdfColumnWidth,
+          slotWidth: pdfColumnWidth,
           top:
-              axis.yFor(axis.range.max - mucusRowCenterOffsetK) -
+              axis.yFor(axis.range.max - mRowCenterOffsetK) -
               _glyphBoxHeight / 2,
-          child: pw.SizedBox(
-            width: pdfColumnWidth,
-            height: _glyphBoxHeight,
-            child: pw.Center(
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  // Base glyph + raised superscript: a composed row (pdf's
-                  // RichText baseline offset drops the raised token at tiny
-                  // sizes).
-                  if (display.symbol case final symbol?)
-                    pw.Text(symbol, style: _label),
-                  if (display.superscript case final quality?)
-                    pw.Transform.translate(
-                      offset: PdfPoint(0, 2.6),
-                      child: pw.Text(quality, style: _mucusQualityStyle),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          ink: pw.Text('M', style: _label),
         );
       }
-      if (record.mucusPeak) {
-        yield pw.Positioned(
-          left: i * pdfColumnWidth + (pdfColumnWidth - _peakDotSize) / 2,
-          top:
-              axis.yFor(axis.range.max - peakDotCenterOffsetK) -
-              _peakDotSize / 2,
-          child: pw.Container(
-            width: _peakDotSize,
-            height: _peakDotSize,
-            decoration: pw.BoxDecoration(
-              color: _markAccent,
-              shape: pw.BoxShape.circle,
-            ),
-          ),
-        );
+      if (numbersVisible) {
+        if (record.dayNumber case final number?) {
+          yield _haloedSlot(
+            left: i * pdfColumnWidth,
+            slotWidth: pdfColumnWidth,
+            top:
+                axis.yFor(axis.range.min + dayNumbersRowCenterOffsetK) -
+                _glyphBoxHeight / 2,
+            ink: pw.Text('$number', style: _tinyAccent),
+          );
+        }
       }
     }
   }
@@ -830,11 +869,58 @@ pw.Widget _inPlotChartMarks(
   return pw.Stack(children: [...placements()]);
 }
 
+/// One positioned glyph slot: the paper-colored halo box under the ink —
+/// `pw`'s text widgets cannot paint a stroke pass, so the box stands in for
+/// the screen's stroke halo. Box and ink share the slot's center (both are
+/// non-positioned Stack children of the one slot widget), so their
+/// placement cannot drift; the box overprints grid, band and curve ink
+/// locally exactly where a halo would (accepted).
+pw.Widget _haloedSlot({
+  required double left,
+  required double slotWidth,
+  required double top,
+  required pw.Widget ink,
+  double haloWidth = _glyphHaloBox,
+}) {
+  return pw.Positioned(
+    left: left,
+    top: top,
+    child: pw.SizedBox(
+      width: slotWidth,
+      height: _glyphBoxHeight,
+      child: pw.Stack(
+        alignment: pw.Alignment.center,
+        // The raised mucus quality token may poke past the slot — keep it
+        // unclipped.
+        overflow: pw.Overflow.visible,
+        children: [
+          pw.Container(
+            width: haloWidth,
+            height: _glyphBoxHeight,
+            color: _paper,
+          ),
+          ink,
+        ],
+      ),
+    ),
+  );
+}
+
 /// The in-plot glyph box (X / letter cells centered within), pt.
 const double _glyphBoxHeight = 8;
 
 /// The peak dot's diameter, pt.
 const double _peakDotSize = 4.6;
+
+/// The halo behind one small in-plot text glyph (X / M / day number), pt.
+const double _glyphHaloBox = 8;
+
+/// The mucus letter (+ its raised quality token) rides a wider halo box, pt.
+const double _mucusHaloBox = 12;
+
+/// The peak dot's halo circle: the dot outgrown by the shared halo stroke
+/// width on both sides — the screen halo circle's diameter rule.
+const double _peakHaloSize = _peakDotSize + 2 * chartMarkHaloStrokeWidth;
 
 /// The mucus quality tokens ride raised at this smaller size.
 final pw.TextStyle _mucusQualityStyle = const pw.TextStyle(fontSize: 4.8);
@@ -1039,44 +1125,6 @@ void pdfStrokeCircle(PdfGraphics canvas, double x, double y, double radius) {
     ..strokePath();
 }
 
-/// The 1–6 low numbers under their low dots (bold accent; the thin row
-/// keeps them off the plotted dots).
-pw.Widget _lowNumbersRow(
-  int windowDayCount,
-  PdfCurveDrawing drawing,
-  List<int> weekend,
-) {
-  return _paperRow(
-    height: _lowNumbersRowHeight,
-    railCaption: 'Zahl',
-    windowDayCount: windowDayCount,
-    weekend: weekend,
-    cell: (position) {
-      final number = drawing.lowNumbers[position];
-      if (number == null) return null;
-      return pw.Center(child: pw.Text('$number', style: _tinyAccent));
-    },
-  );
-}
-
-/// The Mittelschmerz row: the letter M under its column, above the plot.
-/// TODO(user-review): the exact M home is an owner-eyeball choice — the
-/// paper writes it under the mucus letters.
-pw.Widget _mittelschmerzRow(
-  int windowDayCount,
-  List<DailyEntry> windowDays,
-  List<int> weekend,
-) {
-  return _paperRow(
-    height: _mittelschmerzRowHeight,
-    railCaption: 'Mittelschmerz',
-    windowDayCount: windowDayCount,
-    weekend: weekend,
-    cell: (position) =>
-        _centerLetter(mittelschmerzLetter(windowDays[position]), _label),
-  );
-}
-
 /// The measurement-time row: the recorded time-of-day as a vertical
 /// "HH:mm" (the ~18 pt paper column cannot hold "08:33" lying down).
 pw.Widget _timeRow(
@@ -1151,8 +1199,8 @@ pw.Widget _cervixRow(
   );
 }
 
-/// The pain row: the breast-tenderness letter B (the Mittelschmerz M has
-/// its own row above the plot).
+/// The pain row: the breast-tenderness letter B (the Mittelschmerz M
+/// renders inside the plot — see the in-plot glyph seam).
 pw.Widget _painRow(
   int windowDayCount,
   List<DailyEntry> windowDays,

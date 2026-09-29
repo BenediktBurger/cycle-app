@@ -208,6 +208,12 @@ Layout/design decisions:
 - The curve block has no caption row of its own: the °C lives in every
   scale label, and the temperature naming lives on the below-plot value
   row's rail legend ("Temperatur in °C").
+- The in-plot glyph halo is a paper-colored backing, not a stroke pass:
+  with the pdf package (3.13.1) the text layer leaks the render mode —
+  `setFont` emits the `Tr` operator only for non-fill modes and
+  `drawString` never resets it, so a stroke-mode halo pass would keep
+  stroking every later text on the page. Backing and ink share the
+  slot center, so their placement cannot drift.
 
 ## Drip CSV import format
 

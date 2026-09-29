@@ -3,8 +3,9 @@
 // fill, the cervix/pain letter cells, the disturbance codes and the
 // measurement-time text.
 //
-// The sex X marks and the mucus sign letters are not mapped here: they
-// render inside the plot (see cycle_pdf.dart's in-plot glyph seam),
+// The in-plot glyphs (the sex X marks, the mucus sign letters, the
+// Mittelschmerz M and the evaluation day numbers) are not mapped here:
+// they render inside the plot (see cycle_pdf.dart's in-plot glyph seam),
 // placed by the shared chart-marks mapper, whose mucus letters come
 // straight from mucusDisplay (lib/ui/chart_marks.dart).
 //
@@ -63,17 +64,10 @@ String? cervixLetters(DailyEntry? day) {
 }
 
 /// The pain row's letter cell: 'B' for breast tenderness (the
-/// letter-coded pain option's letter). Mittelschmerz alone on ITS OWN row
-/// beneath the mucus letters ([mittelschmerzLetter]) — two rows, two
-/// letters, never mixed.
+/// letter-coded pain option's letter). The Mittelschmerz M renders inside
+/// the plot (the in-plot glyph seam in cycle_pdf.dart), not here.
 String? painLetter(DailyEntry? day) =>
     day != null && day.painBreast ? 'B' : null;
-
-/// The Mittelschmerz letter cell: 'M' under the column (the paper sheet
-/// writes M beneath the mucus letters; in this export the row sits above
-/// the plot).
-String? mittelschmerzLetter(DailyEntry? day) =>
-    day != null && day.painMittelschmerz ? 'M' : null;
 
 /// The disturbance strip row's stacked letter codes, straight from the
 /// shared vocabulary (one code per set flag; empty on flag-free days).

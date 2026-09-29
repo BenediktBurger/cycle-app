@@ -87,20 +87,15 @@ void main() {
       );
     });
 
-    test('pain letter B (breast) and Mittelschmerz letter M', () {
+    test('pain letter B (breast)', () {
       expect(painLetter(null), isNull);
       expect(painLetter(DailyEntry(date: _d(3, 2), painBreast: true)), 'B');
       expect(
         painLetter(DailyEntry(date: _d(3, 2), painMittelschmerz: true)),
         isNull,
-        reason: 'Mittelschmerz M has its own row above the plot',
-      );
-      expect(mittelschmerzLetter(DailyEntry(date: _d(3, 2))), isNull);
-      expect(
-        mittelschmerzLetter(
-          DailyEntry(date: _d(3, 2), painMittelschmerz: true),
-        ),
-        'M',
+        reason:
+            'the pain row carries only the breast letter; the Mittelschmerz '
+            'M renders inside the plot (the in-plot glyph seam)',
       );
     });
 

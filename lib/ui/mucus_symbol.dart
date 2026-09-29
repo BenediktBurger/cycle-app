@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart' show AppLocalizations;
+import 'chart_marks.dart';
 
 /// Tooltip texts of the mucus surfaces, keyed by the domain values — the
 /// single source the picker chips and the display glyphs read, so their
@@ -67,6 +68,7 @@ final class MucusSymbolText extends StatelessWidget {
     required this.color,
     this.fontSize = 11,
     this.fontWeight = FontWeight.w600,
+    this.strokeColor,
   });
 
   final MucusSign? sign;
@@ -84,6 +86,11 @@ final class MucusSymbolText extends StatelessWidget {
   final double fontSize;
 
   final FontWeight fontWeight;
+
+  /// When set, the whole composite paints as a STROKE pass in this color —
+  /// the halo copy the in-plot glyph rows place behind the ink letter
+  /// (chart_marks.dart's stroke width); all other call sites render ink.
+  final Color? strokeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -115,10 +122,20 @@ final class MucusSymbolText extends StatelessWidget {
       color: color,
       fontWeight: fontWeight,
     );
+    final stroke = strokeColor == null
+        ? null
+        : (Paint()
+            ..color = strokeColor!
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = chartMarkHaloStrokeWidth);
 
     Widget result = Text.rich(
+      // A stroke pass changes the STYLE of every span, never the RICH
+      // structure — the two instances over each other share one geometry.
       TextSpan(
-        style: baseStyle,
+        style: stroke == null
+            ? baseStyle
+            : baseStyle.copyWith(foreground: stroke),
         children: [
           TextSpan(text: symbol),
           if (superscript != null)
@@ -130,7 +147,12 @@ final class MucusSymbolText extends StatelessWidget {
               baseline: TextBaseline.alphabetic,
               child: Text(
                 superscript,
-                style: baseStyle.copyWith(fontSize: fontSize * 0.78),
+                style: stroke == null
+                    ? baseStyle.copyWith(fontSize: fontSize * 0.78)
+                    : baseStyle.copyWith(
+                        fontSize: fontSize * 0.78,
+                        foreground: stroke,
+                      ),
               ),
             ),
         ],

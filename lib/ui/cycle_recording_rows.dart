@@ -4,16 +4,11 @@
 
 part of 'cycle.dart';
 
-/// The top block's grid rows (paper sheet order): bleeding →
-/// Mittelschmerz M. The mucus and sex observations render INSIDE the
-/// temperature plot instead (_InPlotGlyphRows, chart_marks.dart).
-/// TODO(user-review): the M letter's home (own row beneath bleeding;
-/// clinicians may prefer it in the pain row too) is an owner-eyeball
-/// choice.
-const _topSignalKinds = <_SignalKind>[
-  _SignalKind.bleeding,
-  _SignalKind.mittelschmerz,
-];
+/// The top strip's row (paper sheet order): bleeding is the only one. The
+/// mucus and sex observations, the Mittelschmerz M and the evaluation day
+/// numbers render INSIDE the temperature plot instead (_InPlotGlyphRows,
+/// chart_marks.dart).
+const _topSignalKinds = <_SignalKind>[_SignalKind.bleeding];
 
 /// The below-chart strip's rows (owner-decided order): measurement time →
 /// disturbance → cervix → pain → day-note indicator. TODO(user-review): the
@@ -98,20 +93,11 @@ double _signalSegmentHeight(List<_SignalKind> kinds) =>
     kinds.fold(0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
     (kinds.isEmpty ? 0 : _signalRowGap);
 
-enum _SignalKind {
-  bleeding,
-  mittelschmerz,
-  time,
-  disturbance,
-  cervix,
-  pain,
-  note,
-}
+enum _SignalKind { bleeding, time, disturbance, cervix, pain, note }
 
 /// Test-visible key prefix of a row's day cells.
 String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCell',
-  _SignalKind.mittelschmerz => 'mittelschmerzCell',
   _SignalKind.cervix => 'cervixCell',
   _SignalKind.pain => 'painCell',
   _SignalKind.disturbance => 'disturbanceCell',
@@ -122,7 +108,6 @@ String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
 /// Test-visible key prefix of a row's 44 px corner slot.
 String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCorner',
-  _SignalKind.mittelschmerz => 'mittelschmerzCorner',
   _SignalKind.cervix => 'cervixCorner',
   _SignalKind.pain => 'painCorner',
   _SignalKind.disturbance => 'disturbanceCorner',
@@ -136,7 +121,6 @@ String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
 String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
     switch (kind) {
       _SignalKind.bleeding => l10n.termBleeding,
-      _SignalKind.mittelschmerz => l10n.termMittelschmerz,
       _SignalKind.cervix => l10n.cycleRowCervix,
       _SignalKind.pain => l10n.termBreastPain,
       _SignalKind.disturbance => l10n.cycleRowDisturbance,
@@ -160,10 +144,6 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
     ),
     _SignalKind.cervix => Text(
       cervixPositionSymbol(CervixPosition.medium),
-      style: TextStyle(fontSize: 10, color: scheme.onSurface),
-    ),
-    _SignalKind.mittelschmerz => Text(
-      'M',
       style: TextStyle(fontSize: 10, color: scheme.onSurface),
     ),
     _SignalKind.pain => Text(
@@ -264,7 +244,6 @@ final class _SignalRow extends StatelessWidget {
       child: Center(
         child: switch (kind) {
           _SignalKind.bleeding => _bleedingContent(context, day),
-          _SignalKind.mittelschmerz => _mittelschmerzContent(context, day),
           _SignalKind.cervix => _cervixContent(context, day),
           _SignalKind.pain => _painContent(context, day),
           _SignalKind.disturbance => _disturbanceContent(context, day),
@@ -324,18 +303,6 @@ final class _SignalRow extends StatelessWidget {
     if (day == null || !day.painBreast) return const SizedBox.shrink();
     return Text(
       'B',
-      style: TextStyle(
-        fontSize: 9,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
-    );
-  }
-
-  /// Mittelschmerz: the letter M in its own top strip row.
-  static Widget _mittelschmerzContent(BuildContext context, DailyEntry? day) {
-    if (day == null || !day.painMittelschmerz) return const SizedBox.shrink();
-    return Text(
-      'M',
       style: TextStyle(
         fontSize: 9,
         color: Theme.of(context).colorScheme.onSurface,
