@@ -8,12 +8,14 @@
 // - PAPER-FORM SCAFFOLD: left rail with rail legends, 40 day columns, the
 //   row stack top-down: day numbers (calendar cycle days), dates (month +
 //   year on every first-of-month column), the recording rows ABOVE the
-//   plot (bleeding bands, mucus glyphs with the peak-dot slot and quality
-//   superscripts, the Mittelschmerz M, the sex X), the CURVE BLOCK (plot +
+//   plot (bleeding bands, the Mittelschmerz M), the CURVE BLOCK (plot +
 //   the 1–6 low-number row), the numeric temperature values below the plot
 //   (out-of-range readings lose no data), the recorded measurement times
 //   (vertical, narrow-column convention), then disturbance/cervix/pain and
 //   the rotated notes area. Columns the window does not track stay empty.
+//   The sex X marks, the mucus sign letters and the mucus peak dot render
+//   INSIDE the plot (paper-form parity with the cycle tab — no duplicated
+//   recording rows), placed by the shared chart-marks mapper.
 // - The TEMPERATURE CURVE and the evaluation overlay (rings around circled
 //   candidates, arrow-up glyphs hanging clear below their dots, the 1–6
 //   low numbers, the solid peak dot, the user-placed SUZ bar+arrow glyphs)
@@ -47,6 +49,14 @@ import 'package:pdf/widgets.dart' as pw;
 import '../domain/date_only.dart';
 import '../domain/models.dart';
 import '../domain/pdf_export_model.dart';
+import '../ui/chart_marks.dart'
+    show
+        chartDayMarks,
+        chartMarkRowVisible,
+        mucusRowCenterOffsetK,
+        peakDotCenterOffsetK,
+        sexGlyphBoxWidth,
+        sexRowCenterOffsetK;
 import '../ui/cycle_curve.dart' show ignoredTemperatureAlpha;
 import '../ui/suz_glyph.dart'
     show suzArrowTopInsetDegrees, suzBarHangSpanDegrees;
@@ -254,12 +264,9 @@ const double _dateRowHeight = 14;
 const double _bleedingRowHeight = 12;
 const double _tempValueRowHeight = 12;
 
-/// The recording rows above the plot.
-const double _mucusBandHeight = 14;
-const double _sexRowHeight = 11;
-
 /// The curve block's painted plot region (fine scale + curve + overlay
-/// marks); the 1–6 numbers band rides inside the block below it.
+/// marks + the in-plot glyph rows); the 1–6 numbers band rides inside the
+/// block below it.
 const double _curvePlotHeight = 185;
 const double _lowNumbersRowHeight = 10;
 
@@ -360,12 +367,11 @@ pw.Widget _paperFormGrid({
         _dayNumberRow(cycleStart, windowDays, weekend),
         _dateRow(windowDays.length, windowDays, weekend),
         _bleedingRow(windowDays.length, windowDays, weekend),
-        // The cycle tab's top strip order, above the plot: bleeding →
-        // mucus (peak dot above the glyph) → Mittelschmerz M → sex.
-        _mucusBand(windowDays.length, windowDays, drawing, weekend),
+        // The recording rows above the plot: bleeding → Mittelschmerz — the
+        // sex/mucus marks render inside the curve block (paper-form parity
+        // with the cycle tab's in-plot glyph rows).
         _mittelschmerzRow(windowDays.length, windowDays, weekend),
-        _sexRow(windowDays.length, windowDays, weekend),
-        _curveBlock(windowDays.length, drawing, axis, weekend),
+        _curveBlock(windowDays, drawing, axis, weekend),
         // The numeric values render BELOW the plot, right above the
         // measured times.
         _tempValueRow(windowDays.length, windowDays, weekend),
@@ -645,10 +651,11 @@ pw.Widget _tempValueRow(
 }
 
 /// The curve block: the painted plot row (rail = scale labels, day
-/// columns = the painter's canvas) and the plot's 1–6 low-number band
-/// below it. The block's boundaries are the plot's own hairlines.
+/// columns = the painter's canvas + the positioned in-plot glyph seam) and
+/// the plot's 1–6 low-number band below it. The block's boundaries are the
+/// plot's own hairlines.
 pw.Widget _curveBlock(
-  int windowDayCount,
+  List<DailyEntry> windowDays,
   PdfCurveDrawing drawing,
   PdfCurveAxis axis,
   List<int> weekend,
@@ -700,6 +707,7 @@ pw.Widget _curveBlock(
                 ),
                 child: pw.Stack(
                   children: [
+                    _inPlotChartMarks(windowDays, drawing, axis),
                     // The computed SUZ's rule letter rides its line's
                     // column (a positioned widget above the geometry).
                     if (drawing.suzLine case final line?)
@@ -721,10 +729,115 @@ pw.Widget _curveBlock(
           ],
         ),
       ),
-      _lowNumbersRow(windowDayCount, drawing, weekend),
+      _lowNumbersRow(windowDays.length, drawing, weekend),
     ],
   );
 }
+
+/// The in-plot glyph rows on the stack seam: one X per recorded sex timing
+/// at its column slot (1/6 · 1/2 · 5/6), the mucus sign letter (+ the S
+/// quality superscript) centered in the day column, and the peak dot at the
+/// peak day's column center — all placed by the shared mapper
+/// (chartDayMarks). Each row hides independently with the settings range
+/// (chartMarkRowVisible: a narrow range pushes the row's center below the
+/// plot's bottom margin); the peak dot hides with the letter band. The top
+/// offsets sit BELOW the plot top edge: `axis.yFor(value)` runs down from
+/// it (pdf_axis y convention), half the glyph box subtracted to center the
+/// ink.
+pw.Widget _inPlotChartMarks(
+  List<DailyEntry> windowDays,
+  PdfCurveDrawing drawing,
+  PdfCurveAxis axis,
+) {
+  final sexVisible = chartMarkRowVisible(sexRowCenterOffsetK, axis.range);
+  final mucusVisible = chartMarkRowVisible(mucusRowCenterOffsetK, axis.range);
+  if (!sexVisible && !mucusVisible) return pw.SizedBox();
+
+  final marks = chartDayMarks({
+    for (var i = 0; i < windowDays.length; i++) i: windowDays[i],
+  }, peakIndexes: drawing.peakIndexes);
+
+  Iterable<pw.Widget> placements() sync* {
+    for (var i = 0; i < windowDays.length; i++) {
+      final record = marks[i];
+      if (record == null) continue;
+      if (sexVisible) {
+        for (final slot in record.sexSlots) {
+          yield pw.Positioned(
+            left:
+                (i + slot.columnFraction) * pdfColumnWidth -
+                sexGlyphBoxWidth / 2,
+            top:
+                axis.yFor(axis.range.max - sexRowCenterOffsetK) -
+                _glyphBoxHeight / 2,
+            child: pw.SizedBox(
+              width: sexGlyphBoxWidth,
+              height: _glyphBoxHeight,
+              child: pw.Center(child: pw.Text('X', style: _label)),
+            ),
+          );
+        }
+      }
+      if (!mucusVisible) continue;
+      if (record.mucus case final display?) {
+        yield pw.Positioned(
+          left: i * pdfColumnWidth,
+          top:
+              axis.yFor(axis.range.max - mucusRowCenterOffsetK) -
+              _glyphBoxHeight / 2,
+          child: pw.SizedBox(
+            width: pdfColumnWidth,
+            height: _glyphBoxHeight,
+            child: pw.Center(
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  // Base glyph + raised superscript: a composed row (pdf's
+                  // RichText baseline offset drops the raised token at tiny
+                  // sizes).
+                  if (display.symbol case final symbol?)
+                    pw.Text(symbol, style: _label),
+                  if (display.superscript case final quality?)
+                    pw.Transform.translate(
+                      offset: PdfPoint(0, 2.6),
+                      child: pw.Text(quality, style: _mucusQualityStyle),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+      if (record.mucusPeak) {
+        yield pw.Positioned(
+          left: i * pdfColumnWidth + (pdfColumnWidth - _peakDotSize) / 2,
+          top:
+              axis.yFor(axis.range.max - peakDotCenterOffsetK) -
+              _peakDotSize / 2,
+          child: pw.Container(
+            width: _peakDotSize,
+            height: _peakDotSize,
+            decoration: pw.BoxDecoration(
+              color: _markAccent,
+              shape: pw.BoxShape.circle,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  return pw.Stack(children: [...placements()]);
+}
+
+/// The in-plot glyph box (X / letter cells centered within), pt.
+const double _glyphBoxHeight = 8;
+
+/// The peak dot's diameter, pt.
+const double _peakDotSize = 4.6;
+
+/// The mucus quality tokens ride raised at this smaller size.
+final pw.TextStyle _mucusQualityStyle = const pw.TextStyle(fontSize: 4.8);
 
 /// All painted geometry of the plot region: the 0.1 °C graduation (light),
 /// the dashed window bounds, the column hairlines, the curve (dots +
@@ -946,62 +1059,6 @@ pw.Widget _lowNumbersRow(
   );
 }
 
-/// The mucus row: the base glyph with the superscript quality token and
-/// the reserved solid peak-dot slot above the glyph.
-pw.Widget _mucusBand(
-  int windowDayCount,
-  List<DailyEntry> windowDays,
-  PdfCurveDrawing drawing,
-  List<int> weekend,
-) {
-  return _paperRow(
-    height: _mucusBandHeight,
-    railCaption: 'Zeichen',
-    windowDayCount: windowDayCount,
-    weekend: weekend,
-    cell: (position) {
-      const mucusGlyph = pw.TextStyle(fontSize: 6.4);
-      const mucusQuality = pw.TextStyle(fontSize: 4.8);
-      final display = mucusText(windowDays[position]);
-      if (display.symbol == null && display.superscript == null) return null;
-      return pw.Column(
-        mainAxisAlignment: pw.MainAxisAlignment.center,
-        children: [
-          pw.SizedBox(
-            height: 5,
-            child: drawing.peakIndexes.contains(position)
-                ? pw.Center(
-                    child: pw.Container(
-                      width: 4.6,
-                      height: 4.6,
-                      decoration: pw.BoxDecoration(
-                        color: _markAccent,
-                        shape: pw.BoxShape.circle,
-                      ),
-                    ),
-                  )
-                : null,
-          ),
-          // Base glyph + raised superscript: a composed row (pdf's
-          // RichText baseline offset drops the raised token at tiny sizes).
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.center,
-            children: [
-              if (display.symbol case final symbol?)
-                pw.Text(symbol, style: mucusGlyph),
-              if (display.superscript case final quality?)
-                pw.Transform.translate(
-                  offset: PdfPoint(0, 2.6),
-                  child: pw.Text(quality, style: mucusQuality),
-                ),
-            ],
-          ),
-        ],
-      );
-    },
-  );
-}
-
 /// The Mittelschmerz row: the letter M under its column, above the plot.
 /// TODO(user-review): the exact M home is an owner-eyeball choice — the
 /// paper writes it under the mucus letters.
@@ -1017,22 +1074,6 @@ pw.Widget _mittelschmerzRow(
     weekend: weekend,
     cell: (position) =>
         _centerLetter(mittelschmerzLetter(windowDays[position]), _label),
-  );
-}
-
-/// The sex row: the X cell (any recorded time slot; the timing's own
-/// thirds stay the chart's finer rendering).
-pw.Widget _sexRow(
-  int windowDayCount,
-  List<DailyEntry> windowDays,
-  List<int> weekend,
-) {
-  return _paperRow(
-    height: _sexRowHeight,
-    railCaption: 'Sex',
-    windowDayCount: windowDayCount,
-    weekend: weekend,
-    cell: (position) => _centerLetter(sexGlyph(windowDays[position]), _label),
   );
 }
 

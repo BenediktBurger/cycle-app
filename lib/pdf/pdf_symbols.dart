@@ -1,17 +1,21 @@
 // The PDF layer's pure per-day symbol mappings: a recorded day's
 // observations mapped onto the paper form's cell contents — the bleeding
-// fill, the mucus glyph (with quality superscript), the sex/cervix/pain
-// letter cells, the disturbance codes and the measurement-time text.
+// fill, the cervix/pain letter cells, the disturbance codes and the
+// measurement-time text.
+//
+// The sex X marks and the mucus sign letters are not mapped here: they
+// render inside the plot (see cycle_pdf.dart's in-plot glyph seam),
+// placed by the shared chart-marks mapper, whose mucus letters come
+// straight from mucusDisplay (lib/ui/chart_marks.dart).
 //
 // Display mapping only (Mode M, ADR-0001): every helper delegates to the
-// existing domain display helpers where they exist (mucusDisplay and its
-// sanitize rule, the cervix chart glyphs, the shared disturbance letter
-// vocabulary in lib/domain/disturbances.dart) — nothing is reinterpreted
+// existing domain display helpers where they exist (the cervix chart
+// glyphs, the shared disturbance letter vocabulary in
+// lib/domain/disturbances.dart) — nothing is reinterpreted
 // or reworded here, so the PDF cannot drift from the chart's conventions.
 import '../domain/date_only.dart';
 import '../domain/disturbances.dart';
 import '../domain/models.dart';
-import '../domain/mucus.dart';
 import '../domain/cervix.dart';
 
 /// The bleed fill of one row cell, bottom-anchored like the shared
@@ -38,19 +42,6 @@ PdfBleedingFill? bleedingFill(Bleeding bleeding) {
         : (bleeding.level - 1) / 4,
   );
 }
-
-/// A day's mucus glyph for the recording row above the plot: the base symbol
-/// plus — only on the S sign — the quality as a superscript token, exactly
-/// the shared `mucusDisplay` mapping (quality dropped for any non-S sign).
-/// Both fields null when the day recorded no sign.
-MucusDisplay mucusText(DailyEntry? day) =>
-    mucusDisplay(sign: day?.mucusSign, quality: day?.mucusQuality);
-
-/// The sex glyph: a single X per recorded day (any recorded time slot —
-/// the timing's own thirds stay the chart's finer rendering; the narrow
-/// paper column carries one X).
-String? sexGlyph(DailyEntry? day) =>
-    day != null && day.sexTimings != 0 ? 'X' : null;
 
 /// The cervix letter cell: position glyph first, then the firmness
 /// shorthand (h / h-w / w), space-joined — the chart's cell text, same

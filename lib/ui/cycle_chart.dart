@@ -443,16 +443,16 @@ final class _CycleChartState extends State<_CycleChart> {
                           ),
                           const SizedBox(height: 4),
                           // The paper sheet's grid rows above the temperature
-                          // body: bleeding, mucus, Mittelschmerz M, sex — no
-                          // gap between the rows and the plot, they read as
-                          // one block.
+                          // body: bleeding and Mittelschmerz M (the mucus
+                          // and sex glyphs render inside the plot, see
+                          // _InPlotGlyphRows) — no gap between the rows and
+                          // the plot, they read as one block.
                           _SignalRows(
                             kinds: _topSignalKinds,
                             days: _days,
                             cellWidth: colW,
                             windowStart: winStart,
                             windowEnd: winEnd,
-                            peakIndexes: overlay.peakIndexes,
                             onDayTap: _openDaySheet,
                           ),
                           SizedBox(
@@ -718,6 +718,15 @@ final class _CycleChartState extends State<_CycleChart> {
                                   windowStart: winStart,
                                   windowEnd: winEnd,
                                 ),
+                                _InPlotGlyphRows(
+                                  days: _days,
+                                  cellWidth: colW,
+                                  windowStart: winStart,
+                                  windowEnd: winEnd,
+                                  peakIndexes: overlay.peakIndexes,
+                                  range: widget.range,
+                                  scale: scale,
+                                ),
                                 // The tap overlay covers the whole scroll
                                 // content and maps taps/long-presses to day
                                 // columns.
@@ -764,7 +773,6 @@ final class _CycleChartState extends State<_CycleChart> {
                             cellWidth: colW,
                             windowStart: winStart,
                             windowEnd: winEnd,
-                            peakIndexes: overlay.peakIndexes,
                             onDayTap: _openDaySheet,
                           ),
                         ],
@@ -965,6 +973,129 @@ final class _CycleOrdinalBadges extends StatelessWidget {
     }
     return Stack(children: chips);
   }
+}
+
+// --- in-plot observation glyphs (mucus letters, sex X, peak dot) -----------
+
+/// The observation glyphs rendered INSIDE the temperature plot — sex X
+/// marks, mucus sign letters, the mucus peak dot — fed by [chartDayMarks]
+/// on the row pitches chart_marks.dart defines. Sits below the tap overlay
+/// in the chart Stack: the glyphs never intercept gestures.
+final class _InPlotGlyphRows extends StatelessWidget {
+  const _InPlotGlyphRows({
+    required this.days,
+    required this.cellWidth,
+    required this.windowStart,
+    required this.windowEnd,
+    required this.peakIndexes,
+    required this.range,
+    required this.scale,
+  });
+
+  final _ChartDays days;
+  final double cellWidth;
+  final int windowStart;
+  final int windowEnd;
+
+  /// Day indexes carrying the mucus-peak mark (the evaluation overlay's).
+  final Set<int> peakIndexes;
+
+  /// The settings range, feeding the narrow-range hiding.
+  final TemperatureRange range;
+  final _TemperatureScale scale;
+
+  static const double _glyphHeight = 12;
+
+  static const double _peakDotSize = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final sexVisible = chartMarkRowVisible(sexRowCenterOffsetK, range);
+    final mucusVisible = chartMarkRowVisible(mucusRowCenterOffsetK, range);
+    if (!sexVisible && !mucusVisible) return const SizedBox.shrink();
+
+    final windowMarks = chartDayMarks({
+      for (final entry in days.byIndex.entries)
+        if (entry.key >= windowStart && entry.key <= windowEnd)
+          entry.key: entry.value,
+    }, peakIndexes: peakIndexes);
+    final sexColor = scheme.onSurface.withValues(alpha: chartMarkAlpha);
+    final mucusColor = scheme.tertiary.withValues(alpha: chartMarkAlpha);
+
+    final glyphs = <Widget>[];
+    for (var i = windowStart; i <= windowEnd; i++) {
+      final record = windowMarks[i];
+      if (record == null) continue;
+      if (sexVisible) {
+        for (final slot in record.sexSlots) {
+          glyphs.add(
+            Positioned(
+              left:
+                  i * cellWidth +
+                  slot.columnFraction * cellWidth -
+                  sexGlyphBoxWidth / 2,
+              top: _pitchTop(sexRowCenterOffsetK, _glyphHeight),
+              child: SizedBox(
+                width: sexGlyphBoxWidth,
+                height: _glyphHeight,
+                child: Center(
+                  child: Text(
+                    'X',
+                    key: ValueKey('inPlotSex-$i-${slot.timing.name}'),
+                    style: TextStyle(fontSize: 9, color: sexColor),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+      if (!mucusVisible) continue;
+      if (record.mucus case final display?) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth,
+            width: cellWidth,
+            top: _pitchTop(mucusRowCenterOffsetK, _glyphHeight),
+            height: _glyphHeight,
+            child: Center(
+              child: MucusSymbolText(
+                key: ValueKey('inPlotMucus-$i'),
+                display: display,
+                fontSize: 9,
+                color: mucusColor,
+              ),
+            ),
+          ),
+        );
+      }
+      if (record.mucusPeak) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth + (cellWidth - _peakDotSize) / 2,
+            top: _pitchTop(peakDotCenterOffsetK, _peakDotSize),
+            child: Container(
+              key: ValueKey('inPlotPeakDot-$i'),
+              width: _peakDotSize,
+              height: _peakDotSize,
+              decoration: BoxDecoration(
+                color: mucusColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    return Stack(children: glyphs);
+  }
+
+  /// The glyph slot's top edge for a row whose CENTER sits [offsetK] °C
+  /// below the scale max — the shared value→pixel mapping applied at
+  /// `yMax − offsetK`, half the slot height above the center.
+  double _pitchTop(double offsetK, double glyphHeight) =>
+      scale.pixelFor(scale.max - offsetK) - glyphHeight / 2;
 }
 // --- temperature scale (chart domain + frozen-rail labels) ------------------
 

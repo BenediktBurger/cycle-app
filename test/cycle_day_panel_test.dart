@@ -150,7 +150,7 @@ void main() {
       reason: 'the second tap on the selected chip removes the mark',
     );
 
-    // R6: placing the peak renders the solid dot in the symbol row.
+    // R6: placing the peak renders the solid in-plot dot.
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(
@@ -158,7 +158,7 @@ void main() {
       contains('mucusPeakDay'),
     );
     expect(
-      find.byKey(const ValueKey('peakDot-6')),
+      find.byKey(const ValueKey('inPlotPeakDot-6')),
       findsOneWidget,
       reason:
           'the chart overlay re-renders from the marks stream '

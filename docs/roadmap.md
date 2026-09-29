@@ -59,7 +59,11 @@ the sections above track planned work, git history keeps the record (see
   - comments should be in one column as well (not spanning the whole sheet)
   - strange distribution: one column with 3, the other one with 2 marks and then on the bottom joined another mark. All marks (and/or comments) should be distributed among columns. Maybe even more columns on wider screen?
 - should we add the birth bleeding (Wochenbett, marked as ~)?
-- render observations inside temperature chart - see [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)?
+- [x] render sex Xs, mucus sign letters and the mucus peak dot inside the
+  temperature plot (sex X row at max − 0.15 °C, mucus peak dot at max
+  − 0.25 °C, mucus letters at max − 0.35 °C);
+  bleeding, Mittelschmerz and exclusion reasons keep their rows - see
+  [signal-symbols-inside-temperature-plot](ideas/2026-09-21-signal-symbols-inside-temperature-plot.md)
 
 - proof read German texts and let translate changes to english
 
