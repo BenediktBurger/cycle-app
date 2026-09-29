@@ -5381,7 +5381,7 @@ void main() {
           reason: 'the chart still mounts with its paper grid',
         );
         expect(
-          find.textContaining('temperature curve appears'),
+          find.textContaining('Enter observations or measurements'),
           findsNothing,
           reason:
               'the "no temperature" placeholder does not show — the '
@@ -6680,6 +6680,29 @@ void main() {
     expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
   });
 
+  testWidgets('a marks stream error also replaces the no-data text with the '
+      'retry surface when there is nothing to chart', (tester) async {
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: const [],
+        selectedDate: DateTime(2024, 5, 2),
+        marksStreamFactory: () =>
+            Stream<List<CycleMark>>.error(StateError('injected error')),
+      ),
+    );
+
+    expect(
+      find.text('Enter observations or measurements to see the cycle.'),
+      findsNothing,
+    );
+    expect(find.text('Loading failed'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('marksStreamRetryButton')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('an entries stream error gains the retry affordance, and '
       'retry restores the chart', (tester) async {
     var attempt = 0;
@@ -6709,5 +6732,150 @@ void main() {
 
     expect(find.byType(LineChart), findsOneWidget);
     expect(attempt, 2);
+  });
+
+  // ═══════════ data-less rendering and the today-span ═══════════
+  // The screen merges the raw entries with the shared derived pass's
+  // span-extended cycle day lists (lib/ui/cycle.dart), so the chart's range
+  // follows the SHARED span rule: it reaches the pinned `today` and renders
+  // whenever any tracked day exists — however signal-less the temperature
+  // data is. The harness pins `now` to the last seeded day by default; the
+  // span tests here pass the explicit pin.
+  testWidgets('a bleeding-only tracked day renders the chart, not the '
+      'no-data message', (tester) async {
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: [
+          DailyEntry(date: DateTime.utc(2026, 9, 10), bleeding: Bleeding.heavy),
+        ],
+      ),
+    );
+
+    expect(
+      _dayLabel(0),
+      findsOneWidget,
+      reason: 'the tracked day renders its day column',
+    );
+    expect(
+      _bleedingFills(0),
+      findsOneWidget,
+      reason: 'the bleeding glyph renders in the bleeding row',
+    );
+    expect(
+      find.textContaining('Enter observations or measurements'),
+      findsNothing,
+      reason: 'bleeding data is data: the no-data placeholder must not show',
+    );
+  });
+
+  testWidgets('a mucus-only tracked day renders the chart', (tester) async {
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: [
+          DailyEntry(date: DateTime.utc(2026, 9, 10), mucusSign: MucusSign.s),
+        ],
+      ),
+    );
+
+    expect(_dayLabel(0), findsOneWidget);
+    expect(
+      chartCellContent(0, 'mucus', find.byType(MucusSymbolText)),
+      findsOneWidget,
+      reason: 'the mucus glyph renders in the mucus row',
+    );
+    expect(
+      find.textContaining('Enter observations or measurements'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('the chart renders up to today, not up to the last tracked day', (
+    tester,
+  ) async {
+    // The scenario's tracked range ends 9/16 (index 10); five placeholder
+    // days extend the span to the pinned today (indexes 11..15).
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: _evaluationEntries,
+        now: () => DateTime.utc(2026, 9, 21),
+      ),
+    );
+
+    expect(
+      _label(15, '21.'),
+      findsOneWidget,
+      reason: "today's column renders, with its day-of-month label",
+    );
+    expect(
+      _marksCell(19),
+      findsNothing,
+      reason: 'the span ends at today, not past it',
+    );
+    expect(
+      _marksCell(15),
+      findsOneWidget,
+      reason:
+          'the placeholder days render tap targets, so the extended '
+          'range stays editable through today',
+    );
+    final renderedLabels = tester
+        .widgetList(
+          find.byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key as ValueKey<String>).value.startsWith('dayLabel-'),
+          ),
+        )
+        .length;
+    expect(
+      renderedLabels,
+      16,
+      reason: '11 tracked days + 5 placeholder days render',
+    );
+  });
+
+  testWidgets('a pinned clock behind the data never retracts the chart', (
+    tester,
+  ) async {
+    // Today (9/10) lies inside the tracked range (ends 9/16): the span
+    // rule's max keeps the tracked end — the clock never shortens a longer
+    // dataset.
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: _evaluationEntries,
+        now: () => DateTime.utc(2026, 9, 10),
+      ),
+    );
+
+    expect(
+      _label(10, '16.'),
+      findsOneWidget,
+      reason: 'the last tracked day stays the chart\'s right edge',
+    );
+    expect(find.byKey(const ValueKey('dayLabel-11')), findsNothing);
+  });
+
+  testWidgets('genuinely nothing tracked keeps the no-data message', (
+    tester,
+  ) async {
+    await pumpChart(
+      tester,
+      chartHarness(
+        entries: const [],
+        marks: const [],
+        selectedDate: DateTime.utc(2026, 9, 10),
+      ),
+    );
+
+    expect(
+      find.textContaining('Enter observations or measurements'),
+      findsOneWidget,
+      reason: 'no entries and no marks render the centered no-data text',
+    );
+    expect(find.byType(LineChart), findsNothing);
   });
 }

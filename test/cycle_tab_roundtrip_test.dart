@@ -29,7 +29,14 @@ Finder _chartScrollView() =>
 Widget _appScope(StreamController<List<DailyEntry>> entries) =>
     // Broadcast so the diary and the cycle chart (both watch this provider)
     // can listen at the same time.
-    appScope(entriesStream: entries.stream, locale: const Locale('de'));
+    appScope(
+      entriesStream: entries.stream,
+      locale: const Locale('de'),
+      // The scenario's last tracked day: the pinned clock keeps the span
+      // end at the seeded range's end, so the chart stays wall-clock
+      // independent.
+      now: () => longRangeDay(59),
+    );
 
 void main() {
   testWidgets(

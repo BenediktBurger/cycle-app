@@ -312,7 +312,6 @@ final class _CycleChartState extends State<_CycleChart> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     // The evaluation artifacts are computed at render time from entries
     // plus marks — never persisted, so a mark change live-updates the
     // overlay (ADR-0001).
@@ -322,24 +321,6 @@ final class _CycleChartState extends State<_CycleChart> {
       firstDay: _days.firstDay,
       dayCount: _days.dayCount,
     );
-
-    // Runs of adjacent measured days: the line connects two temperatures
-    // only when their calendar days are adjacent (curve helpers,
-    // lib/ui/cycle_curve.dart). The points keep the RAW temperatures —
-    // whether a dot or line piece is drawable inside the fixed range is
-    // decided in the chart config below.
-    final runs = curveRuns(
-      _days.byIndex,
-      ignoredDayIndexes: _days.ignoredDayIndexes,
-    );
-    final points = [for (final run in runs) ...run.points];
-
-    if (points.isEmpty) {
-      return Text(
-        l10n.cycleNoData,
-        style: Theme.of(context).textTheme.bodyMedium,
-      );
-    }
 
     // Out-of-range values are simply not rendered: the point filter and the
     // segment clipper keep dots and line pieces inside the window. No

@@ -89,14 +89,6 @@ class ZyklusScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(dailyEntriesProvider),
         ),
         data: (entries) {
-          if (entries.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(l10n.cycleNoData),
-              ),
-            );
-          }
           // Unmasked so a failed marks stream surfaces in place of the
           // chart block; the panel below stays mounted regardless.
           final marksAsync = ref.watch(marksProvider);
@@ -124,6 +116,37 @@ class ZyklusScreen extends ConsumerWidget {
     // constructor data (no riverpod dependency of its own).
     final temperatureRange = ref.watch(temperatureRangeProvider);
     final derived = ref.watch(derivedCycleDataProvider);
+    // The chart's day mapping alone stops at the last tracked entry, while
+    // the shared derived pass's cycle day lists already carry the span
+    // rule's placeholder days out to today (lib/domain/cycle_grouping.dart)
+    // — the same lists the diary tab renders. Merging them gives the chart
+    // the shared range instead of re-deriving a "today" end in the UI; a
+    // tracked entry keeps its date's slot, so a placeholder never covers
+    // real data.
+    final byDay = <DateTime, DailyEntry>{
+      for (final cycle in derived.cycles)
+        for (final day in cycle.days) DateOnly.normalize(day.date): day,
+    };
+    for (final entry in entries) {
+      byDay[DateOnly.normalize(entry.date)] = entry;
+    }
+    final chartEntries = [...byDay.values];
+    if (chartEntries.isEmpty) {
+      // Error beats "no data": with entries empty the ListView's marks
+      // error branch never renders, so surface the retry here.
+      if (marksAsync.hasError) {
+        return StreamLoadError(
+          scope: 'marks',
+          onRetry: () => ref.invalidate(marksProvider),
+        );
+      }
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(l10n.cycleNoData),
+        ),
+      );
+    }
     final observedCyclesOutsideApp = ref.watch(
       observedCyclesOutsideAppProvider,
     );
@@ -133,7 +156,7 @@ class ZyklusScreen extends ConsumerWidget {
       children: [
         marksAsync.when(
           loading: () => _CycleChart(
-            entries: entries,
+            entries: chartEntries,
             marks: marks,
             evaluations: derived.evaluations,
             cycles: derived.cycles,
@@ -145,7 +168,7 @@ class ZyklusScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(marksProvider),
           ),
           data: (markers) => _CycleChart(
-            entries: entries,
+            entries: chartEntries,
             marks: markers,
             evaluations: derived.evaluations,
             cycles: derived.cycles,
