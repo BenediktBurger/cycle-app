@@ -680,4 +680,93 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  // ═══════════ mucus picker chip tooltips ═══════════
+  // Both picker rows explain themselves: long-pressing (hover on desktop)
+  // a sign or quality chip shows the German wording from the INER cheat
+  // sheet (docs/cheatsheet.md). The German wording is pinned exactly, per
+  // the locale-de harness.
+
+  group('mucus picker chip tooltips', () {
+    const signTexts = <MucusSign, String>{
+      MucusSign.t: 'trocken',
+      MucusSign.nothing: 'nichts gesehen, nichts gespürt',
+      MucusSign.f:
+          'feucht, reine Empfindung im Inneren der Scheide, kein Schleim',
+      MucusSign.s: 'Schleim aus den Krypten des Gebärmutterhalses',
+      MucusSign.fs: 'f vor S an einem Tag',
+      MucusSign.a: 'Ausfluss',
+    };
+
+    const qualityTexts = <MucusQuality, String>{
+      MucusQuality.w: 'weißlich, dicklich, klebrig, zäh',
+      MucusQuality.mi: 'milchig',
+      MucusQuality.cr: 'cremig',
+      MucusQuality.kl: 'klumpig',
+      MucusQuality.glb:
+          'gelblich, dünnflüssiger, kann sich dem Aussehen von S der '
+          'besten Qualität annähern',
+      MucusQuality.g: 'deutlich gelb und meist klumpig',
+      MucusQuality.ew:
+          'wie Eiweiß des rohen Eis, wie Eiklar, "fadenziehend", '
+          'spinnbar, eventuell blutig',
+      MucusQuality.gl: 'glasig, glasklar, dehnbar (ausziehbar)',
+      MucusQuality.fl: 'flüssig',
+      MucusQuality.ns:
+          'nass, schlüpfrig, als Empfindung, wenn der Schleim sehr '
+          'dünnflüssig wird',
+    };
+
+    /// The previous overlay's hide timer (show-duration default 1.5 s)
+    /// runs on the fake clock; pumping past it keeps one chip's leftover
+    /// tooltip from bleeding into the next chip's assertion.
+    Future<void> showTooltip(WidgetTester tester, Finder chip) async {
+      await tester.pump(const Duration(seconds: 2));
+      await tester.ensureVisible(chip);
+      await tester.pumpAndSettle();
+      await tester.longPress(chip);
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    testWidgets('every sign chip long-presses into its cheat-sheet wording', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+      await tester.pumpAndSettle();
+
+      for (final MapEntry(key: sign, value: text) in signTexts.entries) {
+        await showTooltip(tester, diaryChip('mucusSign', sign.name));
+        expect(
+          find.text(text),
+          findsOneWidget,
+          reason: 'long-pressing the ${sign.name} chip shows "$text"',
+        );
+      }
+    });
+
+    testWidgets('every quality chip long-presses into its sheet wording once S '
+        'is selected', (WidgetTester tester) async {
+      await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(diaryChip('mucusSign', 's'));
+      await tester.pumpAndSettle();
+      await tester.tap(diaryChip('mucusSign', 's'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('mucusQualityRow')),
+        findsOneWidget,
+        reason: 'selecting S mounts the quality row',
+      );
+
+      for (final MapEntry(key: quality, value: text) in qualityTexts.entries) {
+        await showTooltip(tester, diaryChip('mucusQuality', quality.name));
+        expect(
+          find.text(text),
+          findsOneWidget,
+          reason: 'long-pressing the ${quality.name} chip shows "$text"',
+        );
+      }
+    });
+  });
 }

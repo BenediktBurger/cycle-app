@@ -3795,15 +3795,20 @@ void main() {
         );
 
         // The row name stays attached to the glyph for screen readers and
-        // long-press: a tooltip renders in the rail.
+        // long-press: a tooltip renders in the rail (the mucus glyph adds
+        // its own cheat-sheet one to the row-name tooltip).
+        final tooltips = tester
+            .widgetList<Tooltip>(
+              find.descendant(of: corner, matching: find.byType(Tooltip)),
+            )
+            .length;
         expect(
-          tester
-              .widgetList<Tooltip>(
-                find.descendant(of: corner, matching: find.byType(Tooltip)),
-              )
-              .length,
-          1,
-          reason: 'row $row\'s rail glyph keeps its row-name tooltip',
+          tooltips,
+          row == 'mucus' ? 2 : 1,
+          reason:
+              "row $row's rail glyph keeps "
+              '${row == 'mucus' ? 'two' : 'one'} tooltip${row == 'mucus' ? 's' : ''}'
+              '${row == 'mucus' ? ' (row-name plus the glyph cheat-sheet one)' : ' (row-name)'}',
         );
       }
     });
@@ -4260,9 +4265,13 @@ void main() {
             )
             .map((t) => t.message)
             .toList();
-        expect(tooltips, [
-          value,
-        ], reason: 'row $key\'s corner slot carries the localized row name');
+        // The mucus row's sample is the shared glyph renderer: its own
+        // cheat-sheet tooltip rides along beside the row-name one.
+        expect(
+          tooltips,
+          key == 'mucus' ? contains(value) : [value],
+          reason: 'row $key\'s corner slot carries the localized row name',
+        );
         expect(
           find.descendant(
             of: chartCellCorner(key),
@@ -4307,7 +4316,7 @@ void main() {
         ),
       );
       expect(
-        mucusSample.display.superscript,
+        mucusSample.quality,
         isNull,
         reason: 'the mucus corner sample is the plain S glyph',
       );
@@ -4388,7 +4397,11 @@ void main() {
             )
             .map((t) => t.message)
             .toList();
-        expect(tooltips, [value], reason: 'de: row $key is $value');
+        expect(
+          tooltips,
+          key == 'mucus' ? contains(value) : [value],
+          reason: 'de: row $key is $value',
+        );
       }
     });
 

@@ -84,6 +84,70 @@
   "bleedingMaximum": "maximum",
   "mucusSignUnset": "—",
   "mucusQuality": "Quality",
+  "mucusSignTooltipT": "dry",
+  "@mucusSignTooltipT": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the fertility-sign chip / display glyph t."
+  },
+  "mucusSignTooltipNothing": "nothing seen, nothing felt",
+  "@mucusSignTooltipNothing": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the fertility-sign chip / display glyph Ø (no sign observed)."
+  },
+  "mucusSignTooltipF": "moist, pure sensation inside the vagina, no mucus",
+  "@mucusSignTooltipF": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the fertility-sign chip / display glyph f."
+  },
+  "mucusSignTooltipS": "mucus from the crypts of the cervix",
+  "@mucusSignTooltipS": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the fertility-sign chip / display glyph S."
+  },
+  "mucusSignTooltipFs": "f before S on one day",
+  "@mucusSignTooltipFs": {
+    "description": "Tooltip for the fertility-sign chip / display glyph f/S (not on the cheat-sheet table; wording from the domain vocabulary in lib/domain/mucus.dart)."
+  },
+  "mucusSignTooltipA": "discharge",
+  "@mucusSignTooltipA": {
+    "description": "Tooltip for the fertility-sign chip / display glyph A (not on the cheat-sheet table; wording from the domain vocabulary in lib/domain/mucus.dart)."
+  },
+  "mucusQualityTooltipW": "whitish, thickened, sticky, viscous",
+  "@mucusQualityTooltipW": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token w."
+  },
+  "mucusQualityTooltipMi": "milky",
+  "@mucusQualityTooltipMi": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token mi."
+  },
+  "mucusQualityTooltipCr": "creamy",
+  "@mucusQualityTooltipCr": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token cr."
+  },
+  "mucusQualityTooltipKl": "clumpy",
+  "@mucusQualityTooltipKl": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token kl."
+  },
+  "mucusQualityTooltipGlb": "yellowish, thinner, can come to resemble best-quality S",
+  "@mucusQualityTooltipGlb": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token glb."
+  },
+  "mucusQualityTooltipG": "distinctly yellow and usually clumpy",
+  "@mucusQualityTooltipG": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token g."
+  },
+  "mucusQualityTooltipEw": "like raw egg white, like egg white, \"thread-drawing\", stretchy, possibly bloody",
+  "@mucusQualityTooltipEw": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token EW."
+  },
+  "mucusQualityTooltipGl": "glassy, crystal-clear, stretchable (drawable)",
+  "@mucusQualityTooltipGl": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token gl."
+  },
+  "mucusQualityTooltipFl": "liquid",
+  "@mucusQualityTooltipFl": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token fl."
+  },
+  "mucusQualityTooltipNs": "wet, slippery, as a sensation when the mucus becomes very thin",
+  "@mucusQualityTooltipNs": {
+    "description": "Cheat-sheet tooltip (docs/cheatsheet.md) for the mucus quality chip / superscript token ns."
+  },
   "cervixPositionUnset": "—",
   "cervixPositionLow": "low",
   "cervixPositionMedium": "medium",

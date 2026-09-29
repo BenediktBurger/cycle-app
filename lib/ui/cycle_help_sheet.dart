@@ -243,7 +243,7 @@ final class _HelpEntry extends StatelessWidget {
       _HelpEntryShape.text => MucusSymbolText(
         // Sample glyph: plain S, matching the chart legend — no quality
         // qualifier shown.
-        display: mucusDisplay(sign: MucusSign.s),
+        sign: MucusSign.s,
         fontSize: 10,
         color: color,
       ),
