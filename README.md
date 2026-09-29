@@ -73,7 +73,9 @@ fingerprint, so you can verify the download if you want to.
 
 There is also a public web demo at
 [BenediktBurger.github.io/cycle-app](https://BenediktBurger.github.io/cycle-app/):
-the app running in your browser, nothing to install. Mind that entries
+the app running in your browser, nothing to install. The demo is built
+from the current development state, so it shows the upcoming release
+rather than the latest published one. Mind that entries
 made there stay in that browser (no sync, no upload) — the browser storage
 is not encrypted, and as a beta the demo can still lose data, so only
 enter data you are comfortable losing or exposing. The
