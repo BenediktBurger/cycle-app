@@ -44,6 +44,12 @@ const chartSeedColor = Color(0xFF6750A4);
 ///    range / y-bounds tests); default null keeps the provider default.
 ///  - [observedCyclesOutsideApp] pins the prior-cycles count setting (the
 ///    cycle-page ordinal numbering tests); default 0 keeps the default.
+///  - [now] pins the derived pass's `today` ([nowProvider]). Default null:
+///    the latest date among [entries] and [marks] — the cycle span then ends
+///    AT the last seeded day, so the rendering stays identical to a pre-pin
+///    run and cannot drift with the test machine's wall clock. Both lists
+///    empty leave the provider at its real default (nothing renders).
+///    Tests exercising the span extension pass an explicit pin.
 ///  - [emptyHome] renders an EMPTY Scaffold body instead of the
 ///    ZyklusScreen. Routes pushed on the root navigator (the date picker
 ///    the AppBar's jump affordance opens) survive the body's unmount, which
@@ -64,7 +70,18 @@ Widget chartHarness({
   TemperatureRange? temperatureRange,
   int observedCyclesOutsideApp = 0,
   bool emptyHome = false,
+  DateTime Function()? now,
 }) {
+  // Pin `today` to the latest seeded day: the span extension then ends at
+  // that day, so chart widget tests stay wall-clock independent (see the
+  // [now] doc).
+  DateTime? pinnedToday;
+  for (final date in [
+    for (final entry in entries) entry.date,
+    for (final mark in marks) mark.date,
+  ]) {
+    if (pinnedToday == null || date.isAfter(pinnedToday)) pinnedToday = date;
+  }
   final overrides = [
     dailyEntriesProvider.overrideWith(
       (ref) =>
@@ -78,6 +95,13 @@ Widget chartHarness({
     selectedDateProvider.overrideWith(
       (ref) => selectedDate ?? entries.first.date,
     ),
+    if (now != null)
+      nowProvider.overrideWith((ref) => now)
+    else if (pinnedToday != null)
+      nowProvider.overrideWith(
+        (ref) =>
+            () => pinnedToday!,
+      ),
     if (temperatureRange != null)
       temperatureRangeProvider.overrideWith((ref) => temperatureRange),
     if (observedCyclesOutsideApp != 0)

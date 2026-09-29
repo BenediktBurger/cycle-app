@@ -52,6 +52,11 @@ final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
 /// [marksStreamFactory] replaces the real marks stream: invoked once per
 /// provider (re-)subscription, so a stream-error retry test can hand out a
 /// failing stream on the first attempt and a valid one afterwards.
+///
+/// The derived pass's `today` ([nowProvider]) is pinned to the latest date
+/// among [entries] and [seedMarks]: the cycle span then ends AT the last
+/// seeded day, so the chart's rendering cannot drift with the test machine's
+/// wall clock and stays identical to a pre-pin run.
 Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   WidgetTester tester, {
   required List<DailyEntry> entries,
@@ -62,6 +67,13 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
   Stream<List<CycleMark>> Function()? marksStreamFactory,
 }) async {
   final initialSelected = DateOnly.normalize(selectedDate ?? scenarioDay(1));
+  DateTime? pinnedToday;
+  for (final date in [
+    for (final entry in entries) entry.date,
+    for (final mark in seedMarks) mark.date,
+  ]) {
+    if (pinnedToday == null || date.isAfter(pinnedToday)) pinnedToday = date;
+  }
   CycleDatabase? db;
   final container = ProviderContainer(
     overrides: [
@@ -81,6 +93,11 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
       if (marksStreamFactory != null)
         marksProvider.overrideWith((ref) => marksStreamFactory()),
+      if (pinnedToday != null)
+        nowProvider.overrideWith(
+          (ref) =>
+              () => pinnedToday!,
+        ),
       selectedDateProvider.overrideWith((ref) => initialSelected),
       tabIndexProvider.overrideWith((ref) => initialTab),
     ],

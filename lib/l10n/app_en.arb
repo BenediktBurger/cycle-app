@@ -148,7 +148,7 @@
   "cycleLegendCircledHigher": "Circled higher measurements",
   "cycleLegendArrowHigher": "Premature temperature rise",
   "cycleLegendBaseline": "Baseline",
-  "cycleNoData": "The temperature curve appears once days with measurements exist.",
+  "cycleNoData": "Enter observations or measurements to see the cycle.",
   "cycleJumpToDate": "Jump to date",
   "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",

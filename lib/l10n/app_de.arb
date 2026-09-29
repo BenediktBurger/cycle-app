@@ -122,7 +122,7 @@
   "cycleLegendCircledHigher": "Umrandete höhere Messungen",
   "cycleLegendArrowHigher": "Vorzeitiger Temperaturanstieg",
   "cycleLegendBaseline": "Basislinie",
-  "cycleNoData": "Temperaturkurve erscheint, sobald Tage mit Messwert existieren.",
+  "cycleNoData": "Trage Beobachtungen oder Messwerte ein, um den Zyklus zu sehen.",
   "cycleJumpToDate": "Zum Datum springen",
   "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
