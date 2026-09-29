@@ -30,9 +30,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  final fixtureRaw = File(
-    'test/fixtures/example-cycle.json',
-  ).readAsStringSync();
+  final fixtureRaw = File('examples/example-cycle.json').readAsStringSync();
 
   /// All stored rows mapped to the domain object, ordered ascending by date
   /// (DailyEntry == compares every entry field + the day, no timestamps —

@@ -7,8 +7,8 @@
 // double quotes with inner quotes escaped as "", and the file uses plain
 // newlines that may arrive as \r\n from spreadsheet round-trips.
 //
-// The committed fixture test/fixtures/drip-export-sample.csv is a copy of
-// drip's own export specimen; tests assert VALUES, never byte equality.
+// The committed examples/drip-export-sample.csv is a copy of drip's own
+// export specimen; tests assert VALUES, never byte equality.
 //
 // The mapping tests replicate drip's observation vocabularies (0-based,
 // drip: components/helpers/labels.js) and drip's own getNfpMucus numerics
@@ -26,7 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// The committed drip export specimen, read straight from disk (working dir
 /// is the repo root when the host test runner starts).
 final String dripExportSampleCsv = File(
-  'test/fixtures/drip-export-sample.csv',
+  'examples/drip-export-sample.csv',
 ).readAsStringSync();
 
 /// A minimal, realistic drip CSV column set (header order as drip writes

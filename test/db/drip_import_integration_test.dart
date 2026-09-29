@@ -33,9 +33,7 @@ void main() {
     addTearDown(db.close);
   });
 
-  final fixtureRaw = File(
-    'test/fixtures/drip-export-sample.csv',
-  ).readAsStringSync();
+  final fixtureRaw = File('examples/drip-export-sample.csv').readAsStringSync();
 
   /// All stored rows mapped to the domain object, ordered ascending by date
   /// (DailyEntry == compares every entry field + the day, no timestamps —
