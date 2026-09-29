@@ -524,7 +524,7 @@ final class _CycleChartState extends State<_CycleChart> {
                                                     spot,
                                                     _,
                                                     bar,
-                                                    __,
+                                                    _,
                                                   ) => dotPainterForDay(
                                                     dayIndex: spot.x.round(),
                                                     dotColor:
@@ -608,7 +608,7 @@ final class _CycleChartState extends State<_CycleChart> {
                                           color: Colors.transparent,
                                           dotData: FlDotData(
                                             show: true,
-                                            getDotPainter: (_, __, ___, ____) =>
+                                            getDotPainter: (_, _, _, _) =>
                                                 SuzArrowDotPainter(
                                                   color: evaluationColor,
                                                 ),
