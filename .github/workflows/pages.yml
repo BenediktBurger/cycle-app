@@ -30,7 +30,7 @@ jobs:
       # one shared cache entry — an identical-key save here is skipped,
       # not merged.
       - name: Restore pub cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
