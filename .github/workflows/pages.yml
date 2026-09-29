@@ -83,7 +83,7 @@ jobs:
           cp pages/index.html build/pages/index.html
           cp -a build/web/. build/pages/app/
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v3
         with:
