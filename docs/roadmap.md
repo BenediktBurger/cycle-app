@@ -37,12 +37,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-#### Refactors (decided 2026-09-25, startable)
-
-- Candidate consolidation: the `_popImportDialogWhileCurrent` helper is
-  duplicated verbatim in the export/import card and the drip-import card —
-  it could live once (e.g. in import_dialog.dart); needs discussion.
-
 #### Riverpod modernization (decided, startable)
 
 - [ ] adopt `@riverpod` codegen and convert the legacy `StateProvider`s —

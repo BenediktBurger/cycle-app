@@ -110,18 +110,6 @@ final class ExportImportCard extends ConsumerWidget {
     );
   }
 
-  /// Closes the import dialog after a successful import — only while it is
-  /// STILL the route on top. `mounted` alone cannot guard the follow-up
-  /// pop (the dialog's elements stay connected until the route is
-  /// finalized), and the pop would then fire on whatever route is now on
-  /// top — collapsing the whole route stack.
-  void _popImportDialogWhileCurrent(BuildContext dialogContext) {
-    final route = ModalRoute.of(dialogContext);
-    if (route != null && route.isCurrent) {
-      Navigator.of(dialogContext).pop();
-    }
-  }
-
   Future<void> _applyImport(
     BuildContext dialogContext,
     BuildContext screenContext,
@@ -133,7 +121,7 @@ final class ExportImportCard extends ConsumerWidget {
       final db = await ref.read(databaseProvider.future);
       final summary = await importJsonToDatabase(db, raw);
       if (!dialogContext.mounted) return;
-      _popImportDialogWhileCurrent(dialogContext);
+      popDialogRouteWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;
       ScaffoldMessenger.of(screenContext).showSnackBar(
         SnackBar(
