@@ -24,7 +24,7 @@ void main() {
   // A real-world export (from the actual app, bleeding values 4/3 and all)
   // must keep loading through the whole evolution — canary, not coverage.
   final exampleCycleRaw = File(
-    'test/fixtures/example-cycle.json',
+    'examples/example-cycle.json',
   ).readAsStringSync();
 
   group('export/import JSON codec', () {

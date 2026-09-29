@@ -1,0 +1,912 @@
+{
+  "schema_version": 6,
+  "exported_at": "2026-09-29T09:57:24.781Z",
+  "entries": [
+    {
+      "date": "2024-07-24",
+      "bleeding": 5,
+      "sex_timings": 2,
+      "notes": "DFuipZ Tab. 20"
+    },
+    {
+      "date": "2024-07-25",
+      "bleeding": 5
+    },
+    {
+      "date": "2024-07-26",
+      "bleeding": 5
+    },
+    {
+      "date": "2024-07-27",
+      "bleeding": 4
+    },
+    {
+      "date": "2024-07-28",
+      "bleeding": 3
+    },
+    {
+      "date": "2024-07-29",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 360,
+      "bleeding": 2
+    },
+    {
+      "date": "2024-07-30",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 360,
+      "sex_timings": 2
+    },
+    {
+      "date": "2024-07-31",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 360,
+      "mucus_sign": "nothing",
+      "sex_timings": 2
+    },
+    {
+      "date": "2024-08-01",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 361,
+      "mucus_sign": "f",
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-08-02",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 361,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-03",
+      "bbt_c": 36.45,
+      "measured_at_minutes": 361
+    },
+    {
+      "date": "2024-08-04",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 362,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-05",
+      "bbt_c": 36.55,
+      "measured_at_minutes": 362
+    },
+    {
+      "date": "2024-08-06",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 362,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-07",
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-08",
+      "bbt_c": 36.55,
+      "measured_at_minutes": 362,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-09",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 362,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-10",
+      "bbt_c": 36.45,
+      "measured_at_minutes": 363,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-11",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 363,
+      "sex_timings": 1
+    },
+    {
+      "date": "2024-08-12",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 364,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-13",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 364,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2024-08-14",
+      "bbt_c": 36.3,
+      "measured_at_minutes": 354,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "sex_timings": 2
+    },
+    {
+      "date": "2024-08-15",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 354,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-08-16",
+      "bbt_c": 36.2,
+      "measured_at_minutes": 359,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2024-08-17",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 360,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2024-08-18",
+      "bbt_c": 36.45,
+      "measured_at_minutes": 360,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-08-19",
+      "bbt_c": 36.45,
+      "measured_at_minutes": 360
+    },
+    {
+      "date": "2024-08-20",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 361
+    },
+    {
+      "date": "2024-08-21",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 361,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-08-22",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 361
+    },
+    {
+      "date": "2024-08-23",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 361
+    },
+    {
+      "date": "2024-08-24",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 361
+    },
+    {
+      "date": "2024-08-25",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 362
+    },
+    {
+      "date": "2024-08-26",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 362
+    },
+    {
+      "date": "2024-08-27",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 362,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-08-28",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 362
+    },
+    {
+      "date": "2024-08-29",
+      "bbt_c": 36.85,
+      "measured_at_minutes": 362
+    },
+    {
+      "date": "2024-08-30",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 362,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-08-31",
+      "bbt_c": 37.1,
+      "measured_at_minutes": 363,
+      "sex_timings": 2
+    },
+    {
+      "date": "2024-09-01",
+      "bbt_c": 37.1,
+      "measured_at_minutes": 363,
+      "sex_timings": 2
+    },
+    {
+      "date": "2024-10-06",
+      "bleeding": 1
+    },
+    {
+      "date": "2024-10-07",
+      "bleeding": 1
+    },
+    {
+      "date": "2024-10-08",
+      "bleeding": 5,
+      "notes": "DFuipZ Tab. 21"
+    },
+    {
+      "date": "2024-10-09",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 364,
+      "bleeding": 4,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-10",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 368,
+      "bleeding": 3
+    },
+    {
+      "date": "2024-10-11",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 368,
+      "bleeding": 3
+    },
+    {
+      "date": "2024-10-12",
+      "bbt_c": 36.85,
+      "measured_at_minutes": 368,
+      "bleeding": 3
+    },
+    {
+      "date": "2024-10-13",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 369,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-14",
+      "bbt_c": 36.85,
+      "measured_at_minutes": 369
+    },
+    {
+      "date": "2024-10-15",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 371,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-16",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 372,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-17",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 372
+    },
+    {
+      "date": "2024-10-18",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 372
+    },
+    {
+      "date": "2024-10-19",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 372
+    },
+    {
+      "date": "2024-10-20",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 372,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-21",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 372
+    },
+    {
+      "date": "2024-10-22",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 373
+    },
+    {
+      "date": "2024-10-23",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 373
+    },
+    {
+      "date": "2024-10-24",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 373
+    },
+    {
+      "date": "2024-10-25",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 373
+    },
+    {
+      "date": "2024-10-26",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 373
+    },
+    {
+      "date": "2024-10-27",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 373,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-10-28",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 374,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-29",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 374,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "cervix_opening": "open",
+      "cervix_firmness": "soft",
+      "pain_mittelschmerz": true,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-10-30",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 374,
+      "mucus_sign": "s",
+      "cervix_opening": "open",
+      "cervix_firmness": "soft",
+      "notes": "spinnbar"
+    },
+    {
+      "date": "2024-10-31",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 375,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2024-11-01",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 376,
+      "mucus_sign": "s",
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-11-02",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 376,
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "cervix_opening": "middle"
+    },
+    {
+      "date": "2024-11-03",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 376,
+      "mucus_sign": "s",
+      "cervix_opening": "middle",
+      "cervix_firmness": "hard",
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-11-04",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 377,
+      "mucus_sign": "nothing",
+      "cervix_opening": "closed",
+      "cervix_firmness": "hard"
+    },
+    {
+      "date": "2024-11-05",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 377
+    },
+    {
+      "date": "2024-11-06",
+      "bbt_c": 37,
+      "measured_at_minutes": 377,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-11-07",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 378
+    },
+    {
+      "date": "2024-11-08",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 378
+    },
+    {
+      "date": "2024-11-09",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 378
+    },
+    {
+      "date": "2024-11-10",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 378
+    },
+    {
+      "date": "2024-11-11",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 378
+    },
+    {
+      "date": "2024-11-12",
+      "bbt_c": 37,
+      "measured_at_minutes": 378,
+      "sex_timings": 4
+    },
+    {
+      "date": "2024-11-13",
+      "bbt_c": 37.1,
+      "measured_at_minutes": 379
+    },
+    {
+      "date": "2024-11-14",
+      "bbt_c": 37.15,
+      "measured_at_minutes": 379
+    },
+    {
+      "date": "2024-11-15",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 379
+    },
+    {
+      "date": "2024-11-16",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 379,
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-07-25",
+      "bleeding": 1,
+      "notes": "DFuipZ Tab. 21 Geburtstermin, ab jetzt Tab.22"
+    },
+    {
+      "date": "2025-07-26",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-07-27",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-07-28",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-07-29",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-07-30",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-07-31",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-01",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-02",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-03",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-04",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-05",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-06",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-07",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-08",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-09",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-10",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-11",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-12",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-13",
+      "bleeding": 1
+    },
+    {
+      "date": "2025-08-14",
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-15",
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-16",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 384,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-17",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 384,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-08-18",
+      "mucus_sign": "s",
+      "mucus_quality": "ew",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-08-19",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 385,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-08-20",
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-21",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 385,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-08-22",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 386,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-23",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 386,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-08-24",
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-08-25",
+      "bbt_c": 36.85,
+      "measured_at_minutes": 386,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-08-26",
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-27",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 387,
+      "mucus_sign": "nothing",
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-08-28",
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-08-29",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 387,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-08-30",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 387,
+      "mucus_sign": "s",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-08-31",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 387,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-09-01",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 387,
+      "bleeding": 3
+    },
+    {
+      "date": "2025-09-02",
+      "bleeding": 4
+    },
+    {
+      "date": "2025-10-13",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 360,
+      "mucus_sign": "s",
+      "notes": "DFuipZ Tab. 23"
+    },
+    {
+      "date": "2025-10-14",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 361,
+      "mucus_sign": "nothing",
+      "notes": "volles Stillen"
+    },
+    {
+      "date": "2025-10-15",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 361,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-10-16",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 362,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-10-17",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 362,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-18",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 364,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-19",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 364,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-20",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 365,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-21",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 365,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-22",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 365,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-23",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 365,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-10-24",
+      "bbt_c": 36.4,
+      "measured_at_minutes": 365,
+      "mucus_sign": "nothing",
+      "sex_timings": 4
+    },
+    {
+      "date": "2025-10-25",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 366,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-26",
+      "mucus_sign": "s",
+      "notes": "4 mal am Tag Stillen, 1 x Brei"
+    },
+    {
+      "date": "2025-10-27",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 366,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-10-28",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 366,
+      "mucus_sign": "nothing",
+      "notes": "starker Schnupfen"
+    },
+    {
+      "date": "2025-10-29",
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-10-30",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 367,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-10-31",
+      "bbt_c": 36.7,
+      "measured_at_minutes": 367,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-11-01",
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-11-02",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 367,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-11-03",
+      "bbt_c": 36.75,
+      "measured_at_minutes": 368,
+      "mucus_sign": "s",
+      "mucus_quality": "ew"
+    },
+    {
+      "date": "2025-11-04",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 368,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-11-05",
+      "bbt_c": 36.6,
+      "measured_at_minutes": 368,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-11-06",
+      "bbt_c": 36.65,
+      "measured_at_minutes": 368,
+      "mucus_sign": "s"
+    },
+    {
+      "date": "2025-11-07",
+      "bbt_c": 36.9,
+      "measured_at_minutes": 369,
+      "mucus_sign": "nothing"
+    },
+    {
+      "date": "2025-11-08",
+      "bbt_c": 36.95,
+      "measured_at_minutes": 369
+    },
+    {
+      "date": "2025-11-09",
+      "bbt_c": 37,
+      "measured_at_minutes": 369
+    },
+    {
+      "date": "2025-11-10",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 369
+    },
+    {
+      "date": "2025-11-11",
+      "bbt_c": 37,
+      "measured_at_minutes": 369,
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-11-12",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 369
+    },
+    {
+      "date": "2025-11-13",
+      "bbt_c": 37,
+      "measured_at_minutes": 369,
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-11-14",
+      "bbt_c": 37.05,
+      "measured_at_minutes": 360
+    },
+    {
+      "date": "2025-11-15",
+      "bbt_c": 37,
+      "measured_at_minutes": 360,
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-11-17",
+      "bbt_c": 36.8,
+      "measured_at_minutes": 360,
+      "sex_timings": 2
+    },
+    {
+      "date": "2025-11-18",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 360
+    },
+    {
+      "date": "2025-11-19",
+      "bbt_c": 36.5,
+      "measured_at_minutes": 360,
+      "bleeding": 4
+    }
+  ],
+  "marks": [
+    {
+      "entry_date": "2024-07-24",
+      "mark_type": "cycleStart",
+      "author": "user"
+    },
+    {
+      "entry_date": "2024-10-08",
+      "mark_type": "cycleStart",
+      "author": "user"
+    },
+    {
+      "entry_date": "2025-07-25",
+      "mark_type": "cycleStart",
+      "author": "user"
+    }
+  ]
+}

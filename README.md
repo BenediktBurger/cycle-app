@@ -80,6 +80,14 @@ enter data you are comfortable losing or exposing. The
 [demo page](https://BenediktBurger.github.io/cycle-app/) spells out what
 that means.
 
+### Example data
+
+Sample files in [`examples/`](examples/README.md) — in the app's JSON
+export format and some in the drip CSV format — can be loaded into the app
+or the web demo for a first look. Both import paths merge by date with an
+overwrite policy, so don't import into a profile with real data without
+exporting first.
+
 ### Installing
 
 1. Download the APK matching your device (see above) from the latest
@@ -146,6 +154,9 @@ einzige Backup-Weg (Einzelheiten: [Backup, migration & recovery
    erwarten: Die App ist mit dem eigenen Schlüssel des Projekts signiert
    und wird über keinen Store verteilt — das ist normal und kein Zeichen
    für ein Problem.
+
+Beispieldaten zum Ausprobieren finden Sie unter
+[`examples/`](examples/README.md) (auf Englisch).
 
 ### Aktualisierung
 
