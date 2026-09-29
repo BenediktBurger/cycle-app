@@ -47,6 +47,7 @@ import 'support/chart_pump.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
 import 'support/viewport.dart';
+import 'support/provider_fixtures.dart';
 
 // Widget tests of the cycle chart's grid alignment invariant: day i's
 // temperature dot lands exactly at the horizontal CENTER of its day column
@@ -275,8 +276,8 @@ Widget _harness({
     overrides: [
       dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
       marksProvider.overrideWith((ref) => Stream.value(marks)),
-      selectedDateProvider.overrideWith((ref) => entries.first.date),
-      if (range != null) temperatureRangeProvider.overrideWith((ref) => range),
+      selectedDatePin(entries.first.date),
+      if (range != null) temperatureRangePin(range),
     ],
     child: const Scaffold(body: ZyklusScreen()),
   ),

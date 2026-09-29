@@ -37,15 +37,20 @@ hooks:
 # the android plugin implementation of url_launcher — see the comment on
 # the environment itself:
 #
-# flutter_riverpod: ^3.4.3 on the Riverpod 3.x line. The ~14 StateProviders
-#   (all in lib/providers.dart, incl. the hydration registrar's bind<T>) still
-#   come from package:flutter_riverpod/legacy.dart — StateProvider is legacy
-#   in 3.x, pending the codegen/Notifier adoption (docs/roadmap.md backlog).
+# flutter_riverpod: ^3.4.3 on the Riverpod 3.x line, together with
+#   its codegen pair riverpod_annotation (dependency) + riverpod_generator
+#   (dev): every provider is an @riverpod annotation in lib/providers.dart
+#   whose code lands in the committed lib/providers.g.dart — run
+#   `dart run build_runner build` after editing.
+#   No legacy-bridge imports anywhere; the mutable providers expose their
+#   write through a `set` member (riverpod's Notifier `state` setter is
+#   @protected).
 # drift / drift_dev: ^2.35.0. Both bumped together in lockstep:
 #   2.35 is also the version whose release ships the vendored web assets
 #   (web/sqlite3.wasm + web/drift_worker.js) — keeping the runtime on the
 #   same release line avoids wasm/worker binding mismatches. drift_dev runs
-#   the codegen for the database (lib/db/*.g.dart via build_runner).
+#   the codegen for the database (lib/db/*.g.dart) next to
+#   riverpod_generator for lib/providers.g.dart — both under build_runner.
 # sqlite3_flutter_libs: ^0.6.0. Bundles SQLite for native platforms so drift
 #   works out of the box (referenced via sqlite3's ffi backend underneath
 #   drift; drift_flutter brings it transitively too — kept as an explicit
@@ -100,6 +105,9 @@ dependencies:
     sdk: flutter
   intl: any
   flutter_riverpod: ^3.4.3
+  # Codegen annotations for the @riverpod providers: see the version-notes
+  # paragraph on flutter_riverpod above (lib/providers.dart + its .g.dart).
+  riverpod_annotation: ^4.0.7
   drift: ^2.35.0
   drift_flutter: ^0.3.0
   sqlite3_flutter_libs: ^0.6.0
@@ -145,6 +153,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
+  # Generates lib/providers.g.dart from the riverpod_annotation providers
+  # (same dev-dependency + committed-output pattern as drift_dev below).
+  riverpod_generator: ^4.0.9
   drift_dev: ^2.35.0
   # Test-only: the recording fake in test/about_page_test.dart overrides
   # url_launcher's platform interface to keep the widget suite offline-safe;

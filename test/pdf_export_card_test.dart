@@ -28,6 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/finders.dart';
+import 'support/provider_fixtures.dart';
 
 DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 
@@ -105,12 +106,9 @@ void main() {
             (ref) =>
                 () => today,
           ),
-        pdfExportNameProvider.overrideWith((ref) => 'Maria Muster'),
-        pdfExportBirthDateProvider.overrideWith(
-          (ref) => DateTime.utc(1990, 1, 2),
-        ),
-        if (temperatureRange != null)
-          temperatureRangeProvider.overrideWith((ref) => temperatureRange),
+        pdfExportNamePin('Maria Muster'),
+        pdfExportBirthDatePin(DateTime.utc(1990, 1, 2)),
+        if (temperatureRange != null) temperatureRangePin(temperatureRange),
         pdfDocumentBuilderProvider.overrideWith(
           (ref) => (model, options, fontBytes) async {
             final run = (runSink == null || runSink.isEmpty)
@@ -395,10 +393,8 @@ void main() {
           overrides: [
             dailyEntriesProvider.overrideWith((ref) => entriesCtrl.stream),
             marksProvider.overrideWith((ref) => marksCtrl.stream),
-            pdfExportNameProvider.overrideWith((ref) => 'Maria Muster'),
-            pdfExportBirthDateProvider.overrideWith(
-              (ref) => DateTime.utc(1990, 1, 2),
-            ),
+            pdfExportNamePin('Maria Muster'),
+            pdfExportBirthDatePin(DateTime.utc(1990, 1, 2)),
           ],
           child: const MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,

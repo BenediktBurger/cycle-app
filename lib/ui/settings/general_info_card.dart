@@ -127,9 +127,9 @@ final class GeneralInfoCard extends ConsumerWidget {
               labelText: l10n.settingsPdfExportName,
               onChanged: (raw) {
                 final trimmed = raw.trim();
-                ref.read(pdfExportNameProvider.notifier).state = trimmed.isEmpty
-                    ? null
-                    : trimmed;
+                ref
+                    .read(pdfExportNameProvider.notifier)
+                    .set(trimmed.isEmpty ? null : trimmed);
               },
             ),
             const SizedBox(height: 8),
@@ -151,7 +151,7 @@ final class GeneralInfoCard extends ConsumerWidget {
                     ? null
                     : tryParseIsoDate(raw.trim());
                 if (parsed != null || raw.trim().isEmpty) {
-                  ref.read(pdfExportBirthDateProvider.notifier).state = parsed;
+                  ref.read(pdfExportBirthDateProvider.notifier).set(parsed);
                 }
               },
             ),

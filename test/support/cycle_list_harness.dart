@@ -21,6 +21,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'database.dart';
 import 'fixtures.dart';
 
+import 'provider_fixtures.dart';
+
 /// The evaluation scenario's September, as a day (the fixtures' prose names
 /// the scenario days — 9/6 baseline-window Monday .. 9/16 the SUZ day — so
 /// the assertions can read like the day prose).
@@ -98,8 +100,8 @@ Future<(CycleDatabase, ProviderContainer)> pumpCycleList(
           (ref) =>
               () => pinnedToday!,
         ),
-      selectedDateProvider.overrideWith((ref) => initialSelected),
-      tabIndexProvider.overrideWith((ref) => initialTab),
+      selectedDatePin(initialSelected),
+      tabIndexPin(initialTab),
     ],
   );
   addTearDown(container.dispose);

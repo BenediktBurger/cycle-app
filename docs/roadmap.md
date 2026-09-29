@@ -37,14 +37,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-#### Riverpod modernization (decided, startable)
-
-- [ ] adopt `@riverpod` codegen and convert the legacy `StateProvider`s —
-  all of them in lib/providers.dart, including the hydration registrar's
-  `PersistedSetting.bind<T>` — to `Notifier`/`AsyncNotifier`. The
-  `package:flutter_riverpod/legacy.dart` import is the interim bridge from
-  the Riverpod 3 migration.
-
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent

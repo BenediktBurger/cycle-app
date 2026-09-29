@@ -156,7 +156,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
     if (picked == null) return;
-    ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(picked);
+    ref.read(selectedDateProvider.notifier).set(DateOnly.normalize(picked));
   }
 
   /// Moves the entry form to the adjacent calendar day through
@@ -164,10 +164,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   /// reloads the day — and unsaved edits are discarded by that reload,
   /// like every other day change here.
   void _moveDay(int delta) {
-    ref.read(selectedDateProvider.notifier).state = DateOnly.addDays(
-      ref.read(selectedDateProvider),
-      delta,
-    );
+    ref
+        .read(selectedDateProvider.notifier)
+        .set(DateOnly.addDays(ref.read(selectedDateProvider), delta));
   }
 
   /// Time picker prefilled from the stored (or, on a fresh day, current)
@@ -1025,9 +1024,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           ? Text(day.notes!, maxLines: 1, overflow: TextOverflow.ellipsis)
           : null,
       onTap: () {
-        ref.read(selectedDateProvider.notifier).state = DateOnly.normalize(
-          day.date,
-        );
+        ref
+            .read(selectedDateProvider.notifier)
+            .set(DateOnly.normalize(day.date));
       },
     );
   }

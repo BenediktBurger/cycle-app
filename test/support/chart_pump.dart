@@ -16,6 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'provider_fixtures.dart';
+
 /// The seed color of the app's scheme (lib/main.dart), pinned so tests can
 /// reach the same ColorScheme the charts render with.
 const chartSeedColor = Color(0xFF6750A4);
@@ -92,9 +94,7 @@ Widget chartHarness({
     marksProvider.overrideWith(
       (ref) => marksStreamFactory?.call() ?? Stream.value(marks),
     ),
-    selectedDateProvider.overrideWith(
-      (ref) => selectedDate ?? entries.first.date,
-    ),
+    selectedDatePin(selectedDate ?? entries.first.date),
     if (now != null)
       nowProvider.overrideWith((ref) => now)
     else if (pinnedToday != null)
@@ -102,12 +102,9 @@ Widget chartHarness({
         (ref) =>
             () => pinnedToday!,
       ),
-    if (temperatureRange != null)
-      temperatureRangeProvider.overrideWith((ref) => temperatureRange),
+    if (temperatureRange != null) temperatureRangePin(temperatureRange),
     if (observedCyclesOutsideApp != 0)
-      observedCyclesOutsideAppProvider.overrideWith(
-        (ref) => observedCyclesOutsideApp,
-      ),
+      observedCyclesPin(observedCyclesOutsideApp),
   ];
   final screen = withScaffold
       ? Scaffold(body: emptyHome ? null : const ZyklusScreen())

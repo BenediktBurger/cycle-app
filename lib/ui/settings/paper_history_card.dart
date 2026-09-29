@@ -163,9 +163,9 @@ final class PaperHistoryCard extends ConsumerWidget {
               errorText: l10n.settingsObservedCyclesOutsideAppError,
               initialValue: ref.watch(observedCyclesOutsideAppProvider),
               labelText: l10n.settingsObservedCyclesOutsideApp,
-              onChanged: (value) =>
-                  ref.read(observedCyclesOutsideAppProvider.notifier).state =
-                      value!,
+              onChanged: (value) => ref
+                  .read(observedCyclesOutsideAppProvider.notifier)
+                  .set(value!),
             ),
             const SizedBox(height: 8),
             Text(
@@ -181,11 +181,9 @@ final class PaperHistoryCard extends ConsumerWidget {
               labelText: l10n.settingsPaperShortestCycleLength,
               minValue: 1,
               allowEmpty: true,
-              onChanged: (value) =>
-                  ref
-                          .read(shortestCycleLengthOutsideAppProvider.notifier)
-                          .state =
-                      value,
+              onChanged: (value) => ref
+                  .read(shortestCycleLengthOutsideAppProvider.notifier)
+                  .set(value),
             ),
             const SizedBox(height: 8),
             Text(
@@ -206,14 +204,9 @@ final class PaperHistoryCard extends ConsumerWidget {
               // A cycle-day number counts from 1.
               minValue: 1,
               allowEmpty: true,
-              onChanged: (value) =>
-                  ref
-                          .read(
-                            earliestFirstHigherCycleDayOutsideAppProvider
-                                .notifier,
-                          )
-                          .state =
-                      value,
+              onChanged: (value) => ref
+                  .read(earliestFirstHigherCycleDayOutsideAppProvider.notifier)
+                  .set(value),
             ),
             const SizedBox(height: 8),
             Text(

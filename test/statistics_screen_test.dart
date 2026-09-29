@@ -16,6 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/provider_fixtures.dart';
+
 DateTime m(int month, int day) => DateTime.utc(2026, month, day);
 
 /// Two marked cycles, 2026:
@@ -81,13 +83,9 @@ Widget harness({
     marksProvider.overrideWith(
       (ref) => marksStreamFactory?.call() ?? Stream.value(marks),
     ),
-    observedCyclesOutsideAppProvider.overrideWith((ref) => observedOutsideApp),
-    shortestCycleLengthOutsideAppProvider.overrideWith(
-      (ref) => paperShortestCycleLength,
-    ),
-    earliestFirstHigherCycleDayOutsideAppProvider.overrideWith(
-      (ref) => paperEarliestFirstHigherCycleDay,
-    ),
+    observedCyclesPin(observedOutsideApp),
+    paperShortestPin(paperShortestCycleLength),
+    paperEarliestPin(paperEarliestFirstHigherCycleDay),
   ],
   child: MaterialApp(
     theme: ThemeData(colorSchemeSeed: const Color(0xFF6750A4)),

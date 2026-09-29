@@ -2,7 +2,8 @@ name: CI
 
 # ADR-0006: correctness gate for hand-written code — analyze, dart format,
 # and test on every push/PR; a web build plus an Android debug build compile
-# both shipping targets. development is the primary integration line, main
+# both shipping targets; a build_runner re-run must leave every committed
+# *.g.dart file untouched. development is the primary integration line, main
 # the release line. Manual runs for convenience.
 on:
   push:
@@ -80,6 +81,17 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      # Regenerate the committed .g.dart outputs (drift_dev +
+      # riverpod_generator; why committed: CONTRIBUTING.md, "Codegen and
+      # generated files") and fail on any diff — stale generated schema
+      # still compiles, so analyze/test would not catch it.
+      # Localizations are covered by `generate: true` (regenerated on every
+      # pub get/build) and are gitignored besides.
+      - name: Codegen freshness
+        run: |
+          dart run build_runner build
+          git diff --exit-code -- '*.g.dart'
 
       # What the vendoring check fetches (the upstream pin script and the
       # amalgamation archive it names) is fixed by pubspec.lock, so a

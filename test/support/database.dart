@@ -18,6 +18,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'provider_fixtures.dart';
+
 /// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
 ///
 /// `closeStreamsSynchronously: true` is drift's documented remedy for widget
@@ -113,14 +115,11 @@ ProviderScope appScope({
   return ProviderScope(
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
-      if (locale != null) localeProvider.overrideWith((ref) => locale),
-      if (themeMode != null) themeModeProvider.overrideWith((ref) => themeMode),
-      onboardingCompletedProvider.overrideWith(
-        (ref) => onboardingCompleted ?? true,
-      ),
+      if (locale != null) localePin(locale),
+      if (themeMode != null) themeModePin(themeMode),
+      onboardingPin(onboardingCompleted ?? true),
       if (now != null) nowProvider.overrideWith((ref) => now),
-      if (selectedDay != null)
-        selectedDateProvider.overrideWith((ref) => selectedDay),
+      if (selectedDay != null) selectedDatePin(selectedDay),
       if (entriesStream != null)
         dailyEntriesProvider.overrideWith((ref) => entriesStream),
     ],

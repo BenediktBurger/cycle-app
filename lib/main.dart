@@ -134,8 +134,9 @@ class _CycleAppState extends ConsumerState<CycleApp>
         // Only the departure from the interactive foreground stamps the
         // day; partial wake-ups that never reach `resumed` must not.
         if (previous == AppLifecycleState.resumed) {
-          ref.read(lastForegroundDayProvider.notifier).state =
-              DateOnly.normalize(ref.read(nowProvider)());
+          ref
+              .read(lastForegroundDayProvider.notifier)
+              .set(DateOnly.normalize(ref.read(nowProvider)()));
         }
     }
   }
@@ -164,11 +165,11 @@ class _CycleAppState extends ConsumerState<CycleApp>
     final lastDay = ref.read(lastForegroundDayProvider);
     final today = DateOnly.normalize(ref.read(nowProvider)());
     if (lastDay == null || DateOnly.sameDay(lastDay, today)) return;
-    ref.read(selectedDateProvider.notifier).state = today;
+    ref.read(selectedDateProvider.notifier).set(today);
     // Tab 0 is the diary: the reset lands WITH the ready form, not beside
     // wherever the user last looked.
-    ref.read(tabIndexProvider.notifier).state = 0;
-    ref.read(lastForegroundDayProvider.notifier).state = today;
+    ref.read(tabIndexProvider.notifier).set(0);
+    ref.read(lastForegroundDayProvider.notifier).set(today);
   }
 
   @override
@@ -426,7 +427,7 @@ class _HomeShell extends ConsumerWidget {
                     NavigationRail(
                       selectedIndex: index,
                       onDestinationSelected: (int newIndex) =>
-                          ref.read(tabIndexProvider.notifier).state = newIndex,
+                          ref.read(tabIndexProvider.notifier).set(newIndex),
                       labelType: NavigationRailLabelType.all,
                       destinations: [
                         NavigationRailDestination(
@@ -478,7 +479,7 @@ class _HomeShell extends ConsumerWidget {
     height: 64,
     selectedIndex: index,
     onDestinationSelected: (int newIndex) =>
-        ref.read(tabIndexProvider.notifier).state = newIndex,
+        ref.read(tabIndexProvider.notifier).set(newIndex),
     destinations: [
       NavigationDestination(
         icon: const Icon(Icons.event_outlined),

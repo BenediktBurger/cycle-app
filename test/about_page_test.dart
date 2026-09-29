@@ -21,7 +21,6 @@
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/licenses.dart';
 import 'package:cycle_app/main.dart';
-import 'package:cycle_app/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +32,7 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 import 'support/database.dart';
 import 'support/finders.dart';
 import 'support/viewport.dart';
+import 'support/provider_fixtures.dart';
 
 /// Offline-safe recording fake for the launcher platform interface: every
 /// launch is intercepted and only recorded, so no test ever touches a real
@@ -69,10 +69,7 @@ void main() {
     useDeviceLocales(tester, const [Locale('de')]);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          inMemoryDatabase(),
-          onboardingCompletedProvider.overrideWith((ref) => false),
-        ],
+        overrides: [inMemoryDatabase(), onboardingPin(false)],
         child: const CycleApp(),
       ),
     );
@@ -120,10 +117,7 @@ void main() {
       useDeviceLocales(tester, const [Locale('de')]);
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            inMemoryDatabase(),
-            onboardingCompletedProvider.overrideWith((ref) => false),
-          ],
+          overrides: [inMemoryDatabase(), onboardingPin(false)],
           child: const CycleApp(),
         ),
       );

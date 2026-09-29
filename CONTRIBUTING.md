@@ -290,6 +290,32 @@ failures):
 If `flutter analyze` or `flutter test` fails with hand-written code, please
 report the full analyzer/test output back so issues can be fixed promptly.
 
+## 6. Codegen and generated files
+
+Two generators run on this repo, with opposite policies for their output:
+
+- **Localizations** are regenerated automatically: `generate: true` in
+  `pubspec.yaml` makes every `flutter pub get`/`test`/build run
+  `gen-l10n` (configured via `l10n.yaml`, output under `lib/l10n/`), so
+  the only sources you edit are `app_en.arb`/`app_de.arb` (wording rules:
+  the Localization convention below). The generated files are
+  **gitignored** — they appear freshly on every checkout — and a manual
+  `flutter gen-l10n` is only the fallback when something wedges.
+- **build_runner outputs** are **committed** and rebuilt by hand:
+  `dart run build_runner build` after editing an annotated source —
+  `lib/db/*.g.dart` from the drift table definitions, `lib/providers.g.dart`
+  from the riverpod_generator annotations. Why committed at all: a fresh
+  checkout must compile with no pub-dev round trip first, which the F-Droid
+  build-from-source recipe ([`docs/release.md`](docs/release.md), Phase E)
+  depends on — and CI and agent worktrees compile directly.
+
+Stale committed output fails **silently** at compile time: worst case, a
+new drift column is simply absent from the generated schema while
+everything still compiles — riverpod's generated provider copies (source
+hash, doc comments) drift just as invisibly. Regenerate in the same commit
+as the annotation change and inspect the `.g.dart` diff; CI re-runs
+build_runner and fails the gate on any diff.
+
 ## Conventions
 
 - **Architecture decisions** get an ADR under
