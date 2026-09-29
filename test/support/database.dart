@@ -13,6 +13,9 @@ import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// Override (the inMemoryDatabase return type) ships from the misc entry in
+// Riverpod 3.x — the main import doesn't export it.
+import 'package:flutter_riverpod/misc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 /// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.

@@ -80,11 +80,11 @@ class _CycleAppState extends ConsumerState<CycleApp>
       previous,
       next,
     ) {
-      // valueOrNull (not .value): a broken settings read must surface as
-      // "no snapshot" here — .value rethrows the read error and would
-      // crash the start through this listener, defeating the gate's
-      // fail-open to the shell below.
-      final snapshot = next.valueOrNull; // null while loading/in error
+      // .value returns null on loading and error states in Riverpod 3.x, so
+      // a broken settings read still surfaces as "no snapshot" here instead
+      // of crashing the start through this listener — the gate fails open
+      // to the shell below.
+      final snapshot = next.value; // null while loading/in error
       if (snapshot == null) return;
       hydratePersistedSettings(ref, snapshot);
     });

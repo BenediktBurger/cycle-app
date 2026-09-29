@@ -43,6 +43,21 @@ the sections above track planned work, git history keeps the record (see
   duplicated verbatim in the export/import card and the drip-import card —
   it could live once (e.g. in import_dialog.dart); needs discussion.
 
+#### Riverpod modernization (decided, startable)
+
+- [ ] adopt `@riverpod` codegen and convert the legacy `StateProvider`s —
+  all of them in lib/providers.dart, including the hydration registrar's
+  `PersistedSetting.bind<T>` — to `Notifier`/`AsyncNotifier`. The
+  `package:flutter_riverpod/legacy.dart` import is the interim bridge from
+  the Riverpod 3 migration.
+
+#### Developer infrastructure (decided, startable)
+
+- [ ] set up the Renovate bot (choice over Dependabot because of its
+  grouping) with grouped non-major dependency updates and lock-file
+  maintenance; majors are held for manual review. Its value depends on PR
+  CI actually running the full gate (analyze, format check, tests).
+
 #### Building the app (to be clarified with INER)
 
 - create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
