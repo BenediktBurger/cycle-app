@@ -12,9 +12,11 @@
 // Pure Dart, no pdf-package import: the planner knows only day counts.
 
 /// One page window for ONE cycle: the cycle's days
-/// `[firstDayIndex, firstDayIndex + dayCount)` — indices into that cycle's
-/// tracked-day list (Cycle.days). Ordered: cycle order first, then page
-/// order inside the cycle.
+/// `[firstDayIndex, firstDayIndex + dayCount)` — indices into the cycle's
+/// span list (cycleSpanDays, lib/domain/cycle_grouping.dart: the tracked
+/// days plus the trailing data-less span days; untracked gap days BETWEEN
+/// tracked days stay out of the list). Ordered: cycle order first, then
+/// page order inside the cycle.
 final class CyclePagePlan {
   const CyclePagePlan({
     required this.cycleIndex,
@@ -29,10 +31,10 @@ final class CyclePagePlan {
   /// 0-based page number WITHIN this cycle (for "Blatt k/n" labels).
   final int pageIndexInCycle;
 
-  /// The first day (index into the cycle's day list) drawn on this page.
+  /// The first day (index into the cycle's span list) drawn on this page.
   final int firstDayIndex;
 
-  /// How many of the cycle's days this page draws.
+  /// How many of the cycle's span days this page draws.
   final int dayCount;
 }
 
@@ -45,8 +47,10 @@ final class CyclePagePlan {
 const int defaultMaxDaysPerPage = 40;
 
 /// Plans the pages of the exported cycles: [cycleDayCounts] carries each
-/// exported cycle's tracked-day COUNT in observation order; the result
-/// lists one entry per page, in print order.
+/// exported cycle's span-day count (cycleSpanDays — tracked days plus
+/// trailing data-less span days, so every cycle counts at least one) in
+/// observation order; the result lists one entry per page, in print
+/// order.
 ///
 /// Every cycle gets `ceil(dayCount / maxDaysPerPage)` pages; the last page
 /// of a cycle takes only its trailing remainder days. An empty input
@@ -73,8 +77,8 @@ List<CyclePagePlan> planCyclePages(
         'a cycle day count must not be negative',
       );
     }
-    if (total == 0) continue; // nothing to draw (every tracked cycle group
-    // holds at least one day; harmless for direct callers).
+    if (total == 0) continue; // nothing to draw (every span is at least one
+    // day; harmless for direct callers).
     var pageInCycle = 0;
     for (var first = 0; first < total; first += maxDaysPerPage) {
       final windowEnd = (first + maxDaysPerPage) > total

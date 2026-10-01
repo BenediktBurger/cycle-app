@@ -6,20 +6,19 @@
 // NEVER creates a boundary by itself and never suggests one — the only
 // bleeding-driven derivation lives in the foreign-import replay
 // (lib/domain/drip_import.dart: the drip-local onset rule).
-// The old automatic "first bleeding day starts a cycle" rule is
-// superseded; bleeding sequences alone form ONE group.
 //
 // Span rule (owner requirement, app-wide): a cycle runs on UNTIL the next
-// cycle-start mark, regardless whether data exists there. Grouping extends
-// every cycle's day list with data-less placeholder entries out to
-// (a) the day BEFORE the next cycleStart mark (leading + interior cycles)
-// and (b) for the LAST cycle to max(last tracked day of the whole data
-// set, today) — at least cycle day one can always be printed. A mark with
-// no tracked day on/after it (e.g. placed just today) still opens a
-// data-less cycle AT the mark day. Untracked days BETWEEN a cycle's own
-// tracked days stay out of the list (the gap-day drop-out convention).
-// The "today" of the last-cycle rule is injectable (tests pin a date;
-// production uses the wall clock / nowProvider at the call sites).
+// cycle-start mark, regardless whether data exists there. [Cycle.days]
+// holds ONLY the cycle's tracked entries; the calendar reach lives in
+// [Cycle.spanEnd] — the day BEFORE the next cycleStart mark (leading +
+// interior cycles), and for the LAST cycle max(last tracked day of the
+// whole data set, today). A mark with no tracked day on/after it still
+// opens a data-less cycle AT the mark day: empty [Cycle.days], full span.
+// [cycleSpanDays] joins tracked days and span for the consumers that walk
+// the calendar. Untracked days BETWEEN a cycle's own tracked days stay
+// out of both lists (the gap-day drop-out convention). The "today" of the
+// last-cycle rule is injectable (tests pin a date; production uses the
+// wall clock / nowProvider at the call sites).
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -54,10 +53,9 @@ CycleMark ignoredDay(int year, int month, int day) => CycleMark(
   type: CycleMarkTypes.ignoreTemperature,
 );
 
-/// Matches a data-less span-extension placeholder day: no observation of
-/// any kind — every recorded surface (measurement and its time, bleeding,
-/// mucus sign and quality, cervix, the two pains, sex timings, raw
-/// disturbance flags, notes) reads as the entry constructor's default.
+/// Matches a data-less span day — the filler entries [cycleSpanDays]
+/// appends after a cycle's tracked days: no observation of any kind, every
+/// recorded surface reads as the entry constructor's default.
 final hasNoData = isA<DailyEntry>()
     .having((e) => e.bbtC, 'bbtC', isNull)
     .having((e) => e.measuredAtMinutes, 'measuredAtMinutes', isNull)
@@ -92,23 +90,23 @@ void main() {
       );
 
       expect(cycles, hasLength(2));
-      // The leading group (before the first mark) is NOT a menstruation
-      // onset; the mark-opened group is.
-      expect(cycles[0].startsAtMenstruation, isFalse);
+      // The leading group (before the first mark) does not start at a
+      // cycleStart mark; the mark-opened group does.
+      expect(cycles[0].startsAtMark, isFalse);
       expect(cycles[0].startDate, DateTime(2026, 3, 1));
       expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3, 4]);
-      expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(cycles[1].startsAtMark, isTrue);
       expect(cycles[1].startDate, DateTime(2026, 3, 5));
-      // The cycle runs on to the pinned today: the tracked Mar 5–6 plus
-      // the data-less Mar 7–8 extension days.
+      // days holds only the tracked Mar 5–6; the span runs on to the
+      // pinned today (Mar 8).
+      expect(cycles[1].days.map((e) => e.date.day), [5, 6]);
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 8)));
-      expect(cycles[1].days.map((e) => e.date.day), [5, 6, 7, 8]);
-      // The extension days carry NO data.
-      expect(cycles[1].days.last.bbtC, isNull);
-      expect(cycles[1].days.last.bleeding, Bleeding.none);
+      expect(cycleSpanDays(cycles[1]).map((e) => e.date.day), [5, 6, 7, 8]);
+      // The span filler days carry NO data.
+      expect(cycleSpanDays(cycles[1]).skip(2), everyElement(hasNoData));
     });
 
-    test('an interior cycle extends to the day before the NEXT start mark '
+    test('an interior cycle ends the day before the NEXT start mark '
         '(today-independent)', () {
       final entries = [
         d(2026, 3, 1),
@@ -121,30 +119,16 @@ void main() {
 
       final cycles = groupIntoCycles(entries, marks);
 
-      // The first cycle runs Mar 1..Mar 9 — its tracked days Mar 1–3 plus
-      // data-less Mar 4–9, because the next cycle-start mark is Mar 10.
+      // The first cycle runs Mar 1..Mar 9 — tracked days Mar 1–3, span end
+      // Mar 9, because the next cycle-start mark is Mar 10.
       expect(cycles, hasLength(2));
       expect(cycles[0].startDate, DateTime(2026, 3, 1));
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
-      expect(cycles[0].days.map((e) => e.date.day), [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-      ]);
-      for (final entry in cycles[0].days.skip(3)) {
-        expect(entry.bbtC, isNull, reason: 'an extension day carries no data');
-        expect(entry.bleeding, Bleeding.none);
-      }
+      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
     });
 
     test('untracked days BETWEEN a cycle\'s own tracked days stay out of '
-        'the day list (the gap-day convention)', () {
+        'days and span (the gap-day convention)', () {
       final entries = [
         d(2026, 3, 1),
         d(2026, 3, 2),
@@ -155,12 +139,22 @@ void main() {
 
       final cycles = groupIntoCycles(entries, marks);
 
-      // The interior gap Mar 3–4 is NOT backfilled; starting at the cycle's
-      // last tracked day (Mar 5), the extension fills Mar 6–9.
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 5, 6, 7, 8, 9]);
+      // The interior gap Mar 3–4 is NOT backfilled — in days nor in the
+      // span list the diary/chart walk: starting at the last tracked day
+      // (Mar 5), only the span tail Mar 6–9 joins the tracked days.
+      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 5]);
+      expect(cycleSpanDays(cycles[0]).map((e) => e.date.day), [
+        1,
+        2,
+        5,
+        6,
+        7,
+        8,
+        9,
+      ]);
     });
 
-    test('the leading group extends to the day before the first mark', () {
+    test('the leading group ends the day before the first mark', () {
       final entries = [
         d(2026, 3, 1),
         d(2026, 3, 2),
@@ -172,11 +166,11 @@ void main() {
       final cycles = groupIntoCycles(entries, marks);
 
       expect(cycles, hasLength(2));
-      expect(cycles[0].startsAtMenstruation, isFalse);
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3, 4, 5, 6]);
+      expect(cycles[0].startsAtMark, isFalse);
+      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 6)));
       expect(cycles[1].startDate, DateTime(2026, 3, 7));
-      expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(cycles[1].startsAtMark, isTrue);
     });
 
     test('without marks the single group runs on to today (the last-cycle '
@@ -190,12 +184,13 @@ void main() {
       );
 
       expect(cycles, hasLength(1));
-      expect(cycles.single.startsAtMenstruation, isFalse);
+      expect(cycles.single.startsAtMark, isFalse);
       expect(cycles.single.endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
-      expect(cycles.single.days, hasLength(9));
+      expect(cycles.single.days, hasLength(3));
+      expect(cycleSpanDays(cycles.single), hasLength(9));
     });
 
-    test('the LAST cycle extends to the last tracked day of the WHOLE data '
+    test('the LAST cycle ends at the last tracked day of the WHOLE data '
         'set or today — whichever is later (injectable clock)', () {
       final entries = [
         d(2026, 3, 1),
@@ -206,23 +201,23 @@ void main() {
       ];
       final marks = [start(2026, 3, 1), start(2026, 3, 10)];
 
-      // Today after the last tracked day: the cycle runs on to today.
+      // Today after the last tracked day: the cycle runs on to today
+      // while days keep only the tracked Mar 10–11.
       final cycles = groupIntoCycles(
         entries,
         marks,
         today: DateTime(2026, 3, 15),
       );
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 15)));
-      expect(cycles[1].days, hasLength(6));
+      expect(cycles[1].days.map((e) => e.date.day), [10, 11]);
 
-      // The clock behind the data (raw last tracked wins, no retraction).
+      // The clock behind the data: the raw last tracked day wins, the
+      // span never retracts below it.
       final cyclesPinned = groupIntoCycles(
         entries,
         marks,
         today: DateTime(2026, 3, 9),
       );
-      // The raw last tracked day wins — same CYCLE DAY as the expectation;
-      // endDate carries the entry's own (non-extended) date object.
       expect(
         DateOnly.sameDay(cyclesPinned[1].endDate, DateTime(2026, 3, 11)),
         isTrue,
@@ -241,18 +236,17 @@ void main() {
         today: DateTime(2026, 3, 22),
       );
 
-      // The old data set up to Mar 19 (extension), then the fresh,
-      // data-less cycle Mar 20..Mar 22 — its cycle day 1 prints.
+      // The first cycle runs Mar 1..Mar 19, then the fresh, data-less
+      // cycle Mar 20..Mar 22 — empty days, valid span.
       expect(cycles, hasLength(2));
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 19)));
-      expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(cycles[1].startsAtMark, isTrue);
       expect(cycles[1].startDate, DateOnly.normalize(DateTime(2026, 3, 20)));
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 22)));
-      expect(cycles[1].days.map((e) => e.date.day), [20, 21, 22]);
-      for (final entry in cycles[1].days) {
-        expect(entry.bbtC, isNull);
-        expect(entry.bleeding, Bleeding.none);
-      }
+      expect(cycles[1].days, isEmpty);
+      final freshSpan = cycleSpanDays(cycles[1]);
+      expect(freshSpan.map((e) => e.date.day), [20, 21, 22]);
+      expect(freshSpan, everyElement(hasNoData));
     });
 
     test('several marks beyond the data open consecutive data-less cycles', () {
@@ -270,7 +264,16 @@ void main() {
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 24)));
       expect(cycles[2].startDate, DateOnly.normalize(DateTime(2026, 3, 25)));
       expect(cycles[2].endDate, DateOnly.normalize(DateTime(2026, 3, 30)));
-      expect(cycles[1].days, everyElement(hasNoData));
+      expect(cycles[1].days, isEmpty);
+      expect(cycleSpanDays(cycles[1]), hasLength(5));
+      // The whole span is data-less.
+      for (final entry in [
+        ...cycleSpanDays(cycles[1]),
+        ...cycleSpanDays(cycles[2]),
+      ]) {
+        expect(entry.bbtC, isNull);
+        expect(entry.bleeding, Bleeding.none);
+      }
     });
 
     test('the fresh-mark cycle never retracts below its start (clock behind '
@@ -284,9 +287,11 @@ void main() {
         today: DateTime(2026, 3, 15),
       );
 
-      // today (Mar 15) is behind the mark: end clamps to the start itself.
-      expect(cycles[1].days, hasLength(1));
+      // today (Mar 15) is behind the mark: end clamps to the start itself
+      // — a single-day span, still emitted with empty days.
+      expect(cycles[1].days, isEmpty);
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 20)));
+      expect(cycleSpanDays(cycles[1]), hasLength(1));
     });
 
     test('back-to-back start marks keep adjacent one-day spans apart', () {
@@ -305,14 +310,15 @@ void main() {
       );
 
       // Cycle 1 ends the day before the next start mark — here its own
-      // tracked day (no extension to add); same CYCLE DAY for sure (the
-      // unextended endDate carries the entry's own date object).
+      // tracked day, so span and days coincide.
       expect(cycles, hasLength(2));
       expect(cycles[0].startDate, DateTime(2026, 3, 1));
       expect(DateOnly.sameDay(cycles[0].endDate, DateTime(2026, 3, 1)), isTrue);
+      expect(cycles[0].days, hasLength(1));
       expect(cycles[1].startDate, DateTime(2026, 3, 2));
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 6)));
-      expect(cycles[1].days.map((e) => e.date.day), [2, 3, 4, 5, 6]);
+      expect(cycles[1].days.map((e) => e.date.day), [2, 3, 4]);
+      expect(cycleSpanDays(cycles[1]).map((e) => e.date.day), [2, 3, 4, 5, 6]);
     });
 
     test('start-day marks stay merged: a mark on/before the first tracked '
@@ -332,20 +338,24 @@ void main() {
       );
 
       // Both pre-range marks open the SAME group (no tracked day between
-      // them separates two cycles) at the first tracked day; the NEWEST
-      // one (Mar 1) is the anchor — its own date is the cycle start, an
-      // untracked day before the first tracked day.
+      // them separates two cycles); the NEWEST one (Mar 1) is the anchor
+      // — its own date is the cycle start, an untracked day before the
+      // first tracked day.
       expect(cycles, hasLength(1));
-      expect(cycles.single.startsAtMenstruation, isTrue);
+      expect(cycles.single.startsAtMark, isTrue);
       expect(cycles.single.startDate, DateTime(2026, 3, 1));
       expect(cycles.single.endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
+      expect(cycleSpanDays(cycles.single).map((e) => e.date.day), [
+        5,
+        6,
+        7,
+        8,
+        9,
+      ]);
     });
 
     test('bleeding alone never opens a group — one group without marks', () {
       final entries = <DailyEntry>[
-        // The old rule split at every menstruation-level onset (Mar 2,
-        // Mar 30, Apr 27); under the mark-driven rule all of this is ONE
-        // group unless the user places cycleStart marks.
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, bleeding: Bleeding.medium),
         d(2026, 3, 4),
@@ -363,14 +373,15 @@ void main() {
 
       expect(cycles, hasLength(1));
       expect(
-        cycles.single.startsAtMenstruation,
+        cycles.single.startsAtMark,
         isFalse,
         reason: 'no mark exists — the single group is the leading group',
       );
       expect(cycles.single.startDate, DateTime(2026, 3, 2));
-      // The single (last) cycle runs on to the pinned today: the seven
-      // tracked days plus Mar.../Apr 29 - May 1 extension days.
-      expect(cycles.single.days, hasLength(10));
+      // The single (last) cycle runs on to the pinned today; days keep
+      // only the seven tracked entries.
+      expect(cycles.single.days, hasLength(7));
+      expect(cycles.single.endDate, DateOnly.normalize(DateTime(2026, 5, 1)));
     });
 
     test('a mark on an untracked gap day anchors the start on the mark '
@@ -390,31 +401,28 @@ void main() {
       );
 
       expect(cycles, hasLength(2));
-      expect(cycles[0].startsAtMenstruation, isFalse);
-      // The leading group extends to the day before the mark (Mar 2 as a
-      // data-less extension day).
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2]);
+      expect(cycles[0].startsAtMark, isFalse);
+      expect(cycles[0].days.map((e) => e.date.day), [1]);
+      // The untracked Mar 2 (the day before the mark) is span, not member
+      // data: only the span list carries it.
+      expect(cycleSpanDays(cycles[0]).map((e) => e.date.day), [1, 2]);
       expect(
-        cycles[1].startsAtMenstruation,
+        cycles[1].startsAtMark,
         isTrue,
         reason: 'the group opened for the mark',
       );
       // The start date is the MARK's own date — an untracked day — so the
       // distance between the two marks equals the cycle length.
       expect(cycles[1].startDate, DateTime(2026, 3, 3));
+      expect(cycles[1].days.map((e) => e.date.day), [4, 5]);
+      expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
       expect(
-        cycles[1].days.map((e) => e.date.day),
+        cycleSpanDays(cycles[1]).map((e) => e.date.day),
         [4, 5, 6, 7, 8, 9],
         reason:
-            'tracked days plus the span extension out to the pinned '
-            'today — days in the gap are not member days',
+            'the span out to the pinned today; the mark day itself is '
+            'untracked and stays out of the span list',
       );
-      expect(
-        cycles[1].days.map((e) => e.date.day),
-        isNot(contains(3)),
-        reason: 'startDate lies on an untracked gap day — not a member day',
-      );
-      expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
     });
 
     test('a mark mid-cycle is authoritative wherever placed — including '
@@ -438,12 +446,14 @@ void main() {
       );
 
       expect(cycles, hasLength(2));
-      // The leading group extends across the untracked Mar 4–5 to the day
+      // The leading group ends across the untracked Mar 4–5, the day
       // before the mark.
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3, 4, 5]);
-      expect(cycles[1].startsAtMenstruation, isTrue);
+      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
+      expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(cycles[1].startsAtMark, isTrue);
       expect(cycles[1].startDate, DateTime(2026, 3, 6));
-      expect(cycles[1].days.map((e) => e.date.day), [6, 7, 8, 9]);
+      expect(cycles[1].days.map((e) => e.date.day), [6, 7]);
+      expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
     });
 
     test('a mark on the first tracked day opens the first group itself '
@@ -458,7 +468,7 @@ void main() {
       );
 
       expect(cycles, hasLength(1));
-      expect(cycles.single.startsAtMenstruation, isTrue);
+      expect(cycles.single.startsAtMark, isTrue);
       expect(cycles.single.startDate, DateTime(2026, 3, 1));
       expect(cycles.single.endDate, DateOnly.normalize(DateTime(2026, 3, 4)));
     });
@@ -488,7 +498,7 @@ void main() {
 
       expect(cycles, hasLength(1));
       expect(
-        cycles.single.startsAtMenstruation,
+        cycles.single.startsAtMark,
         isTrue,
         reason: 'the first group opens for the earliest mark',
       );
@@ -514,12 +524,14 @@ void main() {
       expect(cycles, hasLength(2));
       // The newer (re-marked) start supersedes the older one — the anchor
       // rule of the mark sheet applies to the opening batch as well; the
-      // superseded earlier mark hands its day (Mar 3) to the leading group
-      // as a data-less span-extension day.
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
+      // superseded earlier mark's day (Mar 3) falls to the leading group's
+      // span (untracked, no member day).
+      expect(cycles[0].days.map((e) => e.date.day), [1]);
+      expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 3)));
       expect(cycles[1].startDate, DateTime(2026, 3, 4));
-      expect(cycles[1].startsAtMenstruation, isTrue);
-      expect(cycles[1].days.map((e) => e.date.day), [5, 6, 7, 8]);
+      expect(cycles[1].startsAtMark, isTrue);
+      expect(cycles[1].days.map((e) => e.date.day), [5]);
+      expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 8)));
     });
 
     test('other mark types do not create boundaries', () {
@@ -543,9 +555,10 @@ void main() {
       );
 
       expect(cycles, hasLength(1));
-      expect(cycles.single.startsAtMenstruation, isFalse);
+      expect(cycles.single.startsAtMark, isFalse);
       // The single (last) cycle runs on to the pinned today.
-      expect(cycles.single.days, hasLength(5));
+      expect(cycles.single.endDate, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(cycles.single.days, hasLength(3));
     });
 
     // (The per-profile grouping tests are gone: there is no profile
@@ -561,8 +574,8 @@ void main() {
     test('a mark without any tracked data still opens data-less cycles '
         '(entries empty)', () {
       // The "user just created the cycle mark" corner: no data exists at
-      // all, but the placed cycleStart mark opens its cycle — at least
-      // cycle day 1 can be printed. Two marks: two consecutive cycles.
+      // all, but the placed cycleStart mark opens its cycle with a valid
+      // span. Two marks: two consecutive cycles.
       final cycles = groupIntoCycles(const <DailyEntry>[], [
         start(2026, 3, 1),
         start(2026, 3, 5),
@@ -571,16 +584,14 @@ void main() {
       expect(cycles, hasLength(2));
       expect(cycles[0].startDate, DateOnly.normalize(DateTime(2026, 3, 1)));
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 4)));
-      expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3, 4]);
-      expect(cycles[0].days, everyElement(hasNoData));
+      expect(cycles[0].days, isEmpty);
+      expect(cycleSpanDays(cycles[0]).map((e) => e.date.day), [1, 2, 3, 4]);
+      expect(cycleSpanDays(cycles[0]), everyElement(hasNoData));
       expect(cycles[1].startDate, DateOnly.normalize(DateTime(2026, 3, 5)));
       // today (Mar 3) is behind the second mark: end clamps to the start.
-      expect(cycles[1].days.map((e) => e.date.day), [5]);
-      expect(
-        cycles.every((c) => c.startsAtMenstruation),
-        isTrue,
-        reason: 'both cycles opened at a mark',
-      );
+      expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 3, 5)));
+      expect(cycles[1].days, isEmpty);
+      expect(cycles.every((c) => c.startsAtMark), isTrue);
     });
 
     test('unsorted input is sorted internally', () {
@@ -613,18 +624,17 @@ void main() {
       );
 
       expect(cycles, hasLength(3));
-      expect(cycles.map((c) => c.startsAtMenstruation), everyElement(isTrue));
+      expect(cycles.map((c) => c.startsAtMark), everyElement(isTrue));
       expect(cycles[0].startDate, DateTime(2026, 3, 2));
       expect(cycles[1].startDate, DateTime(2026, 3, 30));
       expect(cycles[2].startDate, DateTime(2026, 4, 27));
       // Every interior cycle runs to the day before its next start mark;
       // the last runs to the pinned today.
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2026, 3, 29)));
-      expect(cycles[0].days, hasLength(28));
+      expect(cycles[0].days, hasLength(3));
       expect(cycles[1].endDate, DateOnly.normalize(DateTime(2026, 4, 26)));
       expect(cycles[2].endDate, DateOnly.normalize(DateTime(2026, 4, 30)));
-      // The tracked bleeding observations survive inside the extended day
-      // lists (extension days carry nothing).
+      // The tracked bleeding observations survive inside days.
       expect(
         cycles[0].days,
         containsAll(<Matcher>[
@@ -667,8 +677,7 @@ void main() {
 
     test('an untracked gap day between mark and first tracked day keeps '
         'counting (belongs to the mark-opened cycle)', () {
-      // Mark on Mar 2 with the next tracked day on Mar 5 (fixture chain:
-      // entries extended by the isolated members this pin needs).
+      // Mark on Mar 2 with the next tracked day on Mar 5.
       final gapped = groupIntoCycles(
         [d(2026, 3, 1), d(2026, 3, 5)],
         [start(2026, 3, 2)],
@@ -734,6 +743,16 @@ void main() {
       ]);
     });
 
+    test('a data-less mark cycle keeps its onset (marks-only input)', () {
+      final entries = [d(2026, 3, 1), d(2026, 3, 4)];
+      final marks = [start(2026, 3, 3), start(2026, 4, 2)];
+
+      expect(menstruationOnsetDates(entries, marks), [
+        DateOnly.normalize(DateTime(2026, 3, 3)),
+        DateOnly.normalize(DateTime(2026, 4, 2)),
+      ]);
+    });
+
     test('no marks → no onsets (bleeding alone does not count)', () {
       final entries = [d(2026, 3, 2, bleeding: Bleeding.medium), d(2026, 3, 3)];
       expect(menstruationOnsetDates(entries, const []), isEmpty);
@@ -741,38 +760,39 @@ void main() {
     });
   });
 
-  group('groupIntoCycles — the synthetic span is bounded at the lookback '
-      'floor', () {
-    // The window under test derives from the domain constant, so the
-    // contract follows the number the implementation materializes with.
-    final lookback = syntheticSpanLookbackDays;
-    // The lookback floor under this pinned today — derived with the same
-    // DateOnly arithmetic the implementation must use (DST-immune).
+  group('groupIntoCycles — data-less and far-past cycles carry their FULL '
+      'span', () {
+    // Far in the past or entirely without data, a cycle is no less a
+    // cycle: it is emitted with empty days and the span the mark
+    // arithmetic fixes — no other date in the derivation trims it.
     final today = DateTime(2026, 9, 25);
 
-    test('a year-2000 data-less mark cycle keeps its span but materializes '
-        'placeholders only within the lookback window', () {
+    test('a year-2000 data-less mark cycle keeps its full span with empty '
+        'days', () {
       final cycles = groupIntoCycles(const <DailyEntry>[], [
         start(2000, 1, 1),
       ], today: today);
 
       expect(cycles, hasLength(1));
       final cycle = cycles.single;
-      // The SPAN is unchanged: the still-running cycle reaches today; only
-      // the browsable day list is bounded (the far-past part renders as a
-      // silent gap).
+      // The still-running cycle reaches today; its tracked days are none.
       expect(cycle.startDate, DateOnly.normalize(DateTime(2000, 1, 1)));
       expect(cycle.endDate, DateOnly.normalize(today));
-      expect(cycle.trackedEndDate, isNull);
+      expect(cycle.days, isEmpty);
+      expect(cycle.startsAtMark, isTrue);
 
-      expect(cycle.days, hasLength(lookback));
-      expect(cycle.days.first.date, DateOnly.addDays(today, -(lookback - 1)));
-      expect(cycle.days.last.date, DateOnly.normalize(today));
-      expect(cycle.days, everyElement(hasNoData));
+      final span = cycleSpanDays(cycle);
+      expect(
+        span,
+        hasLength(DateOnly.daysBetween(today, DateTime(2000, 1, 1)) + 1),
+      );
+      expect(span.first.date, DateOnly.normalize(DateTime(2000, 1, 1)));
+      expect(span.last.date, DateOnly.normalize(today));
+      expect(span, everyElement(hasNoData));
     });
 
     test('a data-heavy cycle whose tracked days end years before today keeps '
-        'its tracked days and gains only post-floor placeholders', () {
+        'its tracked days and its full span tail', () {
       final entries = [
         d(2020, 1, 1),
         d(2020, 1, 2),
@@ -786,46 +806,37 @@ void main() {
       final cycles = groupIntoCycles(entries, marks, today: today);
 
       expect(cycles, hasLength(2));
-      // The leading group's whole span predates the floor: exactly its
-      // tracked days, no extension day materializes.
-      expect(cycles[0].startsAtMenstruation, isFalse);
+      // The leading group: tracked days only; the interior span ends the
+      // day before the next mark.
+      expect(cycles[0].startsAtMark, isFalse);
       expect(cycles[0].days.map((e) => e.date.day), [1, 2, 3]);
-      expect(
-        cycles[0].trackedEndDate,
-        DateOnly.normalize(DateTime(2020, 1, 3)),
-      );
       expect(cycles[0].endDate, DateOnly.normalize(DateTime(2020, 1, 9)));
 
-      // The mark-opened cycle: tracked days pass through untouched; the
-      // extension toward today is trimmed at the floor.
-      expect(cycles[1].startsAtMenstruation, isTrue);
+      // The mark-opened cycle: tracked days pass through; the span runs
+      // to the pinned today behind the whole tracked body.
+      expect(cycles[1].startsAtMark, isTrue);
+      expect(cycles[1].days.map((e) => e.date.day), [10, 11, 12]);
+      expect(cycleSpanDays(cycles[1]).last.date, DateOnly.normalize(today));
       expect(
-        cycles[1].trackedEndDate,
-        DateOnly.normalize(DateTime(2020, 1, 12)),
+        cycleSpanDays(cycles[1]),
+        hasLength(DateOnly.daysBetween(today, DateTime(2020, 1, 10)) + 1),
       );
-      expect(cycles[1].endDate, DateOnly.normalize(today));
-      expect(cycles[1].days, hasLength(3 + lookback));
-      expect(cycles[1].days.take(3).map((e) => e.date.day), [10, 11, 12]);
-      final extension = cycles[1].days.skip(3).toList();
-      expect(extension.first.date, DateOnly.addDays(today, -(lookback - 1)));
-      expect(extension.last.date, DateOnly.normalize(today));
-      expect(extension, everyElement(hasNoData));
     });
 
-    test('a data-less cycle whose WHOLE span lies before the floor is still '
-        'emitted — with an empty day list (onsets keep counting it)', () {
+    test('a data-less cycle whose whole span lies before the next mark is '
+        'still emitted — with an empty day list and its own span', () {
       final marks = [start(2000, 1, 1), start(2000, 6, 1)];
 
       final cycles = groupIntoCycles(const <DailyEntry>[], marks, today: today);
 
       expect(cycles, hasLength(2));
-      final trimmed = cycles[0];
-      expect(trimmed.startsAtMenstruation, isTrue);
-      expect(trimmed.startDate, DateOnly.normalize(DateTime(2000, 1, 1)));
-      // The span end survives the trimmed day list — no crash, no retraction.
-      expect(trimmed.endDate, DateOnly.normalize(DateTime(2000, 5, 31)));
-      expect(trimmed.trackedEndDate, isNull);
-      expect(trimmed.days, isEmpty);
+      final interior = cycles[0];
+      expect(interior.startsAtMark, isTrue);
+      expect(interior.startDate, DateOnly.normalize(DateTime(2000, 1, 1)));
+      // The span end survives the empty day list — no crash, no retraction.
+      expect(interior.endDate, DateOnly.normalize(DateTime(2000, 5, 31)));
+      expect(interior.days, isEmpty);
+      expect(cycleSpanDays(interior), everyElement(hasNoData));
 
       // The onsets — the anchors for lengths, ordinals and the statistics
       // cycle count — are unchanged by the empty day list.
@@ -835,16 +846,16 @@ void main() {
       ]);
     });
 
-    test('regression guard: within-lookback day lists stay exactly as the '
-        'span rule pins them', () {
-      // Tracked Mar 1-3, extension out to the pinned today Mar 9 — all
-      // inside the lookback window: nothing trims.
+    test('near-today spans enumerate every calendar day of the span', () {
+      // Tracked Mar 1-3, span out to the pinned today Mar 9.
       final early = groupIntoCycles(
         [d(2026, 3, 1), d(2026, 3, 2), d(2026, 3, 3)],
         [start(2026, 3, 1)],
         today: DateTime(2026, 3, 9),
       );
-      expect(early.single.days.map((e) => e.date.day), [
+      expect(early.single.days.map((e) => e.date.day), [1, 2, 3]);
+      expect(early.single.endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
+      expect(cycleSpanDays(early.single).map((e) => e.date.day), [
         1,
         2,
         3,
@@ -855,23 +866,89 @@ void main() {
         8,
         9,
       ]);
-      expect(early.single.endDate, DateOnly.normalize(DateTime(2026, 3, 9)));
 
-      // A data-less mark cycle of a couple of years that still fits the
-      // window: every day materializes.
+      // A data-less mark cycle of a couple of years: empty days, full span.
       final inside = groupIntoCycles(const <DailyEntry>[], [
         start(2025, 3, 1),
       ], today: today);
       expect(inside, hasLength(1));
+      expect(inside.single.days, isEmpty);
       expect(
-        inside.single.days,
+        cycleSpanDays(inside.single),
         hasLength(DateOnly.daysBetween(today, DateTime(2025, 3, 1)) + 1),
       );
       expect(
-        inside.single.days.first.date,
+        cycleSpanDays(inside.single).first.date,
         DateOnly.normalize(DateTime(2025, 3, 1)),
       );
-      expect(inside.single.days.last.date, DateOnly.normalize(today));
     });
   });
+
+  group(
+    'cycleSpanDays — tracked days joined with their data-less span tail',
+    () {
+      test(
+        'a cycle whose last tracked day IS the span end: no filler days',
+        () {
+          final cycles = groupIntoCycles(
+            [d(2026, 3, 1)],
+            [start(2026, 3, 1), start(2026, 3, 2)],
+          );
+          expect(cycles, hasLength(2));
+          expect(
+            DateOnly.sameDay(cycles[0].endDate, DateTime(2026, 3, 1)),
+            isTrue,
+          );
+          expect(
+            cycleSpanDays(cycles[0]).map((e) => e.date.day),
+            [1],
+            reason: 'the span ends at the tracked day itself — nothing to fill',
+          );
+        },
+      );
+
+      test('a single-day span (fresh mark, clock behind the mark)', () {
+        final cycles = groupIntoCycles(
+          [d(2026, 3, 1)],
+          [start(2026, 3, 1), start(2026, 3, 20)],
+          today: DateTime(2026, 3, 15),
+        );
+        final span = cycleSpanDays(cycles[1]);
+        expect(span, hasLength(1));
+        expect(span.single.date, DateOnly.normalize(DateTime(2026, 3, 20)));
+      });
+
+      test(
+        'an empty-days cycle enumerates its whole span (start..spanEnd)',
+        () {
+          final cycles = groupIntoCycles(const <DailyEntry>[], [
+            start(2026, 3, 1),
+          ], today: DateTime(2026, 3, 4));
+          final span = cycleSpanDays(cycles.single);
+          expect(span.map((e) => e.date.day), [1, 2, 3, 4]);
+          expect(span, everyElement(hasNoData));
+        },
+      );
+
+      test(
+        'the tracked days pass through verbatim (ordering, observations)',
+        () {
+          final cycles = groupIntoCycles(
+            [
+              d(2026, 3, 1, bleeding: Bleeding.medium),
+              d(2026, 3, 2),
+              d(2026, 3, 5),
+            ],
+            [start(2026, 3, 1)],
+            today: DateTime(2026, 3, 9),
+          );
+          final span = cycleSpanDays(cycles.single);
+          // Tracked days first, in their own order; the interior gap Mar 3–4
+          // is not backfilled.
+          expect(span.map((e) => e.date.day), [1, 2, 5, 6, 7, 8, 9]);
+          expect(span.first.bleeding, Bleeding.medium);
+        },
+      );
+    },
+  );
 }

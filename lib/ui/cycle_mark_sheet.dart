@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
@@ -154,7 +155,7 @@ final class CycleDayPanel extends ConsumerWidget {
       // dialog body; the excluded-state comes from the ignoreTemperature
       // mark — raw flags never make a day unusable here.
       DailyEntry? markedEntry;
-      for (final entry in evaluation.cycle.days) {
+      for (final entry in cycleSpanDays(evaluation.cycle)) {
         if (DateOnly.sameDay(entry.date, day)) {
           markedEntry = entry;
           break;

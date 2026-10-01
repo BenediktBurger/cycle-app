@@ -33,14 +33,14 @@ final class _ChartDays {
     final starts = [for (final g in cycles) DateOnly.normalize(g.startDate)];
     cycleStartDates = {
       for (final g in cycles)
-        if (g.startsAtMenstruation) DateOnly.normalize(g.startDate),
+        if (g.startsAtMark) DateOnly.normalize(g.startDate),
     };
     // Ordinals at the mark-opened boundaries via the shared ordinal rule
     // (shifted by the outside-app setting).
     var markOpenedIndex = 0;
     cycleOrdinalByStart = {
       for (final g in cycles)
-        if (g.startsAtMenstruation)
+        if (g.startsAtMark)
           DateOnly.normalize(g.startDate): cycleOrdinalNumber(
             markOpenedIndex++,
             observedCyclesOutsideApp,
@@ -74,8 +74,8 @@ final class _ChartDays {
   final Map<int, int> cycleDayByIndex = {};
 
   /// The recorded dates at which a cycle group opens at a user-placed
-  /// cycleStart mark (startsAtMenstruation) — the cycle separators. Never
-  /// contains the leading group's start (it predates the first mark).
+  /// cycleStart mark ([Cycle.startsAtMark]) — the cycle separators.
+  /// Never contains the leading group's start (it predates the first mark).
   late final Set<DateTime> cycleStartDates;
 
   /// The observed-cycles count the ordinals shift by (the settings value

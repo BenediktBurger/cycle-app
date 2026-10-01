@@ -15,6 +15,7 @@
 // coordinates: window day i's column spans [i, i+1] — dots, row cells and
 // the computed-SUZ line center at i + 0.5, a user SUZ bar's column start
 // at i (morning) or the middle at i + 0.5 (evening).
+import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/evaluation_overlay.dart';
@@ -414,13 +415,19 @@ void main() {
         CycleMark(date: day(2), type: CycleMarkTypes.mucusPeakDay),
         ...cycleMarks(),
       ];
-      final model = buildPdfExportModel(entries: entries, marks: marks);
+      // The window size is the span-day count, so pin the clock: the
+      // still-running cycle's span otherwise reaches the wall clock.
+      final model = buildPdfExportModel(
+        entries: entries,
+        marks: marks,
+        today: day(13),
+      );
       final drawing = pdfCurveDrawing(
         cycle: model.cycles[0],
         overlay: model.overlays[0],
         range: _range,
         windowFirstIndex: 0,
-        windowDayCount: model.cycles[0].cycle.days.length,
+        windowDayCount: cycleSpanDays(model.cycles[0].cycle).length,
         computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(
@@ -446,13 +453,19 @@ void main() {
         for (final e in cycleEntries())
           if (!DateOnly.sameDay(e.date, day(2))) e,
       ];
-      final model = buildPdfExportModel(entries: entries, marks: cycleMarks());
+      final model = buildPdfExportModel(
+        entries: entries,
+        marks: cycleMarks(),
+        // Same reason as the gap test above: pin the clock for a
+        // deterministic span-day window count.
+        today: day(13),
+      );
       final drawing = pdfCurveDrawing(
         cycle: model.cycles[0],
         overlay: model.overlays[0],
         range: _range,
         windowFirstIndex: 0,
-        windowDayCount: model.cycles[0].cycle.days.length,
+        windowDayCount: cycleSpanDays(model.cycles[0].cycle).length,
         computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(drawing.dots.any((d) => d.index == 0), isTrue);
@@ -503,8 +516,8 @@ void main() {
       today: base.add(const Duration(days: 44)),
     );
     final cycle = model.cycles.single;
-    test('the planner splits 45 tracked days into windows [40, 5]', () {
-      final plan = planCyclePages([cycle.cycle.days.length]);
+    test('the planner splits 45 span days into windows [40, 5]', () {
+      final plan = planCyclePages([cycleSpanDays(cycle.cycle).length]);
       expect(plan.map((w) => (w.firstDayIndex, w.dayCount)), [
         (0, 40),
         (40, 5),

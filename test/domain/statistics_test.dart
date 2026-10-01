@@ -307,6 +307,25 @@ void main() {
       // The scenario carries no bleeding: zero bleeding days.
       expect(facts.single.bleedingDays, 0);
     });
+
+    test('a data-less trailing cycle observes no end — the fact row keeps '
+        'its start and mark day, the span facts stay null', () {
+      // The fresh May 10 mark opens a cycle with no tracked day after it;
+      // its first-higher MARK still resolves (May 15), but with no last
+      // tracked day there is no observed end to count the span against.
+      final entries = [d(2026, 3, 2, bleeding: Bleeding.medium), d(2026, 3, 3)];
+      final facts = cycleFacts(entries, [
+        start(2026, 3, 2),
+        start(2026, 5, 10),
+        firstHigher(2026, 5, 15),
+      ]);
+      expect(facts, hasLength(2));
+      expect(facts[1].cycleStart, DateTime.utc(2026, 5, 10));
+      expect(facts[1].firstHigherDay, DateTime.utc(2026, 5, 15));
+      expect(facts[1].lengthDays, isNull);
+      expect(facts[1].firstHigherUntilCycleEndDays, isNull);
+      expect(facts[1].bleedingDays, 0);
+    });
   });
 
   group('cycleStatistics', () {
@@ -438,7 +457,7 @@ void main() {
       ];
       // Five groups form, but only the four mark-opened ones count —
       // the leading group (Feb 25-27, before the first cycleStart mark)
-      // carries startsAtMenstruation == false.
+      // does not start at a mark.
       expect(markDrivenCycleCount(entries, threeCycleStarts()), 4);
     });
   });
@@ -689,7 +708,7 @@ void main() {
       final entries = [d(2026, 2, 20), d(2026, 3, 1)];
       final marks = [
         // A first-higher mark BEFORE the first cycleStart mark belongs to
-        // the leading group (startsAtMenstruation == false): no cycle day,
+        // the leading group (it does not start at a mark): no cycle day,
         // so it must not contribute (the cycle day would be undefined).
         firstHigher(2026, 2, 25),
         start(2026, 3, 1),

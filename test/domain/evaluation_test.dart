@@ -1771,7 +1771,7 @@ void main() {
 
       final a = evalFor(entries, marks, DateTime(2026, 3, 1));
       expect(
-        a.cycle.startsAtMenstruation,
+        a.cycle.startsAtMark,
         isFalse,
         reason: 'the leading group predates the first cycleStart mark',
       );
@@ -1782,7 +1782,7 @@ void main() {
 
       final b = evalFor(entries, marks, DateTime(2026, 3, 10));
       expect(
-        b.cycle.startsAtMenstruation,
+        b.cycle.startsAtMark,
         isTrue,
         reason: 'the mark-driven group opens at the marked day',
       );
@@ -1930,11 +1930,11 @@ void main() {
       // Baseline window Mar 3–8 (highest = Mar 6, 36.4), peak Mar 9,
       // rise marked Mar 10: every candidate Mar 10–12 is strictly after
       // the peak (circles); rule D fires on the 3rd circle (Mar 12) —
-      // and every calendar day BEYOND Mar 13 is untracked, now materialized
-      // as data-less span-extension days by the grouping (cycle through
-      // Mar 25). Neither the walk's lengthened bound nor those days create
-      // candidates, numbers or a stop — the sequence ran out of DATA, it
-      // did not break in the middle.
+      // and every calendar day BEYOND Mar 13 is untracked: the grouping's
+      // span list covers it as data-less span-extension days (cycle
+      // through Mar 25). Neither the walk's lengthened bound nor those
+      // days create candidates, numbers or a stop — the sequence ran out
+      // of DATA, it did not break in the middle.
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),

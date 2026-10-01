@@ -118,16 +118,17 @@ class ZyklusScreen extends ConsumerWidget {
     // constructor data (no riverpod dependency of its own).
     final temperatureRange = ref.watch(temperatureRangeProvider);
     final derived = ref.watch(derivedCycleDataProvider);
-    // The chart's day mapping alone stops at the last tracked entry, while
-    // the shared derived pass's cycle day lists already carry the span
-    // rule's placeholder days out to today (lib/domain/cycle_grouping.dart)
-    // — the same lists the diary tab renders. Merging them gives the chart
-    // the shared range instead of re-deriving a "today" end in the UI; a
-    // tracked entry keeps its date's slot, so a placeholder never covers
-    // real data.
+    // The chart's day mapping covers only the entries it is given, so the
+    // merge feeds it each derived cycle's full calendar span
+    // ([cycleSpanDays] — lib/domain/cycle_grouping.dart), the same span
+    // lists the diary tab renders. That keeps the shared span rule's end
+    // instead of re-deriving a "today" end in the UI; a tracked entry
+    // keeps its date's slot, so a data-less span day never covers real
+    // data.
     final byDay = <DateTime, DailyEntry>{
       for (final cycle in derived.cycles)
-        for (final day in cycle.days) DateOnly.normalize(day.date): day,
+        for (final day in cycleSpanDays(cycle))
+          DateOnly.normalize(day.date): day,
     };
     for (final entry in entries) {
       byDay[DateOnly.normalize(entry.date)] = entry;

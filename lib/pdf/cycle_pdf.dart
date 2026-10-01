@@ -29,7 +29,7 @@
 //   the line.
 // - INDEX SPACES: the overlay's day indexes are calendar offsets from the
 //   cycle start; lib/pdf/pdf_curve.dart maps them onto the page window's
-//   tracked positions (marks on untracked gap days drop out) and the
+//   span-list positions (marks on untracked gap days drop out) and the
 //   scaffold draws window-relative positions only.
 // - VERTICAL NOTES: every tracked day column carries its note text rotated
 //   90° into the column's footer area (multi-line notes folded to one
@@ -49,6 +49,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/models.dart';
 import '../domain/pdf_export_model.dart';
@@ -175,13 +176,10 @@ Future<List<int>> generatePdfBytes({
     theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
   );
 
-  // The planner skips day counts of 0, silently dropping the sheet — but
-  // an empty cycle is still export-selected, so it counts as one
-  // placeholder day.
-  final dayCounts = [
-    for (final evaluation in model.cycles)
-      evaluation.cycle.days.isEmpty ? 1 : evaluation.cycle.days.length,
+  final spans = [
+    for (final evaluation in model.cycles) cycleSpanDays(evaluation.cycle),
   ];
+  final dayCounts = [for (final span in spans) span.length];
   final plan = planCyclePages(dayCounts);
   final windowsPerCycle = <int, int>{};
   for (final window in plan) {
@@ -192,17 +190,10 @@ Future<List<int>> generatePdfBytes({
 
   for (final window in plan) {
     final evaluation = model.cycles[window.cycleIndex];
-    final cycleDays = evaluation.cycle.days;
-    final emptyCycle = cycleDays.isEmpty;
-    // The placeholder feeds page planning and the form grid only.
-    final windowDays = emptyCycle
-        ? [DailyEntry(date: DateOnly.normalize(evaluation.cycle.startDate))]
-        : cycleDays
-              .sublist(
-                window.firstDayIndex,
-                window.firstDayIndex + window.dayCount,
-              )
-              .toList(growable: false);
+    final span = spans[window.cycleIndex];
+    final windowDays = span
+        .sublist(window.firstDayIndex, window.firstDayIndex + window.dayCount)
+        .toList(growable: false);
     final drawing = pdfCurveDrawing(
       cycle: evaluation,
       overlay: model.overlays[window.cycleIndex],
@@ -230,16 +221,14 @@ Future<List<int>> generatePdfBytes({
                 model: model,
                 anonymized: options.anonymized,
                 cycleIndex: window.cycleIndex,
-                cycleWindow: emptyCycle
-                    ? null
-                    : (first: cycleDays.first.date, last: cycleDays.last.date),
+                cycleWindow: (first: span.first.date, last: span.last.date),
               ),
             ),
             pw.SizedBox(height: 4),
             _paperFormGrid(
               // The page window's day-number labels key on the cycle's
               // normalized start day (calendar offsets — never the page
-              // window's tracked positions).
+              // window's column positions).
               cycleStart: DateOnly.normalize(evaluation.cycle.startDate),
               windowDays: windowDays,
               drawing: drawing,

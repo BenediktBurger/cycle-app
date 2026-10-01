@@ -209,7 +209,7 @@ void main() {
         6,
         7,
       ], reason: 'the unnumbered leading group shifts nothing');
-      expect(model.cycles.every((c) => c.cycle.startsAtMenstruation), isTrue);
+      expect(model.cycles.every((c) => c.cycle.startsAtMark), isTrue);
     });
 
     test('exporting up to a chosen cycle: only the mark-opened cycles up '
@@ -627,7 +627,7 @@ void main() {
       final evaluations = evaluateCycles(
         modelEntries(),
         divergentMarks(),
-      ).where((e) => e.cycle.startsAtMenstruation).toList();
+      ).where((e) => e.cycle.startsAtMark).toList();
       final model = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
@@ -900,8 +900,10 @@ void main() {
       );
       // Cycle 1: Mar 1 -> next start Mar 29 (end Mar 28); cycle 2:
       // Mar 29 -> next start Apr 26 (end Apr 25); cycle 3 (last): Apr 26
-      // -> today (May 20). The cycles were tracked far shorter.
-      expect(model.cycles.map((e) => e.cycle.days.length).toList(), [
+      // -> today (May 20). The counts are SPAN days
+      // ([cycleSpanDays] — the tracked entries plus the data-less
+      // extension), not the tracked-day counts.
+      expect(model.cycles.map((e) => cycleSpanDays(e.cycle).length).toList(), [
         28,
         28,
         25,
