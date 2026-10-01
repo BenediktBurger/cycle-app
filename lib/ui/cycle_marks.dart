@@ -17,10 +17,11 @@
 // SEGMENT (R10: from the left edge of low #6's day column to half a day
 // past the last marked candidate's column, mapped by the overlay from the
 // domain's baselineSpan; a cycle with no marked candidate draws no
-// segment) and the solid peak dot ABOVE the mucus letters row
-// (R6 — the peak never touches the temperature curve; EVERY placed peak
-// renders, driven from the marks stream so peaks render even when no
-// evaluation exists). The SUZ renders ONLY user-placed marks (a vertical
+// segment) and the solid peak dot in its own in-plot row above the
+// mucus letters row (R6 — the peak never touches the temperature curve;
+// the dot hangs on the peak mark, not on a recorded entry, so every
+// placed peak renders straight from the marks stream, entry or not).
+// The SUZ renders ONLY user-placed marks (a vertical
 // bar hanging down from the temperature chart's top border plus a
 // right-pointing arrow
 // just below it); the computed
@@ -35,11 +36,6 @@
 // the Mode-M context; the posture is Accepted — the per-item flags below
 // are separate, still-open rendering-detail questions):
 //
-//   TODO(user-review): A peak day without a recorded entry renders NO dot
-//   in the plot rows (the rows show recorded observations only). The
-//   old chart-anchored question is gone with the curve ring: the peak
-//   dot hangs off the recorded mucus row's day cells, where a day
-//   without an entry has no cell content to hang it on.
 //   TODO(user-review): Days after the SUZ trigger or after a
 //   connectedness break render as ordinary temperature dots (the domain
 //   lists exactly the marked candidates; there is no automatic
@@ -159,8 +155,7 @@ final class ArrowUpDotPainter extends FlDotCirclePainter {
 /// placement, not an orientation change. (The glyph's own extent
 /// — the height [ArrowUpDotPainter.arrowHeight] reserves — hangs downward
 /// from the tip and only feeds the painters' size math; the tip itself
-/// always sits on the dot's edge, exactly the way the glyph used to hang
-/// flush from the dot's TOP edge.)
+/// sits on the dot's edge.)
 Offset arrowUpTipFor(Offset dotCenter, {required double radius}) =>
     Offset(dotCenter.dx, dotCenter.dy + radius);
 

@@ -142,7 +142,7 @@ const double pdfCurveDotRadiusPt = 1.5;
 
 /// The clearance (pt) between a candidate dot's bottom edge and its
 /// arrow-up glyph's tip: the paper writes the arrow under the dot, and it
-/// must not touch the dot it marks (owner refinement).
+/// must not touch the dot it marks.
 const double pdfArrowClearanceBelowDotPt = 2.5;
 
 /// One computed-SUZ artifact: a thin vertical line at the `suzBegins`
@@ -203,7 +203,8 @@ final class PdfCurveDrawing {
   final Map<int, int> lowNumbers;
 
   /// The placed mucus-peak marks' window column indexes (the solid peak
-  /// dots above the mucus glyph).
+  /// dots in their own in-plot row above the mucus letters row — a
+  /// data-less column draws the dot without a mucus glyph).
   final Set<int> peakIndexes;
 
   /// The computed-SUZ line, or null when the cycle has none (or the day

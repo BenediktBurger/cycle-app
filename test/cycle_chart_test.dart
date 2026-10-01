@@ -1863,10 +1863,10 @@ void main() {
       );
     });
 
-    testWidgets('a peak day without an entry keeps rendering no dot and '
+    testWidgets('a peak day without an entry still renders the dot and '
         'does not crash', (tester) async {
-      // 9/12 has NO entry at all: the in-plot glyphs render nothing for the
-      // day (rendering assumption, see cycle.dart).
+      // 9/12 has NO entry at all: the dot hangs on the peak mark itself,
+      // so it renders alone in the day's column.
       final entries = _evaluationEntries
           .where((e) => !_sameDay(e, _sat12))
           .toList();
@@ -1874,8 +1874,8 @@ void main() {
 
       expect(
         _peakDot(6),
-        findsNothing,
-        reason: 'no entry -> the in-plot glyphs render nothing for the day',
+        findsOneWidget,
+        reason: 'the dot rides the mark, entry or not',
       );
       for (final bar in dotBars(tester)) {
         for (final spot in bar.spots) {
@@ -4726,8 +4726,8 @@ void main() {
   );
 
   testWidgets('the in-plot glyph rows render per day: sex X marks by timing, '
-      'mucus letters, and the peak dot only for a peak-marked day with an '
-      'entry', (tester) async {
+      'mucus letters, and the peak dot on every peak-marked day — with its '
+      'entry or alone', (tester) async {
     await pumpChart(tester, inPlotHarness());
 
     expect(find.byKey(const ValueKey('inPlotMucus-0')), findsOneWidget);
@@ -4757,6 +4757,41 @@ void main() {
       reason: 'a sign-free day renders no letter',
     );
     expect(find.byKey(const ValueKey('inPlotSex-4-start')), findsNothing);
+  });
+
+  testWidgets('a peak-marked interior GAP day renders the dot alone: the dot '
+      'hangs on the day, no letter X M or number joins it there, and an '
+      'unflagged gap day draws no dot', (tester) async {
+    final gapEntries = [
+      DailyEntry(date: inPlotDay(0), bbtC: 36.5, mucusSign: MucusSign.s),
+      DailyEntry(
+        date: inPlotDay(2),
+        bbtC: 36.7,
+        sexTimings: SexTiming.start.bit,
+      ),
+      DailyEntry(date: inPlotDay(4), bbtC: 36.5),
+    ];
+    final gapMarks = [
+      CycleMark(date: inPlotDay(1), type: CycleMarkTypes.mucusPeakDay),
+    ];
+    await pumpChart(tester, chartHarness(entries: gapEntries, marks: gapMarks));
+
+    expect(find.byKey(const ValueKey('inPlotPeakDot-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('inPlotHaloPeakDot-1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('inPlotMucus-1')),
+      findsNothing,
+      reason: 'a day without an entry renders no letter',
+    );
+    for (final timing in SexTiming.values) {
+      expect(find.byKey(ValueKey('inPlotSex-1-${timing.name}')), findsNothing);
+    }
+    expect(find.byKey(const ValueKey('inPlotM-1')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('inPlotPeakDot-3')),
+      findsNothing,
+      reason: 'the unflagged gap day 3 carries no dot',
+    );
   });
 
   testWidgets('each in-plot glyph sits at its column center (multi-timing '

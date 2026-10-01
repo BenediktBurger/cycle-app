@@ -723,8 +723,9 @@ pw.Widget _curveBlock(
 /// at its column slot (1/6 · 1/2 · 5/6), the mucus sign letter (+ the S
 /// quality superscript) centered in the day column, the peak dot at the
 /// peak day's column center, the Mittelschmerz M under its column and the
-/// evaluation day numbers — all placed by the shared mapper (chartDayMarks:
-/// the M rides painMittelschmerz, the numbers feed through from
+/// evaluation day numbers — the observations placed via the shared mapper
+/// (chartDayMarks: the M rides painMittelschmerz), the marks and numbers
+/// read straight off the artifacts (PdfCurveDrawing.peakIndexes /
 /// PdfCurveDrawing.lowNumbers). Each row hides independently with the
 /// settings range (chartMarkRowVisible / the numbers' bottom rule
 /// dayNumbersRowVisible: a narrow range pushes a row's center past the plot
@@ -750,31 +751,16 @@ pw.Widget _inPlotChartMarks(
     return pw.SizedBox();
   }
 
-  final marks = chartDayMarks(
-    {for (var i = 0; i < windowDays.length; i++) i: windowDays[i]},
-    peakIndexes: drawing.peakIndexes,
-    numbers: drawing.lowNumbers,
-  );
+  final marks = chartDayMarks({
+    for (var i = 0; i < windowDays.length; i++) i: windowDays[i],
+  });
 
   Iterable<pw.Widget> placements() sync* {
     for (var i = 0; i < windowDays.length; i++) {
-      final record = marks[i];
-      if (record == null) continue;
-      if (sexVisible) {
-        for (final slot in record.sexSlots) {
-          yield _haloedSlot(
-            left:
-                (i + slot.columnFraction) * pdfColumnWidth -
-                sexGlyphBoxWidth / 2,
-            slotWidth: sexGlyphBoxWidth,
-            top:
-                axis.yFor(axis.range.max - sexRowCenterOffsetK) -
-                _glyphBoxHeight / 2,
-            ink: pw.Text('X', style: _label),
-          );
-        }
-      }
-      if (peakVisible && record.mucusPeak) {
+      // Dot and number read the drawing artifacts, so they are yielded
+      // before the record skip: a record-less column can still carry
+      // either, while X / mucus / M stay record-gated.
+      if (peakVisible && drawing.peakIndexes.contains(i)) {
         yield pw.Positioned(
           left: i * pdfColumnWidth + (pdfColumnWidth - _peakHaloSize) / 2,
           top:
@@ -795,6 +781,9 @@ pw.Widget _inPlotChartMarks(
                 width: _peakDotSize,
                 height: _peakDotSize,
                 decoration: pw.BoxDecoration(
+                  // Accent = mark, ink = observation: unlike the screen's
+                  // mucus-family tie (the dot is tertiary there), the sheet
+                  // differentiates by data source alone.
                   color: _markAccent,
                   shape: pw.BoxShape.circle,
                 ),
@@ -802,6 +791,22 @@ pw.Widget _inPlotChartMarks(
             ],
           ),
         );
+      }
+      final record = marks[i];
+      if (record == null) continue;
+      if (sexVisible) {
+        for (final slot in record.sexSlots) {
+          yield _haloedSlot(
+            left:
+                (i + slot.columnFraction) * pdfColumnWidth -
+                sexGlyphBoxWidth / 2,
+            slotWidth: sexGlyphBoxWidth,
+            top:
+                axis.yFor(axis.range.max - sexRowCenterOffsetK) -
+                _glyphBoxHeight / 2,
+            ink: pw.Text('X', style: _label),
+          );
+        }
       }
       if (mucusVisible) {
         if (record.mucus case final display?) {
@@ -840,17 +845,16 @@ pw.Widget _inPlotChartMarks(
           ink: pw.Text('M', style: _label),
         );
       }
-      if (numbersVisible) {
-        if (record.dayNumber case final number?) {
-          yield _haloedSlot(
-            left: i * pdfColumnWidth,
-            slotWidth: pdfColumnWidth,
-            top:
-                axis.yFor(axis.range.min + dayNumbersRowCenterOffsetK) -
-                _glyphBoxHeight / 2,
-            ink: pw.Text('$number', style: _tinyAccent),
-          );
-        }
+      final number = numbersVisible ? drawing.lowNumbers[i] : null;
+      if (number != null) {
+        yield _haloedSlot(
+          left: i * pdfColumnWidth,
+          slotWidth: pdfColumnWidth,
+          top:
+              axis.yFor(axis.range.min + dayNumbersRowCenterOffsetK) -
+              _glyphBoxHeight / 2,
+          ink: pw.Text('$number', style: _tinyAccent),
+        );
       }
     }
   }

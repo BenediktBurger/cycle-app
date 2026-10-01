@@ -16,10 +16,11 @@
 // numbering under the six low days, the baseline SEGMENT (R10: from the
 // left edge of low #6's day column to half a day past the last marked
 // candidate's column, from the domain's baselineSpan; a cycle with no
-// marked candidate draws no segment) and the solid peak dot ABOVE the
-// mucus entry in the mucus row (R6 — the peak draws clear of the
-// temperature curve; EVERY placed peak renders, driven from the marks
-// stream so peaks render even when no evaluation exists). The SUZ renders
+// marked candidate draws no segment) and the solid peak dot in its own
+// in-plot row above the mucus letters row (R6 — the peak never touches
+// the temperature curve; EVERY placed
+// peak renders, driven from the marks stream so peaks render even when
+// no evaluation exists). The SUZ renders
 // ONLY user-placed marks (a vertical bar hanging down from the temperature
 // chart's top border plus a right-pointing arrow just below it); the
 // computed suzBegins drives the sheet's suggestion instead — clean
@@ -29,11 +30,9 @@
 // the Mode-M context; the posture is Accepted — the per-item flags below
 // are separate, still-open rendering-detail questions):
 //
-//   TODO(user-review): A peak day without a recorded entry renders NO dot
-//   in the mucus row (the rows show recorded observations only). The
-//   old chart-anchored question is gone with the curve ring: the peak
-//   dot lives in the mucus row, where a day without an entry has no
-//   cell content to hang it on.
+//   The peak dot renders on every in-range day straight from the marks
+//   stream, entry or not — it centers in its day column, so the missing
+//   cell content of an entry-less day is no obstacle.
 //   TODO(user-review): Days after the SUZ trigger or after a
 //   connectedness break render as ordinary temperature dots (the domain
 //   lists exactly the marked candidates; there is no automatic
@@ -129,8 +128,9 @@ final class EvaluationOverlay {
   });
 
   /// Day indexes carrying a mucus-peak mark. R6: the peak renders as a
-  /// solid dot ABOVE the mucus glyph in the symbol row — the curve never
-  /// rings the peak day (the curve's rings wrap only circled candidates).
+  /// solid dot in its own in-plot row above the mucus letters row — the
+  /// curve never rings the peak day (the curve's rings wrap only circled
+  /// candidates).
   /// Driven from the MARKS STREAM (every placed peak), not from the
   /// evaluation's single anchored peak, so multiple peaks (delayed
   /// ovulation) all render — even when no evaluation exists (no rise

@@ -1,11 +1,11 @@
 // Unit tests of the pure in-chart glyph layer (lib/ui/chart_marks.dart):
-// the per-day placement records (sex timing slots, mucus letters, mucus
-// peak flag, Mittelschmerz M flag, evaluation day number), the
-// narrow-range visibility predicates for the top-anchored rows and the
-// bottom-anchored numbers row — all consumed by the cycle chart and the
-// PDF export. The letter vocabulary stays mucusDisplay's — the tests pin
-// that the mapper adds no second mapping, and the numbering stays fed:
-// the mapper carries a passed-in number, it never computes one.
+// the per-day observations records (sex timing slots, mucus letters,
+// Mittelschmerz M flag) and the narrow-range visibility predicates for
+// the top-anchored rows and the bottom-anchored numbers row — consumed
+// by the cycle chart and the PDF export, who render the peak dot and
+// the day numbers from the overlay artifacts themselves. The letter
+// vocabulary stays mucusDisplay's — the tests pin that the mapper adds
+// no second mapping.
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -118,27 +118,15 @@ void main() {
     });
   });
 
-  group('chartDayMarks — mucus peak flag', () {
-    test('a peak-flagged day with an entry gets the dot', () {
-      final marks = chartDayMarks(
-        {0: _entry(0, sign: MucusSign.s), 1: _entry(1, sign: MucusSign.f)},
-        peakIndexes: {0},
-      );
-      expect(marks[0]!.mucusPeak, isTrue);
-      expect(marks[1]!.mucusPeak, isFalse);
+  group('chartDayMarks — a pure observations map (entries.keys only)', () {
+    test('records exist exactly for the entries.keys', () {
+      final marks = chartDayMarks({0: _entry(0), 2: _entry(2)});
+      expect(marks.keys.toSet(), {0, 2});
     });
 
-    test('a peak flag without an entry renders no dot', () {
-      final marks = chartDayMarks(
-        {0: _entry(0, sign: MucusSign.s)},
-        peakIndexes: {1},
-      );
+    test('a day absent from the entries stays record-less', () {
+      final marks = chartDayMarks({0: _entry(0)});
       expect(marks[1], isNull);
-    });
-
-    test('mirrors the rows: the dot needs the entry, not the letter', () {
-      final marks = chartDayMarks({0: _entry(0)}, peakIndexes: {0});
-      expect(marks[0]!.mucusPeak, isTrue);
     });
   });
 
@@ -155,28 +143,6 @@ void main() {
 
     test('a day absent from the entries renders no M', () {
       final marks = chartDayMarks({0: _entry(0, mittelschmerz: true)});
-      expect(marks[1], isNull);
-    });
-  });
-
-  group('chartDayMarks — evaluation day numbers (fed, not computed)', () {
-    test('a day present in the numbers feed carries its number', () {
-      final marks = chartDayMarks({0: _entry(0)}, numbers: {0: 6});
-      expect(marks[0]!.dayNumber, 6);
-    });
-
-    test('an entry day without a number carries nothing', () {
-      final marks = chartDayMarks({0: _entry(0)}, numbers: {1: 5});
-      expect(marks[0]!.dayNumber, isNull);
-    });
-
-    test('the feed defaults to empty — no number anywhere', () {
-      final marks = chartDayMarks({0: _entry(0)});
-      expect(marks[0]!.dayNumber, isNull);
-    });
-
-    test('a number without an entry renders nothing', () {
-      final marks = chartDayMarks({0: _entry(0)}, numbers: {1: 4});
       expect(marks[1], isNull);
     });
   });

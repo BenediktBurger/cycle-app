@@ -1,7 +1,9 @@
 // The in-chart glyph layer's shared constants and the per-day placement
-// map for the marks rendered INSIDE the temperature plot (sex X marks,
-// mucus sign letters, mucus peak dot, the Mittelschmerz M and the
-// evaluation day numbers) — pure Dart, NO Flutter imports (the cycle
+// map for the ENTRY-bound marks rendered INSIDE the temperature plot
+// (sex X marks, mucus sign letters, the Mittelschmerz M) — the mucus
+// peak dot and the evaluation day numbers are no map entries: both
+// renderers read them straight from the overlay artifacts. Pure Dart,
+// NO Flutter imports (the cycle
 // chart and the PDF export both place the glyphs in °C scale units, and
 // the PDF generation layer must stay free of material imports for the
 // host smoke scripts, tool/pdf_smoke.dart).
@@ -81,47 +83,39 @@ bool dayNumbersRowVisible(TemperatureRange range) =>
 /// end → 5/6 — the rows' exact x mapping, mirrored here).
 typedef SexTimingSlot = ({SexTiming timing, double columnFraction});
 
-/// The in-chart marks of one plotted day: the X slots, the mucus letter
-/// (mucusDisplay's record, null when the day recorded no sign), the
-/// peak-dot flag (peak-indexed day WITH an entry — mirrors the rows), the
-/// Mittelschmerz M flag, and the evaluation day number the CALLER feeds
-/// in (day index → number, already window-mapped by its producer — this
-/// layer never computes a numbering).
+/// The in-chart observations of one plotted day: the X slots, the mucus
+/// letter (mucusDisplay's record, null when the day recorded no sign)
+/// and the Mittelschmerz M flag. The peak dot and the evaluation day
+/// number do NOT ride this record — they render from the overlay's
+/// `peakIndexes` / numbers artifact, which the callers hold alongside.
 typedef ChartDayMarks = ({
   List<SexTimingSlot> sexSlots,
   MucusDisplay? mucus,
-  bool mucusPeak,
   bool mittelschmerz,
-  int? dayNumber,
 });
 
 /// Maps the plotted days' entries (by day index, the chart's shapes) into
 /// per-day placement records consumed by the screen widget and the PDF
-/// painter; [peakIndexes] are the day indexes flagged as mucus peaks and
-/// [numbers] feeds the day numbers through unchanged. A day absent from
-/// [entries] gets no record, so an in-window lookup renders nothing for
-/// it.
-Map<int, ChartDayMarks> chartDayMarks(
-  Map<int, DailyEntry> entries, {
-  Set<int> peakIndexes = const {},
-  Map<int, int> numbers = const {},
-}) => {
-  for (final MapEntry(:key, :value) in entries.entries)
-    key: (
-      sexSlots: [
-        for (final timing in SexTiming.values)
-          if (value.sexTimings & timing.bit != 0)
-            (timing: timing, columnFraction: _sexFraction(timing)),
-      ],
-      mucus: _mucusOrNothing(
-        sign: value.mucusSign,
-        quality: value.mucusQuality,
+/// painter: exactly one record per [entries] key, built from that entry
+/// alone. Records never extend beyond the entries, so an in-window
+/// lookup of a day without one renders nothing for the observation rows.
+Map<int, ChartDayMarks> chartDayMarks(Map<int, DailyEntry> entries) {
+  return {
+    for (final MapEntry(key: key, value: value) in entries.entries)
+      key: (
+        sexSlots: [
+          for (final timing in SexTiming.values)
+            if (value.sexTimings & timing.bit != 0)
+              (timing: timing, columnFraction: _sexFraction(timing)),
+        ],
+        mucus: _mucusOrNothing(
+          sign: value.mucusSign,
+          quality: value.mucusQuality,
+        ),
+        mittelschmerz: value.painMittelschmerz,
       ),
-      mucusPeak: peakIndexes.contains(key),
-      mittelschmerz: value.painMittelschmerz,
-      dayNumber: numbers[key],
-    ),
-};
+  };
+}
 
 /// A day without a recorded sign gets NO mucus record — null, not
 /// mucusDisplay's all-null record — so both renderers skip empty days the
