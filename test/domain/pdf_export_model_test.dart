@@ -569,8 +569,12 @@ void main() {
 
   group('earliest first higher cycle day', () {
     /// Marks variant: cycle 2 (start Mar 29) carries a peak AND a
-    /// first-higher mark on the SAME day — a rise not strictly after the
-    /// peak (cycle day 1). The "real" variant must ignore it.
+    /// first-higher mark on the SAME day, so the "any" variant reads its
+    /// marked rise (cycle day 1). Cycle 2 produces no measured circle of
+    /// its own — a rise inside a cycle's first six days has its six-low
+    /// window truncated at the cycle's own tracked days (R9), so no
+    /// baseline and no candidate exist there — and the real variant can
+    /// only come from cycle 1's first circle (cycle day 14).
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -584,9 +588,9 @@ void main() {
         marks: divergentMarks(),
         exportStartsUpTo: d(3, 29),
       );
-      // Cycle 1: rise marked Mar 14, start Mar 1 -> cycle day 14, strictly
-      // after the peak (Mar 12). Cycle 2: rise on the start day itself ->
-      // cycle day 1, NOT strictly after the same-day peak.
+      // Cycle 1: rise marked Mar 14, start Mar 1 -> the first circle sits
+      // on the marked day (measured above the baseline, after the peak
+      // Mar 12) -> cycle day 14, both variants.
       expect(model.earliestFirstHigherCycleDays.length, 2);
       expect(model.earliestFirstHigherCycleDays[0], (
         any: 14,
@@ -596,8 +600,10 @@ void main() {
         model.earliestFirstHigherCycleDays[1],
         (any: 1, afterMucusPeak: 14),
         reason:
-            'cycle 2\'s page sees its own day-1 rise in the "any" '
-            'variant while the "real" variant stays cycle 1\'s late rise',
+            "cycle 2's page sees its marked day-1 rise in the \"any\" "
+            'variant while the real variant qualifies nowhere in cycle 2 '
+            "(no measurable candidate, R9) and keeps cycle 1's first "
+            'circle (cycle day 14)',
       );
     });
 
@@ -648,7 +654,8 @@ void main() {
 
   group('the paper-history constants fold into every exported page', () {
     /// Marks variant: cycle 2's rise sits on its own start day, on the
-    /// SAME day as its peak (not the "real" variant) — same shape as the
+    /// SAME day as its peak (not a measured circle's day — cycle 2
+    /// produces no circle, R9) — same shape as the
     /// earliest-first-higher group's fixture.
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
@@ -686,10 +693,12 @@ void main() {
 
     test('the paper earliest first higher min-combines into BOTH variants '
         'of every page', () {
-      // divergentMarks: cycle 2's rise on its own start day (cycle day 1,
-      // NOT strictly after its same-day peak). Paper 10 undercuts cycle 1's
-      // in-app 14 in both variants; page 2/3's "any" keeps the smaller
-      // in-app 1 while the real variant folds to the paper 10.
+      // divergentMarks: cycle 2's rise on its own start day, exactly on
+      // the SAME day as its peak, with no measurable candidate in cycle
+      // 2 (R9 truncates its six-low window at its start). Paper 10
+      // undercuts cycle 1's in-app 14 in both variants; page 2/3's "any"
+      // keeps the smaller in-app 1 while the real variant falls back to
+      // 14 (paper 10) or stays at cycle 1's first circle (paper 16).
       final paper10 = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
@@ -702,7 +711,8 @@ void main() {
       ]);
 
       // Paper 16 is beaten everywhere by in-app values (14 in the real
-      // variant from page 1 on): the paper constant never inflates a page.
+      // variant from page 1 on): the paper constant never inflates a
+      // page.
       final paper16 = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),

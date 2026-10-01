@@ -1968,4 +1968,82 @@ void main() {
       expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 12)));
     });
   });
+
+  group('firstCircledCandidateDay — the earliest circle candidate (R4)', () {
+    // The same R4 fixture shape as above: baseline 36.4 (Mar 6), rise on
+    // Mar 10. The function only SELECTS a day off the evaluation — the
+    // per-candidate arrow/circle rules themselves are pinned in rule R4.
+    final r4Entries = [
+      ..._baseLowRun,
+      d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
+      d(2026, 3, 11, t: 36.9), // candidate 2
+      d(2026, 3, 12, t: 37.0), // candidate 3
+    ];
+
+    test('peak set before the rise → the rise day (circle #1)', () {
+      final e = evalFor(r4Entries, [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+      ], DateTime(2026, 3, 2));
+
+      expect(
+        firstCircledCandidateDay(e),
+        DateOnly.normalize(DateTime(2026, 3, 10)),
+      );
+    });
+
+    test('mixed peak mid-sequence → the first circle AFTER the peak', () {
+      final mixed = [
+        ...r4Entries,
+        d(2026, 3, 13, t: 37.0), // first candidate after the peak
+      ];
+      final e = evalFor(mixed, [
+        peak(2026, 3, 11),
+        rise(2026, 3, 10),
+      ], DateTime(2026, 3, 2));
+
+      expect(
+        firstCircledCandidateDay(e),
+        DateOnly.normalize(DateTime(2026, 3, 12)),
+      );
+    });
+
+    test('arrows only (peak unset) → null', () {
+      final e = evalFor(r4Entries, [rise(2026, 3, 10)], DateTime(2026, 3, 2));
+
+      expect(
+        e.higherMeasurements.map((h) => h.markKind),
+        everyElement(MarkKind.arrow),
+      );
+      expect(firstCircledCandidateDay(e), isNull);
+    });
+
+    test('gap-stopped sequence with no circle yet → null', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.8), // arrow 1
+        d(2026, 3, 11, t: 36.9), // peak day → arrow 2
+        // Mar 12–13: two untracked days across the transition → break
+        d(2026, 3, 14, t: 37.0), // would-be circle — NOT marked
+      ];
+      final e = evalFor(entries, [
+        peak(2026, 3, 11),
+        rise(2026, 3, 10),
+      ], DateTime(2026, 3, 2));
+
+      expect(e.evaluationStopped, isTrue);
+      expect(firstCircledCandidateDay(e), isNull);
+    });
+
+    test('empty sequence (no marked rise / no baseline) → null', () {
+      final e = evalFor(
+        [..._baseLowRun, d(2026, 3, 10, t: 36.8)],
+        [peak(2026, 3, 9)],
+        DateTime(2026, 3, 2),
+      );
+
+      expect(e.higherMeasurements, isEmpty);
+      expect(firstCircledCandidateDay(e), isNull);
+    });
+  });
 }

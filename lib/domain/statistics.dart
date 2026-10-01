@@ -245,25 +245,30 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
   return spans;
 }
 
-/// The earliest (minimum) cycle-day number of the cycle's marked first
-/// higher measurement across all mark-driven cycles, as a record of TWO
+/// The earliest (minimum) cycle-day number of the cycle's first higher
+/// measurement across all mark-driven cycles, as a record of TWO
 /// documented variants:
 ///
 /// - `any`: the minimum over every mark-driven cycle that carries a
 ///   first-higher mark, wherever it sits relative to the mucus peak;
-/// - `afterMucusPeak`: the minimum over only those first-higher marks
-///   lying STRICTLY AFTER the cycle's marked mucus peak day — the "real
-///   first higher". A cycle without a marked mucus peak (or with its rise
-///   at/before the peak) does not qualify for this variant.
+/// - `afterMucusPeak`: the minimum over the cycle-day numbers of the
+///   mark-driven cycles' FIRST CIRCLED candidates
+///   ([firstCircledCandidateDay] — rule R4's "umrandete Messung": a
+///   measured temperature strictly above the baseline, from the marked
+///   rise onward, strictly after the marked mucus peak day). A cycle
+///   qualifies only when its candidate sequence carries such a circle:
+///   no marked peak (arrows only), no measurable candidate, and a
+///   gap-stopped sequence (R2) all leave the cycle out.
 ///
-/// Both variants are returned (possibly null when no cycle qualifies for
-/// them). The cycle-day number is `(firstHigherDay - cycleStart) + 1`
-/// (the cycle's marked start day is day 1 — DST-free via [DateOnly]).
-/// A first-higher mark inside the LEADING pre-mark group has no cycle
-/// start to count from and is ignored. Pure arithmetic over
-/// [evaluateCycles] output ([CycleEvaluation.firstHigherDay] and
-/// [CycleEvaluation.mucusPeakDay] — the marks are anchored per cycle
-/// window; ADR-0001: render-time computation, nothing persisted).
+/// Both variants' day numbers lie inside their cycle's window by
+/// construction: marks attach within [Cycle.startDate, next cycle start),
+/// and the candidate walk stops at the cycle's own end. The cycle-day
+/// number is `(day - cycleStart) + 1` (the cycle's marked start day is
+/// day 1 — DST-free via [DateOnly]). A first-higher mark inside the
+/// LEADING pre-mark group has no cycle start to count from and is
+/// ignored. Pure arithmetic over [evaluateCycles] output (the
+/// [CycleEvaluation] marks plus its evaluated candidates; ADR-0001:
+/// render-time computation, nothing persisted).
 ({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay(
   List<CycleEvaluation> evaluations,
 ) {
@@ -273,22 +278,16 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
     if (!evaluation.cycle.startsAtMark) continue;
     final rise = evaluation.firstHigherDay;
     if (rise == null) continue;
-    final cycleDayNumber =
-        DateOnly.daysBetween(
-          rise,
-          DateOnly.normalize(evaluation.cycle.startDate),
-        ) +
-        1;
-    if (earliestAny == null || cycleDayNumber < earliestAny) {
-      earliestAny = cycleDayNumber;
+    final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
+    final anyDayNumber = DateOnly.daysBetween(rise, cycleStart) + 1;
+    if (earliestAny == null || anyDayNumber < earliestAny) {
+      earliestAny = anyDayNumber;
     }
-    final peak = evaluation.mucusPeakDay;
-    final riseIsStrictlyAfterPeak =
-        peak != null &&
-        DateOnly.daysBetween(rise, DateOnly.normalize(peak)) > 0;
-    if (riseIsStrictlyAfterPeak &&
-        (earliestAfterPeak == null || cycleDayNumber < earliestAfterPeak)) {
-      earliestAfterPeak = cycleDayNumber;
+    final circled = firstCircledCandidateDay(evaluation);
+    if (circled == null) continue;
+    final circledDayNumber = DateOnly.daysBetween(circled, cycleStart) + 1;
+    if (earliestAfterPeak == null || circledDayNumber < earliestAfterPeak) {
+      earliestAfterPeak = circledDayNumber;
     }
   }
   return (any: earliestAny, afterMucusPeak: earliestAfterPeak);
@@ -556,17 +555,10 @@ List<CycleFact> cycleFactsFromCycles(
   return facts;
 }
 
-/// The statistics value for one fact's first higher: [MarkKind.circle]
-/// candidates lie strictly after the mucus peak (the evaluation classifies
-/// per candidate); the earliest circle is the "real" first higher. No
-/// circle at all — unknown peak, or the sequence never reached past the
-/// peak — falls back to the user-placed mark day.
-DateTime? _resolveFirstHigher(CycleEvaluation evaluation) {
-  for (final candidate in evaluation.higherMeasurements) {
-    if (candidate.markKind == MarkKind.circle) return candidate.date;
-  }
-  return evaluation.firstHigherDay;
-}
+/// The fact-row first higher: the earliest R4 circle
+/// ([firstCircledCandidateDay]), else the user-placed mark day.
+DateTime? _resolveFirstHigher(CycleEvaluation evaluation) =>
+    firstCircledCandidateDay(evaluation) ?? evaluation.firstHigherDay;
 
 /// Min/max/average/population standard deviation over one metric, or all
 /// null when the metric has no data at all. Population std dev (÷ n, not

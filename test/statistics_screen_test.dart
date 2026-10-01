@@ -50,9 +50,12 @@ List<CycleMark> screenMarks() => [
 ];
 
 /// Variant of [screenMarks] adding a first-higher mark ON cycle 2's first
-/// day (Mar 29, cycle day 1) with the peak on the SAME day — a rise NOT
-/// strictly after the peak: it changes the "over all cycles" variant
-/// (minimum cycle day 1) but not the real one (cycle day 14 stays).
+/// day (Mar 29, cycle day 1) with the peak on the SAME day: the "over all
+/// cycles" variant drops to minimum cycle day 1. Cycle 2 produces no
+/// measured circle of its own — a rise inside a cycle's first six days
+/// has its six-low window truncated at the cycle's own tracked days (R9),
+/// so no baseline and no candidate exist there — and the real (umrandete
+/// Messung) variant keeps cycle 1's first circle, cycle day 14.
 List<CycleMark> divergentMarks() => [
   ...screenMarks(),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -440,13 +443,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // The real (strictly after the mucus peak) variant: cycle 1's rise
-      // Mar 14, start Mar 1 -> cycle day 14; the peak lies before the rise,
-      // so both variants equal here.
+      // The real (umrandete Messung: the day after the peak when the
+      // rise sits at/before it) variant: cycle 1's rise Mar 14, start
+      // Mar 1 -> cycle day 14; the peak lies before the rise, so both
+      // variants equal here.
       expect(
         find.descendant(
           of: earliestCard(),
-          matching: find.textContaining('strictly after'),
+          matching: find.textContaining('after the mucus peak'),
         ),
         findsOneWidget,
         reason: 'the real variant row is labeled',
@@ -481,9 +485,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Cycle 2's rise mark sits on its first day (cycle day 1) but on the
-      // SAME day as its mucus peak — not strictly after, so the real variant
-      // keeps cycle day 14 while the "any" minimum drops to cycle day 1.
+      // Cycle 2's rise mark sits on its first day (cycle day 1) on the
+      // SAME day as its mucus peak. Cycle 2 produces no measured circle
+      // of its own (R9 truncates its six-low window at its start), so
+      // the real variant keeps cycle 1's first circle — cycle day 14 —
+      // while the "any" minimum drops to cycle day 1.
       final rows = tester
           .widgetList<Text>(
             find.descendant(
@@ -738,7 +744,6 @@ void main() {
       findsOneWidget,
       reason: 'the hint names the paper cycles behind the grouped figure',
     );
-    // The metric card:
     expect(
       find.descendant(
         of: metricCard('cycleLength'),
@@ -836,7 +841,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.textContaining('strictly after the mucus peak'),
+        matching: find.textContaining('after the mucus peak'),
       ),
       findsOneWidget,
       reason: 'the real variant row keeps its label',
@@ -941,9 +946,9 @@ void main() {
       'in-app value with a paper earliest pinned', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The divergent in-app record (any = 1, real = 14) with paper 5
-    // pinned: the rows read the in-app values, the paper 5 stays on the
-    // summary row.
+    // The divergent in-app record (any = 1, real = 14 — cycle 2 carries
+    // no measurable circle, R9) with paper 5 pinned: the rows read the
+    // in-app values, the paper 5 stays on the summary row.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -969,7 +974,9 @@ void main() {
     expect(
       mixedRows,
       contains('cycle day 14'),
-      reason: 'the real variant keeps its in-app day',
+      reason:
+          'the real variant keeps its in-app first circle (cycle 2 '
+          'carries none)',
     );
     expect(
       mixedRows,
@@ -982,17 +989,16 @@ void main() {
       'a paper figure alone does not suppress it', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The narrow combination: the in-app rise sits ON its peak day (both
-    // marks on one day), so the in-app "any" variant is cycle day 1 while
-    // the real variant qualifies nowhere — a paper earliest value is
-    // pinned, but it surfaces on the summary row only.
+    // The narrow combination: the in-app cycle has a rise but NO marked
+    // mucus peak, so the in-app "any" variant is cycle day 3 while the
+    // real (umrandete) variant qualifies nowhere — a paper earliest value
+    // is pinned, but it surfaces on the summary row only.
     await tester.pumpWidget(
       harness(
         entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
         marks: [
           CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.mucusPeakDay),
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
         ],
         paperEarliestFirstHigherCycleDay: 5,
       ),
@@ -1026,7 +1032,7 @@ void main() {
     expect(
       find.descendant(
         of: earliestCard(),
-        matching: find.textContaining('cycle day 1'),
+        matching: find.textContaining('cycle day 3'),
       ),
       findsOneWidget,
       reason: 'the "any" row keeps its in-app value',
@@ -1037,15 +1043,15 @@ void main() {
       'the real variant, and the note states exactly that', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The in-app rise sits ON its peak day again, but no paper fact folds
-    // in: the real row dashes and the missing-variant note is true.
+    // The in-app cycle again has a rise but NO marked peak, without any
+    // paper fact folding in: the real row dashes and the
+    // missing-variant note is true.
     await tester.pumpWidget(
       harness(
         entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
         marks: [
           CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.mucusPeakDay),
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
         ],
       ),
     );

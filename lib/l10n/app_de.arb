@@ -300,17 +300,17 @@
     },
     "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
   },
-  "statisticsFirstHigherReal": "streng nach dem Schleimhöhepunkt",
+  "statisticsFirstHigherReal": "nach dem Schleimhöhepunkt",
   "@statisticsFirstHigherReal": {
-    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant (umrandete Messung): the qualifying day is the cycle's first circled candidate — a measured temperature strictly above the baseline, from the marked rise onward, after the marked mucus peak day (evaluation rule R4)."
   },
   "statisticsFirstHigherAny": "über alle Zyklen",
   "@statisticsFirstHigherAny": {
     "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
   },
-  "statisticsFirstHigherRealMissing": "keine erste höhere Messung streng nach dem Schleimhöhepunkt markiert",
+  "statisticsFirstHigherRealMissing": "keine umrandete Messung (erste höhere Messung nach dem Schleimhöhepunkt) ermittelt",
   "@statisticsFirstHigherRealMissing": {
-    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+    "description": "Caption shown when no cycle qualifies for the after-the-peak variant: a cycle qualifies only when a measured temperature strictly above the baseline is circled after the marked mucus peak (umrandete Messung), so the caption names the extinguishing fact (no qualifying measured temperature, not a missing mark)."
   },
   "statisticsSummaryPaperHint": "Klammerwerte beziehen die früheren, auf Papier beobachteten Zyklen ein.",
   "@statisticsSummaryPaperHint": {
