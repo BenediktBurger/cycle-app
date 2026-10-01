@@ -366,6 +366,10 @@ void main() {
       expect(stats.firstHigherCycleDays.max, isNull);
       expect(stats.firstHigherCycleDays.average, isNull);
       expect(stats.firstHigherCycleDays.stdDev, isNull);
+      expect(stats.cycleLengths.count, 0);
+      expect(stats.bleedingDays.count, 0);
+      expect(stats.firstHigherUntilCycleEnd.count, 0);
+      expect(stats.firstHigherCycleDays.count, 0);
     });
 
     test('aggregates min/max/avg/population std over the metrics', () {
@@ -374,6 +378,14 @@ void main() {
         firstHigher(2026, 3, 20),
       ]);
       expect(stats.cycleCount, 4);
+
+      // The per-metric counts are the input lists' lengths — lengths
+      // without the open trailing cycle, bleeding across every fact row,
+      // the first-higher metrics on their qualifying facts.
+      expect(stats.cycleLengths.count, 3);
+      expect(stats.bleedingDays.count, 4);
+      expect(stats.firstHigherUntilCycleEnd.count, 1);
+      expect(stats.firstHigherCycleDays.count, 1);
 
       // Lengths [28, 28, 28] (the trailing cycle contributes none).
       expect(stats.cycleLengths.min, 28);
@@ -547,6 +559,7 @@ void main() {
       expect(summary.maximum, 8);
       expect(summary.average, closeTo(6.0, 0.0001));
       expect(summary.standardDeviation, closeTo(1.4142135, 0.0001));
+      expect(summary.count, 4);
     });
 
     test('a single value has zero std-dev', () {
@@ -555,6 +568,7 @@ void main() {
       expect(summary.maximum, 28);
       expect(summary.average, closeTo(28.0, 0.0001));
       expect(summary.standardDeviation, closeTo(0.0, 0.0001));
+      expect(summary.count, 1);
     });
 
     test('empty input yields nulls without throwing', () {
@@ -563,6 +577,7 @@ void main() {
       expect(summary.maximum, isNull);
       expect(summary.average, isNull);
       expect(summary.standardDeviation, isNull);
+      expect(summary.count, 0);
     });
   });
 
@@ -606,6 +621,9 @@ void main() {
       expect(summary.minimum, 2);
       expect(summary.maximum, 4);
       expect(summary.average, closeTo(3.0, 0.0001));
+      // The count follows the feed: only the cycles with a bleeding day
+      // (the non-null durations) count, not every fact row.
+      expect(summary.count, 2);
     });
 
     test('a cycle without any bleeding day contributes null', () {
@@ -996,12 +1014,14 @@ void main() {
             fromPass.cycleLengths.max,
             fromPass.cycleLengths.average,
             fromPass.cycleLengths.stdDev,
+            fromPass.cycleLengths.count,
           ),
           (
             whole.cycleLengths.min,
             whole.cycleLengths.max,
             whole.cycleLengths.average,
             whole.cycleLengths.stdDev,
+            whole.cycleLengths.count,
           ),
           reason: 'the cycle-length aggregates',
         );
@@ -1011,12 +1031,14 @@ void main() {
             fromPass.bleedingDays.max,
             fromPass.bleedingDays.average,
             fromPass.bleedingDays.stdDev,
+            fromPass.bleedingDays.count,
           ),
           (
             whole.bleedingDays.min,
             whole.bleedingDays.max,
             whole.bleedingDays.average,
             whole.bleedingDays.stdDev,
+            whole.bleedingDays.count,
           ),
           reason: 'the bleeding-day aggregates',
         );
@@ -1026,12 +1048,14 @@ void main() {
             fromPass.firstHigherUntilCycleEnd.max,
             fromPass.firstHigherUntilCycleEnd.average,
             fromPass.firstHigherUntilCycleEnd.stdDev,
+            fromPass.firstHigherUntilCycleEnd.count,
           ),
           (
             whole.firstHigherUntilCycleEnd.min,
             whole.firstHigherUntilCycleEnd.max,
             whole.firstHigherUntilCycleEnd.average,
             whole.firstHigherUntilCycleEnd.stdDev,
+            whole.firstHigherUntilCycleEnd.count,
           ),
           reason: 'the first-higher-until-end aggregates',
         );
@@ -1041,12 +1065,14 @@ void main() {
             fromPass.firstHigherCycleDays.max,
             fromPass.firstHigherCycleDays.average,
             fromPass.firstHigherCycleDays.stdDev,
+            fromPass.firstHigherCycleDays.count,
           ),
           (
             whole.firstHigherCycleDays.min,
             whole.firstHigherCycleDays.max,
             whole.firstHigherCycleDays.average,
             whole.firstHigherCycleDays.stdDev,
+            whole.firstHigherCycleDays.count,
           ),
           reason: 'the first-higher-day aggregates',
         );

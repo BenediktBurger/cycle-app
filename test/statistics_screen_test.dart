@@ -65,14 +65,20 @@ List<CycleMark> divergentMarks() => [
 Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
 Finder metricCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
 Finder oldCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
-Finder earliestCard() =>
+Finder earliestFirstHigherCard() =>
     find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
 
-// Pins the summary row's description line in its English wording — the
-// arb string (`statisticsSummaryPaperHint`) and this constant must stay
-// in sync.
-const String paperHintText =
-    'figures in parentheses include the earlier, paper cycles';
+// The outside lines' English wordings, pinned before their arb keys
+// (`statisticsShortestOutsideApp` / `statisticsFirstHigherOutsideApp`)
+// exist — keep the prefixes in sync with the strings' final wordings.
+const String outsideShortestPrefix = 'outside: ';
+const String outsideEarliestPrefix = 'outside: cycle day ';
+
+// The metric cards' count captions' plural rule, pinned before the arb key
+// (`statisticsMetricFromCycles`) exists — keep in sync with the strings'
+// final wordings (the singular form is the German proofread point).
+String countCaption(int cycles) =>
+    cycles == 1 ? 'from 1 cycle' : 'from $cycles cycles';
 
 Widget harness({
   List<DailyEntry> entries = const [],
@@ -232,6 +238,14 @@ void main() {
       findsOneWidget,
       reason: 'the std-dev of the single value',
     );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text(countCaption(1)),
+      ),
+      findsOneWidget,
+      reason: 'only the closed cycle has a length — the caption says so',
+    );
 
     // Bleeding duration: spans 3 (cycle 1) and 2 (cycle 2) -> min 2, max 3,
     // average 2.5, POPULATION std-dev 0.5.
@@ -298,6 +312,14 @@ void main() {
       findsOneWidget,
       reason: 'population std-dev: sqrt(0.25)',
     );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text(countCaption(2)),
+      ),
+      findsOneWidget,
+      reason: 'both bleeding cycles feed the card',
+    );
 
     // The when-card keyed statisticsCard-firstHigher: cycle-day numbers,
     // not durations, so the header unit is the cycle-day one — pinned
@@ -334,6 +356,11 @@ void main() {
     expect(
       find.descendant(of: firstHigherDay, matching: find.text('0.0')),
       findsOneWidget,
+    );
+    expect(
+      find.descendant(of: firstHigherDay, matching: find.text(countCaption(1))),
+      findsOneWidget,
+      reason: 'only cycle 1 carries a resolved first higher',
     );
   });
 
@@ -378,6 +405,11 @@ void main() {
       expect(
         find.descendant(of: untilEnd, matching: find.text('0.0')),
         findsOneWidget,
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text(countCaption(1))),
+        findsOneWidget,
+        reason: 'the one qualified span feeds the card',
       );
     },
   );
@@ -487,76 +519,93 @@ void main() {
     expect(tester.getTopLeft(table).dy, greaterThan(untilEndTop.dy));
   });
 
-  testWidgets(
-    'the earliest first higher rows: both variants, real one primary',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(entries: screenEntries(), marks: screenMarks()),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('the earliest first higher rows live on the summary card: both '
+      'variants, real one primary', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(entries: screenEntries(), marks: screenMarks()),
+    );
+    await tester.pumpAndSettle();
 
-      // The real (umrandete Messung: the day after the peak when the
-      // rise sits at/before it) variant: cycle 1's rise Mar 14, start
-      // Mar 1 -> cycle day 14; the peak lies before the rise, so both
-      // variants equal here.
-      expect(
-        find.descendant(
-          of: earliestCard(),
-          matching: find.textContaining('after the mucus peak'),
-        ),
-        findsOneWidget,
-        reason: 'the real variant row is labeled',
-      );
-      expect(
-        find.descendant(
-          of: earliestCard(),
-          matching: find.textContaining('cycle day 14'),
-        ),
-        findsNWidgets(2),
-        reason: 'both variants equal here: cycle day 14',
-      );
-      expect(
-        find.descendant(
-          of: earliestCard(),
-          matching: find.textContaining('over all cycles'),
-        ),
-        findsOneWidget,
-        reason: 'the fallback variant row is labeled',
-      );
-    },
-  );
+    expect(
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    // The real (umrandete Messung: the day after the peak when the
+    // rise sits at/before it) variant: cycle 1's rise Mar 14, start
+    // Mar 1 -> cycle day 14; the peak lies before the rise, so both
+    // variants equal here.
+    expect(
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.textContaining('after the mucus peak'),
+      ),
+      findsOneWidget,
+      reason: 'the real variant row is labeled',
+    );
+    expect(
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.textContaining('cycle day 14'),
+      ),
+      findsNWidgets(2),
+      reason: 'both variants equal here: cycle day 14',
+    );
+    expect(
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.textContaining('over all cycles'),
+      ),
+      findsOneWidget,
+      reason: 'the fallback variant row is labeled',
+    );
+  });
 
-  testWidgets(
-    'when the variants differ the real one stays the primary row and the '
-    '"over all cycles" row shows its own minimum',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(entries: screenEntries(), marks: divergentMarks()),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('when the variants differ each summary variant row keeps its own '
+      'in-app minimum', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      harness(entries: screenEntries(), marks: divergentMarks()),
+    );
+    await tester.pumpAndSettle();
 
-      // Cycle 2's rise mark sits on its first day (cycle day 1) on the
-      // SAME day as its mucus peak. Cycle 2 produces no measured circle
-      // of its own (R9 truncates its six-low window at its start), so
-      // the real variant keeps cycle 1's first circle — cycle day 14 —
-      // while the "any" minimum drops to cycle day 1.
-      final rows = tester
-          .widgetList<Text>(
-            find.descendant(
-              of: earliestCard(),
-              matching: find.textContaining('cycle day '),
-            ),
-          )
-          .map((t) => t.data!)
-          .toList();
-      expect(rows, contains('cycle day 14'), reason: 'the real one (primary)');
-      expect(rows, contains('cycle day 1'), reason: 'the own "any" minimum');
-    },
-  );
+    expect(
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    // Cycle 2's rise mark sits on its first day (cycle day 1) on the
+    // SAME day as its mucus peak. Cycle 2 produces no measured circle
+    // of its own (R9 truncates its six-low window at its start), so
+    // the real variant keeps cycle 1's first circle — cycle day 14 —
+    // while the "over all cycles" minimum drops to cycle day 1.
+    final rows = tester
+        .widgetList<Text>(
+          find.descendant(
+            of: summaryEarliest,
+            matching: find.textContaining('cycle day '),
+          ),
+        )
+        .map((t) => t.data!)
+        .toList();
+    expect(rows, contains('cycle day 14'), reason: 'the real one (primary)');
+    expect(
+      rows,
+      contains('cycle day 1'),
+      reason: 'the "over all cycles" minimum',
+    );
+  });
 
   testWidgets('the German wording renders on the de surface', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
@@ -591,6 +640,10 @@ void main() {
     expect(find.text('Zykluslänge'), findsNothing);
     expect(find.text('Blutungsdauer'), findsNothing);
     expect(find.text('Dauer der Hochlage'), findsNothing);
+    // The count captions in German: the singular wording on the three
+    // single-fact metric cards, the plural on the two-bleeding-cycle card.
+    expect(find.text('aus 1 Zyklus'), findsNWidgets(3));
+    expect(find.text('aus 2 Zyklen'), findsOneWidget);
   });
 
   testWidgets(
@@ -668,11 +721,39 @@ void main() {
         find.descendant(of: metricCard(id), matching: find.text('—')),
         findsNWidgets(4),
       );
+      expect(
+        find.descendant(
+          of: metricCard(id),
+          matching: find.textContaining(RegExp('from \\d+ cycles?')),
+        ),
+        findsNothing,
+        reason: '$id has no data — no count caption under the dashes',
+      );
     }
+    final emptyUntilEnd = find.byKey(
+      const ValueKey('statisticsMetric-firstHigherUntilEnd'),
+    );
+    expect(emptyUntilEnd, findsOneWidget);
     expect(
-      find.descendant(of: earliestCard(), matching: find.text('—')),
-      findsNWidgets(2),
-      reason: 'both earliest-first-higher rows dash',
+      find.descendant(
+        of: emptyUntilEnd,
+        matching: find.textContaining(RegExp('from \\d+ cycles?')),
+      ),
+      findsNothing,
+      reason: 'the empty Hochlage card carries no count caption',
+    );
+    // The earliest surfaces: the empty case keeps the summary row (and
+    // its earliest card) hidden entirely, and the big earliest card is
+    // gone — the summary card is the single earliest surface.
+    expect(
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    expect(
+      find.byKey(const ValueKey('statisticsCard-earliest')),
+      findsNothing,
+      reason: 'no summary row renders without any countable data',
     );
     // The fact-gated per-cycle table: no cycle start recorded, no rows
     // (with ANY later data the table's row count is the
@@ -727,8 +808,7 @@ void main() {
 
     // One open in-app cycle: no countable in-app length — the summary row
     // still renders (the paper-only-shortest gate), with the in-app main
-    // figure dashing and the paper figure as the grouped second figure
-    // under the hint line.
+    // figure dashing and the paper figure only on the outside line.
     expect(oldCard('shortest'), findsOneWidget);
     expect(
       find.descendant(of: oldCard('shortest'), matching: find.text('—')),
@@ -736,17 +816,25 @@ void main() {
       reason: 'the in-app main figure has no value to show',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      find.descendant(
+        of: oldCard('shortest'),
+        matching: find.text('${outsideShortestPrefix}21'),
+      ),
       findsOneWidget,
-      reason: 'the paper-inclusive minimum is the grouped figure',
+      reason: 'the paper figure lives on the outside line',
     );
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.textContaining(paperHintText),
+        matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
-      findsOneWidget,
-      reason: 'the hint names the paper cycles behind the grouped figure',
+      findsNothing,
+      reason: 'summary cards carry no count caption',
+    );
+    expect(
+      find.textContaining('figures in parentheses'),
+      findsNothing,
+      reason: 'no parenthetical grouping and no hint line remain',
     );
     // The count card stays out of the summary row here too.
     expect(find.byKey(const ValueKey('statisticsCard-count')), findsNothing);
@@ -760,6 +848,14 @@ void main() {
       findsNWidgets(4),
       reason: 'no countable in-app length — every metric row dashes',
     );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.textContaining(RegExp('from \\d+ cycles?')),
+      ),
+      findsNothing,
+      reason: 'the all-dash card carries no count caption',
+    );
     // Single recorded facts do NOT enter the distribution machinery.
     expect(
       find.byKey(const ValueKey('statisticsCard-distribution')),
@@ -767,12 +863,11 @@ void main() {
     );
   });
 
-  testWidgets('the shortest summary card groups the paper-inclusive '
-      'minimum under the in-app main figure, and the count card stays out '
-      'of the summary row', (tester) async {
+  testWidgets('the shortest summary card keeps the in-app minimum as the '
+      'main figure and surfaces the paper figure on the outside line, and '
+      'the count card stays out of the summary row', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // In-app minimum is 28: paper 21 beats it on the summary figure.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -781,29 +876,42 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // The count card is gone from the summary row; the composed caption
-    // lives on the top cycles-count card only.
+    // The count card lives only on the top cycles-count surface; the
+    // summary row holds shortest + earliest.
     expect(find.byKey(const ValueKey('statisticsCard-count')), findsNothing);
     expect(countCard(), findsOneWidget);
-    // Shortest card: the in-app minimum stays the main figure, the
-    // paper-inclusive minimum is grouped under it with the hint line.
+    // Shortest card: the in-app minimum stays the main figure untouched,
+    // the paper figure shows on its own outside line.
     expect(
       find.descendant(of: oldCard('shortest'), matching: find.text('28')),
       findsOneWidget,
       reason: 'the in-app minimum is the main figure',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      find.descendant(
+        of: oldCard('shortest'),
+        matching: find.text('${outsideShortestPrefix}21'),
+      ),
       findsOneWidget,
-      reason: 'the paper-inclusive minimum is the grouped figure',
+      reason: 'the paper figure lives on the outside line',
     );
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.textContaining(paperHintText),
+        matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
-      findsOneWidget,
-      reason: 'the hint names the paper cycles behind the grouped figure',
+      findsNothing,
+      reason: 'summary cards carry no count caption',
+    );
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      findsNothing,
+      reason: 'the paper figure is never a bare second figure',
+    );
+    expect(
+      find.textContaining('figures in parentheses'),
+      findsNothing,
+      reason: 'no parenthetical grouping and no hint line remain',
     );
     expect(
       find.descendant(
@@ -823,12 +931,13 @@ void main() {
     );
   });
 
-  testWidgets('a paper shortest ABOVE the in-app minimum never flips the '
-      'surfaced minimum upward (plain figure, no hint)', (tester) async {
+  testWidgets('a paper shortest above the in-app minimum still surfaces on '
+      'the outside line (no participation gate)', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // Paper 30 loses against the in-app 28: the shortest card keeps the
-    // plain in-app figure — no grouped paper figure, no hint line.
+    // Paper 30 loses against the in-app 28: the main figure stays the
+    // plain in-app minimum, and the outside line shows the paper figure
+    // anyway — the line is a recorded fact, not a better minimum.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -840,23 +949,28 @@ void main() {
     expect(
       find.descendant(of: oldCard('shortest'), matching: find.text('28')),
       findsOneWidget,
-      reason: 'the smaller in-app minimum wins the fold',
-    );
-    expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('30')),
-      findsNothing,
+      reason: 'the smaller in-app minimum stays the main figure',
     );
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.textContaining(paperHintText),
+        matching: find.text('${outsideShortestPrefix}30'),
       ),
-      findsNothing,
-      reason:
-          'the paper figure adds nothing to the minimum here, so the '
-          'hint would describe a parenthesis that is not there',
+      findsOneWidget,
+      reason: 'the paper figure shows even when it adds nothing to the minimum',
     );
-    // With the paper 30 folded out, min and max both read the in-app 28.
+    expect(
+      find.descendant(of: oldCard('shortest'), matching: find.text('30')),
+      findsNothing,
+      reason: 'the paper figure is never a bare second figure',
+    );
+    expect(
+      find.textContaining('figures in parentheses'),
+      findsNothing,
+      reason: 'no parenthetical grouping and no hint line remain',
+    );
+    // The paper 30 touches nothing on the metric card: min and max both
+    // read the in-app 28.
     expect(
       find.descendant(of: metricCard('cycleLength'), matching: find.text('28')),
       findsNWidgets(2),
@@ -864,12 +978,12 @@ void main() {
     );
   });
 
-  testWidgets('the earliest summary card groups both variants with the '
-      'paper-inclusive figures and the hint line', (tester) async {
+  testWidgets('the earliest summary card shows the plain in-app rows and '
+      'one outside line for the paper figure', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // In-app both variants are cycle day 14; a paper rise on cycle day 5
-    // is the earlier fact for both rows.
+    // In-app both variants are cycle day 14; the paper rise on cycle day
+    // 5 shows only on the single outside line, not in the variant rows.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -907,25 +1021,34 @@ void main() {
       reason: 'the any-variant row keeps its label',
     );
     expect(
-      find.descendant(
-        of: summaryEarliest,
-        matching: find.textContaining('cycle day 5'),
-      ),
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
       findsNWidgets(2),
-      reason: 'both rows carry the paper-inclusive minimum',
+      reason: 'both rows carry the in-app minimum un-grouped',
+    );
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 5')),
+      findsNothing,
+      reason: 'the paper figure is never a row value',
     );
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.textContaining(paperHintText),
+        matching: find.text('${outsideEarliestPrefix}5'),
       ),
       findsOneWidget,
-      reason: 'the hint names the paper cycles behind the grouped figures',
+      reason:
+          'the paper figure lives on the single non-variant-split '
+          'outside line',
+    );
+    expect(
+      find.textContaining('figures in parentheses'),
+      findsNothing,
+      reason: 'no parenthetical grouping and no hint line remain',
     );
   });
 
   testWidgets('the earliest summary card without a paper value: plain '
-      'in-app rows and no hint line', (tester) async {
+      'in-app rows and neither hint line nor outside line', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -954,19 +1077,32 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.textContaining(paperHintText),
+        matching: find.textContaining('outside:'),
       ),
       findsNothing,
-      reason: 'no paper value — no grouped figure, no hint',
+      reason: 'no paper value — no outside line on the summary cards',
+    );
+    expect(
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.textContaining(RegExp('from \\d+ cycles?')),
+      ),
+      findsNothing,
+      reason: 'summary cards carry no count caption',
+    );
+    expect(
+      find.textContaining('figures in parentheses'),
+      findsNothing,
+      reason: 'no parenthetical grouping and no hint line remain',
     );
   });
 
-  testWidgets('a paper earliest first higher stays out of the big '
-      'earliest card\'s variant rows', (tester) async {
+  testWidgets('a paper earliest first higher surfaces on the summary '
+      'card only', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     // In-app both variants are cycle day 14; a paper rise on cycle day 5
-    // is pinned but surfaces on the summary row only.
+    // exists only as the summary row's outside line.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -975,32 +1111,45 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final rows = tester
-        .widgetList<Text>(
-          find.descendant(
-            of: earliestCard(),
-            matching: find.textContaining('cycle day '),
-          ),
-        )
-        .map((t) => t.data!)
-        .toList();
     expect(
-      rows,
-      everyElement('cycle day 14'),
-      reason:
-          'both variant rows '
-          'carry the in-app minimum; the paper fact does not enter '
-          'the card',
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    expect(
+      find.text('Earliest first higher measurement'),
+      findsOneWidget,
+      reason: 'one on-screen card carries the earliest title',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
+      findsNWidgets(2),
+      reason: 'the rows keep the in-app minima',
+    );
+    expect(
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.text('${outsideEarliestPrefix}5'),
+      ),
+      findsOneWidget,
+      reason: 'the paper figure lives on the outside line',
     );
   });
 
-  testWidgets('a divergent in-app record keeps each variant row on its '
-      'in-app value with a paper earliest pinned', (tester) async {
+  testWidgets('a divergent in-app record keeps its "over all cycles" '
+      'minimum on the summary card with a paper earliest pinned', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The divergent in-app record (any = 1, real = 14 — cycle 2 carries
-    // no measurable circle, R9) with paper 5 pinned: the rows read the
-    // in-app values, the paper 5 stays on the summary row.
+    // The divergent in-app record (over all cycles = 1, real = 14 —
+    // cycle 2 carries no measurable circle, R9) with paper 5 pinned:
+    // both rows keep their own in-app minima, the paper figure shows on
+    // the one outside line.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -1009,117 +1158,142 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final mixedRows = tester
-        .widgetList<Text>(
-          find.descendant(
-            of: earliestCard(),
-            matching: find.textContaining('cycle day '),
-          ),
-        )
-        .map((t) => t.data!)
-        .toList();
     expect(
-      mixedRows,
-      contains('cycle day 1'),
-      reason: 'the in-app "any" minimum of 1 stays on its row',
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 1')),
+      findsOneWidget,
+      reason: 'the "over all cycles" minimum keeps its own figure',
     );
     expect(
-      mixedRows,
-      contains('cycle day 14'),
-      reason:
-          'the real variant keeps its in-app first circle (cycle 2 '
-          'carries none)',
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
+      findsOneWidget,
+      reason: 'the real row keeps its in-app figure, un-min-combined',
     );
     expect(
-      mixedRows,
-      isNot(contains('cycle day 5')),
-      reason: 'the paper fact does not enter the card',
+      find.descendant(
+        of: summaryEarliest,
+        matching: find.text('${outsideEarliestPrefix}5'),
+      ),
+      findsOneWidget,
+      reason: 'the paper figure lives on the outside line',
     );
   });
 
-  testWidgets('the missing-real-variant note keys on the in-app variants: '
-      'a paper figure alone does not suppress it', (tester) async {
+  testWidgets('a paper earliest cannot qualify the real variant in-app: '
+      'the summary card shows the dash plus the outside line', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     // The narrow combination: the in-app cycle has a rise but NO marked
-    // mucus peak, so the in-app "any" variant is cycle day 3 while the
-    // real (umrandete) variant qualifies nowhere — a paper earliest value
-    // is pinned, but it surfaces on the summary row only.
+    // mucus peak, so the in-app "over all cycles" variant is cycle day 3
+    // while the real (umrandete) variant qualifies nowhere in-app. The
+    // follow-up start (Mar 29) gives the cycle a countable length so the
+    // summary row renders; the paper earliest value is pinned and
+    // surfaces as the card's outside line.
     await tester.pumpWidget(
       harness(
-        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+        entries: [
+          DailyEntry(date: m(3, 1), bbtC: 36.4),
+          DailyEntry(date: m(3, 29), bbtC: 36.4),
+        ],
         marks: [
           CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
           CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
         ],
         paperEarliestFirstHigherCycleDay: 5,
       ),
     );
     await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: earliestCard(),
-        matching: find.textContaining('cycle day 5'),
-      ),
+      earliestFirstHigherCard(),
       findsNothing,
-      reason:
-          'the paper figure does not enter the card, let alone the '
-          'real row',
+      reason: 'the summary card is the single earliest surface',
     );
     expect(
-      find.descendant(of: earliestCard(), matching: find.text('—')),
+      find.textContaining('no first higher measurement'),
+      findsNothing,
+      reason: 'the real variant stays unqualified on the screen',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('—')),
       findsOneWidget,
       reason: 'the real row dashes — the in-app variant has no value',
     );
     expect(
-      find.descendant(
-        of: earliestCard(),
-        matching: find.textContaining('no first higher measurement'),
-      ),
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 3')),
       findsOneWidget,
-      reason:
-          'a paper figure alone does not qualify the real variant '
-          'in-app, so the note stays true',
+      reason: 'the "over all cycles" row keeps its in-app figure',
     );
     expect(
       find.descendant(
-        of: earliestCard(),
-        matching: find.textContaining('cycle day 3'),
+        of: summaryEarliest,
+        matching: find.text('${outsideEarliestPrefix}5'),
       ),
       findsOneWidget,
-      reason: 'the "any" row keeps its in-app value',
+      reason: 'the paper figure lives on the outside line',
     );
   });
 
-  testWidgets('without a paper value the same in-app shape genuinely lacks '
-      'the real variant, and the note states exactly that', (tester) async {
+  testWidgets('without a paper value a genuinely unqualified real variant '
+      'dashes on its summary row', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The in-app cycle again has a rise but NO marked peak, without any
-    // paper fact folding in: the real row dashes and the
-    // missing-variant note is true.
+    // The in-app cycle again has a rise but NO marked peak: the real
+    // (umrandete) variant qualifies nowhere in-app, while the "over all
+    // cycles" variant is cycle day 3. The follow-up start (Mar 29) gives
+    // the cycle a countable length so the summary row renders.
     await tester.pumpWidget(
       harness(
-        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+        entries: [
+          DailyEntry(date: m(3, 1), bbtC: 36.4),
+          DailyEntry(date: m(3, 29), bbtC: 36.4),
+        ],
         marks: [
           CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
           CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+          CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
         ],
       ),
     );
     await tester.pumpAndSettle();
     expect(
-      find.descendant(of: earliestCard(), matching: find.text('—')),
+      earliestFirstHigherCard(),
+      findsNothing,
+      reason: 'the summary card is the single earliest surface',
+    );
+    expect(
+      find.textContaining('no first higher measurement'),
+      findsNothing,
+      reason: 'the real-variant note is gone from the screen',
+    );
+    final summaryEarliest = find.byKey(
+      const ValueKey('statisticsCard-earliest'),
+    );
+    expect(summaryEarliest, findsOneWidget);
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('—')),
       findsOneWidget,
-      reason: 'the real row genuinely dashes without the paper value',
+      reason: 'the real row dashes — the in-app variant has no value',
     );
     expect(
       find.descendant(
-        of: earliestCard(),
-        matching: find.textContaining('no first higher measurement'),
+        of: summaryEarliest,
+        matching: find.textContaining('cycle day 3'),
       ),
       findsOneWidget,
-      reason: 'the note appears only for the genuinely missing real variant',
+      reason: 'the "over all cycles" row keeps its in-app value',
     );
   });
 

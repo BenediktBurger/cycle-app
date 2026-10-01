@@ -120,7 +120,11 @@ final class DescriptiveSummary {
     required this.maximum,
     required this.average,
     required this.standardDeviation,
+    required this.count,
   });
+
+  /// The number of values this summary was computed from (0 when empty).
+  final int count;
 
   /// Smallest input value, or null when there is no data.
   final int? minimum;
@@ -149,6 +153,7 @@ DescriptiveSummary summarizeInts(List<int> values) {
       maximum: null,
       average: null,
       standardDeviation: null,
+      count: 0,
     );
   }
   final mean = values.fold<int>(0, (sum, v) => sum + v) / values.length;
@@ -166,6 +171,7 @@ DescriptiveSummary summarizeInts(List<int> values) {
     maximum: values.reduce((a, b) => a > b ? a : b),
     average: mean,
     standardDeviation: math.sqrt(variance),
+    count: values.length,
   );
 }
 
@@ -261,12 +267,11 @@ List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
 /// The smaller of two optional recorded facts, or null when both are:
 /// null folds to the other side (a missing fact adds nothing — the other
 /// side's value stands alone) and a minimum of observed facts never flips
-/// upward. THE shared MIN-combination rule behind the paper-history fold
-/// (the settings pane's figures recorded before this app existed — the
-/// outside-app shortest cycle and earliest first higher): the surfaces
-/// that include paper facts are the statistics summary row and the PDF
-/// model, and there the paper figures compete through this fold
-/// (lib/ui/statistics.dart and lib/domain/pdf_export_model.dart).
+/// upward. The paper-history fold of the PDF model (the settings pane's
+/// figures recorded before this app existed — the outside-app shortest
+/// cycle and earliest first higher, lib/domain/pdf_export_model.dart);
+/// the statistics screen shows those paper figures as plain "outside"
+/// lines instead, without a fold.
 int? minRecordedFact(int? first, int? second) {
   if (first == null) return second;
   if (second == null) return first;
@@ -534,13 +539,18 @@ final class MetricSummary {
     required this.max,
     required this.average,
     required this.stdDev,
+    required this.count,
   });
 
   const MetricSummary.empty()
     : min = null,
       max = null,
       average = null,
-      stdDev = null;
+      stdDev = null,
+      count = 0;
+
+  /// The number of values this summary was computed from (0 when empty).
+  final int count;
 
   final int? min;
   final int? max;
@@ -563,6 +573,7 @@ MetricSummary _summarize(List<int> values) {
     max: values.reduce((a, b) => a > b ? a : b),
     average: mean,
     stdDev: math.sqrt(variance),
+    count: count,
   );
 }
 

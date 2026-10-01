@@ -292,6 +292,15 @@
     "description": "Population standard deviation (StdAbw über die gesamte beobachtete Menge, kein N-1-Schätzwert) — beschreibender Rechenwert."
   },
   "statisticsMetricBleedingDuration": "Blutungsdauer (Tage)",
+  "statisticsMetricFromCycles": "{n, plural, =1{aus 1 Zyklus} other{aus {n} Zyklen}}",
+  "@statisticsMetricFromCycles": {
+    "description": "Caption under a metric card's rows naming how many cycles fed THIS metric's values — the per-metric observation count, not the global cycle count; hidden when the metric has no data.",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "statisticsCycleDay": "Zyklustag {n}",
   "@statisticsCycleDay": {
     "placeholders": {
@@ -309,13 +318,23 @@
   "@statisticsFirstHigherAny": {
     "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
   },
-  "statisticsFirstHigherRealMissing": "keine umrandete Messung (erste höhere Messung nach dem Schleimhöhepunkt) ermittelt",
-  "@statisticsFirstHigherRealMissing": {
-    "description": "Caption shown when no cycle qualifies for the after-the-peak variant: a cycle qualifies only when a measured temperature strictly above the baseline is circled after the marked mucus peak (umrandete Messung), so the caption names the extinguishing fact (no qualifying measured temperature, not a missing mark)."
+  "statisticsShortestOutsideApp": "außerhalb: {n}",
+  "@statisticsShortestOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Shortest-card caption line naming the cycle length recorded outside this app (the settings value), shown when it has a value. Same shape as the count card's \"außerhalb: {n}\" caption part."
   },
-  "statisticsSummaryPaperHint": "Klammerwerte beziehen die früheren, auf Papier beobachteten Zyklen ein.",
-  "@statisticsSummaryPaperHint": {
-    "description": "Description line of the summary row's shortest/earliest cards, shown only when a paper-history fact (a figure recorded outside this app, e.g. on paper) participates through the min-combination: it names what the parenthesized figures hold."
+  "statisticsFirstHigherOutsideApp": "außerhalb: Zyklustag {n}",
+  "@statisticsFirstHigherOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT per variant: one line for both rows \"nach dem Schleimhöhepunkt\" and \"über alle Zyklen\"."
   },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
@@ -620,6 +639,5 @@
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
-  "statisticsCycles": "Zykluslängen",
   "statisticsShortest": "Kürzester"
 }

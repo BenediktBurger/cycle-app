@@ -5,9 +5,8 @@
 // lengths, averages, buckets — no classification, no fertility
 // statements. Everything is computed at render time from the entries +
 // marks streams (ADR-0001: nothing derived is persisted); missing values
-// render as the "—" dash. The paper-history settings fold into the
-// shortest/earliest surfaces as a MIN-combination only — see the build
-// method's fold comment.
+// render as the "—" dash. Paper-history figures surface as the summary
+// row's "outside" lines only — see the build method's paper comment.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -85,9 +84,10 @@ class StatistikScreen extends ConsumerWidget {
     );
     final earliest = earliestFirstHigherCycleDay(evaluations);
 
-    // Figures recorded before every in-app cycle (paper history) surface
-    // only on the summary row below; every other card reads the in-app
-    // record alone (the PDF build folds its own, lib/domain/pdf_export_model.dart).
+    // Paper-history figures (recorded before this app existed) appear on
+    // the summary row's small "outside" lines only; every other card reads
+    // the in-app record alone (the PDF model folds its own, see
+    // lib/domain/pdf_export_model.dart).
     final paperShortest = ref.watch(shortestCycleLengthOutsideAppProvider);
     final paperEarliest = ref.watch(
       earliestFirstHigherCycleDayOutsideAppProvider,
@@ -114,9 +114,6 @@ class StatistikScreen extends ConsumerWidget {
     if (cyclesOutsideApp > 0) {
       countCaption += ' · ${l10n.statisticsCyclesOutsideApp(cyclesOutsideApp)}';
     }
-
-    String cycleDayText(int? n) =>
-        n == null ? _missing : l10n.statisticsCycleDay(n);
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -175,29 +172,6 @@ class StatistikScreen extends ConsumerWidget {
           detail: _descriptiveDetail(stats.firstHigherUntilCycleEnd),
         ),
         const SizedBox(height: 8),
-        _StatCard(
-          key: const ValueKey('statisticsCard-earliestFirstHigher'),
-          title: l10n.statisticsEarliestFirstHigher,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ValueRow(
-                label: l10n.statisticsFirstHigherReal,
-                value: cycleDayText(earliest.afterMucusPeak),
-              ),
-              _ValueRow(
-                label: l10n.statisticsFirstHigherAny,
-                value: cycleDayText(earliest.any),
-              ),
-              if (earliest.afterMucusPeak == null && earliest.any != null)
-                Text(
-                  l10n.statisticsFirstHigherRealMissing,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
         if (stats.facts.isNotEmpty)
           // Below ALL other statistics: the one-row-per-cycle table keeps
           // the numbers auditable against the mark-driven boundaries
@@ -229,11 +203,10 @@ Widget _countCard(
   ),
 );
 
-/// The summary row: shortest + earliest, with the paper-history facts
-/// folded in — the in-app figure as the main figure, the paper-inclusive
-/// one parenthesized (with the hint) only where the paper fact actually
-/// participates, i.e. beats the in-app value or the in-app value is
-/// missing altogether.
+/// The summary row: shortest + earliest, each card showing the plain
+/// in-app figures; when a paper-history fact exists for the metric, one
+/// small "outside" line names it — the min across both numbers is the
+/// reader's own combination.
 Widget _summaryRow(
   BuildContext context,
   CycleLengthSummary summary, {
@@ -242,26 +215,19 @@ Widget _summaryRow(
   required int? paperShortest,
 }) {
   final l10n = AppLocalizations.of(context);
-  final shortestCombined = minRecordedFact(summary.shortest, paperShortest);
-  // Null when the paper minimum adds nothing: a missing paper figure or
-  // one at-or-above the in-app minimum changes no figure at all.
-  final groupedShortest = shortestCombined == summary.shortest
-      ? null
-      : shortestCombined;
-  String cycleDay(int? folded) =>
-      folded == null ? _missing : l10n.statisticsCycleDay(folded);
-  String variantValue(int? folded) =>
-      paperEarliest == null ? cycleDay(folded) : '(${cycleDay(folded)})';
+  String cycleDay(int? day) =>
+      day == null ? _missing : l10n.statisticsCycleDay(day);
   return Row(
     children: [
       Expanded(
         child: _StatCard(
           key: const ValueKey('statisticsCard-shortest'),
           title: l10n.statisticsShortest,
-          child: _GroupedFigure(
+          child: _SummaryFigure(
             value: summary.shortest == null ? _missing : '${summary.shortest}',
-            paperFigure: groupedShortest,
-            hint: l10n.statisticsSummaryPaperHint,
+            outside: paperShortest == null
+                ? null
+                : l10n.statisticsShortestOutsideApp(paperShortest),
           ),
         ),
       ),
@@ -275,19 +241,15 @@ Widget _summaryRow(
             children: [
               _ValueRow(
                 label: l10n.statisticsFirstHigherReal,
-                value: variantValue(
-                  minRecordedFact(earliest.afterMucusPeak, paperEarliest),
-                ),
+                value: cycleDay(earliest.afterMucusPeak),
               ),
               _ValueRow(
                 label: l10n.statisticsFirstHigherAny,
-                value: variantValue(
-                  minRecordedFact(earliest.any, paperEarliest),
-                ),
+                value: cycleDay(earliest.any),
               ),
               if (paperEarliest != null)
                 Text(
-                  l10n.statisticsSummaryPaperHint,
+                  l10n.statisticsFirstHigherOutsideApp(paperEarliest),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
             ],
@@ -298,19 +260,13 @@ Widget _summaryRow(
   );
 }
 
-/// The main figure of a summary card plus, when the paper fact
-/// participates ([paperFigure]), the parenthesized paper-inclusive figure
-/// and the [hint] naming what the parentheses hold.
-final class _GroupedFigure extends StatelessWidget {
-  const _GroupedFigure({
-    required this.value,
-    required this.hint,
-    this.paperFigure,
-  });
+/// A summary card's main figure, with its optional "outside" line rendered
+/// beneath it.
+final class _SummaryFigure extends StatelessWidget {
+  const _SummaryFigure({required this.value, this.outside});
 
   final String value;
-  final int? paperFigure;
-  final String hint;
+  final String? outside;
 
   @override
   Widget build(BuildContext context) {
@@ -319,21 +275,7 @@ final class _GroupedFigure extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(value, style: theme.textTheme.headlineSmall),
-        if (paperFigure != null) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.ideographic,
-            children: [
-              Text('(', style: theme.textTheme.titleMedium),
-              // One '($paperFigure)' text would read as "(21)" — the
-              // figure must stay its own string, only the parentheses
-              // wrap it.
-              Text('$paperFigure', style: theme.textTheme.titleMedium),
-              Text(')', style: theme.textTheme.titleMedium),
-            ],
-          ),
-          Text(hint, style: theme.textTheme.bodySmall),
-        ],
+        if (outside != null) Text(outside!, style: theme.textTheme.bodySmall),
       ],
     );
   }
@@ -396,7 +338,7 @@ Widget _distributionCard(
 /// [_StatCard] style. The [title] string carries the metric's unit
 /// parenthesized; the min/max rows render bare integers (one decimal in
 /// the effective locale for the fractional rows), or the "—" dash when
-/// there is no data.
+/// there is no data — in which case the count caption is omitted too.
 final class _MetricCard extends StatelessWidget {
   const _MetricCard({super.key, required this.title, required this.detail});
 
@@ -427,6 +369,13 @@ final class _MetricCard extends StatelessWidget {
             label: l10n.statisticsStandardDeviation,
             value: _scalarText(context, detail.standardDeviation),
           ),
+          if (detail.count > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              l10n.statisticsMetricFromCycles(detail.count),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );
@@ -474,6 +423,7 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
       maximum: summary.max,
       average: summary.average,
       standardDeviation: summary.stdDev,
+      count: summary.count,
     );
 
 /// The per-cycle table card: a bordered table of equal-width columns
