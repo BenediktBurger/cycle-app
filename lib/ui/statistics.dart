@@ -83,9 +83,6 @@ class StatistikScreen extends ConsumerWidget {
     final bleedingDetail = summarizeInts(
       cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
     );
-    final riseDetail = summarizeInts(
-      riseToEndDurationsInDays(evaluations).nonNulls.toList(),
-    );
     final earliest = earliestFirstHigherCycleDay(evaluations);
 
     // Figures recorded before every in-app cycle (paper history) surface
@@ -167,9 +164,9 @@ class StatistikScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         _MetricCard(
-          key: const ValueKey('statisticsCard-riseSpan'),
-          title: l10n.statisticsMetricRiseSpan,
-          detail: riseDetail,
+          key: const ValueKey('statisticsCard-firstHigher'),
+          title: l10n.statisticsMetricFirstHigherDay,
+          detail: _descriptiveDetail(stats.firstHigherCycleDays),
         ),
         const SizedBox(height: 8),
         _MetricCard(
@@ -396,8 +393,10 @@ Widget _distributionCard(
 
 /// One metric card: the descriptive detail set (minimum, maximum,
 /// average, standard deviation) for ONE metric family, in the shared
-/// [_StatCard] style. Values are numbers ("n days" / one decimal) or the
-/// "—" dash when there is no data.
+/// [_StatCard] style. The [title] string carries the metric's unit
+/// parenthesized; the min/max rows render bare integers (one decimal in
+/// the effective locale for the fractional rows), or the "—" dash when
+/// there is no data.
 final class _MetricCard extends StatelessWidget {
   const _MetricCard({super.key, required this.title, required this.detail});
 
@@ -414,15 +413,11 @@ final class _MetricCard extends StatelessWidget {
         children: [
           _ValueRow(
             label: l10n.statisticsMinimum,
-            value: detail.minimum == null
-                ? _missing
-                : l10n.termCycleDays(detail.minimum!),
+            value: detail.minimum == null ? _missing : '${detail.minimum}',
           ),
           _ValueRow(
             label: l10n.statisticsMaximum,
-            value: detail.maximum == null
-                ? _missing
-                : l10n.termCycleDays(detail.maximum!),
+            value: detail.maximum == null ? _missing : '${detail.maximum}',
           ),
           _ValueRow(
             label: l10n.statisticsAverage,

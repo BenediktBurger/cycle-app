@@ -109,8 +109,7 @@ int markDrivenCycleCount(List<DailyEntry> entries, List<CycleMark> marks) =>
     markDrivenCycleCountFrom(groupIntoCycles(entries, marks));
 
 /// Descriptive scalars (min, max, mean, standard deviation) over a list
-/// of ints — used for cycle lengths, bleeding durations and rise-to-end
-/// spans alike.
+/// of ints — used for cycle lengths and bleeding durations alike.
 ///
 /// Data-shape note: what a pregnancy-span cycle does to these values is
 /// the open data question documented in the file header — the numbers
@@ -210,40 +209,6 @@ List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
     if (evaluation.cycle.startsAtMark)
       bleedingSpanInDays(evaluation.cycle.days),
 ];
-
-/// The per-cycle spans from the cycle's marked first higher measurement
-/// to the cycle's end, in INCLUSIVE calendar days, for the MARK-driven
-/// cycles in group order.
-///
-/// The cycle end is the calendar day BEFORE the next mark-driven cycle
-/// start (the last day before the next menstruation); untracked gap days
-/// before the next start count through, calendar-honest exactly like
-/// [cycleLengthsInDays]. Single definitions: null when the cycle has no
-/// first-higher mark, and null for the LAST mark-driven cycle (no known
-/// follow-up start — its end is open). The leading pre-mark group is
-/// excluded like everywhere here. Pure arithmetic over [evaluateCycles]
-/// output (ADR-0001).
-List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
-  final spans = <int?>[];
-  for (var i = 0; i < evaluations.length; i++) {
-    final evaluation = evaluations[i];
-    if (!evaluation.cycle.startsAtMark) continue;
-    final rise = evaluation.firstHigherDay;
-    // The next group of a mark-driven cycle is always mark-driven itself
-    // (the leading group can only be the first group) — its start is the
-    // end-of-window anchor here. Absent for the last cycle.
-    final nextStart = i + 1 < evaluations.length
-        ? evaluations[i + 1].cycle.startDate
-        : null;
-    if (rise == null || nextStart == null) {
-      spans.add(null);
-      continue;
-    }
-    final cycleEnd = DateOnly.previousDay(DateOnly.normalize(nextStart));
-    spans.add(DateOnly.daysBetween(cycleEnd, DateOnly.normalize(rise)) + 1);
-  }
-  return spans;
-}
 
 /// The earliest (minimum) cycle-day number of the cycle's first higher
 /// measurement across all mark-driven cycles, as a record of TWO
@@ -609,7 +574,7 @@ final class CycleStatistic {
     required this.cycleLengths,
     required this.bleedingDays,
     required this.firstHigherUntilCycleEnd,
-    required this.earliestFirstHigherDayOfCycle,
+    required this.firstHigherCycleDays,
   });
 
   /// One row per mark-opened cycle — the table data.
@@ -622,11 +587,13 @@ final class CycleStatistic {
   final MetricSummary bleedingDays;
   final MetricSummary firstHigherUntilCycleEnd;
 
-  /// The earliest first higher measurement among all cycles, reported as
-  /// the 1-based day-of-cycle number the chart renders
-  /// (daysBetween(firstHigherDay, cycleStart) + 1). Null when no cycle has
-  /// a resolved first higher measurement.
-  final int? earliestFirstHigherDayOfCycle;
+  /// The per-cycle first higher measurements as 1-based day-of-cycle
+  /// numbers (daysBetween(firstHigherDay, cycleStart) + 1, like the
+  /// chart). One single sense — the cycle's resolved fact
+  /// ([CycleFact.firstHigherDay]) — unlike the two senses of
+  /// [earliestFirstHigherCycleDay]; this summary's `min` is therefore
+  /// THE earliest first-higher cycle day.
+  final MetricSummary firstHigherCycleDays;
 }
 
 /// Aggregates the per-cycle facts of [cycleFacts] into the screen's
@@ -659,16 +626,11 @@ CycleStatistic cycleStatisticsFromCycles(
       if (fact.firstHigherUntilCycleEndDays != null)
         fact.firstHigherUntilCycleEndDays!,
   ];
-
-  var earliestDayOfCycle = 0;
-  for (final fact in facts) {
-    if (fact.firstHigherDay == null) continue;
-    final dayNumber =
-        DateOnly.daysBetween(fact.firstHigherDay!, fact.cycleStart) + 1;
-    if (earliestDayOfCycle == 0 || dayNumber < earliestDayOfCycle) {
-      earliestDayOfCycle = dayNumber;
-    }
-  }
+  final firstHigherDayNumbers = [
+    for (final fact in facts)
+      if (fact.firstHigherDay != null)
+        DateOnly.daysBetween(fact.firstHigherDay!, fact.cycleStart) + 1,
+  ];
 
   return CycleStatistic(
     facts: facts,
@@ -676,8 +638,6 @@ CycleStatistic cycleStatisticsFromCycles(
     cycleLengths: _summarize(lengths),
     bleedingDays: _summarize(bleedings),
     firstHigherUntilCycleEnd: _summarize(firstHigherSpans),
-    earliestFirstHigherDayOfCycle: earliestDayOfCycle == 0
-        ? null
-        : earliestDayOfCycle,
+    firstHigherCycleDays: _summarize(firstHigherDayNumbers),
   );
 }

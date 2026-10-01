@@ -326,6 +326,29 @@ void main() {
       expect(facts[1].firstHigherUntilCycleEndDays, isNull);
       expect(facts[1].bleedingDays, 0);
     });
+
+    test('the cycle before a data-less FRESH mark counts its span to the '
+        'fresh mark', () {
+      final entries = [
+        d(2026, 3, 2, bleeding: Bleeding.medium),
+        d(2026, 3, 30),
+        d(2026, 3, 31, bbtC: 36.8),
+      ];
+      final marks = [
+        start(2026, 3, 2),
+        start(2026, 3, 30),
+        start(2026, 5, 10),
+        firstHigher(2026, 3, 5),
+        firstHigher(2026, 3, 31),
+      ];
+      final facts = cycleFacts(entries, marks);
+      // Cycle 2: rise Mar 31, the fresh May 10 start is its observed
+      // cycle end exclusive -> Mar 31..May 9 inclusive = 40 days.
+      expect(facts[1].firstHigherUntilCycleEndDays, 40);
+      // The fresh data-less cycle itself: no rise, no span.
+      expect(facts[2].firstHigherDay, isNull);
+      expect(facts[2].firstHigherUntilCycleEndDays, isNull);
+    });
   });
 
   group('cycleStatistics', () {
@@ -339,10 +362,13 @@ void main() {
       expect(stats.cycleLengths.stdDev, isNull);
       expect(stats.bleedingDays.average, isNull);
       expect(stats.firstHigherUntilCycleEnd.average, isNull);
-      expect(stats.earliestFirstHigherDayOfCycle, isNull);
+      expect(stats.firstHigherCycleDays.min, isNull);
+      expect(stats.firstHigherCycleDays.max, isNull);
+      expect(stats.firstHigherCycleDays.average, isNull);
+      expect(stats.firstHigherCycleDays.stdDev, isNull);
     });
 
-    test('aggregates min/max/avg/population std over the three metrics', () {
+    test('aggregates min/max/avg/population std over the metrics', () {
       final stats = cycleStatistics(threeCycleData(), [
         ...threeCycleStarts(),
         firstHigher(2026, 3, 20),
@@ -367,20 +393,57 @@ void main() {
       expect(stats.firstHigherUntilCycleEnd.average, closeTo(10.0, 0.0001));
       expect(stats.firstHigherUntilCycleEnd.stdDev, closeTo(0.0, 0.0001));
 
-      // Earliest first higher as 1-based day-of-cycle: Mar 20 is offset 18
-      // from the Mar 2 start, so the chart-convention day number is 19.
-      expect(stats.earliestFirstHigherDayOfCycle, 19);
+      // First higher day numbers as 1-based day-of-cycle: Mar 20 is
+      // offset 18 from the Mar 2 start, so the chart-convention day
+      // number is 19 — the only fact row, one value, no spread.
+      expect(stats.firstHigherCycleDays.min, 19);
+      expect(stats.firstHigherCycleDays.max, 19);
+      expect(stats.firstHigherCycleDays.average, closeTo(19.0, 0.0001));
+      expect(stats.firstHigherCycleDays.stdDev, closeTo(0.0, 0.0001));
     });
 
     test('earliest first higher prefers the smallest day-of-cycle offset', () {
-      // Cycle 1: mark Mar 20 (day 20); cycle 3 (Apr 27..): mark May 1
-      // (offset 4, day 5) — the fifth day wins.
+      // Cycle 1: mark Mar 20, start Mar 2 -> cycle day 19; cycle 3
+      // (Apr 27..): mark May 1 -> cycle day 5 — the fifth day wins.
       final stats = cycleStatistics(threeCycleData(), [
         ...threeCycleStarts(),
         firstHigher(2026, 3, 20),
         firstHigher(2026, 5, 1),
       ]);
-      expect(stats.earliestFirstHigherDayOfCycle, 5);
+      expect(stats.firstHigherCycleDays.min, 5);
+      expect(stats.firstHigherCycleDays.max, 19);
+      expect(stats.firstHigherCycleDays.average, closeTo(12.0, 0.0001));
+      expect(stats.firstHigherCycleDays.stdDev, closeTo(7.0, 0.0001));
+    });
+
+    test('a three-cycle first-higher day distribution: min, max, mean, '
+        'std', () {
+      // Cycle 1 (start Mar 2): mark Mar 20 -> day 19; cycle 2 (start
+      // Mar 30): mark Apr 6 -> day 8; cycle 3 (start Apr 27): mark May 1
+      // -> day 5. Mean 32/3; population std = sqrt(36.2222...).
+      final stats = cycleStatistics(threeCycleData(), [
+        ...threeCycleStarts(),
+        firstHigher(2026, 3, 20),
+        firstHigher(2026, 4, 6),
+        firstHigher(2026, 5, 1),
+      ]);
+      expect(stats.firstHigherCycleDays.min, 5);
+      expect(stats.firstHigherCycleDays.max, 19);
+      expect(stats.firstHigherCycleDays.average, closeTo(32 / 3, 0.0001));
+      expect(stats.firstHigherCycleDays.stdDev, closeTo(6.0184877, 0.0001));
+    });
+
+    test('a first-higher mark in the leading pre-mark group contributes '
+        'no day number', () {
+      final entries = [d(2026, 2, 20), ...threeCycleData()];
+      final stats = cycleStatistics(entries, [
+        firstHigher(2026, 2, 25),
+        ...threeCycleStarts(),
+      ]);
+      // The mark sits inside the leading group (no cycle start to count
+      // from); the four mark-opened cycles carry none.
+      expect(stats.facts, hasLength(4));
+      expect(stats.firstHigherCycleDays.min, isNull);
     });
 
     test('day-of-cycle numbers match the chart convention (1-based)', () {
@@ -397,7 +460,7 @@ void main() {
         ),
         18,
       );
-      expect(stats.earliestFirstHigherDayOfCycle, 19);
+      expect(stats.firstHigherCycleDays.min, 19);
     });
   });
 
@@ -569,40 +632,6 @@ void main() {
     });
   });
 
-  group('riseToEndDurationsInDays', () {
-    test('first higher mark to the last day before the next cycle start', () {
-      // Cycle 1: rise Mar 14, next start Mar 29 -> cycle end Mar 28,
-      // INCLUSIVE span Mar 14..Mar 28 = 15 days. Calendar-honest: the
-      // untracked tail days after each rise count through (cycle 1 after
-      // Mar 14, cycle 2 after Mar 31).
-      final durations = riseToEndDurationsInDays(perCycleEvaluations());
-      // Cycle 2: rise Mar 31, next start Apr 27 -> Apr 26, span 27 days.
-      // Cycle 3 has no first-higher mark; nothing after.
-      expect(durations, [15, 27, null]);
-    });
-
-    test('the last mark-driven cycle has no known end -> null', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 30),
-      ];
-      final marks = [
-        start(2026, 3, 2),
-        start(2026, 3, 30),
-        firstHigher(2026, 3, 5),
-      ];
-      // Two marked cycles; the second one is the last group (no follow-up
-      // start), so its window has no cycle end. Cycle 1: rise Mar 5, next
-      // start Mar 30 -> cycle end Mar 29, INCLUSIVE span = 25 days.
-      expect(
-        riseToEndDurationsInDays(
-          evaluateCycles(entries, marks, today: DateTime(2026, 4, 2)),
-        ),
-        [25, null],
-      );
-    });
-  });
-
   group('the data-span extension (cycle runs to the next mark / today)', () {
     // The grouping extends every cycle across its data-less tail; these
     // tests pin what the STATISTICS make of the appended empty entries.
@@ -626,33 +655,6 @@ void main() {
       // it, so one more length is counted (mark-to-mark, Mar 2 -> May 10).
       expect(cycleLengthsInDays(entries, marks), [28, 41]);
       expect(markDrivenCycleCount(entries, marks), 3);
-    });
-
-    test('the cycle before a fresh mark gets a rise-to-end span to the day '
-        'before that mark', () {
-      final entries = [
-        d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 30),
-        d(2026, 3, 31, bbtC: 36.8),
-      ];
-      final marks = [
-        start(2026, 3, 2),
-        start(2026, 3, 30),
-        start(2026, 5, 10),
-        firstHigher(2026, 3, 5),
-        firstHigher(2026, 3, 31),
-      ];
-
-      // Cycle 1: rise Mar 5 -> next start Mar 30: 25 days (unchanged).
-      // Cycle 2: rise Mar 31 -> next (fresh) start May 10: ends May 9,
-      // span 40 days — before the extension rule this was null (no known
-      // follow-up start). The fresh cycle itself: no rise, null.
-      expect(
-        riseToEndDurationsInDays(
-          evaluateCycles(entries, marks, today: DateTime(2026, 5, 12)),
-        ),
-        [25, 40, null],
-      );
     });
   });
 
@@ -1034,8 +1036,19 @@ void main() {
           reason: 'the first-higher-until-end aggregates',
         );
         expect(
-          fromPass.earliestFirstHigherDayOfCycle,
-          whole.earliestFirstHigherDayOfCycle,
+          (
+            fromPass.firstHigherCycleDays.min,
+            fromPass.firstHigherCycleDays.max,
+            fromPass.firstHigherCycleDays.average,
+            fromPass.firstHigherCycleDays.stdDev,
+          ),
+          (
+            whole.firstHigherCycleDays.min,
+            whole.firstHigherCycleDays.max,
+            whole.firstHigherCycleDays.average,
+            whole.firstHigherCycleDays.stdDev,
+          ),
+          reason: 'the first-higher-day aggregates',
         );
       }
     });

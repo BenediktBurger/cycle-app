@@ -147,7 +147,7 @@ void main() {
   });
 
   testWidgets('per-metric min/max/average/std-dev cards for cycle length, '
-      'bleeding duration and rise span', (tester) async {
+      'bleeding duration and the first-higher cycle day', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -161,9 +161,18 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('cycleLength'),
-        matching: find.text('Cycle length'),
+        matching: find.textContaining('(days)'),
       ),
       findsOneWidget,
+      reason: 'the unit sits once in the card header',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('cycleLength'),
+        matching: find.text('Cycle length'),
+      ),
+      findsNothing,
+      reason: 'the header carries the unit instead',
     );
     expect(
       find.descendant(
@@ -195,12 +204,17 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('28')),
+      findsNWidgets(2),
+      reason: 'min and max both carry the bare value',
+    );
+    expect(
       find.descendant(
         of: metricCard('cycleLength'),
         matching: find.text('28 days'),
       ),
-      findsNWidgets(2),
-      reason: 'min and max both carry the value',
+      findsNothing,
+      reason: 'metric-card rows carry no unit',
     );
     expect(
       find.descendant(
@@ -224,25 +238,50 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
-        matching: find.text('Bleeding duration'),
+        matching: find.textContaining('(days)'),
       ),
       findsOneWidget,
+      reason: 'the unit sits once in the card header',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('Bleeding duration'),
+      ),
+      findsNothing,
+      reason: 'the header carries the unit instead',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('2'),
+      ),
+      findsOneWidget,
+      reason: 'the minimum span, bare',
     );
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
         matching: find.text('2 days'),
       ),
+      findsNothing,
+      reason: 'metric-card rows carry no unit',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('bleedingDuration'),
+        matching: find.text('3'),
+      ),
       findsOneWidget,
-      reason: 'the minimum span',
+      reason: 'the maximum span, bare',
     );
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
         matching: find.text('3 days'),
       ),
-      findsOneWidget,
-      reason: 'the maximum span',
+      findsNothing,
+      reason: 'metric-card rows carry no unit',
     );
     expect(
       find.descendant(
@@ -260,28 +299,40 @@ void main() {
       reason: 'population std-dev: sqrt(0.25)',
     );
 
-    // Rise span: first higher (Mar 14) to the day before the next start
-    // (Mar 28) = 15 days, single value -> all scalars "no spread".
+    // The when-card keyed statisticsCard-firstHigher: cycle-day numbers,
+    // not durations, so the header unit is the cycle-day one — pinned
+    // case-insensitive, the parenthetical's capitalization is l10n's.
+    expect(metricCard('riseSpan'), findsNothing);
+    final firstHigherDay = metricCard('firstHigher');
+    expect(firstHigherDay, findsOneWidget);
     expect(
       find.descendant(
-        of: metricCard('riseSpan'),
-        matching: find.text('First higher measurement → cycle end'),
+        of: firstHigherDay,
+        matching: find.textContaining(
+          RegExp(r'\(cycle day\)', caseSensitive: false),
+        ),
       ),
       findsOneWidget,
+      reason: 'the header carries the cycle-day unit',
     );
+    // Cycle 1's rise Mar 14 (measured 36.7 above the 36.4 low, after the
+    // Mar 12 peak) resolves the when-figure — cycle day 14; cycle 2
+    // carries no mark. Single value: min and max duplicate it, no spread.
     expect(
-      find.descendant(
-        of: metricCard('riseSpan'),
-        matching: find.text('15 days'),
-      ),
+      find.descendant(of: firstHigherDay, matching: find.text('14')),
       findsNWidgets(2),
     );
     expect(
-      find.descendant(of: metricCard('riseSpan'), matching: find.text('15.0')),
+      find.descendant(of: firstHigherDay, matching: find.text('14 days')),
+      findsNothing,
+      reason: 'metric-card rows carry no unit',
+    );
+    expect(
+      find.descendant(of: firstHigherDay, matching: find.text('14.0')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: metricCard('riseSpan'), matching: find.text('0.0')),
+      find.descendant(of: firstHigherDay, matching: find.text('0.0')),
       findsOneWidget,
     );
   });
@@ -306,16 +357,19 @@ void main() {
       );
       expect(untilEnd, findsOneWidget);
       expect(
-        find.descendant(
-          of: untilEnd,
-          matching: find.text('First higher measurement to end of cycle'),
-        ),
+        find.descendant(of: untilEnd, matching: find.textContaining('(days)')),
         findsOneWidget,
+        reason: 'the unit sits once in the card header',
+      );
+      expect(
+        find.descendant(of: untilEnd, matching: find.text('15')),
+        findsNWidgets(2),
+        reason: 'min and max duplicate the single span, bare',
       );
       expect(
         find.descendant(of: untilEnd, matching: find.text('15 days')),
-        findsNWidgets(2),
-        reason: 'min and max duplicate the single span',
+        findsNothing,
+        reason: 'metric-card rows carry no unit',
       );
       expect(
         find.descendant(of: untilEnd, matching: find.text('15.0')),
@@ -521,14 +575,22 @@ void main() {
       'Beobachtete Zyklen',
       'in dieser App: 2',
       'außerhalb: 3',
-      'Zykluslänge',
-      'Blutungsdauer',
+      'Zykluslänge (Tage)',
+      'Blutungsdauer (Tage)',
+      'Dauer der Hochlage (Tage)',
+      'Erste höhere Messung (Zyklustag)',
       'Standardabweichung',
       'Früheste erste höhere Messung',
       'Zyklustag 14',
     ]) {
       expect(find.textContaining(label), findsWidgets, reason: 'de: "$label"');
     }
+    // The unit lives only in the card headers: the bare titles are gone
+    // (the table header still renders "Erste höhere Messung" exactly, so
+    // that one is not asserted gone).
+    expect(find.text('Zykluslänge'), findsNothing);
+    expect(find.text('Blutungsdauer'), findsNothing);
+    expect(find.text('Dauer der Hochlage'), findsNothing);
   });
 
   testWidgets(
@@ -593,7 +655,9 @@ void main() {
       find.descendant(of: countCard(), matching: find.text('0')),
       findsOneWidget,
     );
-    for (final id in ['cycleLength', 'bleedingDuration', 'riseSpan']) {
+    // No riseSpan card exists on the screen, so nothing matches its key.
+    expect(metricCard('riseSpan'), findsNothing);
+    for (final id in ['cycleLength', 'bleedingDuration', 'firstHigher']) {
       expect(
         find.descendant(of: metricCard(id), matching: find.text('Minimum')),
         findsOneWidget,
@@ -687,10 +751,7 @@ void main() {
     // The count card stays out of the summary row here too.
     expect(find.byKey(const ValueKey('statisticsCard-count')), findsNothing);
     expect(
-      find.descendant(
-        of: metricCard('cycleLength'),
-        matching: find.text('21 days'),
-      ),
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('21')),
       findsNothing,
       reason: 'the paper value folds into the summary row only',
     );
@@ -752,18 +813,12 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: metricCard('cycleLength'),
-        matching: find.text('28 days'),
-      ),
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('28')),
       findsNWidgets(2),
       reason: 'the in-app minimum and maximum stay untouched by the paper 21',
     );
     expect(
-      find.descendant(
-        of: metricCard('cycleLength'),
-        matching: find.text('21 days'),
-      ),
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('21')),
       findsNothing,
     );
   });
@@ -803,10 +858,7 @@ void main() {
     );
     // With the paper 30 folded out, min and max both read the in-app 28.
     expect(
-      find.descendant(
-        of: metricCard('cycleLength'),
-        matching: find.text('28 days'),
-      ),
+      find.descendant(of: metricCard('cycleLength'), matching: find.text('28')),
       findsNWidgets(2),
       reason: 'minimum and maximum duplicate the single value again',
     );

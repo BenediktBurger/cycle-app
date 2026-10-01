@@ -239,12 +239,17 @@
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
   "statisticsNoData": "Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier Statistiken.",
-  "statisticsCycleCount": "Zyklen",
-  "statisticsMetricCycleLength": "Zykluslänge",
+  "statisticsMetricCycleLength": "Zykluslänge (Tage)",
   "statisticsBleedingDays": "Blutungstage",
-  "statisticsMetricFirstHigherUntilEnd": "Erste höhere Messung bis Zyklusende",
+  "statisticsMetricFirstHigherDay": "Erste höhere Messung (Zyklustag)",
+  "@statisticsMetricFirstHigherDay": {
+    "description": "Card title of the first-higher metric card: the per-cycle first higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
+  },
+  "statisticsMetricFirstHigherUntilEnd": "Dauer der Hochlage (Tage)",
+  "@statisticsMetricFirstHigherUntilEnd": {
+    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first higher measurement to the cycle's end (the first-higher day counts as one)."
+  },
   "statisticsMinimum": "Minimum",
-  "statisticsStdDev": "Streuung",
   "statisticsAverage": "Durchschnitt",
   "statisticsMaximum": "Maximum",
   "statisticsEarliestFirstHigher": "Früheste erste höhere Messung",
@@ -286,11 +291,7 @@
   "@statisticsStandardDeviation": {
     "description": "Population standard deviation (StdAbw über die gesamte beobachtete Menge, kein N-1-Schätzwert) — beschreibender Rechenwert."
   },
-  "statisticsMetricBleedingDuration": "Blutungsdauer",
-  "statisticsMetricRiseSpan": "Erste höhere Messung → Zyklusende",
-  "@statisticsMetricRiseSpan": {
-    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
-  },
+  "statisticsMetricBleedingDuration": "Blutungsdauer (Tage)",
   "statisticsCycleDay": "Zyklustag {n}",
   "@statisticsCycleDay": {
     "placeholders": {
@@ -340,10 +341,6 @@
   "settingsPaperEarliestFirstHigher": "Früheste erste höhere Messung",
   "settingsPaperEarliestFirstHigherError": "Bitte eine ganze Zahl ≥ 1 eingeben",
   "settingsPaperEarliestFirstHigherHelper": "Die früheste erste höhere Messung aus deinem Papierformular, als Zyklustag (Zählung ab 1).",
-  "settingsObservedCyclesOutsideAppCount": "Anzahl der beobachteten Zyklen",
-  "@settingsObservedCyclesOutsideAppCount": {
-    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
-  },
   "cycleOrdinal": "Zyklus {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -624,7 +621,5 @@
   },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
   "statisticsCycles": "Zykluslängen",
-  "statisticsOnsets": "Zyklusbeginne",
-  "statisticsShortest": "Kürzester",
-  "statisticsLongest": "Längster"
+  "statisticsShortest": "Kürzester"
 }
