@@ -372,6 +372,10 @@
   "@statisticsFirstHigherRealMissing": {
     "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
   },
+  "statisticsSummaryPaperHint": "figures in parentheses include the earlier, paper cycles",
+  "@statisticsSummaryPaperHint": {
+    "description": "Description line of the summary row's shortest/earliest cards, shown only when a paper-history fact (a figure recorded outside this app, e.g. on paper) participates through the min-combination: it names what the parenthesized figures hold."
+  },
   "settingsLanguage": "Language",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",

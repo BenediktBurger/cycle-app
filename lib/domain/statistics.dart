@@ -299,10 +299,10 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
 /// side's value stands alone) and a minimum of observed facts never flips
 /// upward. THE shared MIN-combination rule behind the paper-history fold
 /// (the settings pane's figures recorded before this app existed — the
-/// outside-app shortest cycle and earliest first higher): they are known
-/// at every statistic surface's point of view, so they compete there
-/// through this fold (lib/ui/statistics.dart and
-/// lib/domain/pdf_export_model.dart).
+/// outside-app shortest cycle and earliest first higher): the surfaces
+/// that include paper facts are the statistics summary row and the PDF
+/// model, and there the paper figures compete through this fold
+/// (lib/ui/statistics.dart and lib/domain/pdf_export_model.dart).
 int? minRecordedFact(int? first, int? second) {
   if (first == null) return second;
   if (second == null) return first;
