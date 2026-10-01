@@ -17,7 +17,7 @@
 // left edge of low #6's day column to half a day past the last marked
 // candidate's column, from the domain's baselineSpan; a cycle with no
 // marked candidate draws no segment) and the solid peak dot ABOVE the
-// mucus entry in the mucus row (R6 — the peak no longer touches the
+// mucus entry in the mucus row (R6 — the peak draws clear of the
 // temperature curve; EVERY placed peak renders, driven from the marks
 // stream so peaks render even when no evaluation exists). The SUZ renders
 // ONLY user-placed marks (a vertical bar hanging down from the temperature
@@ -187,8 +187,7 @@ EvaluationOverlay buildEvaluationOverlay({
     // The SUZ marks belong to the cycle whose attribution window contains
     // them (isDayInCycleWindow — the shared window helper above). Their
     // vertical placement is the chart's top anchoring, so the evaluation
-    // only decides WHICH marks render — their y no longer derives from
-    // the cycle's baseline.
+    // only decides WHICH marks render.
     for (final mark in marks) {
       final isSuz =
           mark.type == CycleMarkTypes.suzEvening ||
@@ -286,26 +285,29 @@ bool isDayInCycleWindow(
 }
 
 /// The day indexes of [cycle] whose day carries a temperature-ignore mark:
-/// for every `ignoreTemperature` mark whose normalized date equals a
-/// TRACKED day of [cycle], the index the drawing layers use for that day —
-/// the cycle-local analogue of the cycle chart's ignored-day derivation
-/// (see _ChartDays in lib/ui/cycle.dart, owner decision 2026-09-19: the
-/// MARK is the curve's rendering key; the raw disturbance mask is
-/// read-only display input elsewhere). Index i is the calendar day
-/// `cycle.startDate + i` (see the file-header note on the index space).
-/// A mark on an untracked gap day maps to no tracked day — excluded here,
-/// where the chart's version lists it harmlessly because it can never
-/// reach a curve point.
+/// for every `ignoreTemperature` mark whose normalized date equals a day
+/// of [cycle]'s span ([cycleSpanDays] — the tracked days plus the trailing
+/// data-less span days; untracked gap days between them stay out), the
+/// index the drawing layers use for that day — the cycle-local analogue
+/// of the cycle chart's ignored-day derivation (see _ChartDays in
+/// lib/ui/cycle.dart, owner decision 2026-09-19: the MARK is the curve's
+/// rendering key; the raw disturbance mask is read-only display input
+/// elsewhere). Index i is the calendar day `cycle.startDate + i` (see the
+/// file-header note on the index space). A mark on an untracked gap day
+/// maps to no span day — excluded here, where the chart's version lists
+/// it harmlessly because it can never reach a curve point.
 Set<int> ignoredDayIndexes({
   required Cycle cycle,
   required List<CycleMark> marks,
 }) {
   final start = DateOnly.normalize(cycle.startDate);
-  final tracked = {for (final day in cycle.days) DateOnly.normalize(day.date)};
+  final spanDays = {
+    for (final day in cycleSpanDays(cycle)) DateOnly.normalize(day.date),
+  };
   return {
     for (final mark in marks)
       if (mark.type == CycleMarkTypes.ignoreTemperature &&
-          tracked.contains(DateOnly.normalize(mark.date)))
+          spanDays.contains(DateOnly.normalize(mark.date)))
         DateOnly.daysBetween(DateOnly.normalize(mark.date), start),
   };
 }

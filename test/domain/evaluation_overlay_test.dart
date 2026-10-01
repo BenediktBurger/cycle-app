@@ -183,7 +183,7 @@ void main() {
       ),
     ];
 
-    test('indexes into the cycle’s tracked days, normalized per cycle', () {
+    test('indexes into the cycle’s span days, normalized per cycle', () {
       final cycles = groupIntoCycles(
         [...cycleOneEntries, ...cycleTwoEntries],
         overlayMarks.where((m) => m.type == CycleMarkTypes.cycleStart).toList(),

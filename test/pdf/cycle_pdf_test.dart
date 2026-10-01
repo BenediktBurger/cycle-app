@@ -12,6 +12,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -124,24 +125,26 @@ Future<List<int>> generateFixture() => generatePdfBytes(
   compress: false,
 );
 
-/// The first page's content stream bytes: the de-referenced
-/// `/Contents <n> 0 R` object's uncompressed stream (compress: false).
-String firstPageContentStream(List<int> bytes) {
+/// The [index]-th page's content stream bytes (0-based, print order): the
+/// index-th `/Contents <n> 0 R` de-referenced, uncompressed stream
+/// (compress: false).
+String pageContentStream(List<int> bytes, int index) {
   final latin = latin1.decode(bytes);
-  final ref = RegExp(r'/Contents (\d+) 0 R').firstMatch(latin);
-  if (ref == null) {
-    fail('no /Contents reference in the generated document');
+  final refs = RegExp(r'/Contents (\d+) 0 R').allMatches(latin).toList();
+  if (index >= refs.length) {
+    fail('page $index has no /Contents reference (found ${refs.length})');
   }
-  final obj = RegExp(
-    '${ref.group(1)} 0 obj(.*?)endstream',
-    dotAll: true,
-  ).firstMatch(latin);
+  final n = refs[index].group(1)!;
+  final obj = RegExp('$n 0 obj(.*?)endstream', dotAll: true).firstMatch(latin);
   if (obj == null) {
-    fail('content object ${ref.group(1)} not found');
+    fail('content object $n not found');
   }
   final start = obj.group(1)!.indexOf('stream\n');
   return obj.group(1)!.substring(start + 'stream\n'.length);
 }
+
+/// The first page's content stream bytes.
+String firstPageContentStream(List<int> bytes) => pageContentStream(bytes, 0);
 
 // Content-stream extraction: the document is generated UNCOMPRESSED
 // (compress: false), so these operator reads are byte-exact.
@@ -216,13 +219,16 @@ PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
   return PdfFillPath(color, minX, minY, maxX, maxY);
 }
 
-/// Extracts the first page's text runs and filled paths.
-(List<PdfTextRun>, List<PdfFillPath>) extractPageContent(List<int> bytes) {
+/// Extracts a page's (default: the first's) text runs and filled paths.
+(List<PdfTextRun>, List<PdfFillPath>) extractPageContent(
+  List<int> bytes, {
+  int page = 0,
+}) {
   final document = latin1.decode(bytes);
   final runes = _codeToRuneMap(document);
   final tokens = RegExp(
     '[^ ]+',
-  ).allMatches(firstPageContentStream(bytes)).map((m) => m.group(0)!).toList();
+  ).allMatches(pageContentStream(bytes, page)).map((m) => m.group(0)!).toList();
 
   final runs = <PdfTextRun>[];
   final paths = <PdfFillPath>[];
@@ -694,7 +700,9 @@ void main() {
         '31-day -> 1 page)', () async {
       final bytes = await generateFixture();
       final plan = planCyclePages(
-        fixtureModel().cycles.map((e) => e.cycle.days.length).toList(),
+        fixtureModel().cycles
+            .map((e) => cycleSpanDays(e.cycle).length)
+            .toList(),
       );
       expect(plan.length, 2);
       expect(countPageMarkers(bytes), plan.length);

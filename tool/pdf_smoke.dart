@@ -10,6 +10,7 @@
 
 import 'dart:io';
 
+import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -99,11 +100,11 @@ Future<void> main() async {
     observedCyclesOutsideApp: 4,
     name: 'Maria Muster',
     birthDate: d(12, 24),
-    // The span rule (a cycle runs to the next start mark / today) extends
-    // the LAST cycle — here the pregnancy-style 120-day fixture (Apr 26 –
-    // Aug 23, all tracked) out to the pinned today (Sep 21): 149 days, so
-    // it takes 4 pages under the 40-column budget. Pinned for
-    // determinism; production passes the wall clock (nowProvider).
+    // The span rule (a cycle runs through the next start mark / today)
+    // bounds the LAST cycle's calendar span at the pinned today (Sep 21),
+    // never earlier than its data: 149 span days (Apr 26 - Sep 21), 4
+    // pages under the 40-column budget. Pinned for determinism; production
+    // passes the wall clock (nowProvider).
     today: d(9, 21),
   );
   check(model.cycles.length == 3, 'three mark-opened cycles exported');
@@ -115,12 +116,15 @@ Future<void> main() async {
     'the last page\'s observed-cycle count equals its ordinal 7 '
     '(3 recorded + 4 outside-app cycles)',
   );
-  // The extension: the last cycle's day list gains the data-less days
-  // from its last tracked day (Aug 23) out to the pinned today.
   check(
-    model.cycles.last.cycle.days.length == 149,
-    'the last cycle extends through the pinned today: Apr 26 - Sep 21 (149 '
-    'days, 120 tracked + 29 data-less)',
+    model.cycles.last.cycle.days.length == 120,
+    'the last cycle keeps its tracked entries only: Apr 26 - Aug 23 '
+    '(120 days)',
+  );
+  check(
+    cycleSpanDays(model.cycles.last.cycle).length == 149,
+    'the last cycle\'s span list runs to the pinned today: Apr 26 - Sep 21 '
+    '(149 days, 120 tracked + 29 data-less)',
   );
 
   final overlay = model.overlays[0];
@@ -142,7 +146,7 @@ Future<void> main() async {
   );
 
   final plan = planCyclePages(
-    model.cycles.map((e) => e.cycle.days.length).toList(),
+    model.cycles.map((e) => cycleSpanDays(e.cycle).length).toList(),
   );
   check(
     plan.length == 6,
@@ -176,7 +180,7 @@ Future<void> main() async {
     'a selected subset exports exactly the chosen cycles (1 and 3 of 3)',
   );
   final subsetPlan = planCyclePages(
-    subset.cycles.map((e) => e.cycle.days.length).toList(),
+    subset.cycles.map((e) => cycleSpanDays(e.cycle).length).toList(),
   );
   check(
     subsetPlan.length == 5,

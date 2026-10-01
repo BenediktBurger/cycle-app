@@ -17,10 +17,9 @@
 //   overlay's own dayCount already covers the cycle's full calendar span,
 //   so a mark on the last tracked day of a cycle with untracked gap days
 //   still reaches this mapping.
-// - Page windows slice day-list positions (the layout planner's windows
-//   run over Cycle.days — the tracked days plus the grouping's data-less
-//   span extension; untracked gap days BETWEEN tracked days stay out of
-//   the list).
+// - Page windows slice positions in the cycle's span list
+//   (cycleSpanDays: the tracked days plus the trailing data-less span
+//   days; untracked gap days BETWEEN tracked days stay out of the list).
 //
 // This helper maps an overlay index through the day list's calendar
 // offsets: an index only renders when its calendar offset names a day of
@@ -39,6 +38,7 @@
 // placement is solved at DRAW-LIST time in pt (PdfArrowMark.tipDropPt —
 // the dot radius plus the clearance gap, see the constants), so its
 // "clear of the dot" semantics are pin-able without the pdf package.
+import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
 import '../domain/pdf_export_model.dart';
@@ -142,8 +142,7 @@ const double pdfCurveDotRadiusPt = 1.5;
 
 /// The clearance (pt) between a candidate dot's bottom edge and its
 /// arrow-up glyph's tip: the paper writes the arrow under the dot, and it
-/// must not touch the dot it marks (owner refinement — the glyph used to
-/// hang flush at the edge).
+/// must not touch the dot it marks (owner refinement).
 const double pdfArrowClearanceBelowDotPt = 2.5;
 
 /// One computed-SUZ artifact: a thin vertical line at the `suzBegins`
@@ -216,7 +215,7 @@ final class PdfCurveDrawing {
 ///
 /// [cycle] and [overlay] must reference the SAME cycle (as the export
 /// model guarantees: `overlays[i]` draws over `cycles[i]`). The window is
-/// the tracked-day slice `[windowFirstIndex, windowFirstIndex +
+/// the span-list slice `[windowFirstIndex, windowFirstIndex +
 /// windowDayCount)` of the cycle. [computedSuz] carries the evaluation's
 /// already-computed `suzBegins`/`suzRule` — the PDF draws them, it does
 /// not re-derive the rules.
@@ -228,27 +227,27 @@ PdfCurveDrawing pdfCurveDrawing({
   required int windowDayCount,
   required ({DateTime? suzBegins, SuzRule? suzRule}) computedSuz,
 }) {
-  final days = cycle.cycle.days;
+  final days = cycleSpanDays(cycle.cycle);
   final cycleStart = DateOnly.normalize(cycle.cycle.startDate);
   final windowEnd = windowFirstIndex + windowDayCount;
 
-  // calendar offset from the cycle's start day -> tracked position
-  final trackedPositions = <int, int>{
+  // calendar offset from the cycle's start day -> span-list position
+  final spanPositions = <int, int>{
     for (var i = 0; i < days.length; i++)
       DateOnly.daysBetween(days[i].date, cycleStart): i,
   };
-  // calendar offset -> the tracked day's RAW measured temperature
-  final trackedValues = <int, double>{
-    for (final MapEntry(key: offset, value: position)
-        in trackedPositions.entries)
+  // calendar offset -> the span day's RAW measured temperature
+  final spanValues = <int, double>{
+    for (final MapEntry(key: offset, value: position) in spanPositions.entries)
       offset: ?days[position].bbtC,
   };
 
   /// An overlay day index (calendar-offset space) mapped onto its
-  /// window-relative column index — null when the offset names no tracked
-  /// day (untracked gap) or the day lies outside this window.
+  /// window-relative column index — null when the offset names no day of
+  /// the span list (untracked interior gap) or the day lies outside this
+  /// window.
   int? windowPositionOf(int calendarIndex) {
-    final pos = trackedPositions[calendarIndex];
+    final pos = spanPositions[calendarIndex];
     if (pos == null) return null;
     final windowPos = pos - windowFirstIndex;
     return windowPos >= 0 && windowPos < windowDayCount ? windowPos : null;
@@ -261,7 +260,7 @@ PdfCurveDrawing pdfCurveDrawing({
   /// fractional x (range-boundary crossings) too. [offset] must name a
   /// tracked day of the window (every run point does).
   double offsetToColumnShift(int offset) =>
-      offset - (trackedPositions[offset]! - windowFirstIndex).toDouble();
+      offset - (spanPositions[offset]! - windowFirstIndex).toDouble();
 
   // --- the temperature curve: the chart's rule set over the page
   // window's days, keyed by CALENDAR OFFSET from the cycle's start (the
@@ -276,7 +275,7 @@ PdfCurveDrawing pdfCurveDrawing({
   final windowRuns = curveRuns(
     {
       for (final MapEntry(key: offset, value: position)
-          in trackedPositions.entries)
+          in spanPositions.entries)
         if (position >= windowFirstIndex && position < windowEnd)
           offset: days[position],
     },
@@ -314,8 +313,8 @@ PdfCurveDrawing pdfCurveDrawing({
   // --- the R10 baseline, clipped to the window.
   final baseline = <PdfBaselinePiece>[];
   for (final segment in overlay.baselineSegments) {
-    final startPos = trackedPositions[segment.startIndex];
-    final endPos = trackedPositions[segment.endIndex];
+    final startPos = spanPositions[segment.startIndex];
+    final endPos = spanPositions[segment.endIndex];
     if (startPos == null || endPos == null) continue;
     final a = startPos.toDouble().clamp(
       windowFirstIndex.toDouble(),
@@ -343,7 +342,7 @@ PdfCurveDrawing pdfCurveDrawing({
   // window render.
   final suzBars = [
     for (final mark in overlay.suzMarks)
-      if (trackedPositions[mark.dayIndex] case final pos?
+      if (spanPositions[mark.dayIndex] case final pos?
           when pos >= windowFirstIndex && pos < windowEnd)
         PdfSuzBar(
           (mark.morning ? pos.toDouble() : pos + 0.5) - windowFirstIndex,
@@ -356,7 +355,7 @@ PdfCurveDrawing pdfCurveDrawing({
   PdfSuzLine? suzLine;
   if (computedSuz.suzBegins case final begins?) {
     final offset = DateOnly.daysBetween(DateOnly.normalize(begins), cycleStart);
-    if (trackedPositions[offset] case final pos? when pos >= windowFirstIndex) {
+    if (spanPositions[offset] case final pos? when pos >= windowFirstIndex) {
       final x = (pos + 0.5).clamp(
         windowFirstIndex.toDouble(),
         windowEnd.toDouble(),
@@ -378,14 +377,14 @@ PdfCurveDrawing pdfCurveDrawing({
   final rings = [
     for (final index in overlay.circledIndexes)
       if (windowPositionOf(index) case final pos?)
-        if (trackedValues[index] case final value?
+        if (spanValues[index] case final value?
             when isBbtCInRange(value, range))
           PdfCandidateMark(pos, value),
   ];
   final arrows = [
     for (final index in overlay.arrowIndexes)
       if (windowPositionOf(index) case final pos?)
-        if (trackedValues[index] case final value?
+        if (spanValues[index] case final value?
             when isBbtCInRange(value, range))
           PdfArrowMark(
             pos,

@@ -391,9 +391,11 @@ Future<void> main() async {
   final marks = starts([(2026, 3, 2), (2026, 3, 30), (2026, 4, 27)]);
   final cycles = groupIntoCycles(entries, marks);
   check(cycles.length == 3, 'three cycles grouped at the cycleStart marks');
+  check(cycles.every((c) => c.startsAtMark), 'all cycles opened by marks');
   check(
-    cycles.every((c) => c.startsAtMenstruation),
-    'all cycles opened by marks',
+    cycles[0].spanEnd.day == 29 && cycles[1].spanEnd.day == 26,
+    'a cycle spans to the day before the next opening mark (no bleeding in '
+    'between moves nothing)',
   );
   check(
     eq(menstruationOnsetDates(entries, marks).map((e) => e.day).toList(), [
@@ -417,7 +419,7 @@ Future<void> main() async {
   check(
     gapCycles.length == 2 &&
         gapCycles[1].startDate.day == 3 &&
-        gapCycles[1].startsAtMenstruation &&
+        gapCycles[1].startsAtMark &&
         gapCycles[1].days.first.date.day == 5,
     'a mark in an untracked gap anchors the start on the mark date',
   );

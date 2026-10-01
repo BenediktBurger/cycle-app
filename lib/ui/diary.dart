@@ -882,6 +882,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   List<Widget> _cycleSlivers(AppLocalizations l10n, Cycle cycle) {
     final start = DateOnly.normalize(cycle.startDate);
     final expanded = _expandedCycleStarts.contains(start);
+    final spanDays = cycleSpanDays(cycle);
     return [
       // Stable keys: sibling expand/collapse shifts these slivers' positions
       // and positional reconciliation would remount the neighboring header,
@@ -899,8 +900,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           sliver: SliverList.builder(
             // Index 0 carries the tap-to-edit caption; indexes 1.. walk the
-            // cycle's days newest first.
-            itemCount: cycle.days.length + 1,
+            // cycle's span days newest first.
+            itemCount: spanDays.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Padding(
@@ -911,11 +912,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ),
                 );
               }
-              return _dayTile(
-                l10n,
-                cycle.days[cycle.days.length - index],
-                cycle,
-              );
+              return _dayTile(l10n, spanDays[spanDays.length - index], cycle);
             },
           ),
         ),
@@ -936,7 +933,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final locale = Localizations.localeOf(context).toString();
     final startLabel = _formatDay(cycle.startDate, locale);
     final endLabel = _formatDay(cycle.endDate, locale);
-    final title = cycle.startsAtMenstruation
+    final title = cycle.startsAtMark
         ? l10n.cycleGroupOnset(startLabel)
         // The leading group predates the first cycleStart mark, so the
         // range END stands in the title (the begin is unknown).

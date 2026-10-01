@@ -72,7 +72,7 @@ DerivedCycleData deriveCycleData(
 /// The [menstruationOnsetDates] rule over a precomputed cycle list.
 List<DateTime> menstruationOnsetDatesFrom(List<Cycle> cycles) => [
   for (final cycle in cycles)
-    if (cycle.startsAtMenstruation) DateOnly.normalize(cycle.startDate),
+    if (cycle.startsAtMark) DateOnly.normalize(cycle.startDate),
 ];
 
 /// The [cycleLengthsInDays] rule over a precomputed cycle list.
@@ -95,12 +95,12 @@ List<int> _lengthsBetweenOnsets(List<DateTime> onsets) {
 
 /// The [markDrivenCycleCount] rule over a precomputed cycle list.
 int markDrivenCycleCountFrom(List<Cycle> cycles) =>
-    cycles.where((c) => c.startsAtMenstruation).length;
+    cycles.where((c) => c.startsAtMark).length;
 
 /// The number of mark-driven cycles: cycle groups that opened at a
-/// user-placed cycleStart mark (`startsAtMenstruation == true` — the
-/// leading pre-mark group, which predates the first cycleStart mark, is
-/// NOT one of them and shifts nothing). This is the count of
+/// user-placed cycleStart mark ([Cycle.startsAtMark] — the leading
+/// pre-mark group, which predates the first cycleStart mark, does not
+/// start at a mark and shifts nothing). This is the count of
 /// CycleEvaluations from [evaluateCycles] whose group carries a cycle
 /// start, taken straight from the grouping — suitable for the statistics
 /// screen's "N cycles" line (add the observed-cycles-outside-app setting
@@ -207,7 +207,7 @@ int? bleedingSpanInDays(List<DailyEntry> cycleDays) {
 /// render-time computation, nothing persisted).
 List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
   for (final evaluation in evaluations)
-    if (evaluation.cycle.startsAtMenstruation)
+    if (evaluation.cycle.startsAtMark)
       bleedingSpanInDays(evaluation.cycle.days),
 ];
 
@@ -227,7 +227,7 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
   final spans = <int?>[];
   for (var i = 0; i < evaluations.length; i++) {
     final evaluation = evaluations[i];
-    if (!evaluation.cycle.startsAtMenstruation) continue;
+    if (!evaluation.cycle.startsAtMark) continue;
     final rise = evaluation.firstHigherDay;
     // The next group of a mark-driven cycle is always mark-driven itself
     // (the leading group can only be the first group) — its start is the
@@ -270,7 +270,7 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
   int? earliestAny;
   int? earliestAfterPeak;
   for (final evaluation in evaluations) {
-    if (!evaluation.cycle.startsAtMenstruation) continue;
+    if (!evaluation.cycle.startsAtMark) continue;
     final rise = evaluation.firstHigherDay;
     if (rise == null) continue;
     final cycleDayNumber =
@@ -498,7 +498,7 @@ List<CycleFact> cycleFactsFromCycles(
   // runs until the next mark-opened start, skipping the leading group.
   final starts = <DateTime>[];
   for (var i = 0; i < cycles.length; i++) {
-    if (!cycles[i].startsAtMenstruation) continue;
+    if (!cycles[i].startsAtMark) continue;
     starts.add(DateOnly.normalize(cycles[i].startDate));
   }
 
@@ -506,7 +506,7 @@ List<CycleFact> cycleFactsFromCycles(
   var startSlot = 0;
   for (var i = 0; i < cycles.length; i++) {
     final cycle = cycles[i];
-    if (!cycle.startsAtMenstruation) continue;
+    if (!cycle.startsAtMark) continue;
     final start = starts[startSlot];
     final nextStart = startSlot + 1 < starts.length
         ? starts[startSlot + 1]
@@ -527,16 +527,16 @@ List<CycleFact> cycleFactsFromCycles(
     // Two end notions share this spot, both anchored in their owner rules:
     // a cycle WITH a follow-up start ends at that start (the mark-driven
     // length rule); the trailing cycle's observed end is one day past its
-    // last TRACKED day — the span-extension placeholder days toward today
-    // (see the span rule in cycle_grouping.dart) carry nothing observed,
-    // so they must not inflate the span toward the wall clock. A data-less
-    // trailing cycle observes no end at all (null), mirroring the
-    // evaluation's trailing rise-to-end rule.
+    // last TRACKED day — the unobserved span days toward today ([spanEnd],
+    // see the span rule in cycle_grouping.dart) carry nothing recorded, so
+    // they must not inflate a statistics count. A data-less trailing cycle
+    // observes no end at all (null), mirroring the evaluation's trailing
+    // rise-to-end rule.
     final observedEndExclusive =
         nextStart ??
-        (cycle.trackedEndDate == null
+        (cycle.days.isEmpty
             ? null
-            : DateOnly.addDays(DateOnly.normalize(cycle.trackedEndDate!), 1));
+            : DateOnly.addDays(DateOnly.normalize(cycle.days.last.date), 1));
 
     facts.add(
       CycleFact(

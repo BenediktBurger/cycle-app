@@ -70,10 +70,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // The fixture's total day count, computed with the same pinned clock
-    // the screen groups with: the tracked days themselves (real data is
+    // the screen groups with: the cycles' calendar spans (real data is
     // never trimmed) — here one mark-opened cycle spanning all of them.
     final cycles = groupIntoCycles(_entries, _marks, today: _now);
-    final totalDays = cycles.fold<int>(0, (n, c) => n + c.days.length);
+    final totalDays = cycles.fold<int>(
+      0,
+      (n, c) => n + cycleSpanDays(c).length,
+    );
     expect(
       totalDays,
       greaterThanOrEqualTo(700),

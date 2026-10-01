@@ -15,18 +15,19 @@
 // Day-index convention inside [PdfCycleOverlay]: index i is the calendar
 // day `cycle.startDate + i` — the space the shared overlay builder maps the
 // shared artifacts onto (see lib/domain/evaluation_overlay.dart). While a
-// cycle is tracked daily this equals the position in its tracked-day list
-// (the PDF page windows' space); with untracked gap days the PDF's draw
-// layers map the two spaces explicitly — the page-window draw list maps
-// every overlay index through the tracked days' calendar offsets
-// (lib/pdf/pdf_curve.dart) and any mark on an untracked gap day drops out
-// instead of sliding onto a neighboring column. For that mapping to see
-// the cycle's WHOLE calendar span (the last tracked day sits at a larger
-// offset than the tracked count once a gap exists), the overlay window is
-// built over the span day count below, not over `cycle.days.length`.
+// cycle is tracked daily this equals the position in its span list
+// (cycleSpanDays, lib/domain/cycle_grouping.dart — the PDF page windows'
+// space); with untracked gap days the PDF's draw layers map the two spaces
+// explicitly — the page-window draw list maps every overlay index through
+// the span days' calendar offsets (lib/pdf/pdf_curve.dart) and any mark on
+// an untracked gap day drops out instead of sliding onto a neighboring
+// column. For that mapping to see the cycle's WHOLE calendar span (the
+// last tracked day sits at a larger offset than the tracked count once a
+// gap exists), the overlay window is built over the span day count below,
+// not over the tracked-day count.
 //
 // Numbering rule (decided, shared with the cycle page): ONLY the cycles a
-// user-placed cycleStart mark opened (`Cycle.startsAtMenstruation == true`)
+// user-placed cycleStart mark opened (`Cycle.startsAtMark`)
 // are exported, counted and numbered; the LEADING pre-mark group — entries
 // that predate the first cycleStart mark, which the cycle page leaves
 // unnumbered — is excluded here as well, so a PDF always agrees with the
@@ -210,7 +211,7 @@ final class PdfExportModel {
 /// Builds the [PdfExportModel] for one export run.
 ///
 /// Export filter: a cycle group is exported exactly when a user-placed
-/// cycleStart mark opened it (`Cycle.startsAtMenstruation == true`) AND —
+/// cycleStart mark opened it (`Cycle.startsAtMark`) AND —
 /// its start date (the opening mark's local-midnight datetime since the
 /// mark-anchoring change) normalized to the calendar day is no later than
 /// [exportStartsUpTo]'s (equally normalized) calendar day AND — given
@@ -299,7 +300,7 @@ PdfExportModel buildPdfExportModel({
   final markOpenedIndexes = <int>[];
   var markOpenedCount = 0;
   for (var i = 0; i < all.length; i++) {
-    if (!all[i].cycle.startsAtMenstruation) continue;
+    if (!all[i].cycle.startsAtMark) continue;
     final markOpenedIndex = markOpenedCount++;
     if ((limit == null ||
             !DateOnly.normalize(all[i].cycle.startDate).isAfter(limit)) &&
@@ -359,7 +360,7 @@ PdfExportModel buildPdfExportModel({
     for (var p = 0; p < i; p++) {
       // Only mark-opened cycles are observed cycles the paper form
       // counts; their successor all[p + 1] always exists (p < i).
-      if (!all[p].cycle.startsAtMenstruation) continue;
+      if (!all[p].cycle.startsAtMark) continue;
       final gap = DateOnly.daysBetween(
         all[p + 1].cycle.startDate,
         all[p].cycle.startDate,
@@ -403,15 +404,14 @@ PdfExportModel buildPdfExportModel({
 }
 
 /// The cycle's full CALENDAR span as the overlay window's day count:
-/// from the cycle's start day through its span end (the lib/domain/
-/// cycle_grouping.dart extension — data-less trailing days included),
-/// inclusive — larger than `cycle.days.length` exactly when untracked gap
-/// days sit between the tracked days (they are not in the day list), so
-/// marks beyond a gap (e.g. on the last tracked day) still map to the
-/// correct calendar offset (the draw layers map offsets onto tracked
-/// positions; see lib/pdf/pdf_curve.dart). Anchored on [Cycle.endDate]
-/// rather than the day list, which can be shorter than the span (or empty
-/// — see the span rule's lookback bound).
+/// from the cycle's start day through its span end ([cycleSpanDays] —
+/// tracked days plus trailing data-less span days), inclusive — larger
+/// than the tracked-day count exactly when untracked gap days sit between
+/// the tracked days (they are not in the day list), so marks beyond a gap
+/// (e.g. on the last tracked day) still map to the correct calendar
+/// offset (the draw layers map offsets onto span positions; see
+/// lib/pdf/pdf_curve.dart). Anchored on [Cycle.endDate] rather than the
+/// day list, so a data-less cycle's span is counted too.
 int _calendarSpanDays(Cycle cycle) =>
     DateOnly.daysBetween(
       DateOnly.normalize(cycle.endDate),
@@ -433,7 +433,7 @@ List<({int ordinal, DateTime startDate})> exportableCycles(
   final rows = <({int ordinal, DateTime startDate})>[];
   var markOpenedIndex = 0;
   for (final cycle in groupIntoCycles(entries, marks, today: today)) {
-    if (!cycle.startsAtMenstruation) continue;
+    if (!cycle.startsAtMark) continue;
     rows.add((
       ordinal: cycleOrdinalNumber(markOpenedIndex, observedCyclesOutsideApp),
       startDate: DateOnly.normalize(cycle.startDate),
