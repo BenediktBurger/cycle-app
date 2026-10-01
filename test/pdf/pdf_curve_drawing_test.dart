@@ -484,6 +484,35 @@ void main() {
         reason: 'the consecutive tracked days Mar 3 -> Mar 4 still connect',
       );
     });
+
+    test('a peak on a DATA-LESS SPAN-EXTENSION day draws: the page window\'s '
+        'columns are the cycle\'s span (cycleSpanDays: the tracked days plus '
+        'the trailing data-less span days), so the mark maps to its tracked '
+        'position', () {
+      // Tracked Mar 1–13; `today` pins the still-running cycle's span to
+      // Mar 17, so Mar 14–17 enter the span list as data-less span days.
+      final model = buildPdfExportModel(
+        entries: cycleEntries(),
+        marks: [
+          ...cycleMarks(),
+          CycleMark(date: day(15), type: CycleMarkTypes.mucusPeakDay),
+        ],
+        today: day(17),
+      );
+      final cycle = model.cycles[0];
+      expect(cycleSpanDays(cycle.cycle).length, 17);
+      final drawing = pdfCurveDrawing(
+        cycle: cycle,
+        overlay: model.overlays[0],
+        range: _range,
+        windowFirstIndex: 0,
+        windowDayCount: 17,
+        computedSuz: (suzBegins: null, suzRule: null),
+      );
+      // Mar 15 = calendar offset 14 from the cycle start, and the
+      // placeholder days occupy their own tracked positions in order.
+      expect(drawing.peakIndexes, {9, 14});
+    });
   });
 
   group('continuation-page slicing (long cycle over several pages)', () {

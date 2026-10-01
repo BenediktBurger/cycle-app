@@ -1037,49 +1037,20 @@ final class _InPlotGlyphRows extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final windowMarks = chartDayMarks(
-      {
-        for (final entry in days.byIndex.entries)
-          if (entry.key >= windowStart && entry.key <= windowEnd)
-            entry.key: entry.value,
-      },
-      peakIndexes: peakIndexes,
-      numbers: numbersByIndex,
-    );
+    final windowMarks = chartDayMarks({
+      for (final entry in days.byIndex.entries)
+        if (entry.key >= windowStart && entry.key <= windowEnd)
+          entry.key: entry.value,
+    });
     final onSurfaceColor = scheme.onSurface.withValues(alpha: chartMarkAlpha);
     final mucusColor = scheme.tertiary.withValues(alpha: chartMarkAlpha);
 
     final glyphs = <Widget>[];
     for (var i = windowStart; i <= windowEnd; i++) {
-      final record = windowMarks[i];
-      if (record == null) continue;
-      if (sexVisible) {
-        for (final slot in record.sexSlots) {
-          glyphs.add(
-            Positioned(
-              left:
-                  i * cellWidth +
-                  slot.columnFraction * cellWidth -
-                  sexGlyphBoxWidth / 2,
-              top: _pitchTop(sexRowCenterOffsetK, _glyphHeight),
-              child: SizedBox(
-                width: sexGlyphBoxWidth,
-                height: _glyphHeight,
-                child: Center(
-                  child: _haloedText(
-                    inkKey: 'inPlotSex-$i-${slot.timing.name}',
-                    haloKey: 'inPlotHaloSex-$i-${slot.timing.name}',
-                    text: 'X',
-                    style: TextStyle(fontSize: 9, color: onSurfaceColor),
-                    haloColor: surface,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-      }
-      if (peakVisible && record.mucusPeak) {
+      // The dot and the day number come from the overlay artifacts, so
+      // they are evaluated before the record skip: a record-less day can
+      // still carry either, while X / mucus / M stay record-gated.
+      if (peakVisible && peakIndexes.contains(i)) {
         const haloDotSize = _peakDotSize + 2 * chartMarkHaloStrokeWidth;
         glyphs.add(
           Positioned(
@@ -1110,6 +1081,63 @@ final class _InPlotGlyphRows extends StatelessWidget {
             ),
           ),
         );
+      }
+      final dayNumber = numbersVisible ? numbersByIndex[i] : null;
+      if (dayNumber case final number?) {
+        glyphs.add(
+          Positioned(
+            left: i * cellWidth,
+            width: cellWidth,
+            // The one BOTTOM-anchored row: the value→pixel mapping applied
+            // at `min + offsetK`, unlike every top-anchored row's
+            // `pixelFor(max − offsetK)`.
+            top:
+                scale.pixelFor(scale.min + dayNumbersRowCenterOffsetK) -
+                _glyphHeight / 2,
+            height: _glyphHeight,
+            child: Center(
+              child: _haloedText(
+                inkKey: 'inPlotDayNumber-$i-$number',
+                haloKey: 'inPlotHaloDayNumber-$i-$number',
+                text: '$number',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: scheme.primary,
+                ),
+                haloColor: surface,
+              ),
+            ),
+          ),
+        );
+      }
+      final record = windowMarks[i];
+      if (record == null) continue;
+      if (sexVisible) {
+        for (final slot in record.sexSlots) {
+          glyphs.add(
+            Positioned(
+              left:
+                  i * cellWidth +
+                  slot.columnFraction * cellWidth -
+                  sexGlyphBoxWidth / 2,
+              top: _pitchTop(sexRowCenterOffsetK, _glyphHeight),
+              child: SizedBox(
+                width: sexGlyphBoxWidth,
+                height: _glyphHeight,
+                child: Center(
+                  child: _haloedText(
+                    inkKey: 'inPlotSex-$i-${slot.timing.name}',
+                    haloKey: 'inPlotHaloSex-$i-${slot.timing.name}',
+                    text: 'X',
+                    style: TextStyle(fontSize: 9, color: onSurfaceColor),
+                    haloColor: surface,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
       }
       final mucus = mucusVisible ? record.mucus : null;
       if (mucus case final display?) {
@@ -1155,35 +1183,6 @@ final class _InPlotGlyphRows extends StatelessWidget {
                 haloKey: 'inPlotHaloM-$i',
                 text: 'M',
                 style: TextStyle(fontSize: 9, color: onSurfaceColor),
-                haloColor: surface,
-              ),
-            ),
-          ),
-        );
-      }
-      final dayNumber = numbersVisible ? record.dayNumber : null;
-      if (dayNumber case final number?) {
-        glyphs.add(
-          Positioned(
-            left: i * cellWidth,
-            width: cellWidth,
-            // The one BOTTOM-anchored row: the value→pixel mapping applied
-            // at `min + offsetK`, unlike every top-anchored row's
-            // `pixelFor(max − offsetK)`.
-            top:
-                scale.pixelFor(scale.min + dayNumbersRowCenterOffsetK) -
-                _glyphHeight / 2,
-            height: _glyphHeight,
-            child: Center(
-              child: _haloedText(
-                inkKey: 'inPlotDayNumber-$i-$number',
-                haloKey: 'inPlotHaloDayNumber-$i-$number',
-                text: '$number',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: scheme.primary,
-                ),
                 haloColor: surface,
               ),
             ),

@@ -925,6 +925,59 @@ void main() {
         },
       );
 
+      test('a peak mark on a DATA-LESS span-extension placeholder day paints '
+          'its dot like any other day — the render reads the marks artifact, '
+          'not the entries', () async {
+        // Mar 1–14 carry entries; `today` pins the span extension to
+        // Mar 17, so Mar 15–17 are entry-less placeholder columns and
+        // the peak mark lands on placeholder column 14 (Mar 15).
+        final model = buildPdfExportModel(
+          entries: markFixtureEntries(),
+          marks: [
+            CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+            CycleMark(date: d(3, 15), type: CycleMarkTypes.mucusPeakDay),
+          ],
+          temperatureRange: TemperatureRange.defaults,
+          today: d(3, 17),
+        );
+        final bytes = await generatePdfBytes(
+          model: model,
+          fontBytes: fixtureFontBytes(),
+          options: PdfExportOptions(anonymized: false),
+          compress: false,
+        );
+        final (runs, paths) = extractPageContent(bytes);
+        final blutungY = runY(runs, 'Blutung');
+        final tempY = runY(runs, 'Temperatur');
+        bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
+        final dots = accentDots(paths);
+        expect(
+          dots,
+          hasLength(1),
+          reason: 'the placeholder-day peak mark carries exactly one dot',
+        );
+        expect(
+          (dots.single.minX + dots.single.maxX) / 2,
+          closeTo(x0 + 14.5 * pdfColumnWidth, 1.2),
+          reason: 'the dot centers in the placeholder day column (Mar 15)',
+        );
+        final columnStart = x0 + 14 * pdfColumnWidth + 0.5;
+        final columnEnd = x0 + 15 * pdfColumnWidth - 0.5;
+        final joinedInk = [
+          for (final r in runs)
+            if (inPlot(r) &&
+                r.x > columnStart &&
+                r.x < columnEnd &&
+                {4.8, 5.2, 6.5}.any((s) => (r.fontSize - s).abs() < 0.05))
+              r,
+        ];
+        expect(
+          joinedInk,
+          isEmpty,
+          reason: 'no mucus letter or day number joins the empty column',
+        );
+      });
+
       test('the Mittelschmerz letter M renders INSIDE the plot at the −0.35 '
           'pitch, below the mucus letters, centered in its record day\'s '
           'column', () async {
