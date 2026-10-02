@@ -310,14 +310,6 @@
     },
     "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
   },
-  "statisticsFirstHigherReal": "nach dem Schleimhöhepunkt",
-  "@statisticsFirstHigherReal": {
-    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant (umrandete Messung): the qualifying day is the cycle's first circled candidate — a measured temperature strictly above the baseline, from the marked rise onward, after the marked mucus peak day (evaluation rule R4)."
-  },
-  "statisticsFirstHigherAny": "über alle Zyklen",
-  "@statisticsFirstHigherAny": {
-    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
-  },
   "statisticsShortestOutsideApp": "außerhalb: {n}",
   "@statisticsShortestOutsideApp": {
     "placeholders": {
@@ -334,7 +326,7 @@
         "type": "int"
       }
     },
-    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT per variant: one line for both rows \"nach dem Schleimhöhepunkt\" and \"über alle Zyklen\"."
+    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT the same sense as the card's figure (the earliest umrandete Messung across in-app cycles). Capitalization matches statisticsCycleDay."
   },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",

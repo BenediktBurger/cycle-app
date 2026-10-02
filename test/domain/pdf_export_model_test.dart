@@ -448,10 +448,11 @@ void main() {
         isNull,
         reason: 'no completed cycle exists before it yet',
       );
-      expect(beforeEarliest, (
-        any: 14,
-        afterMucusPeak: 14,
-      ), reason: 'its own rise is part of its own observation');
+      expect(
+        beforeEarliest,
+        14,
+        reason: 'its own rise is part of its own observation',
+      );
 
       // Later print: cycles 2 and 3 exist in the record now; the SAME
       // cycle 1 is exported with the SAME selection. Its page must print
@@ -568,13 +569,13 @@ void main() {
   });
 
   group('earliest first higher cycle day', () {
-    /// Marks variant: cycle 2 (start Mar 29) carries a peak AND a
-    /// first-higher mark on the SAME day, so the "any" variant reads its
-    /// marked rise (cycle day 1). Cycle 2 produces no measured circle of
-    /// its own — a rise inside a cycle's first six days has its six-low
-    /// window truncated at the cycle's own tracked days (R9), so no
-    /// baseline and no candidate exist there — and the real variant can
-    /// only come from cycle 1's first circle (cycle day 14).
+    /// Marks fixture: cycle 2 (start Mar 29) carries a peak AND a
+    /// first-higher mark on the SAME day (its marked rise is cycle day 1).
+    /// Cycle 2 produces no measured circle of its own — a rise inside a
+    /// cycle's first six days has its six-low window truncated at the
+    /// cycle's own tracked days (R9), so no baseline and no candidate
+    /// exist there — and its model fact can only come from cycle 1's
+    /// first circle (cycle day 14).
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -582,7 +583,7 @@ void main() {
     ];
 
     test('computed per cycle over the record prefix truncated AT the '
-        'printed cycle (its own rise included), both variants', () {
+        'printed cycle (its own rise included)', () {
       final model = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
@@ -590,20 +591,16 @@ void main() {
       );
       // Cycle 1: rise marked Mar 14, start Mar 1 -> the first circle sits
       // on the marked day (measured above the baseline, after the peak
-      // Mar 12) -> cycle day 14, both variants.
+      // Mar 12) -> the umrandete fact is cycle day 14.
       expect(model.earliestFirstHigherCycleDays.length, 2);
-      expect(model.earliestFirstHigherCycleDays[0], (
-        any: 14,
-        afterMucusPeak: 14,
-      ));
+      expect(model.earliestFirstHigherCycleDays[0], 14);
       expect(
         model.earliestFirstHigherCycleDays[1],
-        (any: 1, afterMucusPeak: 14),
+        14,
         reason:
-            "cycle 2's page sees its marked day-1 rise in the \"any\" "
-            'variant while the real variant qualifies nowhere in cycle 2 '
-            "(no measurable candidate, R9) and keeps cycle 1's first "
-            'circle (cycle day 14)',
+            'cycle 2 qualifies nowhere on its own (rise on its start day '
+            'beside the peak, no measurable circle candidate, R9) and '
+            "keeps cycle 1's first circle",
       );
     });
 
@@ -616,19 +613,15 @@ void main() {
       );
       expect(
         model.earliestFirstHigherCycleDays,
-        [
-          (any: 14, afterMucusPeak: 14),
-          (any: 1, afterMucusPeak: 14),
-          (any: 1, afterMucusPeak: 14),
-        ],
+        [14, 14, 14],
         reason:
             'the statistic is truncated at the printed cycle, so '
             'later data never leaks into earlier pages',
       );
     });
 
-    test('delegates to the documented two-variant helper — per cycle over '
-        'the record prefix, so the statistics screen and the PDF header '
+    test('delegates to the documented helper — the umrandete variant per '
+        'cycle over the record prefix, so the PDF header and statistics '
         'cannot drift', () {
       final evaluations = evaluateCycles(
         modelEntries(),
@@ -643,7 +636,7 @@ void main() {
         final prefix = evaluations.sublist(0, model.markOpenedIndexes[i] + 1);
         expect(
           model.earliestFirstHigherCycleDays[i],
-          earliestFirstHigherCycleDay(prefix),
+          earliestFirstHigherCycleDay(prefix).afterMucusPeak,
           reason:
               'page ${i + 1}: the shared helper over the record up to '
               'that cycle, never over more',
@@ -691,38 +684,26 @@ void main() {
       expect(losingPaper.shortestCycleLengths, [30, 28, 28]);
     });
 
-    test('the paper earliest first higher min-combines into BOTH variants '
-        'of every page', () {
+    test('the paper earliest first higher min-combines into every page', () {
       // divergentMarks: cycle 2's rise on its own start day, exactly on
       // the SAME day as its peak, with no measurable candidate in cycle
       // 2 (R9 truncates its six-low window at its start). Paper 10
-      // undercuts cycle 1's in-app 14 in both variants; page 2/3's "any"
-      // keeps the smaller in-app 1 while the real variant falls back to
-      // 14 (paper 10) or stays at cycle 1's first circle (paper 16).
+      // undercuts the in-app 14 on every page; paper 16 is beaten
+      // everywhere by cycle 1's first circle (cycle day 14) and never
+      // inflates a page.
       final paper10 = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
         earliestFirstHigherCycleDayOutsideApp: 10,
       );
-      expect(paper10.earliestFirstHigherCycleDays, [
-        (any: 10, afterMucusPeak: 10),
-        (any: 1, afterMucusPeak: 10),
-        (any: 1, afterMucusPeak: 10),
-      ]);
+      expect(paper10.earliestFirstHigherCycleDays, [10, 10, 10]);
 
-      // Paper 16 is beaten everywhere by in-app values (14 in the real
-      // variant from page 1 on): the paper constant never inflates a
-      // page.
       final paper16 = buildPdfExportModel(
         entries: modelEntries(),
         marks: divergentMarks(),
         earliestFirstHigherCycleDayOutsideApp: 16,
       );
-      expect(paper16.earliestFirstHigherCycleDays, [
-        (any: 14, afterMucusPeak: 14),
-        (any: 1, afterMucusPeak: 14),
-        (any: 1, afterMucusPeak: 14),
-      ]);
+      expect(paper16.earliestFirstHigherCycleDays, [14, 14, 14]);
     });
 
     test('the paper constants add no later-cycle dependence: printing an '
@@ -769,7 +750,7 @@ void main() {
             'stands alone instead of the "—" the paperless build prints',
       );
       expect(before.earliestFirstHigherCycleDays, [
-        (any: 10, afterMucusPeak: 10),
+        10,
       ], reason: 'the paper rise on cycle day 10 beats cycle 1\'s own 14');
 
       final after = buildPdfExportModel(
@@ -788,10 +769,7 @@ void main() {
             'value is constant — the page prints identically however '
             'late it is reprinted',
       );
-      expect(after.earliestFirstHigherCycleDays.single, (
-        any: 10,
-        afterMucusPeak: 10,
-      ));
+      expect(after.earliestFirstHigherCycleDays.single, 10);
       // Cross-check against the paperless builds of the same shapes: the
       // first-cycle page difference is exactly the paper figure.
       final paperlessBefore = buildPdfExportModel(

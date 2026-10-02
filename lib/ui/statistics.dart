@@ -236,23 +236,11 @@ Widget _summaryRow(
         child: _StatCard(
           key: const ValueKey('statisticsCard-earliest'),
           title: l10n.statisticsEarliestFirstHigher,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ValueRow(
-                label: l10n.statisticsFirstHigherReal,
-                value: cycleDay(earliest.afterMucusPeak),
-              ),
-              _ValueRow(
-                label: l10n.statisticsFirstHigherAny,
-                value: cycleDay(earliest.any),
-              ),
-              if (paperEarliest != null)
-                Text(
-                  l10n.statisticsFirstHigherOutsideApp(paperEarliest),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
+          child: _SummaryFigure(
+            value: cycleDay(earliest.afterMucusPeak),
+            outside: paperEarliest == null
+                ? null
+                : l10n.statisticsFirstHigherOutsideApp(paperEarliest),
           ),
         ),
       ),

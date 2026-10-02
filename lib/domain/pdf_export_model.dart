@@ -179,22 +179,20 @@ final class PdfExportModel {
   final List<int?> shortestCycleLengths;
 
   /// The per-cycle earliest-first-higher fact, PARALLEL to [cycles]: the
-  /// documented two-variant record of `earliestFirstHigherCycleDay`
-  /// (lib/domain/statistics.dart) computed over the evaluation list
-  /// truncated AT `cycles[i]` (its own rise INCLUDED — from that cycle's
-  /// point of view its rise is part of its own observation, and its marks
-  /// exist in the record whenever it is printed). `any` — the pure
-  /// minimum; `afterMucusPeak` — the minimum over only the first-higher
-  /// marks lying STRICTLY after their cycle's marked mucus peak ("the
-  /// real first higher"). The generator prefers `afterMucusPeak` and
-  /// falls back to `any`; null when no cycle in the prefix carries a
-  /// qualifying mark.
+  /// cycle-day number of the earliest TRUE first higher measurement (the
+  /// umrandete Messung — the `afterMucusPeak` variant of
+  /// [earliestFirstHigherCycleDay], lib/domain/statistics.dart) computed
+  /// over the evaluation list truncated AT `cycles[i]` (its own rise
+  /// INCLUDED — from that cycle's point of view its rise is part of its
+  /// own observation, and its marks exist in the record whenever it is
+  /// printed); null when no cycle in the prefix carries a qualifying
+  /// (circled) candidate.
   ///
-  /// The paper-history earliest first higher (both variants at once — the
-  /// paper form saw the rise but did not record its mucus-peak relation
-  /// as data) min-combines into both variants of every page for the same
-  /// constant-before-the-first-cycle reason as [shortestCycleLengths].
-  final List<({int? any, int? afterMucusPeak})> earliestFirstHigherCycleDays;
+  /// The paper-history earliest first higher (the paper form saw the rise
+  /// but did not record its mucus-peak relation as data) min-combines into
+  /// every page's fact for the same constant-before-the-first-cycle
+  /// reason as [shortestCycleLengths].
+  final List<int?> earliestFirstHigherCycleDays;
 
   /// The display ordinal ("Zyklus N") of the exported cycle at 0-based
   /// [index] — the cycle's REAL number: its mark-opened index in the
@@ -345,15 +343,17 @@ PdfExportModel buildPdfExportModel({
   //   the page once it did — excluded. The first cycle of a record has no
   //   completed earlier cycle and carries null (the renderer's "—").
   //
-  // - Earliest first higher (INCLUSIVE of the running cycle): the shared
-  //   two-variant helper over the evaluation PREFIX — `all` truncated at
-  //   the cycle's own position (a slice of the already-built list, so the
-  //   per-cycle anchored fields are the identical objects). The helper's
-  //   own rules (skip non-mark-opened, ignore the leading pre-mark group)
-  //   keep applying on the slice; unexported earlier cycles count too —
-  //   the paper form counted them.
+  // - Earliest first higher (INCLUSIVE of the running cycle): the
+  //   umrandete figure (the `afterMucusPeak` variant of
+  //   [earliestFirstHigherCycleDay]) over the evaluation PREFIX — `all`
+  //   truncated at the cycle's own position (a slice of the already-built
+  //   list, so the per-cycle anchored fields are the identical objects).
+  //   The helper's own rules (skip non-mark-opened, ignore the leading
+  //   pre-mark group) keep applying on the slice; unexported earlier
+  //   cycles count too — the paper form counted them. The paper constant
+  //   folds in through [minRecordedFact].
   final shortestCycleLengths = <int?>[];
-  final earliestFirstHigherCycleDays = <({int? any, int? afterMucusPeak})>[];
+  final earliestFirstHigherCycleDays = <int?>[];
   for (var e = 0; e < exportedIndexes.length; e++) {
     final i = exportedIndexes[e];
     int? shortest;
@@ -371,16 +371,12 @@ PdfExportModel buildPdfExportModel({
       minRecordedFact(shortest, shortestCycleLengthOutsideApp),
     );
     final inAppFirstHigher = earliestFirstHigherCycleDay(all.sublist(0, i + 1));
-    earliestFirstHigherCycleDays.add((
-      any: minRecordedFact(
-        inAppFirstHigher.any,
-        earliestFirstHigherCycleDayOutsideApp,
-      ),
-      afterMucusPeak: minRecordedFact(
+    earliestFirstHigherCycleDays.add(
+      minRecordedFact(
         inAppFirstHigher.afterMucusPeak,
         earliestFirstHigherCycleDayOutsideApp,
       ),
-    ));
+    );
   }
 
   final trimmedName = name?.trim();

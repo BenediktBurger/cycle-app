@@ -519,8 +519,8 @@ void main() {
     expect(tester.getTopLeft(table).dy, greaterThan(untilEndTop.dy));
   });
 
-  testWidgets('the earliest first higher rows live on the summary card: both '
-      'variants, real one primary', (tester) async {
+  testWidgets('the earliest summary card shows ONE figure: the earliest '
+      'true (umrandete) first higher measurement', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -537,38 +537,23 @@ void main() {
       const ValueKey('statisticsCard-earliest'),
     );
     expect(summaryEarliest, findsOneWidget);
-    // The real (umrandete Messung: the day after the peak when the
-    // rise sits at/before it) variant: cycle 1's rise Mar 14, start
-    // Mar 1 -> cycle day 14; the peak lies before the rise, so both
-    // variants equal here.
-    expect(
-      find.descendant(
-        of: summaryEarliest,
-        matching: find.textContaining('after the mucus peak'),
-      ),
-      findsOneWidget,
-      reason: 'the real variant row is labeled',
-    );
+    // Cycle 1's rise Mar 14 lies after its Mar 12 peak, start Mar 1: the
+    // true (umrandete) figure is cycle day 14, the card's single figure.
     expect(
       find.descendant(
         of: summaryEarliest,
         matching: find.textContaining('cycle day 14'),
       ),
-      findsNWidgets(2),
-      reason: 'both variants equal here: cycle day 14',
-    );
-    expect(
-      find.descendant(
-        of: summaryEarliest,
-        matching: find.textContaining('over all cycles'),
-      ),
       findsOneWidget,
-      reason: 'the fallback variant row is labeled',
+      reason: 'exactly one figure: the verified in-app day',
     );
+    // The marked-rise variant appears NOWHERE — not even as a label.
+    expect(find.textContaining('after the mucus peak'), findsNothing);
+    expect(find.textContaining('over all cycles'), findsNothing);
   });
 
-  testWidgets('when the variants differ each summary variant row keeps its own '
-      'in-app minimum', (tester) async {
+  testWidgets('a divergent record keeps the one true figure on the summary '
+      'card — the marked rise appears nowhere', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -585,26 +570,21 @@ void main() {
       const ValueKey('statisticsCard-earliest'),
     );
     expect(summaryEarliest, findsOneWidget);
-    // Cycle 2's rise mark sits on its first day (cycle day 1) on the
-    // SAME day as its mucus peak. Cycle 2 produces no measured circle
-    // of its own (R9 truncates its six-low window at its start), so
-    // the real variant keeps cycle 1's first circle — cycle day 14 —
-    // while the "over all cycles" minimum drops to cycle day 1.
-    final rows = tester
+    // Cycle 1's first circle is the true (umrandete) figure — cycle day
+    // 14 — and cycle 2 adds no better one (R9): its day-1 rise stays a
+    // marked-rise variant figure only.
+    final figures = tester
         .widgetList<Text>(
           find.descendant(
             of: summaryEarliest,
-            matching: find.textContaining('cycle day '),
+            matching: find.textContaining('cycle day'),
           ),
         )
         .map((t) => t.data!)
         .toList();
-    expect(rows, contains('cycle day 14'), reason: 'the real one (primary)');
-    expect(
-      rows,
-      contains('cycle day 1'),
-      reason: 'the "over all cycles" minimum',
-    );
+    expect(figures, [
+      'cycle day 14',
+    ], reason: 'the single figure is the true one alone');
   });
 
   testWidgets('the German wording renders on the de surface', (tester) async {
@@ -978,12 +958,12 @@ void main() {
     );
   });
 
-  testWidgets('the earliest summary card shows the plain in-app rows and '
-      'one outside line for the paper figure', (tester) async {
+  testWidgets('the earliest summary card shows the one true in-app figure '
+      'and one outside line for the paper figure', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // In-app both variants are cycle day 14; the paper rise on cycle day
-    // 5 shows only on the single outside line, not in the variant rows.
+    // In-app the true (umrandete) figure is cycle day 14; the paper rise
+    // on cycle day 5 shows only on the outside line.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -1002,33 +982,16 @@ void main() {
         matching: find.text('Earliest first higher measurement'),
       ),
       findsOneWidget,
-      reason: 'the neutral title; the variant labels live on the rows',
-    );
-    expect(
-      find.descendant(
-        of: summaryEarliest,
-        matching: find.textContaining('after the mucus peak'),
-      ),
-      findsOneWidget,
-      reason: 'the real variant row keeps its label',
-    );
-    expect(
-      find.descendant(
-        of: summaryEarliest,
-        matching: find.textContaining('over all cycles'),
-      ),
-      findsOneWidget,
-      reason: 'the any-variant row keeps its label',
     );
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
-      findsNWidgets(2),
-      reason: 'both rows carry the in-app minimum un-grouped',
+      findsOneWidget,
+      reason: 'the single figure: the verified in-app day',
     );
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 5')),
       findsNothing,
-      reason: 'the paper figure is never a row value',
+      reason: 'the paper figure is never the main figure',
     );
     expect(
       find.descendant(
@@ -1036,10 +999,10 @@ void main() {
         matching: find.text('${outsideEarliestPrefix}5'),
       ),
       findsOneWidget,
-      reason:
-          'the paper figure lives on the single non-variant-split '
-          'outside line',
+      reason: 'the paper figure lives on the outside line',
     );
+    expect(find.textContaining('after the mucus peak'), findsNothing);
+    expect(find.textContaining('over all cycles'), findsNothing);
     expect(
       find.textContaining('figures in parentheses'),
       findsNothing,
@@ -1047,8 +1010,10 @@ void main() {
     );
   });
 
-  testWidgets('the earliest summary card without a paper value: plain '
-      'in-app rows and neither hint line nor outside line', (tester) async {
+  testWidgets('the earliest summary card without a paper value: the one '
+      'true in-app figure and neither hint line nor outside line', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -1071,8 +1036,8 @@ void main() {
         of: summaryEarliest,
         matching: find.textContaining('cycle day 14'),
       ),
-      findsNWidgets(2),
-      reason: 'both variant rows carry the in-app minimum un-grouped',
+      findsOneWidget,
+      reason: 'the single figure: the verified in-app day',
     );
     expect(
       find.descendant(
@@ -1101,8 +1066,8 @@ void main() {
       'card only', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // In-app both variants are cycle day 14; a paper rise on cycle day 5
-    // exists only as the summary row's outside line.
+    // In-app the true (umrandete) figure is cycle day 14; a paper rise
+    // on cycle day 5 exists only as the summary row's outside line.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -1127,8 +1092,8 @@ void main() {
     expect(summaryEarliest, findsOneWidget);
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
-      findsNWidgets(2),
-      reason: 'the rows keep the in-app minima',
+      findsOneWidget,
+      reason: 'the single figure keeps the in-app day',
     );
     expect(
       find.descendant(
@@ -1140,16 +1105,14 @@ void main() {
     );
   });
 
-  testWidgets('a divergent in-app record keeps its "over all cycles" '
-      'minimum on the summary card with a paper earliest pinned', (
-    tester,
-  ) async {
+  testWidgets('a divergent record with a paper earliest keeps the one true '
+      'figure on the summary card plus the outside line', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The divergent in-app record (over all cycles = 1, real = 14 —
-    // cycle 2 carries no measurable circle, R9) with paper 5 pinned:
-    // both rows keep their own in-app minima, the paper figure shows on
-    // the one outside line.
+    // The divergent in-app record (marked rise = 1, true figure = 14 —
+    // cycle 2 carries no measurable circle, R9) with paper 5 pinned: the
+    // card keeps its single true figure, the paper figure shows on the
+    // one outside line.
     await tester.pumpWidget(
       harness(
         entries: screenEntries(),
@@ -1168,14 +1131,14 @@ void main() {
     );
     expect(summaryEarliest, findsOneWidget);
     expect(
-      find.descendant(of: summaryEarliest, matching: find.text('cycle day 1')),
-      findsOneWidget,
-      reason: 'the "over all cycles" minimum keeps its own figure',
-    );
-    expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 14')),
       findsOneWidget,
-      reason: 'the real row keeps its in-app figure, un-min-combined',
+      reason: 'the single figure: the true in-app day',
+    );
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 1')),
+      findsNothing,
+      reason: 'the marked rise leaves the summary row',
     );
     expect(
       find.descendant(
@@ -1187,13 +1150,12 @@ void main() {
     );
   });
 
-  testWidgets('a paper earliest cannot qualify the real variant in-app: '
+  testWidgets('a paper earliest cannot qualify the true figure in-app: '
       'the summary card shows the dash plus the outside line', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     // The narrow combination: the in-app cycle has a rise but NO marked
-    // mucus peak, so the in-app "over all cycles" variant is cycle day 3
-    // while the real (umrandete) variant qualifies nowhere in-app. The
+    // mucus peak, so no true (umrandete) figure qualifies in-app. The
     // follow-up start (Mar 29) gives the cycle a countable length so the
     // summary row renders; the paper earliest value is pinned and
     // surfaces as the card's outside line.
@@ -1229,12 +1191,19 @@ void main() {
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('—')),
       findsOneWidget,
-      reason: 'the real row dashes — the in-app variant has no value',
+      reason:
+          'the single figure dashes — the rise has no marked peak, so it '
+          'is never an umrandete Messung in-app',
     );
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 3')),
-      findsOneWidget,
-      reason: 'the "over all cycles" row keeps its in-app figure',
+      findsNothing,
+      reason: 'the marked rise appears nowhere on the card',
+    );
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 5')),
+      findsNothing,
+      reason: 'the paper figure is never the main figure',
     );
     expect(
       find.descendant(
@@ -1246,14 +1215,13 @@ void main() {
     );
   });
 
-  testWidgets('without a paper value a genuinely unqualified real variant '
-      'dashes on its summary row', (tester) async {
+  testWidgets('without data the true figure alone dashes on the summary '
+      'card (no figure from the marked rise, no outside line)', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    // The in-app cycle again has a rise but NO marked peak: the real
-    // (umrandete) variant qualifies nowhere in-app, while the "over all
-    // cycles" variant is cycle day 3. The follow-up start (Mar 29) gives
-    // the cycle a countable length so the summary row renders.
+    // The in-app cycle again has a rise but NO marked peak: no true
+    // (umrandete) figure qualifies in-app. The follow-up start (Mar 29)
+    // gives the cycle a countable length so the summary row renders.
     await tester.pumpWidget(
       harness(
         entries: [
@@ -1285,15 +1253,22 @@ void main() {
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('—')),
       findsOneWidget,
-      reason: 'the real row dashes — the in-app variant has no value',
+      reason:
+          'the single figure dashes — the rise has no marked peak, so it '
+          'is never an umrandete Messung in-app',
+    );
+    expect(
+      find.descendant(of: summaryEarliest, matching: find.text('cycle day 3')),
+      findsNothing,
+      reason: 'the marked rise appears nowhere on the card',
     );
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.textContaining('cycle day 3'),
+        matching: find.textContaining('outside:'),
       ),
-      findsOneWidget,
-      reason: 'the "over all cycles" row keeps its in-app value',
+      findsNothing,
+      reason: 'no paper value — no outside line on the summary cards',
     );
   });
 
