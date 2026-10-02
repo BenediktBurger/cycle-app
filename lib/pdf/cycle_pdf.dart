@@ -106,9 +106,7 @@ List<({String label, String value})> pdfHeaderFacts({
   final birthDate = model.birthDate == null
       ? null
       : _formatDate(DateOnly.normalize(model.birthDate!));
-  final earliest =
-      model.earliestFirstHigherCycleDays[cycleIndex].afterMucusPeak ??
-      model.earliestFirstHigherCycleDays[cycleIndex].any;
+  final earliest = model.earliestFirstHigherCycleDays[cycleIndex];
   final shortest = model.shortestCycleLengths[cycleIndex];
   return [
     if (anonymized) (label: 'Anonymisierung', value: 'anonymisiert'),

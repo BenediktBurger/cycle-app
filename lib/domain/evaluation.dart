@@ -100,6 +100,15 @@ final class HigherMeasurement {
   final double differenceK;
 }
 
+/// The earliest circle candidate's day (rule R4 — the circles the chart and
+/// PDF rings draw), null when the sequence has no circle.
+DateTime? firstCircledCandidateDay(CycleEvaluation evaluation) {
+  for (final candidate in evaluation.higherMeasurements) {
+    if (candidate.markKind == MarkKind.circle) return candidate.date;
+  }
+  return null;
+}
+
 /// The computed evaluation of ONE cycle group. Every field is derivable —
 /// anything the user has not marked (or the arithmetic cannot decide) is
 /// null/empty, letting the UI render partial evaluations.

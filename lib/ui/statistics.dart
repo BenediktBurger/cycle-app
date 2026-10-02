@@ -5,9 +5,8 @@
 // lengths, averages, buckets — no classification, no fertility
 // statements. Everything is computed at render time from the entries +
 // marks streams (ADR-0001: nothing derived is persisted); missing values
-// render as the "—" dash. The paper-history settings fold into the
-// shortest/earliest surfaces as a MIN-combination only — see the build
-// method's fold comment.
+// render as the "—" dash. Paper-history figures surface as the summary
+// row's "outside" lines only — see the build method's paper comment.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -83,30 +82,15 @@ class StatistikScreen extends ConsumerWidget {
     final bleedingDetail = summarizeInts(
       cycleBleedingDurationsInDays(evaluations).nonNulls.toList(),
     );
-    final riseDetail = summarizeInts(
-      riseToEndDurationsInDays(evaluations).nonNulls.toList(),
-    );
     final earliest = earliestFirstHigherCycleDay(evaluations);
 
-    // The paper-history settings fold in through minRecordedFact at the
-    // shortest/earliest surfaces: figures recorded BEFORE every in-app
-    // cycle are known facts at this screen's point of view. They stay out
-    // of the lengths list, distribution and per-cycle table (in-app-only
-    // surfaces stay gated on `lengths`).
+    // Paper-history figures (recorded before this app existed) appear on
+    // the summary row's small "outside" lines only; every other card reads
+    // the in-app record alone (the PDF model folds its own, see
+    // lib/domain/pdf_export_model.dart).
     final paperShortest = ref.watch(shortestCycleLengthOutsideAppProvider);
     final paperEarliest = ref.watch(
       earliestFirstHigherCycleDayOutsideAppProvider,
-    );
-    final shortestOverall = minRecordedFact(paperShortest, summary.shortest);
-    final lengthDetailWithPaper = DescriptiveSummary(
-      minimum: minRecordedFact(paperShortest, lengthDetail.minimum),
-      maximum: lengthDetail.maximum,
-      average: lengthDetail.average,
-      standardDeviation: lengthDetail.standardDeviation,
-    );
-    final earliestWithPaper = (
-      any: minRecordedFact(paperEarliest, earliest.any),
-      afterMucusPeak: minRecordedFact(paperEarliest, earliest.afterMucusPeak),
     );
 
     // Renders with ONLY a paper shortest present (in-app lengths empty):
@@ -131,15 +115,6 @@ class StatistikScreen extends ConsumerWidget {
       countCaption += ' · ${l10n.statisticsCyclesOutsideApp(cyclesOutsideApp)}';
     }
 
-    // The earliest first higher, two variants: "real" (strictly after the
-    // mucus peak) is the primary row, the over-all-cycles minimum the
-    // fallback. The missing-variant caption gates on the paper-FOLDED
-    // pair — the rows display the fold, so gating on the raw in-app
-    // values would claim a missing variant while the row carries the
-    // paper figure.
-    String cycleDayText(int? n) =>
-        n == null ? _missing : l10n.statisticsCycleDay(n);
-
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -159,23 +134,25 @@ class StatistikScreen extends ConsumerWidget {
           Text(l10n.statisticsNoData),
           const SizedBox(height: 8),
         ],
-        if (summary.lengths.isNotEmpty) ...[
-          _lengthsListCard(context, l10n, summary.lengths),
-          const SizedBox(height: 8),
-        ],
         if (hasShortestRow) ...[
-          _averageShortestLongestRow(
+          _summaryRow(
             context,
             summary,
-            shortestOverride: shortestOverall,
+            earliest: earliest,
+            paperEarliest: paperEarliest,
+            paperShortest: paperShortest,
           ),
           const SizedBox(height: 8),
         ],
         _MetricCard(
           key: const ValueKey('statisticsCard-cycleLength'),
           title: l10n.statisticsMetricCycleLength,
-          detail: lengthDetailWithPaper,
+          detail: lengthDetail,
         ),
+        if (summary.lengths.isNotEmpty) ...[
+          _distributionCard(context, buckets),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 8),
         _MetricCard(
           key: const ValueKey('statisticsCard-bleedingDuration'),
@@ -184,9 +161,9 @@ class StatistikScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         _MetricCard(
-          key: const ValueKey('statisticsCard-riseSpan'),
-          title: l10n.statisticsMetricRiseSpan,
-          detail: riseDetail,
+          key: const ValueKey('statisticsCard-firstHigher'),
+          title: l10n.statisticsMetricFirstHigherDay,
+          detail: _descriptiveDetail(stats.firstHigherCycleDays),
         ),
         const SizedBox(height: 8),
         _MetricCard(
@@ -195,42 +172,6 @@ class StatistikScreen extends ConsumerWidget {
           detail: _descriptiveDetail(stats.firstHigherUntilCycleEnd),
         ),
         const SizedBox(height: 8),
-        _StatCard(
-          key: const ValueKey('statisticsCard-earliestFirstHigher'),
-          title: l10n.statisticsEarliestFirstHigher,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ValueRow(
-                label: l10n.statisticsFirstHigherReal,
-                value: cycleDayText(earliestWithPaper.afterMucusPeak),
-              ),
-              _ValueRow(
-                label: l10n.statisticsFirstHigherAny,
-                value: cycleDayText(earliestWithPaper.any),
-              ),
-              if (earliestWithPaper.afterMucusPeak == null &&
-                  earliestWithPaper.any != null)
-                Text(
-                  l10n.statisticsFirstHigherRealMissing,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        // The fact-gated surfaces gate on the recorded data's own count —
-        // not the lengths': the onset list shows whenever a cycle start is
-        // recorded, the per-cycle table whenever fact rows exist; only the
-        // distribution card stays glued to the lengths (it buckets lengths).
-        if (onsets.isNotEmpty) ...[
-          _onsetsCard(context, onsets, day),
-          const SizedBox(height: 8),
-        ],
-        if (summary.lengths.isNotEmpty) ...[
-          _distributionCard(context, buckets),
-          const SizedBox(height: 8),
-        ],
         if (stats.facts.isNotEmpty)
           // Below ALL other statistics: the one-row-per-cycle table keeps
           // the numbers auditable against the mark-driven boundaries
@@ -262,88 +203,71 @@ Widget _countCard(
   ),
 );
 
-Widget _lengthsListCard(
-  BuildContext context,
-  AppLocalizations l10n,
-  List<int> lengths,
-) => _StatCard(
-  key: const ValueKey('statisticsCard-lengthsList'),
-  title: l10n.statisticsCycles,
-  child: Column(
-    children: [
-      for (final length in lengths)
-        ListTile(
-          dense: true,
-          leading: const Icon(Icons.loop_outlined),
-          title: Text(l10n.termCycleDays(length)),
-        ),
-    ],
-  ),
-);
-
-Widget _averageShortestLongestRow(
+/// The summary row: shortest + earliest, each card showing the plain
+/// in-app figures; when a paper-history fact exists for the metric, one
+/// small "outside" line names it — the min across both numbers is the
+/// reader's own combination.
+Widget _summaryRow(
   BuildContext context,
   CycleLengthSummary summary, {
-  // Min-combined shortest figure (paper fold — see the build method's
-  // fold comment); average and longest stay in-app-only.
-  required int? shortestOverride,
+  required ({int? any, int? afterMucusPeak}) earliest,
+  required int? paperEarliest,
+  required int? paperShortest,
 }) {
   final l10n = AppLocalizations.of(context);
+  String cycleDay(int? day) =>
+      day == null ? _missing : l10n.statisticsCycleDay(day);
   return Row(
     children: [
       Expanded(
         child: _StatCard(
-          key: const ValueKey('statisticsCard-average'),
-          title: l10n.statisticsAverage,
-          child: Text(
-            _scalarText(context, summary.average),
-            style: Theme.of(context).textTheme.headlineSmall,
+          key: const ValueKey('statisticsCard-shortest'),
+          title: l10n.statisticsShortest,
+          child: _SummaryFigure(
+            value: summary.shortest == null ? _missing : '${summary.shortest}',
+            outside: paperShortest == null
+                ? null
+                : l10n.statisticsShortestOutsideApp(paperShortest),
           ),
         ),
       ),
       const SizedBox(width: 8),
       Expanded(
         child: _StatCard(
-          key: const ValueKey('statisticsCard-shortest'),
-          title: l10n.statisticsShortest,
-          child: _headlineText(context, shortestOverride),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: _StatCard(
-          key: const ValueKey('statisticsCard-longest'),
-          title: l10n.statisticsLongest,
-          child: _headlineText(context, summary.longest),
+          key: const ValueKey('statisticsCard-earliest'),
+          title: l10n.statisticsEarliestFirstHigher,
+          child: _SummaryFigure(
+            value: cycleDay(earliest.afterMucusPeak),
+            outside: paperEarliest == null
+                ? null
+                : l10n.statisticsFirstHigherOutsideApp(paperEarliest),
+          ),
         ),
       ),
     ],
   );
 }
 
-Widget _headlineText(BuildContext context, int? value) => Text(
-  value == null ? _missing : '$value',
-  style: Theme.of(context).textTheme.headlineSmall,
-);
+/// A summary card's main figure, with its optional "outside" line rendered
+/// beneath it.
+final class _SummaryFigure extends StatelessWidget {
+  const _SummaryFigure({required this.value, this.outside});
 
-Widget _onsetsCard(
-  BuildContext context,
-  List<DateTime> onsets,
-  String Function(DateTime) day,
-) => _StatCard(
-  key: const ValueKey('statisticsCard-onsets'),
-  title: AppLocalizations.of(context).statisticsOnsets,
-  child: Column(
-    children: [
-      for (final onset in onsets)
-        ListTile(
-          dense: true,
-          leading: const Icon(Icons.border_color_outlined),
-          title: Text(day(onset)),
-        ),
-    ],
-  ),
-);
+  final String value;
+  final String? outside;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: theme.textTheme.headlineSmall),
+        if (outside != null) Text(outside!, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+}
 
 // The histogram over the cycle lengths; the bucket edges are a domain
 // question (lib/domain/statistics.dart).
@@ -399,8 +323,10 @@ Widget _distributionCard(
 
 /// One metric card: the descriptive detail set (minimum, maximum,
 /// average, standard deviation) for ONE metric family, in the shared
-/// [_StatCard] style. Values are numbers ("n days" / one decimal) or the
-/// "—" dash when there is no data.
+/// [_StatCard] style. The [title] string carries the metric's unit
+/// parenthesized; the min/max rows render bare integers (one decimal in
+/// the effective locale for the fractional rows), or the "—" dash when
+/// there is no data — in which case the count caption is omitted too.
 final class _MetricCard extends StatelessWidget {
   const _MetricCard({super.key, required this.title, required this.detail});
 
@@ -417,15 +343,11 @@ final class _MetricCard extends StatelessWidget {
         children: [
           _ValueRow(
             label: l10n.statisticsMinimum,
-            value: detail.minimum == null
-                ? _missing
-                : l10n.termCycleDays(detail.minimum!),
+            value: detail.minimum == null ? _missing : '${detail.minimum}',
           ),
           _ValueRow(
             label: l10n.statisticsMaximum,
-            value: detail.maximum == null
-                ? _missing
-                : l10n.termCycleDays(detail.maximum!),
+            value: detail.maximum == null ? _missing : '${detail.maximum}',
           ),
           _ValueRow(
             label: l10n.statisticsAverage,
@@ -435,6 +357,13 @@ final class _MetricCard extends StatelessWidget {
             label: l10n.statisticsStandardDeviation,
             value: _scalarText(context, detail.standardDeviation),
           ),
+          if (detail.count > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              l10n.statisticsMetricFromCycles(detail.count),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );
@@ -482,6 +411,7 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
       maximum: summary.max,
       average: summary.average,
       standardDeviation: summary.stdDev,
+      count: summary.count,
     );
 
 /// The per-cycle table card: a bordered table of equal-width columns

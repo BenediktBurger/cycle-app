@@ -161,6 +161,41 @@ Open questions (`TODO(user-review)` in the file):
   current cycle grouping they can never bind. If a future grouping change
   makes them bind, revisit.
 
+## Statistics' "earliest first higher" variants (lib/domain/statistics.dart)
+
+`earliestFirstHigherCycleDay` folds two variants over the mark-driven
+cycles, both reported as cycle-day numbers (the cycle's marked start day is
+day 1):
+
+- `any`: the minimum cycle-day number of the marked first-higher rise,
+  wherever it sits relative to the mucus peak. Mark-position only.
+- `afterMucusPeak` (the "umrandete Messung"): the minimum cycle-day number
+  of the cycles' FIRST CIRCLED candidate — `firstCircledCandidateDay()`
+  (evaluation.dart, rule R4). The same function behind the chart's and
+  PDF's rings and the fact rows' first-higher resolution (`marked day`
+  fallback), so rendering and statistics refer to one domain definition.
+  The PDF per-cycle header line shares the helper over its truncated
+  record prefixes.
+
+The ruling behind the real variant: the NER analysis rules are the
+official ones; the first circled line is a consequence of them, and that
+marked-and-measured day is the first higher measurement the statistics
+analyze. A mark-only reading ("the marked rise, else peak + 1, without a
+temperature") differs from it exactly where the measurement is absent:
+
+| Situation | mark-only reading | first circle (R4, implemented) |
+|---|---|---|
+| rise strictly after peak, measured above the baseline | rise day | first circle = rise day |
+| rise at/before peak, peak + 1 measured above the baseline | peak + 1 | first circle = peak + 1 |
+| rise at/before peak, peak + 1 unmeasured or ≤ baseline | peak + 1 (no temperature needed) | first circle later, or the cycle does not qualify |
+| rise after peak, marked day itself not above the baseline | the marked day | first circle later, or the cycle does not qualify |
+| sequence gap-stopped (R2) before any circle | peak + 1 qualifies | no circle — the cycle does not qualify |
+| no marked peak | real variant null | arrows only — no circle, so the cycle does not qualify |
+
+Both variants' day numbers lie inside their cycle's window by
+construction (marks attach within a cycle window; the candidate walk ends
+at the cycle's own end), so no extra window guard is needed.
+
 ## Paper-form PDF export (lib/pdf/cycle_pdf.dart)
 
 Layout/design decisions:

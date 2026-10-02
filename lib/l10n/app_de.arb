@@ -239,12 +239,17 @@
   "cycleLegendNote": "Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
   "statisticsNoData": "Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier Statistiken.",
-  "statisticsCycleCount": "Zyklen",
-  "statisticsMetricCycleLength": "Zykluslänge",
+  "statisticsMetricCycleLength": "Zykluslänge (Tage)",
   "statisticsBleedingDays": "Blutungstage",
-  "statisticsMetricFirstHigherUntilEnd": "Erste höhere Messung bis Zyklusende",
+  "statisticsMetricFirstHigherDay": "Erste höhere Messung (Zyklustag)",
+  "@statisticsMetricFirstHigherDay": {
+    "description": "Card title of the first-higher metric card: the per-cycle first higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
+  },
+  "statisticsMetricFirstHigherUntilEnd": "Dauer der Hochlage (Tage)",
+  "@statisticsMetricFirstHigherUntilEnd": {
+    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first higher measurement to the cycle's end (the first-higher day counts as one)."
+  },
   "statisticsMinimum": "Minimum",
-  "statisticsStdDev": "Streuung",
   "statisticsAverage": "Durchschnitt",
   "statisticsMaximum": "Maximum",
   "statisticsEarliestFirstHigher": "Früheste erste höhere Messung",
@@ -286,10 +291,15 @@
   "@statisticsStandardDeviation": {
     "description": "Population standard deviation (StdAbw über die gesamte beobachtete Menge, kein N-1-Schätzwert) — beschreibender Rechenwert."
   },
-  "statisticsMetricBleedingDuration": "Blutungsdauer",
-  "statisticsMetricRiseSpan": "Erste höhere Messung → Zyklusende",
-  "@statisticsMetricRiseSpan": {
-    "description": "Metric-card title for the span from the marked first higher measurement to the cycle's end (the day before the next cycle start)."
+  "statisticsMetricBleedingDuration": "Blutungsdauer (Tage)",
+  "statisticsMetricFromCycles": "{n, plural, =1{aus 1 Zyklus} other{aus {n} Zyklen}}",
+  "@statisticsMetricFromCycles": {
+    "description": "Caption under a metric card's rows naming how many cycles fed THIS metric's values — the per-metric observation count, not the global cycle count; hidden when the metric has no data.",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   },
   "statisticsCycleDay": "Zyklustag {n}",
   "@statisticsCycleDay": {
@@ -300,17 +310,23 @@
     },
     "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
   },
-  "statisticsFirstHigherReal": "streng nach dem Schleimhöhepunkt",
-  "@statisticsFirstHigherReal": {
-    "description": "Label of the earliest-first-higher row for the \"real first higher\" variant: only first-higher marks strictly after the cycle's marked mucus peak day."
+  "statisticsShortestOutsideApp": "außerhalb: {n}",
+  "@statisticsShortestOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Shortest-card caption line naming the cycle length recorded outside this app (the settings value), shown when it has a value. Same shape as the count card's \"außerhalb: {n}\" caption part."
   },
-  "statisticsFirstHigherAny": "über alle Zyklen",
-  "@statisticsFirstHigherAny": {
-    "description": "Label of the earliest-first-higher fallback row: the minimum over all cycles with a first-higher mark, regardless of the mucus peak."
-  },
-  "statisticsFirstHigherRealMissing": "keine erste höhere Messung streng nach dem Schleimhöhepunkt markiert",
-  "@statisticsFirstHigherRealMissing": {
-    "description": "Caption shown when no cycle qualifies for the strictly-after-peak variant while the over-all-cycles value exists."
+  "statisticsFirstHigherOutsideApp": "außerhalb: Zyklustag {n}",
+  "@statisticsFirstHigherOutsideApp": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    },
+    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT the same sense as the card's figure (the earliest umrandete Messung across in-app cycles). Capitalization matches statisticsCycleDay."
   },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
@@ -336,10 +352,6 @@
   "settingsPaperEarliestFirstHigher": "Früheste erste höhere Messung",
   "settingsPaperEarliestFirstHigherError": "Bitte eine ganze Zahl ≥ 1 eingeben",
   "settingsPaperEarliestFirstHigherHelper": "Die früheste erste höhere Messung aus deinem Papierformular, als Zyklustag (Zählung ab 1).",
-  "settingsObservedCyclesOutsideAppCount": "Anzahl der beobachteten Zyklen",
-  "@settingsObservedCyclesOutsideAppCount": {
-    "description": "Label of the settings card's integer field: distinct from the card title directly above it."
-  },
   "cycleOrdinal": "Zyklus {n}",
   "@cycleOrdinal": {
     "placeholders": {
@@ -619,8 +631,5 @@
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
-  "statisticsCycles": "Zykluslängen",
-  "statisticsOnsets": "Zyklusbeginne",
-  "statisticsShortest": "Kürzester",
-  "statisticsLongest": "Längster"
+  "statisticsShortest": "Kürzester"
 }

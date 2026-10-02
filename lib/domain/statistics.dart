@@ -109,8 +109,7 @@ int markDrivenCycleCount(List<DailyEntry> entries, List<CycleMark> marks) =>
     markDrivenCycleCountFrom(groupIntoCycles(entries, marks));
 
 /// Descriptive scalars (min, max, mean, standard deviation) over a list
-/// of ints — used for cycle lengths, bleeding durations and rise-to-end
-/// spans alike.
+/// of ints — used for cycle lengths and bleeding durations alike.
 ///
 /// Data-shape note: what a pregnancy-span cycle does to these values is
 /// the open data question documented in the file header — the numbers
@@ -121,7 +120,11 @@ final class DescriptiveSummary {
     required this.maximum,
     required this.average,
     required this.standardDeviation,
+    required this.count,
   });
+
+  /// The number of values this summary was computed from (0 when empty).
+  final int count;
 
   /// Smallest input value, or null when there is no data.
   final int? minimum;
@@ -150,6 +153,7 @@ DescriptiveSummary summarizeInts(List<int> values) {
       maximum: null,
       average: null,
       standardDeviation: null,
+      count: 0,
     );
   }
   final mean = values.fold<int>(0, (sum, v) => sum + v) / values.length;
@@ -167,6 +171,7 @@ DescriptiveSummary summarizeInts(List<int> values) {
     maximum: values.reduce((a, b) => a > b ? a : b),
     average: mean,
     standardDeviation: math.sqrt(variance),
+    count: values.length,
   );
 }
 
@@ -211,59 +216,30 @@ List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
       bleedingSpanInDays(evaluation.cycle.days),
 ];
 
-/// The per-cycle spans from the cycle's marked first higher measurement
-/// to the cycle's end, in INCLUSIVE calendar days, for the MARK-driven
-/// cycles in group order.
-///
-/// The cycle end is the calendar day BEFORE the next mark-driven cycle
-/// start (the last day before the next menstruation); untracked gap days
-/// before the next start count through, calendar-honest exactly like
-/// [cycleLengthsInDays]. Single definitions: null when the cycle has no
-/// first-higher mark, and null for the LAST mark-driven cycle (no known
-/// follow-up start — its end is open). The leading pre-mark group is
-/// excluded like everywhere here. Pure arithmetic over [evaluateCycles]
-/// output (ADR-0001).
-List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
-  final spans = <int?>[];
-  for (var i = 0; i < evaluations.length; i++) {
-    final evaluation = evaluations[i];
-    if (!evaluation.cycle.startsAtMark) continue;
-    final rise = evaluation.firstHigherDay;
-    // The next group of a mark-driven cycle is always mark-driven itself
-    // (the leading group can only be the first group) — its start is the
-    // end-of-window anchor here. Absent for the last cycle.
-    final nextStart = i + 1 < evaluations.length
-        ? evaluations[i + 1].cycle.startDate
-        : null;
-    if (rise == null || nextStart == null) {
-      spans.add(null);
-      continue;
-    }
-    final cycleEnd = DateOnly.previousDay(DateOnly.normalize(nextStart));
-    spans.add(DateOnly.daysBetween(cycleEnd, DateOnly.normalize(rise)) + 1);
-  }
-  return spans;
-}
-
-/// The earliest (minimum) cycle-day number of the cycle's marked first
-/// higher measurement across all mark-driven cycles, as a record of TWO
+/// The earliest (minimum) cycle-day number of the cycle's first higher
+/// measurement across all mark-driven cycles, as a record of TWO
 /// documented variants:
 ///
 /// - `any`: the minimum over every mark-driven cycle that carries a
 ///   first-higher mark, wherever it sits relative to the mucus peak;
-/// - `afterMucusPeak`: the minimum over only those first-higher marks
-///   lying STRICTLY AFTER the cycle's marked mucus peak day — the "real
-///   first higher". A cycle without a marked mucus peak (or with its rise
-///   at/before the peak) does not qualify for this variant.
+/// - `afterMucusPeak`: the minimum over the cycle-day numbers of the
+///   mark-driven cycles' FIRST CIRCLED candidates
+///   ([firstCircledCandidateDay] — rule R4's "umrandete Messung": a
+///   measured temperature strictly above the baseline, from the marked
+///   rise onward, strictly after the marked mucus peak day). A cycle
+///   qualifies only when its candidate sequence carries such a circle:
+///   no marked peak (arrows only), no measurable candidate, and a
+///   gap-stopped sequence (R2) all leave the cycle out.
 ///
-/// Both variants are returned (possibly null when no cycle qualifies for
-/// them). The cycle-day number is `(firstHigherDay - cycleStart) + 1`
-/// (the cycle's marked start day is day 1 — DST-free via [DateOnly]).
-/// A first-higher mark inside the LEADING pre-mark group has no cycle
-/// start to count from and is ignored. Pure arithmetic over
-/// [evaluateCycles] output ([CycleEvaluation.firstHigherDay] and
-/// [CycleEvaluation.mucusPeakDay] — the marks are anchored per cycle
-/// window; ADR-0001: render-time computation, nothing persisted).
+/// Both variants' day numbers lie inside their cycle's window by
+/// construction: marks attach within [Cycle.startDate, next cycle start),
+/// and the candidate walk stops at the cycle's own end. The cycle-day
+/// number is `(day - cycleStart) + 1` (the cycle's marked start day is
+/// day 1 — DST-free via [DateOnly]). A first-higher mark inside the
+/// LEADING pre-mark group has no cycle start to count from and is
+/// ignored. Pure arithmetic over [evaluateCycles] output (the
+/// [CycleEvaluation] marks plus its evaluated candidates; ADR-0001:
+/// render-time computation, nothing persisted).
 ({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay(
   List<CycleEvaluation> evaluations,
 ) {
@@ -273,22 +249,16 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
     if (!evaluation.cycle.startsAtMark) continue;
     final rise = evaluation.firstHigherDay;
     if (rise == null) continue;
-    final cycleDayNumber =
-        DateOnly.daysBetween(
-          rise,
-          DateOnly.normalize(evaluation.cycle.startDate),
-        ) +
-        1;
-    if (earliestAny == null || cycleDayNumber < earliestAny) {
-      earliestAny = cycleDayNumber;
+    final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
+    final anyDayNumber = DateOnly.daysBetween(rise, cycleStart) + 1;
+    if (earliestAny == null || anyDayNumber < earliestAny) {
+      earliestAny = anyDayNumber;
     }
-    final peak = evaluation.mucusPeakDay;
-    final riseIsStrictlyAfterPeak =
-        peak != null &&
-        DateOnly.daysBetween(rise, DateOnly.normalize(peak)) > 0;
-    if (riseIsStrictlyAfterPeak &&
-        (earliestAfterPeak == null || cycleDayNumber < earliestAfterPeak)) {
-      earliestAfterPeak = cycleDayNumber;
+    final circled = firstCircledCandidateDay(evaluation);
+    if (circled == null) continue;
+    final circledDayNumber = DateOnly.daysBetween(circled, cycleStart) + 1;
+    if (earliestAfterPeak == null || circledDayNumber < earliestAfterPeak) {
+      earliestAfterPeak = circledDayNumber;
     }
   }
   return (any: earliestAny, afterMucusPeak: earliestAfterPeak);
@@ -297,12 +267,11 @@ List<int?> riseToEndDurationsInDays(List<CycleEvaluation> evaluations) {
 /// The smaller of two optional recorded facts, or null when both are:
 /// null folds to the other side (a missing fact adds nothing — the other
 /// side's value stands alone) and a minimum of observed facts never flips
-/// upward. THE shared MIN-combination rule behind the paper-history fold
-/// (the settings pane's figures recorded before this app existed — the
-/// outside-app shortest cycle and earliest first higher): they are known
-/// at every statistic surface's point of view, so they compete there
-/// through this fold (lib/ui/statistics.dart and
-/// lib/domain/pdf_export_model.dart).
+/// upward. The paper-history fold of the PDF model (the settings pane's
+/// figures recorded before this app existed — the outside-app shortest
+/// cycle and earliest first higher, lib/domain/pdf_export_model.dart);
+/// the statistics screen shows those paper figures as plain "outside"
+/// lines instead, without a fold.
 int? minRecordedFact(int? first, int? second) {
   if (first == null) return second;
   if (second == null) return first;
@@ -556,17 +525,10 @@ List<CycleFact> cycleFactsFromCycles(
   return facts;
 }
 
-/// The statistics value for one fact's first higher: [MarkKind.circle]
-/// candidates lie strictly after the mucus peak (the evaluation classifies
-/// per candidate); the earliest circle is the "real" first higher. No
-/// circle at all — unknown peak, or the sequence never reached past the
-/// peak — falls back to the user-placed mark day.
-DateTime? _resolveFirstHigher(CycleEvaluation evaluation) {
-  for (final candidate in evaluation.higherMeasurements) {
-    if (candidate.markKind == MarkKind.circle) return candidate.date;
-  }
-  return evaluation.firstHigherDay;
-}
+/// The fact-row first higher: the earliest R4 circle
+/// ([firstCircledCandidateDay]), else the user-placed mark day.
+DateTime? _resolveFirstHigher(CycleEvaluation evaluation) =>
+    firstCircledCandidateDay(evaluation) ?? evaluation.firstHigherDay;
 
 /// Min/max/average/population standard deviation over one metric, or all
 /// null when the metric has no data at all. Population std dev (÷ n, not
@@ -577,13 +539,18 @@ final class MetricSummary {
     required this.max,
     required this.average,
     required this.stdDev,
+    required this.count,
   });
 
   const MetricSummary.empty()
     : min = null,
       max = null,
       average = null,
-      stdDev = null;
+      stdDev = null,
+      count = 0;
+
+  /// The number of values this summary was computed from (0 when empty).
+  final int count;
 
   final int? min;
   final int? max;
@@ -606,6 +573,7 @@ MetricSummary _summarize(List<int> values) {
     max: values.reduce((a, b) => a > b ? a : b),
     average: mean,
     stdDev: math.sqrt(variance),
+    count: count,
   );
 }
 
@@ -617,7 +585,7 @@ final class CycleStatistic {
     required this.cycleLengths,
     required this.bleedingDays,
     required this.firstHigherUntilCycleEnd,
-    required this.earliestFirstHigherDayOfCycle,
+    required this.firstHigherCycleDays,
   });
 
   /// One row per mark-opened cycle — the table data.
@@ -630,11 +598,13 @@ final class CycleStatistic {
   final MetricSummary bleedingDays;
   final MetricSummary firstHigherUntilCycleEnd;
 
-  /// The earliest first higher measurement among all cycles, reported as
-  /// the 1-based day-of-cycle number the chart renders
-  /// (daysBetween(firstHigherDay, cycleStart) + 1). Null when no cycle has
-  /// a resolved first higher measurement.
-  final int? earliestFirstHigherDayOfCycle;
+  /// The per-cycle first higher measurements as 1-based day-of-cycle
+  /// numbers (daysBetween(firstHigherDay, cycleStart) + 1, like the
+  /// chart). One single sense — the cycle's resolved fact
+  /// ([CycleFact.firstHigherDay]) — unlike the two senses of
+  /// [earliestFirstHigherCycleDay]; this summary's `min` is therefore
+  /// THE earliest first-higher cycle day.
+  final MetricSummary firstHigherCycleDays;
 }
 
 /// Aggregates the per-cycle facts of [cycleFacts] into the screen's
@@ -667,16 +637,11 @@ CycleStatistic cycleStatisticsFromCycles(
       if (fact.firstHigherUntilCycleEndDays != null)
         fact.firstHigherUntilCycleEndDays!,
   ];
-
-  var earliestDayOfCycle = 0;
-  for (final fact in facts) {
-    if (fact.firstHigherDay == null) continue;
-    final dayNumber =
-        DateOnly.daysBetween(fact.firstHigherDay!, fact.cycleStart) + 1;
-    if (earliestDayOfCycle == 0 || dayNumber < earliestDayOfCycle) {
-      earliestDayOfCycle = dayNumber;
-    }
-  }
+  final firstHigherDayNumbers = [
+    for (final fact in facts)
+      if (fact.firstHigherDay != null)
+        DateOnly.daysBetween(fact.firstHigherDay!, fact.cycleStart) + 1,
+  ];
 
   return CycleStatistic(
     facts: facts,
@@ -684,8 +649,6 @@ CycleStatistic cycleStatisticsFromCycles(
     cycleLengths: _summarize(lengths),
     bleedingDays: _summarize(bleedings),
     firstHigherUntilCycleEnd: _summarize(firstHigherSpans),
-    earliestFirstHigherDayOfCycle: earliestDayOfCycle == 0
-        ? null
-        : earliestDayOfCycle,
+    firstHigherCycleDays: _summarize(firstHigherDayNumbers),
   );
 }

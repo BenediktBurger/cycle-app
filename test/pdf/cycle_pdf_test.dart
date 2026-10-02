@@ -35,7 +35,7 @@ const _fakeModel = PdfExportModel(
   name: 'Maria Muster',
   birthDate: null,
   shortestCycleLengths: [27],
-  earliestFirstHigherCycleDays: [(any: 14, afterMucusPeak: 14)],
+  earliestFirstHigherCycleDays: [14],
 );
 
 /// Fixture data: two mark-opened cycles (Mar 1..28: 28 days; Mar 29..Apr 28:
@@ -439,7 +439,7 @@ void main() {
         name: null,
         birthDate: DateTime.utc(1980, 12, 24),
         shortestCycleLengths: [null],
-        earliestFirstHigherCycleDays: [(any: null, afterMucusPeak: null)],
+        earliestFirstHigherCycleDays: [null],
       );
       final facts = pdfHeaderFacts(
         model: model,
@@ -489,8 +489,8 @@ void main() {
       );
     });
 
-    test('the earliest first higher prefers the "real" (after mucus peak) '
-        'variant and falls back to any', () {
+    test('the earliest header fact prints "—" when the record fact has no '
+        'umrandete value', () {
       final model = PdfExportModel(
         cycles: const [],
         markOpenedIndexes: const [0],
@@ -499,7 +499,27 @@ void main() {
         name: null,
         birthDate: null,
         shortestCycleLengths: [28],
-        earliestFirstHigherCycleDays: [(any: 1, afterMucusPeak: 14)],
+        earliestFirstHigherCycleDays: [null],
+      );
+      final facts = pdfHeaderFacts(
+        model: model,
+        anonymized: false,
+        cycleIndex: 0,
+      );
+      expect(valueOf(facts, 'Früheste erste höhere Messung'), '—');
+    });
+
+    test('the earliest header fact prints the record\'s umrandete figure '
+        'as is — the header never derives a figure of its own', () {
+      final model = PdfExportModel(
+        cycles: const [],
+        markOpenedIndexes: const [0],
+        overlays: const [],
+        observedCyclesOutsideApp: 0,
+        name: null,
+        birthDate: null,
+        shortestCycleLengths: [28],
+        earliestFirstHigherCycleDays: [14],
       );
       final facts = pdfHeaderFacts(
         model: model,
@@ -519,10 +539,7 @@ void main() {
         name: null,
         birthDate: null,
         shortestCycleLengths: [27, 25],
-        earliestFirstHigherCycleDays: [
-          (any: 14, afterMucusPeak: 14),
-          (any: 12, afterMucusPeak: 12),
-        ],
+        earliestFirstHigherCycleDays: [14, 12],
       );
       final first = pdfHeaderFacts(
         model: model,
