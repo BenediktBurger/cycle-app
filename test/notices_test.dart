@@ -182,14 +182,14 @@ void main() {
       await openAboutPage(tester);
 
       await tester.dragUntilVisible(
-        find.textContaining('nur über den JSON-Export/-Import'),
+        find.textContaining('nur über Export und Import'),
         find.byType(ListView),
         const Offset(0, -200),
       );
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('nur über den JSON-Export/-Import'),
+        find.textContaining('nur über Export und Import'),
         findsOneWidget,
         reason:
             'the about/onboarding page points to the backed-up role '

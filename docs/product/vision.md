@@ -35,7 +35,7 @@ override) **and A** (automatic) are explicitly deferred.
    file-based sharing a nice-to-have.
 6. **Password/biometric lock** (PIN stub in settings; ADR notes web
    limitations, `flutter_secure_storage` on native later).
-7. **Local-first, no cloud, no analytics**; JSON export/import in Settings
+7. **Local-first, no cloud, no analytics**; Export/import in Settings
    from M1.
 8. **Open source** under Apache-2.0 (chosen 2026-09; final confirmation
    before first publishing still open); app size well below 50 MB.

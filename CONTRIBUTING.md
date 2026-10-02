@@ -269,7 +269,7 @@ failures):
 
 ## 5. JSON export/import limits
 
-- **Export routes** — Settings → JSON export shows the whole document as
+- **Export routes** — Settings → Export shows the whole document as
   copyable text on ALL platforms; a real save-as dialog additionally
   exists on every native target (the `file_picker` plugin — desktop file
   choosers and Android's SAF alike; web uses the browser download instead).

@@ -39,7 +39,4 @@ the sections above track planned work, git history keeps the record (see
 
 ### Convenience
 
-- The privacy-notice text references „Einstellungen › Export" / „Import",
-  while the cards are titled „JSON-Export" / „JSON-Import".
-
 ### Deferred for later

@@ -7,7 +7,7 @@ replaces the matching days. Export first, or import into an empty profile.
 
 ## JSON export format
 
-Import via the JSON import in the settings screen.
+Import via the Import button in the settings screen.
 
 - [`example-cycle.json`](example-cycle.json) — one complete cycle in the
   app's current JSON export format (schema v6), with BBT, mucus, cervix and

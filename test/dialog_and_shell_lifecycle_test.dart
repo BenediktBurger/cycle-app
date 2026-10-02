@@ -179,7 +179,7 @@ void main() {
         useSmallAndroidViewport(tester);
         await pumpShell(tester, seedDays: {});
         final errors = await collectLifecycleErrors(tester, () async {
-          await openImportDialog(tester, buttonLabel: 'JSON-Import');
+          await openImportDialog(tester, buttonLabel: 'Import');
           expect(
             find.byType(AlertDialog),
             findsOneWidget,

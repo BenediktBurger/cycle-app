@@ -13,7 +13,7 @@
 // file_transfer_io.dart (shareFileOverride / saveFileOverride, the same
 // pattern as the picker's pickFileTextOverride): the real plugins are
 // never invoked, the suite stays hermetic. Navigation mimics the user
-// path — Settings › JSON-Export › preview page. The German literals below
+// path — Settings › Export › preview page. The German literals below
 // (button, snackbars) must stay in step with the localization entries
 // (exportShare / exportShared / exportShareFailed / exportSaved /
 // exportSaveFailed / exportFailed) they exercise.
@@ -54,7 +54,7 @@ const savedSnackbarLabel = 'Datei gespeichert.';
 const saveFailedSnackbarLabel = 'Speichern fehlgeschlagen.';
 const exportFailedSnackbarLabel = 'Export fehlgeschlagen.';
 const previewTitleLabel = 'JSON-Vorschau';
-const exportButtonLabel = 'JSON-Export';
+const exportButtonLabel = 'Export';
 
 /// Fault injection for the export build: the real in-memory database whose
 /// data reads can be armed to fail AFTER the harness was pumped — the test
@@ -123,7 +123,7 @@ Widget settingsHarness({CycleDatabase Function()? builder}) => ProviderScope(
   ),
 );
 
-/// Pumps the settings screen and navigates through JSON-Export onto the
+/// Pumps the settings screen and navigates through Export onto the
 /// export preview page (the seeded entry keeps the export from being
 /// rejected as empty). The preview page is on top when this returns.
 Future<void> pumpToExportPreview(WidgetTester tester) async {

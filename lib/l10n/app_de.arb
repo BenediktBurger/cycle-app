@@ -395,7 +395,7 @@
   "@aboutLicenseDetailsRow": {
     "description": "Tappable row label after the license/copyright section: opens the in-app license page showing the bundled license texts (the app's Apache-2.0 and the Noto Sans font license)."
   },
-  "aboutBackupHint": "Sicherung, Umzug auf ein anderes Gerät und Wiederherstellung laufen nur über den JSON-Export/-Import in den Einstellungen — die Datenbankdatei selbst kann nicht kopiert werden, weil ihr Schlüssel an dieses Gerät gebunden ist.",
+  "aboutBackupHint": "Sicherung, Umzug auf ein anderes Gerät und Wiederherstellung laufen nur über Export und Import in den Einstellungen — die Datenbankdatei selbst kann nicht kopiert werden, weil ihr Schlüssel an dieses Gerät gebunden ist.",
   "@aboutBackupHint": {
     "description": "One-sentence backup hint on the about/onboarding page, referencing the export card's backup role (settingsExportNote): export/import is the only backup/migration/recovery path; copying the encrypted, device-bound database file is never usable (ADR-0005)."
   },
@@ -443,10 +443,10 @@
   "@settingsDeleteData": {
     "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks) after an explicit confirmation; settings and the onboarding flag survive by design."
   },
-  "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge und Markierungen. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe JSON-Export).",
+  "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge und Markierungen. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "settingsDeleteDataButton": "Alle Daten löschen …",
   "deleteDataDialogTitle": "Daten löschen?",
-  "deleteDataDialogBody": "Es werden {entries} Tagebucheinträge und {marks} Markierungen gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe JSON-Export).",
+  "deleteDataDialogBody": "Es werden {entries} Tagebucheinträge und {marks} Markierungen gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -559,9 +559,9 @@
   },
   "settingsPinLock": "PIN-Sperre (Platzhalter)",
   "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
-  "settingsExport": "JSON-Export",
+  "settingsExport": "Export",
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
-  "settingsImport": "JSON-Import",
+  "settingsImport": "Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
   "exportTitle": "JSON-Vorschau",
   "exportCopy": "Kopieren",
