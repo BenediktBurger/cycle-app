@@ -37,66 +37,6 @@ the sections above track planned work, git history keeps the record (see
 
 ### Necessary
 
-#### Building the app (to be clarified with INER)
-
-- create a logo for this app, with some similarity to the iner logo, but enough distinction to be independent
-- confirm Apache-2.0 (chosen 2026-09) as the final license before the
-  first store submission — release.md Gate G2; sideload APKs are not
-  affected.
-
-#### Domain / UI
-
-- how to mark pregnancy and breast-feeding cycles -> they should not enter into statistics of "normal" cycles
-- how to mark a pregnancy: replace cycle start with pregnancy start or add a "conception" mark -> calculate probable bith?
-  - move edit between date and X in order to save space
-  - checkmark overlaps the icon - do we need the checkmark at all?
-  - comments should be in one column as well (not spanning the whole sheet)
-  - strange distribution: one column with 3, the other one with 2 marks and then on the bottom joined another mark. All marks (and/or comments) should be distributed among columns. Maybe even more columns on wider screen?
-- should we add the birth bleeding (Wochenbett, marked as ~)?
-- proof read German texts and let translate changes to english
-
 ### Convenience
 
-- Password protection for the database — the storage decision is settled
-      (native files are now always-on encrypted, ADR-005); what a
-      user-facing passphrase would additionally protect, and how it
-      interacts with the device-bound key, needs discussion.
-- User-visible FLAG_SECURE/privacy toggle (postponed to v1): release
-      builds block screenshots/recents hard since the native hardening;
-      testers currently send annotated screenshots from debug builds.
-      Decide whether v1 adds a settings toggle or keeps the build-type
-      split (and what tester feedback workflows look like when testers
-      run only release artifacts).
-- save measurement method + thermometer as changeover marks
-      (decided 2026-09-24, sketch only — the ADR is written together with
-      the implementation):
-  - two mark types placed by one "measurement setup" form on the changeover
-    date: `method.rectal|vaginal|oral` (closed vocabulary, in `markType`)
-    and `thermometer` with the free-text model name → needs a nullable
-    `value TEXT` column on `user_marks` (graceful migration)
-  - effective method/thermometer for a day = the latest mark ≤ that day
-    (same derive-from-dated-events pattern as cycle start); the choice is
-    prompted when the first temperature is entered and written as a mark
-    on that date
-  - day view shows only the mark chip — no auto-note, notes stay
-    user-owned; temperature disturbances stay untouched
-  - PDF renders the method in effect at the chart's start date
-- export as password protected zip
-- add (optional) reminder (e.g. every year) to do a backup of your data
-
-- Indicate the fourth day after mucus peak without temperature rising with arrow down (↓)
-
-- German count strings in the app read "1 Tagebucheinträge" for singular
-  counts (gen-l10n plural support would fix all such surfaces at once).
-- The privacy-notice text references „Einstellungen › Export" / „Import",
-  while the cards are titled „JSON-Export" / „JSON-Import".
-- The about-page feedback notice phrasing mixes "an die Issues … oder per
-  E-Mail" awkwardly.
-
 ### Deferred for later
-
-- more translations (Polish, Italian)
-- Fahrenheit — decided: only a UI concern; °C stays the unit of record in
-  storage, conversion happens at the display edge (existing seams:
-  temperature_range, settings pickers, PDF axis); German decimal comma in
-  the PDF is handled separately under Bugs

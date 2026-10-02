@@ -479,7 +479,7 @@
   "@aboutLicenseDetailsRow": {
     "description": "Tappable row label after the license/copyright section: opens the in-app license page showing the bundled license texts (the app's Apache-2.0 and the Noto Sans font license)."
   },
-  "aboutBackupHint": "Backup, moving to another device, and recovery work only through the JSON export/import in the settings — the database file itself cannot be copied, because its key is bound to this device.",
+  "aboutBackupHint": "Backup, moving to another device, and recovery work only through Export and Import in the settings — the database file itself cannot be copied, because its key is bound to this device.",
   "@aboutBackupHint": {
     "description": "One-sentence backup hint on the about/onboarding page, English mirror of the German (settingsExportNote's backup role): export/import is the only backup/migration/recovery path; copying the encrypted, device-bound database file is never usable (ADR-0005)."
   },
@@ -527,10 +527,10 @@
   "@settingsDeleteData": {
     "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks) after an explicit confirmation; settings and the onboarding flag survive by design."
   },
-  "settingsDeleteDataNote": "Removes all diary entries and marks. Your settings are kept. If you want to keep the data: export first (see JSON export).",
+  "settingsDeleteDataNote": "Removes all diary entries and marks. Your settings are kept. If you want to keep the data: export first (see Export).",
   "settingsDeleteDataButton": "Delete all data …",
   "deleteDataDialogTitle": "Delete data?",
-  "deleteDataDialogBody": "{entries} diary entries and {marks} marks will be deleted. Settings are kept. If you want to keep the data: export first (see JSON export).",
+  "deleteDataDialogBody": "{entries} diary entries and {marks} marks will be deleted. Settings are kept. If you want to keep the data: export first (see Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -622,9 +622,9 @@
   "pdfExportSaveButton": "Save",
   "settingsPinLock": "PIN lock (placeholder)",
   "settingsPinLockNote": "Not implemented yet: the app lock (PIN) is planned in ADR-0005. The database file itself is already encrypted at rest on native platforms (key kept in the device's protected storage).",
-  "settingsExport": "JSON export",
+  "settingsExport": "Export",
   "settingsExportNote": "All entries and marks as one JSON document. Export regularly — this is the only backup: moving to another device and recovery work only through it, the database file itself cannot be copied because of its device-bound key.",
-  "settingsImport": "JSON import",
+  "settingsImport": "Import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
   "exportTitle": "JSON preview",
   "exportCopy": "Copy",

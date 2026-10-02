@@ -10,7 +10,7 @@ never suggests and never decides. For a reliable interpretation of
 fertility you need knowledge of the method — from a textbook or a course.
 
 The app is in beta — export your data regularly and before every update
-via the JSON export in the settings.
+via Export in the settings.
 
 Features:
 
@@ -27,7 +27,7 @@ Features:
   of disturbed days.
 • PDF export: export the evaluation as a print-ready PDF.
 • Import from Drip: bring in existing data from the Drip app (CSV export).
-• JSON export and JSON import in the settings — your data always stays
+• Export and Import in the settings — your data always stays
   your own.
 • Open source; licensed under Apache-2.0.
 

@@ -10,7 +10,7 @@ entscheidet nichts. Für eine zuverlässige Beurteilung der Fruchtbarkeit
 brauchen Sie Methodenkenntnisse — aus einem Lehrbuch oder einer Schulung.
 
 Die App befindet sich in der Beta-Phase — exportieren Sie Ihre Daten
-regelmäßig und vor jedem Update über den JSON-Export in den
+regelmäßig und vor jedem Update über den Export in den
 Einstellungen.
 
 Funktionen:
@@ -29,7 +29,7 @@ Funktionen:
 • PDF-Export: die Auswertung als druckfertiges PDF exportieren.
 • Import aus Drip: vorhandene Daten aus der App Drip (CSV-Export)
   übernehmen.
-• JSON-Export und JSON-Import über die Einstellungen — die Daten bleiben
+• Export und Import über die Einstellungen — die Daten bleiben
   jederzeit Ihre eigenen.
 • Offene Quelle (Open Source); lizenziert unter Apache-2.0.
 

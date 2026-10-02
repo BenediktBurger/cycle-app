@@ -153,13 +153,12 @@ Finder settingsThemeSegment(String value) => find.descendant(
   matching: find.byKey(ValueKey('themeSegment-$value')),
 );
 
-/// The settings pane's JSON export launch button (the download action of
-/// the export card).
+/// The settings pane's Export launch button (the download action of the
+/// export card).
 Finder settingsExportButton() =>
     find.byKey(const ValueKey('settingsExportButton'));
 
-/// The settings pane's JSON import launch button (opens the JSON import
-/// dialog).
+/// The settings pane's Import launch button (opens the import dialog).
 Finder settingsImportJsonButton() =>
     find.byKey(const ValueKey('settingsImportJsonButton'));
 

@@ -22,9 +22,9 @@ decision-maker.
 > For the full picture read [docs/product/vision.md](docs/product/vision.md).
 
 > **This app is in beta.** A beta can still lose data, so export your data
-> **regularly and before every update** — via the JSON export in the
+> **regularly and before every update** — via Export in the
 > settings screen. Everything is stored locally on your device, and the
-> JSON export is the one backup path on all platforms (see
+> Export is the one backup path on all platforms (see
 > [Backup, migration & recovery](#backup-migration--recovery)).
 
 - **Package name `cycle_app`** is an explicit **PLACEHOLDER** (ADR-0002) —
@@ -109,7 +109,7 @@ you installed before) from the releases page and install it over the
 existing version. Because the signing certificate stays the same, Android
 updates the app in place instead of treating it as a new install, and your
 data stays. That said: this is a beta — data loss is not ruled out, so
-exporting your data (JSON export in the settings screen) before updating is
+exporting your data (Export in the settings screen) before updating is
 necessary, and exporting regularly while you use the app is wise.
 
 ### Privacy note
@@ -133,8 +133,8 @@ Schulung) sind Voraussetzung für eine zuverlässige Beurteilung.
 
 **Beta-Hinweis:** Die App befindet sich in der Beta-Phase. Datenverlust ist
 nicht ausgeschlossen — exportieren Sie Ihre Daten deshalb **regelmäßig und
-vor jedem Update** über den JSON-Export in den Einstellungen. Alle Daten
-liegen lokal auf dem Gerät; der JSON-Export ist auf allen Plattformen der
+vor jedem Update** über den Export in den Einstellungen. Alle Daten
+liegen lokal auf dem Gerät; der Export ist auf allen Plattformen der
 einzige Backup-Weg (Einzelheiten: [Backup, migration & recovery
 (auf Englisch)](#backup-migration--recovery)).
 
@@ -226,10 +226,10 @@ fastlane store metadata:
 ## Backup, migration & recovery
 
 Backup, data migration to another device, and data recovery all happen
-through the **JSON export/import in the Einstellungen (settings) pane — and
+through **Export and Import in the Einstellungen (settings) pane — and
 nowhere else**:
 
-- Export regularly to a file you control (Einstellungen › JSON-Export) and
+- Export regularly to a file you control (Einstellungen › Export) and
   import it on the target device to restore/re-migrate your data there.
 - **Never copy the database file itself** (Android/iOS): there the database
   is encrypted with a device-bound key (see
@@ -240,7 +240,7 @@ nowhere else**:
   [web demo](https://BenediktBurger.github.io/cycle-app/) states what that
   means for demo users.
 
-JSON export/import is the only backup path on **all** platforms — web
+Export/import is the only backup path on **all** platforms — web
 included.
 
 ## Import from drip
