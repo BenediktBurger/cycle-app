@@ -32,10 +32,13 @@ const _themeSeedColor = Color(0xFF6750A4);
 /// ThemeData built on one brightness' color scheme. Shared by light and
 /// dark mode so both stay in sync: the app bars are slightly slimmer than
 /// the Material 3 default to keep more of the screen for content
-/// (especially the cycle chart).
+/// (especially the cycle chart). `tooltipTheme` prefers above: the
+/// framework's `preferBelow: true` default hides a long-press tooltip
+/// under the triggering finger.
 ThemeData _buildTheme(ColorScheme scheme) => ThemeData(
   colorScheme: scheme,
   appBarTheme: const AppBarTheme(toolbarHeight: 48),
+  tooltipTheme: const TooltipThemeData(preferBelow: false),
 );
 
 void main() {
