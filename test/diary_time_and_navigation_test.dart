@@ -1,6 +1,6 @@
 // Widget tests of the Tagebuch screen's time and navigation behavior —
 // the whole family in one file: the measured-time picker (conditional
-// visibility, prefill, round-trip, clearing, day-tile display), the
+// visibility, stamp-at-entry, round-trip, clearing, day-tile display), the
 // previous/next day chevrons (with their edit-discard semantics) and the
 // entry form's explicit cycle-start switch (the disturbance flags'
 // analysis-exclusion marking works without any auto behavior — see
@@ -37,13 +37,14 @@ import 'support/error_collector.dart';
 // appears while a temperature is entered, and a save without a temperature
 // stores no time (the domain model normalizes — see
 // test/domain/daily_entry_test.dart). Covered here: the conditional
-// visibility with the current-time prefill once a temperature is entered, a
+// visibility, the time stamped at entry when a temperature is entered on
+// today (no stamp on past days and no stamp while merely loading a day), a
 // stored time stays when the day is re-opened for editing, clearing the
 // time is possible, a temperature-less save keeps no time, and the day
 // tiles show the stored time.
 //
 // The clock is pinned through the nowProvider override (the real wall clock
-// would make the prefill assertion race with the minute boundary); the
+// would make the stamped-time assertion race with the minute boundary); the
 // database is an in-memory override, same pattern as test/app_shell_test.dart.
 // The German locale is pinned (like the sibling widget tests) so the 24 h
 // format assertions stay deterministic.
@@ -193,8 +194,67 @@ void main() {
       find.text('14:35'),
       findsOneWidget,
       reason:
-          'the picker button shows the injected current time as the '
-          'prefill',
+          'entering the temperature on today stamps the injected '
+          'current time into the row',
+    );
+  });
+
+  testWidgets('entering a temperature on a past day stamps no time', (
+    WidgetTester tester,
+  ) async {
+    _measuredTimeHarness.tallSurface(tester);
+    final pastDay = DateOnly.normalize(DateTime(2026, 1, 6));
+    await tester.pumpWidget(_measuredTimeHarness.scope(selectedDay: pastDay));
+    await tester.pumpAndSettle();
+
+    await enterTemperature(tester, '36.5');
+
+    expect(
+      measuredTimeField(),
+      findsOneWidget,
+      reason: 'the row itself follows the temperature, not the day',
+    );
+    expect(
+      find.text('nicht erfasst'),
+      findsOneWidget,
+      reason:
+          'the entry stamp applies only on today — a past temperature '
+          'gets no invented time',
+    );
+    expect(find.text('14:35'), findsNothing);
+  });
+
+  testWidgets('a stored today temperature without a stored time: opening shows '
+      'unset, editing the text stamps the current time', (
+    WidgetTester tester,
+  ) async {
+    _measuredTimeHarness.tallSurface(tester);
+    await tester.pumpWidget(
+      _measuredTimeHarness.scope(
+        seed: (db) async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(date: _measuredTimeHarness.selectedDay, bbtC: 36.4),
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('nicht erfasst'),
+      findsOneWidget,
+      reason: 'loading a stored day never stamps a time',
+    );
+    expect(find.text('14:35'), findsNothing);
+
+    await enterTemperature(tester, '36,45');
+
+    expect(
+      find.text('14:35'),
+      findsOneWidget,
+      reason:
+          'a user edit of the temperature text on today stamps the '
+          'injected current time',
     );
   });
 
@@ -248,7 +308,7 @@ void main() {
           await enterTemperature(tester, '36.5');
           // At this width the printed label drops (it is the widest part of
           // the line); the control stays through icon, time button and the
-          // prefill.
+          // stamped time.
           expect(
             find.text('Gemessen um'),
             findsNothing,
@@ -261,7 +321,7 @@ void main() {
             findsOneWidget,
             reason:
                 'the one-line row still renders the time control with the '
-                'prefilled current time at the narrow width',
+                'stamped current time at the narrow width',
           );
           expect(
             find.byIcon(Icons.schedule_outlined),
@@ -299,7 +359,7 @@ void main() {
     );
   });
 
-  testWidgets('a stored time stays on re-open for editing (no re-prefill)', (
+  testWidgets('a stored time stays on re-open for editing (no re-stamp)', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -319,6 +379,16 @@ void main() {
 
     expect(find.text('06:47'), findsOneWidget);
     // The injected "now" (14:35) must NOT overwrite the stored morning time.
+    expect(find.text('14:35'), findsNothing);
+
+    // Editing the temperature text must not re-stamp either: the stored
+    // time is a set fact of the day and keeps winning over the entry stamp.
+    await enterTemperature(tester, '36,45');
+    expect(
+      find.text('06:47'),
+      findsOneWidget,
+      reason: 'the stored time is kept when the temperature is edited',
+    );
     expect(find.text('14:35'), findsNothing);
   });
 
@@ -362,14 +432,14 @@ void main() {
     );
   });
 
-  testWidgets('a temperature-less save stores no time, even after the '
-      'prefill was shown', (WidgetTester tester) async {
+  testWidgets('a temperature-less save stores no time, even after '
+      'a time was stamped', (WidgetTester tester) async {
     _measuredTimeHarness.tallSurface(tester);
     await tester.pumpWidget(_measuredTimeHarness.scope());
     await tester.pumpAndSettle();
 
     // The user starts typing a temperature (the time row appears with the
-    // current-time prefill), then removes the temperature again — e.g. the
+    // stamped current time), then removes the temperature again — e.g. the
     // thermometer showed an unusable value — and saves the mucus-only day.
     await enterTemperature(tester, '36.5');
     expect(measuredTimeField(), findsOneWidget);
@@ -392,11 +462,12 @@ void main() {
       isNull,
       reason:
           'the time is only stored together with a temperature — '
-          'the prefilled current time must not leak into the row',
+          'the stamped in-form time must not leak into a '
+          'temperature-less day',
     );
   });
 
-  testWidgets('saving a temperature stores the (prefilled) time with it', (
+  testWidgets('saving a temperature stores the stamped time with it', (
     WidgetTester tester,
   ) async {
     _measuredTimeHarness.tallSurface(tester);
@@ -415,8 +486,8 @@ void main() {
       stored.measuredAtMinutes,
       14 * 60 + 35, // the injected "now"
       reason:
-          'a temperature with the prefilled measurement time stores '
-          'the time',
+          'the measurement time stamped at temperature entry is stored '
+          'together with the temperature',
     );
   });
 

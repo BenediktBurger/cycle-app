@@ -232,8 +232,8 @@ final class DailyEntry {
 
   /// Time-of-day of the temperature measurement, as minutes since midnight
   /// (0–1439), or null when the user did not record it. Stored per day —
-  /// the entry form prefills the CURRENT time for a fresh day and keeps an
-  /// already-stored value when the day is re-opened (UI layer, see
+  /// the entry form records the CURRENT time when the user enters a
+  /// temperature on today (never on programmatic load; UI layer, see
   /// lib/ui/diary.dart; injectable clock there).
   ///
   /// Invariant: only ever set together with [bbtC] — the constructor drops

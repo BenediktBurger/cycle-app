@@ -81,7 +81,7 @@ Finder diaryTemperatureField() =>
     find.byKey(const ValueKey('diaryTemperatureField'));
 
 /// The entry form's measured-time button: visible only while a plausible
-/// temperature is entered, showing the stored or prefilled time.
+/// temperature is entered, showing the recorded time.
 Finder measuredTimeField() => find.byKey(const ValueKey('measuredTimeField'));
 
 /// The entry form's bottom save button — NOT the AppBar's save action,
