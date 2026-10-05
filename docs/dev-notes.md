@@ -263,7 +263,11 @@ drip's own writer (drip: lib/import-export/export-to-csv.js):
 - rows are joined with plain `\n` (the parser also tolerates `\r\n`),
 - the header lists the columns of whichever drip version exported the
   file, so all parsing is header-driven: unknown columns are ignored,
-  known-but-missing columns simply carry no data.
+  known-but-missing columns simply carry no data. A day's `notes` hold
+  the free note plus tagged lines — `[temp]`, `[bleedingExclude]`,
+  `[mucus]`, `[cervix]`, `[desire]`, `[pain]`, `[sex]` and `[mood]` — for
+  example the unmapped pain kinds in `[pain] cramps, migraine` or the
+  raw desire value in `[desire] 2`.
 
 ## Cycle day mark sheet (lib/ui/cycle_mark_sheet.dart)
 

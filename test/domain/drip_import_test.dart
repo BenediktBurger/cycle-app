@@ -66,6 +66,12 @@ const List<String> painHeader = [
   'pain.tenderBreasts',
   'pain.headache',
   'pain.note',
+  // The remaining unmapped kinds (appended so the indices of the mapped
+  // columns above stay stable across the tests).
+  'pain.backache',
+  'pain.nausea',
+  'pain.migraine',
+  'pain.other',
 ];
 
 /// The full drip sex-column family in drip's own column order (drip:
@@ -97,6 +103,127 @@ const List<String> bleedingExcludeHeader = [
   'bleeding.value',
   'bleeding.exclude',
 ];
+
+/// The full drip mood-flag family (drip: labels.js) plus the note. Used to
+/// pin the flag joining order separately from the shared minimal header.
+const List<String> moodHeader = [
+  'date',
+  'mood.happy',
+  'mood.sad',
+  'mood.stressed',
+  'mood.balanced',
+  'mood.fine',
+  'mood.anxious',
+  'mood.energetic',
+  'mood.fatigue',
+  'mood.angry',
+  'mood.other',
+  'mood.note',
+];
+
+/// The mucus family with the exclude flag, for the `[mucus]` note-line pins.
+const List<String> mucusHeader = [
+  'date',
+  'mucus.feeling',
+  'mucus.texture',
+  'mucus.value',
+  'mucus.exclude',
+];
+
+/// The cervix family with the exclude flag, for the `[cervix]` note-line
+/// pins.
+const List<String> cervixHeader = [
+  'date',
+  'cervix.opening',
+  'cervix.firmness',
+  'cervix.position',
+  'cervix.exclude',
+];
+
+/// Every column drip writes, in drip's own order (mirrors the header row of
+/// examples/drip-export-sample.csv) — for the full note-line order pin.
+const List<String> fullDripHeader = [
+  'date',
+  'temperature.value',
+  'temperature.exclude',
+  'temperature.time',
+  'temperature.note',
+  'bleeding.value',
+  'bleeding.exclude',
+  'mucus.feeling',
+  'mucus.texture',
+  'mucus.value',
+  'mucus.exclude',
+  'cervix.opening',
+  'cervix.firmness',
+  'cervix.position',
+  'cervix.exclude',
+  'note.value',
+  'desire.value',
+  'sex.solo',
+  'sex.partner',
+  'sex.condom',
+  'sex.pill',
+  'sex.iud',
+  'sex.patch',
+  'sex.ring',
+  'sex.implant',
+  'sex.diaphragm',
+  'sex.none',
+  'sex.other',
+  'sex.note',
+  'pain.cramps',
+  'pain.ovulationPain',
+  'pain.headache',
+  'pain.backache',
+  'pain.nausea',
+  'pain.tenderBreasts',
+  'pain.migraine',
+  'pain.other',
+  'pain.note',
+  'mood.happy',
+  'mood.sad',
+  'mood.stressed',
+  'mood.balanced',
+  'mood.fine',
+  'mood.anxious',
+  'mood.energetic',
+  'mood.fatigue',
+  'mood.angry',
+  'mood.other',
+  'mood.note',
+];
+
+/// Builds data row cells aligned to [header]: the 0th cell is [date],
+/// every indexed cell is set, the rest stay empty.
+List<String> rowCells(
+  List<String> header,
+  String date,
+  Map<int, String> byIndex,
+) {
+  final c = List.filled(header.length, '');
+  c[0] = date;
+  byIndex.forEach((i, v) => c[i] = v);
+  return c;
+}
+
+/// Builds data row cells aligned to [fullDripHeader] by column NAME — for
+/// tests that need many families at once without hand-counting indices.
+List<String> fullCells(String date, Map<String, String> byName) {
+  final c = List.filled(fullDripHeader.length, '');
+  c[0] = date;
+  byName.forEach((name, v) => c[fullDripHeader.indexOf(name)] = v);
+  return c;
+}
+
+/// Same as [rowCells] but runs the one-row CSV through the importer and
+/// returns the single produced entry ([header] passed explicitly, so
+/// family-specific headers work).
+Map<String, Object?> entryOn(
+  List<String> header,
+  String date,
+  Map<int, String> byIndex,
+) => entryOf(rowCells(header, date, byIndex), header: header);
 
 /// Builds a drip CSV: [header] plus one data [row] joined the way drip
 /// writes its files (plain comma join, plain newlines).
@@ -616,36 +743,22 @@ void main() {
       expect(absent['cervix_firmness'], isNull);
     });
 
-    test('desire: values are dropped entirely — not data, no key, no flag', () {
+    test('desire: any non-empty cell is rescue-noted verbatim, no key', () {
       // drip's desire vocabulary is 0=low/1=medium/2=high — the intensity
-      // is not storable here AND the dropped flag is no longer data at all
-      // (Lust is removed everywhere). Any desire-only row imports nothing.
-      expect(
-        entryOf(cells('2026-01-01', {12: '0', 4: '2'})).containsKey('desire'),
-        isFalse,
-        reason: 'the v5 shape carries no `desire` key',
-      );
-      expect(
-        entryOf(
-          cells('2026-01-01', {12: 'false', 4: '2'}),
-        ).containsKey('desire'),
-        isFalse,
-      );
-      // A desire-only row (any value, including a literal `false`) carries
-      // no data at all → skipped empty, exactly like the mapping table's
-      // data rule.
+      // is not storable here (Lust is removed everywhere), but the raw
+      // cell rides into the [desire] note line whatever it contains.
       for (final desireValue in ['0', '1', '2', 'false', ' false ']) {
-        final result = dripCsvToExportJson(
-          dripOneRowCsv(dripHeader, cells('2026-01-01', {12: desireValue})),
+        final e = entryOf(cells('2026-01-01', {12: desireValue, 4: '2'}));
+        expect(
+          e.containsKey('desire'),
+          isFalse,
+          reason: 'the v5 shape carries no `desire` key',
         );
         expect(
-          result.stats.rowsImported,
-          0,
-          reason: 'a desire-only row ($desireValue) is not a data row',
+          e['notes'],
+          '[desire] $desireValue',
+          reason: 'desire cell "$desireValue" is noted verbatim',
         );
-        expect(result.stats.rowsSkippedEmpty, 1);
-        final doc = jsonDecode(result.json) as Map<String, Object?>;
-        expect(doc['entries'] as List, isEmpty);
       }
     });
 
@@ -675,28 +788,42 @@ void main() {
       expect(both['pain_breast'], true);
     });
 
-    test('pain: kinds without a cycle-app option are dropped like other '
-        'dropped columns', () {
-      // cramps/headache/… have no storage option; a row whose ONLY data is
-      // such a flag is skipped entirely (dropped columns are not data),
-      // while the pain NOTE keeps any recorded pain day importable.
-      final crampsOnly = dripCsvToExportJson(
-        dripOneRowCsv(painHeader, cells('2026-01-01', {1: 'true'})),
+    test('pain: unmapped kinds are rescue-noted in drip column order', () {
+      // The kinds without a cycle-app option surface in the [pain] line;
+      // the mapped tenderBreasts/ovulationPain flags stay structured day
+      // flags and are NOT noted, and the note joins after a single space.
+      final crampsOnly = entryOf(
+        cells('2026-01-01', {1: 'true'}),
+        header: painHeader,
       );
-      expect(
-        crampsOnly.stats.rowsImported,
-        0,
-        reason: 'cramps alone are not mappable, the row carries no data',
+      expect(crampsOnly['pain_breast'], false);
+      expect(crampsOnly['pain_mittelschmerz'], false);
+      expect(crampsOnly['notes'], '[pain] cramps');
+
+      final several = entryOf(
+        cells('2026-01-01', {1: 'true', 4: 'true', 8: 'true'}),
+        header: painHeader,
       );
-      expect(crampsOnly.stats.rowsSkippedEmpty, 1);
-      final noteOnly = dripCsvToExportJson(
-        dripOneRowCsv(painHeader, cells('2026-01-01', {5: 'cramps day'})),
+      expect(several['notes'], '[pain] cramps, headache, migraine');
+
+      final kindAndNote = entryOf(
+        cells('2026-01-01', {1: 'true', 5: 'had to lie down'}),
+        header: painHeader,
       );
-      expect(
-        noteOnly.stats.rowsImported,
-        1,
-        reason: 'the pain note is mapped data (the [pain] line)',
+      expect(kindAndNote['notes'], '[pain] cramps had to lie down');
+
+      final tenderAndNote = entryOf(
+        cells('2026-01-01', {3: 'true', 5: 'tender in the evening'}),
+        header: painHeader,
       );
+      expect(tenderAndNote['pain_breast'], true);
+      expect(tenderAndNote['notes'], '[pain] tender in the evening');
+
+      final noteOnly = entryOf(
+        cells('2026-01-01', {5: 'cramps day'}),
+        header: painHeader,
+      );
+      expect(noteOnly['notes'], '[pain] cramps day');
     });
 
     group('sex: only with partner without contraception maps', () {
@@ -711,8 +838,8 @@ void main() {
 
       // sexHeader indices: 1 solo, 2 partner, 3 condom, 4 pill, 5 iud,
       // 6 patch, 7 ring, 8 implant, 9 diaphragm, 10 none, 11 other,
-      // 12 note. The note anchors the row in the not-mapped cases (the
-      // unmappable flags alone would leave the row data-less and skipped).
+      // 12 note. The note anchors the row in the not-mapped cases (only
+      // the none-only/all-false variants stay skipped-empty).
       test(
         'partner + none → the sex observation (the only mapped variant)',
         () {
@@ -737,17 +864,26 @@ void main() {
           header: sexHeader,
         );
         expect(e['sex_timings'], SexTiming.middle.bit);
-        expect(e['notes'], '[sex] good day');
+        expect(e['notes'], '[sex] partner good day');
       });
 
       test('partner with any contraceptive method → not sex', () {
-        // The [sex] note keeps the day importable in every variant; the
-        // sex observation itself stays unset (mask 0).
-        for (final method in [3, 4, 5, 6, 7, 8, 9, 11]) {
+        // The structured part (activity + methods) always makes the row an
+        // entry; the sex observation itself stays unset (mask 0).
+        for (final (index, method) in [
+          (3, 'condom'),
+          (4, 'pill'),
+          (5, 'iud'),
+          (6, 'patch'),
+          (7, 'ring'),
+          (8, 'implant'),
+          (9, 'diaphragm'),
+          (11, 'other'),
+        ]) {
           final result = dripCsvToExportJson(
             dripOneRowCsv(
               sexHeader,
-              sexCells('2026-01-01', {2: 'true', method: 'true', 12: 'n'}),
+              sexCells('2026-01-01', {2: 'true', index: 'true', 12: 'n'}),
             ),
           );
           final doc = jsonDecode(result.json) as Map<String, Object?>;
@@ -755,9 +891,13 @@ void main() {
           expect(
             e['sex_timings'],
             0,
-            reason: 'method index $method is a contraception',
+            reason: 'method $method is a contraception',
           );
-          expect(e['notes'], '[sex] n');
+          expect(
+            e['notes'],
+            '[sex] partner ($method) n',
+            reason: 'the method rides into the [sex] line',
+          );
         }
       });
 
@@ -775,6 +915,7 @@ void main() {
           0,
           reason: 'a recorded method contradicts the none confirmation',
         );
+        expect(e['notes'], '[sex] partner (condom) n');
       });
 
       test('partner with no contraceptive info at all → the sex observation '
@@ -795,7 +936,7 @@ void main() {
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
         expect(e['sex_timings'], SexTiming.middle.bit);
-        expect(e['notes'], '[sex] n');
+        expect(e['notes'], '[sex] partner n');
       });
 
       test('solo never maps to the sex observation, even with none', () {
@@ -808,42 +949,58 @@ void main() {
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
         expect(e['sex_timings'], 0, reason: 'solo is not partner sex');
-        expect(e['notes'], '[sex] n');
+        expect(e['notes'], '[sex] solo n');
       });
 
-      test('solo-only / method-only rows are skipped entirely', () {
-        // Unmappable sex flags alone are NOT data — the same rule as the
-        // unmappable pain kinds (the row carries no other mapped field).
-        // Under the owner rule of 2026-09-17 partner-without-method IS
-        // mapped data, so the skipped set shrunk to the activity-less and
-        // solo-only variants.
-        for (final Map<int, String> variant in [
-          {1: 'true'}, // solo
-          {3: 'true'}, // condom
-          {10: 'true'}, // none, no activity
-        ]) {
+      test(
+        'solo + methods also stay mask-free, with the method parenthetical',
+        () {
           final result = dripCsvToExportJson(
-            dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)),
+            dripOneRowCsv(
+              sexHeader,
+              sexCells('2026-01-01', {1: 'true', 3: 'true'}),
+            ),
           );
-          expect(
-            result.stats.rowsImported,
-            0,
-            reason: 'variant $variant maps to nothing',
-          );
-          expect(
-            result.stats.rowsSkippedEmpty,
-            1,
-            reason: 'variant $variant is not data',
-          );
-        }
-      });
+          final doc = jsonDecode(result.json) as Map<String, Object?>;
+          final e = (doc['entries']! as List).single as Map<String, Object?>;
+          expect(e['sex_timings'], 0, reason: 'solo is not partner sex');
+          expect(e['notes'], '[sex] solo (condom)');
+        },
+      );
 
-      test('partner-only and solo+partner rows map (solo is ignored)', () {
+      test(
+        'sex.none alone (or all-false) is not data — no sex line at all',
+        () {
+          for (final Map<int, String> variant in [
+            {10: 'true'}, // none confirmed, no activity
+            {10: 'false'}, // the all-false row
+          ]) {
+            final result = dripCsvToExportJson(
+              dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)),
+            );
+            expect(
+              result.stats.rowsImported,
+              0,
+              reason: 'variant $variant is not data',
+            );
+            expect(
+              result.stats.rowsSkippedEmpty,
+              1,
+              reason: 'variant $variant produces no note token either',
+            );
+            final doc = jsonDecode(result.json) as Map<String, Object?>;
+            expect(doc['entries'] as List, isEmpty);
+          }
+        },
+      );
+
+      test('partner-only and solo+partner rows map (solo noted too)', () {
         // The mapping rule keys on partner plus the absence of a method;
-        // a co-recorded solo flag changes nothing about that.
-        for (final Map<int, String> variant in [
-          {2: 'true'}, // partner, no contraceptive info
-          {1: 'true', 2: 'true'}, // solo + partner
+        // the rescued [sex] line always names the activities. `none` never
+        // appears in a line.
+        for (final (variant, expectedNotes) in [
+          (<int, String>{2: 'true'}, '[sex] partner'),
+          (<int, String>{1: 'true', 2: 'true'}, '[sex] solo, partner'),
         ]) {
           final result = dripCsvToExportJson(
             dripOneRowCsv(sexHeader, sexCells('2026-01-01', variant)),
@@ -860,32 +1017,403 @@ void main() {
             SexTiming.middle.bit,
             reason: 'variant $variant maps to the middle time of day',
           );
+          expect(e['notes'], expectedNotes);
         }
       });
     });
 
-    test('mood: flags are dropped; the [mood] note stays data', () {
-      // Mood (Stimmung) is removed everywhere — the flags are NOT data:
-      // a mood-flag-only row imports nothing. The mood NOTE is a raw note
-      // (still data) and keeps such a day importable, with the '[mood]'
-      // line preserved; the entry carries no `mood` key either way.
-      final flagOnly = dripCsvToExportJson(
-        dripOneRowCsv(dripHeader, cells('2026-01-01', {19: 'true'})),
-      );
+    test('mood: flags are rescue-noted, the note joins them', () {
+      // Stimmung is removed everywhere — the flags have no stored option,
+      // so they surface in the [mood] line; the note joins after a single
+      // space and the entry carries no `mood` key either way.
+      final flagOnly = entryOf(cells('2026-01-01', {19: 'true'}));
       expect(
-        flagOnly.stats.rowsImported,
-        0,
-        reason: 'a mood flag alone is not mappable data',
-      );
-      expect(flagOnly.stats.rowsSkippedEmpty, 1);
-
-      final moodNote = entryOf(cells('2026-01-01', {20: 'deadline stress'}));
-      expect(
-        moodNote.containsKey('mood'),
+        flagOnly.containsKey('mood'),
         isFalse,
         reason: 'the v5 shape carries no `mood` key',
       );
-      expect(moodNote['notes'], '[mood] deadline stress');
+      expect(flagOnly['notes'], '[mood] sad');
+
+      final flagsAndNote = entryOf(
+        cells('2026-01-01', {19: 'true', 20: 'deadline stress'}),
+      );
+      expect(flagsAndNote['notes'], '[mood] sad deadline stress');
+
+      final noteOnly = entryOf(cells('2026-01-01', {20: 'deadline stress'}));
+      expect(noteOnly['notes'], '[mood] deadline stress');
+
+      // Several flags join ', ' in drip's column order.
+      final joined = entryOf(
+        rowCells(moodHeader, '2026-01-01', {1: 'true', 6: 'true'}),
+        header: moodHeader,
+      );
+      expect(joined['notes'], '[mood] happy, anxious');
+    });
+
+    group('rescued-only rows: dropped fields become entries with notes', () {
+      /// The rescued-only entry contract: the note line carries the whole
+      /// day's content, the structured part of the entry stays neutral.
+      void expectRescuedOnlyEntry(Map<String, Object?> e, String notes) {
+        expect(e['notes'], notes);
+        expect(e['bleeding'], 0);
+        expect(e['sex_timings'], 0);
+        expect(e['bbt_c'], isNull);
+        expect(e['measured_at_minutes'], isNull);
+        expect(e['mucus_sign'], isNull);
+        expect(e['mucus_quality'], isNull);
+        expect(e['cervix_position'], isNull);
+        expect(e['cervix_opening'], isNull);
+        expect(e['cervix_firmness'], isNull);
+        expect(e['pain_breast'], false);
+        expect(e['pain_mittelschmerz'], false);
+      }
+
+      test(
+        'every rescued-only shape imports as a neutral notes-only entry',
+        () {
+          final cases = <(String, Map<String, Object?> Function())>[
+            // desire-only, including the odd cells (verbatim, untrimmed)
+            ('[desire] 0', () => entryOf(cells('2026-01-01', {12: '0'}))),
+            ('[desire] 1', () => entryOf(cells('2026-01-01', {12: '1'}))),
+            ('[desire] 2', () => entryOf(cells('2026-01-01', {12: '2'}))),
+            (
+              '[desire] false',
+              () => entryOf(cells('2026-01-01', {12: 'false'})),
+            ),
+            (
+              '[desire]  false ',
+              () => entryOf(cells('2026-01-01', {12: ' false '})),
+            ),
+            // solo-only / method-only sex (method name only, no partner word)
+            ('[sex] solo', () => entryOn(sexHeader, '2026-01-01', {1: 'true'})),
+            (
+              '[sex] (condom)',
+              () => entryOn(sexHeader, '2026-01-01', {3: 'true'}),
+            ),
+            // a lone unmapped pain kind / mood flag
+            (
+              '[pain] cramps',
+              () => entryOn(painHeader, '2026-01-01', {1: 'true'}),
+            ),
+            ('[mood] sad', () => entryOf(cells('2026-01-01', {19: 'true'}))),
+            // mucus/cervix exclusions and unmapped cervix indexes
+            (
+              '[mucus] excluded',
+              () => entryOn(mucusHeader, '2026-01-01', {4: 'true'}),
+            ),
+            (
+              '[cervix] excluded',
+              () => entryOn(cervixHeader, '2026-01-01', {4: 'true'}),
+            ),
+            (
+              '[cervix] position 3 (unmapped)',
+              () => entryOn(cervixHeader, '2026-01-01', {3: '3'}),
+            ),
+            (
+              '[cervix] opening 7 (unmapped)',
+              () => entryOn(cervixHeader, '2026-01-01', {1: '7'}),
+            ),
+          ];
+          for (final (notes, makeEntry) in cases) {
+            expectRescuedOnlyEntry(makeEntry(), notes);
+          }
+        },
+      );
+
+      test(
+        'rescued-only rows shift the stats from skipped-empty to imported',
+        () {
+          for (final csv in [
+            dripOneRowCsv(dripHeader, cells('2026-01-01', {12: '2'})),
+            dripOneRowCsv(
+              sexHeader,
+              rowCells(sexHeader, '2026-01-01', {1: 'true'}),
+            ),
+            dripOneRowCsv(
+              sexHeader,
+              rowCells(sexHeader, '2026-01-01', {3: 'true'}),
+            ),
+            dripOneRowCsv(
+              painHeader,
+              rowCells(painHeader, '2026-01-01', {1: 'true'}),
+            ),
+            dripOneRowCsv(dripHeader, cells('2026-01-01', {19: 'true'})),
+            dripOneRowCsv(
+              mucusHeader,
+              rowCells(mucusHeader, '2026-01-01', {4: 'true'}),
+            ),
+            dripOneRowCsv(
+              cervixHeader,
+              rowCells(cervixHeader, '2026-01-01', {4: 'true'}),
+            ),
+          ]) {
+            final result = dripCsvToExportJson(csv);
+            expect(result.stats.rowsImported, 1);
+            expect(result.stats.rowsSkippedEmpty, 0);
+          }
+        },
+      );
+    });
+
+    test('false symptom flags alone stay skipped-empty (nothing noted)', () {
+      // A `false` cell is an answer, not data — one row per family.
+      for (final (header, flagIndex) in [
+        (sexHeader, 2), // sex.partner
+        (moodHeader, 2), // mood.sad
+        (painHeader, 1), // pain.cramps
+        (mucusHeader, 4), // mucus.exclude
+      ]) {
+        final result = dripCsvToExportJson(
+          dripOneRowCsv(
+            header,
+            rowCells(header, '2026-01-01', {flagIndex: 'false'}),
+          ),
+        );
+        expect(
+          result.stats.rowsImported,
+          0,
+          reason: 'a lone false flag is no data',
+        );
+        expect(result.stats.rowsSkippedEmpty, 1);
+      }
+    });
+
+    group('mucus note rescue', () {
+      /// Cells aligned to [mucusHeader] (1 feeling, 2 texture, 3 value,
+      /// 4 exclude).
+      List<String> mc(
+        String date, {
+        String? feeling,
+        String? texture,
+        String? value,
+        bool exclude = false,
+      }) => rowCells(mucusHeader, date, {
+        1: ?feeling,
+        2: ?texture,
+        3: ?value,
+        if (exclude) 4: 'true',
+      });
+
+      test('a full in-range composite decodes and notes nothing', () {
+        final e = entryOf(
+          mc('2026-01-01', feeling: '2', texture: '1'),
+          header: mucusHeader,
+        );
+        expect(e['mucus_sign'], 's');
+        expect(e['notes'], isNull);
+      });
+
+      test('mucus.value bypassing a present composite is noted', () {
+        final e = entryOf(
+          mc('2026-01-01', feeling: '2', texture: '1', value: '2'),
+          header: mucusHeader,
+        );
+        expect(
+          e['mucus_sign'],
+          'f',
+          reason: 'the structured decode is untouched',
+        );
+        expect(e['mucus_quality'], isNull);
+        expect(e['notes'], '[mucus] feeling 2, texture 1');
+      });
+
+      test('value + one lone part → that part noted', () {
+        expect(
+          entryOf(
+            mc('2026-01-01', texture: '2', value: '2'),
+            header: mucusHeader,
+          )['notes'],
+          '[mucus] texture 2',
+        );
+      });
+
+      test('no value + one lone part → that part noted', () {
+        expect(
+          entryOf(mc('2026-01-01', feeling: '2'), header: mucusHeader)['notes'],
+          '[mucus] feeling 2',
+        );
+        expect(
+          entryOf(mc('2026-01-01', texture: '2'), header: mucusHeader)['notes'],
+          '[mucus] texture 2',
+        );
+      });
+
+      test('no value + both parts out-of-range → parts noted, decode null', () {
+        final e = entryOf(
+          mc('2026-01-01', feeling: '4', texture: '9'),
+          header: mucusHeader,
+        );
+        expect(e['mucus_sign'], isNull);
+        expect(e['mucus_quality'], isNull);
+        expect(e['notes'], '[mucus] feeling 4, texture 9');
+      });
+
+      test('exclusion joins the rescued tokens first', () {
+        final e = entryOf(
+          mc('2026-01-01', feeling: '2', value: '2', exclude: true),
+          header: mucusHeader,
+        );
+        expect(e['notes'], '[mucus] excluded, feeling 2');
+      });
+
+      test(
+        'out-of-range value code 5 next to parts: rescue note, decode null',
+        () {
+          final e = entryOf(
+            mc('2026-01-01', feeling: '1', texture: '0', value: '5'),
+            header: mucusHeader,
+          );
+          expect(e['mucus_sign'], isNull);
+          expect(e['notes'], '[mucus] feeling 1, texture 0');
+        },
+      );
+    });
+
+    group('cervix note rescue', () {
+      /// Cells aligned to [cervixHeader] (1 opening, 2 firmness, 3 position,
+      /// 4 exclude).
+      List<String> cc(
+        String date, {
+        String? opening,
+        String? firmness,
+        String? position,
+        bool exclude = false,
+      }) => rowCells(cervixHeader, date, {
+        1: ?opening,
+        2: ?firmness,
+        3: ?position,
+        if (exclude) 4: 'true',
+      });
+
+      test('excluded rides alone', () {
+        final e = entryOf(
+          cc('2026-01-01', exclude: true),
+          header: cervixHeader,
+        );
+        expect(e['notes'], '[cervix] excluded');
+        expect(e['cervix_position'], isNull);
+        expect(e['cervix_opening'], isNull);
+        expect(e['cervix_firmness'], isNull);
+      });
+
+      test('unmapped position/opening cells note their raw cell', () {
+        final position = entryOf(
+          cc('2026-01-01', position: '3'),
+          header: cervixHeader,
+        );
+        expect(position['cervix_position'], isNull);
+        expect(position['notes'], '[cervix] position 3 (unmapped)');
+
+        final opening = entryOf(
+          cc('2026-01-01', opening: '7'),
+          header: cervixHeader,
+        );
+        expect(opening['cervix_opening'], isNull);
+        expect(opening['notes'], '[cervix] opening 7 (unmapped)');
+
+        final negative = entryOf(
+          cc('2026-01-01', opening: '-1'),
+          header: cervixHeader,
+        );
+        expect(negative['cervix_opening'], isNull);
+        expect(negative['notes'], '[cervix] opening -1 (unmapped)');
+
+        final nonNumeric = entryOf(
+          cc('2026-01-01', position: 'y'),
+          header: cervixHeader,
+        );
+        expect(nonNumeric['cervix_position'], isNull);
+        expect(nonNumeric['notes'], '[cervix] position y (unmapped)');
+      });
+
+      test('the firmness clamp leaves a trace only when it fires', () {
+        final clamped = entryOf(
+          cc('2026-01-01', firmness: '2'),
+          header: cervixHeader,
+        );
+        expect(clamped['cervix_firmness'], 'soft');
+        expect(clamped['notes'], '[cervix] firmness 2 → soft');
+
+        // raw 0/1 decode naturally — no clamp, no token
+        expect(
+          entryOf(
+            cc('2026-01-01', firmness: '0'),
+            header: cervixHeader,
+          )['cervix_firmness'],
+          'hard',
+        );
+        expect(
+          entryOf(
+            cc('2026-01-01', firmness: '0'),
+            header: cervixHeader,
+          )['notes'],
+          isNull,
+        );
+        expect(
+          entryOf(
+            cc('2026-01-01', firmness: '1'),
+            header: cervixHeader,
+          )['cervix_firmness'],
+          'soft',
+        );
+        expect(
+          entryOf(
+            cc('2026-01-01', firmness: '1'),
+            header: cervixHeader,
+          )['notes'],
+          isNull,
+        );
+
+        // a negative index also clamps to hard, but gets NO token
+        final negative = entryOf(
+          cc('2026-01-01', firmness: '-1'),
+          header: cervixHeader,
+        );
+        expect(negative['cervix_firmness'], 'hard');
+        expect(negative['notes'], isNull);
+
+        // non-numeric firmness is neither structured nor noted: without
+        // another anchor the day skips empty again
+        final result = dripCsvToExportJson(
+          dripOneRowCsv(cervixHeader, cc('2026-01-01', firmness: 'x')),
+        );
+        expect(result.stats.rowsImported, 0);
+        expect(result.stats.rowsSkippedEmpty, 1);
+      });
+    });
+
+    test('the [tag] note lines assemble in the fixed order', () {
+      final e = entryOf(
+        fullCells('2026-01-01', {
+          'note.value': 'rough day',
+          'temperature.note': 'measured late',
+          'bleeding.value': '2',
+          'bleeding.exclude': 'true',
+          'mucus.feeling': '2',
+          'cervix.opening': '7',
+          'desire.value': '1',
+          'pain.cramps': 'true',
+          'sex.partner': 'true',
+          'sex.condom': 'true',
+          'mood.stressed': 'true',
+          'mood.note': 'deadline',
+        }),
+        header: fullDripHeader,
+      );
+      expect(
+        e['notes'],
+        [
+          'rough day',
+          '[temp] measured late',
+          '[bleedingExclude] exclude',
+          '[mucus] feeling 2',
+          '[cervix] opening 7 (unmapped)',
+          '[desire] 1',
+          '[pain] cramps',
+          '[sex] partner (condom)',
+          '[mood] stressed deadline',
+        ].join('\n'),
+      );
     });
 
     test('notes: day note first, then [temp]/[pain]/[sex]/[mood] lines', () {
@@ -922,15 +1450,18 @@ void main() {
     });
 
     test(
-      'stats: a contraceptive-only row counts as empty (column dropped)',
+      'stats: a contraceptive-only row imports as a rescued notes-only entry',
       () {
         final result = dripCsvToExportJson(
           dripCsv(dripHeader, [
             cells('2026-01-01', {15: 'true'}),
           ]),
         );
-        expect(result.stats.rowsSkippedEmpty, 1);
-        expect(result.stats.rowsImported, 0);
+        final doc = jsonDecode(result.json) as Map<String, Object?>;
+        final e = (doc['entries']! as List).single as Map<String, Object?>;
+        expect(e['notes'], '[sex] (condom)');
+        expect(result.stats.rowsImported, 1);
+        expect(result.stats.rowsSkippedEmpty, 0);
       },
     );
 
@@ -1079,15 +1610,15 @@ void main() {
       expect(result.stats.rowsInvalid, 0);
       expect(
         result.stats.rowsImported,
-        27,
+        28,
         reason:
-            '2026-08-20 (desire + mood flags only) imports nothing: '
-            'mood/desire are no longer data',
+            '2026-08-20 (desire + mood flags only) imports: the rescued '
+            'note data makes the row an entry',
       );
       expect(
         result.stats.rowsSkippedEmpty,
-        46,
-        reason: '45 blank calendar days + the desire/mood-only day',
+        45,
+        reason: 'the remaining blank calendar days',
       );
       expect(
         result.stats.rowsImported + result.stats.rowsSkippedEmpty,
@@ -1098,7 +1629,9 @@ void main() {
       final entries = (doc['entries'] as List).cast<Map<dynamic, dynamic>>();
       final marks = (doc['marks'] as List).cast<Map<dynamic, dynamic>>();
       Map by(String date) => entries.where((e) => e['date'] == date).single;
-      // mucus day: value 2 ('f') wins over the 2+1 parts, firmness clamps
+      // mucus day: value 2 ('f') wins over the 2+1 parts for the structured
+      // decode while the bypassed parts ride into the note; firmness 2
+      // clamps to soft with its note trace
       expect(by('2026-07-15')['mucus_sign'], 'f');
       expect(
         by('2026-07-15')['cervix'],
@@ -1113,6 +1646,10 @@ void main() {
         reason:
             'the specimen firmness index 2 clamps to soft, also '
             'in the structured field',
+      );
+      expect(
+        by('2026-07-15')['notes'],
+        '[mucus] feeling 2, texture 1\n[cervix] firmness 2 → soft',
       );
       // excluded temperature day: the day carries NO raw exclude key and a
       // neutral mask; the exclusion rides as the derived mark instead.
@@ -1131,23 +1668,18 @@ void main() {
       ], reason: 'temperature.exclude derives the ignore-temperature mark');
       // note-only day
       expect(by('2026-09-15')['notes'], 'cramps again, expecting menses soon.');
-      // bleeding + mood-note day (drip value 2 = medium → level 3); the
-      // mood FLAG is dropped, the [mood] note stays.
+      // bleeding + mood day (drip value 2 = medium → level 3); the anxious
+      // flag joins the note line.
       expect(by('2026-08-31')['bleeding'], 3);
       expect(by('2026-08-31').containsKey('mood'), isFalse);
-      expect(by('2026-08-31')['notes'], '[mood] first day jitters');
-      // the desire + mood-flag-only day (2026-08-20) is gone entirely
-      expect(
-        entries.where((e) => e['date'] == '2026-08-20'),
-        isEmpty,
-        reason: 'a desire/mood-only row is skipped-empty now',
-      );
+      expect(by('2026-08-31')['notes'], '[mood] anxious first day jitters');
+      // the desire + mood-flag-only day imports as a rescued-notes entry
+      final rescued = by('2026-08-20');
+      expect(rescued['bleeding'], 0);
+      expect(rescued['sex_timings'], 0);
+      expect(rescued['notes'], '[desire] 3\n[mood] happy, energetic');
       // Sex observations: partner days without a contraceptive method map
-      // to the sex timings mask (an unfilled method column counts as "no
-      // method" — owner rule of 2026-09-17). Of the specimen's sex days
-      // only 2026-08-16 passes that rule (partner, the only contraceptive
-      // info being condom=false/pill=false); 2026-07-17 carries a condom
-      // and 2026-09-12 is solo — both stay mask-free.
+      // to the sex timings mask; the [sex] line always names the activity.
       final noMethodNamed = by('2026-08-16');
       expect(
         noMethodNamed['sex_timings'],
@@ -1156,6 +1688,7 @@ void main() {
             'partner with condom=false/pill=false and nothing else: '
             'no method flag set → the mapped variant',
       );
+      expect(noMethodNamed['notes'], '[sex] partner');
       final withCondom = by('2026-07-17');
       expect(
         withCondom['sex_timings'],
@@ -1165,16 +1698,40 @@ void main() {
       expect(
         withCondom.containsKey('desire'),
         isFalse,
-        reason: 'desire is dropped entirely',
+        reason: 'no `desire` key exists; the value rides in notes',
       );
-      expect(withCondom['notes'], '[sex] with condom, quite good');
+      expect(
+        withCondom['notes'],
+        '[desire] 2\n[sex] partner (condom) with condom, quite good',
+      );
       final soloDay = by('2026-09-12');
       expect(soloDay['sex_timings'], 0, reason: 'solo is not partner sex');
-      expect(soloDay['notes'], '[sex] morning');
+      expect(soloDay['notes'], '[sex] solo morning');
       // breast-pain (B) + pain-note day (drip pain.tenderBreasts → B)
       expect(by('2026-08-25')['pain_breast'], true);
       expect(by('2026-08-25')['pain_mittelschmerz'], false);
       expect(by('2026-08-25')['notes'], '[pain] tender in the evening');
+      // cramps day: the unmapped kind joins the pain note line
+      expect(
+        by('2026-07-06')['notes'],
+        '[pain] cramps had to lie down, took ibuprofen.',
+      );
+      // the mood-flag pair rides behind the day note
+      expect(
+        by('2026-07-05')['notes'],
+        '[temp] measured right after waking up\n[mood] fine',
+      );
+      expect(
+        by('2026-07-20')['notes'],
+        'headache in the morning, still felt good afterwards.\n'
+        '[mood] happy, energetic',
+      );
+      expect(by('2026-07-28')['notes'], '[mood] stressed deadline stress');
+      // mucus bypass and partial composites on the specimen
+      expect(by('2026-08-13')['mucus_sign'], 'f');
+      expect(by('2026-08-13')['notes'], '[mucus] texture 2');
+      expect(by('2026-09-10')['mucus_sign'], 'f');
+      expect(by('2026-09-10')['notes'], '[mucus] feeling 1, texture 1');
       // temperature measurement times ride through as measured_at_minutes
       expect(
         by('2026-07-05')['measured_at_minutes'],
