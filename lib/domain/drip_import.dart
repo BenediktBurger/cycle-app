@@ -121,7 +121,8 @@ final class DripCsvStats {
   /// Rows that produced an entry.
   final int rowsImported;
 
-  /// Rows without any mapped data (drip exports blank calendar days too).
+  /// Rows without any data — structured or rescued note text (drip exports
+  /// blank calendar days too).
   final int rowsSkippedEmpty;
 
   /// Rows with data but an unparsable date.
@@ -150,12 +151,15 @@ final class DripCsvImport {
 /// Maps a raw drip CSV export into a current-version export document
 /// (see lib/domain/export_import.dart).
 ///
-/// A row maps to an entry only when at least one MAPPED field carries
-/// data; otherwise it counts as skipped-empty (drip exports a row for
-/// every day it knows, most of which are blank). Only a broken date
-/// invalidates a data row; every other wart degrades field-by-field. The
-/// row shape mirrors lib/db/export_adapter.dart's export rows exactly, so
-/// the existing writer/planner gates (bleeding vocabulary,
+/// A row maps to an entry when it carries observations the app stores, or
+/// when a stored field's raw text would otherwise be lost — the unmappable
+/// drip columns surface as `[tag]` note lines (desire, sex
+/// activities/methods, pain kinds, mood flags, mucus/cervix rescue tokens).
+/// Every other row counts as skipped-empty (drip exports a row for every
+/// day it knows, most of which are blank). Only a broken date invalidates
+/// a data row; every other wart degrades field-by-field. The row shape
+/// mirrors lib/db/export_adapter.dart's export rows exactly, so the
+/// existing writer/planner gates (bleeding vocabulary,
 /// quality-requires-S) never drop one of these rows.
 ///
 /// Throws a [FormatException] when [raw] is not a drip CSV at all — see
@@ -188,6 +192,18 @@ DripCsvImport dripCsvToExportJson(String raw) {
   String? prefixedLine(String tag, String? text) =>
       text == null ? null : '$tag $text';
 
+  /// Assembles one `[tag]` note line: the structured tokens joined with
+  /// ', ', then the free note appended after a single space; when no token
+  /// decoded the line is just the note (and `null` when both parts are
+  /// empty).
+  String? tagLine(String tag, String structured, String? note) =>
+      switch ((structured.isEmpty, note == null)) {
+        (true, true) => null,
+        (true, false) => '$tag $note',
+        (false, true) => '$tag $structured',
+        (false, false) => '$tag $structured $note',
+      };
+
   final entries = <Map<String, Object?>>[];
   final excludedDays = <String>{};
   final bleedingExcludedDays = <String>{};
@@ -213,67 +229,125 @@ DripCsvImport dripCsvToExportJson(String raw) {
     final bleeding = _parseBleeding(cell(dataRow, 'bleeding.value'));
     // bleeding.exclude ("ignored" bleeding) is not data, but its day feeds
     // the cycleStart replay's skip set (the entry keeps its bleeding
-    // level).
+    // level); when a bleeding value sits under the flag, the level rides
+    // with a `[bleedingExclude]` note line.
     final bleedingExcluded = boolCell(dataRow, 'bleeding.exclude');
+    final mucusValue = cell(dataRow, 'mucus.value');
+    final mucusFeeling = cell(dataRow, 'mucus.feeling');
+    final mucusTexture = cell(dataRow, 'mucus.texture');
     final mucus = _mucusObservation(
-      nfpNumber: cell(dataRow, 'mucus.value'),
-      feeling: cell(dataRow, 'mucus.feeling'),
-      texture: cell(dataRow, 'mucus.texture'),
+      nfpNumber: mucusValue,
+      feeling: mucusFeeling,
+      texture: mucusTexture,
     );
+    final cervixOpening = cell(dataRow, 'cervix.opening');
+    final cervixFirmness = cell(dataRow, 'cervix.firmness');
+    final cervixPosition = cell(dataRow, 'cervix.position');
     final cervixObservation = _cervixObservation(
-      opening: cell(dataRow, 'cervix.opening'),
-      firmness: cell(dataRow, 'cervix.firmness'),
-      position: cell(dataRow, 'cervix.position'),
+      opening: cervixOpening,
+      firmness: cervixFirmness,
+      position: cervixPosition,
     );
-    // desire.value is dropped entirely (Lust is removed everywhere): the
-    // intensity was never storable, so a desire-only row imports nothing.
+    final desireCell = cell(dataRow, 'desire.value');
     // drip tracks sex as activity (solo/partner) plus the contraceptive
     // methods (condom, pill, iud, patch, ring, implant, diaphragm, other —
     // and `none`; drip: components/helpers/labels.js). The stored variant
     // is partner sex WITHOUT contraception, at the MIDDLE time of day
     // (drip carries none) — an unfilled method column also counts as no
     // contraception (owner decision 2026-09-17: drip is a
-    // non-authoritative import source). Every other activity variant maps
-    // to nothing and is not data (see the data rule below); the [sex] note
-    // line stays independent of the flag.
-    // TODO(user-review): solo sex and the contraceptive methods have no
-    // storage option of their own.
+    // non-authoritative import source). Every other activity/method
+    // combination has no stored option of its own; the whole choice is
+    // rescued into the [sex] note line below (`sex.none` is a "no method"
+    // answer and renders nothing).
+    final sexSolo = boolCell(dataRow, 'sex.solo');
     final sexPartner = boolCell(dataRow, 'sex.partner');
-    final sexMethod = [
-      'sex.condom',
-      'sex.pill',
-      'sex.iud',
-      'sex.patch',
-      'sex.ring',
-      'sex.implant',
-      'sex.diaphragm',
-      'sex.other',
-    ].any((name) => boolCell(dataRow, name));
-    final sex = sexPartner && !sexMethod;
+    final sexMethods = [
+      for (final (column, token) in _sexMethodColumns)
+        if (boolCell(dataRow, column)) token,
+    ];
+    final sex = sexPartner && sexMethods.isEmpty;
+    // Structured part of the [sex] line: the activities joined ', ', the
+    // methods as a parenthetical glued on with a single space
+    // (`[sex] partner (condom)`, `[sex] solo (condom)`, method-only
+    // `[sex] (condom)`, `solo + partner` → `[sex] solo, partner`).
+    final sexMethodParenthetical = sexMethods.isEmpty
+        ? null
+        : '(${sexMethods.join(', ')})';
+    final sexActivities = [
+      if (sexSolo) 'solo',
+      if (sexPartner) 'partner',
+    ].join(', ');
+    final sexStructured = sexMethodParenthetical == null
+        ? sexActivities
+        : sexActivities.isEmpty
+        ? sexMethodParenthetical
+        : '$sexActivities $sexMethodParenthetical';
+    final sexNote = cell(dataRow, 'sex.note');
 
     final dayNote = cell(dataRow, 'note.value');
     final tempNote = cell(dataRow, 'temperature.note');
-    final painNote = cell(dataRow, 'pain.note');
-    final sexNote = cell(dataRow, 'sex.note');
-    // The mood NOTE is raw note text — still data (notes are raw notes).
-    // The mood FLAGS are dropped (Stimmung is removed everywhere).
-    final moodNote = cell(dataRow, 'mood.note');
+
     // drip's pain kinds map onto the letter-coded pain options where a
     // storage option exists: ovulation pain is exactly the Mittelschmerz
-    // (M) option, tender breasts the breast-pain (B) option.
+    // (M) option, tender breasts the breast-pain (B) option. The kinds
+    // without a cycle-app option are rescued into the [pain] note line.
+    final painKindTokens = [
+      for (final (column, token) in _painKindColumns)
+        if (boolCell(dataRow, column)) token,
+    ];
     final painBreast = boolCell(dataRow, 'pain.tenderBreasts');
     final painMittelschmerz = boolCell(dataRow, 'pain.ovulationPain');
-    // Kinds without a cycle-app option (cramps, headache, …) are dropped —
-    // not data: a row carrying only such a flag imports nothing.
-    // TODO(user-review): whether the remaining pain kinds deserve options
-    // of their own instead of being dropped.
+    final painNote = cell(dataRow, 'pain.note');
+    // The mood NOTE is raw note text; the FLAGS have no stored option of
+    // their own (Stimmung is removed everywhere) and are rescued into the
+    // [mood] note line.
+    final moodFlagTokens = [
+      for (final column in _moodFlagColumns)
+        if (boolCell(dataRow, column)) column.substring('mood.'.length),
+    ];
+    final moodNote = cell(dataRow, 'mood.note');
 
-    // A row is worth an entry only when something mappable was recorded —
-    // the dropped flags (excludes, unmappable sex variants and pain kinds,
-    // symptom-flag FALSEs, mood flags) are not data, and a time cell alone
-    // never makes a blank day an entry. A row carrying ONLY an
-    // out-of-range cervix position/opening index is skipped as well: such
-    // an index decodes to no stored observation.
+    // The rescued note tokens per family: cells whose information the
+    // structured decode did NOT capture. `excluded` rides first when the
+    // exclusion flag is set, then the family's tokens in drip's column
+    // order.
+    final mucusTokens = [
+      if (boolCell(dataRow, 'mucus.exclude')) 'excluded',
+      ..._lostMucusTokens(
+        value: mucusValue,
+        feeling: mucusFeeling,
+        texture: mucusTexture,
+        decoded: mucus,
+      ),
+    ];
+    final cervixTokens = [
+      if (boolCell(dataRow, 'cervix.exclude')) 'excluded',
+      ..._unmappedCervixTokens(
+        opening: cervixOpening,
+        firmness: cervixFirmness,
+        position: cervixPosition,
+      ),
+    ];
+
+    // Day note first, then the per-symptom note lines in fixed order.
+    final notes = [
+      dayNote,
+      prefixedLine('[temp]', tempNote),
+      prefixedLine(
+        '[bleedingExclude]',
+        bleeding != null && bleedingExcluded ? 'exclude' : null,
+      ),
+      mucusTokens.isEmpty ? null : '[mucus] ${mucusTokens.join(', ')}',
+      cervixTokens.isEmpty ? null : '[cervix] ${cervixTokens.join(', ')}',
+      prefixedLine('[desire]', desireCell),
+      tagLine('[pain]', painKindTokens.join(', '), painNote),
+      tagLine('[sex]', sexStructured, sexNote),
+      tagLine('[mood]', moodFlagTokens.join(', '), moodNote),
+    ].whereType<String>().where((n) => n.isNotEmpty).join('\n');
+
+    // The structured list holds only signals that map to entry columns or
+    // marks and never produce a note token; anything without a stored
+    // option rides in `notes` instead.
     final hasData =
         bbtC != null ||
         excluded ||
@@ -283,11 +357,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
         sex ||
         painBreast ||
         painMittelschmerz ||
-        painNote != null ||
-        moodNote != null ||
-        dayNote != null ||
-        tempNote != null ||
-        sexNote != null;
+        notes.isNotEmpty;
 
     if (day == null || !hasData) {
       if (hasData) {
@@ -297,16 +367,6 @@ DripCsvImport dripCsvToExportJson(String raw) {
       }
       continue;
     }
-
-    // Day note first, then the per-symptom notes in fixed order.
-    // TODO(user-review): the "[tag] text" note format itself.
-    final notes = [
-      dayNote,
-      prefixedLine('[temp]', tempNote),
-      prefixedLine('[pain]', painNote),
-      prefixedLine('[sex]', sexNote),
-      prefixedLine('[mood]', moodNote),
-    ].whereType<String>().where((n) => n.isNotEmpty).join('\n');
 
     if (excluded) {
       excludedDays.add(formatIsoDay(day));
@@ -351,6 +411,47 @@ DripCsvImport dripCsvToExportJson(String raw) {
 }
 
 // --- vocabulary tables (drip: components/helpers/labels.js, 0-based) -------
+
+/// The drip contraceptive-method columns in drip's CSV order, with the
+/// token each renders as inside the [sex] line's parenthetical;
+/// `sex.none` is a "no method" answer and renders nothing.
+const _sexMethodColumns = <(String, String)>[
+  ('sex.condom', 'condom'),
+  ('sex.pill', 'pill'),
+  ('sex.iud', 'iud'),
+  ('sex.patch', 'patch'),
+  ('sex.ring', 'ring'),
+  ('sex.implant', 'implant'),
+  ('sex.diaphragm', 'diaphragm'),
+  ('sex.other', 'other'),
+];
+
+/// The pain-kind columns without a cycle-app storage option, in drip's CSV
+/// order, with the token each renders as in the [pain] line; tenderBreasts
+/// and ovulationPain stay structured day flags.
+const _painKindColumns = <(String, String)>[
+  ('pain.cramps', 'cramps'),
+  ('pain.headache', 'headache'),
+  ('pain.backache', 'backache'),
+  ('pain.nausea', 'nausea'),
+  ('pain.migraine', 'migraine'),
+  ('pain.other', 'other'),
+];
+
+/// The mood-flag columns (no stored option for any of them), in drip's CSV
+/// order; each renders under its column suffix in the [mood] line.
+const _moodFlagColumns = [
+  'mood.happy',
+  'mood.sad',
+  'mood.stressed',
+  'mood.balanced',
+  'mood.fine',
+  'mood.anxious',
+  'mood.energetic',
+  'mood.fatigue',
+  'mood.angry',
+  'mood.other',
+];
 
 /// Derives the foreign-import marks (author 'import') from the mapped
 /// entry rows [entries] carries (replayed verbatim, same rows the export
@@ -496,9 +597,10 @@ int? _parseBleeding(String? raw) {
 /// exactly like drip (drip: lib/nfp-mucus.js). The number decodes onto
 /// the TWO-COLUMN mucus model (db columns mucus_sign/mucus_quality):
 /// 0 → t, 1 → nothing, 2 → f, 3 → bare s, 4 → s + ew; the pair goes
-/// through [sanitizeMucusPair] (quality never rides a non-S sign).
-/// TODO(user-review): the decode matches the letters 1:1 but loses
-/// texture nuances drip never stored on the number.
+/// through [sanitizeMucusPair] (quality never rides a non-S sign). Whatever
+/// the decode cannot carry back — the parts a number bypasses, a lone
+/// part, or an out-of-range composite — rides into the `[mucus]` note
+/// line instead (see [_lostMucusTokens]).
 MucusPair? _mucusObservation({
   required String? nfpNumber,
   required String? feeling,
@@ -518,6 +620,28 @@ MucusPair? _mucusObservation({
   };
   final quality = nfp == 4 ? MucusQuality.ew : null;
   return sanitizeMucusPair(sign: sign, quality: quality);
+}
+
+/// The mucus cells the structured decode cannot carry back, as the
+/// `[mucus]` tokens: a `mucus.value` bypasses a present composite, a lone
+/// part cannot decode, and an out-of-range composite decodes to nothing —
+/// each loses the raw feeling/texture cells, so they are noted verbatim.
+/// Nothing is lost when a full in-range composite decoded or no part
+/// exists at all.
+List<String> _lostMucusTokens({
+  required String? value,
+  required String? feeling,
+  required String? texture,
+  required MucusPair? decoded,
+}) {
+  final tokens = [
+    if (feeling != null) 'feeling $feeling',
+    if (texture != null) 'texture $texture',
+  ];
+  if (tokens.isEmpty) return const [];
+  if (value != null) return tokens; // the stored value bypassed the composite
+  if (feeling == null || texture == null) return tokens; // composite partial
+  return decoded == null ? tokens : const []; // composite out of range
 }
 
 /// The drip-side NFP number of a row (see [_mucusObservation]): the
@@ -549,10 +673,13 @@ int? _resolveNfp({
 /// only the two outer values map. drip's "medium" opening token maps onto
 /// cycle-app's `middle` (same value, different storage name — see
 /// lib/domain/cervix.dart). An out-of-range position/opening index means
-/// no stored observation for that dimension; an out-of-range firmness
-/// index CLAMPS to the nearest valid one (the shipped specimen carries
-/// `cervix.firmness=2`). TODO(user-review): whether that clamping
-/// asymmetry is acceptable (position/opening null, firmness clamped).
+/// no stored observation for that dimension (its raw cell rides into the
+/// `[cervix]` note line, see [_unmappedCervixTokens]); an out-of-range
+/// firmness index CLAMPS to the nearest valid one (the shipped specimen
+/// carries `cervix.firmness=2`) and leaves a `firmness <i> → soft` trace
+/// in the note line.
+/// TODO(user-review): whether that clamping asymmetry is acceptable
+/// (position/opening null with the raw cell noted, firmness clamped).
 ({CervixPosition? position, CervixOpening? opening, CervixFirmness? firmness})?
 _cervixObservation({
   required String? opening,
@@ -584,4 +711,31 @@ _cervixObservation({
     opening: mappedOpening,
     firmness: mappedFirmness,
   );
+}
+
+/// The cervix cells whose structured decode came up empty, as `[cervix]`
+/// tokens: a position/opening cell that is non-numeric or outside 0..2
+/// notes its raw cell verbatim (the information would be lost), while
+/// firmness notes only the clamp that actually fired — a raw index of 2
+/// or more (a negative index also clamps to hard but leaves no trace,
+/// like raw 0/1 which need no clamp, and non-numeric stays unstructured).
+List<String> _unmappedCervixTokens({
+  required String? opening,
+  required String? firmness,
+  required String? position,
+}) {
+  String? unmapped(String kind, String? raw) {
+    if (raw == null) return null;
+    final index = int.tryParse(raw);
+    if (index != null && index >= 0 && index <= 2) return null;
+    return '$kind $raw (unmapped)';
+  }
+
+  final openingToken = unmapped('opening', opening);
+  final positionToken = unmapped('position', position);
+  final firmnessIndex = firmness == null ? null : int.tryParse(firmness);
+  final firmnessToken = firmnessIndex != null && firmnessIndex >= 2
+      ? 'firmness $firmness → soft'
+      : null;
+  return [?openingToken, ?firmnessToken, ?positionToken];
 }

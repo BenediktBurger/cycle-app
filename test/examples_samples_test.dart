@@ -48,18 +48,22 @@ void main() {
 
   group('examples: drip CSV format', () {
     test('both samples map cleanly with nothing dropped', () {
-      for (final path in [
-        'examples/example-cycle-drip-format.csv',
-        'examples/drip-export-sample.csv',
-      ]) {
+      // Per-sample day counts: the hand-authored specimen rescues the
+      // desire/mood-only day (2026-08-20) into notes; the drip-format
+      // example-cycle sample stores all 27 of its data days.
+      final expectedEntries = {
+        'examples/example-cycle-drip-format.csv': 27,
+        'examples/drip-export-sample.csv': 28,
+      };
+      expectedEntries.forEach((path, expected) {
         final csv = File(path).readAsStringSync();
         final result = dripCsvToExportJson(csv);
         final entries = (jsonDecode(result.json) as Map)['entries']! as List;
-        expect(entries, hasLength(27), reason: path);
+        expect(entries, hasLength(expected), reason: path);
         // Broken rows land in the invalid bucket and are silently absent
         // from the mapped document — a shipped sample must never trip it.
         expect(result.stats.rowsInvalid, 0, reason: path);
-      }
+      });
     });
   });
 }
