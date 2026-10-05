@@ -159,8 +159,16 @@ void main() {
   /// Opens the app on the settings pane (German device locale, seeded
   /// onboarding flag — same pattern as notices_test.dart) and pushes the
   /// about page from the settings pane's app bar info action.
-  Future<void> openGermanAboutPage(WidgetTester tester) async {
+  Future<void> openGermanAboutPage(
+    WidgetTester tester, {
+    double? surfaceHeight,
+  }) async {
     useDeviceLocales(tester, const [Locale('de')]);
+    // A tall surface keeps the lazy page list's lower sections BUILT —
+    // callers reaching below-the-fold content (contact rows) pass one.
+    if (surfaceHeight != null) {
+      useViewportSize(tester, Size(800, surfaceHeight));
+    }
     await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
 
@@ -570,24 +578,17 @@ void main() {
     addTearDown(() => UrlLauncherPlatform.instance = originalLauncher);
     UrlLauncherPlatform.instance = launcher;
 
-    await openGermanAboutPage(tester);
+    await openGermanAboutPage(tester, surfaceHeight: 4000);
 
-    // The contact section sits below the backup hint; bring the LAST row
-    // into the built range so all five rows are visible at once.
-    await tester.dragUntilVisible(
-      find.text(l10n.aboutContactIssues),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.pumpAndSettle();
-
-    // All five labeled rows render with their target URL as visible text —
+    // Every labeled row renders with its target URL as visible text —
     // German pages for the German locale, per-intent arb bindings.
     expect(find.text(l10n.aboutContactHeading), findsOneWidget);
     expect(find.text(l10n.aboutContactWebsite), findsOneWidget);
     expect(find.text(l10n.aboutContactCourses), findsOneWidget);
     expect(find.text(l10n.aboutContactConsultation), findsOneWidget);
     expect(find.text(l10n.aboutContactBooks), findsOneWidget);
+    expect(find.text(l10n.aboutContactsUpdates), findsOneWidget);
+    expect(find.text(l10n.aboutContactIssuesGoogle), findsOneWidget);
     expect(
       find.text('https://iner.org/'),
       findsOneWidget,
@@ -623,6 +624,11 @@ void main() {
           'the German and English rows bind the SAME app-issues '
           'URL — deliberately locale-independent',
     );
+    expect(
+      find.text('https://github.com/BenediktBurger/cycle-app/releases'),
+      findsOneWidget,
+    );
+    expect(find.text('https://forms.gle/TaFRqx5mAC7JrCtS6'), findsOneWidget);
 
     // Tapping a row launches its per-locale URL through the (recorded)
     // platform interface — never a real browser.
@@ -634,7 +640,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactBooks));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactsUpdates));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactIssues));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactIssuesGoogle));
     await tester.pumpAndSettle();
 
     expect(
@@ -644,7 +654,9 @@ void main() {
         'https://iner.org/de/anwenden/kurse/kurse.html',
         'https://iner.org/de/erlernen/beratungen/deutschland.html',
         'https://iner.org/de/anwenden/buecher-infos/buecher-literatur.html',
+        'https://github.com/BenediktBurger/cycle-app/releases',
         'https://github.com/BenediktBurger/cycle-app/issues',
+        'https://forms.gle/TaFRqx5mAC7JrCtS6',
       ]),
     );
   });
@@ -658,6 +670,9 @@ void main() {
     UrlLauncherPlatform.instance = launcher;
 
     useDeviceLocales(tester, const [Locale('en')]);
+    // The contact section sits below the fold on the default surface; the
+    // tall surface keeps the lazy page list building it at once.
+    useViewportSize(tester, const Size(800, 4000));
     await tester.pumpWidget(appScope(locale: const Locale('en')));
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Settings'));
@@ -665,21 +680,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('aboutAction')));
     await tester.pumpAndSettle();
 
-    // The contact section sits below the backup hint; bring the LAST row
-    // into the built range so all five rows are visible at once.
-    await tester.dragUntilVisible(
-      find.text(l10n.aboutContactIssues),
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
-    await tester.pumpAndSettle();
-
-    // Info parity: all five intents render in English too.
+    // Info parity: every intent renders in English too.
     expect(find.text(l10n.aboutContactHeading), findsOneWidget);
     expect(find.text(l10n.aboutContactWebsite), findsOneWidget);
     expect(find.text(l10n.aboutContactCourses), findsOneWidget);
     expect(find.text(l10n.aboutContactConsultation), findsOneWidget);
     expect(find.text(l10n.aboutContactBooks), findsOneWidget);
+    expect(find.text(l10n.aboutContactsUpdates), findsOneWidget);
+    expect(find.text(l10n.aboutContactIssuesGoogle), findsOneWidget);
     // The books row carries the one real EN page; courses and consultation
     // FALL BACK to the general site (never a German-only page from
     // English): visible as three iner.org URL texts.
@@ -716,6 +724,11 @@ void main() {
           'the same URL as the German row — deliberately '
           'locale-independent',
     );
+    expect(
+      find.text('https://github.com/BenediktBurger/cycle-app/releases'),
+      findsOneWidget,
+    );
+    expect(find.text('https://forms.gle/TaFRqx5mAC7JrCtS6'), findsOneWidget);
 
     await tester.tap(find.text(l10n.aboutContactWebsite));
     await tester.pumpAndSettle();
@@ -725,7 +738,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactBooks));
     await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactsUpdates));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.aboutContactIssues));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.aboutContactIssuesGoogle));
     await tester.pumpAndSettle();
 
     expect(
@@ -735,7 +752,9 @@ void main() {
         'https://iner.org/',
         'https://iner.org/',
         'https://iner.org/en/to-exercise/books-informations/books-literature.html',
+        'https://github.com/BenediktBurger/cycle-app/releases',
         'https://github.com/BenediktBurger/cycle-app/issues',
+        'https://forms.gle/TaFRqx5mAC7JrCtS6',
       ]),
     );
   });
