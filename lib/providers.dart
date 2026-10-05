@@ -51,10 +51,11 @@ Future<CycleDatabase> database(Ref ref) async {
   return db;
 }
 
-/// The current wall-clock time, injectable: the Tagebuch entry form prefills
-/// the time-of-measurement with this value for a fresh day. Widget tests
-/// override it with a fixed clock (`() => fixedNow`) so "the form shows the
-/// current time" is deterministic (no race against the real minute boundary).
+/// The current wall-clock time, injectable: the Tagebuch entry form stamps
+/// the time-of-measurement with this value when a valid temperature is
+/// entered on a fresh today-day. Widget tests override it with a fixed
+/// clock (`() => fixedNow`) so "the form shows the current time" is
+/// deterministic (no race against the real minute boundary).
 @Riverpod(keepAlive: true)
 DateTime Function() now(Ref ref) => DateTime.now;
 

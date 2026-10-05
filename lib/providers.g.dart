@@ -73,18 +73,20 @@ final class DatabaseProvider
 
 String _$databaseHash() => r'060c027a48143127107e170943d3f59e079e8853';
 
-/// The current wall-clock time, injectable: the Tagebuch entry form prefills
-/// the time-of-measurement with this value for a fresh day. Widget tests
-/// override it with a fixed clock (`() => fixedNow`) so "the form shows the
-/// current time" is deterministic (no race against the real minute boundary).
+/// The current wall-clock time, injectable: the Tagebuch entry form stamps
+/// the time-of-measurement with this value when a valid temperature is
+/// entered on a fresh today-day. Widget tests override it with a fixed
+/// clock (`() => fixedNow`) so "the form shows the current time" is
+/// deterministic (no race against the real minute boundary).
 
 @ProviderFor(now)
 final nowProvider = NowProvider._();
 
-/// The current wall-clock time, injectable: the Tagebuch entry form prefills
-/// the time-of-measurement with this value for a fresh day. Widget tests
-/// override it with a fixed clock (`() => fixedNow`) so "the form shows the
-/// current time" is deterministic (no race against the real minute boundary).
+/// The current wall-clock time, injectable: the Tagebuch entry form stamps
+/// the time-of-measurement with this value when a valid temperature is
+/// entered on a fresh today-day. Widget tests override it with a fixed
+/// clock (`() => fixedNow`) so "the form shows the current time" is
+/// deterministic (no race against the real minute boundary).
 
 final class NowProvider
     extends
@@ -94,10 +96,11 @@ final class NowProvider
           DateTime Function()
         >
     with $Provider<DateTime Function()> {
-  /// The current wall-clock time, injectable: the Tagebuch entry form prefills
-  /// the time-of-measurement with this value for a fresh day. Widget tests
-  /// override it with a fixed clock (`() => fixedNow`) so "the form shows the
-  /// current time" is deterministic (no race against the real minute boundary).
+  /// The current wall-clock time, injectable: the Tagebuch entry form stamps
+  /// the time-of-measurement with this value when a valid temperature is
+  /// entered on a fresh today-day. Widget tests override it with a fixed
+  /// clock (`() => fixedNow`) so "the form shows the current time" is
+  /// deterministic (no race against the real minute boundary).
   NowProvider._()
     : super(
         from: null,

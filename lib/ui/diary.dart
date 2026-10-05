@@ -59,6 +59,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   TimeOfDay? _measuredAt;
   MucusSign? _sign;
   MucusQuality? _quality;
+
+  /// True while [_applyEntry] seeds [_bbtController]: the stamp listener
+  /// must ignore that notification.
+  bool _suppressBbtStamp = false;
+
   CervixPosition? _cervixPosition;
   CervixOpening? _cervixOpening;
   bool _painBreast = false;
@@ -69,6 +74,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   @override
   void initState() {
     super.initState();
+    _bbtController.addListener(_onBbtChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadEntry(ref.read(selectedDateProvider));
@@ -78,6 +84,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   @override
   void dispose() {
+    _bbtController.removeListener(_onBbtChanged);
     _bbtController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -87,6 +94,22 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _displayLocale = Localizations.localeOf(context).toString();
+  }
+
+  /// Entering a valid, in-range temperature stamps the current time while
+  /// the day is today and no time is in the form yet — a seeded (loaded)
+  /// temperature is a fact of the stored day, not an entry event.
+  void _onBbtChanged() {
+    if (_suppressBbtStamp || !mounted) return;
+    final parsed = parseDecimalInput(_bbtController.text);
+    final now = ref.read(nowProvider)();
+    if (parsed == null ||
+        !isWithinBbtRange(parsed) ||
+        _measuredAt != null ||
+        !DateOnly.sameDay(ref.read(selectedDateProvider), now)) {
+      return;
+    }
+    setState(() => _measuredAt = TimeOfDay.fromDateTime(now));
   }
 
   Future<void> _loadEntry(DateTime date) async {
@@ -120,11 +143,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _tempDisturbances = entry?.tempDisturbances ?? 0;
     _excludeTemperature = excludeMarked;
     _cycleStartMarked = cycleStartMarked;
-    // A fresh day prefill the current time; a re-opened day keeps what
-    // was stored — a deliberately cleared day never re-prefills.
-    _measuredAt = entry == null
-        ? TimeOfDay.fromDateTime(ref.read(nowProvider)())
-        : _minutesToTime(entry.measuredAtMinutes);
+    _measuredAt = _minutesToTime(entry?.measuredAtMinutes);
     // DailyEntry already enforces quality-only-with-S (constructor assert),
     // so the form state can mirror the loaded pair untouched.
     _sign = entry?.mucusSign;
@@ -139,9 +158,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // The prefill follows the display locale ("36,4" in de / "36.4" in
     // en); parseDecimalInput accepts both separators, so the comma form
     // saves back identically.
+    _suppressBbtStamp = true;
     _bbtController.text = bbt == null
         ? ''
         : formatDecimalPrefill(bbt, locale: _displayLocale);
+    _suppressBbtStamp = false;
     _notesController.text = entry?.notes ?? '';
   }
 
@@ -169,8 +190,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
         .set(DateOnly.addDays(ref.read(selectedDateProvider), delta));
   }
 
-  /// Time picker prefilled from the stored (or, on a fresh day, current)
-  /// time.
+  /// Time picker seeded from the form's time; without one it falls back
+  /// to the current time.
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -425,8 +446,8 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // DailyEntry.measuredAtMinutes), so the time control shares
               // the temperature's visual line and shows only while a
               // savable temperature is entered — the same range gate the
-              // validator applies. A fresh day prefill the current time
-              // (see _applyEntry).
+              // validator applies. Entering the temperature on today
+              // stamps the current time (see _onBbtChanged).
               //
               // Narrow content widths (small devices, wide font scaling):
               // below ~300 dp of form width the printed label drops and
