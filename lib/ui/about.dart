@@ -219,7 +219,9 @@ class AboutPage extends ConsumerWidget {
             (l10n.aboutContactCourses, l10n.aboutContactCoursesUrl),
             (l10n.aboutContactConsultation, l10n.aboutContactConsultationUrl),
             (l10n.aboutContactBooks, l10n.aboutContactBooksUrl),
+            (l10n.aboutContactsUpdates, l10n.aboutContactsUpdatesUrl),
             (l10n.aboutContactIssues, l10n.aboutContactIssuesUrl),
+            (l10n.aboutContactIssuesGoogle, l10n.aboutContactIssuesGoogleUrl),
           ]) ...[
             Card(
               child: ListTile(
