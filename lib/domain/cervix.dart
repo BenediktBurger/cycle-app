@@ -103,11 +103,6 @@ String cervixPositionSymbol(CervixPosition position) => switch (position) {
 /// Chart glyph of a firmness for the cycle-tab symbol row: the paper
 /// shorthand — `h` hard, `h-w` halfSoft (the paper's h/w rendered with an
 /// ASCII hyphen), `w` soft.
-/// TODO(user-review): like [cervixPositionSymbol], these glyphs are an
-/// ad-hoc display choice — the NER cheat sheet defines no cervix glyphs
-/// (the paper uses h / h/w only as written shorthand). In particular `h`
-/// visually equals the position `high` glyph; INER experts may want
-/// different symbols.
 String cervixFirmnessSymbol(CervixFirmness firmness) => switch (firmness) {
   CervixFirmness.hard => 'h',
   CervixFirmness.halfSoft => 'h-w',
