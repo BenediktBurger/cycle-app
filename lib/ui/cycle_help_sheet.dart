@@ -176,8 +176,6 @@ final class _CycleHelpSheet extends StatelessWidget {
             _HelpEntry(
               color: scheme.onSurface,
               label: l10n.cycleLegendNote,
-              // Sample note glyph: the sticky-note icon a noted day
-              // renders at the very bottom of the chart block.
               shape: _HelpEntryShape.note,
             ),
             const SizedBox(height: 12),
@@ -354,8 +352,8 @@ final class _HelpEntry extends StatelessWidget {
           Text('kr', style: TextStyle(fontSize: 9, color: color)),
         ],
       ),
-      // Sample note glyph: the same sticky-note icon a noted day renders
-      // in its cell at the very bottom of the chart block.
+      // The notes band's rail-corner sample; the band's day cells render
+      // the note text itself, vertically.
       _HelpEntryShape.note => Icon(
         Icons.sticky_note_2_outlined,
         size: 12,

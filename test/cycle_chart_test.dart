@@ -566,7 +566,7 @@ const _glossaryEn = [
   'Cervix position',
   'Cervix firmness',
   'Breast pain (B)',
-  'Note (this day carries a note in the Diary)',
+  'Note (diary text, shown vertically per day)',
 ];
 
 /// The German glossary wording (authoritative draft per the language
@@ -589,7 +589,7 @@ const _glossaryDe = [
   'Muttermund-Position',
   'Muttermund-Festigkeit',
   'Brustschmerz (B)',
-  'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
+  'Notiz (Tagebuchtext, am Tag senkrecht dargestellt)',
 ];
 
 const _arithmeticNoteEn =
@@ -4506,10 +4506,8 @@ void main() {
     tester,
   ) async {
     final wording = {
-      const Locale('en'): 'Note (this day carries a note in the Diary)',
-      const Locale('de'):
-          'Notiz (für diesen Tag ist eine Notiz '
-          'im Tagebuch vorhanden)',
+      const Locale('en'): 'Note (diary text, shown vertically per day)',
+      const Locale('de'): 'Notiz (Tagebuchtext, am Tag senkrecht dargestellt)',
     };
     for (final MapEntry(:key, :value) in wording.entries) {
       await pumpChart(
