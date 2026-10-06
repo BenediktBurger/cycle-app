@@ -1,12 +1,12 @@
 // Widget tests of the cycle chart on the Zyklus screen — the whole
-// chart family in one file: grid alignment, the Muttermund (cervix)
-// row, per-day column labels, the temperature-disturbance letters,
-// the computed evaluation marks (mucus-peak/first-higher-based
-// candidates, numbering, baseline segment, SUZ), the grid lines (vertical
-// day lines plus the 0.1 K horizontal temperature grid over the fixed
-// settings range), the symbol help sheet, the frozen left rail, the
-// day-note indicator, the per-signal rows, the temperature curve's
-// connectivity and ignore rendering (the unit-level curve runs stay
+// chart family in one file: grid alignment, the merged below-chart
+// notes band, per-day column labels, the temperature-disturbance
+// letters, the computed evaluation marks (mucus-peak/first-higher-based
+// candidates, numbering, baseline segment, SUZ), the grid lines
+// (vertical day lines plus the 0.1 K horizontal temperature grid over
+// the fixed settings range), the symbol help sheet, the frozen left
+// rail, the per-signal rows, the temperature curve's connectivity and
+// ignore rendering (the unit-level curve runs stay
 // in cycle_curve_test.dart — those pin the pure rule set, these pin
 // how the chart draws it), measurement time / sex / pain glyphs,
 // weekend bands, the viewport-limited day window and its rebuild
@@ -19,10 +19,6 @@
 // `_rowsDay`), and local line/bars/scheme/round-trip helpers that
 // were byte-identical to the shared ones in test/support/ now use
 // the shared ones.
-
-// No assertion was edited: run the full gate and diff the collected
-// test names against the pre-merge report — only the suite-path
-// prefix changed.
 
 import 'dart:async';
 import 'package:cycle_app/domain/cervix.dart';
@@ -89,28 +85,118 @@ double _cellCenterX(WidgetTester tester, String key) =>
 Widget _alignmentHarness({required List<DailyEntry> entries}) =>
     chartHarness(entries: entries);
 
-// Widget test of the Muttermund (cervix) display on the Zyklus chart: the
-// recorded position renders as a glyph in the cervix row under the
-// temperature curve, the firmness glyph renders BESIDE the position glyph
-// (one cervix line, two observations), days without an observation stay
-// empty. The glyph's
-// glossary entry lives in the symbol help sheet (the help-sheet section).
+// Widget tests of the Muttermund (cervix) display in the Zyklus chart's
+// notes band: on every cervix day the band reserves the same top block —
+// the glyph zone with 5 fixed position slots (low lowest … veryHigh
+// highest, unreachable beyond) and the fixed letter row beneath it — so
+// the position evolution stays comparable at a glance whatever the note.
+// The glyph zone's ink is the OPENING circle, painted circle geometry
+// sized by its value (the painted diameter communicates the opening, like
+// the course notation). A position value without an opening paints
+// nothing — the position only picks the slot.
+// The firmness letter renders iff a value exists and never moves the
+// slot ink; the breast-pain B sits in its own plain-letter row directly
+// above the note zone (at the band top on cervix-free days, not
+// reserved on pain-free days); the note zone takes the band's rest,
+// spanning the full band on cervix-free pain-free days.
 
+DateTime _cervixDay(int index) => DateTime.utc(2026, 9, 7 + index);
+
+// One cervix-observation shape per day (0..10):
+//  0: low + closed + soft        → filled dot in the lowest slot, letter row
+//  1: medium + middle            → middle circle one slot higher
+//  2: high + open                → open circle higher still
+//  3: veryHigh + open + halfSoft → open circle in the topmost reachable slot
+//  4: unreachable + open         → open circle in the unreachable (topmost) slot
+//  5: opening open only          → open circle at the medium slot
+//  6: position medium only       → nothing paints (position has no glyph)
+//  7: firmness soft only         → only the letter-row 'w', no slot ink
+//  8: breast pain + a long multi-line note, no cervix → the B pain row at
+//    the band top, the note zone below it
+//  9: medium + soft + a long note → the note zone renders below the fixed
+//    letter row, the slot ink never moves
+// 10: medium + soft + a whitespace-only note → the note folds to no text
+//    and the day renders exactly like its cervix observations alone
+// 11: medium + soft + breast pain + a note → the B pain row sits between
+//    the letter row and the note zone, nothing in the cervix stack moves
 List<DailyEntry> _cervixEntries() => [
-  for (var i = 0; i < CervixPosition.values.length; i++)
-    DailyEntry(
-      date: DateTime.utc(2026, 9, 7 + i),
-      bbtC: 36.5 + i * 0.1,
-      cervixPosition: CervixPosition.values[i],
-      // Opening must NOT be displayed on the chart: it only exists in
-      // the entry form.
-      cervixOpening: CervixOpening.open,
-      // Day 0 additionally records a FIRMNESS, to pin that both cervix
-      // observations render side by side in the same line (the 'w' for
-      // soft stays letter-distinct from every position glyph).
-      cervixFirmness: i == 0 ? CervixFirmness.soft : null,
-    ),
-  DailyEntry(date: DateTime.utc(2026, 9, 12), bbtC: 37.0),
+  DailyEntry(
+    date: _cervixDay(0),
+    bbtC: 36.5,
+    cervixPosition: CervixPosition.low,
+    cervixOpening: CervixOpening.closed,
+    cervixFirmness: CervixFirmness.soft,
+  ),
+  DailyEntry(
+    date: _cervixDay(1),
+    bbtC: 36.6,
+    cervixPosition: CervixPosition.medium,
+    cervixOpening: CervixOpening.middle,
+  ),
+  DailyEntry(
+    date: _cervixDay(2),
+    bbtC: 36.7,
+    cervixPosition: CervixPosition.high,
+    cervixOpening: CervixOpening.open,
+  ),
+  DailyEntry(
+    date: _cervixDay(3),
+    bbtC: 36.8,
+    cervixPosition: CervixPosition.veryHigh,
+    cervixOpening: CervixOpening.open,
+    cervixFirmness: CervixFirmness.halfSoft,
+  ),
+  DailyEntry(
+    date: _cervixDay(4),
+    bbtC: 36.9,
+    cervixPosition: CervixPosition.unreachable,
+    cervixOpening: CervixOpening.open,
+  ),
+  DailyEntry(
+    date: _cervixDay(5),
+    bbtC: 37.0,
+    cervixOpening: CervixOpening.open,
+  ),
+  DailyEntry(
+    date: _cervixDay(6),
+    bbtC: 36.4,
+    cervixPosition: CervixPosition.medium,
+  ),
+  DailyEntry(
+    date: _cervixDay(7),
+    bbtC: 36.5,
+    cervixFirmness: CervixFirmness.soft,
+  ),
+  DailyEntry(
+    date: _cervixDay(8),
+    bbtC: 36.6,
+    painBreast: true,
+    notes:
+        'Impfung nachgekauft (Rückfrage bei Dr. Wild) '
+        '\nArztbesuche nachtragen',
+  ),
+  DailyEntry(
+    date: _cervixDay(9),
+    bbtC: 36.7,
+    cervixPosition: CervixPosition.medium,
+    cervixFirmness: CervixFirmness.soft,
+    notes: 'Nachkontrolle beim Frauenarzt',
+  ),
+  DailyEntry(
+    date: _cervixDay(10),
+    bbtC: 36.8,
+    cervixPosition: CervixPosition.medium,
+    cervixFirmness: CervixFirmness.soft,
+    notes: ' \n ',
+  ),
+  DailyEntry(
+    date: _cervixDay(11),
+    bbtC: 36.9,
+    cervixPosition: CervixPosition.medium,
+    cervixFirmness: CervixFirmness.soft,
+    painBreast: true,
+    notes: 'Beim Sport gezogen',
+  ),
 ];
 
 Widget _cervixHarness({required List<DailyEntry> entries}) => chartHarness(
@@ -480,7 +566,7 @@ const _glossaryEn = [
   'Cervix position',
   'Cervix firmness',
   'Breast pain (B)',
-  'Note (this day carries a note in the Diary)',
+  'Note (diary text, shown vertically per day)',
 ];
 
 /// The German glossary wording (authoritative draft per the language
@@ -503,7 +589,7 @@ const _glossaryDe = [
   'Muttermund-Position',
   'Muttermund-Festigkeit',
   'Brustschmerz (B)',
-  'Notiz (für diesen Tag ist eine Notiz im Tagebuch vorhanden)',
+  'Notiz (Tagebuchtext, am Tag senkrecht dargestellt)',
 ];
 
 const _arithmeticNoteEn =
@@ -534,12 +620,12 @@ Widget _helpSheetHarness({
 //     value→pixel mapping as the plot (shared from the chart's min/max and
 //     plot height — one source of truth), with the 0.5 °C interval and the
 //     two-scale numbering (plain integers, halves with one decimal),
-//  3. the per-signal-row corner sample glyphs (bleeding box, Mittelschmerz
-//     M, cervix letter, B, clock), each vertically aligned with its signal
+//  3. the per-signal-row corner sample glyphs (bleeding box, clock,
+//     sticky-note band sample), each vertically aligned with its signal
 //     row's fixed-height slot; the rows' segments mirror the scroll
 //     content: the top-of-block rows (bleeding, M) stack between the
 //     header prototypes and the temperature scale, and the below-chart
-//     strip's rows (time, disturbance, cervix, pain, note) form ONE
+//     strip's rows (time, disturbance, notes band) form ONE
 //     segment below the marks slot. The mucus letters, the sex X marks
 //     and the peak dot render INSIDE the plot (chart_marks.dart), so they
 //     have no row and no rail slot.
@@ -594,23 +680,21 @@ Widget _leftRailHarness({
   TemperatureRange? range,
 }) => chartHarness(entries: entries, locale: locale, temperatureRange: range);
 
-// Widget tests of the day-note indicator on the cycle chart: a day whose
-// entry carries a non-empty notes text shows a small indicator glyph in
-// its day column in the row BELOW the chart block — the LAST row of the
-// below-chart strip (per the paper sheet, whose remarks block sits at the
-// very bottom under the Uhrzeit strip — placement flagged
-// TODO(user-review) in the chart code). Days with an
-// empty/absent notes field render nothing. Tapping the indicator cell
-// opens the day's mark-entry sheet like every other cell.
-//
+// Widget tests of the notes band on the cycle chart: a day whose entry
+// carries a non-empty notes text shows the joined note text in its day
+// column — rotated to read bottom→top and anchored at the band bottom.
+// The band is the LAST segment of the below-chart strip (per the paper
+// sheet, whose remarks block sits at the very bottom). Days with an
+// empty/absent notes field render no text. Tapping any band cell opens
+// the day options panel like every other cell.
 
 DateTime _noteDay(int index) => DateTime.utc(2026, 9, 7 + index);
 
 // Four chart days:
-//  0: plain temperature, no notes                 -> no indicator
-//  1: temperature WITH a note                     -> indicator
-//  2: notes = empty string                        -> no indicator
-//  3: temperature WITHOUT a recorded note field   -> no indicator
+//  0: plain temperature, no notes                 -> no note text
+//  1: temperature WITH a note                     -> rotated note text
+//  2: notes = empty string                        -> no note text
+//  3: temperature WITHOUT a recorded note field   -> no note text
 final _noteEntries = <DailyEntry>[
   DailyEntry(date: _noteDay(0), bbtC: 36.5),
   DailyEntry(date: _noteDay(1), bbtC: 36.6, notes: 'Impfung heute'),
@@ -626,9 +710,9 @@ Widget _noteHarness({
 // Widget tests of the per-signal rows under the cycle chart (the paper's
 // recording rows): one always-rendered row per signal — bleeding, mucus
 // (with the reserved solid peak-dot slot above the glyph), measurement
-// time, cervix, pain. The rows hold ONLY day cells — their sample
-// glyphs and localized row names live in the frozen left rail (see
-// the left-rail section), keyed `${row}Corner` there. The
+// time, disturbance, and the merged notes band. The rows hold ONLY day
+// cells — their sample glyphs and localized row names live in the frozen
+// left rail (see the left-rail section), keyed `${row}Corner` there. The
 // measurement time renders as localized HH:mm text ONLY when the day
 // column is wide enough; no per-day clock icon exists anywhere in the
 // rows. Tapping a row cell opens the day's mark-entry sheet.
@@ -646,17 +730,10 @@ const _dayCount = 9;
 // The chart block's recording rows, top-down in render order: the single
 // top strip row (bleeding), then the single below-chart strip in the
 // owner-decided order — measurement time first, the disturbance letters,
-// cervix, pain, and at the very bottom (the paper sheet's remarks home)
-// the note indicator. The mucus letters, sex Xs, Mittelschmerz M and
+// then the merged notes band at the very bottom (the paper sheet's
+// remarks home). The mucus letters, sex Xs, Mittelschmerz M and
 // evaluation numbers render inside the plot (the in-plot glyph section).
-const _signalRows = [
-  'bleeding',
-  'time',
-  'disturbance',
-  'cervix',
-  'pain',
-  'note',
-];
+const _signalRows = ['bleeding', 'time', 'disturbance', 'notesBand'];
 
 // The bleeding row's dedicated level fixture: every level recorded once,
 // on consecutive days — day 0 none(0), day 1 light, day 2 spotting,
@@ -757,8 +834,9 @@ Widget _temperatureHarness({
 // per-day clock glyph is gone — the clock lives only in the row corner),
 // the sex time slots (one X glyph per SET SexTiming bit, drawn at
 // that slot's third of the day column — multiple bits render multiple X
-// marks), and the letter-coded pain flags B (breast, in the pain row) and
-// M (Mittelschmerz, inside the plot below the mucus letters). Days without
+// marks), the letter-coded pain flag B (breast, in the notes band's pain
+// row) and M (Mittelschmerz, inside the plot below the mucus
+// letters). Days without
 // the respective fact render nothing.
 
 DateTime _timeSexPainDay(int index) => DateTime.utc(2026, 9, 7 + index);
@@ -968,7 +1046,7 @@ void main() {
       );
       // The below-chart strip's rows keep the shared center too (their
       // windowed cells sit at the same global column positions).
-      for (final row in ['time', 'disturbance', 'cervix', 'pain', 'note']) {
+      for (final row in ['time', 'disturbance', 'notesBand']) {
         expect(
           dotX,
           closeTo(_cellCenterX(tester, '${row}Cell-$i'), 0.5),
@@ -1013,67 +1091,399 @@ void main() {
   // former test/cycle_chart_cervix_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
 
-  testWidgets('every recorded position renders one glyph under the curve', (
-    tester,
-  ) async {
+  testWidgets('the band cells match the band-height constant and every '
+      'windowed day renders one', (tester) async {
     await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
 
-    // One glyph per position category, checked inside its own cervix cell
-    // (ValueKey convention 'cervixCell-$i'): low..unreachable days 0..4, day
-    // 5 carries NO Muttermund observation and must render no glyph. The
-    // scoping matters: the legend shows a sample glyph too.
-    final glyphOf = {
-      0: 't', // low (tief)
-      1: 'm', // medium
-      2: 'h', // high
-      3: 'sh', // very high
-      4: 'u', // unreachable
-    };
-    for (final MapEntry(:key, :value) in glyphOf.entries) {
+    expect(
+      notesBandHeight,
+      90,
+      reason:
+          'the band stacks the cervix glyph zone, the letter row, the '
+          'breast-pain row and the note zone',
+    );
+    for (var i = 0; i < _cervixEntries().length; i++) {
+      final cell = tester.getRect(chartCell(i, 'notesBand'));
       expect(
-        find.descendant(
-          of: find.byKey(ValueKey('cervixCell-$key')),
-          matching: find.text(value),
-        ),
-        findsOneWidget,
-        reason:
-            'position category index $key renders its glyph under the '
-            'curve inside its own cell',
-      );
-    }
-    // Negative assertion against ALL five glyph letters (not a vacuous
-    // find.text('') match): day 5 has no cervix observation, so none of
-    // them may appear inside its cervix cell.
-    for (final glyph in glyphOf.values) {
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('cervixCell-5')),
-          matching: find.text(glyph),
-        ),
-        findsNothing,
-        reason: 'no "$glyph" glyph for a day without an observation',
+        cell.height,
+        closeTo(notesBandHeight, 0.01),
+        reason: 'day $i: the band cell is one notesBandHeight band',
       );
     }
   });
 
-  testWidgets('the firmness glyph renders beside the position glyph', (
+  testWidgets('the opening paints a circle sized by its value in its '
+      'position slot; a position without an opening paints nothing', (
     tester,
   ) async {
     await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
 
-    // Day 0 additionally carries the firmness observation: its glyph
-    // renders BESIDE the position letter in the same cervix line ('w' for
-    // soft, distinct from every position letter).
+    final circleOf = {
+      0: CervixOpening.closed, // low slot
+      1: CervixOpening.middle, // medium slot
+      2: CervixOpening.open, // high slot
+      3: CervixOpening.open, // veryHigh slot
+      4: CervixOpening.open, // unreachable slot — topmost, past veryHigh
+      5: CervixOpening.open, // opening-only day: medium slot
+    };
+    final diameterOf = {
+      CervixOpening.closed: 4.0,
+      CervixOpening.middle: 6.0,
+      CervixOpening.open: 8.0,
+    };
+    for (final MapEntry(:key, :value) in circleOf.entries) {
+      final keyFinder = find.byKey(ValueKey('cervixSlotGlyph-$key'));
+      final circle = tester.widget<Container>(keyFinder);
+      final decoration = circle.decoration! as BoxDecoration;
+      final rect = tester.getRect(keyFinder);
+      expect(
+        decoration.shape,
+        BoxShape.circle,
+        reason: 'day $key renders its opening as circle geometry',
+      );
+      expect(
+        rect.width,
+        diameterOf[value],
+        reason: "day $key: the circle's diameter communicates the opening",
+      );
+      expect(
+        rect.height,
+        diameterOf[value],
+        reason: "day $key: the circle's diameter communicates the opening",
+      );
+      if (value == CervixOpening.closed) {
+        expect(
+          decoration.color,
+          isNotNull,
+          reason: 'day $key: the closed opening is the filled dot',
+        );
+        expect(
+          decoration.border,
+          isNull,
+          reason: 'day $key: the filled dot carries no stroke',
+        );
+      } else {
+        expect(
+          decoration.color,
+          isNull,
+          reason: "day $key: the opening's ring is an outline circle",
+        );
+        expect(
+          (decoration.border! as Border).top.width,
+          1.3,
+          reason: "day $key: the ring stroke is the shared circle stroke",
+        );
+      }
+    }
+
+    // A position value is only the slot anchor: without an opening
+    // nothing paints in the glyph zone (day 6 records a position only,
+    // days 9–11 record other observations without an opening).
+    for (final index in [6, 9, 10, 11]) {
+      expect(
+        find.byKey(ValueKey('cervixSlotGlyph-$index')),
+        findsNothing,
+        reason:
+            'day $index: a position without an opening renders no '
+            'slot ink',
+      );
+      expect(
+        find.descendant(
+          of: chartCell(index, 'notesBand'),
+          matching: find.byWidgetPredicate((w) => w is Text && w.data == 'm'),
+        ),
+        findsNothing,
+        reason: 'day $index: positions paint no letter ink',
+      );
+    }
+
+    // The slots encode the position anchored at the band top: the ink
+    // centers step DOWNWARD (larger y) with lower positions — unreachable
+    // topmost, then veryHigh, high, medium, low.
+    double inkCenterY(int index) => tester
+        .getRect(find.byKey(ValueKey('cervixSlotGlyph-$index')))
+        .center
+        .dy;
+    final centers = [
+      for (final i in [4, 3, 2, 1, 0]) inkCenterY(i),
+    ];
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('cervixCell-0')),
-        matching: find.text('w'),
-      ),
-      findsOneWidget,
+      centers,
+      [...centers]..sort(),
       reason:
-          'the firmness glyph renders beside the position glyph in the '
-          'same cervix line',
+          'the slot inks step downward with falling position '
+          '(unreachable topmost … low lowest)',
     );
+    final cell4 = tester.getRect(chartCell(4, 'notesBand'));
+    expect(
+      centers.first,
+      closeTo(cell4.top + 5, 0.5),
+      reason: 'the topmost slot anchors 5 px below the band top',
+    );
+
+    // Every day whose observations still paint the medium slot shares ONE
+    // slot: the opening-only circle keeps the same ink center as the
+    // position+opening day (the letter row and its note never shift the
+    // glyph).
+    final mediumCenter = inkCenterY(1);
+    for (final i in [5]) {
+      expect(
+        inkCenterY(i),
+        closeTo(mediumCenter, 0.5),
+        reason:
+            'day $i: the medium slot center is fixed — the letter row '
+            'and the note never shift the glyph',
+      );
+    }
+  });
+
+  testWidgets('the firmness letter renders iff a firmness value exists, in '
+      'the fixed letter row below the glyph zone', (tester) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    final expectedLetter = {0: 'w', 3: 'h-w', 7: 'w', 9: 'w', 10: 'w', 11: 'w'};
+    for (final MapEntry(:key, :value) in expectedLetter.entries) {
+      final ink = find.byKey(ValueKey('cervixFirmnessGlyph-$key'));
+      expect(ink, findsOneWidget, reason: 'day $key renders its firmness ink');
+      expect(
+        tester.widget<Text>(ink).data,
+        value,
+        reason: 'day $key shows the firmness shorthand "$value"',
+      );
+      final rect = tester.getRect(ink);
+      final cell = tester.getRect(chartCell(key, 'notesBand'));
+      expect(
+        rect.top,
+        closeTo(cell.top + 30, 0.5),
+        reason:
+            'day $key: the letter row starts where the glyph zone ends — '
+            'the same height on every cervix day, position and note '
+            'regardless',
+      );
+    }
+    for (final key in [2, 8]) {
+      expect(
+        find.byKey(ValueKey('cervixFirmnessGlyph-$key')),
+        findsNothing,
+        reason: 'day $key records no firmness and shows no letter',
+      );
+    }
+
+    // The letter still renders below the slot ink — the circle's
+    // distance to the row communicates the position.
+    for (final key in [0, 3]) {
+      expect(
+        tester
+            .getRect(find.byKey(ValueKey('cervixFirmnessGlyph-$key')))
+            .center
+            .dy,
+        greaterThan(
+          tester
+              .getRect(find.byKey(ValueKey('cervixSlotGlyph-$key')))
+              .center
+              .dy,
+        ),
+        reason: 'day $key: the firmness letter renders below the slot ink',
+      );
+    }
+  });
+
+  testWidgets('the note zone top follows the band stack: below letter row '
+      'and pain row on cervix days, below the pain row alone on '
+      'cervix-free days, full band on cervix-free pain-free days', (
+    tester,
+  ) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    // Day 9's note zone starts below the FULL reserved top block — the
+    // same height every cervix day carries.
+    final cell9 = tester.getRect(chartCell(9, 'notesBand'));
+    final day9Note = tester.getRect(find.byKey(const ValueKey('notesText-9')));
+    expect(
+      day9Note.top,
+      closeTo(cell9.top + cervixGlyphZoneHeight + cervixLetterRowHeight, 0.5),
+      reason:
+          "a cervix day's note zone starts below the fixed glyph zone and "
+          'letter row',
+    );
+    // Day 11 adds the breast-pain row between the letter row and the note
+    // zone; the reserved cervix block itself stays untouched.
+    final cell11 = tester.getRect(chartCell(11, 'notesBand'));
+    final day11Note = tester.getRect(
+      find.byKey(const ValueKey('notesText-11')),
+    );
+    expect(
+      day11Note.top,
+      closeTo(
+        cell11.top +
+            cervixGlyphZoneHeight +
+            cervixLetterRowHeight +
+            painRowHeight,
+        0.5,
+      ),
+      reason:
+          "a cervix pain day's note zone starts below the pain row that "
+          'follows the letter row',
+    );
+    // Day 8 is cervix-free: the pain row takes the band top and the note
+    // zone starts below it.
+    final cell8 = tester.getRect(chartCell(8, 'notesBand'));
+    final day8Note = tester.getRect(find.byKey(const ValueKey('notesText-8')));
+    expect(
+      day8Note.top,
+      closeTo(cell8.top + painRowHeight, 0.5),
+      reason:
+          'on a cervix-free pain day the note zone starts below the '
+          'topmost pain row',
+    );
+    expect(
+      day8Note.height,
+      closeTo(notesBandHeight - painRowHeight, 1),
+      reason: 'the cervix-free pain day notes the band minus the pain row',
+    );
+  });
+
+  testWidgets('a whitespace-only note folds to nothing: no note text '
+      'renders and the cervix zones keep their fixed geometry', (tester) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    expect(
+      find.byKey(const ValueKey('notesText-10')),
+      findsNothing,
+      reason:
+          "day 10's whitespace-only note folds to no text — no "
+          'invisible glyph renders',
+    );
+    final cell10 = tester.getRect(chartCell(10, 'notesBand'));
+    final letter = tester.getRect(
+      find.byKey(const ValueKey('cervixFirmnessGlyph-10')),
+    );
+    expect(
+      letter.top,
+      closeTo(cell10.top + 30, 0.5),
+      reason: "day 10's letter row keeps its fixed place without a note",
+    );
+  });
+
+  testWidgets('the notes teaser reads top→bottom anchored at the note zone '
+      "top, joined, single line and ellipsized; the note text keeps the "
+      'column edge on pain and pain-free days alike', (tester) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    final note = tester.widget<Text>(find.byKey(const ValueKey('notesText-8')));
+    expect(
+      note.data,
+      'Impfung nachgekauft (Rückfrage bei Dr. Wild) Arztbesuche nachtragen',
+      reason: 'the notes teaser folds newlines to a space like the PDF',
+    );
+    expect(note.maxLines, 1, reason: 'the teaser is a single line');
+    expect(
+      note.overflow,
+      TextOverflow.ellipsis,
+      reason: 'the teaser ellipsizes instead of wrapping',
+    );
+    final rotated = find
+        .ancestor(
+          of: find.byKey(const ValueKey('notesText-8')),
+          matching: find.byType(RotatedBox),
+        )
+        .first;
+    expect(
+      tester.widget<RotatedBox>(rotated).quarterTurns,
+      1,
+      reason: 'the rotated box reads top→bottom',
+    );
+    final noteRect = tester.getRect(find.byKey(const ValueKey('notesText-8')));
+    final cell8 = tester.getRect(chartCell(8, 'notesBand'));
+    expect(
+      noteRect.top,
+      closeTo(cell8.top + painRowHeight, 1),
+      reason: 'the note text anchors at the note zone top, below the pain row',
+    );
+    expect(
+      noteRect.left,
+      closeTo(cell8.left, 1),
+      reason:
+          'the pain letter lives in its own row — the note text keeps the '
+          'column edge, no left clearance',
+    );
+
+    final cell9 = tester.getRect(chartCell(9, 'notesBand'));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('notesText-9'))).left,
+      closeTo(cell9.left, 1),
+      reason: "a pain-free day's note text sits at the column edge",
+    );
+
+    for (final i in [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]) {
+      expect(
+        find.byKey(ValueKey('painBreastGlyph-$i')),
+        findsNothing,
+        reason: 'day $i records no breast pain and shows no B',
+      );
+      expect(
+        find.descendant(
+          of: chartCell(i, 'notesBand'),
+          matching: find.byWidgetPredicate((w) => w is Text && w.data == 'B'),
+        ),
+        findsNothing,
+        reason: 'no breast-pain letter in day $i\'s band',
+      );
+    }
+  });
+
+  testWidgets('the breast-pain letter renders as a plain letter centered in '
+      'its dedicated row — below the letter row on cervix days, at the band '
+      'top on cervix-free days', (tester) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    Finder inkOf(int index) => find.byKey(ValueKey('painBreastGlyph-$index'));
+
+    final plain = tester.widget<Text>(inkOf(8));
+    expect(plain.data, 'B', reason: 'the pain ink is the plain B letter');
+
+    for (final index in [8, 11]) {
+      final rowTop = index == 8
+          ? tester.getRect(chartCell(index, 'notesBand')).top
+          : tester.getRect(chartCell(index, 'notesBand')).top +
+                cervixGlyphZoneHeight +
+                cervixLetterRowHeight;
+      final ink = tester.getRect(inkOf(index));
+      expect(
+        ink.center.dy,
+        closeTo(rowTop + painRowHeight / 2, 0.5),
+        reason:
+            'day $index: the B letter centers vertically in its '
+            '$painRowHeight-px pain row',
+      );
+      expect(
+        ink.center.dx,
+        closeTo(tester.getRect(chartCell(index, 'notesBand')).center.dx, 0.5),
+        reason:
+            'day $index: the B letter centers horizontally like the '
+            'firmness letters, no fixed left pin',
+      );
+      expect(
+        ink.bottom,
+        lessThanOrEqualTo(rowTop + painRowHeight + 0.5),
+        reason: "day $index: the B letter stays inside its pain row",
+      );
+    }
+
+    expect(
+      find.byKey(const ValueKey('painBreastGlyph-9')),
+      findsNothing,
+      reason: 'day 9 records no breast pain — no pain row is reserved',
+    );
+  });
+
+  testWidgets('a cervix-free day renders no cervix ink in its band', (
+    tester,
+  ) async {
+    await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
+
+    expect(find.byKey(const ValueKey('cervixSlotGlyph-8')), findsNothing);
+    expect(find.byKey(const ValueKey('cervixFirmnessGlyph-8')), findsNothing);
   });
 
   // ═══════════ day labels ═══════════
@@ -2668,7 +3078,7 @@ void main() {
       );
 
       final onSurface = chartScheme(tester).onSurface;
-      for (final row in const ['bleeding', 'cervix', 'pain', 'time']) {
+      for (final row in const ['bleeding', 'time', 'notesBand']) {
         final border = _cellBorder(tester, 1, row);
         expect(
           border.right.width,
@@ -2747,7 +3157,7 @@ void main() {
 
         // The thick border sits on the cell BEFORE the new cycle (its right
         // edge is the separator), in every signal row.
-        for (final row in const ['bleeding', 'cervix', 'pain', 'time']) {
+        for (final row in const ['bleeding', 'time', 'notesBand']) {
           final thick = _cellBorder(tester, 4, row);
           expect(
             thick.right.width,
@@ -2845,7 +3255,7 @@ void main() {
       // border on the cell before the new cycle. (The chart's extra
       // separator line would sit exactly at the domain's left edge x =
       // −0.5, where its 2 px stroke clamps outside the plot.)
-      const edgeThickRows = ['bleeding', 'cervix', 'pain', 'time'];
+      const edgeThickRows = ['bleeding', 'time', 'notesBand'];
       for (final row in edgeThickRows) {
         final border = _cellBorder(tester, 0, row);
         expect(
@@ -3801,14 +4211,7 @@ void main() {
         'aligned with its signal row', (tester) async {
       await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
 
-      const rows = [
-        'bleeding',
-        'cervix',
-        'pain',
-        'disturbance',
-        'time',
-        'note',
-      ];
+      const rows = ['bleeding', 'time', 'disturbance', 'notesBand'];
       for (final row in rows) {
         final corner = find.byKey(ValueKey('${row}Corner'));
         expect(
@@ -3856,13 +4259,13 @@ void main() {
 
     testWidgets(
       'the below-chart strip is ONE rail segment: its glyph slots keep '
-      'the owner-decided order time, disturbance, cervix, pain, note',
+      'the owner-decided order time, disturbance, notes band',
       (tester) async {
         await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
 
         double top(String row) =>
             tester.getRect(find.byKey(ValueKey('${row}Corner'))).top;
-        const strip = ['time', 'disturbance', 'cervix', 'pain', 'note'];
+        const strip = ['time', 'disturbance', 'notesBand'];
         final tops = [for (final row in strip) top(row)];
         expect(
           tops,
@@ -3981,36 +4384,34 @@ void main() {
     });
   });
 
-  // ═══════════ note indicator ═══════════
+  // ═══════════ notes band ═══════════
   // former test/cycle_chart_note_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
 
-  testWidgets('a day with a non-empty note renders the indicator glyph in its '
-      'day column, below the chart block', (tester) async {
+  testWidgets('a day with a non-empty note renders its text in the notes '
+      'band, below the chart block', (tester) async {
     await pumpChart(tester, _noteHarness(entries: _noteEntries));
 
-    // The glyph rides in the day's column (the LAST row of the
+    // The note text rides in the day's column (the LAST segment of the
     // below-chart strip, the paper "Bemerkungen" home).
     final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
-    final noteRect = tester.getRect(chartCell(1, 'note'));
+    final noteRect = tester.getRect(chartCell(1, 'notesBand'));
     expect(
       noteRect.top,
       greaterThan(chartBottom),
-      reason: 'the note-indicator row sits below the chart block',
+      reason: 'the notes band sits below the chart block',
     );
     expect(
       tester.getRect(chartCell(1, 'time')).top,
       lessThan(noteRect.top),
-      reason:
-          'the note indicator renders below the measurement-time '
-          'row, below the chart block',
+      reason: 'the notes band renders below the measurement-time row',
     );
-    for (final row in ['disturbance', 'cervix', 'pain']) {
+    for (final row in ['disturbance']) {
       expect(
         noteRect.top,
         greaterThan(tester.getRect(chartCell(1, row)).top),
         reason:
-            'the note indicator renders below the $row row — notes '
+            'the notes band renders below the $row row — notes '
             'are last in the below-chart strip',
       );
     }
@@ -4018,51 +4419,56 @@ void main() {
     expect(
       noteRect.left,
       closeTo(cell.left, 0.5),
-      reason: 'the note cell shares the day column geometry',
+      reason: 'the band cell shares the day column geometry',
     );
 
-    // The indicator glyphs: the sticky-note icon, one per noted day.
+    // The noted day 1 shows the note text ink in its column; a cervix-free,
+    // pain-free day anchors it at the full band top.
     expect(
-      chartCellContent(1, 'note', find.byIcon(Icons.sticky_note_2_outlined)),
+      find.byKey(const ValueKey('notesText-1')),
       findsOneWidget,
-      reason: 'noted day 1 shows the indicator glyph in its column',
+      reason: 'noted day 1 shows its note text in the band',
+    );
+    expect(
+      tester.getRect(find.byKey(const ValueKey('notesText-1'))).top,
+      closeTo(noteRect.top, 0.5),
+      reason:
+          'without cervix or pain rows the note text anchors at the band top',
     );
   });
 
-  testWidgets('empty/absent notes render nothing', (tester) async {
+  testWidgets('empty/absent notes render no note text', (tester) async {
     await pumpChart(tester, _noteHarness(entries: _noteEntries));
 
     for (final i in [0, 2, 3]) {
       expect(
-        chartCellContent(i, 'note', find.byIcon(Icons.sticky_note_2_outlined)),
+        find.byKey(ValueKey('notesText-$i')),
         findsNothing,
         reason: 'day $i carries no note text',
       );
     }
   });
 
-  testWidgets('tapping a note-indicator cell opens the day sheet', (
-    tester,
-  ) async {
+  testWidgets('tapping a notes-band cell opens the day sheet', (tester) async {
     await pumpChart(tester, _noteHarness(entries: _noteEntries));
 
-    await tester.tap(chartCell(1, 'note'), warnIfMissed: false);
+    await tester.tap(chartCell(1, 'notesBand'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(cycleDayPanel(), findsOneWidget);
     final sheet = tester.widget<CycleDayPanel>(cycleDayPanel());
-    expect(sheet.day, _noteDay(1), reason: 'the tapped note cell owns day 1');
+    expect(sheet.day, _noteDay(1), reason: 'the tapped band cell owns day 1');
   });
 
-  testWidgets('the note row has a rail corner slot with the localized row '
+  testWidgets('the notes band has a rail corner slot with the localized row '
       'name (en and de)', (tester) async {
     await pumpChart(tester, _noteHarness(entries: _noteEntries));
 
-    expect(chartCellCorner('note'), findsOneWidget);
+    expect(chartCellCorner('notesBand'), findsOneWidget);
     final tooltips = tester
         .widgetList<Tooltip>(
           find.descendant(
-            of: chartCellCorner('note'),
+            of: chartCellCorner('notesBand'),
             matching: find.byType(Tooltip),
           ),
         )
@@ -4070,14 +4476,14 @@ void main() {
         .toList();
     expect(tooltips, [
       'Note',
-    ], reason: 'the note corner carries the localized row name');
+    ], reason: 'the band corner carries the localized row name');
 
-    final cornerCenter = tester.getRect(chartCellCorner('note')).center.dy;
-    final cellCenter = tester.getRect(chartCell(1, 'note')).center.dy;
+    final cornerCenter = tester.getRect(chartCellCorner('notesBand')).center.dy;
+    final cellCenter = tester.getRect(chartCell(1, 'notesBand')).center.dy;
     expect(
       cornerCenter,
       closeTo(cellCenter, 0.5),
-      reason: 'the note rail glyph is vertically centered on the row',
+      reason: 'the band rail glyph is vertically centered on the row',
     );
 
     await pumpChart(
@@ -4087,23 +4493,21 @@ void main() {
     final deTooltips = tester
         .widgetList<Tooltip>(
           find.descendant(
-            of: chartCellCorner('note'),
+            of: chartCellCorner('notesBand'),
             matching: find.byType(Tooltip),
           ),
         )
         .map((t) => t.message)
         .toList();
-    expect(deTooltips, ['Notiz'], reason: 'de: the note row is "Notiz"');
+    expect(deTooltips, ['Notiz'], reason: 'de: the band row is "Notiz"');
   });
 
-  testWidgets('the help sheet explains the note indicator (en and de)', (
+  testWidgets('the help sheet keeps the note entry (en and de)', (
     tester,
   ) async {
     final wording = {
-      const Locale('en'): 'Note (this day carries a note in the Diary)',
-      const Locale('de'):
-          'Notiz (für diesen Tag ist eine Notiz '
-          'im Tagebuch vorhanden)',
+      const Locale('en'): 'Note (diary text, shown vertically per day)',
+      const Locale('de'): 'Notiz (Tagebuchtext, am Tag senkrecht dargestellt)',
     };
     for (final MapEntry(:key, :value) in wording.entries) {
       await pumpChart(
@@ -4138,7 +4542,7 @@ void main() {
 
   group('paper layout: bleeding is the one top strip row', () {
     testWidgets('bleeding is the ONLY top strip row, above the curve; '
-        'cervix, pain and time stay below the block', (tester) async {
+        'disturbance and the notes band stay below the block', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
       final chartTop = tester.getRect(find.byType(LineChart)).top;
@@ -4150,7 +4554,7 @@ void main() {
             'the bleeding row renders in the TOP of the temperature '
             'block, above the curve (paper sheet)',
       );
-      for (final row in ['time', 'disturbance', 'cervix', 'pain', 'note']) {
+      for (final row in ['time', 'disturbance', 'notesBand']) {
         expect(
           tester.getRect(chartCell(0, row)).top,
           greaterThan(chartBottom),
@@ -4187,7 +4591,7 @@ void main() {
 
       double top(String row) => tester.getRect(chartCellCorner(row)).top;
       // The below-chart strip keeps the owner-decided order (time first,
-      // notes last): time, disturbance, cervix, pain, note after the top
+      // notes last): time, disturbance, notes band after the top
       // segment and the curve.
       expect(
         top('time'),
@@ -4197,13 +4601,11 @@ void main() {
             'and the curve',
       );
       expect(top('disturbance'), greaterThan(top('time')));
-      expect(top('cervix'), greaterThan(top('disturbance')));
-      expect(top('pain'), greaterThan(top('cervix')));
-      expect(top('note'), greaterThan(top('pain')));
+      expect(top('notesBand'), greaterThan(top('disturbance')));
     });
 
     testWidgets('the Mittelschmerz M renders INSIDE the plot below the '
-        'mucus letters, column-centered; the pain row carries only B', (
+        'mucus letters, column-centered; the band keeps only B', (
       tester,
     ) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
@@ -4236,17 +4638,17 @@ void main() {
         findsOneWidget,
         reason: 'the M ink carries its halo layer',
       );
-      // The other days carry no M; the pain row keeps only B.
+      // The other days carry no M; the band keeps only B.
       expect(find.byKey(const ValueKey('inPlotM-7')), findsNothing);
       expect(
-        chartCellContent(4, 'pain', find.text('M')),
+        chartCellContent(4, 'notesBand', find.text('M')),
         findsNothing,
-        reason: 'the pain row never carries the M letter',
+        reason: 'the band never carries the M letter',
       );
       expect(
-        chartCellContent(7, 'pain', find.text('B')),
+        find.byKey(const ValueKey('painBreastGlyph-7')),
         findsOneWidget,
-        reason: 'breast pain B stays in the strip\'s pain row',
+        reason: 'breast pain B renders in the band\'s pain row',
       );
     });
 
@@ -4268,7 +4670,7 @@ void main() {
 
   group('per-signal rows', () {
     testWidgets('every signal row renders for every windowed day, in order '
-        'bleeding, time, disturbance, cervix, pain, note', (tester) async {
+        'bleeding, time, disturbance, notes band', (tester) async {
       await pumpChart(tester, _rowsHarness(entries: _rowsEntries));
 
       for (var i = 0; i < _dayCount; i++) {
@@ -4283,7 +4685,7 @@ void main() {
         }
       }
 
-      // Row ORDER: the corner slots appear top-down bleeding .. note
+      // Row ORDER: the corner slots appear top-down bleeding .. notes band
       // (paper layout: bleeding alone inside the top of the temperature
       // block, the rest in the below-chart strip, time first).
       final corners = _signalRows.map(
@@ -4305,11 +4707,9 @@ void main() {
 
       final rowNames = {
         'bleeding': 'Bleeding',
-        'cervix': 'Cervix',
-        'pain': 'Breast pain (B)',
         'disturbance': 'Disturbed measurement',
         'time': 'Measurement time',
-        'note': 'Note',
+        'notesBand': 'Note',
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
         expect(find.byKey(ValueKey('${key}Corner')), findsOneWidget);
@@ -4339,8 +4739,8 @@ void main() {
         );
       }
 
-      // The sample glyphs: a bleeding box, a cervix letter, and the B
-      // pain letter.
+      // The corner sample glyphs: a bleeding box and the sticky-note band
+      // sample.
       expect(
         find.descendant(
           of: chartCellCorner('bleeding'),
@@ -4353,22 +4753,14 @@ void main() {
       );
       expect(
         find.descendant(
-          of: chartCellCorner('cervix'),
-          matching: find.text('m'),
+          of: chartCellCorner('notesBand'),
+          matching: find.byIcon(Icons.sticky_note_2_outlined),
         ),
         findsOneWidget,
-        reason: 'the cervix corner shows a position letter sample',
-      );
-      expect(
-        find.descendant(of: chartCellCorner('pain'), matching: find.text('B')),
-        findsOneWidget,
         reason:
-            'the pain corner shows the B sample (the Mittelschmerz M '
-            'renders inside the plot, not in a rail corner)',
-      );
-      expect(
-        find.descendant(of: chartCellCorner('pain'), matching: find.text('M')),
-        findsNothing,
+            'the band corner shows the sticky-note sample (the cervix '
+            'and breast-pain vocabulary has no extra rail corner: it '
+            'lives in the band itself)',
       );
       expect(
         find.descendant(
@@ -4388,11 +4780,9 @@ void main() {
 
       final rowNames = {
         'bleeding': 'Blutung',
-        'cervix': 'Muttermund',
-        'pain': 'Brustschmerz (B)',
         'disturbance': 'Messstörung',
         'time': 'Messzeitpunkt',
-        'note': 'Notiz',
+        'notesBand': 'Notiz',
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
         final tooltips = tester
@@ -5828,7 +6218,7 @@ void main() {
       'the below-chart strip', () {
     testWidgets(
       'the time row renders BELOW the chart block, at the strip\'s top '
-      '— above the disturbance, cervix and pain rows — for every '
+      '— above the disturbance row and the notes band — for every '
       'day with a recorded measurement time',
       (tester) async {
         await pumpChart(
@@ -5838,7 +6228,7 @@ void main() {
 
         final chartBottom = tester.getRect(find.byType(LineChart)).bottom;
         // Own row below the block, first in the strip: the time row starts
-        // after the chart, but above disturbance/cervix/pain (owner order:
+        // after the chart, but above disturbance and the band (owner order:
         // time first in the below-chart strip).
         expect(
           tester.getRect(chartCell(0, 'time')).top,
@@ -5850,15 +6240,13 @@ void main() {
           lessThan(tester.getRect(chartCell(0, 'disturbance')).top),
           reason: 'the time row renders above the disturbance row',
         );
-        for (final row in ['cervix', 'pain']) {
-          expect(
-            tester.getRect(chartCell(0, 'time')).top,
-            lessThan(tester.getRect(chartCell(0, row)).top),
-            reason:
-                'the time row renders above the $row row — time is '
-                'the first row of the below-chart strip',
-          );
-        }
+        expect(
+          tester.getRect(chartCell(0, 'time')).top,
+          lessThan(tester.getRect(chartCell(0, 'notesBand')).top),
+          reason:
+              'the time row renders above the notes band — time is '
+              'the first row of the below-chart strip',
+        );
         // Every day with a recorded time renders its HH:mm (the fixture's
         // only recorded time is day 0).
         expect(chartCellContent(0, 'time', find.text('06:30')), findsOneWidget);
@@ -5885,9 +6273,6 @@ void main() {
           (w) =>
               w.key is ValueKey<String> &&
               (w.key as ValueKey<String>).value.startsWith('timeCell-'),
-        );
-        Finder rotatedBoxes() => find.byWidgetPredicate(
-          (w) => w is RotatedBox && w.quarterTurns != 0,
         );
 
         final orientationCases =
@@ -5961,11 +6346,39 @@ void main() {
             // The time text survives the space constraint: the rendered
             // time cells carry the rotated HH:mm text (RotatedBox), never
             // empty — it is NEVER dropped.
+            final rotatedTime = find.descendant(
+              of: chartCell(checkedDay, 'time'),
+              matching: find.text('06:30'),
+            );
             expect(
-              find.descendant(of: rotatedBoxes(), matching: find.text('06:30')),
-              findsWidgets,
+              rotatedTime,
+              findsOneWidget,
               reason:
-                  '$label: the time renders vertically — it is NEVER dropped',
+                  '$label: the time renders vertically — it is NEVER '
+                  'dropped',
+            );
+            final rotatedBox = find
+                .ancestor(of: rotatedTime, matching: find.byType(RotatedBox))
+                .first;
+            expect(
+              tester.widget<RotatedBox>(rotatedBox).quarterTurns,
+              1,
+              reason:
+                  '$label: the vertical time reads top→bottom, like the '
+                  "band's note teaser",
+            );
+            // The time text scales to fill the row's full 30 px height, so
+            // geometry can't tell a top anchor from a centered one — pin the
+            // anchor itself instead.
+            final anchor = find
+                .ancestor(of: rotatedBox, matching: find.byType(Align))
+                .first;
+            expect(
+              tester.widget<Align>(anchor).alignment,
+              Alignment.topCenter,
+              reason:
+                  '$label: the vertical time anchors its reading start '
+                  'at the row top',
             );
             if (everyCellRotates) {
               expect(
@@ -5980,13 +6393,9 @@ void main() {
               expect(
                 find.descendant(
                   of: chartCell(checkedDay, 'time'),
-                  matching: find.descendant(
-                    of: rotatedBoxes(),
-                    matching: find.text('06:30'),
-                  ),
+                  matching: find.byType(RotatedBox),
                 ),
                 findsOneWidget,
-                reason: '$label: also renders the time vertically',
               );
             }
           } else {
@@ -6144,20 +6553,20 @@ void main() {
     );
   });
 
-  testWidgets('pain renders B in its row; Mittelschmerz renders M inside '
-      'the plot', (tester) async {
+  testWidgets('pain renders B in its band row; Mittelschmerz renders M '
+      'inside the plot', (tester) async {
     await pumpChart(
       tester,
       _timeSexPainHarness(entries: _timeSexPainEntries()),
     );
 
     expect(
-      chartCellContent(3, 'pain', find.text('B')),
+      find.byKey(const ValueKey('painBreastGlyph-3')),
       findsOneWidget,
-      reason: 'breast pain shows the B letter in the pain row',
+      reason: 'breast pain shows the B letter in its band row',
     );
     expect(
-      chartCellContent(3, 'pain', find.text('M')),
+      chartCellContent(3, 'notesBand', find.text('M')),
       findsNothing,
       reason: 'no Mittelschmerz letter without the flag',
     );
@@ -6167,27 +6576,22 @@ void main() {
       reason: 'Mittelschmerz shows the M letter inside the plot',
     );
     expect(
-      chartCellContent(4, 'pain', find.text('M')),
-      findsNothing,
-      reason: 'the pain row never carries the M letter',
-    );
-    expect(
-      chartCellContent(4, 'pain', find.text('B')),
+      find.byKey(const ValueKey('painBreastGlyph-4')),
       findsNothing,
       reason: 'no breast letter without the flag',
     );
-    expect(chartCellContent(5, 'pain', find.text('B')), findsOneWidget);
+    expect(find.byKey(const ValueKey('painBreastGlyph-5')), findsOneWidget);
     expect(find.byKey(const ValueKey('inPlotM-5')), findsOneWidget);
     expect(
-      chartCellContent(6, 'pain', find.text('B')),
+      find.byKey(const ValueKey('painBreastGlyph-6')),
       findsNothing,
       reason: 'a plain day shows no pain letter',
     );
     expect(find.byKey(const ValueKey('inPlotM-6')), findsNothing);
   });
 
-  testWidgets('a combined day carries the sex X marks alongside both pain '
-      'letters (B in the pain row, M inside the plot)', (tester) async {
+  testWidgets('a combined day carries the sex X marks alongside the band '
+      'pain row and the Mittelschmerz M inside the plot', (tester) async {
     await pumpChart(
       tester,
       _timeSexPainHarness(entries: _timeSexPainEntries()),
@@ -6199,11 +6603,11 @@ void main() {
       reason: 'the sex X marks render inside the plot',
     );
     expect(
-      chartCellContent(5, 'pain', find.text('B')),
+      find.byKey(const ValueKey('painBreastGlyph-5')),
       findsOneWidget,
       reason:
-          'the pain letter renders in its own row beside the sex '
-          'row',
+          'the B letter renders in the day\'s pain row beside the in-plot '
+          'sex marks',
     );
     expect(
       find.byKey(const ValueKey('inPlotM-5')),
@@ -6213,28 +6617,31 @@ void main() {
   });
 
   testWidgets('a firmness-only day renders its glyph with no position '
-      'letters', (tester) async {
+      'ink at all', (tester) async {
     await pumpChart(
       tester,
       _timeSexPainHarness(entries: _timeSexPainEntries()),
     );
 
     expect(
-      chartCellContent(7, 'cervix', find.text('w')),
+      find.byKey(const ValueKey('cervixFirmnessGlyph-7')),
       findsOneWidget,
       reason:
-          'the soft-firmness glyph (paper shorthand w) renders in its '
-          'own cell',
+          'the soft-firmness glyph (paper shorthand w) renders pinned '
+          'in the band\'s cervix zone',
     );
     for (final glyph in ['t', 'm', 'h', 'sh', 'u']) {
       expect(
-        chartCellContent(7, 'cervix', find.text(glyph)),
+        chartCellContent(7, 'notesBand', find.text(glyph)),
         findsNothing,
-        reason:
-            'no position letter ($glyph) without a position '
-            'observation',
+        reason: 'positions paint circles, never letters — ($glyph incl.)',
       );
     }
+    expect(
+      find.byKey(const ValueKey('cervixSlotGlyph-7')),
+      findsNothing,
+      reason: 'no slot glyph on a day whose opening was never recorded',
+    );
   });
 
   // ═══════════ weekend bands ═══════════

@@ -16,6 +16,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../domain/band_layout.dart';
 import '../domain/cervix.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
@@ -175,8 +176,6 @@ final class _CycleHelpSheet extends StatelessWidget {
             _HelpEntry(
               color: scheme.onSurface,
               label: l10n.cycleLegendNote,
-              // Sample note glyph: the sticky-note icon a noted day
-              // renders at the very bottom of the chart block.
               shape: _HelpEntryShape.note,
             ),
             const SizedBox(height: 12),
@@ -263,15 +262,39 @@ final class _HelpEntry extends StatelessWidget {
         ),
       ),
       _HelpEntryShape.arrowUp => ArrowUpGlyph(color: color),
-      // Sample Muttermund glyph: the "medium" letter, exactly how a
-      // recorded cervix day renders in the cervix row.
-      _HelpEntryShape.cervix => Text(
-        cervixPositionSymbol(CervixPosition.medium),
-        style: TextStyle(fontSize: 10, color: color),
+      // Sample Muttermund glyph: the painted opening circles by diameter
+      // (closed dot, middle ring, open ring — the shared band constants),
+      // stacked like the band's slots; the position only picks the slot
+      // and paints no ink of its own.
+      _HelpEntryShape.cervix => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (diameter, filled) in const [
+            (cervixClosedDotSize, true),
+            (cervixMiddleCircleSize, false),
+            (cervixOpenCircleSize, false),
+          ])
+            Padding(
+              padding: const EdgeInsets.all(2),
+              child: Container(
+                width: diameter,
+                height: diameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: filled ? color : null,
+                  border: filled
+                      ? null
+                      : Border.all(
+                          color: color,
+                          width: cervixCircleStrokeWidth,
+                        ),
+                ),
+              ),
+            ),
+        ],
       ),
       // Sample firmness glyph: the soft shorthand 'w', exactly how a
-      // recorded firmness renders beside the position letter in the cervix
-      // row.
+      // recorded firmness renders pinned at the band's zone bottom.
       _HelpEntryShape.firmness => Text(
         cervixFirmnessSymbol(CervixFirmness.soft),
         style: TextStyle(fontSize: 10, color: color),
@@ -303,8 +326,9 @@ final class _HelpEntry extends StatelessWidget {
         'X',
         style: TextStyle(fontSize: 10, color: color),
       ),
-      // Sample pain glyph: the B letter, the breast-pain option the below-
-      // curve pain row renders per flag (the M letter has its own entry).
+      // Sample pain glyph: the B letter, the breast-pain option the band
+      // renders per flag in its pain row above the note zone (the M letter
+      // has its own entry).
       _HelpEntryShape.pain => Text(
         'B',
         style: TextStyle(fontSize: 10, color: color),
@@ -328,8 +352,8 @@ final class _HelpEntry extends StatelessWidget {
           Text('kr', style: TextStyle(fontSize: 9, color: color)),
         ],
       ),
-      // Sample note glyph: the same sticky-note icon a noted day renders
-      // in its cell at the very bottom of the chart block.
+      // The notes band's rail-corner sample; the band's day cells render
+      // the note text itself, vertically.
       _HelpEntryShape.note => Icon(
         Icons.sticky_note_2_outlined,
         size: 12,

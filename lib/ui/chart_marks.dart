@@ -8,17 +8,24 @@
 // the PDF generation layer must stay free of material imports for the
 // host smoke scripts, tool/pdf_smoke.dart).
 //
+// The notes band's geometry (its zone heights, the cervix slot mapping
+// and the per-day layout) comes from the shared band module
+// (../domain/band_layout.dart), re-exported here so the cycle tab and the
+// tests keep importing it from this one place.
+//
 // The glyphs paint OVER the fl_chart temperature dots with no avoidance
 // logic — an occasional collision reads as accepted ink-over-dot.
 //
-// TODO(user-review): the row pitches and the alpha below are owner-eyeball
-// rendering details, not settled rules; the top-anchored rows sit between
-// the 0.1 K grid lines at the −0.05 (sex), −0.15 (peak dot / SUZ arrow),
-// −0.25 (mucus letters) and −0.35 (M) offsets from the scale max, and the
-// day numbers anchor from the BOTTOM at min + 0.05.
+// TODO(user-review): the row pitches and the alpha below are
+// owner-eyeball rendering details, not settled rules; the top-anchored
+// rows sit between the 0.1 K grid lines at the −0.05 (sex), −0.15 (peak
+// dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M) offsets from the
+// scale max, and the day numbers anchor from the BOTTOM at min + 0.05.
 import '../domain/mucus.dart';
 import '../domain/models.dart';
 import '../domain/temperature_range.dart';
+
+export '../domain/band_layout.dart';
 
 /// The gridline-gap margin every visibility predicate keeps free at both
 /// ends of the settings range: a row's center must stay at or inside

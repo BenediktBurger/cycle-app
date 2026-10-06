@@ -763,8 +763,7 @@ final class _CycleChartState extends State<_CycleChart> {
                           ),
                           const SizedBox(height: 4),
                           // The below-chart strip: measurement time,
-                          // disturbance letters, cervix, pain, day-note
-                          // indicator.
+                          // disturbance letters, the merged notes band.
                           _SignalRows(
                             kinds: _belowChartKinds,
                             days: _days,
@@ -1195,13 +1194,16 @@ final class _InPlotGlyphRows extends StatelessWidget {
 
   /// One ink text over its surface-colored stroke pass, exactly centered —
   /// the stack renders/hides together with its row's visibility, so each
-  /// halo follows its ink without separate avoidance logic.
+  /// halo follows its ink without separate avoidance logic. [maxLines] and
+  /// [overflow] apply to BOTH layers, so the halo follows the clipped ink.
   static Widget _haloedText({
     required String inkKey,
     required String haloKey,
     required String text,
     required TextStyle style,
     required Color haloColor,
+    int? maxLines,
+    TextOverflow? overflow,
   }) {
     return Stack(
       alignment: Alignment.center,
@@ -1209,6 +1211,8 @@ final class _InPlotGlyphRows extends StatelessWidget {
         Text(
           text,
           key: ValueKey(haloKey),
+          maxLines: maxLines,
+          overflow: overflow,
           style: style.copyWith(
             foreground: Paint()
               ..color = haloColor
@@ -1216,7 +1220,13 @@ final class _InPlotGlyphRows extends StatelessWidget {
               ..strokeWidth = chartMarkHaloStrokeWidth,
           ),
         ),
-        Text(text, key: ValueKey(inkKey), style: style),
+        Text(
+          text,
+          key: ValueKey(inkKey),
+          maxLines: maxLines,
+          overflow: overflow,
+          style: style,
+        ),
       ],
     );
   }

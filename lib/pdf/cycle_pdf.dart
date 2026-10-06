@@ -11,7 +11,10 @@
 //   BLOCK (the plot with the in-plot glyph row seam), the numeric
 //   temperature values below the plot (out-of-range readings lose no
 //   data), the recorded measurement times (vertical, narrow-column
-//   convention), then disturbance/cervix/pain and the rotated notes area.
+//   convention), the disturbance row and the merged notes band — the
+//   cervix glyph zones, firmness letters, breast pain and rotated notes
+//   stacked like the cycle tab's band, the band absorbing the remaining
+//   page height.
 //   Columns the window does not track stay empty. The sex X marks, the
 //   mucus sign letters, the mucus peak dot, the Mittelschmerz M and the
 //   evaluation day numbers render INSIDE the plot (paper-form parity with
@@ -49,6 +52,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../domain/band_layout.dart';
+import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/models.dart';
@@ -141,6 +146,12 @@ const String pdfAppIdentifier = 'Zyklus-App';
 const String pdfRailCaptionDayNumbers = 'Zyklustag';
 const String pdfRailCaptionDates = 'Datum';
 const String pdfRailCaptionTemperatureValues = 'Temperatur in °C';
+
+/// The merged band row's rail caption. The cervix glyph zones, the
+/// firmness letters, the breast pain and the rotated notes share ONE row;
+/// the paper form names it by its notes zone, as the cycle tab names its
+/// band ("Notiz" row).
+const String pdfRailCaptionNotesBand = 'Notizen';
 
 /// The bundled asset font (the app loads the bytes via rootBundle before
 /// handing them to the builder; host smoke scripts read the file directly).
@@ -266,8 +277,12 @@ const double _curvePlotHeight = 185;
 /// The below-plot strip rows.
 const double _timeRowHeight = 15;
 const double _disturbanceRowHeight = 14;
-const double _cervixRowHeight = 10;
-const double _painRowHeight = 10;
+
+/// The rotated narrow-column texts' angle: top→bottom like the cycle
+/// tab's rotated cells, anchored at the zone top (the sign is pw's: in
+/// pw's rotateBox space the flipped page frame lays the line top→down at
+/// −π/2).
+const double pdfRotatedTextAngle = -math.pi / 2;
 
 final pw.TextStyle _label = const pw.TextStyle(fontSize: 6.5);
 final pw.TextStyle _tiny = const pw.TextStyle(fontSize: 5.2);
@@ -373,19 +388,13 @@ pw.Widget _paperFormGrid({
         _tempValueRow(windowDays.length, windowDays, weekend),
         _timeRow(windowDays.length, windowDays, weekend),
         _disturbanceRow(windowDays.length, windowDays, weekend),
-        _cervixRow(windowDays.length, windowDays, weekend),
-        _painRow(windowDays.length, windowDays, weekend),
-        // The rotated notes area absorbs the remaining page height.
+        // The merged notes band below the disturbance row: the cervix
+        // glyph zones, the firmness letters, the breast pain and the
+        // rotated notes stacked in ONE row, the same zone stack as the
+        // cycle tab's band (band_layout.dart). The band absorbs the
+        // remaining page height.
         pw.Expanded(
-          child: _paperRow(
-            height: 0,
-            railCaption: 'Notizen',
-            windowDayCount: windowDays.length,
-            weekend: weekend,
-            cell: (position) => windowDays[position].notes == null
-                ? null
-                : _centerRotated(joinedNoteText(windowDays[position].notes!)),
-          ),
+          child: _notesBandRow(windowDays.length, windowDays, weekend),
         ),
       ],
     ),
@@ -1131,7 +1140,7 @@ pw.Widget _timeRow(
     cell: (position) {
       final text = measuredAtText(windowDays[position].measuredAtMinutes);
       if (text == null) return null;
-      return _centerRotated(text);
+      return _rotatedTopText(text);
     },
   );
 }
@@ -1165,79 +1174,136 @@ pw.Widget _disturbanceRow(
   );
 }
 
-/// The cervix row: position letter + firmness shorthand (the OPENING is
-/// not displayed — entry-form-only field).
-pw.Widget _cervixRow(
+/// The merged notes band row: the same zone stack as the cycle tab's band
+/// — on cervix days the glyph zone (the painted opening circle in its
+/// position slot), the firmness letter row below it, the breast-pain B row
+/// directly above the note zone (absent on pain-free days, at the band
+/// top on cervix-free pain days); the rotated note text absorbs the
+/// band's remainder. The geometry (zone heights, slot centers, circles'
+/// sizes) comes from the shared band module, so the band rows match the
+/// screen's day shapes day-shape for day-shape.
+pw.Widget _notesBandRow(
   int windowDayCount,
   List<DailyEntry> windowDays,
   List<int> weekend,
 ) {
   return _paperRow(
-    height: _cervixRowHeight,
-    railCaption: 'Muttermund',
+    height: 0,
+    railCaption: pdfRailCaptionNotesBand,
     windowDayCount: windowDayCount,
     weekend: weekend,
-    cell: (position) {
-      final letters = cervixLetters(windowDays[position]);
-      if (letters == null) return null;
-      return pw.Center(
-        child: pw.FittedBox(
-          fit: pw.BoxFit.scaleDown,
-          child: pw.Text(letters, style: _tiny, textAlign: pw.TextAlign.center),
-        ),
-      );
-    },
+    cell: (position) => _bandCell(windowDays[position]),
   );
 }
 
-/// The pain row: the breast-tenderness letter B (the Mittelschmerz M
-/// renders inside the plot — see the in-plot glyph seam).
-pw.Widget _painRow(
-  int windowDayCount,
-  List<DailyEntry> windowDays,
-  List<int> weekend,
-) {
-  return _paperRow(
-    height: _painRowHeight,
-    railCaption: 'Schmerz',
-    windowDayCount: windowDayCount,
-    weekend: weekend,
-    cell: (position) => _centerLetter(painLetter(windowDays[position]), _label),
+/// One day's band cell: the zone stack above the note (each zone only on
+/// its observation, exactly the screen band's offsets), then the note
+/// zone.
+pw.Widget _bandCell(DailyEntry day) {
+  final zones = notesBandLayout(day);
+  final joined = day.notes == null ? null : joinedNoteText(day.notes!);
+  final note = joined == null || joined.isEmpty ? null : joined;
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    children: [
+      pw.Stack(
+        children: [
+          // pw's Stack sizes to its non-positioned children — this base
+          // box is the reserved top block the zones hang from; the note
+          // zone starts where it ends.
+          pw.SizedBox(width: double.infinity, height: zones.noteTop),
+          if (zones.opening case final opening?)
+            pw.Positioned(
+              left: 0,
+              right: 0,
+              top:
+                  cervixSlotCenterY(zones.slotIndex!) -
+                  _circleGeometry(opening).diameter / 2,
+              child: pw.Center(child: _circleInk(opening)),
+            ),
+          if (day.cervixFirmness case final firmness?)
+            pw.Positioned(
+              left: 0,
+              right: 0,
+              top: cervixGlyphZoneHeight,
+              child: pw.SizedBox(
+                height: cervixLetterRowHeight,
+                child: pw.Center(
+                  child: pw.Text(
+                    cervixFirmnessSymbol(firmness),
+                    style: _tiny,
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          if (zones.hasPain)
+            pw.Positioned(
+              left: 0,
+              right: 0,
+              top: zones.painRowTop,
+              child: pw.SizedBox(
+                height: painRowHeight,
+                child: pw.Center(
+                  child: pw.Text(painLetter(day)!, style: _tiny),
+                ),
+              ),
+            ),
+        ],
+      ),
+      if (note case final text?) pw.Expanded(child: _rotatedTopText(text)),
+    ],
   );
 }
 
-pw.Widget? _centerLetter(String? letter, pw.TextStyle style) => letter == null
-    ? null
-    : pw.Center(
-        child: pw.Text(letter, style: style, textAlign: pw.TextAlign.center),
-      );
+({double diameter, bool filled}) _circleGeometry(CervixOpening opening) =>
+    switch (opening) {
+      CervixOpening.closed => (diameter: cervixClosedDotSize, filled: true),
+      CervixOpening.middle => (diameter: cervixMiddleCircleSize, filled: false),
+      CervixOpening.open => (diameter: cervixOpenCircleSize, filled: false),
+    };
 
-/// A column's text written bottom-up through the narrow column, centered
-/// in the cell. The line lays out along the CELL'S HEIGHT —
-/// pw.Transform.rotateBox with unconstrained child + relaid bounding box
-/// does the constraint swap (plain pw.Transform.rotate would clip the
-/// line after a few characters). Text beyond the cell height wraps into a
-/// (dropped) second line — overflowing notes clip at the cell bounds.
-pw.Widget _centerRotated(String text) => pw.LayoutBuilder(
+/// One opening's painted circle: filled dot closed, ring otherwise (the
+/// screen band's circle decoration, same sizes).
+pw.Widget _circleInk(CervixOpening opening) {
+  final (:diameter, :filled) = _circleGeometry(opening);
+  return pw.Container(
+    width: diameter,
+    height: diameter,
+    decoration: pw.BoxDecoration(
+      shape: pw.BoxShape.circle,
+      color: filled ? _ink : null,
+      border: filled
+          ? null
+          : pw.Border.all(color: _ink, width: cervixCircleStrokeWidth),
+    ),
+  );
+}
+
+/// A column's text written TOP-DOWN through the narrow column — the cycle
+/// tab's reading direction — anchored at the zone top (the LayoutBuilder
+/// reads the CELL's height; the align pins the reading start there). The
+/// line lays out along the CELL'S HEIGHT — pw.Transform.rotateBox with
+/// unconstrained child + relaid bounding box does the constraint swap
+/// (plain pw.Transform.rotate would clip the line after a few
+/// characters). Text beyond the cell height wraps into a (dropped) second
+/// line — overflowing notes clip at the cell bounds.
+pw.Widget _rotatedTopText(String text) => pw.LayoutBuilder(
   builder: (context, constraints) {
     final length = constraints?.maxHeight ?? 0;
     if (length <= 0) {
       return pw.SizedBox();
     }
-    return pw.Center(
+    return pw.Align(
+      alignment: pw.Alignment.topLeft,
       child: pw.Transform.rotateBox(
-        angle: -math.pi / 2,
+        angle: pdfRotatedTextAngle,
         // Unconstrained: after the rotation the strip fills the cell's
         // height and rotateBox relayouts the bounding box.
         unconstrained: true,
         child: pw.SizedBox(
           width: length,
-          child: pw.Text(
-            text,
-            style: _tiny,
-            textAlign: pw.TextAlign.center,
-            maxLines: 1,
-          ),
+          child: pw.Text(text, style: _tiny, maxLines: 1),
         ),
       ),
     );

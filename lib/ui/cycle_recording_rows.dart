@@ -11,14 +11,11 @@ part of 'cycle.dart';
 const _topSignalKinds = <_SignalKind>[_SignalKind.bleeding];
 
 /// The below-chart strip's rows (owner-decided order): measurement time →
-/// disturbance → cervix → pain → day-note indicator. TODO(user-review): the
-/// note's home in the strip's last row is an owner-eyeball choice.
+/// disturbance → the merged notes band.
 const _belowChartKinds = <_SignalKind>[
   _SignalKind.time,
   _SignalKind.disturbance,
-  _SignalKind.cervix,
-  _SignalKind.pain,
-  _SignalKind.note,
+  _SignalKind.notesBand,
 ];
 
 /// One recording row per segment signal, top-down in segment order. The
@@ -76,7 +73,8 @@ const double _signalRowGap = 2;
 double _signalRowHeight(_SignalKind kind) => switch (kind) {
   _SignalKind.disturbance => 24,
   _SignalKind.time => 30,
-  _ => 12,
+  _SignalKind.notesBand => notesBandHeight,
+  _SignalKind.bleeding => 12,
 };
 
 double _signalRowTop(_SignalKind kind, List<_SignalKind> kinds) {
@@ -93,26 +91,22 @@ double _signalSegmentHeight(List<_SignalKind> kinds) =>
     kinds.fold(0.0, (h, kind) => h + _signalRowHeight(kind) + _signalRowGap) -
     (kinds.isEmpty ? 0 : _signalRowGap);
 
-enum _SignalKind { bleeding, time, disturbance, cervix, pain, note }
+enum _SignalKind { bleeding, time, disturbance, notesBand }
 
 /// Test-visible key prefix of a row's day cells.
 String _signalKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCell',
-  _SignalKind.cervix => 'cervixCell',
-  _SignalKind.pain => 'painCell',
+  _SignalKind.notesBand => 'notesBandCell',
   _SignalKind.disturbance => 'disturbanceCell',
   _SignalKind.time => 'timeCell',
-  _SignalKind.note => 'noteCell',
 };
 
 /// Test-visible key prefix of a row's 44 px corner slot.
 String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
   _SignalKind.bleeding => 'bleedingCorner',
-  _SignalKind.cervix => 'cervixCorner',
-  _SignalKind.pain => 'painCorner',
+  _SignalKind.notesBand => 'notesBandCorner',
   _SignalKind.disturbance => 'disturbanceCorner',
   _SignalKind.time => 'timeCorner',
-  _SignalKind.note => 'noteCorner',
 };
 
 /// The localized row name for a signal (corner tooltip/semantics label).
@@ -121,11 +115,9 @@ String _signalCornerKeyPrefix(_SignalKind kind) => switch (kind) {
 String _signalRowName(_SignalKind kind, AppLocalizations l10n) =>
     switch (kind) {
       _SignalKind.bleeding => l10n.termBleeding,
-      _SignalKind.cervix => l10n.cycleRowCervix,
-      _SignalKind.pain => l10n.termBreastPain,
+      _SignalKind.notesBand => l10n.cycleRowNote,
       _SignalKind.disturbance => l10n.cycleRowDisturbance,
       _SignalKind.time => l10n.termMeasurementTime,
-      _SignalKind.note => l10n.cycleRowNote,
     };
 
 /// A signal row's sample glyph, rendered in the frozen left rail at the
@@ -142,26 +134,25 @@ Widget _signalCornerSample(BuildContext context, _SignalKind kind) {
         borderColor: scheme.error,
       ),
     ),
-    _SignalKind.cervix => Text(
-      cervixPositionSymbol(CervixPosition.medium),
-      style: TextStyle(fontSize: 10, color: scheme.onSurface),
-    ),
-    _SignalKind.pain => Text(
-      'B',
-      style: TextStyle(fontSize: 10, color: scheme.onSurface),
+    _SignalKind.notesBand => Icon(
+      Icons.sticky_note_2_outlined,
+      size: 12,
+      color: scheme.onSurface,
     ),
     _SignalKind.disturbance => Text(
       'kr',
       style: TextStyle(fontSize: 10, color: scheme.onSurface),
     ),
     _SignalKind.time => Icon(Icons.schedule, size: 12, color: scheme.onSurface),
-    _SignalKind.note => Icon(
-      Icons.sticky_note_2_outlined,
-      size: 12,
-      color: scheme.onSurface,
-    ),
   };
 }
+
+/// The notes band's text: a diary note may be recorded MULTI-LINE
+/// (embedded line breaks) but the rotated band line renders it as one
+/// line — every whitespace run folds into a single space, mirroring the
+/// PDF's joinedNoteText (lib/pdf/pdf_symbols.dart).
+String _joinedNoteText(String notes) =>
+    notes.replaceAll(RegExp(r'\s+'), ' ').trim();
 
 /// The day-column width boundary between the time row's HORIZONTAL and
 /// VERTICAL rendering: below it the HH:mm text renders rotated so the time
@@ -241,16 +232,14 @@ final class _SignalRow extends StatelessWidget {
     final day = days.byIndex[index];
     return SizedBox(
       height: _cellHeight,
-      child: Center(
-        child: switch (kind) {
-          _SignalKind.bleeding => _bleedingContent(context, day),
-          _SignalKind.cervix => _cervixContent(context, day),
-          _SignalKind.pain => _painContent(context, day),
-          _SignalKind.disturbance => _disturbanceContent(context, day),
-          _SignalKind.time => _timeContent(context, day),
-          _SignalKind.note => _noteContent(context, day),
-        },
-      ),
+      child: switch (kind) {
+        _SignalKind.bleeding => Center(child: _bleedingContent(context, day)),
+        _SignalKind.notesBand => _notesBandContent(context, day, index),
+        _SignalKind.disturbance => Center(
+          child: _disturbanceContent(context, day),
+        ),
+        _SignalKind.time => Center(child: _timeContent(context, day)),
+      },
     );
   }
 
@@ -261,52 +250,149 @@ final class _SignalRow extends StatelessWidget {
     return BleedingSymbol(bleeding: day.bleeding);
   }
 
-  /// Cervix: position letter, firmness shorthand beside it; the OPENING is
-  /// deliberately not displayed (entry-form-only field). Raw observation
-  /// display only, never a fertility conclusion (ADR-0001); neutral
-  /// on-surface ink (no scheme hue claimed).
-  static Widget _cervixContent(BuildContext context, DailyEntry? day) {
-    if (day == null) return const SizedBox.shrink();
-    final List<String>? cervixLine =
-        day.cervixPosition == null && day.cervixFirmness == null
+  /// One day's slot ink, centered in the glyph zone at its slot: the
+  /// opening renders as a painted circle sized by its value (diameter
+  /// communicates the opening), placed at the position's slot — the
+  /// position only picks the slot, a position without an opening paints
+  /// nothing.
+  static Widget? _cervixSlotInk(
+    BuildContext context,
+    DailyEntry day,
+    int index,
+  ) {
+    final zones = notesBandLayout(day);
+    if (zones.opening == null || zones.slotIndex == null) return null;
+    final scheme = Theme.of(context).colorScheme;
+    final (diameter, filled) = switch (zones.opening!) {
+      CervixOpening.closed => (cervixClosedDotSize, true),
+      CervixOpening.middle => (cervixMiddleCircleSize, false),
+      CervixOpening.open => (cervixOpenCircleSize, false),
+    };
+    final centerY = cervixSlotCenterY(zones.slotIndex!);
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: centerY - diameter / 2,
+      height: diameter,
+      child: Center(
+        child: Container(
+          key: ValueKey('cervixSlotGlyph-$index'),
+          width: diameter,
+          height: diameter,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: filled ? scheme.onSurface : null,
+            border: filled
+                ? null
+                : Border.all(
+                    color: scheme.onSurface,
+                    width: cervixCircleStrokeWidth,
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The day cell's merged notes band: the cervix stacked zones on top
+  /// (only for days with any cervix observation — glyph zone, letter row,
+  /// then the note zone; one reserved top block per cervix day, so the
+  /// slot ink never depends on the note or the firmness letter), the
+  /// breast-pain B letter row directly above the note zone (at the very
+  /// band top on cervix-free days; not rendered or reserved on pain-free
+  /// days), then the note zone. The note line reads top→bottom. Raw
+  /// observation display only, never a fertility conclusion (ADR-0001);
+  /// neutral on-surface ink with the in-plot glyphs' halo pass.
+  static Widget _notesBandContent(
+    BuildContext context,
+    DailyEntry? day,
+    int index,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final surface = scheme.surface;
+    final zones = notesBandLayout(day);
+    final joined = day == null || day.notes == null
         ? null
-        : [
-            if (day.cervixPosition case final position?)
-              cervixPositionSymbol(position),
-            if (day.cervixFirmness case final firmness?)
-              cervixFirmnessSymbol(firmness),
-          ];
-    if (cervixLine == null) return const SizedBox.shrink();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
+        : _joinedNoteText(day.notes!);
+    final note = switch (joined) {
+      final text? when text.isNotEmpty => text,
+      _ => null,
+    };
+    return Stack(
       children: [
-        for (var i = 0; i < cervixLine.length; i++) ...[
-          if (i > 0) const SizedBox(width: 1),
-          Text(
-            cervixLine[i],
-            style: TextStyle(
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.onSurface,
+        if (zones.hasCervix)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: cervixGlyphZoneHeight,
+            child: _cervixZone(context, day!, index),
+          ),
+        if (day?.cervixFirmness case final firmness?)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: cervixGlyphZoneHeight,
+            height: cervixLetterRowHeight,
+            child: Center(
+              child: _InPlotGlyphRows._haloedText(
+                inkKey: 'cervixFirmnessGlyph-$index',
+                haloKey: 'cervixFirmnessHalo-$index',
+                text: cervixFirmnessSymbol(firmness),
+                style: TextStyle(fontSize: 9, color: scheme.onSurface),
+                haloColor: surface,
+              ),
             ),
           ),
-        ],
+        if (zones.hasPain)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: zones.painRowTop,
+            height: painRowHeight,
+            child: Center(
+              child: _InPlotGlyphRows._haloedText(
+                inkKey: 'painBreastGlyph-$index',
+                haloKey: 'painBreastHalo-$index',
+                text: 'B',
+                style: TextStyle(fontSize: 9, color: scheme.onSurface),
+                haloColor: surface,
+              ),
+            ),
+          ),
+        if (note case final text?)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: zones.noteTop,
+            bottom: 0,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: RotatedBox(
+                quarterTurns: 1,
+                child: _InPlotGlyphRows._haloedText(
+                  inkKey: 'notesText-$index',
+                  haloKey: 'notesHaloText-$index',
+                  text: text,
+                  style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
+                  haloColor: surface,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  /// Pain: the letter B (uppercase, distinguishable from the lowercase
-  /// cervix letters; neutral on-surface ink). TODO(user-review): the letter
-  /// mirrors the entry-form ("Brustschmerzen (B)") vocabulary — the same
-  /// ad-hoc glyph caveat as the cervix letters applies.
-  static Widget _painContent(BuildContext context, DailyEntry? day) {
-    if (day == null || !day.painBreast) return const SizedBox.shrink();
-    return Text(
-      'B',
-      style: TextStyle(
-        fontSize: 9,
-        color: Theme.of(context).colorScheme.onSurface,
-      ),
+  /// The cervix zone's glyph area: the day's ink in ONE of the evenly
+  /// spaced position slots (the other four stay empty). An opening-only
+  /// day takes the medium slot.
+  static Widget _cervixZone(BuildContext context, DailyEntry day, int index) {
+    return SizedBox(
+      height: cervixGlyphZoneHeight,
+      child: Stack(children: [?_cervixSlotInk(context, day, index)]),
     );
   }
 
@@ -355,25 +441,17 @@ final class _SignalRow extends StatelessWidget {
     );
     if (cellWidth < _timeCellMinColumnWidth) {
       // The rotated text's width becomes its cell height — the row-height
-      // constant reserves that space (see _signalRowHeight).
-      return FittedBox(
-        fit: BoxFit.scaleDown,
-        child: RotatedBox(quarterTurns: 3, child: text),
+      // constant reserves that space (see _signalRowHeight). The Align
+      // anchors the reading start at the row's top (the outer Center only
+      // fills the cell).
+      return Align(
+        alignment: Alignment.topCenter,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: RotatedBox(quarterTurns: 1, child: text),
+        ),
       );
     }
     return FittedBox(fit: BoxFit.scaleDown, child: text);
-  }
-
-  /// Note indicator: a small sticky-note glyph for a day whose entry
-  /// carries a NON-EMPTY notes text; the note is edited in the Diary form.
-  static Widget _noteContent(BuildContext context, DailyEntry? day) {
-    if (day == null || day.notes == null || day.notes!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Icon(
-      Icons.sticky_note_2_outlined,
-      size: 10,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
   }
 }

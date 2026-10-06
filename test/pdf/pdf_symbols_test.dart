@@ -1,11 +1,12 @@
 // Tests of the PDF layer's pure per-day symbol mappings
 // (lib/pdf/pdf_symbols.dart): the display mapping of a recorded day's
 // observations onto the paper form's cell contents — bleeding fill,
-// cervix/pain/disturbance letters, and the measurement-time text. Every
+// pain/disturbance letters, and the measurement-time text. Every
 // helper DELEGATES to the existing domain display helpers where they exist
-// (the cervix symbols, the temperature-disturbance letter vocabulary) —
-// nothing is reworded here.
-import 'package:cycle_app/domain/cervix.dart';
+// (the temperature-disturbance letter vocabulary) —
+// nothing is reworded here. The cervix band cells (opening circles,
+// firmness letters, per-day zone layout) live in the shared band module's
+// tests (the band geometry lib/domain/band_layout.dart).
 import 'package:cycle_app/domain/disturbances.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/pdf/pdf_symbols.dart';
@@ -59,34 +60,6 @@ void main() {
   });
 
   group('letter glyphs of the strip rows', () {
-    test('cervix letters combine position and firmness symbols', () {
-      expect(cervixLetters(null), isNull);
-      expect(
-        cervixLetters(
-          DailyEntry(
-            date: _d(3, 2),
-            cervixPosition: CervixPosition.medium,
-            cervixFirmness: CervixFirmness.soft,
-          ),
-        ),
-        'm w',
-      );
-      expect(
-        cervixLetters(
-          DailyEntry(date: _d(3, 2), cervixPosition: CervixPosition.veryHigh),
-        ),
-        'sh',
-        reason: 'the "sehr hoch" glyph keeps its two letters to stay distinct',
-      );
-      // The opening is deliberately not displayed (entry-form-only field).
-      expect(
-        cervixLetters(
-          DailyEntry(date: _d(3, 2), cervixOpening: CervixOpening.open),
-        ),
-        isNull,
-      );
-    });
-
     test('pain letter B (breast)', () {
       expect(painLetter(null), isNull);
       expect(painLetter(DailyEntry(date: _d(3, 2), painBreast: true)), 'B');

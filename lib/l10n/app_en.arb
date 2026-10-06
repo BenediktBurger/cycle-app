@@ -195,14 +195,13 @@
     "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
   },
   "cycleLegendTemperature": "BBT (temperature) in °C",
-  "cycleRowCervix": "Cervix",
   "cycleRowDisturbance": "Disturbed measurement",
   "@cycleRowDisturbance": {
     "description": "Row name (corner tooltip/semantics) of the disturbance row at the bottom of the cycle chart block: the letter codes of the day's temperature-disturbance (exclusion) flags."
   },
   "cycleRowNote": "Note",
   "@cycleRowNote": {
-    "description": "Row name (corner tooltip/semantics) of the note-indicator row at the very bottom of the cycle chart block: a small glyph marks the days whose entry carries a non-empty notes text."
+    "description": "Row name (corner tooltip/semantics) of the merged notes band at the bottom of the cycle chart block: cervix slot glyph, pinned firmness letter, breast-pain B and the rotated diary note text share the one band."
   },
   "cycleHelpShow": "Show symbol glossary",
   "@cycleHelpShow": {
@@ -290,9 +289,9 @@
   "@cycleLegendDisturbance": {
     "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
   },
-  "cycleLegendNote": "Note (this day carries a note in the Diary)",
+  "cycleLegendNote": "Note (diary text, shown vertically per day)",
   "@cycleLegendNote": {
-    "description": "Glossary entry for the note-indicator glyph (sticky-note icon) marking days with a non-empty notes text; the note text itself lives in the diary entry form."
+    "description": "Glossary entry for the merged notes band: the day's diary note text renders vertically in the band, beginning first; a note too long for the band is truncated."
   },
   "statisticsNote": "Numbers only (cycle lengths derived from the marked cycle starts) — no evaluation or fertility conclusions. A marked cycle start binds wherever it sits; interruptions and bleeding never move it.",
   "statisticsNoData": "Statistics appear once a first cycle start is recorded.",

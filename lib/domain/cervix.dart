@@ -82,35 +82,22 @@ CervixFirmness? tryParseCervixFirmness(Object? raw) {
   return null;
 }
 
-/// Chart glyph of a position for the cycle-tab symbol row: the first letter
-/// of the German vocabulary word — `t` tief, `m` mittel, `h` hoch, `sh`
-/// (sehr hoch, two letters to stay distinct from plain `h`), `u`
-/// (unerreichbar). The opening is NOT displayed on the chart.
-///
-/// TODO(user-review): these letters are an ad-hoc display choice — the NER
-/// cheat sheet defines no cervix glyphs. In particular `t` visually equals
-/// the mucus dry-sign glyph `t`; the chart distinguishes them only by color
-/// (neutral on-surface vs. the tertiary mucus color). INER experts may want
-/// different symbols.
-String cervixPositionSymbol(CervixPosition position) => switch (position) {
-  CervixPosition.low => 't',
-  CervixPosition.medium => 'm',
-  CervixPosition.high => 'h',
-  CervixPosition.veryHigh => 'sh',
-  CervixPosition.unreachable => 'u',
-};
-
 /// Chart glyph of a firmness for the cycle-tab symbol row: the paper
 /// shorthand — `h` hard, `h-w` halfSoft (the paper's h/w rendered with an
 /// ASCII hyphen), `w` soft.
-///
-/// TODO(user-review): like [cervixPositionSymbol], these glyphs are an
-/// ad-hoc display choice — the NER cheat sheet defines no cervix glyphs
-/// (the paper uses h / h/w only as written shorthand). In particular `h`
-/// visually equals the position `high` glyph; INER experts may want
-/// different symbols.
 String cervixFirmnessSymbol(CervixFirmness firmness) => switch (firmness) {
   CervixFirmness.hard => 'h',
   CervixFirmness.halfSoft => 'h-w',
   CervixFirmness.soft => 'w',
+};
+
+/// Chart glyph of an opening — the INER ruleset's course-paper notation of
+/// increasingly wider circles: `·` (U+00B7) closed, `∘` (U+2218) middle,
+/// `◯` (U+25EF) open. Unlike the position and firmness glyphs these are
+/// ruleset-defined, not an ad-hoc display choice.
+String? cervixOpeningSymbol(CervixOpening? opening) => switch (opening) {
+  null => null,
+  CervixOpening.closed => '·',
+  CervixOpening.middle => '∘',
+  CervixOpening.open => '◯',
 };
