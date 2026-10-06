@@ -119,14 +119,6 @@ void main() {
   });
 
   group('display symbols', () {
-    test('position symbols follow the ad-hoc first-letter scheme', () {
-      expect(cervixPositionSymbol(CervixPosition.low), 't');
-      expect(cervixPositionSymbol(CervixPosition.medium), 'm');
-      expect(cervixPositionSymbol(CervixPosition.high), 'h');
-      expect(cervixPositionSymbol(CervixPosition.veryHigh), 'sh');
-      expect(cervixPositionSymbol(CervixPosition.unreachable), 'u');
-    });
-
     test('firmness symbols follow the paper h / h-w / w shorthand', () {
       expect(cervixFirmnessSymbol(CervixFirmness.hard), 'h');
       expect(cervixFirmnessSymbol(CervixFirmness.halfSoft), 'h-w');

@@ -82,24 +82,6 @@ CervixFirmness? tryParseCervixFirmness(Object? raw) {
   return null;
 }
 
-/// Chart glyph of a position for the cycle-tab symbol row: the first letter
-/// of the German vocabulary word — `t` tief, `m` mittel, `h` hoch, `sh`
-/// (sehr hoch, two letters to stay distinct from plain `h`), `u`
-/// (unerreichbar).
-///
-/// TODO(user-review): these letters are an ad-hoc display choice — the NER
-/// cheat sheet defines no cervix glyphs. In particular `t` visually equals
-/// the mucus dry-sign glyph `t`; the chart distinguishes them only by color
-/// (neutral on-surface vs. the tertiary mucus color). INER experts may want
-/// different symbols.
-String cervixPositionSymbol(CervixPosition position) => switch (position) {
-  CervixPosition.low => 't',
-  CervixPosition.medium => 'm',
-  CervixPosition.high => 'h',
-  CervixPosition.veryHigh => 'sh',
-  CervixPosition.unreachable => 'u',
-};
-
 /// Chart glyph of a firmness for the cycle-tab symbol row: the paper
 /// shorthand — `h` hard, `h-w` halfSoft (the paper's h/w rendered with an
 /// ASCII hyphen), `w` soft.

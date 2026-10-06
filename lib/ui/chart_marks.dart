@@ -8,18 +8,24 @@
 // the PDF generation layer must stay free of material imports for the
 // host smoke scripts, tool/pdf_smoke.dart).
 //
+// The notes band's geometry (its zone heights, the cervix slot mapping
+// and the per-day layout) comes from the shared band module
+// (../domain/band_layout.dart), re-exported here so the cycle tab and the
+// tests keep importing it from this one place.
+//
 // The glyphs paint OVER the fl_chart temperature dots with no avoidance
 // logic — an occasional collision reads as accepted ink-over-dot.
 //
-// TODO(user-review): the row pitches, the notes band's height and the
-// alpha below are owner-eyeball rendering details, not settled rules; the
-// top-anchored rows sit between the 0.1 K grid lines at the −0.05 (sex),
-// −0.15 (peak dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M)
-// offsets from the scale max, and the day numbers anchor from the BOTTOM
-// at min + 0.05.
+// TODO(user-review): the row pitches and the alpha below are
+// owner-eyeball rendering details, not settled rules; the top-anchored
+// rows sit between the 0.1 K grid lines at the −0.05 (sex), −0.15 (peak
+// dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M) offsets from the
+// scale max, and the day numbers anchor from the BOTTOM at min + 0.05.
 import '../domain/mucus.dart';
 import '../domain/models.dart';
 import '../domain/temperature_range.dart';
+
+export '../domain/band_layout.dart';
 
 /// The gridline-gap margin every visibility predicate keeps free at both
 /// ends of the settings range: a row's center must stay at or inside
@@ -49,32 +55,6 @@ const double mRowCenterOffsetK = 0.35;
 /// scale min ([TemperatureRange.min]) — the one bottom-anchored row; all
 /// other rows anchor from the max.
 const double dayNumbersRowCenterOffsetK = 0.05;
-
-/// The merged below-chart notes band's height: the cervix zone, the letter
-/// row, the breast-pain row and the note text zone share it.
-const double notesBandHeight = 90;
-
-/// The band's cervix glyph zone, anchored at the band TOP: the same
-/// reserved block height on every cervix day, so the position evolution
-/// stays comparable at a glance whatever the note below.
-const double cervixGlyphZoneHeight = 30;
-
-/// The fixed letter row below the glyph zone: the firmness letter renders
-/// here iff a value exists, never moving the slot ink above it.
-const double cervixLetterRowHeight = 10;
-
-/// The dedicated breast-pain letter row, directly above the note zone (at
-/// the band top on cervix-free days): rendered only on pain days, never
-/// reserved on pain-free ones.
-const double painRowHeight = 12;
-
-/// The band's painted cervix-opening circles' diameters (the opening is
-/// communicated by diameter, like the course notation) and their outline
-/// stroke.
-const double cervixClosedDotSize = 4;
-const double cervixMiddleCircleSize = 6;
-const double cervixOpenCircleSize = 8;
-const double cervixCircleStrokeWidth = 1.3;
 
 /// The one alpha every in-chart glyph renders at.
 const double chartMarkAlpha = 0.85;

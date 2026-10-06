@@ -11,7 +11,10 @@
 // in the uncompressed content stream.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
+import 'package:cycle_app/domain/band_layout.dart';
+import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
@@ -160,16 +163,26 @@ final class PdfTextRun {
   final double fontSize;
 }
 
-/// One filled path of the page: the fill color and the bounding box of the
-/// path's points, in page coordinates (y-up).
-final class PdfFillPath {
-  const PdfFillPath(this.color, this.minX, this.minY, this.maxX, this.maxY);
+/// One painted path of the page: its color (fill or stroke), whether it
+/// is filled, and the bounding box of the path's points, in page
+/// coordinates (y-up).
+final class PdfInkPath {
+  const PdfInkPath(
+    this.color,
+    this.minX,
+    this.minY,
+    this.maxX,
+    this.maxY, {
+    this.filled = true,
+  });
 
   final List<double> color;
   final double minX;
   final double minY;
   final double maxX;
   final double maxY;
+
+  final bool filled;
 }
 
 /// The document's ToUnicode CMap: glyph code → Unicode rune (the pdf package
@@ -205,7 +218,11 @@ List<double> _apply(List<double> m, double x, double y) => [
   m[1] * x + m[3] * y + m[5],
 ];
 
-PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
+PdfInkPath _pathOf(
+  List<double> color,
+  List<List<double>> points, {
+  bool filled = true,
+}) {
   var minX = points.first[0];
   var minY = points.first[1];
   var maxX = minX;
@@ -216,11 +233,12 @@ PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
     if (p[0] > maxX) maxX = p[0];
     if (p[1] > maxY) maxY = p[1];
   }
-  return PdfFillPath(color, minX, minY, maxX, maxY);
+  return PdfInkPath(color, minX, minY, maxX, maxY, filled: filled);
 }
 
-/// Extracts a page's (default: the first's) text runs and filled paths.
-(List<PdfTextRun>, List<PdfFillPath>) extractPageContent(
+/// Extracts a page's (default: the first's) text runs and painted paths
+/// (fills and ink strokes).
+(List<PdfTextRun>, List<PdfInkPath>) extractPageContent(
   List<int> bytes, {
   int page = 0,
 }) {
@@ -231,13 +249,14 @@ PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
   ).allMatches(pageContentStream(bytes, page)).map((m) => m.group(0)!).toList();
 
   final runs = <PdfTextRun>[];
-  final paths = <PdfFillPath>[];
+  final paths = <PdfInkPath>[];
 
   var ctm = <double>[1, 0, 0, 1, 0, 0];
   final saved = <List<double>>[];
   final pending = <double>[];
   final pathPoints = <List<double>>[];
   var fill = <double>[0, 0, 0];
+  var stroke = <double>[0, 0, 0];
   double fontSize = 0;
   double textX = 0;
   double textY = 0;
@@ -296,8 +315,15 @@ PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
           );
       case 'rg':
         fill = pending.sublist(pending.length - 3);
+      case 'RG':
+        stroke = pending.sublist(pending.length - 3);
       case 'f' || 'f*':
         if (pathPoints.isNotEmpty) paths.add(_pathOf(fill, pathPoints));
+        pathPoints.clear();
+      case 'S' || 's':
+        if (pathPoints.isNotEmpty) {
+          paths.add(_pathOf(stroke, pathPoints, filled: false));
+        }
         pathPoints.clear();
       case 'Td':
         final at = _apply(ctm, pending[pending.length - 2], pending.last);
@@ -305,8 +331,9 @@ PdfFillPath _pathOf(List<double> color, List<List<double>> points) {
         textY = at[1];
       case 'Tf':
         fontSize = pending.last;
-      // Any other path-closing operator discards the collected points (the
-      // strokes and clips are not needed; only fills are extracted).
+      // Any other path-closing operator discards the collected points
+      // (the clips and the multiline-paint combos are not needed; fills
+      // and ink strokes are extracted above).
       default:
         if (pathPoints.isNotEmpty) pathPoints.clear();
     }
@@ -356,6 +383,64 @@ Future<List<int>> generateMarkFixture({TemperatureRange? range}) =>
       options: PdfExportOptions(anonymized: false),
       compress: false,
     );
+
+// ---------------------------------------------------------------------------
+// The merged notes-band fixture: day 0 records the full stack (closed
+// opening in the low slot + soft firmness + breast pain + note), day 1 an
+// unreachable open cervix with the half-soft firmness alone, day 2 breast
+// pain + note without any cervix observation and day 3 a middle opening
+// in the middle slot alone — on a continuous window (column == calendar
+// offset from the Mar 1 cycle start), one page.
+// ---------------------------------------------------------------------------
+
+List<DailyEntry> bandFixtureEntries() => [
+  DailyEntry(
+    date: d(3, 1),
+    bbtC: 36.5,
+    cervixPosition: CervixPosition.low,
+    cervixOpening: CervixOpening.closed,
+    cervixFirmness: CervixFirmness.soft,
+    painBreast: true,
+    notes: 'Erste Notiz',
+  ),
+  DailyEntry(
+    date: d(3, 2),
+    bbtC: 36.5,
+    cervixPosition: CervixPosition.unreachable,
+    cervixOpening: CervixOpening.open,
+    cervixFirmness: CervixFirmness.halfSoft,
+  ),
+  DailyEntry(
+    date: d(3, 3),
+    bbtC: 36.5,
+    painBreast: true,
+    notes: 'Zweite Notiz',
+  ),
+  DailyEntry(
+    date: d(3, 4),
+    bbtC: 36.5,
+    cervixPosition: CervixPosition.medium,
+    cervixOpening: CervixOpening.middle,
+  ),
+  for (var i = 4; i < 14; i++) DailyEntry(date: d(3, 1 + i), bbtC: 36.5),
+];
+
+List<CycleMark> bandFixtureMarks() => [
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+];
+
+PdfExportModel bandFixtureModel() => buildPdfExportModel(
+  entries: bandFixtureEntries(),
+  marks: bandFixtureMarks(),
+  today: d(3, 14),
+);
+
+Future<List<int>> generateBandFixture() => generatePdfBytes(
+  model: bandFixtureModel(),
+  fontBytes: fixtureFontBytes(),
+  options: PdfExportOptions(anonymized: false),
+  compress: false,
+);
 
 // The in-plot day-numbers fixture: six low measurements at 36.2, then the
 // first higher on day 7 (marked) — the evaluation numbers the lows 6…1, and
@@ -776,7 +861,7 @@ void main() {
       /// The small accent-filled circles (the letters/X draw as ink text; the
       /// only small accent fill in the plot is the peak dot — candidate arrow
       /// sticks are excluded by the width gate).
-      List<PdfFillPath> accentDots(List<PdfFillPath> paths) => [
+      List<PdfInkPath> accentDots(List<PdfInkPath> paths) => [
         for (final p in paths)
           if ((p.color[0] - 0x35 / 255).abs() < 0.004 &&
               (p.color[1] - 0x56 / 255).abs() < 0.004 &&
@@ -791,7 +876,7 @@ void main() {
       /// The halo backings: paper-white fills behind the in-plot glyphs (the
       /// PDF's halo equivalent — see the backing's slot comment in
       /// cycle_pdf.dart).
-      List<PdfFillPath> whiteBackings(List<PdfFillPath> paths) => [
+      List<PdfInkPath> whiteBackings(List<PdfInkPath> paths) => [
         for (final p in paths)
           if (p.color.every((c) => (c - 1.0).abs() < 0.002)) p,
       ];
@@ -799,7 +884,7 @@ void main() {
       /// Whether a white backing of [paths] sits in [column]'s day column,
       /// vertically centered on [inkBaselineY] — a text glyph's halo box
       /// shares the ink's slot center.
-      bool backedIn(List<PdfFillPath> paths, int column, double inkBaselineY) {
+      bool backedIn(List<PdfInkPath> paths, int column, double inkBaselineY) {
         return whiteBackings(paths).any((p) {
           final cx = (p.minX + p.maxX) / 2;
           final cy = (p.minY + p.maxY) / 2;
@@ -811,7 +896,7 @@ void main() {
 
       /// Whether any backing of [paths] sits in [column]'s day column —
       /// column-only, for the rows whose ink (and backing) must be absent.
-      bool backedInColumn(List<PdfFillPath> paths, int column) {
+      bool backedInColumn(List<PdfInkPath> paths, int column) {
         return whiteBackings(paths).any(
           (p) =>
               (p.minX + p.maxX) / 2 > x0 + column * pdfColumnWidth + 1 &&
@@ -1175,8 +1260,8 @@ void main() {
           'Temperatur',
           'Zeit',
           'Störung',
-          'Muttermund',
-          'Schmerz',
+          // The merged band's one rail caption — the cervix and pain zones
+          // share it.
           'Notizen',
         ];
         for (final caption in kept) {
@@ -1184,6 +1269,15 @@ void main() {
             rendered,
             contains(caption),
             reason: 'the kept scaffold row "$caption" stays',
+          );
+        }
+        for (final dropped in ['Muttermund', 'Schmerz']) {
+          expect(
+            rendered,
+            isNot(contains(dropped)),
+            reason:
+                'the merged band\'s row carries no "$dropped" caption — '
+                'the zones ride its one row',
           );
         }
       });
@@ -1281,4 +1375,192 @@ void main() {
       });
     },
   );
+
+  group('merged notes band (cervix zones, pain and notes in one row)', () {
+    const x0 = 28 + 58;
+
+    double runYOf(List<PdfTextRun> runs, String exact) => runs
+        .firstWhere(
+          (r) => r.text == exact,
+          orElse: () => throw TestFailure('no "$exact" text run rendered'),
+        )
+        .y;
+
+    /// The painted cervix openings: the filled ink-dark circles (the
+    /// closed dot fills; the outlined rings stroke and don't fill), ONE
+    /// per cervix day, in the merged band's region (below the disturbance
+    /// row's caption — the temperature dots live above it).
+    List<PdfInkPath> bandDots(List<PdfInkPath> paths, double bandTopY) => [
+      for (final p in paths)
+        if (p.color.every((c) => c <= 0.2) &&
+            (p.maxX - p.minX) >= 3.4 &&
+            (p.maxX - p.minX) <= 4.6 &&
+            ((p.maxX - p.minX) - (p.maxY - p.minY)).abs() <= 1 &&
+            p.maxY < bandTopY)
+          p,
+    ];
+
+    /// The painted cervix rings: the stroked ink circles (see [bandDots]
+    /// for the closed dot's fill counterpart), gated into the merged
+    /// band's region the same way.
+    List<PdfInkPath> bandRings(List<PdfInkPath> paths, double bandTopY) => [
+      for (final p in paths)
+        if (p.color.every((c) => c <= 0.2) &&
+            (p.maxX - p.minX) >= 5 &&
+            (p.maxX - p.minX) <= 9 &&
+            ((p.maxX - p.minX) - (p.maxY - p.minY)).abs() <= 1 &&
+            p.maxY < bandTopY)
+          p,
+    ];
+
+    test('the band columns carry the cervix letters and the pain B at the '
+        'tiny ink size, like the cycle tab\'s glyph rows', () async {
+      final bytes = await generateBandFixture();
+      final (runs, _) = extractPageContent(bytes);
+      List<PdfTextRun> byText(String text, double size) => runs
+          .where((r) => r.text == text && (r.fontSize - size).abs() < 0.05)
+          .toList();
+      expect(
+        byText('w', 5.2),
+        isNotEmpty,
+        reason: "day 0's soft firmness 'w' renders its letter",
+      );
+      expect(
+        byText('h-w', 5.2),
+        isNotEmpty,
+        reason: "day 1's halfSoft firmness 'h-w' renders its letter",
+      );
+      expect(
+        byText('B', 5.2),
+        isNotEmpty,
+        reason: "the breast-pain days' B renders in the band's pain zone",
+      );
+    });
+
+    test('the middle and open openings paint their outlined rings in their '
+        'day columns inside the band, sized 6 / 8 pt like the screen '
+        'shapes', () async {
+      final bytes = await generateBandFixture();
+      final (runs, paths) = extractPageContent(bytes);
+      final stoerungY = runYOf(runs, 'Störung');
+      final rings = bandRings(paths, stoerungY);
+      List<PdfInkPath> ringsIn(int column) => [
+        for (final p in rings)
+          if ((p.minX + p.maxX) / 2 > x0 + column * pdfColumnWidth + 1 &&
+              (p.minX + p.maxX) / 2 < x0 + (column + 1) * pdfColumnWidth - 1)
+            p,
+      ];
+      expect(
+        ringsIn(2),
+        isEmpty,
+        reason: "day 2 records no cervix opening — the band paints no rings",
+      );
+      final middleRing = ringsIn(3).single;
+      expect(
+        middleRing.maxX - middleRing.minX,
+        closeTo(cervixMiddleCircleSize, 0.05),
+        reason: "day 3's middle opening paints the 6 pt circle's width",
+      );
+      expect(
+        middleRing.maxY - middleRing.minY,
+        closeTo(cervixMiddleCircleSize, 0.05),
+        reason: "day 3's middle ring paints square",
+      );
+      final openRing = ringsIn(1).single;
+      expect(
+        openRing.maxX - openRing.minX,
+        closeTo(cervixOpenCircleSize, 0.05),
+        reason: "day 1's open opening paints the 8 pt circle's width",
+      );
+      expect(
+        openRing.maxY - openRing.minY,
+        closeTo(cervixOpenCircleSize, 0.05),
+        reason: "day 1's open ring paints square",
+      );
+    });
+
+    test('the closed opening paints its dot in its day column inside the '
+        'band; the cervix-free day paints none', () async {
+      final bytes = await generateBandFixture();
+      final (runs, paths) = extractPageContent(bytes);
+      final stoerungY = runYOf(runs, 'Störung');
+      final dots = bandDots(paths, stoerungY);
+      final day0Dots = [
+        for (final p in dots)
+          if ((p.minX + p.maxX) / 2 > x0 + 0 * pdfColumnWidth + 1 &&
+              (p.minX + p.maxX) / 2 < x0 + 1 * pdfColumnWidth - 1)
+            p,
+      ];
+      expect(
+        day0Dots,
+        hasLength(1),
+        reason: "day 0's closed opening paints exactly one filled 4 pt dot",
+      );
+      final day2Dots = [
+        for (final p in dots)
+          if ((p.minX + p.maxX) / 2 > x0 + 2 * pdfColumnWidth + 1 &&
+              (p.minX + p.maxX) / 2 < x0 + 3 * pdfColumnWidth - 1)
+            p,
+      ];
+      expect(
+        day2Dots,
+        isEmpty,
+        reason: "day 2 records no cervix — the band paints no circles",
+      );
+    });
+
+    test(
+      'the note text anchors at its zone top, like the cycle tab\'s '
+      'reading direction (the vertical line reads starting at the top)',
+      () async {
+        final bytes = await generateBandFixture();
+        final (runs, _) = extractPageContent(bytes);
+        // The caption sits at the band's top edge; a top-anchored note's
+        // first glyph lands a note zone's worth below it — the cervix-free
+        // pain day's noteTop is 12 pt (pain row only). The TJ runs split
+        // words, so the lookup anchors on the notes' FIRST fragments (the
+        // fragment of the line's start).
+        final captionY = runYOf(runs, 'Notizen');
+        final day2NoteY = runs
+            .firstWhere(
+              (r) =>
+                  r.text.contains('Zweite') && (r.fontSize - 5.2).abs() < 0.05,
+              orElse: () => throw TestFailure(
+                "no day-2 note text run ('Zweite' fragment) rendered",
+              ),
+            )
+            .y;
+        expect(
+          captionY - day2NoteY,
+          lessThan(20),
+          reason:
+              'the note starts at the top of its zone, a pain row below '
+              "the band's caption — not mid-band as a centered/bottom-up "
+              'line would place it',
+        );
+        // The cervix-stack day's note sits below the full 52 pt top block.
+        final day0NoteY = runs
+            .firstWhere(
+              (r) =>
+                  r.text.contains('Erste') && (r.fontSize - 5.2).abs() < 0.05,
+              orElse: () => throw TestFailure(
+                "no day-0 note text run ('Erste' fragment) rendered",
+              ),
+            )
+            .y;
+        expect(
+          captionY - day0NoteY,
+          inInclusiveRange(40, 65),
+          reason:
+              "day 0's note starts below the 30 pt glyph zone, 10 pt letter "
+              'row and 12 pt pain row (~52 pt)',
+        );
+      },
+    );
+    test('the merged band\'s rotated cells read top→bottom (the cycle '
+        "tab's direction): pdfRotatedTextAngle is −π/2, pw's top→down "
+        'quarter turn', () {
+      expect(pdfRotatedTextAngle, closeTo(-math.pi / 2, 1e-9));
+    });
+  });
 }

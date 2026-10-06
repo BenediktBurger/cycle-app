@@ -39,7 +39,4 @@ the sections above track planned work, git history keeps the record (see
 
 ### Convenience
 
-- [ ] Mirror the cervix circle notation in the cycle PDF and match the
-  cycle tab's vertical text direction so screen and print match
-
 ### Deferred for later

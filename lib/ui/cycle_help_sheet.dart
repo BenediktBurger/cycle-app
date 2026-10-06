@@ -16,6 +16,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../domain/band_layout.dart';
 import '../domain/cervix.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
@@ -263,11 +264,36 @@ final class _HelpEntry extends StatelessWidget {
         ),
       ),
       _HelpEntryShape.arrowUp => ArrowUpGlyph(color: color),
-      // Sample Muttermund glyph: the "medium" letter, exactly how a
-      // recorded position renders in the band's cervix zone.
-      _HelpEntryShape.cervix => Text(
-        cervixPositionSymbol(CervixPosition.medium),
-        style: TextStyle(fontSize: 10, color: color),
+      // Sample Muttermund glyph: the painted opening circles by diameter
+      // (closed dot, middle ring, open ring — the shared band constants),
+      // stacked like the band's slots; the position only picks the slot
+      // and paints no ink of its own.
+      _HelpEntryShape.cervix => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (diameter, filled) in const [
+            (cervixClosedDotSize, true),
+            (cervixMiddleCircleSize, false),
+            (cervixOpenCircleSize, false),
+          ])
+            Padding(
+              padding: const EdgeInsets.all(2),
+              child: Container(
+                width: diameter,
+                height: diameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: filled ? color : null,
+                  border: filled
+                      ? null
+                      : Border.all(
+                          color: color,
+                          width: cervixCircleStrokeWidth,
+                        ),
+                ),
+              ),
+            ),
+        ],
       ),
       // Sample firmness glyph: the soft shorthand 'w', exactly how a
       // recorded firmness renders pinned at the band's zone bottom.

@@ -90,10 +90,10 @@ Widget _alignmentHarness({required List<DailyEntry> entries}) =>
 // the glyph zone with 5 fixed position slots (low lowest … veryHigh
 // highest, unreachable beyond) and the fixed letter row beneath it — so
 // the position evolution stays comparable at a glance whatever the note.
-// The opening renders as PAINTED circle geometry sized by its value (the
-// painted diameter communicates the opening, like the course notation);
-// an opening-free day falls back to the position letter and an
-// unreachable day to `u`.
+// The glyph zone's ink is the OPENING circle, painted circle geometry
+// sized by its value (the painted diameter communicates the opening, like
+// the course notation). A position value without an opening paints
+// nothing — the position only picks the slot.
 // The firmness letter renders iff a value exists and never moves the
 // slot ink; the breast-pain B sits in its own plain-letter row directly
 // above the note zone (at the band top on cervix-free days, not
@@ -107,9 +107,9 @@ DateTime _cervixDay(int index) => DateTime.utc(2026, 9, 7 + index);
 //  1: medium + middle            → middle circle one slot higher
 //  2: high + open                → open circle higher still
 //  3: veryHigh + open + halfSoft → open circle in the topmost reachable slot
-//  4: unreachable + open         → 'u' (unreachable renders no circle)
+//  4: unreachable + open         → open circle in the unreachable (topmost) slot
 //  5: opening open only          → open circle at the medium slot
-//  6: position medium only       → 'm' letter fallback in the slot
+//  6: position medium only       → nothing paints (position has no glyph)
 //  7: firmness soft only         → only the letter-row 'w', no slot ink
 //  8: breast pain + a long multi-line note, no cervix → the B pain row at
 //    the band top, the note zone below it
@@ -1113,8 +1113,9 @@ void main() {
   });
 
   testWidgets('the opening paints a circle sized by its value in its '
-      'position slot; an opening-free day falls back to the position '
-      'letter, an unreachable day to u', (tester) async {
+      'position slot; a position without an opening paints nothing', (
+    tester,
+  ) async {
     await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
 
     final circleOf = {
@@ -1122,6 +1123,7 @@ void main() {
       1: CervixOpening.middle, // medium slot
       2: CervixOpening.open, // high slot
       3: CervixOpening.open, // veryHigh slot
+      4: CervixOpening.open, // unreachable slot — topmost, past veryHigh
       5: CervixOpening.open, // opening-only day: medium slot
     };
     final diameterOf = {
@@ -1174,18 +1176,24 @@ void main() {
       }
     }
 
-    final letterOf = {4: 'u', 6: 'm'};
-    for (final MapEntry(:key, :value) in letterOf.entries) {
-      final ink = find.byKey(ValueKey('cervixSlotGlyph-$key'));
+    // A position value is only the slot anchor: without an opening
+    // nothing paints in the glyph zone (day 6 records a position only,
+    // days 9–11 record other observations without an opening).
+    for (final index in [6, 9, 10, 11]) {
       expect(
-        ink,
-        findsOneWidget,
-        reason: 'day $key renders the slot letter ink',
+        find.byKey(ValueKey('cervixSlotGlyph-$index')),
+        findsNothing,
+        reason:
+            'day $index: a position without an opening renders no '
+            'slot ink',
       );
       expect(
-        tester.widget<Text>(ink).data,
-        value,
-        reason: 'day $key renders "$value" in its position slot',
+        find.descendant(
+          of: chartCell(index, 'notesBand'),
+          matching: find.byWidgetPredicate((w) => w is Text && w.data == 'm'),
+        ),
+        findsNothing,
+        reason: 'day $index: positions paint no letter ink',
       );
     }
 
@@ -1213,11 +1221,12 @@ void main() {
       reason: 'the topmost slot anchors 5 px below the band top',
     );
 
-    // Every medium day shares ONE slot: the opening-only circle, the
-    // letter fallback and the noted firmness day (whose letter row and
-    // note zone render below) keep the same ink center.
+    // Every day whose observations still paint the medium slot shares ONE
+    // slot: the opening-only circle keeps the same ink center as the
+    // position+opening day (the letter row and its note never shift the
+    // glyph).
     final mediumCenter = inkCenterY(1);
-    for (final i in [5, 6, 9, 11]) {
+    for (final i in [5]) {
       expect(
         inkCenterY(i),
         closeTo(mediumCenter, 0.5),
@@ -1353,14 +1362,6 @@ void main() {
       letter.top,
       closeTo(cell10.top + 30, 0.5),
       reason: "day 10's letter row keeps its fixed place without a note",
-    );
-    expect(
-      tester
-          .getRect(find.byKey(const ValueKey('cervixSlotGlyph-10')))
-          .center
-          .dy,
-      closeTo(cell10.top + 20, 0.5),
-      reason: "day 10's medium slot ink keeps its fixed place without a note",
     );
   });
 
@@ -6635,15 +6636,13 @@ void main() {
       expect(
         chartCellContent(7, 'notesBand', find.text(glyph)),
         findsNothing,
-        reason:
-            'no position letter ($glyph) without a position '
-            'observation',
+        reason: 'positions paint circles, never letters — ($glyph incl.)',
       );
     }
     expect(
       find.byKey(const ValueKey('cervixSlotGlyph-7')),
       findsNothing,
-      reason: 'no slot glyph without a position or opening observation',
+      reason: 'no slot glyph on a day whose opening was never recorded',
     );
   });
 

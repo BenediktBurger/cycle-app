@@ -250,71 +250,32 @@ final class _SignalRow extends StatelessWidget {
     return BleedingSymbol(bleeding: day.bleeding);
   }
 
-  static const double _cervixReservedTop =
-      cervixGlyphZoneHeight + cervixLetterRowHeight;
-
-  static bool _hasCervixObservation(DailyEntry day) =>
-      day.cervixPosition != null ||
-      day.cervixOpening != null ||
-      day.cervixFirmness != null;
-
-  /// The cervix zone's position slot, counted TOP-DOWN: veryHigh is the
-  /// topmost reachable slot, unreachable — past everything — sits above
-  /// it, and low at the very bottom.
-  static int _cervixSlotIndex(CervixPosition position) =>
-      CervixPosition.values.length - 1 - position.index;
-
-  /// A position slot's ink-center Y inside the glyph zone: the slots keep
-  /// the largest circle's half diameter plus a stroke's worth of edge room
-  /// at both ends, evenly spaced between.
-  static double _cervixSlotCenterY(int slotIndex) {
-    const edge = cervixOpenCircleSize / 2 + cervixCircleStrokeWidth;
-    return edge +
-        slotIndex *
-            (cervixGlyphZoneHeight - 2 * edge) /
-            (CervixPosition.values.length - 1);
-  }
-
   /// One day's slot ink, centered in the glyph zone at its slot: the
   /// opening renders as a painted circle sized by its value (diameter
-  /// communicates the opening), unless the cervix is unreachable — the
-  /// ruleset has no circle for it, `u` fills the slot — and an
-  /// opening-free day falls back to the plain position letter.
+  /// communicates the opening), placed at the position's slot — the
+  /// position only picks the slot, a position without an opening paints
+  /// nothing.
   static Widget? _cervixSlotInk(
     BuildContext context,
     DailyEntry day,
     int index,
   ) {
+    final zones = notesBandLayout(day);
+    if (zones.opening == null || zones.slotIndex == null) return null;
     final scheme = Theme.of(context).colorScheme;
-    final centerY = _cervixSlotCenterY(
-      _cervixSlotIndex(day.cervixPosition ?? CervixPosition.medium),
-    );
-    Positioned at(double size, Widget ink) => Positioned(
+    final (diameter, filled) = switch (zones.opening!) {
+      CervixOpening.closed => (cervixClosedDotSize, true),
+      CervixOpening.middle => (cervixMiddleCircleSize, false),
+      CervixOpening.open => (cervixOpenCircleSize, false),
+    };
+    final centerY = cervixSlotCenterY(zones.slotIndex!);
+    return Positioned(
       left: 0,
       right: 0,
-      top: centerY - size / 2,
-      height: size,
-      child: Center(child: ink),
-    );
-    Widget textGlyph(String glyph) => _InPlotGlyphRows._haloedText(
-      inkKey: 'cervixSlotGlyph-$index',
-      haloKey: 'cervixSlotHalo-$index',
-      text: glyph,
-      style: TextStyle(fontSize: 9, color: scheme.onSurface),
-      haloColor: scheme.surface,
-    );
-    if (day.cervixPosition == CervixPosition.unreachable) {
-      return at(9, textGlyph(cervixPositionSymbol(CervixPosition.unreachable)));
-    }
-    if (day.cervixOpening case final opening?) {
-      final (diameter, filled) = switch (opening) {
-        CervixOpening.closed => (cervixClosedDotSize, true),
-        CervixOpening.middle => (cervixMiddleCircleSize, false),
-        CervixOpening.open => (cervixOpenCircleSize, false),
-      };
-      return at(
-        diameter,
-        Container(
+      top: centerY - diameter / 2,
+      height: diameter,
+      child: Center(
+        child: Container(
           key: ValueKey('cervixSlotGlyph-$index'),
           width: diameter,
           height: diameter,
@@ -329,12 +290,8 @@ final class _SignalRow extends StatelessWidget {
                   ),
           ),
         ),
-      );
-    }
-    if (day.cervixPosition case final position?) {
-      return at(9, textGlyph(cervixPositionSymbol(position)));
-    }
-    return null;
+      ),
+    );
   }
 
   /// The day cell's merged notes band: the cervix stacked zones on top
@@ -353,8 +310,7 @@ final class _SignalRow extends StatelessWidget {
   ) {
     final scheme = Theme.of(context).colorScheme;
     final surface = scheme.surface;
-    final hasCervix = day != null && _hasCervixObservation(day);
-    final hasPain = day?.painBreast ?? false;
+    final zones = notesBandLayout(day);
     final joined = day == null || day.notes == null
         ? null
         : _joinedNoteText(day.notes!);
@@ -362,17 +318,15 @@ final class _SignalRow extends StatelessWidget {
       final text? when text.isNotEmpty => text,
       _ => null,
     };
-    final painRowTop = hasCervix ? _cervixReservedTop : 0.0;
-    final noteTop = hasPain ? painRowTop + painRowHeight : painRowTop;
     return Stack(
       children: [
-        if (hasCervix)
+        if (zones.hasCervix)
           Positioned(
             left: 0,
             right: 0,
             top: 0,
             height: cervixGlyphZoneHeight,
-            child: _cervixZone(context, day, index),
+            child: _cervixZone(context, day!, index),
           ),
         if (day?.cervixFirmness case final firmness?)
           Positioned(
@@ -390,11 +344,11 @@ final class _SignalRow extends StatelessWidget {
               ),
             ),
           ),
-        if (hasPain)
+        if (zones.hasPain)
           Positioned(
             left: 0,
             right: 0,
-            top: painRowTop,
+            top: zones.painRowTop,
             height: painRowHeight,
             child: Center(
               child: _InPlotGlyphRows._haloedText(
@@ -410,7 +364,7 @@ final class _SignalRow extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            top: noteTop,
+            top: zones.noteTop,
             bottom: 0,
             child: Align(
               alignment: Alignment.topLeft,

@@ -1,23 +1,25 @@
 // The PDF layer's pure per-day symbol mappings: a recorded day's
 // observations mapped onto the paper form's cell contents — the bleeding
-// fill, the cervix/pain letter cells, the disturbance codes and the
+// fill, the pain letter cell, the disturbance codes and the
 // measurement-time text.
 //
 // The in-plot glyphs (the sex X marks, the mucus sign letters, the
 // Mittelschmerz M and the evaluation day numbers) are not mapped here:
 // they render inside the plot (see cycle_pdf.dart's in-plot glyph seam),
 // placed by the shared chart-marks mapper, whose mucus letters come
-// straight from mucusDisplay (lib/ui/chart_marks.dart).
+// straight from mucusDisplay (lib/ui/chart_marks.dart). The cervix cells
+// (opening circles, firmness letters) and the merged band's zone layout
+// come straight from the band module (../domain/band_layout.dart) the
+// cycle tab uses — no PDF-side re-mapping.
 //
 // Display mapping only (Mode M, ADR-0001): every helper delegates to the
-// existing domain display helpers where they exist (the cervix chart
-// glyphs, the shared disturbance letter vocabulary in
-// lib/domain/disturbances.dart) — nothing is reinterpreted
-// or reworded here, so the PDF cannot drift from the chart's conventions.
+// existing domain display helpers where they exist (the shared
+// disturbance letter vocabulary in lib/domain/disturbances.dart) —
+// nothing is reinterpreted or reworded here, so the PDF cannot drift from
+// the chart's conventions.
 import '../domain/date_only.dart';
 import '../domain/disturbances.dart';
 import '../domain/models.dart';
-import '../domain/cervix.dart';
 
 /// The bleed fill of one row cell, bottom-anchored like the shared
 /// bleeding symbol (lib/ui/bleeding_symbol.dart): level 1 (spotting)
@@ -42,22 +44,6 @@ PdfBleedingFill? bleedingFill(Bleeding bleeding) {
         ? 1 / 4
         : (bleeding.level - 1) / 4,
   );
-}
-
-/// The cervix letter cell: position glyph first, then the firmness
-/// shorthand (h / h-w / w), space-joined — the chart's cell text, same
-/// glyphs. The opening is deliberately not displayed (entry-form-only
-/// field). Null when neither observation was recorded.
-String? cervixLetters(DailyEntry? day) {
-  if (day == null) return null;
-  final position = day.cervixPosition == null
-      ? null
-      : cervixPositionSymbol(day.cervixPosition!);
-  final firmness = day.cervixFirmness == null
-      ? null
-      : cervixFirmnessSymbol(day.cervixFirmness!);
-  if (position == null && firmness == null) return null;
-  return [?position, ?firmness].join(' ');
 }
 
 /// The pain row's letter cell: 'B' for breast tenderness (the
