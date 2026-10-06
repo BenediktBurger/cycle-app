@@ -1,9 +1,10 @@
 // Tests for the Muttermund (cervix) vocabularies in
 // lib/domain/cervix.dart: POSITION, OPENING, and FIRMNESS. Enum NAMES are
 // the stable storage tokens (database + export), so the token-set tests
-// below pin them — a rename is a data migration. The firmness glyph is an
-// ad-hoc display choice (TODO(user-review) in the helper), but at the time
-// of writing it is the one contract the chart renders, so it is pinned too.
+// below pin them — a rename is a data migration. The position and firmness
+// glyphs are ad-hoc display choices (TODO(user-review) in the helpers), the
+// opening glyph is the ruleset's circle notation; all three are pinned as
+// the contract the chart renders.
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -130,6 +131,13 @@ void main() {
       expect(cervixFirmnessSymbol(CervixFirmness.hard), 'h');
       expect(cervixFirmnessSymbol(CervixFirmness.halfSoft), 'h-w');
       expect(cervixFirmnessSymbol(CervixFirmness.soft), 'w');
+    });
+
+    test('opening symbols follow the ruleset circle notation', () {
+      expect(cervixOpeningSymbol(CervixOpening.closed), '·');
+      expect(cervixOpeningSymbol(CervixOpening.middle), '∘');
+      expect(cervixOpeningSymbol(CervixOpening.open), '◯');
+      expect(cervixOpeningSymbol(null), isNull);
     });
   });
 }

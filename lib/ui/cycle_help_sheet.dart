@@ -264,14 +264,13 @@ final class _HelpEntry extends StatelessWidget {
       ),
       _HelpEntryShape.arrowUp => ArrowUpGlyph(color: color),
       // Sample Muttermund glyph: the "medium" letter, exactly how a
-      // recorded cervix day renders in the cervix row.
+      // recorded position renders in the band's cervix zone.
       _HelpEntryShape.cervix => Text(
         cervixPositionSymbol(CervixPosition.medium),
         style: TextStyle(fontSize: 10, color: color),
       ),
       // Sample firmness glyph: the soft shorthand 'w', exactly how a
-      // recorded firmness renders beside the position letter in the cervix
-      // row.
+      // recorded firmness renders pinned at the band's zone bottom.
       _HelpEntryShape.firmness => Text(
         cervixFirmnessSymbol(CervixFirmness.soft),
         style: TextStyle(fontSize: 10, color: color),
@@ -303,8 +302,9 @@ final class _HelpEntry extends StatelessWidget {
         'X',
         style: TextStyle(fontSize: 10, color: color),
       ),
-      // Sample pain glyph: the B letter, the breast-pain option the below-
-      // curve pain row renders per flag (the M letter has its own entry).
+      // Sample pain glyph: the B letter, the breast-pain option the band
+      // renders per flag in its pain row above the note zone (the M letter
+      // has its own entry).
       _HelpEntryShape.pain => Text(
         'B',
         style: TextStyle(fontSize: 10, color: color),

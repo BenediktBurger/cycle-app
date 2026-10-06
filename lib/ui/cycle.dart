@@ -4,8 +4,8 @@
 // mucus sign letters, mucus peak dot, the Mittelschmerz M and the
 // evaluation 1–6 day numbering — chart_marks.dart, _InPlotGlyphRows).
 // Under the curve comes the single below-chart strip (measurement time,
-// disturbance letters, cervix, pain, day-note indicator) — as with every
-// row the raw observations are pure recordings. The COMPUTED
+// disturbance letters, then the merged notes band) — as with
+// every row the raw observations are pure recordings. The COMPUTED
 // evaluation overlay (Mode M, ADR-0001) draws the user's mucus-peak and
 // first-higher marks' derived artifacts for DISPLAY ONLY — never persisted;
 // it is derived in lib/domain/evaluation_overlay.dart over evaluateCycles

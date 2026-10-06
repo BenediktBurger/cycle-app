@@ -216,6 +216,36 @@ void main() {
     );
   });
 
+  testWidgets('the opening chips show the ruleset glyph beside their label', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+    await tester.pumpAndSettle();
+
+    const openingVocabulary = {
+      CervixOpening.closed: 'geschlossen',
+      CervixOpening.middle: 'mittel',
+      CervixOpening.open: 'offen',
+    };
+    for (final MapEntry(key: opening, value: label)
+        in openingVocabulary.entries) {
+      final chip = diaryChip('cervixOpening', opening.name);
+      expect(
+        find.descendant(of: chip, matching: find.text(label)),
+        findsOneWidget,
+        reason: 'the ${opening.name} chip keeps its verbal label "$label"',
+      );
+      expect(
+        find.descendant(
+          of: chip,
+          matching: find.text(cervixOpeningSymbol(opening)!),
+        ),
+        findsOneWidget,
+        reason: 'the ${opening.name} chip shows its opening glyph',
+      );
+    }
+  });
+
   // ═══════════ pain options (B, M) ═══════════
   // former test/diary_pain_selector_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)

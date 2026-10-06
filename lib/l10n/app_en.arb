@@ -195,14 +195,13 @@
     "description": "Column-header tooltip for the day-of-cycle prototype (\"#5\") on the cycle chart."
   },
   "cycleLegendTemperature": "BBT (temperature) in °C",
-  "cycleRowCervix": "Cervix",
   "cycleRowDisturbance": "Disturbed measurement",
   "@cycleRowDisturbance": {
     "description": "Row name (corner tooltip/semantics) of the disturbance row at the bottom of the cycle chart block: the letter codes of the day's temperature-disturbance (exclusion) flags."
   },
   "cycleRowNote": "Note",
   "@cycleRowNote": {
-    "description": "Row name (corner tooltip/semantics) of the note-indicator row at the very bottom of the cycle chart block: a small glyph marks the days whose entry carries a non-empty notes text."
+    "description": "Row name (corner tooltip/semantics) of the merged notes band at the bottom of the cycle chart block: cervix slot glyph, pinned firmness letter, breast-pain B and the rotated diary note text share the one band."
   },
   "cycleHelpShow": "Show symbol glossary",
   "@cycleHelpShow": {

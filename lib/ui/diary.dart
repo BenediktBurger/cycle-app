@@ -736,11 +736,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   for (final opening in CervixOpening.values)
                     ChoiceChip(
                       key: ValueKey('cervixOpeningChip-${opening.name}'),
-                      label: Text(switch (opening) {
-                        CervixOpening.closed => l10n.cervixOpeningClosed,
-                        CervixOpening.middle => l10n.cervixOpeningMiddle,
-                        CervixOpening.open => l10n.cervixOpeningOpen,
-                      }),
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(cervixOpeningSymbol(opening)!),
+                          const SizedBox(width: 4),
+                          Text(switch (opening) {
+                            CervixOpening.closed => l10n.cervixOpeningClosed,
+                            CervixOpening.middle => l10n.cervixOpeningMiddle,
+                            CervixOpening.open => l10n.cervixOpeningOpen,
+                          }),
+                        ],
+                      ),
                       selected: _cervixOpening == opening,
                       onSelected: (selected) => setState(() {
                         _cervixOpening = selected ? opening : null;
