@@ -166,8 +166,8 @@ dev_dependencies:
   # the package itself arrives transitively with url_launcher.
   url_launcher_platform_interface: ^2.3.2
   # Regenerates the launcher icons (all Android/iOS mipmaps) from
-  # design/icon.png (rendered from the design/logo.svg master): run
-  # `dart run flutter_launcher_icons` after changing the source.
+  # design/icon.png: run `dart run flutter_launcher_icons` after changing
+  # the source. Full render pipeline for a logo change: design/README.md.
   flutter_launcher_icons: ^0.14.0
 
 # Launcher-icon generation configuration (see the dev dependency above).

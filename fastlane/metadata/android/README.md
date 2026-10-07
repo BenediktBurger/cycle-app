@@ -33,8 +33,10 @@ F-Droid `metadata/<applicationId>.yml` draft pending the fdroiddata MR.
   text files must stay usable as-is (stores parse `title.txt` etc.
   literally, ≤ 30 characters).
 - **Images: partially done** — `phoneScreenshots/` exists for both locales
-  (2 PNG shots each, English UI, shared by `de-DE` and `en-US`); `icon.png`
-  and `featureGraphic.png` remain pending Gate G4 and do not exist yet.
+  (2 PNG shots each, English UI, shared by `de-DE` and `en-US`), and
+  `en-US/images/icon.png` (512×512, rendered from `design/logo.svg`) covers
+  the F-Droid listing icon (F-Droid reads it from the default locale
+  only); `featureGraphic.png` remains pending Gate G4.
 - **Screenshot ratio note:** the phone screenshots are 1080×2340 = 19.5:9
   (near-9:20 tall — a standard modern-phone screenshot ratio; Play accepts
   up to 9:21), which exceeds F-Droid's classic 16:9/9:16 guidance. They are

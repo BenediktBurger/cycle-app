@@ -12,7 +12,7 @@ Layout and file set the stores expect:
 - `images/` — **partially done**: `phoneScreenshots/` exists (Gate G4
   pending for the remaining assets)
 
-## Images: screenshots exist, branding assets pending Gate G4
+## Images: screenshots exist, feature graphic pending Gate G4
 
 `phoneScreenshots/` holds **2 screenshots** (`01.png`, `02.png`, 1080×2340)
 of the app's English UI, copied byte-identical from
@@ -24,14 +24,15 @@ screenshot ratio; Play accepts up to 9:21), which exceeds F-Droid's classic
 16:9/9:16 guidance. They are kept uncropped rather than faking the ratio —
 re-capture on a 16:9 display if an F-Droid reviewer ever objects.
 
-Still missing until Gate G4 ("branding assets") lands and a real logo
+The F-Droid listing icon (512×512) lives in `../en-US/images/icon.png`;
+F-Droid reads it from the default locale, so no per-locale copies exist.
+
+Still missing until Gate G4 ("branding assets") lands and a final logo
 exists:
 
-- `icon.png` (512×512, F-Droid; Play derives 512×512 from adaptive icon or
-  high-resolution asset)
 - `featureGraphic.png` (1024×500)
 
-These two do not exist yet. Do **not** mistake "NER Cycle App" for a
+Do **not** mistake "NER Cycle App" for a
 decided product name: it is a clearly-marked **working title** shown to
 test users (Gate G4 placeholder), recorded as such in `docs/release.md`;
 the package name `cycle_app` remains an internal placeholder (ADR-0002).
