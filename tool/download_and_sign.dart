@@ -989,6 +989,16 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
     _fail(pubspecProblem);
   }
 
+  // F-Droid requires one changelog file per shipped per-ABI versionCode
+  // (N*10 + abiCode); verified at this same commit, before any download
+  // or signing.
+  print("verifying the changelog files at the run's commit …");
+  await requireChangelogFiles(
+    versionName: versionName,
+    versionCodeBase: runPubspec.build,
+    headSha: headSha,
+  );
+
   // --- stage 5: download the three unsigned artifacts ------------------------
   print('downloading artifacts into $ciArtifactsDir …');
   await Directory(ciArtifactsDir).create(recursive: true);

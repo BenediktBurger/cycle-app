@@ -11,6 +11,7 @@
 // sha256sum, and no release, upload, or signing ever happens in a test.
 // Relative import on purpose: tool/ scripts live outside lib/ and are not
 // addressable through `package:cycle_app/`.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -557,6 +558,372 @@ void main() {
       );
       expect(isFingerprintHex(pinnedReleaseFingerprint), isTrue);
       expect(isFingerprintHex('0aa57498'), isFalse);
+    });
+  });
+
+  group('F-Droid changelog files gate (both helpers)', () {
+    const authoringName = '0.2.5.txt';
+    const linkNames = ['71.txt', '72.txt', '73.txt', 'default.txt'];
+
+    /// The blob sha the fixture assigns to each symlink entry —
+    /// deterministic per path so the blob map keys line up.
+    String shaFor(String locale, String name) => 'sha-$locale-$name';
+
+    /// Builds the recursive Git Trees fixture the gate requests at its head
+    /// SHA and the blob map its symlink entries point to: every locale
+    /// carries the authoring file as a blob in git mode [authoringMode]
+    /// (a regular file by default), and every name with a
+    /// non-null target in [targets] becomes a symlink entry (mode
+    /// 120000) whose blob decodes to the given filename — unless the name
+    /// is in [regularNames], where it is committed as a regular file
+    /// (mode 100644). Blob shas stay unique per locale so a caller fetching
+    /// one locale's blob can never be answered by another's.
+    ({String tree, Map<String, String> blobs}) fixture({
+      required Map<String, Map<String, String>> targets,
+      String authoringMode = '100644',
+      Set<String> regularNames = const {},
+      bool truncated = false,
+    }) {
+      final blobs = <String, String>{};
+      final entries = <String>[];
+      for (final MapEntry(key: locale, value: names) in targets.entries) {
+        entries.add(
+          '{"path":"$fdroidMetadataPath/$locale","mode":"040000",'
+          '"type":"tree","sha":"tree-$locale"}',
+        );
+        final prefix = '$fdroidMetadataPath/$locale/changelogs/';
+        entries.add(
+          '{"path":"$prefix$authoringName","mode":"$authoringMode",'
+          '"type":"blob","sha":"sha-$locale-authoring"}',
+        );
+        for (final name in linkNames) {
+          final target = names[name];
+          if (target == null) continue;
+          if (regularNames.contains(name)) {
+            entries.add(
+              '{"path":"$prefix$name","mode":"100644",'
+              '"type":"blob","sha":"sha-$locale-file-$name"}',
+            );
+            continue;
+          }
+          final sha = shaFor(locale, name);
+          blobs[sha] =
+              '{"content":"${base64Encode(utf8.encode(target))}",'
+              '"encoding":"base64"}';
+          entries.add(
+            '{"path":"$prefix$name","mode":"120000",'
+            '"type":"blob","sha":"$sha"}',
+          );
+        }
+      }
+      return (
+        tree: jsonEncode({
+          'tree': [for (final entry in entries) jsonDecode(entry)],
+          'truncated': truncated,
+        }),
+        blobs: blobs,
+      );
+    }
+
+    /// A pure-seam gh runner serving one recursive tree answer plus one
+    /// blob per requested sha; anything else exits 1 like an unexpected gh
+    /// call, so a stray invocation cannot pass silently.
+    GhApiRunner gateRunner(({String tree, Map<String, String> blobs}) data) {
+      return (arguments) async {
+        final call = arguments.length > 1 ? arguments[1] : arguments.join(' ');
+        const treePrefix = 'repos/$releaseRepo/git/trees/';
+        const blobPrefix = 'repos/$releaseRepo/git/blobs/';
+        if (call.startsWith(treePrefix) && call.endsWith('recursive=1')) {
+          return ProcessResult(0, 0, data.tree, '');
+        }
+        if (call.startsWith(blobPrefix)) {
+          final sha = call.substring(blobPrefix.length);
+          final blob = data.blobs[sha];
+          if (blob == null) {
+            return ProcessResult(0, 1, '', 'gh: blob $sha not found');
+          }
+          return ProcessResult(0, 0, blob, '');
+        }
+        return ProcessResult(0, 1, '', 'unexpected gh call: $arguments');
+      };
+    }
+
+    test('expected file set: authoring file, three per-ABI links, default', () {
+      expect(expectedChangelogFiles(versionName: '0.2.5', versionCodeBase: 7), [
+        '0.2.5.txt',
+        '71.txt',
+        '72.txt',
+        '73.txt',
+        'default.txt',
+      ]);
+    });
+
+    test('recursive tree JSON decodes to path/mode/type/sha entries', () {
+      final entries = decodeGhTree(
+        '{"tree":['
+        '{"path":"fastlane/metadata/android/de-DE","mode":"040000",'
+        '"type":"tree","sha":"tree-de"},'
+        '{"path":"fastlane/metadata/android/de-DE/changelogs/71.txt",'
+        '"mode":"120000","type":"blob","sha":"blob-71"}'
+        '],"truncated":false}',
+      );
+      expect(entries.map((entry) => entry.path), [
+        'fastlane/metadata/android/de-DE',
+        'fastlane/metadata/android/de-DE/changelogs/71.txt',
+      ]);
+      expect(entries.last.mode, '120000');
+      expect(entries.first.type, 'tree');
+      expect(entries.last.sha, 'blob-71');
+    });
+
+    test('tree decode is loud on a non-object answer, a missing tree array, '
+        'mistyped fields, and a truncated answer', () {
+      for (final badAnswer in [
+        '[{"path":"p"}]',
+        '{"truncated":false}',
+        '{"tree":[{"path":4}]}',
+        '{"tree":[{"path":"p","mode":"120000","type":"blob"}]}',
+        '{"tree":[],"truncated":true}',
+      ]) {
+        expect(
+          () => decodeGhTree(badAnswer),
+          throwsA(isA<ReleaseToolException>()),
+          reason: 'tree answer "$badAnswer" must abort the verify',
+        );
+      }
+    });
+
+    test('a blob answer decodes to the resolved symlink target — embedded '
+        'base64 line wraps included', () {
+      final encoded = base64Encode(utf8.encode(authoringName));
+      final wrapped = '${encoded.substring(0, 3)}\\n${encoded.substring(3)}';
+      expect(
+        decodeGhBlobText('{"content":"$wrapped","encoding":"base64"}'),
+        authoringName,
+      );
+    });
+
+    test('a blob decode is loud on non-object answers and missing content', () {
+      for (final badAnswer in ['[]', '{"encoding":"base64"}']) {
+        expect(
+          () => decodeGhBlobText(badAnswer),
+          throwsA(isA<ReleaseToolException>()),
+          reason: 'blob answer "$badAnswer" must abort the verify',
+        );
+      }
+    });
+
+    test('complete symlinks pointing at the authoring name pass with an ok '
+        'line per locale', () async {
+      final lines = <String>[];
+      await requireChangelogFiles(
+        versionName: '0.2.5',
+        versionCodeBase: 7,
+        headSha: validHeadSha,
+        ghApiRunner: gateRunner(
+          fixture(
+            targets: {
+              for (final locale in ['de-DE', 'en-US'])
+                locale: {for (final name in linkNames) name: authoringName},
+            },
+          ),
+        ),
+        sink: lines.add,
+      );
+      expect(lines.length, 2, reason: lines.join('\n'));
+      expect(lines.join('\n'), contains('de-DE ok'));
+      expect(lines.join('\n'), contains('en-US ok'));
+    });
+
+    test(
+      'missing links fail loudly and name every gap plus the fix path',
+      () async {
+        Object? caught;
+        try {
+          await requireChangelogFiles(
+            versionName: '0.2.5',
+            versionCodeBase: 7,
+            headSha: validHeadSha,
+            ghApiRunner: gateRunner(
+              fixture(targets: {'de-DE': {}, 'en-US': {}}),
+            ),
+            sink: (_) {},
+          );
+        } on ReleaseToolException catch (error) {
+          caught = error;
+        }
+        expect(caught, isNotNull);
+        final message = '$caught';
+        expect(
+          message,
+          contains('F-Droid changelog files for 0.2.5'),
+          reason: message,
+        );
+        expect(
+          message,
+          contains('de-DE: missing 71.txt, 72.txt, 73.txt, default.txt'),
+          reason: message,
+        );
+        expect(
+          message,
+          contains('en-US: missing 71.txt, 72.txt, 73.txt, default.txt'),
+          reason: message,
+        );
+        expect(
+          message,
+          contains('fdroid_changelog_links.dart'),
+          reason: message,
+        );
+        expect(message, contains('--run-id re-attach'), reason: message);
+      },
+    );
+
+    test('a regular file in place of a per-ABI symlink fails loudly naming '
+        'the locale and the name', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            fixture(
+              targets: {
+                for (final locale in ['de-DE', 'en-US'])
+                  locale: {for (final name in linkNames) name: authoringName},
+              },
+              regularNames: const {'72.txt'},
+            ),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(caught, isNotNull, reason: 'a regular 72.txt must fail the gate');
+      final message = '$caught';
+      expect(
+        message,
+        contains('de-DE: 72.txt is a regular file'),
+        reason: message,
+      );
+      expect(message, contains('remove or rename it by hand'), reason: message);
+      expect(message, contains('fdroid_changelog_links.dart'), reason: message);
+    });
+
+    test('a symlink to a stale or diverged versionName fails loudly naming '
+        'the actual target', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            fixture(
+              targets: {
+                for (final locale in ['de-DE', 'en-US'])
+                  locale: {
+                    for (final name in linkNames)
+                      name: name == '71.txt' ? '0.2.4.txt' : authoringName,
+                  },
+              },
+            ),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(caught, isNotNull, reason: 'a stale target must fail the gate');
+      final message = '$caught';
+      expect(
+        message,
+        contains(
+          'de-DE: 71.txt is a symlink to "0.2.4.txt" but must point '
+          'at "0.2.5.txt"',
+        ),
+        reason: message,
+      );
+      expect(message, contains('fdroid_changelog_links.dart'), reason: message);
+    });
+
+    test('a non-regular authoring entry fails the gate loudly naming the '
+        'locale and the actual mode', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            fixture(
+              targets: {
+                for (final locale in ['de-DE', 'en-US'])
+                  locale: {for (final name in linkNames) name: authoringName},
+              },
+              authoringMode: '120000',
+            ),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a symlinked authoring entry must fail the gate',
+      );
+      final message = '$caught';
+      expect(message, contains('de-DE:'), reason: message);
+      expect(message, contains(authoringName), reason: message);
+      expect(message, contains('git mode 120000'), reason: message);
+    });
+
+    test(
+      'a failed tree call aborts instead of counting as "missing"',
+      () async {
+        Object? caught;
+        try {
+          await requireChangelogFiles(
+            versionName: '0.2.5',
+            versionCodeBase: 7,
+            headSha: validHeadSha,
+            ghApiRunner: (arguments) async =>
+                ProcessResult(0, 1, '', 'gh: HTTP 404'),
+            sink: (_) {},
+          );
+        } on ReleaseToolException catch (error) {
+          caught = error;
+        }
+        final message = '$caught';
+        expect(message, contains('git-tree'), reason: message);
+        expect(message, contains('gh'), reason: message);
+        expect(message, isNot(contains('Fix path')), reason: message);
+      },
+    );
+
+    test('a locale-less metadata tree fails loudly', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner((
+            tree:
+                '{"tree":[{"path":"$fdroidMetadataPath/README.md",'
+                '"mode":"100644","type":"blob","sha":"sha-readme"}],'
+                '"truncated":false}',
+            blobs: const {},
+          )),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect('$caught', contains('no locale directory'), reason: '$caught');
     });
   });
 }
