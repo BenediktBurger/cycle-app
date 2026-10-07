@@ -8,7 +8,9 @@ Layout and file set the stores expect:
   **≤ 30 characters**
 - `short_description.txt` — **≤ 80 characters**
 - `full_description.txt` — **≤ 4000 characters**
-- `changelogs/<versionCode>.txt` (one file per versionCode)
+- `changelogs/<versionName>.txt` — the release notes (authoring file); the
+  numeric `<versionCode>.txt` entries plus `default.txt` are generated
+  relative symlinks by `tool/fdroid_changelog_links.dart`
 - `images/` — **partially done**: `phoneScreenshots/` exists (Gate G4
   pending for the remaining assets)
 

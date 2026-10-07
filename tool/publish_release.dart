@@ -593,6 +593,18 @@ Future<void> runPublishRelease(
     'headSha=${manifest.headSha}',
   );
 
+  // F-Droid requires one changelog file per shipped per-ABI versionCode
+  // (N*10 + abiCode); re-verified at the manifest's head commit before
+  // anything is created or attached.
+  out("verifying the changelog files at the run's commit …");
+  await requireChangelogFiles(
+    versionName: manifest.versionName,
+    versionCodeBase: manifest.versionCodeBase,
+    headSha: manifest.headSha,
+    ghApiRunner: runGh,
+    sink: out,
+  );
+
   // --- stage 2: checksums for real (read-only) --------------------------------
   final shaByPublishName = await stagedChecksums(
     root: repoRoot,

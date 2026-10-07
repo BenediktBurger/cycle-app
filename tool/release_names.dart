@@ -334,6 +334,284 @@ String? parsePinFile(String pinFileContent) {
   return null;
 }
 
+// --- F-Droid changelog files gate --------------------------------------------
+//
+// F-Droid's index rebuild matches `changelogs/<versionCode>.txt` against
+// every Build the app produces — with the split scheme that is one file per
+// `N*10 + abiCode`, authored once per release as `<versionName>.txt` and
+// linked by tool/fdroid_changelog_links.dart. Below, both helpers verify
+// the file set AT THEIR OWN COMMIT via the Git Trees and Git Blobs APIs, so
+// a forgotten changelog-links run stops the release helpers before any
+// signing or publishing happens, with the fix path in the message. The
+// entries are verified by git type, not just by name: each generated name
+// must be a symlink whose blob content is the `<versionName>.txt` filename —
+// a regular file or a link to a stale versionName fails loudly, too.
+
+/// The fastlane metadata root the changelog check walks, relative to the
+/// repository root (same tree tool/fdroid_changelog_links.dart links).
+const String fdroidMetadataPath = 'fastlane/metadata/android';
+
+/// The changelog names one complete locale must carry at a commit:
+/// `<versionName>.txt` (the authoring file), the three per-ABI versionCode
+/// links, and the `default.txt` fallback link.
+List<String> expectedChangelogFiles({
+  required String versionName,
+  required int versionCodeBase,
+}) => [
+  '$versionName.txt',
+  for (final abi in releaseAbis) '${versionCodeBase * 10 + abiCodes[abi]!}.txt',
+  'default.txt',
+];
+
+/// The process layer the Git Trees/Blobs answers run through. Injectable so
+/// the gate can be exercised pure-seam (no real gh).
+typedef GhApiRunner = Future<ProcessResult> Function(List<String> arguments);
+
+/// The real runner: `gh api …` (the helpers' conventional transport).
+Future<ProcessResult> defaultGhApiRunner(List<String> arguments) =>
+    Process.run('gh', arguments);
+
+/// argv for one recursive Git Trees listing of the whole repo at [ref]
+/// (a SHA or branch).
+List<String> ghTreeArguments({required String ref}) => [
+  'api',
+  'repos/$releaseRepo/git/trees/$ref?recursive=1',
+];
+
+/// argv for one Git Blobs fetch of [sha].
+List<String> ghBlobArguments({required String sha}) => [
+  'api',
+  'repos/$releaseRepo/git/blobs/$sha',
+];
+
+/// One entry of a Git Trees listing. [mode] is the gate's type discriminator
+/// (`100644` regular file, `120000` symlink) — the plain contents API does
+/// not expose it.
+class GhTreeEntry {
+  const GhTreeEntry(this.path, this.mode, this.type, this.sha);
+
+  final String path;
+  final String mode;
+  final String type;
+  final String sha;
+}
+
+/// Decodes a recursive Git Trees answer. Loud failure on anything unusable —
+/// a silent fallback would verify the wrong shape of tree — including a
+/// truncated answer: a partial tree could hide missing locales.
+List<GhTreeEntry> decodeGhTree(String apiOutput) {
+  final dynamic decoded;
+  try {
+    decoded = jsonDecode(apiOutput.trim());
+  } on FormatException catch (error) {
+    throw ReleaseToolException(
+      'could not parse the git-tree answer as JSON: ${error.message} '
+      '(raw: "${_rawPreview(apiOutput)}")',
+    );
+  }
+  if (decoded is! Map || decoded['tree'] is! List) {
+    throw ReleaseToolException(
+      'the git-tree answer is not a JSON object with a "tree" array of '
+      'entries (raw: "${_rawPreview(apiOutput)}")',
+    );
+  }
+  if (decoded['truncated'] == true) {
+    throw ReleaseToolException(
+      'the git-tree answer is truncated — the changelog verify cannot '
+      'trust a partial tree.',
+    );
+  }
+  return [
+    for (final entry in (decoded['tree'] as List)) decodeGhTreeEntry(entry),
+  ];
+}
+
+/// Decodes one tree entry; loud on missing/mistyped `path`, `mode`, `type`,
+/// or `sha` fields.
+GhTreeEntry decodeGhTreeEntry(dynamic decoded) {
+  if (decoded is! Map ||
+      decoded['path'] is! String ||
+      decoded['mode'] is! String ||
+      decoded['type'] is! String ||
+      decoded['sha'] is! String) {
+    throw ReleaseToolException(
+      'a git-tree entry carries no string "path"/"mode"/"type"/"sha" '
+      'fields (got: $decoded).',
+    );
+  }
+  return GhTreeEntry(
+    decoded['path'] as String,
+    decoded['mode'] as String,
+    decoded['type'] as String,
+    decoded['sha'] as String,
+  );
+}
+
+/// Decodes a Git Blobs answer into its text content: strips the base64 line
+/// wraps the API embeds and utf8-decodes. Loud on anything unusable.
+String decodeGhBlobText(String apiOutput) {
+  final dynamic decoded;
+  try {
+    decoded = jsonDecode(apiOutput.trim());
+  } on FormatException catch (error) {
+    throw ReleaseToolException(
+      'could not parse a git-blob answer as JSON: ${error.message} '
+      '(raw: "${_rawPreview(apiOutput)}")',
+    );
+  }
+  if (decoded is! Map || decoded['content'] is! String) {
+    throw ReleaseToolException(
+      'the git-blob answer is not a JSON object with a "content" string '
+      'field (raw: "${_rawPreview(apiOutput)}")',
+    );
+  }
+  final content = decoded['content'] as String;
+  final String bytes;
+  try {
+    bytes = utf8.decode(base64.decode(content.replaceAll(RegExp(r'\s'), '')));
+  } on FormatException catch (error) {
+    throw ReleaseToolException(
+      'the git-blob answer content is not usable base64: ${error.message}',
+    );
+  }
+  return bytes;
+}
+
+String _rawPreview(String apiOutput) =>
+    apiOutput.length > 80 ? apiOutput.substring(0, 80) : apiOutput;
+
+/// Verifies, AT [headSha] (via the GitHub Git Trees and Git Blobs APIs),
+/// that every locale under [fdroidMetadataPath] carries a complete F-Droid
+/// changelog file set for the release ([versionName] / [versionCodeBase])
+/// — see [expectedChangelogFiles]. Verified by commit shape: each generated
+/// name must be a symlink (git mode `120000`) whose blob resolves to the
+/// `<versionName>.txt` filename; the authoring file itself must be a
+/// regular-file blob (git mode `100644`). Prints one ok line per locale through
+/// [sink]; throws [ReleaseToolException] naming every gap plus the fix path
+/// otherwise.
+Future<void> requireChangelogFiles({
+  required String versionName,
+  required int versionCodeBase,
+  required String headSha,
+  GhApiRunner? ghApiRunner,
+  void Function(String line)? sink,
+}) async {
+  final runGhApi = ghApiRunner ?? defaultGhApiRunner;
+  final out = sink ?? (line) => print(line);
+  final expected = expectedChangelogFiles(
+    versionName: versionName,
+    versionCodeBase: versionCodeBase,
+  );
+  final authoringFileName = '$versionName.txt';
+
+  final treeResult = await runGhApi(ghTreeArguments(ref: headSha));
+  if (treeResult.exitCode != 0) {
+    throw ReleaseToolException(
+      'the git-tree listing at $headSha failed (exit ${treeResult.exitCode}): '
+      '${'${treeResult.stderr} ${treeResult.stdout}'.trim()}',
+    );
+  }
+  final tree = decodeGhTree(treeResult.stdout as String);
+
+  // Locale directories: exact `fdroidMetadataPath/<locale>` tree entries.
+  final localePrefix = '$fdroidMetadataPath/';
+  final locales = [
+    for (final entry in tree)
+      if (entry.type == 'tree' &&
+          entry.path.startsWith(localePrefix) &&
+          !entry.path.substring(localePrefix.length).contains('/'))
+        entry.path.substring(localePrefix.length),
+  ];
+  if (locales.isEmpty) {
+    throw ReleaseToolException(
+      '$fdroidMetadataPath at $headSha carries no locale directory — the '
+      'changelog check has no tree to verify.',
+    );
+  }
+
+  Future<String> fetchBlobTarget(String sha) async {
+    final result = await runGhApi(ghBlobArguments(sha: sha));
+    if (result.exitCode != 0) {
+      throw ReleaseToolException(
+        'the git-blob fetch of $sha at $headSha failed '
+        '(exit ${result.exitCode}): '
+        '${'${result.stderr} ${result.stdout}'.trim()}',
+      );
+    }
+    return decodeGhBlobText(result.stdout as String);
+  }
+
+  final problems = <String>[];
+  for (final locale in locales) {
+    final changelogPrefix = '$fdroidMetadataPath/$locale/changelogs/';
+    final entriesByName = {
+      for (final entry in tree)
+        if (entry.type == 'blob' &&
+            entry.path.startsWith(changelogPrefix) &&
+            !entry.path.substring(changelogPrefix.length).contains('/'))
+          entry.path.substring(changelogPrefix.length): entry,
+    };
+    final missing = [
+      for (final name in expected)
+        if (!entriesByName.containsKey(name)) name,
+    ];
+    if (missing.isNotEmpty) {
+      problems.add('$locale: missing ${missing.join(', ')}');
+    }
+    for (final name in expected) {
+      final entry = entriesByName[name];
+      if (entry == null) continue;
+      if (name == authoringFileName) {
+        if (entry.mode != '100644') {
+          problems.add(
+            '$locale: ${entry.path} has git mode ${entry.mode} instead of '
+            'a regular-file blob (100644).',
+          );
+        }
+        continue;
+      }
+      if (entry.mode == '100644') {
+        problems.add(
+          '$locale: $name is a regular file — remove or rename it by hand, '
+          'then run tool/fdroid_changelog_links.dart.',
+        );
+        continue;
+      }
+      if (entry.mode != '120000') {
+        problems.add(
+          '$locale: $name has git mode ${entry.mode} instead of a symlink '
+          'entry — run tool/fdroid_changelog_links.dart to shape it.',
+        );
+        continue;
+      }
+      final target = await fetchBlobTarget(entry.sha);
+      if (target != authoringFileName) {
+        problems.add(
+          '$locale: $name is a symlink to "$target" but must point at '
+          '"$authoringFileName" — fix the commit before publishing.',
+        );
+      }
+    }
+    if (!problems.any((problem) => problem.startsWith('$locale:'))) {
+      out(
+        'changelog files at $headSha: $locale ok '
+        '(${expected.where((n) => n != 'default.txt').join(' ')})',
+      );
+    }
+  }
+  if (problems.isNotEmpty) {
+    throw ReleaseToolException(
+      'the F-Droid changelog files for $versionName (versionCode base '
+      '$versionCodeBase) are not correct at commit $headSha:\n'
+      '${problems.map((problem) => '  $problem').join('\n')}\n'
+      'Fix path: run `dart run tool/fdroid_changelog_links.dart` on the '
+      'release branch (its authoring file is what these links point at), '
+      'commit, wait for the new CI run, then re-run this helper — the '
+      '--run-id re-attach flow composes with the new run.',
+    );
+  }
+}
+
 // --- adb install next steps + device-test reminder ------------------------------
 
 /// The exact `adb install -r` command for one staged signed APK — the

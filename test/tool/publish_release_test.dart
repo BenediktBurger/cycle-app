@@ -13,6 +13,7 @@
 // Relative import on purpose: tool/ scripts live outside lib/. The two
 // release scripts share names for their local plumbing, so both are
 // prefixed here; the shared module is imported plainly.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -778,6 +779,55 @@ void main() {
         if (arguments.first == 'auth') {
           return ok('Logged in to github.com', '');
         }
+        if (arguments[0] == 'api') {
+          // Git Trees + Git Blobs API (read-only): the changelog-files gate
+          // walks the fastlane tree at the manifest's head commit and
+          // resolves each changelog symlink's target blob.
+          const treePrefix = 'repos/$releaseRepo/git/trees/';
+          const blobPrefix = 'repos/$releaseRepo/git/blobs/';
+          final call = arguments[1];
+          if (call.startsWith(treePrefix)) {
+            final changelogTargets = [
+              for (final locale in const ['de-DE', 'en-US']) ...[
+                '{"path":"$fdroidMetadataPath/$locale","mode":"040000",'
+                    '"type":"tree","sha":"tree-$locale"}',
+                '{"path":"$fdroidMetadataPath/$locale/changelogs/0.2.1.txt",'
+                    '"mode":"100644","type":"blob","sha":"sha-$locale-a"}',
+                for (final entry in const {
+                  '31.txt': '31',
+                  '32.txt': '32',
+                  '33.txt': '33',
+                  'default.txt': 'def',
+                }.entries)
+                  '{"path":"$fdroidMetadataPath/$locale/changelogs/'
+                      '${entry.key}","mode":"120000","type":"blob",'
+                      '"sha":"sha-$locale-${entry.value}"}',
+              ],
+            ];
+            return ok(
+              '{"tree":[${changelogTargets.join(',')}],'
+              '"truncated":false}',
+            );
+          }
+          if (call.startsWith(blobPrefix)) {
+            const authoringTarget = '0.2.1.txt';
+            final sha = call.substring(blobPrefix.length);
+            if (!const {
+              '31',
+              '32',
+              '33',
+              'def',
+            }.contains(sha.split('-').last)) {
+              return Future.value(
+                ProcessResult(0, 1, '', 'gh: blob $sha not found'),
+              );
+            }
+            return ok(
+              '{"content":"${base64Encode(utf8.encode(authoringTarget))}",'
+              '"encoding":"base64"}',
+            );
+          }
+        }
         if (arguments[0] == 'release' && arguments[1] == 'view') {
           return releaseViewResult == 'present'
               ? ok(existingBody)
@@ -883,11 +933,12 @@ void main() {
       expect(output, contains('gh pr merge --merge --auto release/v0.2.1'));
       expect(output, contains('dry run complete'));
 
-      // Nothing mutating was handed to gh: only auth status and the
-      // release view (read-only).
+      // Nothing mutating was handed to gh: only auth status, the
+      // contents-API listings, and the release view (read-only).
       for (final invocation in ghInvocations) {
         final isReadOnly =
             (invocation.first == 'auth') ||
+            (invocation.first == 'api') ||
             (invocation[0] == 'release' && invocation[1] == 'view');
         expect(isReadOnly, isTrue, reason: 'invocation: $invocation');
       }
@@ -926,6 +977,7 @@ void main() {
       for (final invocation in ghInvocations) {
         final isReadOnly =
             (invocation.first == 'auth') ||
+            (invocation.first == 'api') ||
             (invocation[0] == 'release' && invocation[1] == 'view');
         expect(isReadOnly, isTrue, reason: 'invocation: $invocation');
       }
