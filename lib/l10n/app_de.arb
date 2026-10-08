@@ -16,7 +16,7 @@
   "@termCycleStart": {
     "description": "Name des Zyklusbeginn-Marks (der erste Chip im Tag-Panel) und zugleich Spaltentitel „Zyklusbeginn“ in der Zyklen-Tabelle der Statistik — eine Zeichenkette auf beiden Flächen, damit die beiden Namen nicht auseinanderlaufen."
   },
-  "termCycleDays": "{n} Tage",
+  "termCycleDays": "{n, plural, =1{1 Tag} other{{n} Tage}}",
   "@termCycleDays": {
     "placeholders": {
       "n": {
@@ -208,7 +208,7 @@
       }
     }
   },
-  "cycleSheetCircledInfo": "Umrandete höhere Messung {number}",
+  "cycleSheetCircledInfo": "{number}. umrandete höhere Messung",
   "@cycleSheetCircledInfo": {
     "placeholders": {
       "number": {
@@ -449,7 +449,7 @@
   "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge und Markierungen. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "settingsDeleteDataButton": "Alle Daten löschen …",
   "deleteDataDialogTitle": "Daten löschen?",
-  "deleteDataDialogBody": "Es werden {entries} Tagebucheinträge und {marks} Markierungen gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
+  "deleteDataDialogBody": "Es werden {entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}} und {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -461,7 +461,7 @@
     }
   },
   "deleteDataConfirm": "Löschen",
-  "deleteDataDone": "{entries} Tagebucheinträge und {marks} Markierungen gelöscht.",
+  "deleteDataDone": "{entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}} und {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} gelöscht.",
   "@deleteDataDone": {
     "placeholders": {
       "entries": {
@@ -528,7 +528,7 @@
   "@pdfExportCyclesNone": {
     "description": "Bulk button of the export card's cycle-selection list: deselects every cycle (the empty selection keeps the export behind the empty-data guard)."
   },
-  "pdfExportCyclesSelectedSummary": "{n} von {total} Zyklen ausgewählt",
+  "pdfExportCyclesSelectedSummary": "{total, plural, =1{{n} von 1 Zyklus} other{{n} von {total} Zyklen}} ausgewählt",
   "@pdfExportCyclesSelectedSummary": {
     "placeholders": {
       "n": {
@@ -587,7 +587,7 @@
   "importApply": "Import durchführen",
   "importInvalid": "Ungültiges Dokument (kein gültiger cycle-app-Export).",
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
-  "importSummary": "Tage neu: {newDays}, Tage überschrieben: {overwritten}, doppelte Zeilen im Dokument: {duplicates}, ungültige Zeilen: {invalid}, Markierungen neu: {newMarks}, Markierungen übersprungen: {skipped}.",
+  "importSummary": "{newDays, plural, =1{1 Tag} other{{newDays} Tage}} neu, {overwritten, plural, =1{1 Tag} other{{overwritten} Tage}} überschrieben, {duplicates, plural, =1{1 doppelte Zeile} other{{duplicates} doppelte Zeilen}} im Dokument, {invalid, plural, =1{1 ungültige Zeile} other{{invalid} ungültige Zeilen}}, {newMarks, plural, =1{1 Markierung} other{{newMarks} Markierungen}} neu, {skipped, plural, =1{1 Markierung} other{{skipped} Markierungen}} übersprungen.",
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
   "importOverwriteWarning": "{days, plural, =1{1 Tag wird überschrieben.} other{{days} Tage werden überschrieben.}}",
   "@importOverwriteWarning": {
@@ -602,7 +602,7 @@
   "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Eine ausgeschlossene Temperatur erzeugt eine „vom Auswerten ausschließen“-Markierung; Stimmung- und Lust-Kennzeichen fallen weg (ihre Notizen bleiben erhalten).",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",
   "dripImportInvalid": "Das ist kein Drip-CSV-Export (keine „date“-Spalte in der Kopfzeile).",
-  "dripImportSummary": "{imported} Tage importiert, {skipped} leere Tage übersprungen, {invalid} ungültige Zeilen; Tage neu: {newDays}, Tage überschrieben: {overwritten}.",
+  "dripImportSummary": "{imported, plural, =1{1 Tag importiert} other{{imported} Tage importiert}}, {skipped, plural, =1{1 leerer Tag übersprungen} other{{skipped} leere Tage übersprungen}}, {invalid, plural, =1{1 ungültige Zeile} other{{invalid} ungültige Zeilen}}; {newDays, plural, =1{1 Tag} other{{newDays} Tage}} neu, {overwritten, plural, =1{1 Tag} other{{overwritten} Tage}} überschrieben.",
   "@dripImportSummary": {
     "placeholders": {
       "imported": {

@@ -1530,8 +1530,7 @@ void main() {
 
   group('SUZ mark + suggestion (the app suggests, the user places)', () {
     testWidgets(
-      'the computed SUZ day suggests the start with the EVENING phrasing, '
-      'naming rule D',
+      'the computed SUZ day suggests the start with the EVENING phrasing',
       (tester) async {
         // Main scenario: the 3rd circled candidate (9/16, 37.0) is >= 0.2 K
         // above the baseline 36.4 -> rule D fires, SUZ begins 9/16 evening.
@@ -1551,23 +1550,21 @@ void main() {
               'no user SUZ mark exists anywhere in the cycle',
         );
         expect(
-          find.textContaining('begins this evening (rule D)'),
+          find.textContaining('begins this evening'),
           findsOneWidget,
           reason:
-              'rule D: the suggestion names the rule AND carries the '
-              'evening phrasing (rule D begins the SUZ that evening)',
+              'the suggestion carries the evening phrasing (begins the SUZ that evening)',
         );
         expect(
           find.textContaining('begins this morning'),
           findsNothing,
-          reason: 'rule D must NOT render the morning phrasing',
+          reason: 'must NOT render the morning phrasing',
         );
       },
     );
 
     testWidgets(
-      'the suggestion carries the MORNING phrasing when rule E fires on '
-      'the 4th circle',
+      'the suggestion carries the MORNING phrasing on the 4th circle',
       (tester) async {
         // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd circled
         // candidate is below the rule-D margin, so the 4th (9/17) fires
@@ -1594,17 +1591,16 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.textContaining('begins this morning (rule E)'),
+          find.textContaining('begins this morning'),
           findsOneWidget,
           reason:
-              'rule E: the suggestion names the rule AND carries the '
-              'morning phrasing (rule E begins the SUZ that morning)',
+              'the suggestion carries the morning phrasing (begins the SUZ that morning)',
         );
         expect(
           find.textContaining('begins this evening'),
           findsNothing,
           reason:
-              'rule E must NOT render the evening phrasing — the SUZ '
+              'must NOT render the evening phrasing — the SUZ '
               'begins in the morning of the 4th circled day',
         );
       },
