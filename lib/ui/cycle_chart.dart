@@ -53,8 +53,10 @@ final class _CycleChartState extends State<_CycleChart> {
 
   /// The frozen left rail's width (the paper sheet's fixed left margin).
   /// The chart reserves NO axis width; the scroll content holds day columns
-  /// only and the plot spans its full width.
-  static const double frozenRailWidth = 44;
+  /// only and the plot spans its full width. The width is the widest scale
+  /// label's paint width ("36.5 °C" at fontSize 10: 32.2 px Roboto) + the
+  /// labels' 3 px right inset + 1 px rounding safety.
+  static const double frozenRailWidth = 37;
 
   /// The fixed height of the day/cycle header segment (day of month above,
   /// day of cycle underneath) — shared between the scrolling header row and
@@ -885,12 +887,9 @@ Widget _columnPrototype({required String prototype, required String label}) =>
       label: label,
       child: Tooltip(
         message: label,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(prototype, style: const TextStyle(fontSize: 10)),
-          ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(prototype, style: const TextStyle(fontSize: 10)),
         ),
       ),
     );
@@ -1323,7 +1322,7 @@ final class _LeftRail extends StatelessWidget {
               height: _CycleChartState.dayHeaderRowHeight,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   _columnPrototype(
                     prototype: '14.',
