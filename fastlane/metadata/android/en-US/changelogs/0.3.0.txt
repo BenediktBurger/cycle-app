@@ -1,0 +1,3 @@
+- Rename: start, middle, end to morning, midday, evening
+- cycle shows cervix position and notes
+- only relevant statistics are shown
