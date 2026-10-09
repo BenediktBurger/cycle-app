@@ -57,7 +57,6 @@
   "entryPreviousDay": "Previous day",
   "entryNextDay": "Next day",
   "temperature": "Temperature",
-  "measuredTime": "Measured at",
   "measuredTimeUnset": "not set",
   "notes": "Notes",
   "splashLoadingDatabase": "Loading database …",
@@ -686,7 +685,7 @@
     }
   },
   "disturbancesCaption": "Temperature disturbance (flag the measurement):",
-  "diaryExcludeTemperatureSwitch": "Exclude from the evaluation",
+  "diaryExcludeTemperatureSwitch": "Exclude temperature from the evaluation",
   "disturbanceLateToBed": "Late to bed (sp)",
   "disturbanceNightAwakening": "Frequent night awakening (a)",
   "disturbanceAlcohol": "Alcohol (alk)",

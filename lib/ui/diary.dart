@@ -32,12 +32,6 @@ class TagebuchScreen extends ConsumerStatefulWidget {
 }
 
 final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
-  /// The minimum one-line width that still shows the printed time-field
-  /// label next to the temperature field; below it the label drops and
-  /// the clock icon carries the meaning (see the narrow-width note at
-  /// the BBT/time row).
-  static const double _timeLabelMinLineWidth = 300;
-
   final _formKey = GlobalKey<FormState>();
   final _bbtController = TextEditingController();
   final _notesController = TextEditingController();
@@ -455,8 +449,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // pins that this line stays overflow-free.
               LayoutBuilder(
                 builder: (context, lineConstraints) {
-                  final showTimeLabel =
-                      lineConstraints.maxWidth >= _timeLabelMinLineWidth;
                   return Row(
                     children: [
                       Expanded(
@@ -495,10 +487,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                             children: [
                               const Icon(Icons.schedule_outlined),
                               const SizedBox(width: 4),
-                              if (showTimeLabel) ...[
-                                Text(l10n.measuredTime),
-                                const SizedBox(width: 4),
-                              ],
                               OutlinedButton(
                                 key: const ValueKey('measuredTimeField'),
                                 onPressed: _pickTime,
@@ -531,8 +519,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // (interrupted-day data); the exclude switch is the only
               // diary-side input that writes the ignoreTemperature mark on
               // save (manual-only coupling — see _save).
-              // TODO(user-review): the group wording (heading + switch
-              // label) is pending the expert review.
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),

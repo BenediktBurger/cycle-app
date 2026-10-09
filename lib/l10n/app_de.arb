@@ -46,7 +46,6 @@
   "entryPreviousDay": "Voriger Tag",
   "entryNextDay": "Nächster Tag",
   "temperature": "Temperatur",
-  "measuredTime": "Gemessen um",
   "measuredTimeUnset": "nicht erfasst",
   "notes": "Notizen",
   "splashLoadingDatabase": "Lade Datenbank …",
@@ -623,7 +622,7 @@
     }
   },
   "disturbancesCaption": "Temperaturstörung (Kennzeichen der Messung):",
-  "diaryExcludeTemperatureSwitch": "Von der Auswertung ausschließen",
+  "diaryExcludeTemperatureSwitch": "Temperaturmessung von Auswertung ausschließen",
   "disturbanceLateToBed": "Spät ins Bett (sp)",
   "disturbanceNightAwakening": "Nachts öfter aufstehen (a)",
   "disturbanceAlcohol": "Alkohol (alk)",
