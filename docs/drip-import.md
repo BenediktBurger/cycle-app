@@ -17,6 +17,19 @@ Rows merge into the **main profile** with the same overwrite-by-date policy
 as the JSON import: an imported row overwrites that day's existing entry.
 Re-importing the same export therefore adds no duplicates.
 
+## Derived cycle starts
+
+From the merged rows the import derives the foreign `cycleStart` marks
+(author `import`) the way drip derives its own cycle starts: a bleeding
+day at any heaviness (spotting included) is a start unless a non-excluded
+bleeding day sits within the previous two calendar days — so a single
+bleeding-free day does not end an episode, a gap of two days does. A
+`bleeding.exclude` day cannot open a cycle and is transparent in that
+lookback (the bleeding behind it suppresses through it); whether excluded
+or not, every day keeps its stored bleeding level. A temperature
+exclusion never affects this replay (it derives its own
+`ignoreTemperature` mark instead).
+
 ## What is lost
 
 - Mucus texture nuances: the decode works on drip's combined NFP number, so

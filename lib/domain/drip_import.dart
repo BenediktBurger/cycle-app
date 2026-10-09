@@ -453,23 +453,29 @@ const _moodFlagColumns = [
   'mood.other',
 ];
 
+// The onset-replay lookback: one bleeding-free calendar day does not end
+// a bleeding episode — the rule and constant of drip: lib/cycle.js
+// isMensesStart.
+const _dripMaxBreakInBleeding = 1;
+
 /// Derives the foreign-import marks (author 'import') from the mapped
 /// entry rows [entries] carries (replayed verbatim, same rows the export
 /// document has; the idempotent marks writer makes a repeated import a
 /// no-op). Two mark kinds:
 ///
-/// - `cycleStart`: the drip-local onset rule (_isDripOnset) — a bleeding
-///   day at ANY stored level opens a row of bleedings, the mark sits on
-///   the row's first day; [bleedingExcludedDays] are skipped by the
-///   replay only (they cannot open, continue or suppress; entries keep
-///   their bleeding level).
+/// - `cycleStart`: the drip onset rule (_isDripOnset) — a non-excluded
+///   bleeding day at ANY stored level is a cycle start unless another
+///   non-excluded bleeding day sits within the previous
+///   [_dripMaxBreakInBleeding] + 1 calendar days; bleeding-excluded days
+///   are transparent to that lookback (they cannot open) and their
+///   entries keep the stored bleeding level.
 /// - `ignoreTemperature`: one per [ignoreTemperatureDays] day —
 ///   bleeding-excluded days alone derive none.
 ///
 /// Rows are judged in DAY order, not CSV row order (the onset rule's
-/// previous-day check must always see the prior day); duplicated day
-/// keys keep their first occurrence, like the import merge plan counts
-/// them; the derived rows sort deterministically by day, then type.
+/// lookback must always see the prior days); duplicated day keys keep
+/// their first occurrence, like the import merge plan counts them; the
+/// derived rows sort deterministically by day, then type.
 ///
 /// Contract: every entry map's `date` parses as an ISO day, and its
 /// `bleeding` value — when the key exists at all — is a bleeding level
@@ -502,8 +508,8 @@ List<Map<String, Object?>> deriveDripMarks(
   replayed.sort((a, b) => DateOnly.daysBetween(a.date, b.date));
 
   final marks = <Map<String, Object?>>[];
-  for (var i = 0; i < replayed.length; i++) {
-    final entry = replayed[i];
+  DateTime? lastNonExcludedBleeding;
+  for (final entry in replayed) {
     final iso = formatIsoDay(entry.date);
     if (ignoreTemperatureDays.contains(iso)) {
       marks.add(<String, Object?>{
@@ -512,17 +518,15 @@ List<Map<String, Object?>> deriveDripMarks(
         'author': 'import',
       });
     }
-    // Separate scopes: [ignoreTemperatureDays] feeds only the mark above;
-    // [bleedingExcludedDays] only makes its days invisible to the onset
-    // rule below — a temperature-excluded day still opens/continues a
-    // bleeding row.
-    final previous = i == 0 ? null : replayed[i - 1];
-    if (_isDripOnset(entry, previous, bleedingExcludedDays)) {
+    if (_isDripOnset(entry, lastNonExcludedBleeding, bleedingExcludedDays)) {
       marks.add(<String, Object?>{
         'entry_date': iso,
         'mark_type': CycleMarkTypes.cycleStart,
         'author': 'import',
       });
+    }
+    if (entry.bleeding.level >= 1 && !bleedingExcludedDays.contains(iso)) {
+      lastNonExcludedBleeding = entry.date;
     }
   }
   marks.sort((a, b) {
@@ -535,28 +539,24 @@ List<Map<String, Object?>> deriveDripMarks(
   return marks;
 }
 
-/// The drip-local onset rule of the cycleStart replay: ANY bleeding level
-/// (1–4; spotting is full-coverage bleeding) on a not-bleeding-excluded
-/// day opens a row, continuing only when the previous REPLAYED entry sits
-/// on the previous CALENDAR day, bleeds, and is itself not excluded — a
-/// gap, an excluded day between, or a bleeding-less day leaves a fresh
-/// onset. ANY level on purpose: drip routinely records spotting, and it
-/// opens and continues rows like heavier bleeding.
+/// The drip onset rule of the cycleStart replay, ported from drip's
+/// isMensesStart (lib/cycle.js): ANY stored bleeding level (1–4; spotting
+/// is full-coverage bleeding) opens a cycle unless a non-excluded
+/// bleeding day sits within the previous [_dripMaxBreakInBleeding] + 1
+/// calendar days — [lastNonExcludedBleeding] carries the most recent such
+/// day. An excluded day cannot open and never counts as that suppressing
+/// day, but it does not shield either: the calendar days behind it still
+/// count toward the window.
 bool _isDripOnset(
   DailyEntry entry,
-  DailyEntry? previous,
+  DateTime? lastNonExcludedBleeding,
   Set<String> bleedingExcludedDays,
 ) {
   if (bleedingExcludedDays.contains(formatIsoDay(entry.date))) return false;
   if (entry.bleeding.level < 1) return false;
-  if (previous == null) return true;
-  if (!DateOnly.sameDay(previous.date, DateOnly.previousDay(entry.date))) {
-    return true; // a data gap still opens a fresh onset
-  }
-  if (bleedingExcludedDays.contains(formatIsoDay(previous.date))) {
-    return true; // an excluded day cannot continue/suppress the row
-  }
-  return previous.bleeding.level < 1; // bleeding previous day → continuation
+  final last = lastNonExcludedBleeding;
+  if (last == null) return true;
+  return DateOnly.daysBetween(entry.date, last) > _dripMaxBreakInBleeding + 1;
 }
 
 /// Parses a drip temperature cell (`36.2`); any non-number means no

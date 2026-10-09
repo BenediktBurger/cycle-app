@@ -476,14 +476,15 @@ void main() {
       expect(starts[1].author, 'user');
     });
 
-    test('an excluded bleeding day neither opens nor continues the row '
-        '(round trip)', () async {
-      // bleeding.exclude is a replay-skip flag: 01-02 (drip 1 → stored
-      // level 2) derives no mark, cannot continue 01-01's row of
-      // bleedings and cannot suppress 01-03 — the next non-excluded
-      // bleeding day is a fresh onset. The stored entry keeps its
-      // bleeding level and derives NO ignoreTemperature mark (that mark
-      // is temperature-only).
+    test('an excluded bleeding day is transparent: the episode stays one '
+        'cycle (round trip)', () async {
+      // bleeding.exclude skips only the excluded day itself in the
+      // cycleStart replay: 01-02 (drip 1 → stored level 2) derives no
+      // mark, cannot open a cycle and does not shield the lookback —
+      // 01-03 is suppressed by the bleeding 01-01 behind the excluded
+      // day, so the fixture is one bleeding episode and one stored
+      // cycleStart. The stored entry keeps its bleeding level and derives
+      // NO ignoreTemperature mark (that mark is temperature-only).
       final csv = [
         'date,bleeding.value,bleeding.exclude',
         '2026-01-01,2,',
@@ -493,15 +494,16 @@ void main() {
       final mapping = dripCsvToExportJson(csv);
       final summary = await importJsonToDatabase(db, mapping.json);
       expect(summary.entriesWritten, 3);
-      expect(summary.marksNew, 2, reason: 'one cycleStart per fresh onset');
+      expect(summary.marksNew, 1, reason: 'one cycleStart per episode');
 
       final starts = await storedCycleStarts(db);
       expect(
         starts.map((m) => formatIsoDay(m.entryDate)).toList(),
-        ['2026-01-01', '2026-01-03'],
+        ['2026-01-01'],
         reason:
-            'the excluded day derives no mark and does not '
-            'suppress the following bleeding day',
+            'the excluded day derives no mark, and 01-03 stays '
+            'suppressed by the bleeding 01-01 behind the transparent '
+            'exclusion',
       );
 
       // The exclusion affects only the cycleStart replay: the bleeding
