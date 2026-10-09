@@ -1097,7 +1097,7 @@ void main() {
 
     expect(
       notesBandHeight,
-      90,
+      64,
       reason:
           'the band stacks the cervix glyph zone, the letter row, the '
           'breast-pain row and the note zone',
@@ -1254,7 +1254,7 @@ void main() {
       final cell = tester.getRect(chartCell(key, 'notesBand'));
       expect(
         rect.top,
-        closeTo(cell.top + 30, 0.5),
+        closeTo(cell.top + cervixGlyphZoneHeight, 0.5),
         reason:
             'day $key: the letter row starts where the glyph zone ends — '
             'the same height on every cervix day, position and note '
@@ -1360,7 +1360,7 @@ void main() {
     );
     expect(
       letter.top,
-      closeTo(cell10.top + 30, 0.5),
+      closeTo(cell10.top + cervixGlyphZoneHeight, 0.5),
       reason: "day 10's letter row keeps its fixed place without a note",
     );
   });
@@ -3793,8 +3793,6 @@ void main() {
           reason: 'the glossary explains "$entry"',
         );
       }
-      // The sheet also carries the evaluation-arithmetic note (which stays
-      // on the screen below the chart card too — scoped to the sheet here).
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('cycleHelpSheet')),
@@ -4349,6 +4347,69 @@ void main() {
             ),
             findsOneWidget,
           );
+        }
+      },
+    );
+
+    testWidgets(
+      'the rail is only as wide as its widest label: every scale label '
+      'stays inside the rail without clipping (en and de)',
+      (tester) async {
+        for (final locale in const [Locale('en'), Locale('de')]) {
+          await pumpChart(
+            tester,
+            KeyedSubtree(
+              key: UniqueKey(),
+              child: _leftRailHarness(
+                entries: _leftRailEntries,
+                locale: locale,
+              ),
+            ),
+          );
+
+          final rail = tester.getRect(_rail());
+          expect(
+            rail.width,
+            37,
+            reason:
+                'the frozen rail stays as wide as its widest '
+                'scale label plus inset — wider wastes row room',
+          );
+
+          final scale = tester.getRect(find.byKey(const ValueKey('railScale')));
+          final labels = find.descendant(
+            of: _rail(),
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is Text &&
+                  w.key is ValueKey<String> &&
+                  (w.key as ValueKey<String>).value.startsWith(
+                    'railScaleLabel-',
+                  ),
+            ),
+          );
+          for (final widget in tester.widgetList<Text>(labels)) {
+            final what = '$locale "${widget.data!}"';
+            final rect = tester.getRect(find.byWidget(widget));
+            expect(
+              rect.left,
+              greaterThanOrEqualTo(rail.left),
+              reason: '$what stays inside the rail\'s left edge',
+            );
+            expect(
+              rect.right,
+              lessThanOrEqualTo(rail.right),
+              reason: '$what is not clipped at the rail\'s right edge',
+            );
+            // The labels sit centered on their tick's plot pixel, so the
+            // edge ticks' boxes straddle the scale's edges by half a
+            // label height; the CENTER must stay within the scale.
+            expect(
+              rect.center.dy,
+              inInclusiveRange(scale.top, scale.bottom),
+              reason: '$what centers on its tick within the scale',
+            );
+          }
         }
       },
     );
@@ -7024,7 +7085,7 @@ void main() {
         );
         // The scroll viewport: block width (800 test viewport, 12 body
         // padding on each side) minus the frozen rail left of the scroll.
-        const scrollViewport = 800.0 - 2 * 12 - 44; // 732
+        const scrollViewport = 800.0 - 2 * 12 - 37; // 739
         final marginDays = (scrollViewport / _columnWidth).ceil(); // 31
 
         // Fresh park 1: the initial auto-scroll landed at the newest days;
@@ -7098,7 +7159,7 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
-      const scrollViewport = 800.0 - 2 * 12 - 44; // 732
+      const scrollViewport = 800.0 - 2 * 12 - 37; // 739
       final marginDays = (scrollViewport / _columnWidth).ceil();
       final maxExtent = state.position.maxScrollExtent;
       final freshVisible = (maxExtent / _columnWidth).floor();
@@ -7269,13 +7330,13 @@ void main() {
         // day column of index 58 (= 2026-02-28) inside the visible area. The
         // chart's x domain is half a column shifted, so day 58's column
         // center maps to tap x = colW * (58 + 0.5).
-        const railWidth = 44.0; // the frozen rail left of the scroll view
+        const railWidth = 37.0; // the frozen rail left of the scroll view
         const testViewportWidth = 800.0;
         const bodyPadding = 12.0;
         const scrollViewport =
-            testViewportWidth - 2 * bodyPadding - railWidth; // 732
+            testViewportWidth - 2 * bodyPadding - railWidth; // 739
         const contentWidth = 60 * 24.0; // 1440
-        const maxOffset = contentWidth - scrollViewport; // 708
+        const maxOffset = contentWidth - scrollViewport; // 701
         final tapContentX = 24.0 * (58 + 0.5);
         final tapScreenX =
             bodyPadding + railWidth + (tapContentX - maxOffset); // 752
@@ -7309,7 +7370,7 @@ void main() {
       // Same column mapping as the tap above (day 58's column center at
       // colW * (58 + 0.5), content = 60 columns without a strip); the
       // long-press behaves identically to the tap.
-      const railWidth = 44.0; // the frozen rail left of the scroll view
+      const railWidth = 37.0; // the frozen rail left of the scroll view
       const bodyPadding = 12.0;
       const contentWidth = 60 * 24.0;
       const maxOffset = contentWidth - (800.0 - 2 * bodyPadding - railWidth);

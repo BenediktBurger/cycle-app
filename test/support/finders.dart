@@ -19,8 +19,8 @@ Finder navLabel(String label) => find.descendant(
 );
 
 /// The non-modal day options panel on the cycle screen (the converted
-/// former modal bottom sheet): keyed wrapper the Zyklus screen renders
-/// below the chart while a tapped day's options are showing.
+/// former modal bottom sheet): keyed card the Zyklus screen docks at the
+/// bottom of the surface while a tapped day's options are showing.
 Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 
 /// The day options panel's "edit day" icon button (the form-jump affordance

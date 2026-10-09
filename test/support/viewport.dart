@@ -35,9 +35,8 @@ void useNarrowPhoneViewport(WidgetTester tester) {
 /// Enlarges the test surface over a WIDE, tall viewport (default 800x2400
 /// dp): a lazy vertical list only builds the viewport's visible children, so
 /// content below the default 800x600 test surface is not even BUILT and
-/// finders miss it (the entry form's save button, the diary day tiles, the
-/// cycle screen's day-options panel). The previous
-/// surface is restored at test end.
+/// finders miss it (the entry form's save button, the diary day tiles). The
+/// previous surface is restored at test end.
 void useTallSurface(
   WidgetTester tester, {
   double width = 800,

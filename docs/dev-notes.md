@@ -278,10 +278,23 @@ drip's own writer (drip: lib/import-export/export-to-csv.js):
   entries + marks streams at render time; a write re-emits through
   marksProvider, so labels, chart overlay and info lines update live.
 - Non-modal: the panel is owned by cycle_day_panel_provider and rendered
-  in a fixed slot below the chart, never pushed as a route. Tapping
-  another chart day retargets it in place — the first day's marks are
-  never deselected by a dismissal — and the close button clears it
-  explicitly.
+  as a fixed dock at the bottom of the cycle screen — a card in front of
+  the chart list, margin ~12 dp above the system bottom inset, elevation
+  so it reads as a layer above the chart — never pushed as a route.
+  Tapping a chart day never scrolls the list: it only swaps the dock's
+  content in place (retargeting keeps the panel open; the first day's
+  marks are never deselected by a dismissal), and the close button clears
+  it explicitly. The rows the dock covers stay reachable through the
+  list's extra bottom padding, measured from the dock's laid-out height
+  and re-measured on every retarget.
+- Height cap: the dock never covers more than ~60% of the body space above
+  its own bottom offset — the cap is computed from a `LayoutBuilder`'s
+  constraints around the dock branch (the AppBar's share and a
+  keyboard-shrunk body count; the full surface does not) and handed to the
+  panel as data. Most days never reach the cap (two or three chip rows
+  plus the note); beyond it the panel content scrolls internally instead
+  of the dock growing over the chart, and the scroll view is re-keyed per
+  day so a retarget opens the new day's content at the top.
 - Layout: all six chips (the five mark chips and the temperature-exclusion
   chip) sit in ONE shared grid of equal column widths — two columns on
   phone widths, three from 600 dp — so every row completes evenly. Each

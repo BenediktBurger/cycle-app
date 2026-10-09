@@ -1540,7 +1540,7 @@ void main() {
               "the band's caption — not mid-band as a centered/bottom-up "
               'line would place it',
         );
-        // The cervix-stack day's note sits below the full 52 pt top block.
+        // The cervix-stack day's note sits below the full 48 pt top block.
         final day0NoteY = runs
             .firstWhere(
               (r) =>
@@ -1554,8 +1554,8 @@ void main() {
           captionY - day0NoteY,
           inInclusiveRange(40, 65),
           reason:
-              "day 0's note starts below the 30 pt glyph zone, 10 pt letter "
-              'row and 12 pt pain row (~52 pt)',
+              "day 0's note starts below the 26 pt glyph zone, 10 pt letter "
+              'row and 12 pt pain row (~48 pt)',
         );
       },
     );

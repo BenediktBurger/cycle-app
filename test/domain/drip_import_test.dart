@@ -2034,13 +2034,14 @@ void main() {
         expect(marksOf(outOfRange), isEmpty);
       });
 
-      test('an excluded bleeding day neither opens nor continues: the next '
-          'non-excluded bleeding day is an onset again', () {
-        // bleeding.exclude is a replay-skip flag only: the excluded day
-        // (01-02, drip 1 → stored level 2) derives no mark, cannot
-        // continue 01-01's flow and cannot suppress 01-03 — the next
-        // non-excluded bleeding day is a fresh onset. The stored entry
-        // keeps its bleeding level either way.
+      test('an excluded bleeding day is transparent: the bleeding day '
+          'behind it still suppresses through it', () {
+        // bleeding.exclude is a replay-skip flag for the day itself only:
+        // the excluded 01-02 (drip 1 → stored level 2) derives no mark,
+        // cannot open a cycle and does not shield the lookback — 01-03's
+        // two-day window still contains the non-excluded bleeding 01-01,
+        // so 01-03 stays mid-flow (one mark for the whole episode). The
+        // stored entry keeps its bleeding level either way.
         final result = dripCsvToExportJson(
           dripCsv(bleedingExcludeHeader, [
             bleedingExcludeCells('2026-01-01', value: '2'),
@@ -2048,9 +2049,77 @@ void main() {
             bleedingExcludeCells('2026-01-03', value: '1'),
           ]),
         );
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
+      });
+
+      test('a two-day bleeding-free stretch after an excluded day is a '
+          'fresh onset', () {
+        // The excluded day is transparent to the lookback, not a wall:
+        // with the excluded 01-02 behind it and the tracked bleeding-free
+        // 01-03 (temperature only), the 01-04 window holds no non-excluded
+        // bleeding day, so 01-04 is a fresh onset.
+        final result = dripCsvToExportJson(
+          dripCsv(
+            ['date', 'temperature.value', 'bleeding.value', 'bleeding.exclude'],
+            [
+              ['2026-01-01', '', '2', ''],
+              ['2026-01-02', '', '1', 'true'],
+              ['2026-01-03', '36.2', '', ''],
+              ['2026-01-04', '', '1', ''],
+            ],
+          ),
+        );
         expect(marksOf(result), [
           derivedMark('2026-01-01'),
-          derivedMark('2026-01-03'),
+          derivedMark('2026-01-04'),
+        ]);
+      });
+
+      test('a one-day bleeding-free break is bridged (tracked none day)', () {
+        // A break of one bleeding-free day does not end the episode:
+        // 01-02's temperature-only row carries no bleeding, and 01-03's
+        // two-day lookback window (01-02, 01-01) still contains the
+        // bleeding 01-01 — so 01-03 continues 01-01's flow and only the
+        // episode's first day derives a mark.
+        final result = dripCsvToExportJson(
+          dripCsv(dripHeader, [
+            cells('2026-01-01', {4: '2'}),
+            cells('2026-01-02', {1: '36.2'}), // tracked, no bleeding
+            cells('2026-01-03', {4: '2'}),
+          ]),
+        );
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
+      });
+
+      test('a one-day bleeding-free break is bridged (untracked day)', () {
+        // Same bridge when the free day has no row data at all (drip
+        // exports blank calendar days too): 01-03's lookback window still
+        // contains the bleeding 01-01, so the episode stays one cycle.
+        final result = dripCsvToExportJson(
+          dripCsv(dripHeader, [
+            cells('2026-01-01', {4: '2'}),
+            cells('2026-01-03', {4: '2'}),
+          ]),
+        );
+        expect(marksOf(result), [derivedMark('2026-01-01')]);
+      });
+
+      test('a break of two bleeding-free days opens a fresh cycle (the '
+          'lookback window is two calendar days)', () {
+        // fade-then-restart: bleed 01-01 followed by bleed 01-03 (a single
+        // bleeding-free day 01-02) is one episode — pinned by the bridged
+        // variants above; with two bleeding-free days in between, 01-04 is
+        // outside 01-01's two-day lookback window: a fresh onset with its
+        // own mark.
+        final result = dripCsvToExportJson(
+          dripCsv(dripHeader, [
+            cells('2026-01-01', {4: '2'}),
+            cells('2026-01-04', {4: '2'}),
+          ]),
+        );
+        expect(marksOf(result), [
+          derivedMark('2026-01-01'),
+          derivedMark('2026-01-04'),
         ]);
       });
 
@@ -2073,7 +2142,7 @@ void main() {
       test('bleeding.exclude never derives an ignoreTemperature mark', () {
         // The ignoreTemperature mark is temperature-only: the bleeding
         // exclusion feeds ONLY the cycleStart replay (where the excluded
-        // day is skipped entirely — it cannot open either).
+        // day cannot open a cycle).
         final result = dripCsvToExportJson(
           dripOneRowCsv(
             bleedingExcludeHeader,
