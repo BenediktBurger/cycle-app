@@ -1,0 +1,3 @@
+- Umbenennung: Anfang, Mittag, Ende zu morgens, mittags, abends
+- Zyklus zeigt Muttermundposition und Notizen an
+- Nur relevante Statistiken werden angezeigt und verständlicher dargestellt
