@@ -108,9 +108,9 @@ void main() {
 
   group('SexTiming bitmask', () {
     test('bits follow the numeric-flag pattern (1/2/4)', () {
-      expect(SexTiming.start.bit, 1);
-      expect(SexTiming.middle.bit, 2);
-      expect(SexTiming.end.bit, 4);
+      expect(SexTiming.morning.bit, 1);
+      expect(SexTiming.midday.bit, 2);
+      expect(SexTiming.evening.bit, 4);
     });
 
     test('bits are pairwise disjoint (a mask can name each combination)', () {
@@ -144,7 +144,7 @@ void main() {
       }
       final twice = DailyEntry(
         date: day,
-        sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+        sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
       );
       expect(
         twice.sexTimings,
@@ -170,7 +170,7 @@ void main() {
     });
 
     test('copyWith keeps the mask unless given', () {
-      final entry = DailyEntry(date: day, sexTimings: SexTiming.middle.bit);
+      final entry = DailyEntry(date: day, sexTimings: SexTiming.midday.bit);
       expect(entry.copyWith().sexTimings, 2);
       expect(entry.copyWith(painBreast: true).sexTimings, 2);
       expect(entry.copyWith(sexTimings: 7).sexTimings, 7);
@@ -391,8 +391,8 @@ void main() {
 
   group('equality/hashCode include the new fields', () {
     test('entries differing only in sexTimings differ', () {
-      final a = DailyEntry(date: day, sexTimings: SexTiming.start.bit);
-      final b = DailyEntry(date: day, sexTimings: SexTiming.end.bit);
+      final a = DailyEntry(date: day, sexTimings: SexTiming.morning.bit);
+      final b = DailyEntry(date: day, sexTimings: SexTiming.evening.bit);
       final c = DailyEntry(date: day);
       expect(a, isNot(equals(b)));
       expect(a, isNot(equals(c)));

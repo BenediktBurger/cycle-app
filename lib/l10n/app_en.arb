@@ -19,7 +19,7 @@
   "@termCycleStart": {
     "description": "Name of the cycleStart mark (the day panel's first chip) and, at the same time, the \"Cycle start\" column header of the statistics table — one string on both surfaces so the two names cannot drift."
   },
-  "termCycleDays": "{n} days",
+  "termCycleDays": "{n, plural, =1{1 day} other{{n} days}}",
   "@termCycleDays": {
     "placeholders": {
       "n": {
@@ -57,7 +57,6 @@
   "entryPreviousDay": "Previous day",
   "entryNextDay": "Next day",
   "temperature": "Temperature",
-  "measuredTime": "Measured at",
   "measuredTimeUnset": "not set",
   "notes": "Notes",
   "splashLoadingDatabase": "Loading database …",
@@ -163,9 +162,9 @@
   "cervixFirmnessHard": "hard",
   "cervixFirmnessHalfSoft": "h-w",
   "cervixFirmnessSoft": "soft",
-  "sexTimingStart": "start",
-  "sexTimingMiddle": "middle",
-  "sexTimingEnd": "end",
+  "sexTimingMorning": "morning",
+  "sexTimingMidday": "midday",
+  "sexTimingEvening": "evening",
   "errorTemperature": "One temperature using comma or dot, two decimals max",
   "errorTemperatureRange": "Plausibility: temperatures between 25 and 45 °C",
   "cycleGroupLeading": "Before the first cycle start (until {day})",
@@ -282,8 +281,8 @@
     "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
   },
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
-  "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening (rule D)",
-  "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning (rule E)",
+  "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening",
+  "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning",
   "cycleLegendSex": "Sex (X per time of day)",
   "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
@@ -533,7 +532,7 @@
   "settingsDeleteDataNote": "Removes all diary entries and marks. Your settings are kept. If you want to keep the data: export first (see Export).",
   "settingsDeleteDataButton": "Delete all data …",
   "deleteDataDialogTitle": "Delete data?",
-  "deleteDataDialogBody": "{entries} diary entries and {marks} marks will be deleted. Settings are kept. If you want to keep the data: export first (see Export).",
+  "deleteDataDialogBody": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}} and {marks, plural, =1{1 mark} other{{marks} marks}} will be deleted. Settings are kept. If you want to keep the data: export first (see Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -545,7 +544,7 @@
     }
   },
   "deleteDataConfirm": "Delete",
-  "deleteDataDone": "{entries} diary entries and {marks} marks deleted.",
+  "deleteDataDone": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}} and {marks, plural, =1{1 mark} other{{marks} marks}} deleted.",
   "@deleteDataDone": {
     "placeholders": {
       "entries": {
@@ -597,7 +596,7 @@
   "@pdfExportCyclesNone": {
     "description": "Bulk button of the export card's cycle-selection list: deselects every cycle (the empty selection keeps the export behind the empty-data guard)."
   },
-  "pdfExportCyclesSelectedSummary": "{n} of {total} cycles selected",
+  "pdfExportCyclesSelectedSummary": "{total, plural, =1{{n} of 1 cycle} other{{n} of {total} cycles}} selected",
   "@pdfExportCyclesSelectedSummary": {
     "placeholders": {
       "n": {
@@ -650,7 +649,7 @@
   "importApply": "Apply import",
   "importInvalid": "Invalid document (not a valid cycle-app export).",
   "importFailed": "Import failed — the data was not changed.",
-  "importSummary": "Days new: {newDays}, days overwritten: {overwritten}, duplicate rows in document: {duplicates}, invalid rows: {invalid}, marks new: {newMarks}, marks skipped: {skipped}.",
+  "importSummary": "{newDays, plural, =1{1 day} other{{newDays} days}} new, {overwritten, plural, =1{1 day} other{{overwritten} days}} overwritten, {duplicates, plural, =1{1 duplicate row} other{{duplicates} duplicate rows}} in document, {invalid, plural, =1{1 invalid row} other{{invalid} invalid rows}}, {newMarks, plural, =1{1 mark} other{{newMarks} marks}} new, {skipped, plural, =1{1 mark} other{{skipped} marks}} skipped.",
   "importEmpty": "Import: nothing to change (document empty or already identical).",
   "importOverwriteWarning": "{days, plural, =1{1 day will be overwritten.} other{{days} days will be overwritten.}}",
   "@importOverwriteWarning": {
@@ -665,7 +664,7 @@
   "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. An excluded temperature derives an \"exclude from analysis\" mark; mood and desire flags are dropped (their notes are kept).",
   "dripImportHint": "Paste a drip CSV export here …",
   "dripImportInvalid": "Not a drip CSV export (no \"date\" column in the header row).",
-  "dripImportSummary": "{imported} days imported, {skipped} empty days skipped, {invalid} invalid rows; days new: {newDays}, days overwritten: {overwritten}.",
+  "dripImportSummary": "{imported, plural, =1{1 day imported} other{{imported} days imported}}, {skipped, plural, =1{1 empty day skipped} other{{skipped} empty days skipped}}, {invalid, plural, =1{1 invalid row} other{{invalid} invalid rows}}; {newDays, plural, =1{1 day} other{{newDays} days}} new, {overwritten, plural, =1{1 day} other{{overwritten} days}} overwritten.",
   "@dripImportSummary": {
     "placeholders": {
       "imported": {
@@ -686,7 +685,7 @@
     }
   },
   "disturbancesCaption": "Temperature disturbance (flag the measurement):",
-  "diaryExcludeTemperatureSwitch": "Exclude from the evaluation",
+  "diaryExcludeTemperatureSwitch": "Exclude temperature from the evaluation",
   "disturbanceLateToBed": "Late to bed (sp)",
   "disturbanceNightAwakening": "Frequent night awakening (a)",
   "disturbanceAlcohol": "Alcohol (alk)",

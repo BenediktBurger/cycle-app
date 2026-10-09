@@ -133,7 +133,7 @@ MucusDisplay? _mucusOrNothing({MucusSign? sign, MucusQuality? quality}) {
 }
 
 double _sexFraction(SexTiming timing) => switch (timing) {
-  SexTiming.start => 1 / 6,
-  SexTiming.middle => 0.5,
-  SexTiming.end => 5 / 6,
+  SexTiming.morning => 1 / 6,
+  SexTiming.midday => 0.5,
+  SexTiming.evening => 5 / 6,
 };

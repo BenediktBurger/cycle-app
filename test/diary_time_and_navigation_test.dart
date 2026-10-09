@@ -274,7 +274,9 @@ void main() {
       final tempTop = tester.getTopLeft(tempField).dy;
       final tempBottom = tester.getBottomRight(tempField).dy;
       // Deliberate: this geometry pins the label's rect, not the control.
-      final timeTop = tester.getTopLeft(find.text('Gemessen um')).dy;
+      final timeTop = tester
+          .getTopLeft(find.byIcon(Icons.schedule_outlined))
+          .dy;
       expect(
         timeTop,
         inInclusiveRange(tempTop, tempBottom),

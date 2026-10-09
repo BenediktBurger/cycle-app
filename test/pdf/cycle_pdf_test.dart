@@ -355,8 +355,10 @@ List<DailyEntry> markFixtureEntries() => [
       date: d(3, 1 + i),
       bbtC: 36.5,
       sexTimings: i == 2
-          ? (SexTiming.start.bit | SexTiming.middle.bit | SexTiming.end.bit)
-          : (i == 3 ? SexTiming.end.bit : 0),
+          ? (SexTiming.morning.bit |
+                SexTiming.midday.bit |
+                SexTiming.evening.bit)
+          : (i == 3 ? SexTiming.evening.bit : 0),
       mucusSign: i == 5 ? MucusSign.s : (i == 6 ? MucusSign.fs : null),
       mucusQuality: i == 5 ? MucusQuality.ew : null,
       painMittelschmerz: i == 8,

@@ -414,27 +414,27 @@ void main() {
 
     // The three time slots (pinned German locale).
     expect(
-      find.text('Anfang'),
+      find.text('morgens'),
       findsOneWidget,
-      reason: 'the start slot must be offered',
+      reason: 'the morning slot must be offered',
     );
     expect(
-      find.text('Mitte'),
+      find.text('mittags'),
       findsOneWidget,
-      reason: 'the middle slot must be offered',
+      reason: 'the midday slot must be offered',
     );
     expect(
-      find.text('Ende'),
+      find.text('abends'),
       findsOneWidget,
-      reason: 'the end slot must be offered',
+      reason: 'the evening slot must be offered',
     );
 
     // Select TWO slots at once — the old single bool is gone.
-    await tester.ensureVisible(diaryChip('sexTiming', 'start'));
+    await tester.ensureVisible(diaryChip('sexTiming', 'morning'));
     await tester.pumpAndSettle();
-    await tester.tap(diaryChip('sexTiming', 'start'));
+    await tester.tap(diaryChip('sexTiming', 'morning'));
     await tester.pumpAndSettle();
-    await tester.tap(diaryChip('sexTiming', 'end'));
+    await tester.tap(diaryChip('sexTiming', 'evening'));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(diarySaveButton());
@@ -448,7 +448,7 @@ void main() {
     expect(
       row!.sexTimings,
       1 | 4,
-      reason: 'Anfang (bit 1) + Ende (bit 4) must persist as mask 5',
+      reason: 'morning (bit 1) + evening (bit 4) must persist as mask 5',
     );
   });
 
@@ -458,13 +458,13 @@ void main() {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(diaryChip('sexTiming', 'middle'));
+    await tester.ensureVisible(diaryChip('sexTiming', 'morning'));
     await tester.pumpAndSettle();
-    await tester.tap(diaryChip('sexTiming', 'middle'));
+    await tester.tap(diaryChip('sexTiming', 'morning'));
     await tester.pumpAndSettle();
-    await tester.tap(diaryChip('sexTiming', 'middle')); // deselect again
+    await tester.tap(diaryChip('sexTiming', 'morning')); // deselect again
     await tester.pumpAndSettle();
-    await tester.tap(diaryChip('sexTiming', 'end'));
+    await tester.tap(diaryChip('sexTiming', 'evening'));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(diarySaveButton());
@@ -479,7 +479,7 @@ void main() {
       row!.sexTimings,
       4,
       reason:
-          'the re-tapped middle slot must be cleared; Ende (bit 4) '
+          'the re-tapped midday slot must be cleared; evening (bit 4) '
           'stays',
     );
   });

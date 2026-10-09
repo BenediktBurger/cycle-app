@@ -72,7 +72,7 @@ void main() {
       expect(pinnedDay.mucusSign, MucusSign.t);
       expect(
         pinnedDay.sexTimings,
-        SexTiming.middle.bit,
+        SexTiming.midday.bit,
         reason: 'mask 2 is the middle bit of the sex timings vocabulary',
       );
 

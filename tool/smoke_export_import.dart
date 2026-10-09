@@ -126,7 +126,7 @@ Future<void> main() async {
       // (start|end → multiple X on one day).
       mucusSign: MucusSign.a,
       cervixFirmness: CervixFirmness.hard,
-      sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+      sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
     ),
   );
   await source.entriesDao.upsertDaily(
@@ -178,7 +178,7 @@ Future<void> main() async {
   check(
     json.contains('"cervix_firmness": "hard"') &&
         json.contains(
-          '"sex_timings": ${SexTiming.start.bit | SexTiming.end.bit}',
+          '"sex_timings": ${SexTiming.morning.bit | SexTiming.evening.bit}',
         ),
     'export carries the redefined-v4 keys (cervix_firmness, sex_timings)',
   );
@@ -269,7 +269,7 @@ Future<void> main() async {
     'the firmness token survives the export/import round trip',
   );
   check(
-    heavyRow.sexTimings == SexTiming.start.bit | SexTiming.end.bit,
+    heavyRow.sexTimings == SexTiming.morning.bit | SexTiming.evening.bit,
     'the sex-timings mask survives the export/import round trip',
   );
   final flaggedRow = migrated.firstWhere(

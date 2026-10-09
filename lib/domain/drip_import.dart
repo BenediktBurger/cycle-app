@@ -387,7 +387,7 @@ DripCsvImport dripCsvToExportJson(String raw) {
       'cervix_firmness': cervixObservation?.firmness?.name,
       'pain_breast': painBreast,
       'pain_mittelschmerz': painMittelschmerz,
-      'sex_timings': sex ? SexTiming.middle.bit : 0,
+      'sex_timings': sex ? SexTiming.midday.bit : 0,
       'notes': notes.isEmpty ? null : notes,
     };
     entries.add(entry);

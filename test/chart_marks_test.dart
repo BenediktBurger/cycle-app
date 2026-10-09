@@ -35,29 +35,31 @@ void main() {
 
     test('start / middle / end each map to their column fraction', () {
       final start = chartDayMarks({
-        0: _entry(0, sexTimings: SexTiming.start.bit),
+        0: _entry(0, sexTimings: SexTiming.morning.bit),
       });
-      expect(start[0]!.sexSlots.single.timing, SexTiming.start);
+      expect(start[0]!.sexSlots.single.timing, SexTiming.morning);
       expect(start[0]!.sexSlots.single.columnFraction, closeTo(1 / 6, 1e-9));
 
       final middle = chartDayMarks({
-        0: _entry(0, sexTimings: SexTiming.middle.bit),
+        0: _entry(0, sexTimings: SexTiming.midday.bit),
       });
-      expect(middle[0]!.sexSlots.single.timing, SexTiming.middle);
+      expect(middle[0]!.sexSlots.single.timing, SexTiming.midday);
       expect(middle[0]!.sexSlots.single.columnFraction, closeTo(0.5, 1e-9));
 
-      final end = chartDayMarks({0: _entry(0, sexTimings: SexTiming.end.bit)});
-      expect(end[0]!.sexSlots.single.timing, SexTiming.end);
+      final end = chartDayMarks({
+        0: _entry(0, sexTimings: SexTiming.evening.bit),
+      });
+      expect(end[0]!.sexSlots.single.timing, SexTiming.evening);
       expect(end[0]!.sexSlots.single.columnFraction, closeTo(5 / 6, 1e-9));
     });
 
     test('two bits list both slots in SexTiming.values order', () {
       final marks = chartDayMarks({
-        0: _entry(0, sexTimings: SexTiming.end.bit | SexTiming.start.bit),
+        0: _entry(0, sexTimings: SexTiming.evening.bit | SexTiming.morning.bit),
       });
       expect(
         [for (final slot in marks[0]!.sexSlots) slot.timing],
-        [SexTiming.start, SexTiming.end],
+        [SexTiming.morning, SexTiming.evening],
       );
       expect(marks[0]!.sexSlots[0].columnFraction, closeTo(1 / 6, 1e-9));
       expect(marks[0]!.sexSlots[1].columnFraction, closeTo(5 / 6, 1e-9));
@@ -68,7 +70,9 @@ void main() {
         0: _entry(
           0,
           sexTimings:
-              SexTiming.start.bit | SexTiming.middle.bit | SexTiming.end.bit,
+              SexTiming.morning.bit |
+              SexTiming.midday.bit |
+              SexTiming.evening.bit,
         ),
       });
       expect([

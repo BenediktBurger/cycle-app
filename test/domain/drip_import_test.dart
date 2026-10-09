@@ -849,7 +849,7 @@ void main() {
           );
           // Time-less drip sex maps onto the MIDDLE time of day (owner
           // decision); drip carries no time-of-day for sex itself.
-          expect(e['sex_timings'], SexTiming.middle.bit);
+          expect(e['sex_timings'], SexTiming.midday.bit);
           expect(
             e.containsKey('sex'),
             isFalse,
@@ -863,7 +863,7 @@ void main() {
           sexCells('2026-01-01', {2: 'true', 10: 'true', 12: 'good day'}),
           header: sexHeader,
         );
-        expect(e['sex_timings'], SexTiming.middle.bit);
+        expect(e['sex_timings'], SexTiming.midday.bit);
         expect(e['notes'], '[sex] partner good day');
       });
 
@@ -935,7 +935,7 @@ void main() {
         );
         final doc = jsonDecode(result.json) as Map<String, Object?>;
         final e = (doc['entries']! as List).single as Map<String, Object?>;
-        expect(e['sex_timings'], SexTiming.middle.bit);
+        expect(e['sex_timings'], SexTiming.midday.bit);
         expect(e['notes'], '[sex] partner n');
       });
 
@@ -1014,7 +1014,7 @@ void main() {
           final e = (doc['entries']! as List).single as Map<String, Object?>;
           expect(
             e['sex_timings'],
-            SexTiming.middle.bit,
+            SexTiming.midday.bit,
             reason: 'variant $variant maps to the middle time of day',
           );
           expect(e['notes'], expectedNotes);
@@ -1683,7 +1683,7 @@ void main() {
       final noMethodNamed = by('2026-08-16');
       expect(
         noMethodNamed['sex_timings'],
-        SexTiming.middle.bit,
+        SexTiming.midday.bit,
         reason:
             'partner with condom=false/pill=false and nothing else: '
             'no method flag set → the mapped variant',

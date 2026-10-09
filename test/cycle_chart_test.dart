@@ -858,12 +858,12 @@ List<DailyEntry> _timeSexPainEntries() => [
     measuredAtMinutes: 6 * 60 + 30,
   ),
   DailyEntry(date: _timeSexPainDay(1), bbtC: 36.4),
-  DailyEntry(date: _timeSexPainDay(2), sexTimings: SexTiming.start.bit),
+  DailyEntry(date: _timeSexPainDay(2), sexTimings: SexTiming.morning.bit),
   DailyEntry(date: _timeSexPainDay(3), painBreast: true),
   DailyEntry(date: _timeSexPainDay(4), painMittelschmerz: true),
   DailyEntry(
     date: _timeSexPainDay(5),
-    sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+    sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
     painBreast: true,
     painMittelschmerz: true,
   ),
@@ -5098,9 +5098,13 @@ void main() {
       date: inPlotDay(1),
       bbtC: 36.6,
       sexTimings:
-          SexTiming.start.bit | SexTiming.middle.bit | SexTiming.end.bit,
+          SexTiming.morning.bit | SexTiming.midday.bit | SexTiming.evening.bit,
     ),
-    DailyEntry(date: inPlotDay(2), bbtC: 36.7, sexTimings: SexTiming.start.bit),
+    DailyEntry(
+      date: inPlotDay(2),
+      bbtC: 36.7,
+      sexTimings: SexTiming.morning.bit,
+    ),
     DailyEntry(date: inPlotDay(3), bbtC: 36.4, mucusSign: MucusSign.f),
     DailyEntry(date: inPlotDay(4), bbtC: 36.5),
   ];
@@ -5129,9 +5133,9 @@ void main() {
         reason: 'the all-three-timings day renders the $timing X',
       );
     }
-    expect(find.byKey(const ValueKey('inPlotSex-2-start')), findsOneWidget);
+    expect(find.byKey(const ValueKey('inPlotSex-2-morning')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('inPlotSex-2-middle')),
+      find.byKey(const ValueKey('inPlotSex-2-midday')),
       findsNothing,
       reason: 'no X for an unrecorded timing',
     );
@@ -5146,7 +5150,7 @@ void main() {
       findsNothing,
       reason: 'a sign-free day renders no letter',
     );
-    expect(find.byKey(const ValueKey('inPlotSex-4-start')), findsNothing);
+    expect(find.byKey(const ValueKey('inPlotSex-4-morning')), findsNothing);
   });
 
   testWidgets('a peak-marked interior GAP day renders the dot alone: the dot '
@@ -5157,7 +5161,7 @@ void main() {
       DailyEntry(
         date: inPlotDay(2),
         bbtC: 36.7,
-        sexTimings: SexTiming.start.bit,
+        sexTimings: SexTiming.morning.bit,
       ),
       DailyEntry(date: inPlotDay(4), bbtC: 36.5),
     ];
@@ -5217,7 +5221,7 @@ void main() {
       reason: 'the mucus letter pins at the letters row pitch',
     );
 
-    final fractions = {'start': 1 / 6, 'middle': 0.5, 'end': 5 / 6};
+    final fractions = {'morning': 1 / 6, 'midday': 0.5, 'evening': 5 / 6};
     for (final MapEntry(:key, :value) in fractions.entries) {
       expect(
         tester.getRect(find.byKey(ValueKey('inPlotSex-1-$key'))).center.dx,
@@ -5231,7 +5235,10 @@ void main() {
       );
     }
     expect(
-      tester.getRect(find.byKey(const ValueKey('inPlotSex-2-start'))).center.dx,
+      tester
+          .getRect(find.byKey(const ValueKey('inPlotSex-2-morning')))
+          .center
+          .dx,
       closeTo(plot.left + (2 + 1 / 6) * colW, 1),
     );
   });
@@ -5241,7 +5248,7 @@ void main() {
     await pumpChart(tester, inPlotHarness());
 
     for (final haloKey in const [
-      'inPlotHaloSex-2-start',
+      'inPlotHaloSex-2-morning',
       'inPlotHaloMucus-0',
       'inPlotHaloPeakDot-0',
     ]) {
@@ -5255,9 +5262,9 @@ void main() {
     );
     expect(
       tester
-          .getRect(find.byKey(const ValueKey('inPlotHaloSex-2-start')))
+          .getRect(find.byKey(const ValueKey('inPlotHaloSex-2-morning')))
           .center,
-      tester.getRect(find.byKey(const ValueKey('inPlotSex-2-start'))).center,
+      tester.getRect(find.byKey(const ValueKey('inPlotSex-2-morning'))).center,
       reason: 'the X halo sits exactly behind the ink',
     );
   });
@@ -5296,7 +5303,7 @@ void main() {
     );
     expect(
       tester
-          .widget<Text>(find.byKey(const ValueKey('inPlotSex-2-start')))
+          .widget<Text>(find.byKey(const ValueKey('inPlotSex-2-morning')))
           .style!
           .color,
       scheme.onSurface.withValues(alpha: chartMarkAlpha),
@@ -5486,8 +5493,8 @@ void main() {
         'inPlotHaloMucus-4',
         'inPlotM-4',
         'inPlotHaloM-4',
-        'inPlotSex-6-start',
-        'inPlotHaloSex-6-start',
+        'inPlotSex-6-morning',
+        'inPlotHaloSex-6-morning',
       },
       reason:
           'only the mucus letters, the M, the X marks and their halos '
@@ -6476,16 +6483,16 @@ void main() {
     );
 
     expect(
-      find.byKey(const ValueKey('inPlotSex-2-start')),
+      find.byKey(const ValueKey('inPlotSex-2-morning')),
       findsOneWidget,
       reason: 'the sex day shows its X glyph inside the plot',
     );
     expect(
-      find.byKey(const ValueKey('inPlotSex-0-start')),
+      find.byKey(const ValueKey('inPlotSex-0-morning')),
       findsNothing,
       reason: 'no X on a temperature day without sex',
     );
-    expect(find.byKey(const ValueKey('inPlotSex-6-start')), findsNothing);
+    expect(find.byKey(const ValueKey('inPlotSex-6-morning')), findsNothing);
   });
 
   testWidgets('every set sex time slot renders its own X — multiple slots '
@@ -6497,18 +6504,18 @@ void main() {
 
     // day 5 recorded start + end: middle is the only absent timing.
     expect(
-      find.byKey(const ValueKey('inPlotSex-5-middle')),
+      find.byKey(const ValueKey('inPlotSex-5-midday')),
       findsNothing,
       reason: 'no X for an unrecorded timing',
     );
     expect(
-      find.byKey(const ValueKey('inPlotSex-5-start')),
+      find.byKey(const ValueKey('inPlotSex-5-morning')),
       findsOneWidget,
       reason: 'two recorded slots (start + end) render their X marks',
     );
-    expect(find.byKey(const ValueKey('inPlotSex-5-end')), findsOneWidget);
+    expect(find.byKey(const ValueKey('inPlotSex-5-evening')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('inPlotSex-2-start')),
+      find.byKey(const ValueKey('inPlotSex-2-morning')),
       findsOneWidget,
       reason: 'a single recorded slot renders exactly one X',
     );
@@ -6532,7 +6539,7 @@ void main() {
       return (glyph.center.dx - plot.left) / colW - dayIndex;
     }
 
-    final startF = xFraction(2, 'start');
+    final startF = xFraction(2, 'morning');
     expect(
       startF,
       closeTo(1 / 6, 0.05),
@@ -6542,12 +6549,12 @@ void main() {
     );
 
     expect(
-      xFraction(5, 'start'),
+      xFraction(5, 'morning'),
       closeTo(1 / 6, 0.05),
       reason: 'the first X belongs to the start slot (left)',
     );
     expect(
-      xFraction(5, 'end'),
+      xFraction(5, 'evening'),
       closeTo(5 / 6, 0.05),
       reason: 'the second X belongs to the end slot (right)',
     );
@@ -6598,7 +6605,7 @@ void main() {
     );
 
     expect(
-      find.byKey(const ValueKey('inPlotSex-5-end')),
+      find.byKey(const ValueKey('inPlotSex-5-evening')),
       findsOneWidget,
       reason: 'the sex X marks render inside the plot',
     );
