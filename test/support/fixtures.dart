@@ -96,7 +96,7 @@ List<DailyEntry> nineDayRowsFixture({
     cervixPosition: CervixPosition.low,
     cervixFirmness: CervixFirmness.soft,
   ),
-  DailyEntry(date: day(6), bbtC: 37.0, sexTimings: SexTiming.start.bit),
+  DailyEntry(date: day(6), bbtC: 37.0, sexTimings: SexTiming.morning.bit),
   DailyEntry(date: day(7), bbtC: 36.9, painBreast: true),
   DailyEntry(date: day(8)),
 ];

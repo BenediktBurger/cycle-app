@@ -440,7 +440,7 @@ void main() {
         DailyEntry(
           date: DateTime(2026, 6, 15),
           cervixFirmness: CervixFirmness.halfSoft,
-          sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+          sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
         ),
       );
       // The old columns must not even be addressable any more.
@@ -914,7 +914,7 @@ void main() {
           cervixFirmness: CervixFirmness.soft,
           painBreast: true,
           painMittelschmerz: true,
-          sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+          sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
           notes: 'Notiz am Rande.',
         );
 
@@ -1914,7 +1914,7 @@ void main() {
             cervixFirmness: CervixFirmness.soft,
             painBreast: true,
             painMittelschmerz: true,
-            sexTimings: SexTiming.middle.bit,
+            sexTimings: SexTiming.midday.bit,
             notes: 'rich day',
           ),
         );

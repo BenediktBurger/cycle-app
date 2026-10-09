@@ -105,9 +105,9 @@ int? tryParseMeasuredAtMinutes(Object? raw) {
 /// representable — the observation is either tied to a recorded time or not
 /// recorded.
 enum SexTiming {
-  start(1),
-  middle(2),
-  end(4);
+  morning(1),
+  midday(2),
+  evening(4);
 
   const SexTiming(this.bit);
 

@@ -198,7 +198,7 @@ void main() {
       final noMethodDay = await dayRow('2026-08-16');
       expect(
         noMethodDay.sexTimings,
-        SexTiming.middle.bit,
+        SexTiming.midday.bit,
         reason: 'partner without any method flag → the mapped variant',
       );
       expect(noMethodDay.notes, '[sex] partner');

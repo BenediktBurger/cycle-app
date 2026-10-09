@@ -241,7 +241,7 @@ Future<void> main() async {
     painBreast: true,
     painMittelschmerz: true,
     cervixFirmness: CervixFirmness.halfSoft,
-    sexTimings: SexTiming.start.bit | SexTiming.end.bit,
+    sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
     notes: 'Notiz am Rande.',
   );
   final mappedBack = dailyEntryFromDrift(
@@ -276,7 +276,8 @@ Future<void> main() async {
     'raw cervix_firmness token is the enum name',
   );
   check(
-    cervixTokens.data['sex_timings'] == SexTiming.start.bit | SexTiming.end.bit,
+    cervixTokens.data['sex_timings'] ==
+        SexTiming.morning.bit | SexTiming.evening.bit,
     'raw sex_timings is the SexTiming bitmask',
   );
   check(

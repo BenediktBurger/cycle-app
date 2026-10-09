@@ -798,9 +798,9 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                     FilterChip(
                       key: ValueKey('sexTimingChip-${timing.name}'),
                       label: Text(switch (timing) {
-                        SexTiming.start => l10n.sexTimingStart,
-                        SexTiming.middle => l10n.sexTimingMiddle,
-                        SexTiming.end => l10n.sexTimingEnd,
+                        SexTiming.morning => l10n.sexTimingMorning,
+                        SexTiming.midday => l10n.sexTimingMidday,
+                        SexTiming.evening => l10n.sexTimingEvening,
                       }),
                       selected: _sexTimings & timing.bit != 0,
                       onSelected: (selected) => setState(() {
