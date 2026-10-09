@@ -6,14 +6,14 @@
 > **Author's note (2026-10-08, drip import):** the drip-local onset rule
 > is now a faithful port of drip's `isMensesStart` (../drip
 > lib/cycle.js): a non-excluded bleeding day within the 2 previous
-> calendar days (drip's `maxBreakInBleeding` = 1) suppresses the
-> mark — a bleeding-free gap of one day is bridged, a gap of two days
-> starts a fresh cycle. `bleeding.exclude` days cannot open and are
-> transparent to the lookback: a bleeding day behind them still
-> suppresses, a two-day bleeding-free stretch after them is a fresh
-> onset. This supersedes the 2026-09-24 note's onset-rule wording and
-> settled question (b)'s "skipped entirely / cannot suppress" semantics
-> for the derivation replay.
+> calendar days (drip's `maxBreakInBleeding` = 1) suppresses the mark —
+> a bleeding-free gap of one day is bridged, a gap of two days starts a
+> fresh cycle. `bleeding.exclude` days cannot open and are transparent
+> to the lookback: a bleeding day behind them still suppresses, a
+> two-day bleeding-free stretch after them is a fresh onset. This
+> supersedes the 2026-09-24 note's onset-rule wording and settled
+> question (b)'s "skipped entirely / cannot suppress" semantics for the
+> derivation replay.
 >
 > **Author's note (2026-09-24, drip import):** the shared suggestion
 > predicate `isSuggestedCycleStart` is REMOVED — its last production
