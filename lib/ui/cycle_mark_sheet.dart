@@ -1,10 +1,10 @@
 // The cycle tab's day options panel: tapping a chart day shows this
-// non-modal panel below the chart instead of jumping straight to the
-// entry form. HARD RULE (ADR-0001): the user places all marks, the app
-// only computes — writes go through the MarksDao, everything shown as
-// evaluation data is recomputed from the entries + marks streams at
-// render time. Layout, suggestion and exclusion-posture details live in
-// docs/dev-notes.md ("Cycle day mark sheet").
+// non-modal panel docked at the bottom of the screen instead of jumping
+// straight to the entry form. HARD RULE (ADR-0001): the user places all
+// marks, the app only computes — writes go through the MarksDao,
+// everything shown as evaluation data is recomputed from the entries +
+// marks streams at render time. Layout, suggestion and exclusion-posture
+// details live in docs/dev-notes.md ("Cycle day mark sheet").
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -34,10 +34,20 @@ double _gridChipWidth(double maxWidth) =>
 /// panel to the new day with the old day's marks untouched. The chips
 /// read their selected state from the live marks stream.
 final class CycleDayPanel extends ConsumerWidget {
-  const CycleDayPanel({super.key, required this.day, required this.onClose});
+  const CycleDayPanel({
+    super.key,
+    required this.day,
+    required this.maxHeight,
+    required this.onClose,
+  });
 
   /// The tapped calendar day (UTC-midnight normalized).
   final DateTime day;
+
+  /// The tallest content height the panel may render, computed by the
+  /// docking screen from the body's own constraints; beyond it the panel
+  /// content scrolls internally.
+  final double maxHeight;
 
   final VoidCallback onClose;
 
@@ -232,6 +242,21 @@ final class CycleDayPanel extends ConsumerWidget {
     });
   }
 
+  /// The tapped day's note text, or null when the day carries no entry or
+  /// the note is whitespace-only — the panel shows nothing in that case.
+  /// The chart band folds newlines for its rotated teaser; the panel keeps
+  /// the raw String.
+  String? _dayNote(List<DailyEntry> entries) {
+    for (final entry in entries) {
+      if (DateOnly.sameDay(entry.date, day)) {
+        final notes = entry.notes;
+        if (notes != null && notes.trim().isNotEmpty) return notes;
+        return null;
+      }
+    }
+    return null;
+  }
+
   /// Locale-formatted value (two fraction digits); takes the locale
   /// string, not the context, so callers can format across an async gap.
   String _formatValue(String locale, double value) =>
@@ -360,6 +385,7 @@ final class CycleDayPanel extends ConsumerWidget {
         ? const <(String, Key?)>[]
         : _infoLines(context, l10n, entries, marks);
     final locale = Localizations.localeOf(context).toString();
+    final note = _dayNote(entries);
 
     /// One grid chip: the STATIC mark-name [label] plus the mark type's
     /// identifying leading [icon]. The selected state carries set/remove
@@ -387,197 +413,242 @@ final class CycleDayPanel extends ConsumerWidget {
       ),
     );
 
-    // A non-modal card in the Zyklus screen's list; scrollability comes
-    // from the owning ListView, and the panel's own key is what the tests
-    // and the retargeting provider address.
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The day header row: the date label (expanded, so long
-          // localized names soft-wrap), then "edit day", then close.
-          Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    // Date-only values are UTC-normalized midnights —
-                    // print verbatim; a .toLocal() shows the previous day
-                    // on UTC-negative hosts.
-                    DateFormat.yMMMEd(locale).format(DateOnly.normalize(day)),
-                    style: Theme.of(context).textTheme.titleMedium,
+    // A non-modal card the Zyklus screen docks at the bottom of the
+    // surface, in front of the chart list; the panel's own key is what the
+    // tests and the retargeting provider address. The caller-computed cap
+    // ([maxHeight] — the docking body's constraints, not the full surface)
+    // bounds the dock; above it the panel content scrolls internally
+    // (most days never reach the cap).
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 4,
+        child: SingleChildScrollView(
+          // Recreated per day so a retarget opens the new day's content
+          // at the top instead of inheriting the previous day's scroll
+          // offset (the panel element stays mounted across retargets).
+          key: ValueKey('cycleSheetScroll-${day.toIso8601String()}'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The day header row: the date label (expanded, so long
+              // localized names soft-wrap), then "edit day", then close.
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        // Date-only values are UTC-normalized midnights —
+                        // print verbatim; a .toLocal() shows the previous day
+                        // on UTC-negative hosts.
+                        DateFormat.yMMMEd(
+                          locale,
+                        ).format(DateOnly.normalize(day)),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('cycleDayPanelEdit'),
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: l10n.cycleSheetEditDay,
+                      onPressed: () => _editDay(context, ref),
+                    ),
+                    IconButton(
+                      key: const ValueKey('cycleDayPanelClose'),
+                      icon: const Icon(Icons.close),
+                      tooltip: l10n.cycleDayPanelClose,
+                      onPressed: onClose,
+                    ),
+                  ],
+                ),
+              ),
+              // Computed per build — display only, nothing persisted (ADR-0001);
+              // the subtle surface tint marks the block as computed against the
+              // editable chips below it.
+              if (infoLines.isNotEmpty)
+                Container(
+                  key: const ValueKey('cycleSheetInfoBlock'),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.06),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final (line, key) in infoLines)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            line,
+                            key: key,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  key: const ValueKey('cycleDayPanelEdit'),
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: l10n.cycleSheetEditDay,
-                  onPressed: () => _editDay(context, ref),
+              // The shared chip grid: all six chips in ONE Wrap of equal
+              // column widths — two columns on phone-width panels, three from
+              // 600 dp — so every row completes evenly.
+              // TODO(user-review): a further column count on even wider
+              // surfaces (>600 dp) is left out until a concrete viewport asks
+              // for it.
+              //
+              // Reading order: cycle start, mucus peak, temperature
+              // exclusion, first higher measurement, SUZ evening, SUZ
+              // morning.
+              if (marksAsync.hasError)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: StreamLoadError(
+                    scope: 'marks',
+                    onRetry: () => ref.invalidate(marksProvider),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: LayoutBuilder(
+                    // The chip closures capture the panel's context, not the
+                    // builder's: the grid element is recomputed whenever the
+                    // info-line count above changes, so a captured builder
+                    // context could go defunct while the closure still runs.
+                    builder: (_, constraints) {
+                      final chipWidth = _gridChipWidth(constraints.maxWidth);
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          // The authoritative cycle-boundary mark of the
+                          // mark-driven grouping (bleeding only suggests it —
+                          // lib/domain/cycle_grouping.dart); settable on any
+                          // day.
+                          gridChip(
+                            l10n.termCycleStart,
+                            hasCycleStart,
+                            icon: Icons.flag_outlined,
+                            key: const ValueKey('cycleSheetChip-cycleStart'),
+                            (wanted) => _writeMark(
+                              context,
+                              ref,
+                              type: CycleMarkTypes.cycleStart,
+                              remove: !wanted,
+                            ),
+                            width: chipWidth,
+                          ),
+                          gridChip(
+                            l10n.termMucusPeak,
+                            hasPeak,
+                            icon: Icons.circle,
+                            key: const ValueKey('cycleSheetChip-mucusPeakDay'),
+                            (wanted) => _writeMark(
+                              context,
+                              ref,
+                              type: CycleMarkTypes.mucusPeakDay,
+                              remove: !wanted,
+                            ),
+                            width: chipWidth,
+                          ),
+                          // Manual-only exclusion (owner decision
+                          // 2026-09-19), the grid's third chip; the day's
+                          // disturbance flags are not shown here (the chart's
+                          // disturbance row spells them, flag editing stays
+                          // diary-side). The mark is the temperature curve's
+                          // dimming key (owner decision 2026-09-19) and does
+                          // not affect the drip-import cycleStart replay
+                          // (lib/domain/drip_import.dart).
+                          SizedBox(
+                            key: const ValueKey('cycleSheetExcludeGroup'),
+                            child: gridChip(
+                              l10n.cycleSheetSetIgnoreTemperature,
+                              hasExcluded,
+                              icon: Icons.visibility_off_outlined,
+                              key: const ValueKey(
+                                'cycleSheetChip-ignoreTemperature',
+                              ),
+                              (wanted) => _writeMark(
+                                context,
+                                ref,
+                                type: CycleMarkTypes.ignoreTemperature,
+                                remove: !wanted,
+                              ),
+                              width: chipWidth,
+                            ),
+                          ),
+                          // Placement goes through the consistency dialog
+                          // check; deselect removes directly.
+                          gridChip(
+                            l10n.termFirstHigher,
+                            hasFirstHigher,
+                            icon: Icons.adjust,
+                            key: const ValueKey(
+                              'cycleSheetChip-firstHigherMeasurement',
+                            ),
+                            (wanted) => _writeFirstHigherMark(
+                              context,
+                              ref,
+                              remove: !wanted,
+                              entries: entries,
+                              marks: marks,
+                            ),
+                            width: chipWidth,
+                          ),
+                          // SUZ start from a morning or an evening, placeable
+                          // on any day; the two variants are mutually
+                          // exclusive per day.
+                          gridChip(
+                            l10n.cycleSheetSuzEveningLabel,
+                            hasSuzEvening,
+                            icon: Icons.nightlight_outlined,
+                            key: const ValueKey('cycleSheetChip-suzEvening'),
+                            (wanted) => _writeSuzMark(
+                              context,
+                              ref,
+                              type: CycleMarkTypes.suzEvening,
+                              otherType: CycleMarkTypes.suzMorning,
+                              remove: !wanted,
+                            ),
+                            width: chipWidth,
+                          ),
+                          gridChip(
+                            l10n.cycleSheetSuzMorningLabel,
+                            hasSuzMorning,
+                            icon: Icons.wb_sunny_outlined,
+                            key: const ValueKey('cycleSheetChip-suzMorning'),
+                            (wanted) => _writeSuzMark(
+                              context,
+                              ref,
+                              type: CycleMarkTypes.suzMorning,
+                              otherType: CycleMarkTypes.suzEvening,
+                              remove: !wanted,
+                            ),
+                            width: chipWidth,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-                IconButton(
-                  key: const ValueKey('cycleDayPanelClose'),
-                  icon: const Icon(Icons.close),
-                  tooltip: l10n.cycleDayPanelClose,
-                  onPressed: onClose,
+              // The tapped day's own note, read-only at the panel's very bottom
+              // — notes proper only, the band zones' mucus/cervix glyphs stay a
+              // chart concern.
+              if (note != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Text(
+                    note,
+                    key: const ValueKey('cycleSheetNote'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ],
-            ),
+            ],
           ),
-          // Computed per build — display only, nothing persisted (ADR-0001).
-          for (final (line, key) in infoLines)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                line,
-                key: key,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          // The shared chip grid: all six chips in ONE Wrap of equal
-          // column widths — two columns on phone-width panels, three from
-          // 600 dp — so every row completes evenly.
-          // TODO(user-review): a further column count on even wider
-          // surfaces (>600 dp) is left out until a concrete viewport asks
-          // for it.
-          //
-          // Reading order: cycle start, mucus peak, temperature
-          // exclusion, first higher measurement, SUZ evening, SUZ
-          // morning.
-          if (marksAsync.hasError)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-              child: StreamLoadError(
-                scope: 'marks',
-                onRetry: () => ref.invalidate(marksProvider),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-              child: LayoutBuilder(
-                // The chip closures capture the panel's context, not the
-                // builder's: the grid element is recomputed whenever the
-                // info-line count above changes, so a captured builder
-                // context could go defunct while the closure still runs.
-                builder: (_, constraints) {
-                  final chipWidth = _gridChipWidth(constraints.maxWidth);
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      // The authoritative cycle-boundary mark of the
-                      // mark-driven grouping (bleeding only suggests it —
-                      // lib/domain/cycle_grouping.dart); settable on any
-                      // day.
-                      gridChip(
-                        l10n.termCycleStart,
-                        hasCycleStart,
-                        icon: Icons.flag_outlined,
-                        key: const ValueKey('cycleSheetChip-cycleStart'),
-                        (wanted) => _writeMark(
-                          context,
-                          ref,
-                          type: CycleMarkTypes.cycleStart,
-                          remove: !wanted,
-                        ),
-                        width: chipWidth,
-                      ),
-                      gridChip(
-                        l10n.termMucusPeak,
-                        hasPeak,
-                        icon: Icons.circle,
-                        key: const ValueKey('cycleSheetChip-mucusPeakDay'),
-                        (wanted) => _writeMark(
-                          context,
-                          ref,
-                          type: CycleMarkTypes.mucusPeakDay,
-                          remove: !wanted,
-                        ),
-                        width: chipWidth,
-                      ),
-                      // Manual-only exclusion (owner decision
-                      // 2026-09-19), the grid's third chip; the day's
-                      // disturbance flags are not shown here (the chart's
-                      // disturbance row spells them, flag editing stays
-                      // diary-side). The mark is the temperature curve's
-                      // dimming key (owner decision 2026-09-19) and does
-                      // not affect the drip-import cycleStart replay
-                      // (lib/domain/drip_import.dart).
-                      SizedBox(
-                        key: const ValueKey('cycleSheetExcludeGroup'),
-                        child: gridChip(
-                          l10n.cycleSheetSetIgnoreTemperature,
-                          hasExcluded,
-                          icon: Icons.visibility_off_outlined,
-                          key: const ValueKey(
-                            'cycleSheetChip-ignoreTemperature',
-                          ),
-                          (wanted) => _writeMark(
-                            context,
-                            ref,
-                            type: CycleMarkTypes.ignoreTemperature,
-                            remove: !wanted,
-                          ),
-                          width: chipWidth,
-                        ),
-                      ),
-                      // Placement goes through the consistency dialog
-                      // check; deselect removes directly.
-                      gridChip(
-                        l10n.termFirstHigher,
-                        hasFirstHigher,
-                        icon: Icons.adjust,
-                        key: const ValueKey(
-                          'cycleSheetChip-firstHigherMeasurement',
-                        ),
-                        (wanted) => _writeFirstHigherMark(
-                          context,
-                          ref,
-                          remove: !wanted,
-                          entries: entries,
-                          marks: marks,
-                        ),
-                        width: chipWidth,
-                      ),
-                      // SUZ start from a morning or an evening, placeable
-                      // on any day; the two variants are mutually
-                      // exclusive per day.
-                      gridChip(
-                        l10n.cycleSheetSuzEveningLabel,
-                        hasSuzEvening,
-                        icon: Icons.nightlight_outlined,
-                        key: const ValueKey('cycleSheetChip-suzEvening'),
-                        (wanted) => _writeSuzMark(
-                          context,
-                          ref,
-                          type: CycleMarkTypes.suzEvening,
-                          otherType: CycleMarkTypes.suzMorning,
-                          remove: !wanted,
-                        ),
-                        width: chipWidth,
-                      ),
-                      gridChip(
-                        l10n.cycleSheetSuzMorningLabel,
-                        hasSuzMorning,
-                        icon: Icons.wb_sunny_outlined,
-                        key: const ValueKey('cycleSheetChip-suzMorning'),
-                        (wanted) => _writeSuzMark(
-                          context,
-                          ref,
-                          type: CycleMarkTypes.suzMorning,
-                          otherType: CycleMarkTypes.suzEvening,
-                          remove: !wanted,
-                        ),
-                        width: chipWidth,
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

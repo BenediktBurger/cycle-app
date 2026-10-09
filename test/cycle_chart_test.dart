@@ -1097,7 +1097,7 @@ void main() {
 
     expect(
       notesBandHeight,
-      90,
+      64,
       reason:
           'the band stacks the cervix glyph zone, the letter row, the '
           'breast-pain row and the note zone',
@@ -1254,7 +1254,7 @@ void main() {
       final cell = tester.getRect(chartCell(key, 'notesBand'));
       expect(
         rect.top,
-        closeTo(cell.top + 30, 0.5),
+        closeTo(cell.top + cervixGlyphZoneHeight, 0.5),
         reason:
             'day $key: the letter row starts where the glyph zone ends — '
             'the same height on every cervix day, position and note '
@@ -1360,7 +1360,7 @@ void main() {
     );
     expect(
       letter.top,
-      closeTo(cell10.top + 30, 0.5),
+      closeTo(cell10.top + cervixGlyphZoneHeight, 0.5),
       reason: "day 10's letter row keeps its fixed place without a note",
     );
   });
@@ -3793,8 +3793,6 @@ void main() {
           reason: 'the glossary explains "$entry"',
         );
       }
-      // The sheet also carries the evaluation-arithmetic note (which stays
-      // on the screen below the chart card too — scoped to the sheet here).
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('cycleHelpSheet')),

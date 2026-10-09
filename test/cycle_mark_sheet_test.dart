@@ -1,5 +1,6 @@
 // Widget tests of the day options panel on the cycle tab (Mode M, ADR-0001):
-// tapping a chart day shows a NON-MODAL panel below the chart with a single
+// tapping a chart day shows a NON-MODAL panel docked at the bottom of the
+// cycle screen with a single
 // header row (the day's locale-formatted label, then the compact "edit day"
 // icon button, then the close button) and the mark toggles as Material
 // FilterChips in ONE shared two-column grid of equal column widths
@@ -11,11 +12,12 @@
 // the canvas-drawn check is off): the mucus peak, the first higher
 // measurement, the SUZ
 // start, the cycle start (the authoritative cycle boundary — bleeding only
-// suggests it) and the temperature exclusion — plus the computed info lines
+// suggests it) and the temperature exclusion — plus the computed info block
 // (derived artifacts such as the baseline value, the 1-6 low numbering, the
 // difference to the baseline for marked candidates and the stopped-evaluation
-// notice). Formerly a modal bottom sheet; the fixture/scenarios and all
-// write paths are unchanged by the conversion.
+// notice, between the header and the chip grid) and the tapped day's note at
+// the very bottom of the panel. Formerly a modal bottom sheet; the
+// fixture/scenarios and all write paths are unchanged by the conversion.
 //
 // Unlike the evaluation section of test/cycle_chart_test.dart (fixed
 // marks streams), these tests write through the REAL MarksDao against an
@@ -44,13 +46,9 @@ import 'support/finders.dart';
 import 'support/fixtures.dart';
 import 'support/viewport.dart';
 
-/// A tall-enough test surface for every pump: the Zyklus list is lazy and
-/// the panel sits BELOW the chart block, so the default viewport would
-/// leave most panel rows unbuilt below the fold. A tall surface lays the
-/// chart and the open panel out at once (the modal
-/// sheet of the old layout always fit the viewport on its own — the panel
-/// replaced that self-scroll with the owning list, see the panel comment).
-/// The scenario constants and the write-through harness live once in
+/// The standard scenario pump: the shared write-through harness with the
+/// providers pinned ([selectedDate] default: the scenario's first day,
+/// [initialTab] default 0). The scenario constants live once in
 /// support/cycle_list_harness.dart.
 Future<(CycleDatabase, ProviderContainer)> _pump(
   WidgetTester tester, {
@@ -61,7 +59,6 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
   CycleDatabase Function()? builder,
   Stream<List<CycleMark>> Function()? marksStreamFactory,
 }) async {
-  useTallSurface(tester);
   return pumpCycleList(
     tester,
     entries: entries,
@@ -73,15 +70,6 @@ Future<(CycleDatabase, ProviderContainer)> _pump(
   );
 }
 
-/// Brings a panel row into view: the panel lives in the Zyklus screen's
-/// vertical list, and the bottom rows of the chip grid (the SUZ variants)
-/// can sit below the viewport fold once the day options carry all content —
-/// scrolled into view the same way the modal sheet's rows used to be.
-Future<void> scrollSheetTo(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(finder, 50, scrollable: cycleListScroller());
-  await tester.pumpAndSettle();
-}
-
 /// [_pump] with the surface width pinned: the chip grid's column count is
 /// breakpoint-dependent (three columns from 600 dp of grid width), so the
 /// geometry tests pin a narrow or a wide surface first — [_pump] always
@@ -91,7 +79,7 @@ Future<(CycleDatabase, ProviderContainer)> _pumpAt(
   required double width,
   required List<DailyEntry> entries,
 }) async {
-  useTallSurface(tester, width: width);
+  useViewportSize(tester, Size(width, 600));
   return pumpCycleList(tester, entries: entries);
 }
 
@@ -591,10 +579,7 @@ void main() {
     await tester.tap(cycleSheetRiseKeepButton());
     await tester.pumpAndSettle();
 
-    // Removing the second mark keeps the first one untouched. The chip can
-    // sit below the panel fold (the shared grid carries all six chips
-    // now) — scroll it into view first (same pattern as the SUZ chips).
-    await scrollSheetTo(tester, cycleSheetChip('firstHigherMeasurement'));
+    // Removing the second mark keeps the first one untouched.
     await tester.tap(cycleSheetChip('firstHigherMeasurement'));
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)), [
@@ -1139,6 +1124,117 @@ void main() {
     );
   });
 
+  group('computed info block and the day note (the panel content rows)', () {
+    testWidgets(
+      'the computed info lines render as one compact block between the '
+      'header and the chip grid, each line wrapping in less than an 8 dp '
+      'vertical inset',
+      (tester) async {
+        final (_, _) = await _pump(
+          tester,
+          entries: scenarioEntries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        );
+
+        await tapCycleDay(tester, 3); // 9/9: baseline day — two facts
+
+        final block = find.byKey(const ValueKey('cycleSheetInfoBlock'));
+        expect(block, findsOneWidget, reason: 'the info lines share one block');
+        final headerRect = tester.getRect(find.text(dayLabelOf(9)));
+        final blockRect = tester.getRect(block);
+        final chipRect = tester.getRect(cycleSheetChip('cycleStart'));
+        expect(
+          blockRect.top,
+          greaterThan(headerRect.bottom),
+          reason: 'the info block follows the header row',
+        );
+        expect(
+          blockRect.bottom,
+          lessThan(chipRect.top),
+          reason: 'the info block precedes the chip grid',
+        );
+        expect(find.text('Baseline: 36.40'), findsOneWidget);
+        expect(find.text('Low measurement 5'), findsOneWidget);
+        final linePadding = tester.firstWidget<Padding>(
+          find.ancestor(
+            of: find.text('Baseline: 36.40'),
+            matching: find.byType(Padding),
+          ),
+        );
+        final insets = linePadding.padding as EdgeInsets;
+        expect(
+          insets.top,
+          lessThan(8),
+          reason: 'the per-line vertical inset carries less than 8 dp',
+        );
+      },
+    );
+
+    testWidgets(
+      "the tapped day's note renders as raw text at the very bottom of "
+      'the panel — newlines preserved verbatim',
+      (tester) async {
+        // A multi-line note: the panel must render the raw String — the
+        // chart band's newline folding stays a band concern alone.
+        final raw =
+            'Morning temp after a late night.\n\nSecond line, continued.';
+        final entries = [...scenarioEntries];
+        entries[4] = entries[4].copyWith(notes: raw);
+        final (_, _) = await _pump(tester, entries: entries);
+
+        await tapCycleDay(tester, 4); // 9/10, the noted day
+
+        final noteRow = find.byKey(const ValueKey('cycleSheetNote'));
+        expect(noteRow, findsOneWidget, reason: "the day's note row renders");
+        expect(
+          tester.widget<Text>(noteRow).data,
+          raw,
+          reason: 'the note text stays raw, line breaks intact',
+        );
+        // The very bottom: below the chip grid, no earlier position.
+        expect(
+          tester.getRect(noteRow).top,
+          greaterThan(tester.getRect(cycleSheetChip('suzMorning')).bottom),
+          reason: 'the note row sits below the chip grid',
+        );
+      },
+    );
+
+    testWidgets('a day without an entry renders no note row', (tester) async {
+      // Days 1–4 and 6–9 tracked; 9/5 keeps its chart column but no entry.
+      final entries = [
+        for (final date in [1, 2, 3, 4])
+          DailyEntry(date: scenarioDay(date), bbtC: 36.2),
+        for (final date in [6, 7, 8, 9])
+          DailyEntry(date: scenarioDay(date), bbtC: 36.5),
+      ];
+      final (_, _) = await _pump(tester, entries: entries);
+
+      await tapCycleDay(tester, 4); // 9/5: the untracked day
+
+      expect(cycleDayPanelEditButton(), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('cycleSheetNote')),
+        findsNothing,
+        reason: 'no entry for the day — no note row at all',
+      );
+    });
+
+    testWidgets('a whitespace-only note renders no note row', (tester) async {
+      final entries = [...scenarioEntries];
+      entries[4] = entries[4].copyWith(notes: '   ');
+      final (_, _) = await _pump(tester, entries: entries);
+
+      await tapCycleDay(tester, 4); // 9/10, the blank-note day
+
+      expect(
+        find.byKey(const ValueKey('cycleSheetNote')),
+        findsNothing,
+        reason: 'an empty note text shows nothing',
+      );
+    });
+  });
+
   group('ignoreTemperature toggle (the temperature-ignore mark)', () {
     testWidgets('tapping the exclusion chip places the ignoreTemperature mark '
         'through the MarksDao on ANY day; tapping again removes it', (
@@ -1656,9 +1752,6 @@ void main() {
         4,
       ); // 9/10 — an arbitrary day (chips on ANY day)
 
-      // The chip can sit below the panel fold — scroll it into view first
-      // (the helper used throughout for the bottom rows).
-      await scrollSheetTo(tester, cycleSheetChip('suzEvening'));
       await tester.tap(cycleSheetChip('suzEvening'));
       await tester.pumpAndSettle();
       expect(
@@ -1672,10 +1765,7 @@ void main() {
         reason: 'the evening chip renders selected',
       );
 
-      // Variant switch: placing the other variant removes the one present
-      // (scroll it into view first — the bottom chips can sit below the
-      // panel fold).
-      await scrollSheetTo(tester, cycleSheetChip('suzMorning'));
+      // Variant switch: placing the other variant removes the one present.
       await tester.tap(cycleSheetChip('suzMorning'));
       await tester.pumpAndSettle();
       expect(
@@ -2011,7 +2101,6 @@ void main() {
           faulty.failMarkWrites = true;
 
           await tapCycleDay(tester, 4); // 9/10, an unmarked arbitrary day
-          await scrollSheetTo(tester, cycleSheetChip('suzEvening'));
           await tester.tap(cycleSheetChip('suzEvening'));
           await tester.pumpAndSettle();
 
