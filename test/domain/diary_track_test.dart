@@ -24,7 +24,6 @@ void main() {
       () {
         final tracked = DiaryTrack.defaults.withTracked(DiaryItem.cervix, true);
         expect(tracked, const DiaryTrack(cervix: true));
-        expect(DiaryTrack.defaults, DiaryTrack.defaults);
         expect(
           tracked.withTracked(DiaryItem.cervix, false),
           DiaryTrack.defaults,

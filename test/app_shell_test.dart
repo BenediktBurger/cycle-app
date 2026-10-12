@@ -274,14 +274,14 @@ void main() {
     expect(
       find.textContaining('PIN'),
       findsNothing,
-      reason: 'the stub title ("PIN-Sperre (Platzhalter)") is gone',
+      reason: 'the settings pane carries no PIN-lock switch',
     );
     expect(
       find.textContaining('Noch nicht umgesetzt'),
       findsNothing,
       reason:
-          'the stub note is gone — probed independently of any '
-          'SwitchListTile count',
+          'no not-yet-implemented note exists anywhere on the pane — '
+          'probed by its text, independent of any SwitchListTile count',
     );
   });
 

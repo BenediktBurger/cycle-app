@@ -35,9 +35,7 @@ final class DiaryTrack {
   /// JSON-map form for the generic settings store (the exact shape the
   /// app_settings column holds).
   Map<String, Object?> toJson() => {
-    'mucus': mucus,
-    'cervix': cervix,
-    'sex': sex,
+    for (final item in DiaryItem.values) item.name: isTracked(item),
   };
 
   /// Restores a track map stored under [toJson]'s shape. Never throws:

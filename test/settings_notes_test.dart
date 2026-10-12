@@ -65,7 +65,7 @@ void main() {
       expect(
         find.textContaining('Not implemented yet'),
         findsNothing,
-        reason: 'the PIN-lock note is gone with the placeholder card',
+        reason: 'the pane carries no not-yet-implemented placeholder note',
       );
     },
   );
