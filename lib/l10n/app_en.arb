@@ -393,6 +393,10 @@
   "settingsRangeLower": "Lower limit",
   "settingsRangeUpper": "Upper limit",
   "settingsTemperatureRangeDefaultHint": "Default: 36–38 °C.",
+  "settingsTrackTitle": "What to track",
+  "settingsTrackMucus": "Mucus",
+  "settingsTrackCervix": "Cervix",
+  "settingsTrackSex": "Sex",
   "settingsObservedCyclesOutsideApp": "Cycles observed outside this app",
   "@settingsObservedCyclesOutsideApp": {
     "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."

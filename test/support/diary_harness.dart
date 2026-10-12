@@ -12,6 +12,7 @@
 //      800x600 viewport) and the bleeding-chip save + mark readback helpers.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
+import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
@@ -25,8 +26,10 @@ import 'viewport.dart';
 
 /// Entry-form selector scope: the real app over an in-memory database,
 /// language pinned to [locale] (German in every caller so the German token
-/// assertions hold).
-ProviderScope diarySelectorScope(Locale locale) => appScope(locale: locale);
+/// assertions hold). An entry-form section pinned off in the What-to-track
+/// defaults (cervix) can be re-shown for the tests that exercise it.
+ProviderScope diarySelectorScope(Locale locale, {DiaryTrack? diaryTrack}) =>
+    appScope(locale: locale, diaryTrack: diaryTrack);
 
 /// Reads the saved day back through the database provider — the same
 /// instance the entry form writes through, not a second connection.
@@ -66,6 +69,7 @@ class DiaryHarness {
   ProviderScope scope({
     Future<void> Function(CycleDatabase db)? seed,
     DateTime? selectedDay,
+    DiaryTrack? diaryTrack,
     CycleDatabase Function()? builder,
   }) => appScope(
     seed: seed,
@@ -73,6 +77,7 @@ class DiaryHarness {
     onCreated: (db) => this.db = db,
     now: () => now,
     selectedDay: selectedDay ?? this.selectedDay,
+    diaryTrack: diaryTrack,
     locale: const Locale('de'),
   );
 

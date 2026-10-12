@@ -15,6 +15,7 @@ import 'settings/paper_history_card.dart';
 import 'settings/pdf_export_card.dart';
 import 'settings/temperature_range_card.dart';
 import 'settings/theme_card.dart';
+import 'settings/what_to_track_card.dart';
 
 export 'settings/export_import_card.dart' show exportFileName;
 
@@ -54,6 +55,8 @@ class EinstellungenScreen extends ConsumerWidget {
           const ThemeModeCard(),
           const SizedBox(height: 8),
           const TemperatureRangeCard(),
+          const SizedBox(height: 8),
+          const WhatToTrackCard(),
           const SizedBox(height: 8),
           const ExportImportCard(),
           const SizedBox(height: 8),

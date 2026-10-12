@@ -25,6 +25,7 @@ import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'db/settings_store.dart';
 import 'domain/date_only.dart';
+import 'domain/diary_track.dart';
 import 'domain/marks.dart';
 import 'domain/models.dart';
 import 'domain/pdf_export_model.dart';
@@ -277,6 +278,20 @@ class PdfExportBirthDateNotifier extends _$PdfExportBirthDateNotifier
   void set(DateTime? value) => state = value;
 }
 
+/// The "Was aufzeichnen" configuration: which diary entry items (mucus /
+/// cervix / sex) show their entry options on the Tagebuch form. A later
+/// item (e.g. pain) joins through [DiaryTrack], not through a new provider.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class DiaryTrackNotifier extends _$DiaryTrackNotifier
+    implements SettableSetting<DiaryTrack> {
+  @override
+  DiaryTrack build() => DiaryTrack.defaults;
+  @override
+  void set(DiaryTrack value) => state = value;
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called
@@ -308,7 +323,7 @@ typedef SettingsWriteSink =
 /// The write contract every mutable settings notifier exposes — the
 /// sanctioned external write (`ref.read(xProvider.notifier).set(v)`),
 /// because riverpod annotates the Notifier `state` setter `@protected`.
-/// Implemented by all 14 Notifier classes below; the registrar's
+/// Implemented by all 15 Notifier classes in this file; the registrar's
 /// [PersistedSetting.bind] is generic over it.
 mixin SettableSetting<T> {
   /// The sanctioned external write for the provider this notifier backs.
@@ -430,6 +445,13 @@ final _persistedSettings = <PersistedSetting>[
     untouched: null,
     fromSnapshot: (snapshot) => snapshot.pdfExportBirthDate,
     persist: (store, value) => store.persistPdfExportBirthDate(value),
+  ),
+  PersistedSetting.bind(
+    provider: diaryTrackProvider,
+    notifier: diaryTrackProvider.notifier,
+    untouched: DiaryTrack.defaults,
+    fromSnapshot: (snapshot) => snapshot.diaryTrack,
+    persist: (store, value) => store.persistDiaryTrack(value),
   ),
   PersistedSetting.bind(
     provider: onboardingCompletedProvider,

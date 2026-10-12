@@ -6,6 +6,7 @@
 // default, which is exactly what the "system follows the device" tests rely
 // on (see locale_test.dart / theme_mode_setting_test.dart).
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
@@ -68,6 +69,7 @@ Override inMemoryDatabase({
 ///
 ///  - [locale]: the system language (the settings' "System" option),
 ///  - [themeMode]: follow the device brightness ("System"),
+///  - [diaryTrack]: the real What-to-track defaults (mucus/sex on),
 ///  - [now]: the real wall clock,
 ///  - [selectedDay]: today (the provider's real default),
 ///  - [entriesStream]: the provider's real database-backed stream (the
@@ -97,6 +99,7 @@ Override inMemoryDatabase({
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
+  DiaryTrack? diaryTrack,
   bool? onboardingCompleted,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
@@ -117,6 +120,7 @@ ProviderScope appScope({
       inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
       if (locale != null) localePin(locale),
       if (themeMode != null) themeModePin(themeMode),
+      if (diaryTrack != null) diaryTrackPin(diaryTrack),
       onboardingPin(onboardingCompleted ?? true),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null) selectedDatePin(selectedDay),

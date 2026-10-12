@@ -1195,6 +1195,85 @@ abstract class _$PdfExportBirthDateNotifier extends $Notifier<DateTime?> {
   }
 }
 
+/// The "Was aufzeichnen" configuration: which diary entry items (mucus /
+/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
+/// item is view-only — the form still loads and saves a stored day's
+/// values for it (lib/ui/diary.dart's visibility conditionals).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+@ProviderFor(DiaryTrackNotifier)
+final diaryTrackProvider = DiaryTrackNotifierProvider._();
+
+/// The "Was aufzeichnen" configuration: which diary entry items (mucus /
+/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
+/// item is view-only — the form still loads and saves a stored day's
+/// values for it (lib/ui/diary.dart's visibility conditionals).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+final class DiaryTrackNotifierProvider
+    extends $NotifierProvider<DiaryTrackNotifier, DiaryTrack> {
+  /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
+  /// cervix / sex) show their entry options on the Tagebuch form. Hiding an
+  /// item is view-only — the form still loads and saves a stored day's
+  /// values for it (lib/ui/diary.dart's visibility conditionals).
+  ///
+  /// Persisted exactly as [localeProvider] (registrar-table entry below).
+  DiaryTrackNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'diaryTrackProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$diaryTrackNotifierHash();
+
+  @$internal
+  @override
+  DiaryTrackNotifier create() => DiaryTrackNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DiaryTrack value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DiaryTrack>(value),
+    );
+  }
+}
+
+String _$diaryTrackNotifierHash() =>
+    r'323595ba462b269bc024b7c6b06687e3a38edeaf';
+
+/// The "Was aufzeichnen" configuration: which diary entry items (mucus /
+/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
+/// item is view-only — the form still loads and saves a stored day's
+/// values for it (lib/ui/diary.dart's visibility conditionals).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+abstract class _$DiaryTrackNotifier extends $Notifier<DiaryTrack> {
+  DiaryTrack build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<DiaryTrack, DiaryTrack>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<DiaryTrack, DiaryTrack>,
+              DiaryTrack,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called

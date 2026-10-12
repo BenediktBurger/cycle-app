@@ -8,6 +8,7 @@
 // these fixtures instead: a subclass of the production notifier whose
 // `build()` returns the seeded value.
 // The fixture factories' `Override` return type ships from the misc entry.
+import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:flutter/material.dart';
@@ -145,4 +146,16 @@ class _FixedPdfBirth extends PdfExportBirthDateNotifier {
 
   @override
   DateTime? build() => seed;
+}
+
+Override diaryTrackPin(DiaryTrack value) =>
+    diaryTrackProvider.overrideWith(() => _FixedDiaryTrack(value));
+
+class _FixedDiaryTrack extends DiaryTrackNotifier {
+  _FixedDiaryTrack(this.seed);
+
+  final DiaryTrack seed;
+
+  @override
+  DiaryTrack build() => seed;
 }

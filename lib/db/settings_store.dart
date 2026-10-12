@@ -17,6 +17,7 @@ import 'dart:ui' show Locale;
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../domain/date_only.dart';
+import '../domain/diary_track.dart';
 import '../domain/temperature_range.dart';
 import 'cycle_database.dart';
 
@@ -81,6 +82,12 @@ abstract final class SettingKeys {
   /// string or a corrupt row decodes to null. Hidden by the per-export
   /// anonymize toggle exactly like [pdfExportName].
   static const pdfExportBirthDate = 'pdfExport.birthDate';
+
+  /// Which diary entry items the user tracks (mucus / cervix / sex), as a
+  /// {"mucus":..,"cervix":..,"sex":..} JSON map (DiaryTrack.toJson). A
+  /// value that is not a JSON map keeps the default; the map form is
+  /// forgiving per item and ignores unknown future item keys.
+  static const diaryTrack = 'diaryTrack';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -98,6 +105,7 @@ final class PersistedSettings {
     this.onboardingCompleted = false,
     this.pdfExportName,
     this.pdfExportBirthDate,
+    this.diaryTrack = DiaryTrack.defaults,
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -142,6 +150,10 @@ final class PersistedSettings {
   /// when unset. Hidden in the generated document like [pdfExportName].
   final DateTime? pdfExportBirthDate;
 
+  /// Which diary entry items are tracked ("Was aufzeichnen" card); drives
+  /// the Tagebuch entry form's section visibility.
+  final DiaryTrack diaryTrack;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
@@ -154,7 +166,8 @@ final class PersistedSettings {
           earliestFirstHigherCycleDayOutsideApp &&
       other.onboardingCompleted == onboardingCompleted &&
       other.pdfExportName == pdfExportName &&
-      other.pdfExportBirthDate == pdfExportBirthDate;
+      other.pdfExportBirthDate == pdfExportBirthDate &&
+      other.diaryTrack == diaryTrack;
 
   @override
   int get hashCode => Object.hash(
@@ -167,6 +180,7 @@ final class PersistedSettings {
     onboardingCompleted,
     pdfExportName,
     pdfExportBirthDate,
+    diaryTrack,
   );
 }
 
@@ -195,6 +209,7 @@ final class SettingsStore {
     var onboardingCompleted = false;
     String? pdfExportName;
     DateTime? pdfExportBirthDate;
+    var diaryTrack = DiaryTrack.defaults;
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -225,6 +240,10 @@ final class SettingsStore {
             pdfExportName = _pdfExportNameFromStored(decoded);
           case SettingKeys.pdfExportBirthDate:
             pdfExportBirthDate = _pdfExportBirthDateFromStored(decoded);
+          case SettingKeys.diaryTrack:
+            if (decoded is Map<String, Object?>) {
+              diaryTrack = DiaryTrack.fromJson(decoded);
+            }
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -242,6 +261,7 @@ final class SettingsStore {
       onboardingCompleted: onboardingCompleted,
       pdfExportName: pdfExportName,
       pdfExportBirthDate: pdfExportBirthDate,
+      diaryTrack: diaryTrack,
     );
   }
 
@@ -344,6 +364,11 @@ final class SettingsStore {
     SettingKeys.pdfExportBirthDate,
     birthDate == null ? null : formatIsoDate(birthDate),
   );
+
+  /// Persists the diary-track family as its JSON map (one row for all
+  /// items).
+  Future<void> persistDiaryTrack(DiaryTrack track) =>
+      writeSetting(SettingKeys.diaryTrack, track.toJson());
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code

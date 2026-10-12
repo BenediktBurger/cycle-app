@@ -16,6 +16,7 @@
 // prefix changed.
 
 import 'package:cycle_app/domain/cervix.dart';
+import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/ui/diary.dart';
@@ -38,6 +39,10 @@ import 'support/error_collector.dart';
 
 // The tests call diarySelectorScope (support/diary_harness.dart) directly —
 // the one-hundred-percent alias this file used to carry is gone.
+
+// The cervix pickers sit behind the What-to-track setting (cervix off by
+// default), so the cervix sections below pin that item on.
+const _cervixTracked = DiaryTrack(cervix: true);
 
 // Widget test of the Muttermund (cervix) observation on the Tagebuch entry
 // form: the position (tief … unerreichbar) and the opening
@@ -165,7 +170,9 @@ void main() {
   testWidgets('Muttermund position and opening are offered and persist', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+    await tester.pumpWidget(
+      diarySelectorScope(const Locale('de'), diaryTrack: _cervixTracked),
+    );
     await tester.pumpAndSettle();
 
     // The pickers are offered with the German vocabulary (pinned locale).
@@ -219,7 +226,9 @@ void main() {
   testWidgets('the opening chips show the ruleset glyph beside their label', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+    await tester.pumpWidget(
+      diarySelectorScope(const Locale('de'), diaryTrack: _cervixTracked),
+    );
     await tester.pumpAndSettle();
 
     const openingVocabulary = {
@@ -333,7 +342,9 @@ void main() {
   testWidgets('firmness options are offered and a selection persists', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+    await tester.pumpWidget(
+      diarySelectorScope(const Locale('de'), diaryTrack: _cervixTracked),
+    );
     await tester.pumpAndSettle();
 
     // The firmness vocabulary (paper shorthand h / h-w / w as the chip
@@ -381,7 +392,9 @@ void main() {
   testWidgets('tapping the selected firmness again deselects it', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(diarySelectorScope(const Locale('de')));
+    await tester.pumpWidget(
+      diarySelectorScope(const Locale('de'), diaryTrack: _cervixTracked),
+    );
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(diaryChip('cervixFirmness', 'hard'));
