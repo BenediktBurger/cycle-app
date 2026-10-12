@@ -340,6 +340,7 @@
   "settingsTrackMucus": "Zervixschleim",
   "settingsTrackCervix": "Muttermund",
   "settingsTrackSex": "Sex",
+  "settingsTrackPain": "Schmerzen",
   "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
   "@settingsObservedCyclesOutsideApp": {
     "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."

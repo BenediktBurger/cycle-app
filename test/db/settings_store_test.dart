@@ -438,7 +438,7 @@ void main() {
       await store.persistDiaryTrack(tracked);
       expect(
         await db.settingsDao.readValue(SettingKeys.diaryTrack),
-        '{"mucus":false,"cervix":true,"sex":false}',
+        '{"mucus":false,"cervix":true,"sex":false,"pain":true}',
         reason: 'the value column stores the JSON map, exactly',
       );
       final snapshot = await store.load();
@@ -475,11 +475,23 @@ void main() {
     test('unknown item keys in a stored map are ignored', () async {
       await seedRaw(
         SettingKeys.diaryTrack,
-        '{"mucus":true,"cervix":true,"sex":false,"pain":true}',
+        '{"mucus":true,"cervix":true,"sex":false,"flow":true}',
       );
       expect(
         (await store.load()).diaryTrack,
         const DiaryTrack(mucus: true, cervix: true, sex: false),
+      );
+    });
+
+    test('a pre-pain row without the pain key decodes pain tracked', () async {
+      await seedRaw(
+        SettingKeys.diaryTrack,
+        '{"mucus":false,"cervix":true,"sex":false}',
+      );
+      expect(
+        (await store.load()).diaryTrack.pain,
+        isTrue,
+        reason: 'a stored map predating the pain item keeps pain visible',
       );
     });
 

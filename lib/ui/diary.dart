@@ -809,27 +809,29 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              // --- pain toggles ----------------------------------------
-              Text(l10n.termPain),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  FilterChip(
-                    key: const ValueKey('painChip-breast'),
-                    label: Text(l10n.termBreastPain),
-                    selected: _painBreast,
-                    onSelected: (v) => setState(() => _painBreast = v),
-                  ),
-                  FilterChip(
-                    key: const ValueKey('painChip-mittelschmerz'),
-                    label: Text(l10n.termMittelschmerz),
-                    selected: _painMittelschmerz,
-                    onSelected: (v) => setState(() => _painMittelschmerz = v),
-                  ),
-                ],
-              ),
+              if (track.pain) ...[
+                // --- pain toggles ----------------------------------------
+                Text(l10n.termPain),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    FilterChip(
+                      key: const ValueKey('painChip-breast'),
+                      label: Text(l10n.termBreastPain),
+                      selected: _painBreast,
+                      onSelected: (v) => setState(() => _painBreast = v),
+                    ),
+                    FilterChip(
+                      key: const ValueKey('painChip-mittelschmerz'),
+                      label: Text(l10n.termMittelschmerz),
+                      selected: _painMittelschmerz,
+                      onSelected: (v) => setState(() => _painMittelschmerz = v),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               // --- notes ------------------------------------------------
               TextFormField(

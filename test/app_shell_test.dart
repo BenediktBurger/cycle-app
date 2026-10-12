@@ -253,8 +253,10 @@ void main() {
     WidgetTester tester,
   ) async {
     // Whole-pane surface: the pane's lazy list builds everything it
-    // carries, so the absence probes below need no scrolling.
-    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    // carries, so the absence probes below need no scrolling. The height
+    // clears the pane with all track switches, so the closing note that
+    // anchors the guard stays built.
+    await tester.binding.setSurfaceSize(const Size(900, 2600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();

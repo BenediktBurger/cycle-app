@@ -4,32 +4,60 @@
 /// day's values for a hidden item (lib/ui/diary.dart).
 ///
 /// One value for the whole family, one JSON map under one settings key:
-/// a later item (e.g. pain) joins by adding one enum value, one field and
-/// one decoder default here. A stored map missing a later-added key
-/// decodes to the new item's default; unknown item keys are ignored.
-enum DiaryItem { mucus, cervix, sex }
+/// a later item joins by adding one enum value, one field and one decoder
+/// default here. A stored map missing a later-added key decodes to the new
+/// item's default; unknown item keys are ignored.
+enum DiaryItem { mucus, cervix, sex, pain }
 
 final class DiaryTrack {
-  const DiaryTrack({this.mucus = true, this.cervix = false, this.sex = true});
+  const DiaryTrack({
+    this.mucus = true,
+    this.cervix = false,
+    this.sex = true,
+    this.pain = true,
+  });
 
   static const DiaryTrack defaults = DiaryTrack();
 
   final bool mucus;
   final bool cervix;
   final bool sex;
+  final bool pain;
 
   bool isTracked(DiaryItem item) => switch (item) {
     DiaryItem.mucus => mucus,
     DiaryItem.cervix => cervix,
     DiaryItem.sex => sex,
+    DiaryItem.pain => pain,
   };
 
   /// A copy with exactly one item's tracking flipped — the write the
   /// settings card's switches issue.
   DiaryTrack withTracked(DiaryItem item, bool tracked) => switch (item) {
-    DiaryItem.mucus => DiaryTrack(mucus: tracked, cervix: cervix, sex: sex),
-    DiaryItem.cervix => DiaryTrack(mucus: mucus, cervix: tracked, sex: sex),
-    DiaryItem.sex => DiaryTrack(mucus: mucus, cervix: cervix, sex: tracked),
+    DiaryItem.mucus => DiaryTrack(
+      mucus: tracked,
+      cervix: cervix,
+      sex: sex,
+      pain: pain,
+    ),
+    DiaryItem.cervix => DiaryTrack(
+      mucus: mucus,
+      cervix: tracked,
+      sex: sex,
+      pain: pain,
+    ),
+    DiaryItem.sex => DiaryTrack(
+      mucus: mucus,
+      cervix: cervix,
+      sex: tracked,
+      pain: pain,
+    ),
+    DiaryItem.pain => DiaryTrack(
+      mucus: mucus,
+      cervix: cervix,
+      sex: sex,
+      pain: tracked,
+    ),
   };
 
   /// JSON-map form for the generic settings store (the exact shape the
@@ -45,6 +73,7 @@ final class DiaryTrack {
     mucus: _boolOr(json['mucus'], true),
     cervix: _boolOr(json['cervix'], false),
     sex: _boolOr(json['sex'], true),
+    pain: _boolOr(json['pain'], true),
   );
 
   static bool _boolOr(Object? value, bool fallback) =>
@@ -55,8 +84,9 @@ final class DiaryTrack {
       other is DiaryTrack &&
       other.mucus == mucus &&
       other.cervix == cervix &&
-      other.sex == sex;
+      other.sex == sex &&
+      other.pain == pain;
 
   @override
-  int get hashCode => Object.hash(mucus, cervix, sex);
+  int get hashCode => Object.hash(mucus, cervix, sex, pain);
 }

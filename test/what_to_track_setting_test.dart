@@ -51,6 +51,11 @@ void main() {
         reason: 'cervix defaults to NOT tracked',
       );
       expect(switchState(tester, DiaryItem.sex), isTrue);
+      expect(
+        switchState(tester, DiaryItem.pain),
+        isTrue,
+        reason: 'pain defaults to tracked',
+      );
     });
   });
 
@@ -83,7 +88,8 @@ void main() {
         'mucus': false,
         'cervix': true,
         'sex': true,
-      }, reason: 'both flips must land in the one diaryTrack JSON row');
+        'pain': true,
+      }, reason: 'all flips must land in the one diaryTrack JSON row');
     });
   });
 
@@ -95,7 +101,12 @@ void main() {
 
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistDiaryTrack(
-            const DiaryTrack(mucus: false, cervix: true, sex: false),
+            const DiaryTrack(
+              mucus: false,
+              cervix: true,
+              sex: false,
+              pain: false,
+            ),
           );
 
       await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
@@ -107,6 +118,7 @@ void main() {
       expect(switchState(tester, DiaryItem.mucus), isFalse);
       expect(switchState(tester, DiaryItem.cervix), isTrue);
       expect(switchState(tester, DiaryItem.sex), isFalse);
+      expect(switchState(tester, DiaryItem.pain), isFalse);
     });
 
     testWidgets('hydration cannot clobber a live switch choice', (

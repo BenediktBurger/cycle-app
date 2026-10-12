@@ -1196,9 +1196,8 @@ abstract class _$PdfExportBirthDateNotifier extends $Notifier<DateTime?> {
 }
 
 /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
-/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
-/// item is view-only — the form still loads and saves a stored day's
-/// values for it (lib/ui/diary.dart's visibility conditionals).
+/// cervix / sex / pain) show their entry options on the Tagebuch form. A
+/// later item joins through [DiaryTrack], not through a new provider.
 ///
 /// Persisted exactly as [localeProvider] (registrar-table entry below).
 
@@ -1206,17 +1205,15 @@ abstract class _$PdfExportBirthDateNotifier extends $Notifier<DateTime?> {
 final diaryTrackProvider = DiaryTrackNotifierProvider._();
 
 /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
-/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
-/// item is view-only — the form still loads and saves a stored day's
-/// values for it (lib/ui/diary.dart's visibility conditionals).
+/// cervix / sex / pain) show their entry options on the Tagebuch form. A
+/// later item joins through [DiaryTrack], not through a new provider.
 ///
 /// Persisted exactly as [localeProvider] (registrar-table entry below).
 final class DiaryTrackNotifierProvider
     extends $NotifierProvider<DiaryTrackNotifier, DiaryTrack> {
   /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
-  /// cervix / sex) show their entry options on the Tagebuch form. Hiding an
-  /// item is view-only — the form still loads and saves a stored day's
-  /// values for it (lib/ui/diary.dart's visibility conditionals).
+  /// cervix / sex / pain) show their entry options on the Tagebuch form. A
+  /// later item joins through [DiaryTrack], not through a new provider.
   ///
   /// Persisted exactly as [localeProvider] (registrar-table entry below).
   DiaryTrackNotifierProvider._()
@@ -1250,9 +1247,8 @@ String _$diaryTrackNotifierHash() =>
     r'323595ba462b269bc024b7c6b06687e3a38edeaf';
 
 /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
-/// cervix / sex) show their entry options on the Tagebuch form. Hiding an
-/// item is view-only — the form still loads and saves a stored day's
-/// values for it (lib/ui/diary.dart's visibility conditionals).
+/// cervix / sex / pain) show their entry options on the Tagebuch form. A
+/// later item joins through [DiaryTrack], not through a new provider.
 ///
 /// Persisted exactly as [localeProvider] (registrar-table entry below).
 

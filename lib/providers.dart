@@ -279,8 +279,8 @@ class PdfExportBirthDateNotifier extends _$PdfExportBirthDateNotifier
 }
 
 /// The "Was aufzeichnen" configuration: which diary entry items (mucus /
-/// cervix / sex) show their entry options on the Tagebuch form. A later
-/// item (e.g. pain) joins through [DiaryTrack], not through a new provider.
+/// cervix / sex / pain) show their entry options on the Tagebuch form. A
+/// later item joins through [DiaryTrack], not through a new provider.
 ///
 /// Persisted exactly as [localeProvider] (registrar-table entry below).
 @Riverpod(keepAlive: true)

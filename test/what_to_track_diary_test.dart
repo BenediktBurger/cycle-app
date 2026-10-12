@@ -34,9 +34,8 @@ Future<DailyEntry> storedDay(WidgetTester tester) async {
 
 void main() {
   group('default configuration renders the form', () {
-    testWidgets('mucus and sex chips show, the cervix pickers stay hidden', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('mucus, sex and pain chips show, the cervix pickers stay '
+        'hidden', (WidgetTester tester) async {
       useTallSurface(tester);
       await tester.pumpWidget(_harness.scope());
       await tester.pumpAndSettle();
@@ -51,6 +50,12 @@ void main() {
         findsOneWidget,
         reason: 'sex is tracked by default — its chips show',
       );
+      expect(
+        find.byKey(const ValueKey('painChip-breast')),
+        findsOneWidget,
+        reason: 'pain is tracked by default — its chips show',
+      );
+      expect(find.text('Schmerzen'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('cervixPositionChip-low')),
         findsNothing,
@@ -113,6 +118,35 @@ void main() {
       );
       expect(positionTop.dy < openingTop.dy, isTrue);
       expect(openingTop.dy < firmnessTop.dy, isTrue);
+    });
+  });
+
+  group('pain untracked', () {
+    testWidgets('the pain chips stay hidden; mucus and sex are unaffected', (
+      WidgetTester tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        _harness.scope(diaryTrack: const DiaryTrack(pain: false)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('painChip-breast')),
+        findsNothing,
+        reason: 'pain untracked — the section stays hidden',
+      );
+      expect(
+        find.byKey(const ValueKey('painChip-mittelschmerz')),
+        findsNothing,
+      );
+      expect(find.text('Schmerzen'), findsNothing);
+
+      expect(find.byKey(const ValueKey('mucusSignChip-unset')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('sexTimingChip-morning')),
+        findsOneWidget,
+      );
     });
   });
 
@@ -224,6 +258,34 @@ void main() {
             'sex timings must not be zeroed by a save with the section '
             'hidden',
       );
+    });
+
+    testWidgets('a stored pain pair survives a save with the section hidden', (
+      WidgetTester tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        _harness.scope(
+          diaryTrack: const DiaryTrack(pain: false),
+          seed: (db) => db.entriesDao.upsertDaily(
+            DailyEntry(date: _day, painBreast: true, painMittelschmerz: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('painChip-breast')), findsNothing);
+      await tester.tap(diarySaveButton());
+      await tester.pumpAndSettle();
+
+      final stored = await storedDay(tester);
+      expect(
+        stored.painBreast,
+        isTrue,
+        reason:
+            'hiding the pain section must not null the stored flags on save',
+      );
+      expect(stored.painMittelschmerz, isTrue);
     });
   });
 }

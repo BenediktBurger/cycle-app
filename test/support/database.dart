@@ -69,7 +69,7 @@ Override inMemoryDatabase({
 ///
 ///  - [locale]: the system language (the settings' "System" option),
 ///  - [themeMode]: follow the device brightness ("System"),
-///  - [diaryTrack]: the real What-to-track defaults (mucus/sex on),
+///  - [diaryTrack]: the real What-to-track defaults (mucus/sex/pain on),
 ///  - [now]: the real wall clock,
 ///  - [selectedDay]: today (the provider's real default),
 ///  - [entriesStream]: the provider's real database-backed stream (the

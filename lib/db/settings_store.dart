@@ -83,10 +83,10 @@ abstract final class SettingKeys {
   /// anonymize toggle exactly like [pdfExportName].
   static const pdfExportBirthDate = 'pdfExport.birthDate';
 
-  /// Which diary entry items the user tracks (mucus / cervix / sex), as a
-  /// {"mucus":..,"cervix":..,"sex":..} JSON map (DiaryTrack.toJson). A
-  /// value that is not a JSON map keeps the default; the map form is
-  /// forgiving per item and ignores unknown future item keys.
+  /// Which diary entry items the user tracks (mucus / cervix / sex / pain),
+  /// as a {"mucus":..,"cervix":..,"sex":..,"pain":..} JSON map
+  /// (DiaryTrack.toJson). A value that is not a JSON map keeps the default;
+  /// the map form is forgiving per item and ignores unknown future item keys.
   static const diaryTrack = 'diaryTrack';
 }
 

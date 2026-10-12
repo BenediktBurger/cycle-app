@@ -47,5 +47,6 @@ final class WhatToTrackCard extends ConsumerWidget {
     DiaryItem.mucus => l10n.settingsTrackMucus,
     DiaryItem.cervix => l10n.settingsTrackCervix,
     DiaryItem.sex => l10n.settingsTrackSex,
+    DiaryItem.pain => l10n.settingsTrackPain,
   };
 }
