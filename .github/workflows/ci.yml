@@ -151,6 +151,78 @@ jobs:
       - name: Build Android (debug)
         run: flutter build apk --debug --target-platform android-arm64
 
+  # Unsigned iOS Simulator build — the way to run the app on iOS without an
+  # Apple account or signing. Deliberately non-blocking while the iOS
+  # release workstream (docs/release.md Phase G) has not seriously started;
+  # making it required means adding this job to ci-status's needs and
+  # dropping the continue-on-error below.
+  build-ios:
+    # macOS is the only runner with Xcode, which the Simulator target needs.
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      # Restore-keys match by string prefix; the pin hash leads the key so
+      # the prefix can match, and an SDK bump restores nothing by design —
+      # a pub cache built under a different SDK would be stale.
+      - name: Restore pub cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-${{ hashFiles('tool/flutter-version') }}-
+
+      # The pinned Flutter version lives in tool/flutter-version (one bare
+      # version line under comments) and is read directly — the same file the
+      # F-Droid build recipe parses from each built commit, with the same
+      # parse. Shell expansion IS possible here: it runs in this run step,
+      # then is rendered into the action input below via ${{ }}; the literal
+      # flutter-version input is gone, so a Flutter bump edits
+      # tool/flutter-version ONLY. (Deliberately no `set -o pipefail`: a
+      # comment-only pin file must fail in the guards below, not abort
+      # silently inside the pipeline.)
+      - name: Resolve the pinned Flutter version (same parse as the F-Droid recipe)
+        id: flutter-pin
+        run: |
+          pinned="$(grep -v '^#' tool/flutter-version | tail -n 1)"
+          [ -n "$pinned" ] || { echo "tool/flutter-version has no non-comment version line"; exit 1; }
+          [[ "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tool/flutter-version pins '$pinned', expected a bare X.Y.Z version (inline-comment contamination or whitespace/CRLF?)"; exit 1; }
+          echo "Resolved Flutter pin: $pinned"   # informational, not a gate
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ steps.flutter-pin.outputs.pinned }}
+          # SDK cache keyed on version+channel: the same pin restores one
+          # shared download across the workflows.
+          cache: true
+          # Same 'false' pub-cache semantics as the main job.
+          pub-cache: 'false'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Unsigned simulator-target debug build: no Apple account or signing
+      # involved. Yields build/ios/iphonesimulator/Runner.app, which the
+      # Xcode iOS Simulator can run directly. Any signed device/TestFlight
+      # build is a separate future concern.
+      - name: Build iOS (simulator, debug)
+        run: flutter build ios --simulator --debug
+
+      # ditto preserves .app bundle internals (resource forks, symlinks,
+      # permissions) that a naive zip would mangle; the artifact is
+      # downloaded, unzipped, and dragged into the Xcode Simulator.
+      - name: Package the simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app ios-simulator-app.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-simulator-app
+          path: ios-simulator-app.zip
+          if-no-files-found: error
+
   # Re-runs the date-label tests on a UTC-negative host: date labels are
   # computed from UTC-midnight dates formatted verbatim, so nothing may
   # shift them into the host timezone (a toLocal() there reads the wrong
