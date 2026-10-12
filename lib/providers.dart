@@ -13,8 +13,6 @@
 // change back to that table. The settings themselves are @riverpod
 // Notifier providers in this file; their only sanctioned external write
 // is the notifier's `set` member.
-//
-// The PIN lock stub (Settings screen) is non-functional and local.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ProviderBase/Refreshable (the registrar bind's parameter types) ship from

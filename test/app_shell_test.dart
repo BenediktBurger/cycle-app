@@ -249,40 +249,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
-  testWidgets('PIN lock stub is visible and non-interactive', (
+  testWidgets('the settings pane carries no PIN-lock surface', (
     WidgetTester tester,
   ) async {
-    // The stub must be visibly NOT interactive (onChanged: null) — flipping
-    // it would falsely signal an existing protection (ADR-0005).
+    // Whole-pane surface: the pane's lazy list builds everything it
+    // carries, so the absence probes below need no scrolling.
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Einstellungen'));
     await tester.pumpAndSettle();
 
-    // The settings list keeps growing with the data it carries: the PIN
-    // stub can sit below the scroll's initial cache extent, so bring the
-    // list down until the stub renders instead of pinning a drag amount.
-    var guard = 0;
-    while (tester
-            .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-            .length <
-        2) {
-      guard++;
-      assert(
-        guard < 10,
-        'the settings pane never revealed the PIN stub surface',
-      );
-      await tester.drag(find.byType(ListView).first, const Offset(0, -600));
-      await tester.pumpAndSettle();
-    }
+    // Guard that the pane's bottom IS on the surface — otherwise the
+    // absence probes below would silently survey only a truncated pane.
+    expect(
+      find.textContaining('GitHub-Issue'),
+      findsOneWidget,
+      reason:
+          'the closing feedback note is on the surface, so the '
+          'absence probes surveyed the whole pane',
+    );
 
-    // The PIN stub is the FIRST switch on the pane (the PDF-export card's
-    // anonymize toggle renders after the data-entry cards).
-    final pinSwitch = tester
-        .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-        .first;
-    expect(pinSwitch.value, isFalse);
-    expect(pinSwitch.onChanged, isNull);
+    expect(
+      find.textContaining('PIN'),
+      findsNothing,
+      reason: 'the stub title ("PIN-Sperre (Platzhalter)") is gone',
+    );
+    expect(
+      find.textContaining('Noch nicht umgesetzt'),
+      findsNothing,
+      reason:
+          'the stub note is gone — probed independently of any '
+          'SwitchListTile count',
+    );
   });
 
   testWidgets('phone portrait: the save snackbar never drapes the bottom '

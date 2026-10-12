@@ -1,6 +1,6 @@
 // Einstellungen screen: language and theme-mode switchers, the
-// temperature range, paper history, the PIN-lock stub (ADR-0005), JSON
-// export/import, PDF export and the drip CSV import.
+// temperature range, paper history, the JSON export/import, PDF export and
+// the drip CSV import.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -54,30 +54,6 @@ class EinstellungenScreen extends ConsumerWidget {
           const ThemeModeCard(),
           const SizedBox(height: 8),
           const TemperatureRangeCard(),
-          const SizedBox(height: 8),
-          // --- PIN lock stub -------------------------------------------
-          // Disabled ON PURPOSE: flipping it on would falsely signal that a
-          // lock exists (at-rest encryption is already always-on on
-          // native, ADR-005; the user-facing lock story is open).
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SwitchListTile.adaptive(
-                    value: false,
-                    onChanged: null,
-                    title: Text(l10n.settingsPinLock),
-                  ),
-                  Text(
-                    l10n.settingsPinLockNote,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
           const ExportImportCard(),
           const SizedBox(height: 8),

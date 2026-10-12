@@ -1,8 +1,7 @@
 // Widget test of the settings pane's note texts: the three "saved in the
 // app's local storage" notes under the language, theme-mode and
 // temperature-range cards are gone (users expect settings to persist), and
-// the temperature-range card keeps only the useful default hint. The
-// PIN-lock note (a real "not yet implemented" explanation) stays untouched.
+// the temperature-range card keeps only the useful default hint.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,8 +49,7 @@ void main() {
       );
 
       // The temperature-range card keeps the useful default measurement as
-      // its only note. The PIN stub sits below the first screenful, so the
-      // lazy list needs one scroll first.
+      // its only note.
       expect(
         find.text('Default: 36–38 °C.'),
         findsOneWidget,
@@ -60,22 +58,14 @@ void main() {
             'on the temperature-range card',
       );
 
-      // Probe the note BODY, not the card title ("PIN lock (placeholder)"):
-      // the title is incidental text that a textContaining('PIN lock') probe
-      // would match even if the note were gone.
-      final pinNote = find.textContaining('Not implemented yet');
-      await tester.dragUntilVisible(
-        pinNote,
-        cycleListScroller(),
-        const Offset(0, -300),
-      );
-      await tester.pumpAndSettle();
+      // The feedback notice is the pane's last card — its presence proves
+      // the surface held the whole pane, so the absence probe did not
+      // silently survey a truncated list.
+      expect(find.textContaining('GitHub issue'), findsOneWidget);
       expect(
-        pinNote,
-        findsOneWidget,
-        reason:
-            'the PIN-lock note (a real "not yet implemented" '
-            'explanation) stays untouched',
+        find.textContaining('Not implemented yet'),
+        findsNothing,
+        reason: 'the PIN-lock note is gone with the placeholder card',
       );
     },
   );
