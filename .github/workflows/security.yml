@@ -27,7 +27,7 @@ permissions:
 jobs:
   dependency-vulnerabilities-osv:
     name: Dependency vulnerabilities (OSV)
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.6.0"
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0"
     with:
       # Guard: scanner failures and findings do not fail the workflow yet.
       # Flip this to true (blocking) after the first clean run.
