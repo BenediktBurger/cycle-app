@@ -56,11 +56,9 @@ double get pdfGridRightEdge =>
 /// row: the curve block is plot-only (the former caption row above the
 /// plot is removed) and the temperature naming lives on the numeric value
 /// row's rail legend "Temperatur in °C" BELOW the plot (cycle_pdf.dart's
-/// value row). The app chart's rail renders the
-/// identical label convention (lib/ui/cycle.dart's frozen rail,
-/// temperature-scale slot) — the two implementations are deliberately
-/// separate (pdf_axis labels the PDF rail, the chart rail renders its own
-/// labels), so keep the unit-suffix styling in sync by eye on both sides.
+/// value row). The app chart's rail renders a different convention: bare
+/// half-degree numerals with a single small °C line under the topmost
+/// label — nothing to keep in sync here by eye.
 ///
 /// RAIL WIDTH: the suffix needs no wider rail — the widest label
 /// ("37,5 °C") still fits comfortably into [pdfRailWidth] at the rail's
