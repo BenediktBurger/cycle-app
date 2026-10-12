@@ -1,16 +1,22 @@
 name: CI
 
-# ADR-0006: correctness gate for hand-written code — analyze, dart format,
-# and test on every push/PR; a web build plus an Android debug build compile
+# Correctness gate for hand-written code — analyze, dart format,
+# and test on every PR or push to main; a web build plus an Android debug build compile
 # both shipping targets; a build_runner re-run must leave every committed
-# *.g.dart file untouched. development is the primary integration line, main
-# the release line. Manual runs for convenience.
+# *.g.dart file untouched. main is the primary integration line.
+# The OSV dependency scan runs here too, by calling
+# .github/workflows/security.yml.
+# ci-status is the single branch-protection required check;
+# every other job is gated through it.
+# Manual runs for convenience.
 on:
   push:
     branches: [main, development]
   pull_request:
-    branches: [main, development]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 # Superseded runs of the same branch are cancelled to save runner minutes.
 concurrency:
@@ -202,3 +208,35 @@ jobs:
           test/dialog_and_shell_lifecycle_test.dart
           test/statistics_screen_test.dart
           test/domain/pdf_export_model_test.dart
+
+  # The OSV scan runs as a job in this workflow's DAG — a required check can
+  # only wait on jobs declared in the same workflow's `needs` graph.
+  dependency-vulnerabilities-osv:
+    name: Dependency vulnerabilities (OSV)
+    uses: ./.github/workflows/security.yml
+    with:
+      # Fork PRs get a read-only token; the Code-scanning upload 403s and
+      # fails the called workflow's step (codeql-action has no fork skip),
+      # so it is switched off there. The scan still gates via
+      # fail-on-vuln; results remain in the run's artifacts.
+      upload-sarif: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+    # Caller's grant is the upper bound for the called workflow's token;
+    # mirror security.yml's permissions so the SARIF upload works.
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
+
+  # Single branch-protection required check: GitHub merges a PR whose
+  # required check is skipped, so this job must always run and post a
+  # verdict — `if: always()` plus an explicit failure check, never a bare
+  # `needs:` alone.
+  ci-status:
+    name: CI status
+    needs: [analyze-test-build, test-on-utc-negative-host, dependency-vulnerabilities-osv]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on failure or cancellation
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
