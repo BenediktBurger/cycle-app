@@ -162,6 +162,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # Restore-keys match by string prefix; the pin hash leads the key so
       # the prefix can match, and an SDK bump restores nothing by design —
