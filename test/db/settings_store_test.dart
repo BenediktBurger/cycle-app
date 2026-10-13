@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 
 void main() {
@@ -423,6 +424,97 @@ void main() {
               'and must replay the welcome page rather than skip it',
         );
       }
+    });
+  });
+
+  group('what to track (diary section visibility family)', () {
+    test('an empty table loads to the diary-track defaults', () async {
+      final snapshot = await store.load();
+      expect(snapshot.diaryTrack, DiaryTrack.defaults);
+    });
+
+    test('the track map round-trips under its key', () async {
+      const tracked = DiaryTrack(mucus: false, cervix: true, sex: false);
+      await store.persistDiaryTrack(tracked);
+      expect(
+        await db.settingsDao.readValue(SettingKeys.diaryTrack),
+        '{"mucus":false,"cervix":true,"sex":false,"pain":true}',
+        reason: 'the value column stores the JSON map, exactly',
+      );
+      final snapshot = await store.load();
+      expect(snapshot.diaryTrack, tracked);
+      expect(await db.select(db.appSettings).get(), hasLength(1));
+    });
+
+    test(
+      'a corrupt or mistyped row degrades item-by-item to the defaults',
+      () async {
+        final expectations = <(String, DiaryTrack)>[
+          ('"opaque string"', DiaryTrack.defaults), // string, not a map
+          ('garbage{', DiaryTrack.defaults), // not JSON at all
+          ('[true,false,true]', DiaryTrack.defaults), // list, not an object
+          // Only the mistyped item degrades; the valid ones stand.
+          ('{"mucus":"yes","cervix":true}', const DiaryTrack(cervix: true)),
+          ('{"mucus":true,"cervix":2}', const DiaryTrack(mucus: true)),
+          (
+            '{"mucus":true,"cervix":true,"sex":"x"}',
+            const DiaryTrack(mucus: true, cervix: true),
+          ),
+        ];
+        for (final (raw, expected) in expectations) {
+          await seedRaw(SettingKeys.diaryTrack, raw);
+          expect(
+            (await store.load()).diaryTrack,
+            expected,
+            reason: 'corrupt stored value "$raw" must not surface an error',
+          );
+        }
+      },
+    );
+
+    test('unknown item keys in a stored map are ignored', () async {
+      await seedRaw(
+        SettingKeys.diaryTrack,
+        '{"mucus":true,"cervix":true,"sex":false,"flow":true}',
+      );
+      expect(
+        (await store.load()).diaryTrack,
+        const DiaryTrack(mucus: true, cervix: true, sex: false),
+      );
+    });
+
+    test('a pre-pain row without the pain key decodes pain tracked', () async {
+      await seedRaw(
+        SettingKeys.diaryTrack,
+        '{"mucus":false,"cervix":true,"sex":false}',
+      );
+      expect(
+        (await store.load()).diaryTrack.pain,
+        isTrue,
+        reason: 'a stored map predating the pain item keeps pain visible',
+      );
+    });
+
+    test('a partially typed row keeps its valid items', () async {
+      await seedRaw(SettingKeys.diaryTrack, '{"cervix":true,"sex":false}');
+      expect(
+        (await store.load()).diaryTrack,
+        const DiaryTrack(mucus: true, cervix: true, sex: false),
+        reason:
+            'only the valid items are restored; the absent mucus item '
+            'keeps its default',
+      );
+    });
+
+    test('the snapshot equality covers the track map', () {
+      expect(
+        PersistedSettings(diaryTrack: const DiaryTrack(cervix: true)),
+        isNot(PersistedSettings.defaults()),
+      );
+      expect(
+        PersistedSettings(diaryTrack: DiaryTrack.defaults),
+        PersistedSettings.defaults(),
+      );
     });
   });
 

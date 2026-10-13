@@ -161,3 +161,14 @@ entries stay in the browser (OPFS/IndexedDB, unencrypted at rest in the
 browser profile, readable by same-origin scripts), nothing is uploaded, and
 the residual-risk acceptance for the demo is an owner decision recorded in
 ADR-0012.
+
+## Amendment 2026-10-12: the settings PIN-lock placeholder is removed
+
+**Status: Accepted (amends the "Web limitation must be surfaced visibly"
+consequence above).** The disabled "PIN lock" switch in the settings pane
+was removed: a control that is visibly non-interactive signals a protection
+that does not exist, and the at-rest limitation itself is unchanged and
+stays documented here (and in the app's README/dev docs). The
+user-facing lock story ("PIN lock only on web", the native
+password/biometric lock) remains open and gets no placeholder surface in
+the meantime.

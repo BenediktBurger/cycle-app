@@ -375,6 +375,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     // nothing beyond tomorrow. "Now" comes from nowProvider so tests can
     // pin the clock.
     final now = ref.watch(nowProvider);
+    // Which entry sections render ("Was aufzeichnen"). Hiding is
+    // view-only: a hidden section's form state still saves its loaded
+    // values unchanged.
+    final track = ref.watch(diaryTrackProvider);
     final previousDay = DateOnly.addDays(selected, -1);
     final nextDay = DateOnly.addDays(selected, 1);
     final selectedCycleDay = dayOfCycleFor(selected, cycles);
@@ -622,203 +626,212 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // (t/Ø/f/S/A) themselves; a quality exists only together
               // with S, so the quality picker appears only while S is
               // selected.
-              Text(l10n.termMucus),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ChoiceChip(
-                    key: const ValueKey('mucusSignChip-unset'),
-                    label: Text(l10n.mucusSignUnset),
-                    selected: _sign == null,
-                    onSelected: (_) => setState(() {
-                      _sign = null;
-                      _quality = null;
-                    }),
-                  ),
-                  for (final sign in MucusSign.values)
-                    ChoiceChip(
-                      key: ValueKey('mucusSignChip-${sign.name}'),
-                      label: Text(mucusSignSymbol(sign)),
-                      tooltip: mucusSignTooltip(sign, l10n),
-                      selected: _sign == sign,
-                      onSelected: (selected) => setState(() {
-                        _sign = selected ? sign : null;
-                        if (_sign != MucusSign.s) _quality = null;
-                      }),
-                    ),
-                ],
-              ),
-              if (_sign == MucusSign.s) ...[
-                const SizedBox(height: 8),
-                Text(l10n.mucusQuality),
+              if (track.mucus) ...[
+                Text(l10n.termMucus),
                 const SizedBox(height: 4),
                 Wrap(
-                  key: const ValueKey('mucusQualityRow'),
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final quality in MucusQuality.values)
+                    ChoiceChip(
+                      key: const ValueKey('mucusSignChip-unset'),
+                      label: Text(l10n.mucusSignUnset),
+                      selected: _sign == null,
+                      onSelected: (_) => setState(() {
+                        _sign = null;
+                        _quality = null;
+                      }),
+                    ),
+                    for (final sign in MucusSign.values)
                       ChoiceChip(
-                        key: ValueKey('mucusQualityChip-${quality.name}'),
-                        label: Text(mucusQualityToken(quality)),
-                        tooltip: mucusQualityTooltip(quality, l10n),
-                        selected: _quality == quality,
+                        key: ValueKey('mucusSignChip-${sign.name}'),
+                        label: Text(mucusSignSymbol(sign)),
+                        tooltip: mucusSignTooltip(sign, l10n),
+                        selected: _sign == sign,
                         onSelected: (selected) => setState(() {
-                          // Tapping the selected chip returns to bare S.
-                          _quality = selected ? quality : null;
+                          _sign = selected ? sign : null;
+                          if (_sign != MucusSign.s) _quality = null;
+                        }),
+                      ),
+                  ],
+                ),
+                if (_sign == MucusSign.s) ...[
+                  const SizedBox(height: 8),
+                  Text(l10n.mucusQuality),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    key: const ValueKey('mucusQualityRow'),
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final quality in MucusQuality.values)
+                        ChoiceChip(
+                          key: ValueKey('mucusQualityChip-${quality.name}'),
+                          label: Text(mucusQualityToken(quality)),
+                          tooltip: mucusQualityTooltip(quality, l10n),
+                          selected: _quality == quality,
+                          onSelected: (selected) => setState(() {
+                            // Tapping the selected chip returns to bare S.
+                            _quality = selected ? quality : null;
+                          }),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+              // --- Muttermund: position (5), opening (3), firmness (3) --
+              // All THREE pickers behind one toggle. Independent pickers;
+              // the unset chip plus the tap-again-deselect rule returns to
+              // the no-observation state, like the mucus quality chips.
+              if (track.cervix) ...[
+                Text(l10n.termCervixPosition),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(
+                      label: Text(l10n.cervixPositionUnset),
+                      selected: _cervixPosition == null,
+                      onSelected: (_) => setState(() => _cervixPosition = null),
+                    ),
+                    for (final position in CervixPosition.values)
+                      ChoiceChip(
+                        key: ValueKey('cervixPositionChip-${position.name}'),
+                        label: Text(switch (position) {
+                          CervixPosition.low => l10n.cervixPositionLow,
+                          CervixPosition.medium => l10n.cervixPositionMedium,
+                          CervixPosition.high => l10n.cervixPositionHigh,
+                          CervixPosition.veryHigh =>
+                            l10n.cervixPositionVeryHigh,
+                          CervixPosition.unreachable =>
+                            l10n.cervixPositionUnreachable,
+                        }),
+                        selected: _cervixPosition == position,
+                        onSelected: (selected) => setState(() {
+                          _cervixPosition = selected ? position : null;
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(l10n.cervixOpening),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(
+                      label: Text(l10n.cervixOpeningUnset),
+                      selected: _cervixOpening == null,
+                      onSelected: (_) => setState(() => _cervixOpening = null),
+                    ),
+                    for (final opening in CervixOpening.values)
+                      ChoiceChip(
+                        key: ValueKey('cervixOpeningChip-${opening.name}'),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(cervixOpeningSymbol(opening)!),
+                            const SizedBox(width: 4),
+                            Text(switch (opening) {
+                              CervixOpening.closed => l10n.cervixOpeningClosed,
+                              CervixOpening.middle => l10n.cervixOpeningMiddle,
+                              CervixOpening.open => l10n.cervixOpeningOpen,
+                            }),
+                          ],
+                        ),
+                        selected: _cervixOpening == opening,
+                        onSelected: (selected) => setState(() {
+                          _cervixOpening = selected ? opening : null;
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(l10n.termCervixFirmness),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(
+                      label: Text(l10n.cervixFirmnessUnset),
+                      selected: _cervixFirmness == null,
+                      onSelected: (_) => setState(() => _cervixFirmness = null),
+                    ),
+                    for (final firmness in CervixFirmness.values)
+                      ChoiceChip(
+                        key: ValueKey('cervixFirmnessChip-${firmness.name}'),
+                        label: Text(switch (firmness) {
+                          CervixFirmness.hard => l10n.cervixFirmnessHard,
+                          CervixFirmness.halfSoft =>
+                            l10n.cervixFirmnessHalfSoft,
+                          CervixFirmness.soft => l10n.cervixFirmnessSoft,
+                        }),
+                        selected: _cervixFirmness == firmness,
+                        onSelected: (selected) => setState(() {
+                          _cervixFirmness = selected ? firmness : null;
                         }),
                       ),
                   ],
                 ),
               ],
               const SizedBox(height: 12),
-              // --- Muttermund: position (5), opening (3), firmness (3) --
-              // Independent pickers; the unset chip plus the
-              // tap-again-deselect rule returns to the no-observation
-              // state, like the mucus quality chips.
-              Text(l10n.termCervixPosition),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ChoiceChip(
-                    label: Text(l10n.cervixPositionUnset),
-                    selected: _cervixPosition == null,
-                    onSelected: (_) => setState(() => _cervixPosition = null),
-                  ),
-                  for (final position in CervixPosition.values)
-                    ChoiceChip(
-                      key: ValueKey('cervixPositionChip-${position.name}'),
-                      label: Text(switch (position) {
-                        CervixPosition.low => l10n.cervixPositionLow,
-                        CervixPosition.medium => l10n.cervixPositionMedium,
-                        CervixPosition.high => l10n.cervixPositionHigh,
-                        CervixPosition.veryHigh => l10n.cervixPositionVeryHigh,
-                        CervixPosition.unreachable =>
-                          l10n.cervixPositionUnreachable,
-                      }),
-                      selected: _cervixPosition == position,
-                      onSelected: (selected) => setState(() {
-                        _cervixPosition = selected ? position : null;
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(l10n.cervixOpening),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ChoiceChip(
-                    label: Text(l10n.cervixOpeningUnset),
-                    selected: _cervixOpening == null,
-                    onSelected: (_) => setState(() => _cervixOpening = null),
-                  ),
-                  for (final opening in CervixOpening.values)
-                    ChoiceChip(
-                      key: ValueKey('cervixOpeningChip-${opening.name}'),
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(cervixOpeningSymbol(opening)!),
-                          const SizedBox(width: 4),
-                          Text(switch (opening) {
-                            CervixOpening.closed => l10n.cervixOpeningClosed,
-                            CervixOpening.middle => l10n.cervixOpeningMiddle,
-                            CervixOpening.open => l10n.cervixOpeningOpen,
-                          }),
-                        ],
+              if (track.sex) ...[
+                // --- sex times (multi-select) ------------------------------
+                // Independent toggles: each tap sets/clears its own bit,
+                // several slots at once. No bits = not recorded — a time-less
+                // "sex happened" is deliberately not representable (see
+                // DailyEntry.sexTimings).
+                Text(l10n.termSex),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final timing in SexTiming.values)
+                      FilterChip(
+                        key: ValueKey('sexTimingChip-${timing.name}'),
+                        label: Text(switch (timing) {
+                          SexTiming.morning => l10n.sexTimingMorning,
+                          SexTiming.midday => l10n.sexTimingMidday,
+                          SexTiming.evening => l10n.sexTimingEvening,
+                        }),
+                        selected: _sexTimings & timing.bit != 0,
+                        onSelected: (selected) => setState(() {
+                          _sexTimings = selected
+                              ? _sexTimings | timing.bit
+                              : _sexTimings & ~timing.bit;
+                        }),
                       ),
-                      selected: _cervixOpening == opening,
-                      onSelected: (selected) => setState(() {
-                        _cervixOpening = selected ? opening : null;
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(l10n.termCervixFirmness),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ChoiceChip(
-                    label: Text(l10n.cervixFirmnessUnset),
-                    selected: _cervixFirmness == null,
-                    onSelected: (_) => setState(() => _cervixFirmness = null),
-                  ),
-                  for (final firmness in CervixFirmness.values)
-                    ChoiceChip(
-                      key: ValueKey('cervixFirmnessChip-${firmness.name}'),
-                      label: Text(switch (firmness) {
-                        CervixFirmness.hard => l10n.cervixFirmnessHard,
-                        CervixFirmness.halfSoft => l10n.cervixFirmnessHalfSoft,
-                        CervixFirmness.soft => l10n.cervixFirmnessSoft,
-                      }),
-                      selected: _cervixFirmness == firmness,
-                      onSelected: (selected) => setState(() {
-                        _cervixFirmness = selected ? firmness : null;
-                      }),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
-              // --- sex times (multi-select) ------------------------------
-              // Independent toggles: each tap sets/clears its own bit,
-              // several slots at once. No bits = not recorded — a time-less
-              // "sex happened" is deliberately not representable (see
-              // DailyEntry.sexTimings).
-              Text(l10n.termSex),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final timing in SexTiming.values)
+              if (track.pain) ...[
+                // --- pain toggles ----------------------------------------
+                Text(l10n.termPain),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
                     FilterChip(
-                      key: ValueKey('sexTimingChip-${timing.name}'),
-                      label: Text(switch (timing) {
-                        SexTiming.morning => l10n.sexTimingMorning,
-                        SexTiming.midday => l10n.sexTimingMidday,
-                        SexTiming.evening => l10n.sexTimingEvening,
-                      }),
-                      selected: _sexTimings & timing.bit != 0,
-                      onSelected: (selected) => setState(() {
-                        _sexTimings = selected
-                            ? _sexTimings | timing.bit
-                            : _sexTimings & ~timing.bit;
-                      }),
+                      key: const ValueKey('painChip-breast'),
+                      label: Text(l10n.termBreastPain),
+                      selected: _painBreast,
+                      onSelected: (v) => setState(() => _painBreast = v),
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // --- pain toggles ----------------------------------------
-              Text(l10n.termPain),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  FilterChip(
-                    key: const ValueKey('painChip-breast'),
-                    label: Text(l10n.termBreastPain),
-                    selected: _painBreast,
-                    onSelected: (v) => setState(() => _painBreast = v),
-                  ),
-                  FilterChip(
-                    key: const ValueKey('painChip-mittelschmerz'),
-                    label: Text(l10n.termMittelschmerz),
-                    selected: _painMittelschmerz,
-                    onSelected: (v) => setState(() => _painMittelschmerz = v),
-                  ),
-                ],
-              ),
+                    FilterChip(
+                      key: const ValueKey('painChip-mittelschmerz'),
+                      label: Text(l10n.termMittelschmerz),
+                      selected: _painMittelschmerz,
+                      onSelected: (v) => setState(() => _painMittelschmerz = v),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               // --- notes ------------------------------------------------
               TextFormField(

@@ -336,6 +336,11 @@
   "settingsRangeLower": "Untergrenze",
   "settingsRangeUpper": "Obergrenze",
   "settingsTemperatureRangeDefaultHint": "Standard: 36–38 °C.",
+  "settingsTrackTitle": "Was aufzeichnen",
+  "settingsTrackMucus": "Zervixschleim",
+  "settingsTrackCervix": "Muttermund",
+  "settingsTrackSex": "Sex",
+  "settingsTrackPain": "Schmerzen",
   "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
   "@settingsObservedCyclesOutsideApp": {
     "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."
@@ -559,8 +564,6 @@
   "@pdfExportSaveButton": {
     "description": "Save button of the PDF-export card's action row: generates the document and saves it via the file-transfer seam — the share hand-off next to it reuses the shared exportShare/exportShared/exportShareFailed wording."
   },
-  "settingsPinLock": "PIN-Sperre (Platzhalter)",
-  "settingsPinLockNote": "Noch nicht umgesetzt: die App-Sperre (PIN) ist in ADR-0005 geplant. Die Datenbankdatei selbst ist auf nativen Plattformen bereits verschlüsselt (Schlüssel im geschützten Speicher des Geräts).",
   "settingsExport": "Export",
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
   "settingsImport": "Import",
