@@ -22,6 +22,7 @@ import 'dart:io';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/export_import.dart'
     show ExportBlob, buildExportJson, formatIsoDay;
+import 'package:cycle_app/domain/measurement_method.dart' show MeasurementRoute;
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show
@@ -53,6 +54,7 @@ const saveFileButtonLabel = 'Als Datei speichern';
 const savedSnackbarLabel = 'Datei gespeichert.';
 const saveFailedSnackbarLabel = 'Speichern fehlgeschlagen.';
 const exportFailedSnackbarLabel = 'Export fehlgeschlagen.';
+const emptyExportSnackbarLabel = 'Datenbank ist leer — nichts zu exportieren.';
 const previewTitleLabel = 'JSON-Vorschau';
 const exportButtonLabel = 'Export';
 
@@ -98,13 +100,18 @@ _FaultyDatabase _faultyDatabase() {
 /// shell (sans the shell itself) over the in-memory database. [builder]
 /// swaps the database subclass for fault injection, like the delete-data
 /// tests build theirs.
-Widget settingsHarness({CycleDatabase Function()? builder}) => ProviderScope(
+Widget settingsHarness({
+  CycleDatabase Function()? builder,
+  Future<void> Function(CycleDatabase db)? seed,
+}) => ProviderScope(
   overrides: [
     inMemoryDatabase(
       builder: builder,
-      seed: (db) async {
-        await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
-      },
+      seed:
+          seed ??
+          (db) async {
+            await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
+          },
     ),
   ],
   child: MaterialApp(
@@ -201,6 +208,54 @@ void main() {
         find.text(previewTitleLabel),
         findsNothing,
         reason: 'the preview page does not open when the export failed',
+      );
+    });
+  });
+
+  group('export open: methods-only database', () {
+    testWidgets('a database holding only measurement-method snapshots is not '
+        'reported as empty — the export opens the preview page', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        settingsHarness(
+          seed: (db) async {
+            await db.measurementMethodsDao.upsertByDate(
+              date: DateTime.utc(2026, 9, 6),
+              route: MeasurementRoute.oral,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroller = find
+          .descendant(
+            of: find.byType(EinstellungenScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, exportButtonLabel),
+        200,
+        scrollable: scroller,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(previewTitleLabel),
+        findsOneWidget,
+        reason:
+            'a document with method snapshots but no entries/marks carries '
+            'importable data — the empty guard must not swallow it',
+      );
+      expect(
+        find.text(emptyExportSnackbarLabel),
+        findsNothing,
+        reason:
+            'the empty-database snackbar is reserved for a truly '
+            'row-free export document',
       );
     });
   });

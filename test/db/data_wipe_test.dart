@@ -1,13 +1,14 @@
 // The delete-all wipe behind the settings pane's "Daten löschen" card.
 //
-// The wipe clears the TRACKED data — cycle_entries and user_marks, both
-// tables inside ONE transaction. The app_settings table deliberately
-// SURVIVES: its rows are user choices (language, theme, temperature
-// range…), and the onboarding flag must stay so the completed welcome page
-// does not replay after a data wipe.
+// The wipe clears the TRACKED data — cycle_entries, user_marks and
+// measurement_methods, all tables inside ONE transaction. The
+// app_settings table deliberately SURVIVES: its rows are user choices
+// (language, theme, temperature range…), and the onboarding flag must
+// stay so the completed welcome page does not replay after a data wipe.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,37 +40,46 @@ void main() {
       DateTime.utc(2026, 9, 12),
       CycleMarkTypes.mucusPeakDay,
     );
+    await db.measurementMethodsDao.upsertByDate(
+      date: DateTime.utc(2026, 9, 6),
+      route: MeasurementRoute.vaginal,
+    );
   }
 
-  group('deleteAllTrackedData (entries + marks tables, settings survive)', () {
-    test(
-      'empties the entries and marks tables and reports the counts',
-      () async {
-        await seedTrackedData();
-        expect(await db.entriesDao.allEntries(), hasLength(2));
-        expect(await db.marksDao.allMarks(), hasLength(2));
+  group('deleteAllTrackedData (entries + marks + methods tables, settings '
+      'survive)', () {
+    test('empties the tracked data tables and reports the counts', () async {
+      await seedTrackedData();
+      expect(await db.entriesDao.allEntries(), hasLength(2));
+      expect(await db.marksDao.allMarks(), hasLength(2));
+      expect(await db.measurementMethodsDao.allSnapshots(), hasLength(1));
 
-        final counts = await db.deleteAllTrackedData();
-        expect(
-          counts.entries,
-          2,
-          reason:
-              'the reported count is the number '
-              'of REMOVED entry rows',
-        );
-        expect(counts.marks, 2);
-        expect(
-          await db.entriesDao.allEntries(),
-          isEmpty,
-          reason: 'after the wipe the entries table is empty',
-        );
-        expect(
-          await db.marksDao.allMarks(),
-          isEmpty,
-          reason: 'after the wipe the marks table is empty',
-        );
-      },
-    );
+      final counts = await db.deleteAllTrackedData();
+      expect(
+        counts.entries,
+        2,
+        reason:
+            'the reported count is the number '
+            'of REMOVED entry rows',
+      );
+      expect(counts.marks, 2);
+      expect(counts.methods, 1);
+      expect(
+        await db.entriesDao.allEntries(),
+        isEmpty,
+        reason: 'after the wipe the entries table is empty',
+      );
+      expect(
+        await db.marksDao.allMarks(),
+        isEmpty,
+        reason: 'after the wipe the marks table is empty',
+      );
+      expect(
+        await db.measurementMethodsDao.allSnapshots(),
+        isEmpty,
+        reason: 'after the wipe the methods table is empty',
+      );
+    });
 
     test(
       'app_settings rows survive the wipe (onboarding flag included)',
@@ -107,8 +117,10 @@ void main() {
         final counts = await db.deleteAllTrackedData();
         expect(counts.entries, 0);
         expect(counts.marks, 0);
+        expect(counts.methods, 0);
         expect(await db.entriesDao.allEntries(), isEmpty);
         expect(await db.marksDao.allMarks(), isEmpty);
+        expect(await db.measurementMethodsDao.allSnapshots(), isEmpty);
       },
     );
   });

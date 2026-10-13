@@ -15,6 +15,7 @@ final class _CycleChart extends StatefulWidget {
   const _CycleChart({
     required this.entries,
     required this.marks,
+    required this.methodSnapshotDates,
     required this.evaluations,
     required this.cycles,
     required this.range,
@@ -26,6 +27,11 @@ final class _CycleChart extends StatefulWidget {
   /// The user-placed marks (the ignore-temperature keys and the drawn mark
   /// glyphs ride on them directly).
   final List<CycleMark> marks;
+
+  /// The dates carrying a measurement-method snapshot: the thermometer
+  /// glyphs' day anchors, mapped onto day indexes like the marks. The
+  /// glyph is route-agnostic, so the dates alone suffice.
+  final Set<DateTime> methodSnapshotDates;
 
   /// The per-cycle evaluations the overlay draws from — part of the shared
   /// derived pass the screen watches, never re-derived here.
@@ -162,6 +168,7 @@ final class _CycleChartState extends State<_CycleChart> {
     _days = _ChartDays(
       widget.entries,
       widget.marks,
+      widget.methodSnapshotDates,
       widget.cycles,
       widget.observedCyclesOutsideApp,
     );
@@ -178,11 +185,13 @@ final class _CycleChartState extends State<_CycleChart> {
     // rendering stale data.
     if (!identical(oldWidget.entries, widget.entries) ||
         !identical(oldWidget.marks, widget.marks) ||
+        !identical(oldWidget.methodSnapshotDates, widget.methodSnapshotDates) ||
         !identical(oldWidget.cycles, widget.cycles) ||
         oldWidget.observedCyclesOutsideApp != widget.observedCyclesOutsideApp) {
       _days = _ChartDays(
         widget.entries,
         widget.marks,
+        widget.methodSnapshotDates,
         widget.cycles,
         widget.observedCyclesOutsideApp,
       );
@@ -1045,6 +1054,11 @@ final class _InPlotGlyphRows extends StatelessWidget {
 
   static const double _peakDotSize = 8;
 
+  static const double _methodIconSize = 12;
+
+  static const double _methodHaloIconSize =
+      _methodIconSize + 2 * chartMarkHaloStrokeWidth;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -1054,11 +1068,19 @@ final class _InPlotGlyphRows extends StatelessWidget {
     final mucusVisible = chartMarkRowVisible(mucusRowCenterOffsetK, range);
     final mVisible = chartMarkRowVisible(mRowCenterOffsetK, range);
     final numbersVisible = dayNumbersRowVisible(range);
+    final methodFallbackVisible = methodGlyphFallbackRowVisible(range);
+    // The loop must run when a windowed day carries a snapshot even if
+    // every row hides: the glyph may still anchor below a plotted point.
+    final hasMethodDayInWindow = days.methodSnapshotDayIndexes.any(
+      (index) => index >= windowStart && index <= windowEnd,
+    );
     if (!sexVisible &&
         !peakVisible &&
         !mucusVisible &&
         !mVisible &&
-        !numbersVisible) {
+        !numbersVisible &&
+        !methodFallbackVisible &&
+        !hasMethodDayInWindow) {
       return const SizedBox.shrink();
     }
 
@@ -1135,6 +1157,50 @@ final class _InPlotGlyphRows extends StatelessWidget {
             ),
           ),
         );
+      }
+      // The thermometer glyph marking a snapshot day: anchored directly
+      // below the day's plotted temperature point, parked in the fixed
+      // fallback slot when the column has none (no entry, an entry without
+      // a temperature, an out-of-range value). Not gated by the record —
+      // an untracked gap day's column may carry a snapshot too.
+      if (days.methodSnapshotDayIndexes.contains(i)) {
+        final temperature = days.byIndex[i]?.bbtC;
+        final hasPlottedPoint =
+            temperature != null && isBbtCInRange(temperature, range);
+        if (hasPlottedPoint || methodFallbackVisible) {
+          final top = hasPlottedPoint
+              ? scale.pixelFor(temperature - methodGlyphUnderPointOffsetK) -
+                    _glyphHeight / 2
+              : scale.pixelFor(scale.min + methodGlyphFallbackCenterOffsetK) -
+                    _glyphHeight / 2;
+          glyphs.add(
+            Positioned(
+              left: i * cellWidth,
+              width: cellWidth,
+              top: top,
+              height: _glyphHeight,
+              child: Center(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.device_thermostat,
+                      key: ValueKey('inPlotHaloMethodGlyph-$i'),
+                      size: _methodHaloIconSize,
+                      color: surface,
+                    ),
+                    Icon(
+                      Icons.device_thermostat,
+                      key: ValueKey('inPlotMethodGlyph-$i'),
+                      size: _methodIconSize,
+                      color: onSurfaceColor,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
       }
       final record = windowMarks[i];
       if (record == null) continue;

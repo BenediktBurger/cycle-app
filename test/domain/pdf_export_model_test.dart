@@ -7,6 +7,7 @@ import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -991,6 +992,245 @@ void main() {
         name: '   ',
       );
       expect(model.name, isNull);
+    });
+  });
+
+  group('per-cycle measurement-method fact', () {
+    test('no snapshots: every cycle carries the fact-less null', () {
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        today: d(4, 28),
+      );
+      expect(model.measurementMethods, [
+        null,
+        null,
+        null,
+      ], reason: 'the fact list stays parallel to the cycles');
+    });
+
+    test('a snapshot before the first cycle\'s first temperature day heads '
+        'every page', () {
+      final snapshot = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [snapshot],
+        today: d(4, 28),
+      );
+      expect(model.measurementMethods, [
+        for (var i = 0; i < model.cycles.length; i++)
+          (route: MeasurementRoute.vaginal, thermometer: 'ThermaPen'),
+      ]);
+    });
+
+    test('a mid-cycle change heads cycle 2\'s page, not cycle 1\'s', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      );
+      final change = MeasurementMethodSnapshot(
+        date: d(3, 10),
+        route: MeasurementRoute.oral,
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [baseline, change],
+        today: d(4, 28),
+      );
+      // Cycle 1's first temperature (Mar 1) predates the change; cycle 2's
+      // (Mar 29) and cycle 3's (Apr 26) follow it.
+      expect(model.measurementMethods[0], (
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      ));
+      expect(model.measurementMethods[1], (
+        route: MeasurementRoute.oral,
+        thermometer: null,
+      ));
+      expect(model.measurementMethods[2], (
+        route: MeasurementRoute.oral,
+        thermometer: null,
+      ));
+    });
+
+    test('a change day maps into its cycle\'s overlay at its calendar '
+        'offset', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+      );
+      final change = MeasurementMethodSnapshot(
+        date: d(3, 10),
+        route: MeasurementRoute.oral,
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [baseline, change],
+        today: d(4, 28),
+      );
+      expect(model.overlays[0].methodChanges, {9: change});
+      expect(model.overlays[1].methodChanges, isEmpty);
+      expect(model.overlays[2].methodChanges, isEmpty);
+    });
+
+    test('a change on an untracked mid-span gap day lands on the first span '
+        'day at or after it', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 20),
+        route: MeasurementRoute.vaginal,
+      );
+      final change = MeasurementMethodSnapshot(
+        date: d(3, 6),
+        route: MeasurementRoute.other,
+      );
+      final entries = [
+        DailyEntry(date: d(3, 1), bbtC: 36.4, bleeding: Bleeding.medium),
+        for (var day = 2; day <= 5; day++)
+          DailyEntry(date: d(3, day), bbtC: 36.2),
+        for (var day = 9; day <= 12; day++)
+          DailyEntry(date: d(3, day), bbtC: 36.3),
+      ];
+      final marks = [CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart)];
+      final model = buildPdfExportModel(
+        entries: entries,
+        marks: marks,
+        measurementSnapshots: [baseline, change],
+        today: d(3, 12),
+      );
+      expect(model.cycles, hasLength(1));
+      // The gap days Mar 6–8 carry no page column; the change renders on
+      // the first tracked day at or after Mar 6 (Mar 9, offset 8).
+      expect(model.overlays[0].methodChanges, {8: change});
+    });
+
+    test('a snapshot AFTER a cycle\'s first temperature day does not leak '
+        'into that cycle\'s fact', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      );
+      final change = MeasurementMethodSnapshot(
+        date: d(4, 30),
+        route: MeasurementRoute.rectal,
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [baseline, change],
+        today: d(5, 5),
+      );
+      expect(
+        model.measurementMethods,
+        everyElement(
+          anyOf(
+            isNull,
+            equals((route: MeasurementRoute.vaginal, thermometer: 'ThermaPen')),
+          ),
+        ),
+      );
+      // The change day sits in cycle 3's trailing span (data-less days are
+      // still page columns) and renders there.
+      expect(model.overlays[2].methodChanges, {4: change});
+    });
+
+    test('a same-route thermometer swap on a span day emits its snapshot-day '
+        'entry', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen A',
+      );
+      final swap = MeasurementMethodSnapshot(
+        date: d(3, 10),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen B',
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [baseline, swap],
+        today: d(4, 28),
+      );
+      expect(
+        model.overlays[0].methodChanges,
+        {9: swap},
+        reason:
+            'the stored snapshot row takes effect on its own day, '
+            'whatever its value difference to the previous state',
+      );
+      expect(
+        model.overlays[1].methodChanges,
+        isEmpty,
+        reason:
+            'the swap governs before cycle 2 starts, so no later cycle '
+            're-echoes it',
+      );
+      expect(model.overlays[2].methodChanges, isEmpty);
+    });
+
+    test('two snapshots inside one tracked-gap cluster collapse into ONE '
+        'entry at the first tracked day after the gap', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 20),
+        route: MeasurementRoute.vaginal,
+      );
+      final first = MeasurementMethodSnapshot(
+        date: d(3, 6),
+        route: MeasurementRoute.oral,
+      );
+      final second = MeasurementMethodSnapshot(
+        date: d(3, 7),
+        route: MeasurementRoute.rectal,
+      );
+      final entries = [
+        DailyEntry(date: d(3, 1), bbtC: 36.4, bleeding: Bleeding.medium),
+        for (var day = 2; day <= 5; day++)
+          DailyEntry(date: d(3, day), bbtC: 36.2),
+        for (var day = 9; day <= 12; day++)
+          DailyEntry(date: d(3, day), bbtC: 36.3),
+      ];
+      final marks = [CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart)];
+      final model = buildPdfExportModel(
+        entries: entries,
+        marks: marks,
+        measurementSnapshots: [baseline, first, second],
+        today: d(3, 12),
+      );
+      expect(model.cycles, hasLength(1));
+      // The gap days Mar 6–8 carry no page column; both snapshots render
+      // as the one column that first shows the surviving state (Mar 9,
+      // offset 8) — the later snapshot's value.
+      expect(model.overlays[0].methodChanges, {8: second});
+    });
+
+    test('a baseline-only record renders no snapshot day in any overlay', () {
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      );
+      final model = buildPdfExportModel(
+        entries: modelEntries(),
+        marks: modelMarks(),
+        measurementSnapshots: [baseline],
+        today: d(4, 28),
+      );
+      expect(
+        model.overlays.map((overlay) => overlay.methodChanges),
+        everyElement(isEmpty),
+        reason:
+            'a snapshot dated before a cycle only governs that cycle\'s '
+            'header fact — it never echoes on the cycle\'s columns',
+      );
     });
   });
 }

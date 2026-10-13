@@ -7,6 +7,11 @@
 //    day key exists on-device; inserts otherwise; structurally invalid rows
 //    are skipped and counted.
 //  - marks: added idempotently via MarksDao.addMark (existing ones skipped).
+//  - method snapshots: overwritten day-keyed via
+//    MeasurementMethodsDao.upsertByDate (the entries merge rule); rows the
+//    shared helper tryMethodSnapshotFromExport rejects are skipped and
+//    counted (a foreign `method` token cannot pass the NOT NULL CHECK —
+//    no coercion exists to tolerate).
 //  - old documents (v1–4) carry profile keys (`profile_id` on every row, a
 //    root `profiles` list): both are ACCEPTED and IGNORED — rows merge by
 //    day / (day, mark_type), never by profile. Their exclude_* keys
@@ -23,6 +28,7 @@ import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
 import 'cycle_database.dart';
+import 'mappers.dart';
 
 /// Wraps an unexpected error raised while the import transaction was
 /// running (constraint failures, storage errors, ...). The transaction has
@@ -41,10 +47,19 @@ final class ImportFailedException implements Exception {
 // --- export (rows -> ExportBlob -> JSON string) ---------------------------
 
 /// Collects every table of [db] into the export document (profile-free:
-/// the v5 document carries no profile keys anywhere).
+/// the v5 document carries no profile keys anywhere). The methods list
+/// rides through the shared writer's only-when-non-empty emission
+/// (buildExportJson), so snapshot-free documents keep the four-key shape.
 Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
   final entries = await db.entriesDao.allEntries();
   final marks = await db.marksDao.allMarks();
+  final methodSnapshots = [
+    for (final m in await db.measurementMethodsDao.allSnapshots())
+      // The shared mapping parses the route token through
+      // tryParseMeasurementRoute — a corrupt stored token fails loudly
+      // instead of exporting a value no reader can parse back.
+      measurementSnapshotFromDrift(m),
+  ];
 
   return ExportBlob(
     exportedAt: DateTime.now(),
@@ -90,6 +105,15 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           'author': m.author,
         },
     ],
+    // Sparse row shape (like entries): no key for a null thermometer.
+    methods: [
+      for (final s in methodSnapshots)
+        {
+          'date': formatIsoDay(s.date),
+          'method': s.route.name,
+          if (s.thermometer != null) 'thermometer': s.thermometer,
+        },
+    ],
   );
 }
 
@@ -111,6 +135,7 @@ Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
     doc,
     existingEntryKeys: existing.entryKeys,
     existingMarkKeys: existing.markKeys,
+    existingMethodKeys: existing.methodKeys,
   );
 }
 
@@ -135,6 +160,7 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         doc,
         existingEntryKeys: existing.entryKeys,
         existingMarkKeys: existing.markKeys,
+        existingMethodKeys: existing.methodKeys,
       );
 
       // 1) Entries in document order. Duplicate same-day keys inside the
@@ -200,6 +226,25 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         );
       }
 
+      // 3) Method snapshots in document order, day-keyed overwrite (the
+      //    entries merge rule). The duplicate counting/exclusion and the
+      //    row gate are the planner's (tryMethodSnapshotFromExport is the
+      //    shared helper) — the seen key again only for valid rows, so
+      //    counted == written.
+      final seenMethodKeys = <String>{};
+      for (final row in doc.methods) {
+        final snapshot = tryMethodSnapshotFromExport(row);
+        if (snapshot == null) continue;
+        if (!seenMethodKeys.add(importMethodKey(formatIsoDay(snapshot.date)))) {
+          continue; // duplicate: first wins
+        }
+        await db.measurementMethodsDao.upsertByDate(
+          date: snapshot.date,
+          route: snapshot.route,
+          thermometer: snapshot.thermometer,
+        );
+      }
+
       return summary;
     });
   } on FormatException {
@@ -220,15 +265,17 @@ bool _oldDocExcluded(Map<String, Object?> row) =>
     row['exclude_other'] == true;
 
 final class _Existing {
-  _Existing(this.entryKeys, this.markKeys);
+  _Existing(this.entryKeys, this.markKeys, this.methodKeys);
 
   final Set<String> entryKeys;
   final Set<String> markKeys;
+  final Set<String> methodKeys;
 }
 
 Future<_Existing> _existingKeys(CycleDatabase db) async {
   final entries = await db.entriesDao.allEntries();
   final marks = await db.marksDao.allMarks();
+  final methods = await db.measurementMethodsDao.allSnapshots();
 
   return _Existing(
     {for (final e in entries) importEntryKey(formatIsoDay(e.date))},
@@ -236,6 +283,7 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
       for (final m in marks)
         importMarkKey(formatIsoDay(m.entryDate), m.markType),
     },
+    {for (final m in methods) importMethodKey(formatIsoDay(m.date))},
   );
 }
 

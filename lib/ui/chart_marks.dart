@@ -56,6 +56,18 @@ const double mRowCenterOffsetK = 0.35;
 /// other rows anchor from the max.
 const double dayNumbersRowCenterOffsetK = 0.05;
 
+/// Vertical pitch of the method glyph's anchor BELOW its day's plotted
+/// temperature point: the glyph's center sits this many °C under the
+/// measured value in scale space (a value offset, never a clamped pixel
+/// offset).
+const double methodGlyphUnderPointOffsetK = 0.2;
+
+/// Vertical pitch of the method glyph's fixed fallback slot's center, in °C
+/// above the scale min — bottom-anchored like the day numbers
+/// ([dayNumbersRowCenterOffsetK]), one row above them. A snapshot day
+/// without a plotted point parks the glyph there.
+const double methodGlyphFallbackCenterOffsetK = 0.15;
+
 /// The one alpha every in-chart glyph renders at.
 const double chartMarkAlpha = 0.85;
 
@@ -77,13 +89,28 @@ const double sexGlyphBoxWidth = 14;
 bool chartMarkRowVisible(double rowCenterOffsetK, TemperatureRange range) =>
     range.max - rowCenterOffsetK >= range.min + chartEdgeMarginK;
 
+/// Whether a bottom-anchored row whose center sits [rowCenterOffsetK] °C
+/// above the scale min still lands inside the plot — the shared
+/// `chartEdgeMarginK` guard; the day numbers ([dayNumbersRowVisible]) and
+/// the method glyph's fallback slot ([methodGlyphFallbackRowVisible]) run
+/// their own pitch through it.
+bool bottomRowVisible(double rowCenterOffsetK, TemperatureRange range) =>
+    range.min + rowCenterOffsetK <= range.max - chartEdgeMarginK;
+
 /// Whether the bottom-anchored day-numbers row still lands inside the
 /// plot: its center sits [dayNumbersRowCenterOffsetK] °C above the scale
 /// min, visible only while that center stays at or below
 /// `max − [chartEdgeMarginK]` — i.e. when the range's span is at least
 /// twice the edge margin. Boundary equality is visible.
 bool dayNumbersRowVisible(TemperatureRange range) =>
-    range.min + dayNumbersRowCenterOffsetK <= range.max - chartEdgeMarginK;
+    bottomRowVisible(dayNumbersRowCenterOffsetK, range);
+
+/// Whether the method glyph's fixed fallback slot still lands inside the
+/// plot — the bottom-anchored shape with its own (larger than the day
+/// numbers') pitch, so a narrow range can hide the slot while the day
+/// numbers stay visible.
+bool methodGlyphFallbackRowVisible(TemperatureRange range) =>
+    bottomRowVisible(methodGlyphFallbackCenterOffsetK, range);
 
 /// One X mark inside a day column: the recorded timing and its horizontal
 /// slot as a fraction of the column width (start → 1/6, middle → 1/2,

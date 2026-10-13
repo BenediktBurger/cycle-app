@@ -139,6 +139,16 @@ final class _ZyklusScreenState extends ConsumerState<ZyklusScreen> {
     // constructor data (no riverpod dependency of its own).
     final temperatureRange = ref.watch(temperatureRangeProvider);
     final derived = ref.watch(derivedCycleDataProvider);
+    // The thermometer glyphs' day anchors: the snapshot dates, a fresh set
+    // per build — a methods write re-emits the stream and re-renders the
+    // chart through the identity check.
+    final methodSnapshotDates =
+        ref
+            .watch(measurementMethodsProvider)
+            .value
+            ?.map((snapshot) => snapshot.date)
+            .toSet() ??
+        const <DateTime>{};
     // The chart's day mapping covers only the entries it is given, so the
     // merge feeds it each derived cycle's full calendar span
     // ([cycleSpanDays] — lib/domain/cycle_grouping.dart), the same span
@@ -207,6 +217,7 @@ final class _ZyklusScreenState extends ConsumerState<ZyklusScreen> {
                     loading: () => _CycleChart(
                       entries: chartEntries,
                       marks: marks,
+                      methodSnapshotDates: methodSnapshotDates,
                       evaluations: derived.evaluations,
                       cycles: derived.cycles,
                       range: temperatureRange,
@@ -219,6 +230,7 @@ final class _ZyklusScreenState extends ConsumerState<ZyklusScreen> {
                     data: (markers) => _CycleChart(
                       entries: chartEntries,
                       marks: markers,
+                      methodSnapshotDates: methodSnapshotDates,
                       evaluations: derived.evaluations,
                       cycles: derived.cycles,
                       range: temperatureRange,

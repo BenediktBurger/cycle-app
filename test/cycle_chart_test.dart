@@ -23,6 +23,7 @@
 import 'dart:async';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -981,6 +982,39 @@ Widget _windowingHarness({
   entriesStream: entriesStream,
   emptyHome: emptyHome,
 );
+
+// Widget tests of the measurement-method thermometer glyph inside the
+// temperature plot: every day whose date carries a stored snapshot renders
+// the SAME thermometer ink for all routes in its
+// day column — anchored directly below the day's plotted temperature
+// point; a snapshot day without a plotted point (no entry, an entry
+// without a temperature, an out-of-range value — the dot's own filter)
+// parks the glyph in the fixed bottom-anchored slot above the evaluation
+// day numbers, which hides itself when the range is too narrow for it.
+// A day without a snapshot renders nothing.
+
+DateTime methodGlyphDay(int index) => DateTime.utc(2026, 9, 7 + index);
+
+// Five chart days:
+//  0: temperature 36.5 (in range) + a snapshot    -> glyph below the point
+//  1: temperature 38.2 (out of range) + a snapshot -> fallback slot
+//  2: entry WITHOUT a temperature + a snapshot    -> fallback slot
+//  3: untracked gap day + a snapshot              -> fallback slot
+//  4: plain temperature day, no snapshot          -> nothing
+final methodGlyphEntries = [
+  DailyEntry(date: methodGlyphDay(0), bbtC: 36.5),
+  DailyEntry(date: methodGlyphDay(1), bbtC: 38.2),
+  DailyEntry(date: methodGlyphDay(2)),
+  DailyEntry(date: methodGlyphDay(4), bbtC: 36.5),
+];
+
+final methodGlyphSnapshots = [
+  for (final index in [0, 1, 2, 3])
+    MeasurementMethodSnapshot(
+      date: methodGlyphDay(index),
+      route: MeasurementRoute.vaginal,
+    ),
+];
 
 // A regression test for the chart's window-rebuild pace: the built day
 // window parks with an extra screen-width of margin past the visible
@@ -7945,5 +7979,223 @@ void main() {
       reason: 'no entries and no marks render the centered no-data text',
     );
     expect(find.byType(LineChart), findsNothing);
+  });
+
+  // ═══════════ measurement-method thermometer glyph ═══════════
+  group('method-snapshot thermometer glyph', () {
+    Finder methodGlyph(int index) =>
+        find.byKey(ValueKey('inPlotMethodGlyph-$index'));
+
+    testWidgets('a snapshot day with an in-range temperature anchors the '
+        'glyph one pitch below the plotted point, centered in its column', (
+      tester,
+    ) async {
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: methodGlyphEntries,
+          methodSnapshots: methodGlyphSnapshots,
+        ),
+      );
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final data = chartData(tester);
+      final span = data.maxY - data.minY;
+      // The chart's day space spans 9/7..9/11: four entries around the
+      // untracked gap day 3 — five day columns wide.
+      const dayCount = 5;
+      final colW = plot.width / dayCount;
+      double expectedCenterY(double value) =>
+          plot.top + (data.maxY - value) / span * plot.height;
+
+      final glyph = methodGlyph(0);
+      expect(
+        glyph,
+        findsOneWidget,
+        reason: 'the snapshot day renders its thermometer glyph',
+      );
+      expect(
+        find.byKey(const ValueKey('inPlotHaloMethodGlyph-0')),
+        findsOneWidget,
+        reason: 'one halo layer behind the ink',
+      );
+      expect(
+        tester.getRect(glyph).center.dy,
+        closeTo(expectedCenterY(36.5 - methodGlyphUnderPointOffsetK), 0.5),
+        reason:
+            'the glyph pins one method pitch below the temperature '
+            'point in scale space',
+      );
+      expect(
+        tester.getRect(glyph).center.dx,
+        closeTo(plot.left + 0.5 * colW, 1),
+        reason: 'the glyph centers in its day column',
+      );
+    });
+
+    testWidgets('a snapshot day without a plotted point parks the glyph in '
+        'the fixed fallback slot: out-of-range value, unmeasured entry, '
+        'untracked gap day', (tester) async {
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: methodGlyphEntries,
+          methodSnapshots: methodGlyphSnapshots,
+        ),
+      );
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final data = chartData(tester);
+      final span = data.maxY - data.minY;
+      const dayCount = 5;
+      final colW = plot.width / dayCount;
+      final fallbackY =
+          plot.top +
+          (data.maxY - (data.minY + methodGlyphFallbackCenterOffsetK)) /
+              span *
+              plot.height;
+
+      for (final index in [1, 2, 3]) {
+        final glyph = methodGlyph(index);
+        expect(
+          glyph,
+          findsOneWidget,
+          reason:
+              'day $index: no plotted point on a snapshot day -> '
+              'the fallback slot renders the glyph',
+        );
+        expect(
+          tester.getRect(glyph).center.dy,
+          closeTo(fallbackY, 0.5),
+          reason: 'day $index: the glyph pins at the fixed fallback slot',
+        );
+        expect(
+          tester.getRect(glyph).center.dx,
+          closeTo(plot.left + (index + 0.5) * colW, 1),
+          reason: 'day $index: the fallback glyph centers in its column',
+        );
+      }
+      // Every fallback day shares the SAME fixed slot.
+      expect(
+        tester.getRect(methodGlyph(1)).center.dy,
+        tester.getRect(methodGlyph(3)).center.dy,
+      );
+    });
+
+    testWidgets('a day without a snapshot renders nothing', (tester) async {
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: methodGlyphEntries,
+          methodSnapshots: methodGlyphSnapshots,
+        ),
+      );
+
+      expect(
+        methodGlyph(4),
+        findsNothing,
+        reason: 'the plain temperature day carries no snapshot',
+      );
+      expect(
+        find.byKey(const ValueKey('inPlotHaloMethodGlyph-4')),
+        findsNothing,
+        reason: 'no halo renders without the ink either',
+      );
+    });
+
+    testWidgets('a snapshot-less range renders no thermometer glyph at all', (
+      tester,
+    ) async {
+      await pumpChart(tester, chartHarness(entries: methodGlyphEntries));
+
+      for (var i = 0; i <= methodGlyphEntries.length; i++) {
+        expect(methodGlyph(i), findsNothing);
+      }
+      expect(
+        find.byKey(const ValueKey('inPlotHaloMethodGlyph-0')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('the fallback slot hides itself in a narrow range: hidden '
+        'at span 0.10, visible again at the 0.20 boundary', (tester) async {
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: methodGlyphEntries,
+          methodSnapshots: methodGlyphSnapshots,
+          temperatureRange: const TemperatureRange(min: 37.9, max: 38.0),
+        ),
+      );
+
+      for (final index in [1, 2, 3]) {
+        expect(
+          methodGlyph(index),
+          findsNothing,
+          reason:
+              'day $index: the 0.1 K span leaves no room for the '
+              'fallback slot (center above the bottom margin)',
+        );
+      }
+
+      // Remount the app per iteration: a same-shaped re-pump would only
+      // update the const-canonicalized subtree in place and keep the old
+      // provider range.
+      await pumpChart(
+        tester,
+        KeyedSubtree(
+          key: UniqueKey(),
+          child: chartHarness(
+            entries: methodGlyphEntries,
+            methodSnapshots: methodGlyphSnapshots,
+            temperatureRange: const TemperatureRange(min: 37.8, max: 38.0),
+          ),
+        ),
+      );
+      expect(
+        methodGlyph(1),
+        findsOneWidget,
+        reason:
+            'the fallback slot lands exactly on the bottom margin '
+            'at span 0.20 — visible',
+      );
+    });
+
+    testWidgets('a snapshot stream re-emit re-renders the glyphs', (
+      tester,
+    ) async {
+      // Broadcast: the provider subscribes during the pump, so the emit
+      // below reaches it; before that (or without any subscriber) an emit
+      // is dropped and the ledger stays glyph-free.
+      final snapshots =
+          StreamController<List<MeasurementMethodSnapshot>>.broadcast();
+      addTearDown(snapshots.close);
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: methodGlyphEntries,
+          methodSnapshotsStream: snapshots.stream,
+        ),
+      );
+
+      expect(
+        methodGlyph(0),
+        findsNothing,
+        reason: 'the stream has not emitted yet — the start is glyph-free',
+      );
+
+      snapshots.add(methodGlyphSnapshots);
+      await tester.pumpAndSettle();
+      expect(
+        methodGlyph(0),
+        findsOneWidget,
+        reason: 'the snapshot re-emit renders the day-0 glyph',
+      );
+      expect(
+        methodGlyph(4),
+        findsNothing,
+        reason: 'the plain day still carries no snapshot',
+      );
+    });
   });
 }

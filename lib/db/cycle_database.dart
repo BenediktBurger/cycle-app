@@ -1,7 +1,7 @@
-// The app's drift database (schema version 12, profile-free).
+// The app's drift database (schema version 13, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
-// settings_dao.dart) are
+// measurement_methods_dao.dart, settings_dao.dart) are
 // PARTS of this library. That is the standard drift layout when DAOs
 // reference generated data classes — drift writes all data
 // classes/companions and the _$DaoMixin classes into a single
@@ -16,6 +16,7 @@
 import 'package:drift/drift.dart';
 
 import '../domain/date_only.dart';
+import '../domain/measurement_method.dart';
 import '../domain/models.dart';
 import 'converters.dart';
 import 'mappers.dart';
@@ -25,11 +26,12 @@ part 'cycle_database.g.dart';
 
 part 'entries_dao.dart';
 part 'marks_dao.dart';
+part 'measurement_methods_dao.dart';
 part 'settings_dao.dart';
 
 @DriftDatabase(
-  tables: [CycleEntries, UserMarks, AppSettings],
-  daos: [EntriesDao, MarksDao, SettingsDao],
+  tables: [CycleEntries, UserMarks, AppSettings, MeasurementMethods],
+  daos: [EntriesDao, MarksDao, MeasurementMethodsDao, SettingsDao],
 )
 class CycleDatabase extends _$CycleDatabase {
   // Accepts any QueryExecutor; tests pass NativeDatabase.memory(), the
@@ -38,23 +40,25 @@ class CycleDatabase extends _$CycleDatabase {
   CycleDatabase(super.executor);
 
   /// A UI-level reset (the settings pane's danger card): deletes everything
-  /// from the TRACKED data tables — cycle_entries and user_marks, both
-  /// inside ONE transaction (all-or-nothing) — and reports the removed row
-  /// counts. It is deliberately NOT part of the domain export/import module
+  /// from the TRACKED data tables — cycle_entries, user_marks and
+  /// measurement_methods, all inside ONE transaction (all-or-nothing) —
+  /// and reports the removed row counts. It is deliberately NOT part of
+  /// the domain export/import module
   /// (that one transfers data; this wipes it) and it deliberately touches
   /// NO app_settings row: settings are user choices (language, theme,
   /// temperature range…), and the onboarding flag must stay so the
   /// completed welcome page does not replay after a data wipe.
-  Future<({int entries, int marks})> deleteAllTrackedData() {
+  Future<({int entries, int marks, int methods})> deleteAllTrackedData() {
     return transaction(() async {
       final entries = await entriesDao.deleteAll();
       final marks = await marksDao.deleteAll();
-      return (entries: entries, marks: marks);
+      final methods = await measurementMethodsDao.deleteAll();
+      return (entries: entries, marks: marks, methods: methods);
     });
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -94,11 +98,21 @@ class CycleDatabase extends _$CycleDatabase {
       }
 
       // Each future schema-version bump adds its own guarded block here
-      // (e.g. `if (from < 13) { ... }`), using Migrator helpers only
+      // (e.g. `if (from < 14) { ... }`), using Migrator helpers only
       // (createTable, addColumn, customStatement, …); disruptive table
       // shape changes copy data into the new table instead of dropping
       // anything. Skipped steps (from several versions behind) run every
       // missing block in order, so any distance migrates step-wise.
+
+      if (from < 13) {
+        // The methods snapshot table is NEW in v13 (no SELECT data is
+        // transformed): an existing install's tracked data is untouched,
+        // older-version files simply did not store methods yet.
+        // createTable brings only the table — the day key's unique index
+        // belongs to the same delta and must be created with it.
+        await m.createTable(measurementMethods);
+        await m.createIndex(measurementMethodsDateUnique);
+      }
     },
     // SQLite only enforces FOREIGN KEY constraints when the pragma is
     // enabled for the connection; make that explicit. Idempotent if

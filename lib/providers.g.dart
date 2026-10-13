@@ -246,6 +246,62 @@ final class MarksProvider
 
 String _$marksHash() => r'5caa831b4920c0bd557c09b53a1df1d3f4295ff1';
 
+/// Live stream of the measurement-method snapshots (as pure domain models)
+/// — the state history of the TRACKED method ("from this day onwards").
+/// Re-emits on every methods write; consumers derive the per-day effective
+/// method from it (effectiveMeasurementMethod).
+
+@ProviderFor(measurementMethods)
+final measurementMethodsProvider = MeasurementMethodsProvider._();
+
+/// Live stream of the measurement-method snapshots (as pure domain models)
+/// — the state history of the TRACKED method ("from this day onwards").
+/// Re-emits on every methods write; consumers derive the per-day effective
+/// method from it (effectiveMeasurementMethod).
+
+final class MeasurementMethodsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<MeasurementMethodSnapshot>>,
+          List<MeasurementMethodSnapshot>,
+          Stream<List<MeasurementMethodSnapshot>>
+        >
+    with
+        $FutureModifier<List<MeasurementMethodSnapshot>>,
+        $StreamProvider<List<MeasurementMethodSnapshot>> {
+  /// Live stream of the measurement-method snapshots (as pure domain models)
+  /// — the state history of the TRACKED method ("from this day onwards").
+  /// Re-emits on every methods write; consumers derive the per-day effective
+  /// method from it (effectiveMeasurementMethod).
+  MeasurementMethodsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'measurementMethodsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$measurementMethodsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<MeasurementMethodSnapshot>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<MeasurementMethodSnapshot>> create(Ref ref) {
+    return measurementMethods(ref);
+  }
+}
+
+String _$measurementMethodsHash() =>
+    r'da72cf769b6b6fffd0ba8079c6129da9db5cadce';
+
 /// The one derived grouping+evaluation pass behind the Tagebuch, Zyklus and
 /// Statistik screens: each faces its data through the SAME
 /// [DerivedCycleData] instance, so a mark write or entry write re-derives it

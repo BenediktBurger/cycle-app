@@ -18,6 +18,7 @@ import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -431,14 +432,51 @@ List<CycleMark> bandFixtureMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
 ];
 
-PdfExportModel bandFixtureModel() => buildPdfExportModel(
+PdfExportModel bandFixtureModel({
+  List<MeasurementMethodSnapshot> measurementSnapshots = const [],
+}) => buildPdfExportModel(
   entries: bandFixtureEntries(),
   marks: bandFixtureMarks(),
+  measurementSnapshots: measurementSnapshots,
   today: d(3, 14),
 );
 
-Future<List<int>> generateBandFixture() => generatePdfBytes(
-  model: bandFixtureModel(),
+Future<List<int>> generateBandFixture({
+  List<MeasurementMethodSnapshot> measurementSnapshots = const [],
+}) => generatePdfBytes(
+  model: bandFixtureModel(measurementSnapshots: measurementSnapshots),
+  fontBytes: fixtureFontBytes(),
+  options: PdfExportOptions(anonymized: false),
+  compress: false,
+);
+
+// The measurement-method GAP fixture: tracked Mar 1–3 and Mar 7–9 (the
+// interior days Mar 4–6 carry no page column) — a change dated Mar 5 must
+// render on the FIRST tracked column at or after it (Mar 7, the window's
+// fourth column: the page window position, not the calendar offset 6).
+List<DailyEntry> gapMethodEntries() => [
+  for (var i = 1; i <= 3; i++) DailyEntry(date: d(3, i), bbtC: 36.4),
+  for (var i = 7; i <= 9; i++) DailyEntry(date: d(3, i), bbtC: 36.2),
+];
+
+PdfExportModel gapMethodModel() => buildPdfExportModel(
+  entries: gapMethodEntries(),
+  marks: [CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart)],
+  measurementSnapshots: [
+    MeasurementMethodSnapshot(
+      date: DateTime.utc(2026, 2, 20),
+      route: MeasurementRoute.vaginal,
+    ),
+    MeasurementMethodSnapshot(
+      date: DateTime.utc(2026, 3, 5),
+      route: MeasurementRoute.other,
+    ),
+  ],
+  today: d(3, 9),
+);
+
+Future<List<int>> generateGapMethodFixture() => generatePdfBytes(
+  model: gapMethodModel(),
   fontBytes: fixtureFontBytes(),
   options: PdfExportOptions(anonymized: false),
   compress: false,
@@ -660,6 +698,97 @@ void main() {
       );
     });
 
+    group('the measurement-method fact (Messmethode line)', () {
+      PdfExportModel methodModel(
+        ({MeasurementRoute route, String? thermometer})? fact,
+      ) => PdfExportModel(
+        cycles: const [],
+        markOpenedIndexes: const [0],
+        overlays: const [],
+        observedCyclesOutsideApp: 0,
+        name: null,
+        birthDate: null,
+        shortestCycleLengths: [null],
+        earliestFirstHigherCycleDays: [null],
+        measurementMethods: [fact],
+      );
+
+      test('the fact prints the German route wording and the thermometer '
+          'name; it is NOT a person identifier (it stays when anonymized)', () {
+        expect(
+          valueOf(
+            pdfHeaderFacts(
+              model: methodModel((
+                route: MeasurementRoute.vaginal,
+                thermometer: 'ThermaPen',
+              )),
+              anonymized: false,
+              cycleIndex: 0,
+            ),
+            'Messmethode',
+          ),
+          'vaginal, ThermaPen',
+        );
+        expect(
+          valueOf(
+            pdfHeaderFacts(
+              model: methodModel((
+                route: MeasurementRoute.vaginal,
+                thermometer: 'ThermaPen',
+              )),
+              anonymized: true,
+              cycleIndex: 0,
+            ),
+            'Messmethode',
+          ),
+          'vaginal, ThermaPen',
+        );
+      });
+
+      test('a fact without a thermometer prints the route alone', () {
+        expect(
+          valueOf(
+            pdfHeaderFacts(
+              model: methodModel((
+                route: MeasurementRoute.rectal,
+                thermometer: null,
+              )),
+              anonymized: false,
+              cycleIndex: 0,
+            ),
+            'Messmethode',
+          ),
+          'rektal',
+        );
+      });
+
+      test('a cycle without the fact (no governing snapshot, no temperature) '
+          'keeps the "—" convention', () {
+        expect(
+          valueOf(
+            pdfHeaderFacts(
+              model: methodModel(null),
+              anonymized: false,
+              cycleIndex: 0,
+            ),
+            'Messmethode',
+          ),
+          '—',
+        );
+      });
+
+      test('a model with fewer facts than cycles (shorter list) renders '
+          '"—" instead of throwing', () {
+        expect(
+          valueOf(
+            pdfHeaderFacts(model: _fakeModel, anonymized: false, cycleIndex: 0),
+            'Messmethode',
+          ),
+          '—',
+        );
+      });
+    });
+
     group('the observation window fact (Zykluszeitraum)', () {
       test('the window row carries the exported cycle\'s dates WITH year', () {
         final facts = pdfHeaderFacts(
@@ -701,6 +830,41 @@ void main() {
           reason: 'no window was carried — the fact row never renders',
         );
       });
+    });
+  });
+
+  group('the header fact lines on the rendered page', () {
+    test('every fact label of page 1 renders inside the fixed 58 pt '
+        'header band', () async {
+      final model = fixtureModel();
+      final span = cycleSpanDays(model.cycles.first.cycle);
+      final labels = [
+        for (final fact in pdfHeaderFacts(
+          model: model,
+          anonymized: false,
+          cycleIndex: 0,
+          cycleWindow: (first: span.first.date, last: span.last.date),
+        ))
+          fact.label,
+      ];
+      expect(labels, isNotEmpty, reason: 'the fixture must carry facts to pin');
+      final bytes = await generateFixture();
+      final (runs, _) = extractPageContent(bytes);
+      // The fact lines paint at 6.4 pt inside the top header block
+      // (page height 595 − 28 margin − 58 header); fragments join in
+      // paint order, the lost TJ spaces stripped.
+      final bandTop = 595 - 28 - 58;
+      final factText = [
+        for (final run in runs)
+          if ((run.fontSize - 6.4).abs() < 0.05 && run.y > bandTop) run.text,
+      ].join().replaceAll(' ', '');
+      for (final label in labels) {
+        expect(
+          factText,
+          contains("${label.replaceAll(' ', '')}:"),
+          reason: 'the fact line "$label" survives the fixed header height',
+        );
+      }
     });
   });
 
@@ -1563,6 +1727,203 @@ void main() {
         "tab's direction): pdfRotatedTextAngle is −π/2, pw's top→down "
         'quarter turn', () {
       expect(pdfRotatedTextAngle, closeTo(-math.pi / 2, 1e-9));
+    });
+  });
+
+  group('measurement method: band note (render-time synthesis)', () {
+    const x0 = 28 + 58;
+
+    /// The 5.2 pt runs whose line sits in [column]'s x window at the
+    /// band's own height, joined in reading order (a rotated vertical line
+    /// descends the page, so the earlier fragments have the larger y).
+    /// The threshold reaches a hairline past the band's top edge (the
+    /// first rotated glyph's baseline does too); the rows ABOVE the band
+    /// (day numbers, values, times) sit clearly higher on the page and
+    /// never fall in. Word runs the TJ operator split lose their
+    /// separating spaces — comparisons strip them ([compact]).
+    String cellText(List<PdfTextRun> runs, int column) {
+      final bandTopY = runs.firstWhere((r) => r.text == 'Notizen').y + 7;
+      final left = x0 + column * pdfColumnWidth;
+      final fragments =
+          runs
+              .where((r) => (r.fontSize - 5.2).abs() < 0.05)
+              .where((r) => r.y < bandTopY)
+              .where((r) => r.x > left && r.x < left + pdfColumnWidth)
+              .toList()
+            ..sort((a, b) => b.y.compareTo(a.y));
+      return fragments.map((r) => r.text).join();
+    }
+
+    /// [s] with the TJ split's lost spaces removed.
+    String compact(String s) => s.replaceAll(' ', '');
+
+    test('a change day WITH user notes renders note and synthesis as one '
+        'cell text, joined by the em-dash separator', () async {
+      final bytes = await generateBandFixture(
+        measurementSnapshots: [
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 2, 20),
+            route: MeasurementRoute.vaginal,
+            thermometer: 'ThermaPen',
+          ),
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 3, 3),
+            route: MeasurementRoute.rectal,
+          ),
+        ],
+      );
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        compact(cellText(runs, 2)),
+        'BZweiteNotiz—rektal',
+        reason:
+            "day 2 (Mar 3) carries the note AND the snapshot day's synthesis "
+            "(the day's own 'B' pain letter rides the zone above)",
+      );
+    });
+
+    test('a snapshot day whose snapshot names a thermometer renders the '
+        'name after the route word', () async {
+      final bytes = await generateBandFixture(
+        measurementSnapshots: [
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 2, 20),
+            route: MeasurementRoute.vaginal,
+          ),
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 3, 3),
+            route: MeasurementRoute.rectal,
+            thermometer: 'ThermaPen',
+          ),
+        ],
+      );
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        compact(cellText(runs, 2)),
+        'BZweiteNotiz—rektal,ThermaPen',
+        reason: 'the band note carries the snapshot\'s name like the fact line',
+      );
+    });
+
+    test('a change date marks exactly ONE band column: the neighboring '
+        'columns render no synthesis', () async {
+      final bytes = await generateBandFixture(
+        measurementSnapshots: [
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 2, 20),
+            route: MeasurementRoute.vaginal,
+            thermometer: 'ThermaPen',
+          ),
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 3, 3),
+            route: MeasurementRoute.rectal,
+          ),
+        ],
+      );
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        cellText(runs, 0),
+        isNot(contains('rektal')),
+        reason:
+            "day 0 (Mar 1): the governing snapshot predates the cycle start "
+            "so it does not echo — its note stays alone",
+      );
+      expect(
+        cellText(runs, 3),
+        isEmpty,
+        reason: "day 3 (Mar 4) carries neither a note nor a synthesis",
+      );
+    });
+
+    test('the synthesized text keeps the MODEL untouched: the fixture day '
+        'still carries its stored note after a full generation', () async {
+      final model = bandFixtureModel(
+        measurementSnapshots: [
+          MeasurementMethodSnapshot(
+            date: d(2, 20),
+            route: MeasurementRoute.vaginal,
+            thermometer: 'ThermaPen',
+          ),
+          MeasurementMethodSnapshot(
+            date: d(3, 3),
+            route: MeasurementRoute.rectal,
+          ),
+        ],
+      );
+      final noteDay = model.cycles[0].cycle.days
+          .where((e) => DateOnly.sameDay(e.date, d(3, 3)))
+          .single;
+      expect(
+        noteDay.notes,
+        'Zweite Notiz',
+        reason: 'the synthesis joins at RENDER time only',
+      );
+    });
+
+    test('a change on an untracked mid-span gap day renders on the FIRST '
+        'tracked column at or after it (the window-day column, not the '
+        'calendar offset)', () async {
+      final bytes = await generateGapMethodFixture();
+      final (runs, _) = extractPageContent(bytes);
+      // Mar 7 is the span list's 4th day => column 3 of the single page.
+      // The Mar 5 snapshot's synthesis alone fills that noteless cell.
+      expect(
+        compact(cellText(runs, 3)),
+        'andere',
+        reason: 'Mar 5 sits inside the Mar 4–6 gap: no column of its own',
+      );
+      expect(
+        cellText(runs, 2),
+        isEmpty,
+        reason: "no synthesis slides onto the snapshot day's NEIGHBOR before",
+      );
+      // Page-plan exactness: the synthesis rides the EXISTING band row.
+      expect(countPageMarkers(bytes), 1);
+    });
+
+    test('a change whose column lies BEYOND the first page window renders '
+        'in the later window\'s column (the synthesis follows the page '
+        'plan)', () async {
+      final entries = [
+        for (var i = 1; i <= 45; i++) DailyEntry(date: d(3, i), bbtC: 36.2),
+      ];
+      final change = MeasurementMethodSnapshot(
+        date: d(3, 42),
+        route: MeasurementRoute.other,
+      );
+      final model = buildPdfExportModel(
+        entries: entries,
+        marks: [CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart)],
+        measurementSnapshots: [
+          MeasurementMethodSnapshot(
+            date: d(2, 20),
+            route: MeasurementRoute.vaginal,
+          ),
+          change,
+        ],
+        today: d(3, 45),
+      );
+      // 45 span days: page 1 holds the window offsets 0..39, the change
+      // (Mar 42, offset 41) rides page 2's column 1.
+      expect(model.overlays[0].methodChanges, {41: change});
+      final bytes = await generatePdfBytes(
+        model: model,
+        fontBytes: fixtureFontBytes(),
+        options: PdfExportOptions(anonymized: false),
+        compress: false,
+      );
+      expect(countPageMarkers(bytes), 2);
+      final (runs, _) = extractPageContent(bytes, page: 1);
+      final page2Text = runs
+          .where((r) => (r.fontSize - 5.2).abs() < 0.05)
+          .map((r) => r.text)
+          .join(' ');
+      expect(page2Text, contains('andere'));
+      expect(
+        page2Text,
+        isNot(contains('Messmethode')),
+        reason: 'the band note is the route word alone, no label prefix',
+      );
     });
   });
 }

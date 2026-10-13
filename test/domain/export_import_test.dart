@@ -16,6 +16,7 @@ import 'dart:io';
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/export_import.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +142,7 @@ void main() {
         doc,
         existingEntryKeys: {'2026-03-05'},
         existingMarkKeys: {'2026-03-03|baseline'},
+        existingMethodKeys: {},
       );
 
       expect(summary.duplicateEntryRows, 0, reason: 'no date repeated in doc');
@@ -169,6 +171,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
 
       // The plan counts EXACTLY what the writer will write: the two
@@ -194,6 +197,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(summary.duplicateEntryRows, 1);
       // The first occurrence wins; the later one is the counted duplicate.
@@ -224,6 +228,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
 
       expect(summary.entriesNew, 1, reason: 'the second row is a duplicate');
@@ -334,6 +339,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -372,6 +378,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesNew, 2);
@@ -464,6 +471,7 @@ void main() {
         docWithMucus(const {'mucus_sign': 'zzz', 'mucus_quality': 'qqq'}),
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -558,6 +566,7 @@ void main() {
           ),
           existingEntryKeys: {},
           existingMarkKeys: {},
+          existingMethodKeys: {},
         );
         expect(
           summary.entriesInvalid,
@@ -697,6 +706,7 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -814,6 +824,7 @@ void main() {
           ),
           existingEntryKeys: {},
           existingMarkKeys: {},
+          existingMethodKeys: {},
         );
         expect(
           summary.entriesInvalid,
@@ -900,6 +911,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -932,6 +944,7 @@ void main() {
         doc,
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesWritten, 1);
@@ -983,6 +996,7 @@ void main() {
           doc,
           existingEntryKeys: {},
           existingMarkKeys: {},
+          existingMethodKeys: {},
         );
         expect(
           summary.entriesInvalid,
@@ -1050,7 +1064,12 @@ void main() {
       expect(doc.marks, markRows);
 
       // First import: both rows count as new writes.
-      final first = planMerge(doc, existingEntryKeys: {}, existingMarkKeys: {});
+      final first = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingMethodKeys: {},
+      );
       expect(first.marksNew, 2);
       expect(first.marksSkipped, 0);
 
@@ -1068,6 +1087,7 @@ void main() {
         doc,
         existingEntryKeys: const {'2026-01-01', '2026-02-01'},
         existingMarkKeys: existingMarkKeys,
+        existingMethodKeys: {},
       );
       expect(second.marksNew, 0);
       expect(second.marksSkipped, 2);
@@ -1161,6 +1181,7 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -1251,6 +1272,7 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -1281,6 +1303,7 @@ void main() {
         ),
         existingEntryKeys: {},
         existingMarkKeys: {},
+        existingMethodKeys: {},
       );
       expect(
         summary.entriesInvalid,
@@ -1322,6 +1345,189 @@ void main() {
       );
       expect(peak['mark_type'], 'mucusPeakDay');
       expect(peak['author'], 'user');
+    });
+  });
+
+  group('measurement method rows in the document', () {
+    test('buildExportJson ↔ parseExportJson round-trips method rows', () {
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const [],
+          marks: const [],
+          methods: const [
+            {
+              'date': '2026-02-01',
+              'method': 'vaginal',
+              'thermometer': 'ThermaPen',
+            },
+            {'date': '2026-03-15', 'method': 'oral'},
+          ],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
+
+      // The sparse row shape: a missing thermometer key, never a null one.
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      final rows = decoded['methods']! as List;
+      expect(rows, hasLength(2));
+      expect(
+        (rows.last as Map).containsKey('thermometer'),
+        isFalse,
+        reason: 'the thermometer key is omitted when null (no ": null")',
+      );
+
+      final doc = parseExportJson(json);
+      expect(doc.methods, [
+        {'date': '2026-02-01', 'method': 'vaginal', 'thermometer': 'ThermaPen'},
+        {'date': '2026-03-15', 'method': 'oral'},
+      ]);
+    });
+
+    test('a snapshot-free document keeps the four-root-key shape', () {
+      // Byte-compatibility decision: the WRITER emits the `methods` root key
+      // only when the dataset carries snapshots, so snapshot-free exports
+      // stay identical to the pinned v6 shape (the root pin above and the
+      // db adapter pin stay green without datasets).
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const [],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      expect(decoded.keys.toSet(), {
+        'schema_version',
+        'exported_at',
+        'entries',
+        'marks',
+      }, reason: 'an empty methods list is NOT emitted at all');
+    });
+
+    test('a document without the methods key parses with empty methods', () {
+      // Old documents simply omit the key: one export from before the
+      // feature must flow through the reader untouched. Raw JSON on
+      // purpose — pins the actual old file content, not a hand-built blob.
+      const oldJson =
+          '{"schema_version": 6, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"entries": [{"date": "2026-03-01", "bleeding": 3}], '
+          '"marks": []}';
+      final doc = parseExportJson(oldJson);
+      expect(doc.methods, isEmpty);
+      final summary = planMerge(
+        doc,
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingMethodKeys: {},
+      );
+      expect(summary.methodsNew, 0);
+    });
+
+    test('a non-list methods value is a document error', () {
+      // Like entries/marks: a present-but-broken value fails loudly
+      // instead of being ignored (a map of rows behind it would silently
+      // vanish — the shape must never lie about the data).
+      for (final bad in const [
+        {'date': '2026-03-01'},
+        3,
+        'no',
+        true,
+        null,
+      ]) {
+        expect(
+          () => parseExportJson(
+            jsonEncode(<String, Object?>{
+              'schema_version': exportSchemaVersion,
+              'exported_at': '2026-09-15T12:00:00Z',
+              'entries': <Object?>[],
+              'marks': <Object?>[],
+              'methods': bad,
+            }),
+          ),
+          throwsA(isA<FormatException>()),
+          reason: 'a non-list methods value ($bad) must fail loudly',
+        );
+      }
+    });
+
+    test('planMerge counts method rows by the day-keyed overwrite rule', () {
+      final summary = planMerge(
+        ExportBlob(
+          entries: const [],
+          marks: const [],
+          methods: const [
+            // New day.
+            {'date': '2026-03-01', 'method': 'vaginal'},
+            // Stored day → overwrite (the entries merge rule).
+            {'date': '2026-03-05', 'method': 'oral'},
+            // Same day already inside the document: first wins.
+            {'date': '2026-03-01', 'method': 'rectal'},
+            // Out-of-vocabulary token — the SQL CHECK cannot store it.
+            {'date': '2026-03-07', 'method': 'sublingual'},
+            // Missing method key.
+            {'date': '2026-03-08'},
+            // Broken/missing date.
+            {'date': 'not-a-day', 'method': 'oral'},
+            {'method': 'oral'},
+          ],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingMethodKeys: {'2026-03-05'},
+      );
+
+      expect(summary.methodsNew, 1, reason: '2026-03-01 only');
+      expect(summary.methodsOverwritten, 1, reason: '2026-03-05 exists');
+      expect(summary.duplicateMethodRows, 1, reason: 'first occurrence wins');
+      expect(
+        summary.methodsInvalid,
+        4,
+        reason: 'unknown token, missing method, broken date, missing date',
+      );
+      expect(summary.methodsWritten, 2);
+      expect(summary.entriesWritten, 0, reason: 'entries stayed untouched');
+    });
+
+    test('a blank thermometer is a valid row that stores null', () {
+      // Counted == written: the planner counts through the same helper the
+      // writer builds with, so a blank name can neither invalidate the row
+      // on one path nor store padding on the other.
+      const row = <String, Object?>{
+        'date': '2026-03-01',
+        'method': 'vaginal',
+        'thermometer': '   ',
+      };
+      final summary = planMerge(
+        ExportBlob(
+          entries: const [],
+          marks: const [],
+          methods: [row],
+          exportedAt: DateTime.utc(2026, 9, 15),
+        ),
+        existingEntryKeys: {},
+        existingMarkKeys: {},
+        existingMethodKeys: {},
+      );
+      expect(summary.methodsInvalid, 0);
+      expect(summary.methodsNew, 1);
+
+      final snapshot = tryMethodSnapshotFromExport(row)!;
+      expect(
+        snapshot.thermometer,
+        isNull,
+        reason: 'whitespace-only names normalize to null',
+      );
+      expect(
+        snapshot,
+        equals(
+          MeasurementMethodSnapshot(
+            date: DateTime.utc(2026, 3, 1),
+            route: MeasurementRoute.vaginal,
+          ),
+        ),
+      );
     });
   });
 }

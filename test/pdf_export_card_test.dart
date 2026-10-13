@@ -13,6 +13,7 @@
 import 'dart:async';
 
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -84,6 +85,8 @@ void main() {
   Widget harness({
     List<DailyEntry> entries = const [],
     List<CycleMark> marks = const [],
+    List<MeasurementMethodSnapshot> measurementSnapshots = const [],
+    Stream<List<MeasurementMethodSnapshot>>? measurementSnapshotsStream,
     List<CapturedRun>? runSink,
     VoidCallback? onExport,
     TemperatureRange? temperatureRange,
@@ -99,6 +102,10 @@ void main() {
       overrides: [
         dailyEntriesProvider.overrideWith((ref) => Stream.value(entries)),
         marksProvider.overrideWith((ref) => Stream.value(marks)),
+        measurementMethodsProvider.overrideWith(
+          (ref) =>
+              measurementSnapshotsStream ?? Stream.value(measurementSnapshots),
+        ),
         // The grouping's injected clock (see nowProvider — test seam):
         // pinned so fixtures far from the wall clock stay deterministic.
         if (today != null)
@@ -315,6 +322,57 @@ void main() {
       saves,
       hasLength(1),
       reason: 'the subset export still saves through the seam',
+    );
+  });
+
+  testWidgets('the method snapshots flow into the generation model: the '
+      'per-cycle fact and the overlay change note ride with it', (
+    WidgetTester tester,
+  ) async {
+    final run = CapturedRun();
+    final saves = <(String, List<int>)>[];
+    await enlargeViewport(tester);
+    saveFileBytesOverride = (filename, bytes) async {
+      saves.add((filename, bytes));
+      return true;
+    };
+    addTearDown(() => saveFileBytesOverride = null);
+    final baseline = MeasurementMethodSnapshot(
+      date: d(2, 15),
+      route: MeasurementRoute.vaginal,
+      thermometer: 'ThermaPen',
+    );
+    final change = MeasurementMethodSnapshot(
+      date: d(3, 10),
+      route: MeasurementRoute.oral,
+    );
+    await pumpCard(
+      tester,
+      harness(
+        entries: cardEntries(),
+        marks: cardMarks(),
+        measurementSnapshots: [baseline, change],
+        runSink: [run],
+      ),
+    );
+    await tester.tap(pdfExportButton());
+    await tester.pumpAndSettle();
+
+    final model = run.model!;
+    // Cycle 1's first temperature day is Mar 1; cycles 2/3 follow the
+    // change (mid-March).
+    expect(model.measurementMethods[0], (
+      route: MeasurementRoute.vaginal,
+      thermometer: 'ThermaPen',
+    ));
+    expect(model.measurementMethods[1], (
+      route: MeasurementRoute.oral,
+      thermometer: null,
+    ));
+    expect(
+      model.overlays[0].methodChanges,
+      {9: change},
+      reason: 'the change day rides the cycle overlay (offset Mar 10 − Mar 1)',
     );
   });
 
@@ -626,6 +684,100 @@ void main() {
         reason:
             'the flipped switch still maps onto the per-export '
             'anonymize option (unchanged behavior, re-asserted)',
+      );
+    },
+  );
+
+  testWidgets(
+    'the hand-off buttons stay disabled while the methods stream has not '
+    'delivered its data — an export mid-load must not silently drop the '
+    'method snapshots; once delivered, the press runs with them',
+    (WidgetTester tester) async {
+      final methodsCtrl = StreamController<List<MeasurementMethodSnapshot>>();
+      addTearDown(() => methodsCtrl.close());
+      final run = CapturedRun();
+      await enlargeViewport(tester);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(
+          entries: cardEntries(),
+          marks: cardMarks(),
+          measurementSnapshotsStream: methodsCtrl.stream,
+          runSink: [run],
+        ),
+      );
+
+      expect(
+        tester.widget<FilledButton>(pdfExportButton()).onPressed,
+        isNull,
+        reason: 'save is disabled while the method history is still loading',
+      );
+      expect(
+        tester.widget<FilledButton>(pdfExportShareButton()).onPressed,
+        isNull,
+        reason: 'share is disabled while the method history is still loading',
+      );
+
+      final baseline = MeasurementMethodSnapshot(
+        date: d(2, 15),
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      );
+      final methodChange = MeasurementMethodSnapshot(
+        date: d(3, 10),
+        route: MeasurementRoute.oral,
+      );
+      methodsCtrl.add([baseline, methodChange]);
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<FilledButton>(pdfExportButton()).onPressed,
+        isNotNull,
+        reason: 'the delivered data unlocks the hand-offs',
+      );
+      await tester.tap(pdfExportButton());
+      await tester.pumpAndSettle();
+
+      expect(find.text('File saved.'), findsOneWidget);
+      expect(run.model!.measurementMethods[0], (
+        route: MeasurementRoute.vaginal,
+        thermometer: 'ThermaPen',
+      ), reason: 'the export ran WITH the delivered method data');
+    },
+  );
+
+  testWidgets(
+    'a failed methods stream keeps the hand-off buttons disabled — the '
+    'export never runs on anything less than the complete method history',
+    (WidgetTester tester) async {
+      final methodsCtrl = StreamController<List<MeasurementMethodSnapshot>>();
+      addTearDown(() => methodsCtrl.close());
+      await enlargeViewport(tester);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      await pumpCard(
+        tester,
+        harness(
+          entries: cardEntries(),
+          marks: cardMarks(),
+          measurementSnapshotsStream: methodsCtrl.stream,
+        ),
+      );
+
+      methodsCtrl.addError(StateError('injected methods stream failure'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<FilledButton>(pdfExportButton()).onPressed,
+        isNull,
+        reason: 'save stays blocked on the failed stream',
+      );
+      expect(
+        tester.widget<FilledButton>(pdfExportShareButton()).onPressed,
+        isNull,
+        reason: 'share stays blocked on the failed stream',
       );
     },
   );

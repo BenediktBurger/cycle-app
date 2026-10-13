@@ -56,7 +56,7 @@
   "saved": "Gespeichert.",
   "saveFailed": "Speichern fehlgeschlagen — die Daten wurden nicht geändert.",
   "@saveFailed": {
-    "description": "Fehlermeldung für das Speichern eines Tagebuchtages: erscheint, wenn der Eintrag-UPSERT oder eine der beiden Markierungs-Schreibvorgänge fehlschlägt. Alle drei Schreibvorgänge sind eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu deleteDataFailed/importFailed)."
+    "description": "Fehlermeldung für das Speichern eines Tagebuchtages oder des Messmethoden-Dialogs: erscheint, wenn der Eintrag-UPSERT oder eine der beiden Markierungs-Schreibvorgänge fehlschlägt (Tagebuch) bzw. wenn der UPSERT des Dialogs fehlschlägt. Die drei Tagebuch-Schreibvorgänge sind eine All-oder-Nichts-Transaktion, deshalb versichert der Zusatz, dass nichts geändert wurde (analog zu deleteDataFailed/importFailed)."
   },
   "noEntriesYet": "Noch keine Einträge. Trage oben deinen ersten Tag ein.",
   "loadFailed": "Laden fehlgeschlagen",
@@ -448,12 +448,12 @@
   },
   "settingsDeleteData": "Daten löschen",
   "@settingsDeleteData": {
-    "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks) after an explicit confirmation; settings and the onboarding flag survive by design."
+    "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks + method snapshots) after an explicit confirmation; settings and the onboarding flag survive by design."
   },
-  "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge und Markierungen. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
+  "settingsDeleteDataNote": "Entfernt alle Tagebucheinträge, Markierungen und Messmethoden. Deine Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "settingsDeleteDataButton": "Alle Daten löschen …",
   "deleteDataDialogTitle": "Daten löschen?",
-  "deleteDataDialogBody": "Es werden {entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}} und {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
+  "deleteDataDialogBody": "Es werden {entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}}, {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} und {methods, plural, =1{1 Messmethode} other{{methods} Messmethoden}} gelöscht. Einstellungen bleiben erhalten. Wenn du die Daten behalten willst: vorher exportieren (siehe Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -461,17 +461,23 @@
       },
       "marks": {
         "type": "int"
+      },
+      "methods": {
+        "type": "int"
       }
     }
   },
   "deleteDataConfirm": "Löschen",
-  "deleteDataDone": "{entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}} und {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} gelöscht.",
+  "deleteDataDone": "{entries, plural, =1{1 Tagebucheintrag} other{{entries} Tagebucheinträge}}, {marks, plural, =1{1 Markierung} other{{marks} Markierungen}} und {methods, plural, =1{1 Messmethode} other{{methods} Messmethoden}} gelöscht.",
   "@deleteDataDone": {
     "placeholders": {
       "entries": {
         "type": "int"
       },
       "marks": {
+        "type": "int"
+      },
+      "methods": {
         "type": "int"
       }
     }
@@ -589,7 +595,7 @@
   "importApply": "Import durchführen",
   "importInvalid": "Ungültiges Dokument (kein gültiger cycle-app-Export).",
   "importFailed": "Import fehlgeschlagen — die Daten wurden nicht geändert.",
-  "importSummary": "{newDays, plural, =1{1 Tag} other{{newDays} Tage}} neu, {overwritten, plural, =1{1 Tag} other{{overwritten} Tage}} überschrieben, {duplicates, plural, =1{1 doppelte Zeile} other{{duplicates} doppelte Zeilen}} im Dokument, {invalid, plural, =1{1 ungültige Zeile} other{{invalid} ungültige Zeilen}}, {newMarks, plural, =1{1 Markierung} other{{newMarks} Markierungen}} neu, {skipped, plural, =1{1 Markierung} other{{skipped} Markierungen}} übersprungen.",
+  "importSummary": "{newDays, plural, =1{1 Tag} other{{newDays} Tage}} neu, {overwritten, plural, =1{1 Tag} other{{overwritten} Tage}} überschrieben, {duplicates, plural, =1{1 doppelte Zeile} other{{duplicates} doppelte Zeilen}} im Dokument, {invalid, plural, =1{1 ungültige Zeile} other{{invalid} ungültige Zeilen}}, {newMarks, plural, =1{1 Markierung} other{{newMarks} Markierungen}} neu, {skipped, plural, =1{1 Markierung} other{{skipped} Markierungen}} übersprungen, {newMethods, plural, =1{1 Methode} other{{newMethods} Methoden}} neu, {methodsOverwritten, plural, =1{1 Methode} other{{methodsOverwritten} Methoden}} überschrieben.",
   "importEmpty": "Import: nichts zu ändern (Dokument leer oder bereits identisch).",
   "importOverwriteWarning": "{days, plural, =1{1 Tag wird überschrieben.} other{{days} Tage werden überschrieben.}}",
   "@importOverwriteWarning": {
@@ -636,5 +642,27 @@
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
   "cycleLegendIgnoreTemperature": "Temperatur ignoriert (heller gezeichnet)",
-  "statisticsShortest": "Kürzester"
+  "statisticsShortest": "Kürzester",
+  "methodDialogTitle": "Messmethode",
+  "@methodDialogTitle": {
+    "description": "Titel des Messmethoden-Dialogs im Tagebuch und Tooltip des Thermometer-Symbols an der Temperatur-Zeile. Der Dialog gilt für den ausgewählten Tagebuch-Tag; die Navigation im Tagebuch ist die Tagesauswahl."
+  },
+  "methodRouteVaginal": "vaginal",
+  "methodRouteRectal": "rektal",
+  "methodRouteOral": "oral",
+  "methodRouteOther": "andere",
+  "methodThermometerLabel": "Thermometer",
+  "methodNotRecorded": "Noch nicht erfasst",
+  "@methodNotRecorded": {
+    "description": "Leerzustand des Messmethoden-Dialogs: Der Tag erbt noch keine Messmethode aus einer früheren Momentaufnahme — die erste Speicherung ist der Startwert."
+  },
+  "methodHelperText": "Zum Ändern oder Löschen einer früheren Angabe: navigiere im Tagebuch zum jeweiligen Tag.",
+  "methodDeleteChange": "Änderung löschen",
+  "@methodDeleteChange": {
+    "description": "Aktion im Messmethoden-Dialog: entfernt nur die Momentaufnahme des ausgewählten Tages; die wirksame Methode fällt danach auf die frühere Angabe zurück."
+  },
+  "methodNavigateToChange": "Zum Tag der letzten Änderung navigieren",
+  "@methodNavigateToChange": {
+    "description": "Tooltip/Semantik-Meldung der antippbaren Datumszeile im Messmethoden-Dialog: erscheint, während der Dialog eine von einem früheren Tag geerbte Methode zeigt; antippen navigiert das Tagebuch zu jenem Tag."
+  }
 }

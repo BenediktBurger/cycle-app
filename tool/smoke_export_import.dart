@@ -19,6 +19,7 @@ import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/decimal_input.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 
@@ -143,6 +144,17 @@ Future<void> main() async {
   await source.entriesDao.upsertDaily(
     DailyEntry(date: DateTime(2026, 3, 4), bleeding: Bleeding.none),
   );
+  // Two method state snapshots: the carry-the-name baseline and a later
+  // name-less change (the sparse row shape).
+  await source.measurementMethodsDao.upsertByDate(
+    date: DateTime(2026, 3, 1),
+    route: MeasurementRoute.vaginal,
+    thermometer: 'ThermaPen',
+  );
+  await source.measurementMethodsDao.upsertByDate(
+    date: DateTime(2026, 3, 20),
+    route: MeasurementRoute.oral,
+  );
 
   final json = await exportDatabaseToJson(source);
   check(
@@ -191,6 +203,17 @@ Future<void> main() async {
     !json.contains('profile_id') && !json.contains('"profiles"'),
     'the export document is profile-free',
   );
+  check(
+    json.contains('"methods"') &&
+        json.contains('"method": "vaginal"') &&
+        json.contains('"thermometer": "ThermaPen"') &&
+        json.contains('"method": "oral"'),
+    'export carries the measurement-method snapshot rows',
+  );
+  check(
+    !json.contains('"thermometer": null'),
+    'the thermometer key is omitted when the snapshot has no name',
+  );
 
   // Malformed documents must be rejected BEFORE any write.
   var rejected = false;
@@ -206,6 +229,10 @@ Future<void> main() async {
   final plan = await planDatabaseImport(target, json);
   check(plan.entriesNew == 5, 'plan counts all 5 entries as new ($plan)');
   check(plan.marksNew == 1, 'plan counts the exclusion mark as new');
+  check(
+    plan.methodsNew == 2 && plan.methodsWritten == 2,
+    'plan counts both method snapshots as new ($plan)',
+  );
 
   // Merge: target already holds one day that the document overwrites.
   final overwrittenDay = DateOnly.normalize(DateTime(2026, 3, 3));
@@ -231,6 +258,16 @@ Future<void> main() async {
   );
   final migrated = await target.entriesDao.allEntries();
   check(migrated.length == 5, 'import wrote 5 entry rows total');
+  final importedMethods = await target.measurementMethodsDao.allSnapshots();
+  check(
+    importedMethods.length == 2 &&
+        importedMethods[0].method == 'vaginal' &&
+        importedMethods[0].thermometer == 'ThermaPen' &&
+        importedMethods[1].method == 'oral' &&
+        importedMethods[1].thermometer == null,
+    'import wrote both method snapshots day-keyed (name carried and '
+    'name-less)',
+  );
   final day2 = migrated.firstWhere((e) => e.date == overwrittenDay);
   check(
     day2.bleeding == Bleeding.medium && day2.bbtC == 36.05,
@@ -287,11 +324,17 @@ Future<void> main() async {
   // Re-import of the SAME document: everything is now idempotent/skipped.
   final second = await importJsonToDatabase(target, json);
   check(
-    second.entriesOverwritten == 5 && second.marksSkipped == 1,
+    second.entriesOverwritten == 5 &&
+        second.marksSkipped == 1 &&
+        second.methodsOverwritten == 2,
     're-import overwrites all days and skips no marks: $second',
   );
   final afterSecond = await target.entriesDao.allEntries();
   check(afterSecond.length == 5, 're-import keeps exactly 5 rows');
+  check(
+    (await target.measurementMethodsDao.allSnapshots()).length == 2,
+    're-import keeps exactly 2 method snapshots (no duplicates)',
+  );
 
   check(
     (await source.entriesDao.allEntries()).length == 5,

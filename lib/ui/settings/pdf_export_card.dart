@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../db/settings_store.dart';
 import '../../domain/date_only.dart';
 import '../../domain/marks.dart';
+import '../../domain/measurement_method.dart';
 import '../../domain/models.dart';
 import '../../domain/pdf_export_model.dart';
 import '../../l10n/app_localizations.dart';
@@ -48,6 +49,10 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
   var _anonymized = false;
   var _running = false;
 
+  /// The snapshot list watched at the last build; the export run picks it
+  /// up from here (a run is an event handler — it cannot watch).
+  List<MeasurementMethodSnapshot> _measurementSnapshots = const [];
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -56,6 +61,14 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
     final entries =
         ref.watch(dailyEntriesProvider).value ?? const <DailyEntry>[];
     final marks = ref.watch(marksProvider).value ?? const <CycleMark>[];
+    final methods = ref.watch(measurementMethodsProvider);
+    _measurementSnapshots =
+        methods.value ?? const <MeasurementMethodSnapshot>[];
+    // The hand-offs unlock only once the stream DELIVERED its history
+    // (never on the loading or failed state): an export on the masked
+    // empty default would silently export without the method facts.
+    final methodsReady =
+        methods.hasValue && !methods.isLoading && !methods.hasError;
     final outside = ref.watch(observedCyclesOutsideAppProvider);
     final choices = exportableCycles(
       entries,
@@ -121,7 +134,7 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
               children: [
                 FilledButton.icon(
                   key: const ValueKey('pdfExportButton'),
-                  onPressed: _running
+                  onPressed: _running || !methodsReady
                       ? null
                       : () => _runExport(context, share: false),
                   icon: const Icon(Icons.save_outlined),
@@ -130,7 +143,7 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
                 if (canShareFile)
                   FilledButton.tonalIcon(
                     key: const ValueKey('pdfExportShareButton'),
-                    onPressed: _running
+                    onPressed: _running || !methodsReady
                         ? null
                         : () => _runExport(context, share: true),
                     icon: const Icon(Icons.share_outlined),
@@ -232,6 +245,7 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
       earliestFirstHigherCycleDayOutsideApp: ref.read(
         earliestFirstHigherCycleDayOutsideAppProvider,
       ),
+      measurementSnapshots: _measurementSnapshots,
       name: ref.read(pdfExportNameProvider),
       birthDate: ref.read(pdfExportBirthDateProvider),
       selectedStartDates: selected,
