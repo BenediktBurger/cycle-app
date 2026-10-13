@@ -755,5 +755,42 @@
   "methodNavigateToChange": "Navigate to the day of the last change",
   "@methodNavigateToChange": {
     "description": "Tooltip/semantics message of the tappable date line in the measurement-method dialog: shown while the dialog displays a method inherited from an earlier day's snapshot; tapping navigates the diary to that day."
+},
+  "sectionInfoTooltip": "Information about {topic}",
+  "@sectionInfoTooltip": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    },
+    "description": "Tooltip- und Semantics-Label der Info-Schaltfläche an einer Abschnittsüberschrift des Tagebuch-Eingabeformulars; als {topic} wird der jeweilige Abschnittstitel eingesetzt."
+  },
+  "termCervix": "Cervix",
+  "@termCervix": {
+    "description": "Kombinierter Titel des Muttermund-Abschnitts im Tagebuch-Eingabeformular: Position, Öffnung und Festigkeit stehen als kleine Untertitel unter dieser einen Überschrift."
+  },
+  "diaryInfoTemperature": "Measure immediately after waking, before getting up and before any activity such as speaking, sitting or drinking. Always at about the same time each morning and after sufficient sleep. Interruptions such as going to bed late, frequent night awakenings, alcohol or illness are marked as measurement disturbances.",
+  "@diaryInfoTemperature": {
+    "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
+  },
+  "diaryInfoBleeding": "Observe your bleeding and its strength day by day. The first day of serious bleeding after a high temperature is the first cycle day and is marked as the cycle start with the cycle-start switch. If the bleeding starts late evening (after 9/10 pm), the cycle starts the next day.",
+  "@diaryInfoBleeding": {
+    "description": "Info-Text zum Blutungs-Abschnitt im Tagebuch-Eingabeformular: die Beobachtung der Blutung und der Bezug zur Zyklusbeginn-Markierung."
+  },
+  "diaryInfoMucus": "Observe your fertility sign: the sensation at the vaginal opening and the visible mucus. The observation is entered through the signs t, Ø, f, S and A; the quality qualifier belongs to the S sign only.",
+  "@diaryInfoMucus": {
+    "description": "Info-Text zum Fruchtbarkeitszeichen-Abschnitt im Tagebuch-Eingabeformular: was beobachtet wird und wie die Zeichen-Erfassung funktioniert."
+  },
+  "diaryInfoCervix": "The cervix is felt daily with your own finger (clean hands, short nails) — best at the same time each day and in the same posture. Position (low to unreachable), opening and firmness are recorded.",
+  "@diaryInfoCervix": {
+    "description": "Info-Text zum Muttermund-Abschnitt im Tagebuch-Eingabeformular: die Technik der Selbstuntersuchung und die drei erfassten Merkmale."
+  },
+  "diaryInfoSex": "Recorded is intercourse with ejaculation into the vagina. The time of day (morning, midday, evening) is noted too because it is fertility-relevant: sperm can survive several days, so intercourse before the fertile time can lead to pregnancy. Several times of day can be selected together for the same day.",
+  "@diaryInfoSex": {
+    "description": "Info-Text zum Sex-Abschnitt im Tagebuch-Eingabeformular: im Zyklus-Kontext meint „Sex“ Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
+  },
+  "diaryInfoPain": "Two pain observations: cyclical breast pain (the typical tension-type pain of the second half of the cycle) and mittelschmerz, the possible ovulation pain around mid-cycle.",
+  "@diaryInfoPain": {
+    "description": "Info-Text zum Schmerz-Abschnitt im Tagebuch-Eingabeformular: die beiden Beobachtungen Brustschmerz und Mittelschmerz."
   }
 }

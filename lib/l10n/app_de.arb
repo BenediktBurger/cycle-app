@@ -664,5 +664,42 @@
   "methodNavigateToChange": "Zum Tag der letzten Änderung navigieren",
   "@methodNavigateToChange": {
     "description": "Tooltip/Semantik-Meldung der antippbaren Datumszeile im Messmethoden-Dialog: erscheint, während der Dialog eine von einem früheren Tag geerbte Methode zeigt; antippen navigiert das Tagebuch zu jenem Tag."
+},
+  "sectionInfoTooltip": "Informationen zu {topic}",
+  "@sectionInfoTooltip": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    },
+    "description": "Tooltip- und Semantics-Label der Info-Schaltfläche an einer Abschnittsüberschrift des Tagebuch-Eingabeformulars; als {topic} wird der jeweilige Abschnittstitel eingesetzt."
+  },
+  "termCervix": "Muttermund",
+  "@termCervix": {
+    "description": "Kombinierter Titel des Muttermund-Abschnitts im Tagebuch-Eingabeformular: Position, Öffnung und Festigkeit stehen als kleine Untertitel unter dieser einen Überschrift."
+  },
+  "diaryInfoTemperature": "Messen sofort nach dem Aufwachen, vor dem Aufstehen und vor jeder Tätigkeit wie Sprechen, Sitzen oder Trinken. Möglichst immer zur selben Tageszeit und nach ausreichendem Schlaf. Unterbrechungen wie spätes Zubettgehen, nächtliches Aufwachen, Alkohol oder Krankheit werden als Messstörung gekennzeichnet.",
+  "@diaryInfoTemperature": {
+    "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
+  },
+  "diaryInfoBleeding": "Tägliche Beobachtung der Blutung und ihrer Stärke. Der erste Tag einer richtigen Blutung nach einer Hochlage ist der erste Zyklustag und wird über den Zyklusbeginn-Schalter als Zyklusbeginn markiert. Wenn die Blutung erst spät abends (so ab 21/22 Uhr) einsetzt, beginnt der Zyklus erst am nächsten Tag.",
+  "@diaryInfoBleeding": {
+    "description": "Info-Text zum Blutungs-Abschnitt im Tagebuch-Eingabeformular: die Beobachtung der Blutung und der Bezug zur Zyklusbeginn-Markierung."
+  },
+  "diaryInfoMucus": "Beobachte das Fruchtbarkeitszeichen: die Empfindung im Bereich des Scheideneingangs und den sichtbaren Schleim. Die Beobachtung wird über die Zeichen t, Ø, f, S und A erfasst; die Zusatzqualität gehört nur zum S-Zeichen.",
+  "@diaryInfoMucus": {
+    "description": "Info-Text zum Fruchtbarkeitszeichen-Abschnitt im Tagebuch-Eingabeformular: was beobachtet wird und wie die Zeichen-Erfassung funktioniert."
+  },
+  "diaryInfoCervix": "Der Muttermund wird täglich mit dem eigenen Finger ertastet (saubere Hände, kurze Nägel) — am besten immer zur selben Tageszeit und in derselben Körperhaltung. Erfasst werden Position (tief bis unerreichbar), Öffnung und Festigkeit.",
+  "@diaryInfoCervix": {
+    "description": "Info-Text zum Muttermund-Abschnitt im Tagebuch-Eingabeformular: die Technik der Selbstuntersuchung und die drei erfassten Merkmale."
+  },
+  "diaryInfoSex": "Erfasst wird Geschlechtsverkehr mit Samenerguss in die Scheide. Der Zeitpunkt (morgens, mittags, abends) wird mit notiert, weil er fruchtbarkeitsrelevant ist: Samenzellen können mehrere Tage überleben, so dass auch Verkehr vor der fruchtbaren Zeit zur Schwangerschaft führen kann. Mehrere Zeitpunkte am selben Tag lassen sich gleichzeitig markieren.",
+  "@diaryInfoSex": {
+    "description": "Info-Text zum Sex-Abschnitt im Tagebuch-Eingabeformular: im Zyklus-Kontext meint „Sex“ Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
+  },
+  "diaryInfoPain": "Zwei Schmerz-Beobachtungen: der zyklische Brustschmerz (typischerweise auftretender Spannungsschmerz in der zweiten Zyklushälfte) und der Mittelschmerz als möglicher Hinweis auf den Eisprung um die Zyklusmitte.",
+  "@diaryInfoPain": {
+    "description": "Info-Text zum Schmerz-Abschnitt im Tagebuch-Eingabeformular: die beiden Beobachtungen Brustschmerz und Mittelschmerz."
   }
 }
