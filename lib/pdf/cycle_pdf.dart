@@ -113,6 +113,11 @@ List<({String label, String value})> pdfHeaderFacts({
       : _formatDate(DateOnly.normalize(model.birthDate!));
   final earliest = model.earliestFirstHigherCycleDays[cycleIndex];
   final shortest = model.shortestCycleLengths[cycleIndex];
+  // A model with fewer facts than cycles indexes past the list — that
+  // page reads as "—", never throws.
+  final method = cycleIndex < model.measurementMethods.length
+      ? model.measurementMethods[cycleIndex]
+      : null;
   return [
     if (anonymized) (label: 'Anonymisierung', value: 'anonymisiert'),
     (label: 'Name', value: anonymized ? 'anonymisiert' : (model.name ?? '—')),
@@ -125,6 +130,12 @@ List<({String label, String value})> pdfHeaderFacts({
     (
       label: 'Früheste erste höhere Messung',
       value: earliest == null ? '—' : 'Zyklustag $earliest',
+    ),
+    (
+      label: 'Messmethode',
+      value: method == null
+          ? '—'
+          : pdfMethodFactText(method.route, method.thermometer),
     ),
     if (cycleWindow != null)
       (
@@ -200,9 +211,22 @@ Future<List<int>> generatePdfBytes({
   for (final window in plan) {
     final evaluation = model.cycles[window.cycleIndex];
     final span = spans[window.cycleIndex];
+    final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
     final windowDays = span
         .sublist(window.firstDayIndex, window.firstDayIndex + window.dayCount)
         .toList(growable: false);
+    // The page's snapshot-day method notes, keyed by the snapshot day's
+    // normalized date: the overlay's calendar-offset keys laid back onto
+    // the cycle's calendar. A snapshot day this page's slice does not
+    // contain simply finds no cell to join into.
+    final methodNotes = {
+      for (final MapEntry(:key, :value)
+          in model.overlays[window.cycleIndex].methodChanges.entries)
+        DateOnly.addDays(cycleStart, key): pdfMethodChangeNote(
+          value.route,
+          value.thermometer,
+        ),
+    };
     final drawing = pdfCurveDrawing(
       cycle: evaluation,
       overlay: model.overlays[window.cycleIndex],
@@ -238,8 +262,9 @@ Future<List<int>> generatePdfBytes({
               // The page window's day-number labels key on the cycle's
               // normalized start day (calendar offsets — never the page
               // window's column positions).
-              cycleStart: DateOnly.normalize(evaluation.cycle.startDate),
+              cycleStart: cycleStart,
               windowDays: windowDays,
+              methodNotes: methodNotes,
               drawing: drawing,
               axis: PdfCurveAxis(
                 range: model.temperatureRange,
@@ -345,17 +370,36 @@ pw.Widget _cycleHeader({
             ],
           ),
         ),
+        pw.Expanded(child: _factColumns(facts)),
+      ],
+    ),
+  );
+}
+
+/// The header's fact lines, split into two side-by-side columns: a full
+/// page's fact set (7–8 lines incl. the anonymize marker) overflows the
+/// fixed header height as one stack — the pdf package paints a Column
+/// beyond (then past) a container's bounds and the last line drops off
+/// the sheet. The paper-form reading order flows down the left column
+/// then the right.
+pw.Widget _factColumns(List<({String label, String value})> facts) {
+  const normal = pw.TextStyle(fontSize: 6.4);
+  final lines = [
+    for (final fact in facts)
+      pw.Text('${fact.label}: ${fact.value}', style: normal),
+  ];
+  final mid = (lines.length + 1) ~/ 2;
+  return pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      for (final half in [lines.sublist(0, mid), lines.sublist(mid)])
         pw.Expanded(
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              for (final fact in facts)
-                pw.Text('${fact.label}: ${fact.value}', style: normal),
-            ],
+            children: half,
           ),
         ),
-      ],
-    ),
+    ],
   );
 }
 
@@ -366,6 +410,7 @@ pw.Widget _cycleHeader({
 pw.Widget _paperFormGrid({
   required DateTime cycleStart,
   required List<DailyEntry> windowDays,
+  required Map<DateTime, String> methodNotes,
   required PdfCurveDrawing drawing,
   required PdfCurveAxis axis,
 }) {
@@ -394,7 +439,12 @@ pw.Widget _paperFormGrid({
         // cycle tab's band (band_layout.dart). The band absorbs the
         // remaining page height.
         pw.Expanded(
-          child: _notesBandRow(windowDays.length, windowDays, weekend),
+          child: _notesBandRow(
+            windowDays.length,
+            windowDays,
+            weekend,
+            methodNotes,
+          ),
         ),
       ],
     ),
@@ -1186,23 +1236,28 @@ pw.Widget _notesBandRow(
   int windowDayCount,
   List<DailyEntry> windowDays,
   List<int> weekend,
+  Map<DateTime, String> methodNotes,
 ) {
   return _paperRow(
     height: 0,
     railCaption: pdfRailCaptionNotesBand,
     windowDayCount: windowDayCount,
     weekend: weekend,
-    cell: (position) => _bandCell(windowDays[position]),
+    cell: (position) {
+      final day = windowDays[position];
+      return _bandCell(day, methodNotes[DateOnly.normalize(day.date)]);
+    },
   );
 }
 
 /// One day's band cell: the zone stack above the note (each zone only on
 /// its observation, exactly the screen band's offsets), then the note
-/// zone.
-pw.Widget _bandCell(DailyEntry day) {
+/// zone. [methodNote] is a snapshot day's synthesized text, joined into
+/// the stored note at render time (pdfNotesCellText — the stored notes
+/// never move).
+pw.Widget _bandCell(DailyEntry day, String? methodNote) {
   final zones = notesBandLayout(day);
-  final joined = day.notes == null ? null : joinedNoteText(day.notes!);
-  final note = joined == null || joined.isEmpty ? null : joined;
+  final note = pdfNotesCellText(day.notes, methodNote);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [

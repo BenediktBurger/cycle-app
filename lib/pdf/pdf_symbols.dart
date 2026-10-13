@@ -19,6 +19,7 @@
 // the chart's conventions.
 import '../domain/date_only.dart';
 import '../domain/disturbances.dart';
+import '../domain/measurement_method.dart';
 import '../domain/models.dart';
 
 /// The bleed fill of one row cell, bottom-anchored like the shared
@@ -67,6 +68,46 @@ final disturbanceCodes = disturbanceLetters;
 /// VERTICAL NOTES bullet in lib/pdf/cycle_pdf.dart's file header).
 String joinedNoteText(String notes) =>
     notes.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+// The measurement-method texts of the paper form: the German route wording
+// lives ONCE here, so the header's fact line and the band's method note
+// cannot drift (the document layer has no l10n — it replaces the German
+// paper form).
+
+/// The route's German word for the sheet.
+String pdfMethodRouteLabel(MeasurementRoute route) => switch (route) {
+  MeasurementRoute.vaginal => 'vaginal',
+  MeasurementRoute.rectal => 'rektal',
+  MeasurementRoute.oral => 'oral',
+  MeasurementRoute.other => 'andere',
+};
+
+/// The header's method-fact value: the route plus, when a thermometer name
+/// is known, the name after the comma.
+String pdfMethodFactText(MeasurementRoute route, String? thermometer) {
+  final label = pdfMethodRouteLabel(route);
+  return thermometer == null ? label : '$label, $thermometer';
+}
+
+/// The band's synthesized snapshot-day note: the route word alone, or the
+/// thermometer name comma-attached after it — the same wording as the
+/// header's fact line. No glyph prefix: the bundled font's cmap covers
+/// neither U+1F321 nor U+2668 (fc-query on assets/fonts/NotoSans-Regular.ttf),
+/// so one would draw as the notdef box.
+String pdfMethodChangeNote(MeasurementRoute route, String? thermometer) =>
+    pdfMethodFactText(route, thermometer);
+
+/// The rotated notes cell's text for one day: the stored note, the method
+/// change's synthesis, or both joined by the em-dash. The synthesis happens
+/// at RENDER time — the caller passes the day's stored notes untouched.
+/// Empty in both slots → null (the empty cell the row renders today).
+String? pdfNotesCellText(String? notes, String? methodChange) {
+  final note = notes == null ? null : joinedNoteText(notes);
+  final readable = note == null || note.isEmpty ? null : note;
+  if (readable == null) return methodChange;
+  if (methodChange == null) return readable;
+  return '$readable — $methodChange';
+}
 
 /// One page window's WEEKEND columns: the tracked-day positions whose
 /// calendar date falls on a Saturday or Sunday. Judged purely by the DATE

@@ -40,6 +40,7 @@ import 'date_only.dart';
 import 'evaluation.dart';
 import 'evaluation_overlay.dart';
 import 'marks.dart';
+import 'measurement_method.dart';
 import 'models.dart';
 import 'statistics.dart';
 import 'temperature_range.dart';
@@ -63,17 +64,22 @@ final class PdfCycleOverlay {
     this.baselineSegments = const [],
     this.suzMarks = const [],
     this.ignoredIndexes = const {},
+    this.methodChanges = const {},
   });
 
   /// Copies the shared overlay's fields; [ignoredIndexes] come from the
-  /// cycle-local [ignoredDayIndexes] derivation.
-  PdfCycleOverlay.from(EvaluationOverlay overlay, this.ignoredIndexes)
-    : peakIndexes = overlay.peakIndexes,
-      circledIndexes = overlay.circledIndexes,
-      arrowIndexes = overlay.arrowIndexes,
-      numbersByIndex = overlay.numbersByIndex,
-      baselineSegments = overlay.baselineSegments,
-      suzMarks = overlay.suzMarks;
+  /// cycle-local [ignoredDayIndexes] derivation, [methodChanges] from the
+  /// measurement-snapshot history (see the field's contract).
+  PdfCycleOverlay.from(
+    EvaluationOverlay overlay,
+    this.ignoredIndexes, {
+    this.methodChanges = const {},
+  }) : peakIndexes = overlay.peakIndexes,
+       circledIndexes = overlay.circledIndexes,
+       arrowIndexes = overlay.arrowIndexes,
+       numbersByIndex = overlay.numbersByIndex,
+       baselineSegments = overlay.baselineSegments,
+       suzMarks = overlay.suzMarks;
 
   /// Day indexes carrying a mucus-peak mark (EVERY placed peak; see
   /// EvaluationOverlay.peakIndexes).
@@ -95,6 +101,15 @@ final class PdfCycleOverlay {
   /// The temperature-ignore day indexes ([ignoredDayIndexes]) — the
   /// curve's dimming key, shared with the chart's derivation.
   final Set<int> ignoredIndexes;
+
+  /// The days a stored measurement-method snapshot takes effect, keyed by
+  /// CALENDAR OFFSET from the cycle start (the overlay's index convention):
+  /// the day that first shows the snapshot's state — the snapshot's own
+  /// day, or, when that day is an untracked mid-span gap day (no page
+  /// column, see the file-header note), the first span day AT OR AFTER it.
+  /// The value is the effective snapshot on that day (the map collapses
+  /// the same-state span a multi-day gap would otherwise produce).
+  final Map<int, MeasurementMethodSnapshot> methodChanges;
 }
 
 final class PdfExportModel {
@@ -107,6 +122,7 @@ final class PdfExportModel {
     required this.birthDate,
     required this.shortestCycleLengths,
     required this.earliestFirstHigherCycleDays,
+    this.measurementMethods = const [],
     this.temperatureRange = TemperatureRange.defaults,
   });
 
@@ -194,6 +210,21 @@ final class PdfExportModel {
   /// reason as [shortestCycleLengths].
   final List<int?> earliestFirstHigherCycleDays;
 
+  /// The per-cycle measurement-method fact, PARALLEL to [cycles]: the
+  /// effective snapshot at `cycles[i]`' FIRST temperature day (the cycle
+  /// span's first tracked day carrying a measured value;
+  /// [effectiveMeasurementMethod]), or null when the cycle carries no
+  /// temperature at all or no snapshot governs that day—the renderer's
+  /// "—" convention; a typical no-change cycle's line describes the whole
+  /// page. Only snapshots at or before that day count (the day itself
+  /// included), so a later change never rewrites an earlier page's line
+  /// (print idempotency, same record-prefix reasoning as
+  /// [shortestCycleLengths]; the paper form reads BACK from the method
+  /// line to the temperature columns, so the fact travels with the cycle's
+  /// own first measurement).
+  final List<({MeasurementRoute route, String? thermometer})?>
+  measurementMethods;
+
   /// The display ordinal ("Zyklus N") of the exported cycle at 0-based
   /// [index] — the cycle's REAL number: its mark-opened index in the
   /// whole record ([markOpenedIndexes]) through [cycleOrdinalNumber], so
@@ -250,6 +281,11 @@ final class PdfExportModel {
 /// freshly tracked cycle only ever adds in-app data, which stays
 /// truncated at the printed cycle).
 ///
+/// [measurementSnapshots] are the tracked measurement-method snapshots
+/// ("from this day onwards"); the model reads them per cycle (the header
+/// fact + the overlay's snapshot-day notes above) — it stores no method
+/// table of its own.
+///
 /// [temperatureRange] is the settings card's display range, echoed into
 /// the model for the curve block's fixed y scale (default:
 /// [TemperatureRange.defaults] — the provider's starting window).
@@ -267,6 +303,7 @@ PdfExportModel buildPdfExportModel({
   int? earliestFirstHigherCycleDayOutsideApp,
   DateTime? exportStartsUpTo,
   Set<DateTime>? selectedStartDates,
+  List<MeasurementMethodSnapshot> measurementSnapshots = const [],
   TemperatureRange temperatureRange = TemperatureRange.defaults,
   DateTime? today,
 }) {
@@ -328,6 +365,10 @@ PdfExportModel buildPdfExportModel({
           dayCount: _calendarSpanDays(all[i].cycle),
         ),
         ignoredDayIndexes(cycle: all[i].cycle, marks: marks),
+        methodChanges: _methodChangesByOffset(
+          all[i].cycle,
+          measurementSnapshots,
+        ),
       ),
   ];
 
@@ -354,6 +395,8 @@ PdfExportModel buildPdfExportModel({
   //   folds in through [minRecordedFact].
   final shortestCycleLengths = <int?>[];
   final earliestFirstHigherCycleDays = <int?>[];
+  final measurementMethods =
+      <({MeasurementRoute route, String? thermometer})?>[];
   for (var e = 0; e < exportedIndexes.length; e++) {
     final i = exportedIndexes[e];
     int? shortest;
@@ -377,6 +420,15 @@ PdfExportModel buildPdfExportModel({
         earliestFirstHigherCycleDayOutsideApp,
       ),
     );
+    final firstTempDay = _firstTemperatureDay(all[i].cycle);
+    final method = firstTempDay == null
+        ? null
+        : effectiveMeasurementMethod(measurementSnapshots, firstTempDay.date);
+    measurementMethods.add(
+      method == null
+          ? null
+          : (route: method.route, thermometer: method.thermometer),
+    );
   }
 
   final trimmedName = name?.trim();
@@ -395,6 +447,7 @@ PdfExportModel buildPdfExportModel({
     earliestFirstHigherCycleDays: List.unmodifiable(
       earliestFirstHigherCycleDays,
     ),
+    measurementMethods: List.unmodifiable(measurementMethods),
     temperatureRange: temperatureRange,
   );
 }
@@ -414,6 +467,55 @@ int _calendarSpanDays(Cycle cycle) =>
       DateOnly.normalize(cycle.startDate),
     ) +
     1;
+
+/// The cycle span's first tracked day carrying a measured temperature (the
+/// method snapshot valid that day heads the cycle page's method fact), or
+/// null when the whole span stays unmeasured.
+DailyEntry? _firstTemperatureDay(Cycle cycle) {
+  for (final day in cycleSpanDays(cycle)) {
+    if (day.bbtC != null) return day;
+  }
+  return null;
+}
+
+/// The measurement-method snapshot days visible IN one cycle, keyed by the
+/// calendar offset (overlay index convention) of the day that first shows
+/// the snapshot's state — the snapshot's own day, or, for a snapshot dated
+/// on an untracked mid-span gap day, the first span day at or after it.
+/// Derived by walking the span days and emitting a day when its governing
+/// snapshot's DATE jumps against the previous SPAN day's, seeded the day
+/// before the cycle start, so the snapshot a cycle inherits from before
+/// its start does not re-echo on its first column and no snapshot dated
+/// past the span's last day leaks in. The comparison keys on the GOVERNING
+/// ROW's date, not on its route/thermometer values: every stored snapshot
+/// row is an emission point (a broken-device swap along one route is one,
+/// and so is a re-statement of the identical state on a later day), and
+/// the rule must not depend on which fields the snapshot equality covers.
+/// Value rules: the effective snapshot at that day (a multi-day gap
+/// collapses to the state visible on the first following tracked day).
+Map<int, MeasurementMethodSnapshot> _methodChangesByOffset(
+  Cycle cycle,
+  List<MeasurementMethodSnapshot> snapshots,
+) {
+  final days = cycleSpanDays(cycle);
+  if (days.isEmpty) return const {};
+  final cycleStart = DateOnly.normalize(cycle.startDate);
+  final changes = <int, MeasurementMethodSnapshot>{};
+  var previous = effectiveMeasurementMethod(
+    snapshots,
+    DateOnly.previousDay(cycleStart),
+  );
+  for (final day in days) {
+    final effective = effectiveMeasurementMethod(snapshots, day.date);
+    if (effective != null &&
+        (previous == null || effective.date.isAfter(previous.date))) {
+      changes[DateOnly.daysBetween(DateOnly.normalize(day.date), cycleStart)] =
+          effective;
+    }
+    previous = effective;
+  }
+  return changes;
+}
 
 /// The cycle selector's option rows: one per MARK-OPENED cycle (the leading
 /// pre-mark group stays unnumbered and is omitted — same rule as the

@@ -71,7 +71,7 @@ final class ExportImportCard extends ConsumerWidget {
       final json = await exportDatabaseToJson(db);
       // An empty export is not useful as a file — communicate instead.
       final doc = parseExportJson(json);
-      if (doc.entries.isEmpty && doc.marks.isEmpty) {
+      if (doc.entries.isEmpty && doc.marks.isEmpty && doc.methods.isEmpty) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(
           context,

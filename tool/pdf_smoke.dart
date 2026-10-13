@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -94,10 +95,21 @@ Future<void> main() async {
   ).readAsBytes();
   check(fontBytes.isNotEmpty, 'bundled Noto Sans TTF is present');
 
+  final baseline = MeasurementMethodSnapshot(
+    date: d(2, 20),
+    route: MeasurementRoute.vaginal,
+    thermometer: 'ThermaPen',
+  );
+  final change = MeasurementMethodSnapshot(
+    date: d(3, 10),
+    route: MeasurementRoute.oral,
+  );
+  final methodSnapshots = [baseline, change];
   final model = buildPdfExportModel(
     entries: fixtureEntries(),
     marks: fixtureMarks(),
     observedCyclesOutsideApp: 4,
+    measurementSnapshots: methodSnapshots,
     name: 'Maria Muster',
     birthDate: d(12, 24),
     // The span rule (a cycle runs through the next start mark / today)
@@ -108,6 +120,26 @@ Future<void> main() async {
     today: d(9, 21),
   );
   check(model.cycles.length == 3, 'three mark-opened cycles exported');
+  // The method snapshots ride the model as per-cycle facts: cycle 1's
+  // first temperature (Mar 1) reads the vaginal baseline, the Mar 10
+  // change moves to oral WITHIN the cycle (so cycle 2+ pick that state)
+  // and the change day itself rides cycle 1's overlay at offset 9.
+  check(
+    model.measurementMethods[0] ==
+        (route: MeasurementRoute.vaginal, thermometer: 'ThermaPen'),
+    "cycle 1's method fact reads the snapshot at its first temperature day",
+  );
+  check(
+    model.measurementMethods[1] ==
+            (route: MeasurementRoute.oral, thermometer: null) &&
+        model.measurementMethods[1] == model.measurementMethods[2],
+    'cycles 2+ follow the mid-cycle change at their own first temperature',
+  );
+  check(
+    model.overlays[0].methodChanges.length == 1 &&
+        model.overlays[0].methodChanges[9] == change,
+    "the change day Mar 10 rides cycle 1's overlay at offset 9",
+  );
   // The header's observed-cycle count IS the page's ordinal (one shared
   // rule): the last page counts up to 7 — the record's three cycles plus
   // the 4 outside-app paper cycles. Earlier pages count only themselves.
