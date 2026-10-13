@@ -8,6 +8,7 @@ final class _ChartDays {
   _ChartDays(
     List<DailyEntry> entries,
     List<CycleMark> marks,
+    Set<DateTime> methodSnapshotDates,
     List<Cycle> cycles,
     this.observedCyclesOutsideApp,
   ) {
@@ -25,6 +26,15 @@ final class _ChartDays {
         if (mark.type == CycleMarkTypes.ignoreTemperature)
           DateOnly.daysBetween(DateOnly.normalize(mark.date), firstDay),
     };
+    // The chart columns carrying a measurement-method snapshot (the
+    // thermometer glyph's day anchors): mapped like the marks, but skipped
+    // outside the recorded range — a date with no column renders nothing.
+    final snapshotIndexes = <int>{};
+    for (final date in methodSnapshotDates) {
+      final index = DateOnly.daysBetween(DateOnly.normalize(date), firstDay);
+      if (!index.isNegative && index < dayCount) snapshotIndexes.add(index);
+    }
+    methodSnapshotDayIndexes = snapshotIndexes;
     // Cycle mapping over the whole index range, from the cycle groups the
     // screen shares with Tagebuch/Statistik (the derived pass): every day
     // counts into the cycle with the LATEST group start on or before it, so
@@ -60,6 +70,11 @@ final class _ChartDays {
   /// `ignoreTemperature` MARKS — the marks, not the raw disturbance mask,
   /// are the curve's rendering key.
   late final Set<int> ignoredDayIndexes;
+
+  /// The chart day indexes carrying a measurement-method snapshot (the
+  /// thermometer glyph's day anchors), mapped from the snapshot dates;
+  /// dates outside the recorded range have no column and stay out.
+  late final Set<int> methodSnapshotDayIndexes;
 
   /// UTC-midnight of the first recorded day (day index 0).
   late final DateTime firstDay;

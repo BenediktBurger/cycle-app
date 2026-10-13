@@ -21,6 +21,7 @@ import '../domain/mucus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
 import 'bleeding_symbol.dart';
+import 'measurement_method_dialog.dart';
 import 'mucus_symbol.dart';
 import 'stream_error.dart';
 
@@ -464,6 +465,17 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                           ),
                           decoration: InputDecoration(
                             labelText: '${l10n.temperature} (°C)',
+                            // A suffix icon cannot overflow the way a
+                            // widget right of the field can — this line is
+                            // the temperature/time row whose narrow-width
+                            // layout a pinned test guards.
+                            suffixIcon: IconButton(
+                              key: const ValueKey('diaryMethodButton'),
+                              icon: const Icon(Icons.device_thermostat),
+                              tooltip: l10n.methodDialogTitle,
+                              onPressed: () =>
+                                  showMeasurementMethodDialog(context),
+                            ),
                           ),
                           validator: (value) {
                             final parsed = parseDecimalInput(value ?? '');

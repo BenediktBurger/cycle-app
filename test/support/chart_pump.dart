@@ -7,6 +7,7 @@
 // outside vs. inside the MaterialApp, an optional dark scheme, and
 // optionally no theme wiring at all.
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
@@ -52,6 +53,10 @@ const chartSeedColor = Color(0xFF6750A4);
 ///    run and cannot drift with the test machine's wall clock. Both lists
 ///    empty leave the provider at its real default (nothing renders).
 ///    Tests exercising the span extension pass an explicit pin.
+///  - [methodSnapshots] / [methodSnapshotsStream] pin the
+///    measurement-method snapshot stream (the chart's thermometer glyphs;
+///    a wholesale stream for re-emit tests) the same way [marks] and
+///    [marksStreamFactory] do for the marks.
 ///  - [emptyHome] renders an EMPTY Scaffold body instead of the
 ///    ZyklusScreen. Routes pushed on the root navigator (the date picker
 ///    the AppBar's jump affordance opens) survive the body's unmount, which
@@ -60,6 +65,8 @@ const chartSeedColor = Color(0xFF6750A4);
 Widget chartHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
+  List<MeasurementMethodSnapshot> methodSnapshots = const [],
+  Stream<List<MeasurementMethodSnapshot>>? methodSnapshotsStream,
   Stream<List<DailyEntry>>? entriesStream,
   Stream<List<DailyEntry>> Function()? entriesStreamFactory,
   Stream<List<CycleMark>> Function()? marksStreamFactory,
@@ -93,6 +100,9 @@ Widget chartHarness({
     ),
     marksProvider.overrideWith(
       (ref) => marksStreamFactory?.call() ?? Stream.value(marks),
+    ),
+    measurementMethodsProvider.overrideWith(
+      (ref) => methodSnapshotsStream ?? Stream.value(methodSnapshots),
     ),
     selectedDatePin(selectedDate ?? entries.first.date),
     if (now != null)
