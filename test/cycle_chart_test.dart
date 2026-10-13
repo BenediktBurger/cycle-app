@@ -4489,6 +4489,93 @@ void main() {
       },
     );
 
+    testWidgets('at enlarged system text scale the scale labels and the °C '
+        'stay inside the rail, with the °C clear of the topmost value', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      // Only the rail's scale labels and °C slot carry FittedBox clamping;
+      // the day-header slots and the rail's corner cell have no room at 2×
+      // either, and their flex overflows would fail the test without
+      // touching this test's subject.
+      final realOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exception is FlutterError &&
+            details.exception.toString().contains('RenderFlex overflowed')) {
+          return;
+        }
+        realOnError!(details);
+      };
+      addTearDown(() => FlutterError.onError = realOnError);
+      await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
+
+      final rail = tester.getRect(_rail());
+      final labels = find.descendant(
+        of: _rail(),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.key is ValueKey<String> &&
+              (w.key as ValueKey<String>).value.startsWith('railScaleLabel-'),
+        ),
+      );
+      for (final widget in tester.widgetList<Text>(labels)) {
+        final what = '2× text scale "${widget.data!}"';
+        final rect = tester.getRect(find.byWidget(widget));
+        // The unclamped layout size: clamped to the slot, a label would
+        // lay out at the slot's span and clip its glyphs at 2×; inside
+        // the FittedBox it lays out unconstrained and scales to fit.
+        final natural = tester.getSize(find.byWidget(widget));
+        expect(
+          natural.width,
+          greaterThan(rail.width - 3),
+          reason:
+              '$what lays out wider than its slot span, so the slot '
+              'scales it into the span instead of clipping it',
+        );
+        expect(
+          rect.left,
+          greaterThanOrEqualTo(rail.left),
+          reason: '$what stays inside the rail\'s left edge',
+        );
+        expect(
+          rect.right,
+          lessThanOrEqualTo(rail.right),
+          reason: '$what is not clipped at the rail\'s right edge',
+        );
+      }
+      final unit = tester.getRect(
+        find.descendant(of: _rail(), matching: find.text('°C')),
+      );
+      final unitNatural = tester.getSize(
+        find.descendant(of: _rail(), matching: find.text('°C')),
+      );
+      expect(
+        unitNatural.width,
+        greaterThan(rail.width - 3),
+        reason:
+            '2× text scale "°C" lays out wider than its slot span, so '
+            'the slot scales it into the span instead of clipping it',
+      );
+      expect(
+        unit.left,
+        greaterThanOrEqualTo(rail.left),
+        reason: '2× text scale "°C" stays inside the rail\'s left edge',
+      );
+      expect(
+        unit.right,
+        lessThanOrEqualTo(rail.right),
+        reason: '2× text scale "°C" is not clipped at the rail\'s right edge',
+      );
+      final topValue = tester.getRect(find.text('38'));
+      expect(
+        unit.top,
+        greaterThanOrEqualTo(topValue.bottom),
+        reason: 'the °C does not overlap the topmost value\'s label',
+      );
+    });
+
     testWidgets('a flat temperature record keeps the scale usable (the fixed '
         'range always has ticks)', (tester) async {
       // All five days at 36.5: the bounds stay the settings range 36..38,

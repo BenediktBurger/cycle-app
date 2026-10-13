@@ -898,7 +898,7 @@ Widget _columnPrototype({required String prototype, required String label}) =>
 
 /// One temperature-scale label at its tick's plot pixel y, right-aligned
 /// inside the frozen rail. The °C unit renders as its own muted line below
-/// the topmost label; the topmost value's semantics carries the "36.5 °C"
+/// the topmost label; the topmost value's semantics carries the "38 °C"
 /// label, so a screen reader still hears the unit with its value.
 Widget _railScaleLabel(_TemperatureScale scale, double value) {
   final text = scale.labelFor(value);
@@ -906,10 +906,13 @@ Widget _railScaleLabel(_TemperatureScale scale, double value) {
     alignment: Alignment.centerRight,
     child: Padding(
       padding: const EdgeInsets.only(right: 3),
-      child: Text(
-        text,
-        key: ValueKey('railScaleLabel-$text'),
-        style: const TextStyle(fontSize: 10),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          key: ValueKey('railScaleLabel-$text'),
+          style: const TextStyle(fontSize: 10),
+        ),
       ),
     ),
   );
@@ -1378,25 +1381,28 @@ final class _LeftRail extends StatelessWidget {
                       height: 12,
                       child: _railScaleLabel(scale, value),
                     ),
-                  // Label slots span tick ± 6, so this starts 1 px below the
-                  // lower edge of the topmost value's slot.
+                  // Label slots span tick ± 6, so 7 px starts 1 px below
+                  // the lower edge of the topmost value's slot.
                   Positioned(
                     left: 0,
                     width: _CycleChartState.frozenRailWidth,
-                    top: scale.pixelFor(scale.ticks.last) + 7,
+                    top: 7,
                     height: 10,
                     child: ExcludeSemantics(
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: const EdgeInsets.only(right: 3),
-                          child: Text(
-                            '°C',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '°C',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ),
