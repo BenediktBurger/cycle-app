@@ -8,41 +8,46 @@ void main() {
 
   group('deleteDataDialogBody', () {
     test('German singular nouns at count 1', () {
-      final text = de.deleteDataDialogBody(1, 1);
+      final text = de.deleteDataDialogBody(1, 1, 1);
       expect(text, contains('1 Tagebucheintrag'));
       expect(text, contains('1 Markierung'));
+      expect(text, contains('1 Messmethode'));
       expect(text, isNot(contains('Tagebucheinträge')));
       expect(text, isNot(contains('Markierungen')));
+      expect(text, isNot(contains('Messmethoden')));
     });
     test('English singular nouns at count 1', () {
-      final text = en.deleteDataDialogBody(1, 1);
+      final text = en.deleteDataDialogBody(1, 1, 1);
       expect(text, contains('1 diary entry'));
       expect(text, contains('1 mark'));
+      expect(text, contains('1 measurement method'));
       expect(text, isNot(contains('diary entries')));
       expect(text, isNot(contains('marks')));
+      expect(text, isNot(contains('measurement methods')));
     });
     test('German plural nouns at count 2', () {
-      final text = de.deleteDataDialogBody(2, 2);
+      final text = de.deleteDataDialogBody(2, 2, 2);
       expect(text, contains('2 Tagebucheinträge'));
       expect(text, contains('2 Markierungen'));
+      expect(text, contains('2 Messmethoden'));
     });
   });
 
   group('deleteDataDone', () {
     test('German mixed counts flex per noun', () {
       expect(
-        de.deleteDataDone(1, 2),
-        contains('1 Tagebucheintrag und 2 Markierungen'),
+        de.deleteDataDone(1, 2, 1),
+        contains('1 Tagebucheintrag, 2 Markierungen und 1 Messmethode'),
       );
       expect(
-        de.deleteDataDone(2, 1),
-        contains('2 Tagebucheinträge und 1 Markierung'),
+        de.deleteDataDone(2, 1, 2),
+        contains('2 Tagebucheinträge, 1 Markierung und 2 Messmethoden'),
       );
     });
     test('English plural branch stays intact', () {
       expect(
-        en.deleteDataDone(2, 2),
-        contains('2 diary entries and 2 marks deleted.'),
+        en.deleteDataDone(2, 2, 1),
+        contains('2 diary entries, 2 marks and 1 measurement method'),
       );
     });
   });
@@ -88,18 +93,20 @@ void main() {
 
   group('importSummary', () {
     test('German singular nouns at count 1', () {
-      final text = de.importSummary(1, 1, 1, 1, 1, 1);
+      final text = de.importSummary(1, 1, 1, 1, 1, 1, 1, 1);
       expect(text, contains('1 Tag neu'));
       expect(text, contains('1 Markierung neu'));
       expect(text, contains('1 doppelte Zeile'));
       expect(text, contains('1 ungültige Zeile'));
+      expect(text, contains('1 Methode neu'));
       expect(text, isNot(contains('Tage:')));
       expect(text, isNot(contains('Markierungen:')));
     });
     test('English plural shapes at count 2', () {
-      final text = en.importSummary(2, 2, 2, 2, 2, 2);
+      final text = en.importSummary(2, 2, 2, 2, 2, 2, 2, 2);
       expect(text, contains('2 days new'));
       expect(text, contains('2 marks new'));
+      expect(text, contains('2 methods new'));
     });
   });
 

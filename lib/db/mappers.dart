@@ -7,6 +7,7 @@ import 'package:drift/drift.dart';
 import '../domain/cervix.dart';
 import '../domain/date_only.dart';
 import '../domain/marks.dart';
+import '../domain/measurement_method.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
 import 'cycle_database.dart';
@@ -92,3 +93,24 @@ UserMarksCompanion cycleMarkToCompanion(CycleMark mark) => UserMarksCompanion(
   markType: Value(mark.type),
   author: Value(mark.author),
 );
+
+/// MeasurementMethods row -> domain snapshot. The stored token parses
+/// through the shared helper. A corrupt token throws loudly (the fail-loud
+/// read-side posture): behind the SQL CHECK it can only exist via foreign
+/// writes, and silently collapsing it would misreport future days' method
+/// state.
+MeasurementMethodSnapshot measurementSnapshotFromDrift(MeasurementMethod m) {
+  final route = tryParseMeasurementRoute(m.method);
+  if (route == null) {
+    throw ArgumentError.value(
+      m.method,
+      'method',
+      'unknown stored measurement route',
+    );
+  }
+  return MeasurementMethodSnapshot(
+    date: m.date,
+    route: route,
+    thermometer: m.thermometer,
+  );
+}

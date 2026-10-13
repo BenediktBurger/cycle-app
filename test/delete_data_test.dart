@@ -6,6 +6,7 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
@@ -32,7 +33,7 @@ class _FaultyDatabase extends CycleDatabase {
   EntriesDao get entriesDao => _faultyEntriesDao;
 
   @override
-  Future<({int entries, int marks})> deleteAllTrackedData() {
+  Future<({int entries, int marks, int methods})> deleteAllTrackedData() {
     if (failWipe) {
       throw StateError('injected wipe failure');
     }
@@ -94,6 +95,10 @@ void main() {
         DateTime.utc(2026, 9, 12),
         CycleMarkTypes.mucusPeakDay,
       );
+      await database.measurementMethodsDao.upsertByDate(
+        date: DateTime.utc(2026, 9, 6),
+        route: MeasurementRoute.vaginal,
+      );
       await SettingsStore(
         database.settingsDao,
       ).persistLocale(const Locale('de'));
@@ -148,6 +153,13 @@ void main() {
           'the confirmation dialog shows the count of marks to be '
           'wiped',
     );
+    expect(
+      find.textContaining('1 Messmethode'),
+      findsOneWidget,
+      reason:
+          'the confirmation dialog shows the count of stored method '
+          'snapshots to be wiped',
+    );
 
     // CANCEL is the default: tapping it closes the dialog without any
     // deletion.
@@ -197,6 +209,11 @@ void main() {
       await db.marksDao.allMarks(),
       isEmpty,
       reason: 'the wipe also clears the marks table',
+    );
+    expect(
+      await db.measurementMethodsDao.allSnapshots(),
+      isEmpty,
+      reason: 'the wipe also clears the methods table',
     );
     expect(
       await db.settingsDao.readValue(SettingKeys.locale),

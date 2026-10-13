@@ -38,6 +38,23 @@
 //
 // Marks rows are NOT sparse: all three keys are carried always.
 //
+// The `methods` root key carries the measurement-method state snapshots
+// (route + thermometer, lib/domain/measurement_method.dart) as rows
+//
+//   [{"date": "YYYY-MM-DD", "method": "vaginal|rectal|oral|other",
+//     "thermometer": "<name>"}, ...]
+//
+// — `date`/`method` always, the thermometer `thermometer` omitted when the
+// snapshot has none (the same null-omits rule as `notes`). Like every
+// observational key since the Muttermund fields, the table rides
+// ADDITIVELY without a schema-version bump: a document never carries the
+// key when it has no snapshots (empty list = absent), readers treat the
+// missing key as "no snapshots", and older readers ignore the unknown key
+// entirely. Snapshot rows are gated: the `method` token must parse into
+// the route vocabulary — behind a NOT NULL CHECK it cannot be coerced —
+// and a broken day or method makes the ROW invalid (the row-killer rule
+// of bleeding), never a silent collapse.
+//
 // An EMPTY-STRING `notes` is non-null and thus KEPT — only null is omitted.
 // The reader accepts FULL maps just the same: extra keys and explicit
 // neutral values (a level-0 `bleeding`, false pain flags, null fields)
@@ -48,7 +65,9 @@
 // The document root is exactly schema_version / exported_at / entries /
 // marks — there are NO profile keys anywhere (the Profiles table, the
 // profile_id columns and the per-profile machinery are gone from the
-// schema; see the version note below). Old (v1–4) documents DO carry
+// schema; see the version note below). The `methods` list joins the root
+// additively and only when non-empty (see above), so documents without
+// snapshots keep this exact four-key shape. Old (v1–4) documents DO carry
 // `profile_id` on every row and a root `profiles` list: those keys are
 // ACCEPTED and IGNORED on import — rows merge by day / (day, mark_type),
 // never by profile.
@@ -120,13 +139,16 @@
 //
 // Import merge policy (resolved decision, see exportMergePolicy): entries
 // merge by DAY with an OVERWRITE of the stored day; marks are idempotent
-// (existing marks are skipped, never duplicated). The planner only COUNTS
-// what will happen — the actual writes are performed by the db adapter
-// against the same plan.
+// (existing marks are skipped, never duplicated); method snapshots merge
+// exactly like entries — overwritten day-keyed via the DAO upsert, first
+// occurrence wins inside one document, invalid rows counted (see
+// planMerge). The planner only COUNTS what will happen — the actual
+// writes are performed by the db adapter against the same plan.
 
 import 'dart:convert';
 
 import 'date_only.dart';
+import 'measurement_method.dart';
 import 'models.dart';
 
 /// Bump when the document shape changes; importers accept older/newer
@@ -164,20 +186,27 @@ const int exportSchemaVersion = 6;
 /// documented in CONTRIBUTING; importers MUST behave exactly like this).
 const String exportMergePolicy = 'overwrite';
 
-/// Row maps of the two exported tables. Values are plain JSON-decodable
+/// Row maps of the exported tables. Values are plain JSON-decodable
 /// scalars (String / num / bool / null / nested lists/maps). There is no
 /// profiles list: the document is profile-free.
 /// [entries] may be SPARSE (see the header): rows written by the current
 /// writer carry only their non-neutral keys; full maps stay valid.
+/// [methods] rows are sparse too (`thermometer` omitted when null); the
+/// WRITER emits the root key only when the list is non-empty — a
+/// snapshot-free document keeps the pinned four-key shape — while every
+/// reader parses the missing key as "no snapshots".
 final class ExportBlob {
   const ExportBlob({
     required this.entries,
     required this.marks,
+    this.methods = const [],
     required this.exportedAt,
   });
 
   final List<Map<String, Object?>> entries;
   final List<Map<String, Object?>> marks;
+
+  final List<Map<String, Object?>> methods;
 
   final DateTime exportedAt;
 }
@@ -212,6 +241,8 @@ String buildExportJson(ExportBlob blob) {
     'exported_at': blob.exportedAt.toUtc().toIso8601String(),
     'entries': blob.entries,
     'marks': blob.marks,
+    // Snapshot-free datasets stay byte-identical to the pinned four-key shape.
+    if (blob.methods.isNotEmpty) 'methods': blob.methods,
   });
 }
 
@@ -259,6 +290,12 @@ ExportBlob parseExportJson(String raw) {
     exportedAt: exported,
     entries: _listOfMaps(decoded['entries'], 'entries'),
     marks: _listOfMaps(decoded['marks'], 'marks'),
+    // Absent key = no snapshots (old documents and snapshot-free exports).
+    // A PRESENT key goes through the same list gate as the other tables: a
+    // broken value is a document error, never silently swallowed data.
+    methods: decoded.containsKey('methods')
+        ? _listOfMaps(decoded['methods'], 'methods')
+        : const [],
   );
 }
 
@@ -291,6 +328,10 @@ final class ImportSummary {
     this.marksNew = 0,
     this.marksSkipped = 0,
     this.marksInvalid = 0,
+    this.methodsNew = 0,
+    this.methodsOverwritten = 0,
+    this.methodsInvalid = 0,
+    this.duplicateMethodRows = 0,
   });
 
   /// Entries absent on this device (to insert).
@@ -316,8 +357,28 @@ final class ImportSummary {
 
   final int marksInvalid;
 
+  /// Method snapshots absent on this device (to insert).
+  final int methodsNew;
+
+  /// Method snapshots present on this device (to overwrite, per the
+  /// entries merge rule).
+  final int methodsOverwritten;
+
+  /// Rows rejected because they are structurally invalid (a broken or
+  /// missing ISO day, a missing or out-of-vocabulary `method` token —
+  /// the SQL CHECK cannot store such a row, so these are exactly the
+  /// rows the db writer drops).
+  final int methodsInvalid;
+
+  /// Rows whose same-day key appears twice IN the document itself; the
+  /// first occurrence wins.
+  final int duplicateMethodRows;
+
   /// Total rows that end up stored for the entries table.
   int get entriesWritten => entriesNew + entriesOverwritten;
+
+  /// Total rows that end up stored for the methods table.
+  int get methodsWritten => methodsNew + methodsOverwritten;
 }
 
 /// Stable key of an entry row for the day uniqueness (the ISO day itself);
@@ -328,20 +389,54 @@ String importEntryKey(String isoDay) => isoDay;
 /// Stable key of a mark row for its (day, type) uniqueness.
 String importMarkKey(String isoDay, String markType) => '$isoDay|$markType';
 
+/// Stable key of a method-snapshot row for the day uniqueness (the ISO day
+/// itself, like [importEntryKey]); also part of the adapter contract (the
+/// db layer looks up existing snapshots by exactly this key).
+String importMethodKey(String isoDay) => isoDay;
+
+/// Row map -> [MeasurementMethodSnapshot], or null when structurally
+/// invalid (bad/missing day, unknown `method` token). SHARED by the merge
+/// planner and the db writer — the counted rows and the written rows are
+/// exactly the same set. The route parses through the shared vocabulary
+/// hook tryParseMeasurementRoute (the SQL CHECK behind it has no
+/// tolerance, so a foreign token is a row killer, never a collapse to a
+/// default); the thermometer arrives normalized by the snapshot
+/// constructor (blank -> null). Unknown/extra keys (e.g. `thermometer`
+/// variants) are never read.
+MeasurementMethodSnapshot? tryMethodSnapshotFromExport(
+  Map<String, Object?> row,
+) {
+  final day = row['date'] is String
+      ? tryParseIsoDay(row['date'] as String)
+      : null;
+  final route = tryParseMeasurementRoute(row['method']);
+  if (day == null || route == null) return null;
+  return MeasurementMethodSnapshot(
+    date: day,
+    route: route,
+    // Only a string value is a name; any other JSON junk means "no name"
+    // — like the notes field, the value IS the identity here.
+    thermometer: row['thermometer'] is String
+        ? row['thermometer'] as String
+        : null,
+  );
+}
+
 /// Plans the import of [doc] into an existing dataset.
 ///
-/// [existingEntryKeys] / [existingMarkKeys] contain the keys of all rows
-/// already on the device (built with [importEntryKey]/[importMarkKey]).
-/// The `profile_id` / `profiles` keys of old documents are NOT read here
-/// (accepted and ignored — rows merge by day / (day, mark_type), and two
-/// rows that differ only by profile on the same day collapse onto one
-/// key: first occurrence wins, extras count as duplicates). Only counts
-/// are produced — no writes happen here, keeping this function pure and
-/// testable.
+/// [existingEntryKeys] / [existingMarkKeys] / [existingMethodKeys] contain
+/// the keys of all rows already on the device (built with
+/// [importEntryKey]/[importMarkKey]/[importMethodKey]). The `profile_id` /
+/// `profiles` keys of old documents are NOT read here (accepted and
+/// ignored — rows merge by day / (day, mark_type), and two rows that
+/// differ only by profile on the same day collapse onto one key: first
+/// occurrence wins, extras count as duplicates). Only counts are produced
+/// — no writes happen here, keeping this function pure and testable.
 ImportSummary planMerge(
   ExportBlob doc, {
   required Set<String> existingEntryKeys,
   required Set<String> existingMarkKeys,
+  required Set<String> existingMethodKeys,
 }) {
   var entriesNew = 0;
   var entriesOverwritten = 0;
@@ -350,8 +445,13 @@ ImportSummary planMerge(
   var marksNew = 0;
   var marksSkipped = 0;
   var marksInvalid = 0;
+  var methodsNew = 0;
+  var methodsOverwritten = 0;
+  var methodsInvalid = 0;
+  var duplicateMethodRows = 0;
 
   final seenEntryKeys = <String>{};
+  final seenMethodKeys = <String>{};
 
   for (final row in doc.entries) {
     // Same field-level gates as the db writer (tryDailyEntryFromExport):
@@ -399,6 +499,29 @@ ImportSummary planMerge(
     }
   }
 
+  // Same merge shape as entries: day-keyed overwrite via the shared row
+  // helper (tryMethodSnapshotFromExport gates exactly what the writer
+  // writes — out-of-vocabulary/missing method tokens are row INVALID,
+  // broken days too), first occurrence wins inside one document.
+  for (final row in doc.methods) {
+    final snapshot = tryMethodSnapshotFromExport(row);
+    if (snapshot == null) {
+      methodsInvalid++;
+      continue;
+    }
+    final key = importMethodKey(formatIsoDay(snapshot.date));
+    if (seenMethodKeys.contains(key)) {
+      duplicateMethodRows++;
+      continue;
+    }
+    seenMethodKeys.add(key);
+    if (existingMethodKeys.contains(key)) {
+      methodsOverwritten++;
+    } else {
+      methodsNew++;
+    }
+  }
+
   return ImportSummary(
     entriesNew: entriesNew,
     entriesOverwritten: entriesOverwritten,
@@ -407,5 +530,9 @@ ImportSummary planMerge(
     marksNew: marksNew,
     marksSkipped: marksSkipped,
     marksInvalid: marksInvalid,
+    methodsNew: methodsNew,
+    methodsOverwritten: methodsOverwritten,
+    methodsInvalid: methodsInvalid,
+    duplicateMethodRows: duplicateMethodRows,
   );
 }

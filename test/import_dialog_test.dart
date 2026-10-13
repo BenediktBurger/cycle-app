@@ -606,6 +606,38 @@ void main() {
     );
   });
 
+  group('import summary counts the method snapshots', () {
+    testWidgets('a methods-only document is not reported as empty — the '
+        'method figures ride the applied summary', (WidgetTester tester) async {
+      await pumpAndOpenJsonDialog(tester);
+      final methodsOnlyDoc = buildExportJson(
+        ExportBlob(
+          exportedAt: DateTime.utc(2026, 9, 20),
+          entries: const [],
+          marks: const [],
+          methods: [
+            {'date': '2026-01-01', 'method': 'vaginal'},
+          ],
+        ),
+      );
+      await tester.enterText(importTextField(), methodsOnlyDoc);
+      await tester.pumpAndSettle();
+      await tester.tap(applyButton());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('1 Methode neu'),
+        findsOneWidget,
+        reason: 'the summary reports the written method snapshot',
+      );
+      expect(
+        find.textContaining('nichts zu ändern'),
+        findsNothing,
+        reason: 'a methods-only document is not an empty import',
+      );
+    });
+  });
+
   group('accept-string translation for the native picker', () {
     test('default JSON accept keeps the paired extension filter', () {
       expect(acceptExtensions('application/json,.json'), ['json']);

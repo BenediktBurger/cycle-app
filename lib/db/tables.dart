@@ -227,6 +227,45 @@ abstract final class MarkTypes {
   static const cycleStart = 'cycleStart';
 }
 
+/// WHICH basal-temperature measurement method (route + thermometer) applies
+/// FROM A DAY ON. One row is a STATE SNAPSHOT ("from this date onwards") —
+/// a method change writes a new row, and any later day's effective method
+/// is the latest snapshot at or before it (see effectiveMeasurementMethod
+/// in lib/domain/measurement_method.dart). Uniqueness is enforced by the
+/// unique index [measurementMethodsDateUnique] (@TableIndex below), which
+/// the MeasurementMethodsDao upsert relies on.
+@TableIndex(
+  name: 'measurement_methods_date_unique',
+  columns: {#date},
+  unique: true,
+)
+class MeasurementMethods extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Calendar day the state starts applying (unix-epoch days).
+  IntColumn get date => integer().map(const EpochDayConverter())();
+
+  /// The measurement route, as a TEXT token from the [MeasurementRoute]
+  /// enum-name vocabulary: 'vaginal' / 'rectal' / 'oral' / 'other' (the
+  /// tokens are pinned by tests; a rename is a data migration).
+  /// customConstraint replaces drift's own constraints, so NOT NULL is
+  /// written out explicitly inside the constraint string (a bare CHECK
+  /// would silently drop it). The engine-level CHECK mirrors that
+  /// vocabulary so foreign data (e.g. a future import path) cannot write
+  /// an impossible route.
+  TextColumn get method => text().customConstraint(
+    "NOT NULL CHECK (method IN ('vaginal', 'rectal', 'oral', 'other'))",
+  )();
+
+  /// Name of the thermometer in use from that day on, when given. Trimming
+  /// (and blank → null) is a WRITER rule via normalizeThermometerName
+  /// (lib/domain/measurement_method.dart), not an SQL constraint.
+  TextColumn get thermometer => text().nullable()();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
 /// Generic key-value storage for general settings (language, theme mode,
 /// temperature range, and any future setting such as PDF export options).
 ///

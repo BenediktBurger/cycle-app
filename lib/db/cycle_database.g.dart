@@ -1602,12 +1602,433 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $MeasurementMethodsTable extends MeasurementMethods
+    with TableInfo<$MeasurementMethodsTable, MeasurementMethod> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MeasurementMethodsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> date =
+      GeneratedColumn<int>(
+        'date',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MeasurementMethodsTable.$converterdate);
+  static const VerificationMeta _methodMeta = const VerificationMeta('method');
+  @override
+  late final GeneratedColumn<String> method = GeneratedColumn<String>(
+    'method',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (method IN (\'vaginal\', \'rectal\', \'oral\', \'other\'))',
+  );
+  static const VerificationMeta _thermometerMeta = const VerificationMeta(
+    'thermometer',
+  );
+  @override
+  late final GeneratedColumn<String> thermometer = GeneratedColumn<String>(
+    'thermometer',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    date,
+    method,
+    thermometer,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'measurement_methods';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MeasurementMethod> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('method')) {
+      context.handle(
+        _methodMeta,
+        method.isAcceptableOrUnknown(data['method']!, _methodMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_methodMeta);
+    }
+    if (data.containsKey('thermometer')) {
+      context.handle(
+        _thermometerMeta,
+        thermometer.isAcceptableOrUnknown(
+          data['thermometer']!,
+          _thermometerMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MeasurementMethod map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MeasurementMethod(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      date: $MeasurementMethodsTable.$converterdate.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}date'],
+        )!,
+      ),
+      method: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}method'],
+      )!,
+      thermometer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thermometer'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MeasurementMethodsTable createAlias(String alias) {
+    return $MeasurementMethodsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterdate =
+      const EpochDayConverter();
+}
+
+class MeasurementMethod extends DataClass
+    implements Insertable<MeasurementMethod> {
+  final int id;
+
+  /// Calendar day the state starts applying (unix-epoch days).
+  final DateTime date;
+
+  /// The measurement route, as a TEXT token from the [MeasurementRoute]
+  /// enum-name vocabulary: 'vaginal' / 'rectal' / 'oral' / 'other' (the
+  /// tokens are pinned by tests; a rename is a data migration).
+  /// customConstraint replaces drift's own constraints, so NOT NULL is
+  /// written out explicitly inside the constraint string (a bare CHECK
+  /// would silently drop it). The engine-level CHECK mirrors that
+  /// vocabulary so foreign data (e.g. a future import path) cannot write
+  /// an impossible route.
+  final String method;
+
+  /// Name of the thermometer in use from that day on, when given. Trimming
+  /// (and blank → null) is a WRITER rule via normalizeThermometerName
+  /// (lib/domain/measurement_method.dart), not an SQL constraint.
+  final String? thermometer;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const MeasurementMethod({
+    required this.id,
+    required this.date,
+    required this.method,
+    this.thermometer,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    {
+      map['date'] = Variable<int>(
+        $MeasurementMethodsTable.$converterdate.toSql(date),
+      );
+    }
+    map['method'] = Variable<String>(method);
+    if (!nullToAbsent || thermometer != null) {
+      map['thermometer'] = Variable<String>(thermometer);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MeasurementMethodsCompanion toCompanion(bool nullToAbsent) {
+    return MeasurementMethodsCompanion(
+      id: Value(id),
+      date: Value(date),
+      method: Value(method),
+      thermometer: thermometer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thermometer),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MeasurementMethod.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MeasurementMethod(
+      id: serializer.fromJson<int>(json['id']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      method: serializer.fromJson<String>(json['method']),
+      thermometer: serializer.fromJson<String?>(json['thermometer']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'date': serializer.toJson<DateTime>(date),
+      'method': serializer.toJson<String>(method),
+      'thermometer': serializer.toJson<String?>(thermometer),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MeasurementMethod copyWith({
+    int? id,
+    DateTime? date,
+    String? method,
+    Value<String?> thermometer = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MeasurementMethod(
+    id: id ?? this.id,
+    date: date ?? this.date,
+    method: method ?? this.method,
+    thermometer: thermometer.present ? thermometer.value : this.thermometer,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MeasurementMethod copyWithCompanion(MeasurementMethodsCompanion data) {
+    return MeasurementMethod(
+      id: data.id.present ? data.id.value : this.id,
+      date: data.date.present ? data.date.value : this.date,
+      method: data.method.present ? data.method.value : this.method,
+      thermometer: data.thermometer.present
+          ? data.thermometer.value
+          : this.thermometer,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MeasurementMethod(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('method: $method, ')
+          ..write('thermometer: $thermometer, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, date, method, thermometer, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MeasurementMethod &&
+          other.id == this.id &&
+          other.date == this.date &&
+          other.method == this.method &&
+          other.thermometer == this.thermometer &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MeasurementMethodsCompanion extends UpdateCompanion<MeasurementMethod> {
+  final Value<int> id;
+  final Value<DateTime> date;
+  final Value<String> method;
+  final Value<String?> thermometer;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const MeasurementMethodsCompanion({
+    this.id = const Value.absent(),
+    this.date = const Value.absent(),
+    this.method = const Value.absent(),
+    this.thermometer = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  MeasurementMethodsCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime date,
+    required String method,
+    this.thermometer = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : date = Value(date),
+       method = Value(method);
+  static Insertable<MeasurementMethod> custom({
+    Expression<int>? id,
+    Expression<int>? date,
+    Expression<String>? method,
+    Expression<String>? thermometer,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (date != null) 'date': date,
+      if (method != null) 'method': method,
+      if (thermometer != null) 'thermometer': thermometer,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  MeasurementMethodsCompanion copyWith({
+    Value<int>? id,
+    Value<DateTime>? date,
+    Value<String>? method,
+    Value<String?>? thermometer,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return MeasurementMethodsCompanion(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      method: method ?? this.method,
+      thermometer: thermometer ?? this.thermometer,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<int>(
+        $MeasurementMethodsTable.$converterdate.toSql(date.value),
+      );
+    }
+    if (method.present) {
+      map['method'] = Variable<String>(method.value);
+    }
+    if (thermometer.present) {
+      map['thermometer'] = Variable<String>(thermometer.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MeasurementMethodsCompanion(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('method: $method, ')
+          ..write('thermometer: $thermometer, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$CycleDatabase extends GeneratedDatabase {
   _$CycleDatabase(QueryExecutor e) : super(e);
   $CycleDatabaseManager get managers => $CycleDatabaseManager(this);
   late final $CycleEntriesTable cycleEntries = $CycleEntriesTable(this);
   late final $UserMarksTable userMarks = $UserMarksTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $MeasurementMethodsTable measurementMethods =
+      $MeasurementMethodsTable(this);
   late final Index cycleEntriesDateUnique = Index(
     'cycle_entries_date_unique',
     'CREATE UNIQUE INDEX cycle_entries_date_unique ON cycle_entries (date)',
@@ -1616,8 +2037,14 @@ abstract class _$CycleDatabase extends GeneratedDatabase {
     'user_marks_date_type_unique',
     'CREATE UNIQUE INDEX user_marks_date_type_unique ON user_marks (entry_date, mark_type)',
   );
+  late final Index measurementMethodsDateUnique = Index(
+    'measurement_methods_date_unique',
+    'CREATE UNIQUE INDEX measurement_methods_date_unique ON measurement_methods (date)',
+  );
   late final EntriesDao entriesDao = EntriesDao(this as CycleDatabase);
   late final MarksDao marksDao = MarksDao(this as CycleDatabase);
+  late final MeasurementMethodsDao measurementMethodsDao =
+      MeasurementMethodsDao(this as CycleDatabase);
   late final SettingsDao settingsDao = SettingsDao(this as CycleDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -1627,8 +2054,10 @@ abstract class _$CycleDatabase extends GeneratedDatabase {
     cycleEntries,
     userMarks,
     appSettings,
+    measurementMethods,
     cycleEntriesDateUnique,
     userMarksDateTypeUnique,
+    measurementMethodsDateUnique,
   ];
 }
 
@@ -2413,6 +2842,246 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$MeasurementMethodsTableCreateCompanionBuilder =
+    MeasurementMethodsCompanion Function({
+      Value<int> id,
+      required DateTime date,
+      required String method,
+      Value<String?> thermometer,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$MeasurementMethodsTableUpdateCompanionBuilder =
+    MeasurementMethodsCompanion Function({
+      Value<int> id,
+      Value<DateTime> date,
+      Value<String> method,
+      Value<String?> thermometer,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+class $$MeasurementMethodsTableFilterComposer
+    extends Composer<_$CycleDatabase, $MeasurementMethodsTable> {
+  $$MeasurementMethodsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get date =>
+      $composableBuilder(
+        column: $table.date,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get method => $composableBuilder(
+    column: $table.method,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get thermometer => $composableBuilder(
+    column: $table.thermometer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MeasurementMethodsTableOrderingComposer
+    extends Composer<_$CycleDatabase, $MeasurementMethodsTable> {
+  $$MeasurementMethodsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get method => $composableBuilder(
+    column: $table.method,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get thermometer => $composableBuilder(
+    column: $table.thermometer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MeasurementMethodsTableAnnotationComposer
+    extends Composer<_$CycleDatabase, $MeasurementMethodsTable> {
+  $$MeasurementMethodsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get method =>
+      $composableBuilder(column: $table.method, builder: (column) => column);
+
+  GeneratedColumn<String> get thermometer => $composableBuilder(
+    column: $table.thermometer,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$MeasurementMethodsTableTableManager
+    extends
+        RootTableManager<
+          _$CycleDatabase,
+          $MeasurementMethodsTable,
+          MeasurementMethod,
+          $$MeasurementMethodsTableFilterComposer,
+          $$MeasurementMethodsTableOrderingComposer,
+          $$MeasurementMethodsTableAnnotationComposer,
+          $$MeasurementMethodsTableCreateCompanionBuilder,
+          $$MeasurementMethodsTableUpdateCompanionBuilder,
+          (
+            MeasurementMethod,
+            BaseReferences<
+              _$CycleDatabase,
+              $MeasurementMethodsTable,
+              MeasurementMethod
+            >,
+          ),
+          MeasurementMethod,
+          PrefetchHooks Function()
+        > {
+  $$MeasurementMethodsTableTableManager(
+    _$CycleDatabase db,
+    $MeasurementMethodsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MeasurementMethodsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MeasurementMethodsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MeasurementMethodsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<String> method = const Value.absent(),
+                Value<String?> thermometer = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => MeasurementMethodsCompanion(
+                id: id,
+                date: date,
+                method: method,
+                thermometer: thermometer,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required DateTime date,
+                required String method,
+                Value<String?> thermometer = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => MeasurementMethodsCompanion.insert(
+                id: id,
+                date: date,
+                method: method,
+                thermometer: thermometer,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$MeasurementMethodsTable, MeasurementMethod>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$CycleDatabase,
+                    $MeasurementMethodsTable,
+                    MeasurementMethod
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MeasurementMethodsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CycleDatabase,
+      $MeasurementMethodsTable,
+      MeasurementMethod,
+      $$MeasurementMethodsTableFilterComposer,
+      $$MeasurementMethodsTableOrderingComposer,
+      $$MeasurementMethodsTableAnnotationComposer,
+      $$MeasurementMethodsTableCreateCompanionBuilder,
+      $$MeasurementMethodsTableUpdateCompanionBuilder,
+      (
+        MeasurementMethod,
+        BaseReferences<
+          _$CycleDatabase,
+          $MeasurementMethodsTable,
+          MeasurementMethod
+        >,
+      ),
+      MeasurementMethod,
+      PrefetchHooks Function()
+    >;
 
 class $CycleDatabaseManager {
   final _$CycleDatabase _db;
@@ -2423,6 +3092,8 @@ class $CycleDatabaseManager {
       $$UserMarksTableTableManager(_db, _db.userMarks);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$MeasurementMethodsTableTableManager get measurementMethods =>
+      $$MeasurementMethodsTableTableManager(_db, _db.measurementMethods);
 }
 
 mixin _$EntriesDaoMixin on DatabaseAccessor<CycleDatabase> {
@@ -2447,6 +3118,23 @@ class MarksDaoManager {
   MarksDaoManager(this._db);
   $$UserMarksTableTableManager get userMarks =>
       $$UserMarksTableTableManager(_db.attachedDatabase, _db.userMarks);
+}
+
+mixin _$MeasurementMethodsDaoMixin on DatabaseAccessor<CycleDatabase> {
+  $MeasurementMethodsTable get measurementMethods =>
+      attachedDatabase.measurementMethods;
+  MeasurementMethodsDaoManager get managers =>
+      MeasurementMethodsDaoManager(this);
+}
+
+class MeasurementMethodsDaoManager {
+  final _$MeasurementMethodsDaoMixin _db;
+  MeasurementMethodsDaoManager(this._db);
+  $$MeasurementMethodsTableTableManager get measurementMethods =>
+      $$MeasurementMethodsTableTableManager(
+        _db.attachedDatabase,
+        _db.measurementMethods,
+      );
 }
 
 mixin _$SettingsDaoMixin on DatabaseAccessor<CycleDatabase> {

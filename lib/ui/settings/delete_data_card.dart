@@ -5,8 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../providers.dart';
 
 // --- delete data (danger) -------------------------------------
-// One transactional wipe of every diary entry and mark (settings
-// and onboarding flag survive); cancel is the DEFAULT action.
+// One transactional wipe of every diary entry, mark and method snapshot
+// (settings and onboarding flag survive); cancel is the DEFAULT action.
 final class DeleteDataCard extends ConsumerWidget {
   const DeleteDataCard({super.key});
 
@@ -61,6 +61,7 @@ final class DeleteDataCard extends ConsumerWidget {
       final db = await ref.read(databaseProvider.future);
       final entries = await db.entriesDao.allEntries();
       final marks = await db.marksDao.allMarks();
+      final methods = await db.measurementMethodsDao.allSnapshots();
       if (!context.mounted) return;
 
       final confirmed = await showDialog<bool>(
@@ -68,7 +69,11 @@ final class DeleteDataCard extends ConsumerWidget {
         builder: (dialogContext) => AlertDialog(
           title: Text(l10n.deleteDataDialogTitle),
           content: Text(
-            l10n.deleteDataDialogBody(entries.length, marks.length),
+            l10n.deleteDataDialogBody(
+              entries.length,
+              marks.length,
+              methods.length,
+            ),
           ),
           actions: [
             TextButton(
@@ -98,7 +103,9 @@ final class DeleteDataCard extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.deleteDataDone(counts.entries, counts.marks)),
+          content: Text(
+            l10n.deleteDataDone(counts.entries, counts.marks, counts.methods),
+          ),
         ),
       );
     } catch (_) {

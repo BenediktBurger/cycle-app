@@ -126,7 +126,9 @@ final class ExportImportCard extends ConsumerWidget {
       ScaffoldMessenger.of(screenContext).showSnackBar(
         SnackBar(
           content: Text(
-            summary.entriesWritten == 0 && summary.marksNew == 0
+            summary.entriesWritten == 0 &&
+                    summary.marksNew == 0 &&
+                    summary.methodsWritten == 0
                 ? l10n.importEmpty
                 : l10n.importSummary(
                     summary.entriesNew,
@@ -135,6 +137,8 @@ final class ExportImportCard extends ConsumerWidget {
                     summary.entriesInvalid,
                     summary.marksNew,
                     summary.marksSkipped,
+                    summary.methodsNew,
+                    summary.methodsOverwritten,
                   ),
           ),
         ),

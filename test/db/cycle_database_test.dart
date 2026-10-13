@@ -17,6 +17,7 @@ import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/db/converters.dart';
@@ -464,20 +465,20 @@ void main() {
     });
   });
 
-  group('schema & migration (v10, v11): app_settings key-value store', () {
+  group('schema & migration: version pin + app_settings key-value store', () {
     test(
-      'the schema version is 12 (the engine-level bleeding CHECK)',
+      'the schema version is 13 (the measurement_methods snapshot table)',
       () async {
         final version = await db
             .customSelect('PRAGMA user_version')
             .getSingle();
         expect(
           version.data['user_version'],
-          12,
+          13,
           reason:
-              'v12 adds the bleeding column\'s CHECK constraint; the '
-              'table is recreated with data preserved, so the step is a '
-              'real migration',
+              'v13 adds the measurement_methods table; an existing '
+              'install gains it through the incremental create, so the '
+              'step is a real migration',
         );
       },
     );
@@ -597,7 +598,8 @@ void main() {
                 .customSelect(
                   "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT "
                   "NULL AND tbl_name IN "
-                  "('cycle_entries', 'user_marks', 'app_settings')",
+                  "('cycle_entries', 'user_marks', 'app_settings', "
+                  "'measurement_methods')",
                 )
                 .get())
           {
@@ -620,10 +622,13 @@ void main() {
     /// stripped back to the plain `NOT NULL DEFAULT 0` column (the regex
     /// matches the column definition up to the next comma, whatever the
     /// rest of the statement looks like). Per the documented history, the
-    /// remaining DDL of a v9/v10/v11-shaped file is the current DDL — v9→v10
-    /// adds only `app_settings`, v10→v11 changes no SQL and v11→v12 touches
-    /// only the bleeding column — so these deltas are all the fixture
-    /// controls. The seeded user data is written with raw SQL and explicit
+    /// remaining DDL of a v9/v10/v11/v12-shaped file is the current DDL —
+    /// v9→v10 adds only `app_settings`, v10→v11 changes no SQL, v11→v12
+    /// touches only the bleeding column, and the `measurement_methods`
+    /// snapshot table is NEW in v13, so no pre-v13 file carries it (the
+    /// fixture never replays it; the migration is what must create it).
+    /// These deltas are all the fixture controls. The seeded user data is
+    /// written with raw SQL and explicit
     /// created_at/updated_at values so the rows are individually
     /// identifiable (a table recreated from the current schema cannot
     /// answer them, which is what makes the data-preservation pin
@@ -635,7 +640,11 @@ void main() {
     }) async {
       final statements = [
         for (final r in currentDdl)
-          if (withAppSettings || r['name'] != 'app_settings')
+          if ((withAppSettings || r['name'] != 'app_settings') &&
+              // All of the methods table's DDL (its index included) is the
+              // v13 delta — no pre-v13 file carries any of it.
+              r['name'] != 'measurement_methods' &&
+              r['name'] != 'measurement_methods_date_unique')
             (
               tableFirst: r['type'] == 'table' ? 0 : 1,
               sql: r['type'] == 'table' && r['name'] == 'cycle_entries'
@@ -681,7 +690,7 @@ void main() {
       final version = await db.customSelect('PRAGMA user_version').getSingle();
       expect(
         version.data['user_version'],
-        12,
+        13,
         reason: 'drift records the migration run',
       );
 
@@ -811,6 +820,74 @@ void main() {
       await db.settingsDao.writeValue('themeMode', 'dark');
       expect(await db.settingsDao.readValue('themeMode'), 'dark');
     });
+
+    test(
+      'a v12 file migrates incrementally: the methods table appears with '
+      'its day key, vocabulary CHECK and the tracked data preserved',
+      () async {
+        final db = await openMigrationFixture(12, withAppSettings: true);
+        await expectPreserved(db);
+
+        // The only SQL delta of v12 → v13: the methods snapshot table now
+        // exists, in the current shape.
+        final columns = await db
+            .customSelect('PRAGMA table_info(measurement_methods)')
+            .get();
+        final byName = {
+          for (final r in columns) r.data['name']! as String: r.data,
+        };
+        expect(
+          byName.keys,
+          containsAll(['id', 'date', 'method', 'thermometer', 'created_at']),
+          reason:
+              'the snapshot table is day-keyed with its route and '
+              'optional thermometer',
+        );
+        expect(byName['date']!['notnull'], 1);
+        expect(byName['method']!['notnull'], 1);
+        expect(
+          byName['thermometer']!['notnull'],
+          0,
+          reason: 'the thermometer name stays optional after the migration',
+        );
+
+        final indexNames = [
+          for (final r
+              in await db
+                  .customSelect(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND "
+                    "name = 'measurement_methods_date_unique'",
+                  )
+                  .get())
+            r.data['name']! as String,
+        ];
+        expect(
+          indexNames,
+          hasLength(1),
+          reason: 'the day key is unique — one snapshot per calendar day',
+        );
+
+        // The engine CHECK survives the incremental create: foreign data
+        // cannot write an impossible route into a migrated file.
+        final rawDate = 20000;
+        await expectLater(
+          db.customStatement(
+            "INSERT INTO measurement_methods (date, method) "
+            "VALUES ($rawDate, 'anal')",
+          ),
+          throwsA(isA<Exception>()),
+        );
+        await db.customStatement(
+          "INSERT INTO measurement_methods (date, method) "
+          "VALUES ($rawDate, 'oral')",
+        );
+        expect(
+          await db.measurementMethodsDao.snapshotFor(DateTime(2024, 10, 4)),
+          isNotNull,
+          reason: 'the migrated table answers the DAO immediately',
+        );
+      },
+    );
 
     test('a pre-existing out-of-range bleeding row fails the migration '
         'loudly', () async {
@@ -2001,6 +2078,233 @@ void main() {
         );
         expect(reExported.marks, firstExport.marks);
       });
+    });
+
+    group('measurement method snapshots at the export boundary', () {
+      test(
+        'a snapshot-free database exports exactly the four root keys',
+        () async {
+          // The byte-compatibility decision: a dataset without snapshots
+          // emits NO methods key at all, so the pinned four-key document
+          // shape survives unchanged.
+          final json = await exportDatabaseToJson(db);
+          final decoded = jsonDecode(json) as Map<String, Object?>;
+          expect(decoded.keys.toSet(), {
+            'schema_version',
+            'exported_at',
+            'entries',
+            'marks',
+          });
+        },
+      );
+
+      test('export carries seeded snapshots in the sparse row shape', () async {
+        await db.measurementMethodsDao.upsertByDate(
+          date: DateTime(2026, 2, 1),
+          route: MeasurementRoute.vaginal,
+          thermometer: 'ThermaPen',
+        );
+        await db.measurementMethodsDao.upsertByDate(
+          date: DateTime(2026, 3, 15),
+          route: MeasurementRoute.oral,
+        );
+
+        final json = await exportDatabaseToJson(db);
+        expect(json, contains('"methods"'));
+        expect(
+          json,
+          isNot(contains(': null')),
+          reason: 'the thermometer key is omitted when null, never null',
+        );
+
+        final decoded = jsonDecode(json) as Map<String, Object?>;
+        final rows = [
+          for (final raw in decoded['methods']! as List)
+            Map<String, Object?>.from(raw as Map),
+        ];
+        expect(rows, [
+          {
+            'date': '2026-02-01',
+            'method': 'vaginal',
+            'thermometer': 'ThermaPen',
+          },
+          // The sparse shape: no thermometer key on the name-less row.
+          {'date': '2026-03-15', 'method': 'oral'},
+        ], reason: 'ordered by day');
+      });
+
+      test(
+        'import writes snapshots via the DAO, overwriting stored days',
+        () async {
+          await db.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 2, 1),
+            route: MeasurementRoute.vaginal,
+            thermometer: 'ThermaPen',
+          );
+          await db.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 3, 15),
+            route: MeasurementRoute.oral,
+          );
+
+          final target = CycleDatabase(NativeDatabase.memory());
+          addTearDown(target.close);
+          // A stored snapshot on a day the document also carries: the
+          // entries merge rule — overwrite, never a duplicate row.
+          await target.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 2, 1),
+            route: MeasurementRoute.other,
+            thermometer: 'Obsolete',
+          );
+
+          final json = await exportDatabaseToJson(db);
+          final summary = await importJsonToDatabase(target, json);
+          expect(summary.methodsNew, 1, reason: '2026-03-15 is new');
+          expect(summary.methodsOverwritten, 1, reason: '2026-02-01 stored');
+          expect(summary.methodsWritten, 2);
+
+          // Read back through the domain mapper (same read the rest of the
+          // app uses), ordered ascending by day — two rows, no duplicate.
+          final rows = [
+            for (final row in await target.measurementMethodsDao.allSnapshots())
+              measurementSnapshotFromDrift(row),
+          ];
+          expect(rows, [
+            MeasurementMethodSnapshot(
+              date: DateTime(2026, 2, 1),
+              route: MeasurementRoute.vaginal,
+              thermometer: 'ThermaPen',
+            ),
+            MeasurementMethodSnapshot(
+              date: DateTime(2026, 3, 15),
+              route: MeasurementRoute.oral,
+            ),
+          ]);
+        },
+      );
+
+      test(
+        'an old (pre-methods) document leaves stored methods untouched',
+        () async {
+          // The additive root key: a document that simply omits it must not
+          // touch the device's snapshots (missing key = no snapshots).
+          await db.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 2, 1),
+            route: MeasurementRoute.rectal,
+            thermometer: 'Alt',
+          );
+          const oldJson =
+              '{"schema_version": 3, '
+              '"exported_at": "2026-04-01T00:00:00Z", '
+              '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
+              '"entries": [{"profile_id": 1, "date": "2026-04-02", '
+              '"bleeding": 3}], '
+              '"marks": []}';
+
+          final summary = await importJsonToDatabase(db, oldJson);
+          expect(summary.entriesNew, 1);
+          expect(summary.methodsNew, 0);
+
+          final rows = [
+            for (final row in await db.measurementMethodsDao.allSnapshots())
+              measurementSnapshotFromDrift(row),
+          ];
+          expect(rows, [
+            MeasurementMethodSnapshot(
+              date: DateTime(2026, 2, 1),
+              route: MeasurementRoute.rectal,
+              thermometer: 'Alt',
+            ),
+          ]);
+        },
+      );
+
+      test(
+        'invalid method rows are counted AND skipped (counted == written)',
+        () async {
+          final doc = buildExportJson(
+            ExportBlob(
+              exportedAt: DateTime.utc(2026, 4, 1),
+              entries: const [],
+              marks: const [],
+              methods: [
+                {'date': '2026-05-01', 'method': 'vaginal'},
+                // The SQL CHECK cannot store this token — a plan that
+                // counted it as a write would break the writer-parity rule.
+                {'date': '2026-05-02', 'method': 'sublingual'},
+              ],
+            ),
+          );
+
+          final plan = await planDatabaseImport(db, doc);
+          expect(plan.methodsInvalid, 1);
+          expect(plan.methodsWritten, 1);
+
+          final summary = await importJsonToDatabase(db, doc);
+          expect(summary.methodsInvalid, 1);
+          expect(summary.methodsWritten, 1);
+          final rows = [
+            for (final row in await db.measurementMethodsDao.allSnapshots())
+              measurementSnapshotFromDrift(row),
+          ];
+          expect(rows, hasLength(1));
+          expect(rows.single.route, MeasurementRoute.vaginal);
+        },
+      );
+
+      test(
+        'the duplicate first-wins rule holds for same-day document rows',
+        () async {
+          final doc = buildExportJson(
+            ExportBlob(
+              exportedAt: DateTime.utc(2026, 4, 1),
+              entries: const [],
+              marks: const [],
+              methods: const [
+                {'date': '2026-05-01', 'method': 'vaginal'},
+                {'date': '2026-05-01', 'method': 'oral'},
+              ],
+            ),
+          );
+
+          final summary = await importJsonToDatabase(db, doc);
+          expect(summary.methodsNew, 1);
+          expect(summary.duplicateMethodRows, 1);
+          final rows = [
+            for (final row in await db.measurementMethodsDao.allSnapshots())
+              measurementSnapshotFromDrift(row),
+          ];
+          expect(rows, hasLength(1));
+          expect(
+            rows.single.route,
+            MeasurementRoute.vaginal,
+            reason: 'the FIRST occurrence wins (the entries merge rule)',
+          );
+        },
+      );
+
+      test(
+        'planDatabaseImport preview counts include the methods fields',
+        () async {
+          await db.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 5, 5),
+            route: MeasurementRoute.other,
+          );
+          final json = await exportDatabaseToBlob(db).then(buildExportJson);
+
+          final target = CycleDatabase(NativeDatabase.memory());
+          addTearDown(target.close);
+          await target.measurementMethodsDao.upsertByDate(
+            date: DateTime(2026, 5, 5),
+            route: MeasurementRoute.oral,
+          );
+
+          final plan = await planDatabaseImport(target, json);
+          expect(plan.methodsNew, 0);
+          expect(plan.methodsOverwritten, 1);
+          expect(plan.methodsInvalid, 0);
+          expect(plan.methodsWritten, 1);
+        },
+      );
     });
 
     test('unexpected errors surface as ImportFailedException', () async {

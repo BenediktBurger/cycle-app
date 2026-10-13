@@ -27,6 +27,7 @@ import 'db/settings_store.dart';
 import 'domain/date_only.dart';
 import 'domain/diary_track.dart';
 import 'domain/marks.dart';
+import 'domain/measurement_method.dart';
 import 'domain/models.dart';
 import 'domain/pdf_export_model.dart';
 import 'domain/statistics.dart';
@@ -80,6 +81,18 @@ Stream<List<CycleMark>> marks(Ref ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.marksDao.watchAll().map(
     (rows) => rows.map(cycleMarkFromDrift).toList(),
+  );
+}
+
+/// Live stream of the measurement-method snapshots (as pure domain models)
+/// — the state history of the TRACKED method ("from this day onwards").
+/// Re-emits on every methods write; consumers derive the per-day effective
+/// method from it (effectiveMeasurementMethod).
+@riverpod
+Stream<List<MeasurementMethodSnapshot>> measurementMethods(Ref ref) async* {
+  final db = await ref.watch(databaseProvider.future);
+  yield* db.measurementMethodsDao.watchAll().map(
+    (rows) => rows.map(measurementSnapshotFromDrift).toList(),
   );
 }
 

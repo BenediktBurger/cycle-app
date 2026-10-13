@@ -67,7 +67,7 @@
   "saved": "Saved.",
   "saveFailed": "Saving failed — the data was not changed.",
   "@saveFailed": {
-    "description": "Failure message for saving a diary day: shown when the entry upsert or either of the two mark writes fails. All three writes run as one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors deleteDataFailed/importFailed."
+    "description": "Failure message for saving a diary day or the measurement-method dialog: shown when the diary-day entry upsert or either of the two mark writes fails, or when the dialog's method upsert fails. The diary writes run as one all-or-nothing transaction, so the reassurance clause (nothing was changed) mirrors deleteDataFailed/importFailed."
   },
   "noEntriesYet": "No entries yet. Enter your first day above.",
   "loadFailed": "Loading failed",
@@ -532,12 +532,12 @@
   },
   "settingsDeleteData": "Delete data",
   "@settingsDeleteData": {
-    "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks) after an explicit confirmation; settings and the onboarding flag survive by design."
+    "description": "Title of the danger-tinted card that wipes ALL tracked data (entries + marks + method snapshots) after an explicit confirmation; settings and the onboarding flag survive by design."
   },
-  "settingsDeleteDataNote": "Removes all diary entries and marks. Your settings are kept. If you want to keep the data: export first (see Export).",
+  "settingsDeleteDataNote": "Removes all diary entries, marks and measurement methods. Your settings are kept. If you want to keep the data: export first (see Export).",
   "settingsDeleteDataButton": "Delete all data …",
   "deleteDataDialogTitle": "Delete data?",
-  "deleteDataDialogBody": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}} and {marks, plural, =1{1 mark} other{{marks} marks}} will be deleted. Settings are kept. If you want to keep the data: export first (see Export).",
+  "deleteDataDialogBody": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}}, {marks, plural, =1{1 mark} other{{marks} marks}} and {methods, plural, =1{1 measurement method} other{{methods} measurement methods}} will be deleted. Settings are kept. If you want to keep the data: export first (see Export).",
   "@deleteDataDialogBody": {
     "placeholders": {
       "entries": {
@@ -545,17 +545,23 @@
       },
       "marks": {
         "type": "int"
+      },
+      "methods": {
+        "type": "int"
       }
     }
   },
   "deleteDataConfirm": "Delete",
-  "deleteDataDone": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}} and {marks, plural, =1{1 mark} other{{marks} marks}} deleted.",
+  "deleteDataDone": "{entries, plural, =1{1 diary entry} other{{entries} diary entries}}, {marks, plural, =1{1 mark} other{{marks} marks}} and {methods, plural, =1{1 measurement method} other{{methods} measurement methods}} deleted.",
   "@deleteDataDone": {
     "placeholders": {
       "entries": {
         "type": "int"
       },
       "marks": {
+        "type": "int"
+      },
+      "methods": {
         "type": "int"
       }
     }
@@ -652,7 +658,7 @@
   "importApply": "Apply import",
   "importInvalid": "Invalid document (not a valid cycle-app export).",
   "importFailed": "Import failed — the data was not changed.",
-  "importSummary": "{newDays, plural, =1{1 day} other{{newDays} days}} new, {overwritten, plural, =1{1 day} other{{overwritten} days}} overwritten, {duplicates, plural, =1{1 duplicate row} other{{duplicates} duplicate rows}} in document, {invalid, plural, =1{1 invalid row} other{{invalid} invalid rows}}, {newMarks, plural, =1{1 mark} other{{newMarks} marks}} new, {skipped, plural, =1{1 mark} other{{skipped} marks}} skipped.",
+  "importSummary": "{newDays, plural, =1{1 day} other{{newDays} days}} new, {overwritten, plural, =1{1 day} other{{overwritten} days}} overwritten, {duplicates, plural, =1{1 duplicate row} other{{duplicates} duplicate rows}} in document, {invalid, plural, =1{1 invalid row} other{{invalid} invalid rows}}, {newMarks, plural, =1{1 mark} other{{newMarks} marks}} new, {skipped, plural, =1{1 mark} other{{skipped} marks}} skipped, {newMethods, plural, =1{1 method} other{{newMethods} methods}} new, {methodsOverwritten, plural, =1{1 method} other{{methodsOverwritten} methods}} overwritten.",
   "importEmpty": "Import: nothing to change (document empty or already identical).",
   "importOverwriteWarning": "{days, plural, =1{1 day will be overwritten.} other{{days} days will be overwritten.}}",
   "@importOverwriteWarning": {
@@ -712,6 +718,12 @@
       },
       "skipped": {
         "type": "int"
+      },
+      "newMethods": {
+        "type": "int"
+      },
+      "methodsOverwritten": {
+        "type": "int"
       }
     }
   },
@@ -721,5 +733,27 @@
     "description": "Tooltip/semantics label of the close button on the non-modal day options panel below the cycle chart."
   },
   "cycleLegendIgnoreTemperature": "Ignored temperature (lighter; set in the day sheet)",
-  "statisticsShortest": "Shortest"
+  "statisticsShortest": "Shortest",
+  "methodDialogTitle": "Measurement method",
+  "@methodDialogTitle": {
+    "description": "Title of the measurement-method dialog in the diary and tooltip of the thermometer icon at the temperature line. The dialog applies to the selected diary day; diary navigation is the date selection."
+  },
+  "methodRouteVaginal": "vaginal",
+  "methodRouteRectal": "rectal",
+  "methodRouteOral": "oral",
+  "methodRouteOther": "other",
+  "methodThermometerLabel": "Thermometer",
+  "methodNotRecorded": "Not recorded yet",
+  "@methodNotRecorded": {
+    "description": "Empty state of the measurement-method dialog: the day inherits no method from an earlier snapshot yet — the first save is the baseline."
+  },
+  "methodHelperText": "To change or delete a past entry, navigate the diary to that day.",
+  "methodDeleteChange": "Delete change",
+  "@methodDeleteChange": {
+    "description": "Action in the measurement-method dialog: removes only the selected day's snapshot; the effective method then falls back to the earlier entry."
+  },
+  "methodNavigateToChange": "Navigate to the day of the last change",
+  "@methodNavigateToChange": {
+    "description": "Tooltip/semantics message of the tappable date line in the measurement-method dialog: shown while the dialog displays a method inherited from an earlier day's snapshot; tapping navigates the diary to that day."
+  }
 }
