@@ -651,7 +651,8 @@ List<DailyEntry> _flatEntries() => [
 Finder _rail() => find.byKey(const ValueKey('leftRail'));
 
 /// The rail's temperature-scale label texts, in top-down (descending
-/// value) order — with the rendered °C unit suffix.
+/// value) order — bare numerals; the °C unit renders as its own single
+/// line under the topmost label.
 List<String> _scaleLabels(WidgetTester tester) {
   final labelFinder = find.descendant(
     of: _rail(),
@@ -668,11 +669,6 @@ List<String> _scaleLabels(WidgetTester tester) {
   ]..sort((a, b) => a.rect.top.compareTo(b.rect.top));
   return [for (final e in entries) e.text];
 }
-
-/// The scale labels' numeric part (the labels carry a " °C" unit suffix
-/// whose formatting is asserted separately).
-double _scaleLabelValue(String label) =>
-    double.parse(label.replaceFirst(RegExp(r' ?°C$'), ''));
 
 Widget _leftRailHarness({
   required List<DailyEntry> entries,
@@ -971,7 +967,7 @@ Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
 // The chart's day-column geometry at the test viewport (800 wide, 12 body
 // padding on each side): a 60-day range overflows, so columns render at the
 // minimum usable width and the content exceeds the viewport.
-const _columnWidth = 24.0;
+const _columnWidth = 21.0;
 
 /// The finder for the horizontal scroll view that carries the chart block.
 Widget _windowingHarness({
@@ -1143,12 +1139,12 @@ void main() {
       );
       expect(
         rect.width,
-        diameterOf[value],
+        closeTo(diameterOf[value]!, 0.01),
         reason: "day $key: the circle's diameter communicates the opening",
       );
       expect(
         rect.height,
-        diameterOf[value],
+        closeTo(diameterOf[value]!, 0.01),
         reason: "day $key: the circle's diameter communicates the opening",
       );
       if (value == CervixOpening.closed) {
@@ -1755,7 +1751,7 @@ void main() {
         // marks: the leading cycle group's day-of-cycle counter runs 1..104,
         // so the range's tail renders three-digit day-of-cycle labels. The
         // 104 columns overflow the viewport, so every column renders at the
-        // 24 px minimum width — the narrowest layout the chart ever uses.
+        // 21 px minimum width — the narrowest layout the chart ever uses.
         await pumpChart(
           tester,
           _dayLabelsHarness(entries: _dayLabelsEntries(104)),
@@ -1766,7 +1762,7 @@ void main() {
           isNull,
           reason:
               'the three-digit day-of-cycle label must not overflow '
-              'its 24 px column',
+              'its 21 px column',
         );
 
         // Day index 103 shows day-of-cycle 104 (the leading group counts
@@ -3433,14 +3429,14 @@ void main() {
         'label into the windowed span instead of overflowing the plot', (
       tester,
     ) async {
-      // A 150-day range with a sole cycleStart mark at day index 62: the
+      // A 150-day range with a sole cycleStart mark at day index 72: the
       // mark's cycle's own columns would run all the way to the range's
       // end — far past the built window once the block scrolled away from
       // the newest days. After dragging to the content's start the parked
-      // window's last built index is 62 (observed below), so the clamp
+      // window's last built index is 72 (observed below), so the clamp
       // leaves the chip a SINGLE day column — narrower than the natural
       // label, i.e. the clamp really bites.
-      const boundaryIndex = 62;
+      const boundaryIndex = 72;
       final entries = longRangeEntries(150);
       final marks = [
         CycleMark(
@@ -4074,7 +4070,7 @@ void main() {
         final span = data.maxY - data.minY;
         expect(span, greaterThan(0), reason: 'a usable y domain');
         for (final label in _scaleLabels(tester)) {
-          final value = _scaleLabelValue(label);
+          final value = double.parse(label);
           final expectedY =
               chartRect.top + (data.maxY - value) / span * chartRect.height;
           final labelCenter = tester
@@ -4094,9 +4090,9 @@ void main() {
 
     testWidgets(
       'the scale keeps the 0.5 °C interval and the two-scale numbering '
-      '(integers plain, halves with one decimal), with the °C unit on '
-      'EVERY label (mirrors the PDF rail), and an overridden range moves '
-      'the bounds AND the labels (one source of truth)',
+      '(integers plain, halves with one decimal) as bare numerals, and '
+      'an overridden range moves the bounds AND the labels (one source '
+      'of truth)',
       (tester) async {
         final cases =
             <
@@ -4111,35 +4107,34 @@ void main() {
               (
                 // The fixed settings range 36..38 supplies the bounds (not
                 // the data rounding anymore): every half-degree tick between
-                // them, top-down 38 .. 36 — each carrying the unit suffix.
+                // them, top-down 38 .. 36 — each a bare numeral.
                 range: null,
                 expectedMinY: 36.0,
                 expectedMaxY: 38.0,
-                labels: ['38 °C', '37.5 °C', '37 °C', '36.5 °C', '36 °C'],
+                labels: ['38', '37.5', '37', '36.5', '36'],
                 labelsReason:
                     'half-degree ticks over the default range, integers '
-                    'plain and halves one-decimal, unit suffix on every '
-                    'label (the standalone "°C" caption row is removed '
-                    'accordingly)',
+                    'plain and halves one-decimal; the °C unit renders once, '
+                    'as its own line under the topmost label',
               ),
               (
                 range: const TemperatureRange(min: 35.0, max: 39.0),
                 expectedMinY: 35.0,
                 expectedMaxY: 39.0,
                 labels: [
-                  '39 °C',
-                  '38.5 °C',
-                  '38 °C',
-                  '37.5 °C',
-                  '37 °C',
-                  '36.5 °C',
-                  '36 °C',
-                  '35.5 °C',
-                  '35 °C',
+                  '39',
+                  '38.5',
+                  '38',
+                  '37.5',
+                  '37',
+                  '36.5',
+                  '36',
+                  '35.5',
+                  '35',
                 ],
                 labelsReason:
                     'every half-degree tick between the overridden bounds '
-                    'renders in the rail (each carrying the unit suffix)',
+                    'renders in the rail as bare numerals',
               ),
             ];
         for (final (
@@ -4197,7 +4192,7 @@ void main() {
 
         expect(
           _scaleLabels(tester),
-          ['38 °C', '37,5 °C', '37 °C', '36,5 °C', '36 °C'],
+          ['38', '37,5', '37', '36,5', '36'],
           reason:
               'the rail\'s decimal display follows the effective '
               'locale — integers stay plain, halves comma-formatted in de',
@@ -4351,6 +4346,31 @@ void main() {
       },
     );
 
+    testWidgets('the header prototypes center inside the FULL rail width '
+        '(the centering must be geometric, not a shrink-wrap no-op)', (
+      tester,
+    ) async {
+      await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
+
+      final railCenterX = tester.getRect(_rail()).center.dx;
+      final corner = find.byKey(const ValueKey('dayHeaderCorner'));
+      for (final prototype in ['14.', '#5']) {
+        expect(
+          tester
+              .getRect(
+                find.descendant(of: corner, matching: find.text(prototype)),
+              )
+              .center
+              .dx,
+          closeTo(railCenterX, 1),
+          reason:
+              '"$prototype" is centered on the rail\'s horizontal '
+              'center — a slot that shrink-wraps to its widest child '
+              'leaves both prototypes left-bound',
+        );
+      }
+    });
+
     testWidgets(
       'the rail is only as wide as its widest label: every scale label '
       'stays inside the rail without clipping (en and de)',
@@ -4370,7 +4390,7 @@ void main() {
           final rail = tester.getRect(_rail());
           expect(
             rail.width,
-            37,
+            24,
             reason:
                 'the frozen rail stays as wide as its widest '
                 'scale label plus inset — wider wastes row room',
@@ -4410,9 +4430,151 @@ void main() {
               reason: '$what centers on its tick within the scale',
             );
           }
+          final unit = tester.getRect(
+            find.descendant(of: _rail(), matching: find.text('°C')),
+          );
+          expect(
+            unit.left,
+            greaterThanOrEqualTo(rail.left),
+            reason: '$locale "°C" stays inside the rail\'s left edge',
+          );
+          expect(
+            unit.right,
+            lessThanOrEqualTo(rail.right),
+            reason: '$locale "°C" is not clipped at the rail\'s right edge',
+          );
         }
       },
     );
+
+    testWidgets(
+      'the °C unit renders once, directly below the topmost scale value, '
+      'and the value+unit pair reads as one for screen readers',
+      (tester) async {
+        await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
+
+        final unitFinder = find.descendant(
+          of: _rail(),
+          matching: find.text('°C'),
+        );
+        expect(
+          unitFinder,
+          findsOneWidget,
+          reason: 'the °C renders as ONE dedicated line in the rail',
+        );
+        final unit = tester.getRect(unitFinder);
+        final topValue = tester.getRect(find.text('38'));
+        expect(
+          unit.top,
+          greaterThan(topValue.bottom),
+          reason: 'the °C sits below the topmost value\'s label, not beside it',
+        );
+        expect(
+          unit.top,
+          lessThan(
+            tester.getRect(find.byKey(const ValueKey('railScale'))).bottom,
+          ),
+          reason: 'the °C line stays inside the scale\'s slot',
+        );
+        expect(
+          find.descendant(
+            of: _rail(),
+            matching: find.byWidgetPredicate(
+              (w) => w is Semantics && w.properties.label == '38 °C',
+            ),
+          ),
+          findsOneWidget,
+          reason: 'the screen reader hears the topmost value WITH its unit',
+        );
+      },
+    );
+
+    testWidgets('at enlarged system text scale the scale labels and the °C '
+        'stay inside the rail, with the °C clear of the topmost value', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      // Only the rail's scale labels and °C slot carry FittedBox clamping;
+      // the day-header slots and the rail's corner cell have no room at 2×
+      // either, and their flex overflows would fail the test without
+      // touching this test's subject.
+      final realOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exception is FlutterError &&
+            details.exception.toString().contains('RenderFlex overflowed')) {
+          return;
+        }
+        realOnError!(details);
+      };
+      addTearDown(() => FlutterError.onError = realOnError);
+      await pumpChart(tester, _leftRailHarness(entries: _leftRailEntries));
+
+      final rail = tester.getRect(_rail());
+      final labels = find.descendant(
+        of: _rail(),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.key is ValueKey<String> &&
+              (w.key as ValueKey<String>).value.startsWith('railScaleLabel-'),
+        ),
+      );
+      for (final widget in tester.widgetList<Text>(labels)) {
+        final what = '2× text scale "${widget.data!}"';
+        final rect = tester.getRect(find.byWidget(widget));
+        // The unclamped layout size: clamped to the slot, a label would
+        // lay out at the slot's span and clip its glyphs at 2×; inside
+        // the FittedBox it lays out unconstrained and scales to fit.
+        final natural = tester.getSize(find.byWidget(widget));
+        expect(
+          natural.width,
+          greaterThan(rail.width - 3),
+          reason:
+              '$what lays out wider than its slot span, so the slot '
+              'scales it into the span instead of clipping it',
+        );
+        expect(
+          rect.left,
+          greaterThanOrEqualTo(rail.left),
+          reason: '$what stays inside the rail\'s left edge',
+        );
+        expect(
+          rect.right,
+          lessThanOrEqualTo(rail.right),
+          reason: '$what is not clipped at the rail\'s right edge',
+        );
+      }
+      final unit = tester.getRect(
+        find.descendant(of: _rail(), matching: find.text('°C')),
+      );
+      final unitNatural = tester.getSize(
+        find.descendant(of: _rail(), matching: find.text('°C')),
+      );
+      expect(
+        unitNatural.width,
+        greaterThan(rail.width - 3),
+        reason:
+            '2× text scale "°C" lays out wider than its slot span, so '
+            'the slot scales it into the span instead of clipping it',
+      );
+      expect(
+        unit.left,
+        greaterThanOrEqualTo(rail.left),
+        reason: '2× text scale "°C" stays inside the rail\'s left edge',
+      );
+      expect(
+        unit.right,
+        lessThanOrEqualTo(rail.right),
+        reason: '2× text scale "°C" is not clipped at the rail\'s right edge',
+      );
+      final topValue = tester.getRect(find.text('38'));
+      expect(
+        unit.top,
+        greaterThanOrEqualTo(topValue.bottom),
+        reason: 'the °C does not overlap the topmost value\'s label',
+      );
+    });
 
     testWidgets('a flat temperature record keeps the scale usable (the fixed '
         'range always has ticks)', (tester) async {
@@ -4422,11 +4584,11 @@ void main() {
       await pumpChart(tester, _leftRailHarness(entries: _flatEntries()));
 
       expect(_scaleLabels(tester), [
-        '38 °C',
-        '37.5 °C',
-        '37 °C',
-        '36.5 °C',
-        '36 °C',
+        '38',
+        '37.5',
+        '37',
+        '36.5',
+        '36',
       ], reason: 'a single-value record still renders a half-degree scale');
       final data = tester.widget<LineChart>(find.byType(LineChart)).data;
       final chartRect = tester.getRect(find.byType(LineChart));
@@ -4434,7 +4596,7 @@ void main() {
           chartRect.top +
           (data.maxY - 36.5) / (data.maxY - data.minY) * chartRect.height;
       final midCenter = tester
-          .getRect(find.descendant(of: _rail(), matching: find.text('36.5 °C')))
+          .getRect(find.descendant(of: _rail(), matching: find.text('36.5')))
           .center
           .dy;
       expect(
@@ -4887,7 +5049,7 @@ void main() {
       );
 
       // 60 days overflow the viewport: columns render at the minimum
-      // usable width (24 px), below the horizontal threshold. The initial
+      // usable width (21 px), below the horizontal threshold. The initial
       // auto-scroll puts the newest days' cells on screen.
       await pumpChart(
         tester,
@@ -5079,16 +5241,16 @@ void main() {
 
     // Cross-check at a narrow viewport (the same device class the diary
     // sign-row repro used): the in-plot mucus letters render at the
-    // minimum usable column width (24 px, forced by a range longer than
-    // the 320 dp viewport). The two widest glyph shapes (the two-glyph
-    // f/S token, and the S glyph with its EW superscript) must lay out
-    // without a framework exception in their 24 px columns.
+    // minimum usable column width (21 px, forced by a 13-day range longer
+    // than the 320 dp viewport). The two widest glyph shapes (the
+    // two-glyph f/S token, and the S glyph with its EW superscript) must
+    // lay out without a framework exception in their 21 px columns.
     testWidgets('the in-plot mucus letters render at the minimum column width '
         'without a framework exception', (tester) async {
       useNarrowPhoneViewport(tester);
 
       final entries = [
-        for (var i = 0; i < 12; i++)
+        for (var i = 0; i < 13; i++)
           DailyEntry(
             date: _rowsDay(i),
             bbtC: 36.5,
@@ -6356,22 +6518,22 @@ void main() {
             >[
               (
                 // 60 days overflow the viewport: columns render at the
-                // minimum usable width (24 px), far below the horizontal
+                // minimum usable width (21 px), far below the horizontal
                 // text threshold.
                 '60 days, columns at the minimum usable width',
                 timedEntries(60),
                 59,
-                closeTo(24, 0.5),
+                closeTo(21, 0.5),
                 true,
                 true,
               ),
               (
-                // 25 days fit the viewport but leave only ~29 px per column —
-                // below the threshold, so still vertical.
-                '25 days, a narrow non-minimum ~29 px column',
+                // 25 days fit the viewport but leave only ~30 px per column
+                // — below the threshold, so still vertical.
+                '25 days, a narrow non-minimum ~30 px column',
                 timedEntries(25),
                 24,
-                closeTo(29, 1.5),
+                closeTo(30, 1.5),
                 true,
                 false,
               ),
@@ -7085,8 +7247,8 @@ void main() {
         );
         // The scroll viewport: block width (800 test viewport, 12 body
         // padding on each side) minus the frozen rail left of the scroll.
-        const scrollViewport = 800.0 - 2 * 12 - 37; // 739
-        final marginDays = (scrollViewport / _columnWidth).ceil(); // 31
+        const scrollViewport = 800.0 - 2 * 12 - 24; // 752
+        final marginDays = (scrollViewport / _columnWidth).ceil(); // 36
 
         // Fresh park 1: the initial auto-scroll landed at the newest days;
         // the left margin is unclamped and ends exactly one extra
@@ -7111,7 +7273,7 @@ void main() {
         // Fresh park 2: a long jump (the jump-to-date landing does the same)
         // re-parks the window around the landed position: both margins
         // extend exactly one extra screen-width past the visible edges.
-        // Day cell i spans [i * 24, (i + 1) * 24).
+        // Day cell i spans [i * 21, (i + 1) * 21).
         state.position.jumpTo(1000.0);
         await tester.pumpAndSettle();
         expect(
@@ -7159,7 +7321,7 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
-      const scrollViewport = 800.0 - 2 * 12 - 37; // 739
+      const scrollViewport = 800.0 - 2 * 12 - 24; // 752
       final marginDays = (scrollViewport / _columnWidth).ceil();
       final maxExtent = state.position.maxScrollExtent;
       final freshVisible = (maxExtent / _columnWidth).floor();
@@ -7170,7 +7332,7 @@ void main() {
         reason: 'precondition: the parked margin is unclamped here',
       );
 
-      // Travel 240 px (ten columns) — well within one extra screen-width
+      // Travel 240 px (≈ 11 columns) — well within one extra screen-width
       // of margin: the visible edge moves, but the parked window around it
       // still covers the viewport with seam margin to spare.
       state.position.jumpTo(maxExtent - 240.0);
@@ -7330,16 +7492,16 @@ void main() {
         // day column of index 58 (= 2026-02-28) inside the visible area. The
         // chart's x domain is half a column shifted, so day 58's column
         // center maps to tap x = colW * (58 + 0.5).
-        const railWidth = 37.0; // the frozen rail left of the scroll view
+        const railWidth = 24.0; // the frozen rail left of the scroll view
         const testViewportWidth = 800.0;
         const bodyPadding = 12.0;
         const scrollViewport =
-            testViewportWidth - 2 * bodyPadding - railWidth; // 739
-        const contentWidth = 60 * 24.0; // 1440
-        const maxOffset = contentWidth - scrollViewport; // 701
-        final tapContentX = 24.0 * (58 + 0.5);
+            testViewportWidth - 2 * bodyPadding - railWidth; // 752
+        const contentWidth = 60 * 21.0; // 1260
+        const maxOffset = contentWidth - scrollViewport; // 508
+        final tapContentX = 21.0 * (58 + 0.5);
         final tapScreenX =
-            bodyPadding + railWidth + (tapContentX - maxOffset); // 752
+            bodyPadding + railWidth + (tapContentX - maxOffset); // 756.5
         final chartTop = tester.getRect(find.byType(LineChart)).top;
 
         await tester.tapAt(Offset(tapScreenX, chartTop + 100));
@@ -7370,11 +7532,11 @@ void main() {
       // Same column mapping as the tap above (day 58's column center at
       // colW * (58 + 0.5), content = 60 columns without a strip); the
       // long-press behaves identically to the tap.
-      const railWidth = 37.0; // the frozen rail left of the scroll view
+      const railWidth = 24.0; // the frozen rail left of the scroll view
       const bodyPadding = 12.0;
-      const contentWidth = 60 * 24.0;
+      const contentWidth = 60 * 21.0;
       const maxOffset = contentWidth - (800.0 - 2 * bodyPadding - railWidth);
-      final tapContentX = 24.0 * (58 + 0.5);
+      final tapContentX = 21.0 * (58 + 0.5);
       final chartTop = tester.getRect(find.byType(LineChart)).top;
 
       await tester.longPressAt(

@@ -47,16 +47,18 @@ final class _CycleChart extends StatefulWidget {
 }
 
 final class _CycleChartState extends State<_CycleChart> {
-  /// Narrowest day column still considered usable — below this the labels
-  /// would overlap, so a longer recorded range scrolls (never shrink-squeezes).
-  static const double minDayColumnWidth = 24;
+  /// Narrowest day column still considered usable: every label is
+  /// FittedBox-squeezed rather than clipped, but the day/cycle header
+  /// stack needs about this much ink to stay readable, so a longer
+  /// recorded range scrolls (never shrinks further).
+  static const double minDayColumnWidth = 21;
 
   /// The frozen left rail's width (the paper sheet's fixed left margin).
   /// The chart reserves NO axis width; the scroll content holds day columns
   /// only and the plot spans its full width. The width is the widest scale
-  /// label's paint width ("36.5 °C" at fontSize 10: 32.2 px Roboto) + the
+  /// label's paint width ("36.5" at fontSize 10: 19.5 px Roboto) + the
   /// labels' 3 px right inset + 1 px rounding safety.
-  static const double frozenRailWidth = 37;
+  static const double frozenRailWidth = 24;
 
   /// The fixed height of the day/cycle header segment (day of month above,
   /// day of cycle underneath) — shared between the scrolling header row and
@@ -894,6 +896,31 @@ Widget _columnPrototype({required String prototype, required String label}) =>
       ),
     );
 
+/// One temperature-scale label at its tick's plot pixel y, right-aligned
+/// inside the frozen rail. The °C unit renders as its own muted line below
+/// the topmost label; the topmost value's semantics carries the "38 °C"
+/// label, so a screen reader still hears the unit with its value.
+Widget _railScaleLabel(_TemperatureScale scale, double value) {
+  final text = scale.labelFor(value);
+  final label = Align(
+    alignment: Alignment.centerRight,
+    child: Padding(
+      padding: const EdgeInsets.only(right: 3),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          key: ValueKey('railScaleLabel-$text'),
+          style: const TextStyle(fontSize: 10),
+        ),
+      ),
+    ),
+  );
+  return value == scale.ticks.last
+      ? Semantics(label: '$text °C', excludeSemantics: true, child: label)
+      : label;
+}
+
 /// The in-plot "Zyklus N" chips: at every mark-opened cycle boundary a
 /// small chip renders pinned to the top of the boundary day's column, below
 /// the opaque tap overlay so day mapping is untouched. The boundary
@@ -1272,12 +1299,10 @@ final class _TemperatureScale {
     for (var k = 0; k <= ((max - min) * 2).round(); k++) min + k * 0.5,
   ];
 
-  /// The tick label with the °C unit on every label (the PDF's axis-label
-  /// convention): numerals via the shared locale-aware display formatter,
-  /// whole degrees plain, halves with one decimal (see
-  /// lib/domain/decimal_display.dart).
-  String labelFor(double value) =>
-      '${_formatHalfDegree(value, locale: locale)} °C';
+  /// The tick label's numerals: integers plain, halves with one decimal
+  /// (see lib/domain/decimal_display.dart) — no unit; the rail renders one
+  /// °C line under the topmost label instead.
+  String labelFor(double value) => _formatHalfDegree(value, locale: locale);
 }
 
 // --- frozen left rail --------------------------------------------------------
@@ -1316,10 +1341,13 @@ final class _LeftRail extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // The header slot: the two column prototypes.
+            // The header slot: the two column prototypes, centered on the
+            // rail's full width (the slot must take that width itself —
+            // a shrink-wrapped slot would dodge the centering).
             SizedBox(
               key: const ValueKey('dayHeaderCorner'),
               height: _CycleChartState.dayHeaderRowHeight,
+              width: _CycleChartState.frozenRailWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1351,20 +1379,36 @@ final class _LeftRail extends StatelessWidget {
                       width: _CycleChartState.frozenRailWidth,
                       top: scale.pixelFor(value) - 6,
                       height: 12,
+                      child: _railScaleLabel(scale, value),
+                    ),
+                  // Label slots span tick ± 6, so 7 px starts 1 px below
+                  // the lower edge of the topmost value's slot.
+                  Positioned(
+                    left: 0,
+                    width: _CycleChartState.frozenRailWidth,
+                    top: 7,
+                    height: 10,
+                    child: ExcludeSemantics(
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Padding(
                           padding: const EdgeInsets.only(right: 3),
-                          child: Text(
-                            scale.labelFor(value),
-                            key: ValueKey(
-                              'railScaleLabel-${scale.labelFor(value)}',
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '°C',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                            style: const TextStyle(fontSize: 10),
                           ),
                         ),
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -1413,8 +1457,7 @@ final class _LeftRail extends StatelessWidget {
 // --- half-degree formatting ---------------------------------------------------
 
 /// The rail's tick-label numerals: integers plain ("37"), halves with one
-/// locale-correct decimal ("36.5" en / "36,5" de). The °C unit is appended
-/// by [_TemperatureScale.labelFor], not here.
+/// locale-correct decimal ("36.5" en / "36,5" de), without the unit.
 String _formatHalfDegree(double value, {required String locale}) {
   final rounded = (value * 100).round() / 100;
   return rounded % 1 == 0
