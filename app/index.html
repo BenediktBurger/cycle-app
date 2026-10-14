@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!--
+  Hand-written web scaffold: minimal, matched to the
+  bootstrap script of current stable Flutter.
+
+  If `flutter run -d chrome` complains about `flutter_bootstrap.js` missing
+  (older Flutter releases used the `flutter.js` / `main.dart.js` loader
+  instead), simply regenerate the platform scaffolding with
+  `flutter create --platforms=web .` — flutter create preserves existing
+  files, so nothing else in the repo is clobbered.
+-->
+<html lang="de">
+<head>
+  <!-- /cycle-app/app/ is substituted by the build (default /); --base-href targets it. -->
+  <base href="/cycle-app/app/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Local-first Zyklus-Auswertung nach NER (Rötzer) — lokal, ohne Cloud.">
+  <title>NER Cycle App</title>
+  <link rel="manifest" href="manifest.json">
+  <!-- All paths stay relative: the app is deployed under /cycle-app/app/. -->
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <script src="flutter_bootstrap.js" async></script>
+</head>
+<body>
+</body>
+</html>
