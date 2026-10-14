@@ -34,9 +34,9 @@
     sich nicht auf die Daten.</strong> Datenverlust ist nicht
     ausgeschlossen. Für ernsthafte Nutzung: Android-App aus dem
     <a href="https://github.com/BenediktBurger/cycle-app/releases">Release-Bereich</a>
-    installieren (eine iOS-Version gibt es noch nicht). Die Demo wird aus
-    dem aktuellen Entwicklungsstand gebaut und zeigt daher die kommende
-    statt der zuletzt veröffentlichten Version.</p>
+    installieren (eine iOS-Version gibt es noch nicht). Zwei Demos liegen
+    bereit: die „App-Demo“ zeigt die zuletzt veröffentlichte Version, die
+    „Entwicklungs-Demo“ den aktuellen Stand der Entwicklung.</p>
 
     <p>Die Web-Demo zeigt die App auf dem Web-Ziel der Entwicklung (Details
     im <a href="https://github.com/BenediktBurger/cycle-app">GitHub-Repository</a>):
@@ -46,13 +46,15 @@
 
     <h2>Wo Ihre Daten bleiben</h2>
     <p>Alle Einträge, die Sie hier erfassen, <strong>bleiben in diesem
-    Browser</strong> (im Browserspeicher OPFS/IndexedDB):</p>
+    Browser</strong> (im Browserspeicher OPFS/IndexedDB, getrennt nach
+    aufgerufener Seite und Version):</p>
     <ul>
       <li>Nichts wird hochgeladen — kein Cloud-Dienst, keine Analyse, keine
       Nutzungsstatistik.</li>
-      <li>Umgekehrt gibt es <strong>keine Synchronisierung</strong> zwischen
-      Browsern oder Geräten: Jeder Browser und jedes Gerät hält seine eigene
-      Kopie.</li>
+      <li>Umgekehrt gibt es <strong>keine Synchronisierung</strong>: Weder
+      zwischen Browsern oder Geräten (jeder Browser und jedes Gerät hält
+      seine eigene Kopie) noch zwischen den Demos — was die App-Demo
+      speichert, sieht die Entwicklungs-Demo nicht, und umgekehrt.</li>
       <li>Gelöscht werden die Daten durch die Browser-Option „Websitedaten
       löschen“, im privaten Modus verschwinden Einträge mit dem Fenster —
       und ein Wechsel des Browsers oder Geräts ist ein Neuanfang.</li>
@@ -72,16 +74,19 @@
     <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#web-demo">README
     (englisch)</a>.</p>
 
-    <p><a href="./app/"><strong>Zur App-Demo</strong></a></p>
+    <p><a href="./app/"><strong>Zur App-Demo</strong></a> (veröffentlichte
+    Version) ·
+    <a href="./branches/main/"><strong>Zur Entwicklungs-Demo</strong></a>
+    (aktueller Stand)</p>
 
     <h2 lang="en">English</h2>
 
     <p><strong>This app is in beta — do not rely on the data.</strong> Data
     loss is not ruled out. For serious use, install the Android app from the
     <a href="https://github.com/BenediktBurger/cycle-app/releases">releases
-    page</a> (an iOS build does not exist yet). The demo is built from the
-    current development state, so it shows the upcoming release rather than
-    the latest published one.</p>
+    page</a> (an iOS build does not exist yet). Two demos are available:
+    the “app demo” shows the latest published version, and the
+    “development demo” shows the current state of development.</p>
 
     <p>The web demo shows the app on the web iteration target (details in
     the
@@ -92,12 +97,15 @@
 
     <h3 lang="en">Where your data stays</h3>
     <p>Every entry you make here <strong>stays in this browser</strong>
-    (browser-local storage, OPFS/IndexedDB):</p>
+    (browser-local storage, OPFS/IndexedDB, kept separate per page and
+    version):</p>
     <ul>
       <li>Nothing is uploaded — no cloud service, no analytics, no usage
       statistics.</li>
-      <li>Conversely, there is <strong>no sync</strong> between browsers or
-      devices: every browser and every device holds its own copy.</li>
+      <li>Conversely, there is <strong>no sync</strong>: neither between
+      browsers or devices (every browser and every device holds its own copy)
+      nor between the demos — what the app demo stores is invisible to the
+      development demo, and vice versa.</li>
       <li>The browser's “clear site data” wipes the entries, private windows
       discard them on close, and switching browser or device is a fresh
       start.</li>
@@ -114,7 +122,10 @@
     live with — details in the
     <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#web-demo">README</a>.</p>
 
-    <p><a href="./app/"><strong>Open the app demo</strong></a></p>
+    <p><a href="./app/"><strong>Open the app demo</strong></a> (published
+    version) ·
+    <a href="./branches/main/"><strong>Open the development
+    demo</strong></a> (current state)</p>
   </main>
 </body>
 </html>

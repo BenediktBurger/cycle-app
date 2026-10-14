@@ -1,30 +1,58 @@
 name: Pages
 
-# ADR-0012: ships the web demo to GitHub Pages on every push to main.
-# Manual runs for convenience.
+# ADR-0012: ships the released web demo to GitHub Pages. Publishing a
+# release — or a manual workflow_dispatch run with the ref input below —
+# checks out the resolved ref, rebuilds the app under app/, and refreshes
+# the landing page from that commit — so /app/ mirrors the published APK,
+# and the branches/ subtree owned by pages-branches.yml carries through
+# untouched. The current development version lives under branches/main/,
+# served by pages-branches.yml. The assembled site is committed straight
+# to the gh-pages branch (Pages source "deploy from branch";
+# Actions-artifact and branch publishing are mutually exclusive).
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref to build — a tag, a branch name, or a commit SHA (required for manual runs)
+        required: true
+        type: string
 
-# Superseded runs of the same branch are cancelled to save runner minutes.
+# Shared with pages-branches.yml: both write commits to gh-pages, so runs
+# must serialize instead of cancelling each other mid-write.
 concurrency:
-  group: pages-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: pages-deploy
+  # Several branch deploys may arrive while one run holds the group: queue
+  # them all instead of the default single-pending-run replace.
+  cancel-in-progress: false
+  queue: max
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # On release events GITHUB_SHA points at the default-branch tip, not
+    # the released commit — the resolved ref is what selects the build.
     steps:
+      - name: Resolve the ref to build
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_REF: ${{ inputs.ref }}
+        # The guard fails the run here rather than letting checkout
+        # silently fall back to the default branch on an empty ref.
+        run: |
+          web_ref="${RELEASE_TAG:-$DISPATCH_REF}"
+          [ -n "$web_ref" ] || { echo "No ref to build: a release event must carry a tag_name, and a manual run must pass the ref input"; exit 1; }
+          echo "WEB_REF=$web_ref" >> "$GITHUB_ENV"
+
+      # persist: false — the publish step below authenticates explicitly.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.WEB_REF }}
+          persist-credentials: false
 
       # Same key as in ci.yml (restore-key semantics commented there):
       # one shared cache entry — an identical-key save here is skipped,
@@ -73,22 +101,49 @@ jobs:
       - name: Build web
         run: flutter build web --base-href /cycle-app/app/
 
-      # One deployed tree: docs index.html at the Pages root, the built app
-      # shifted into app/. Stale files must never leak into the artifact,
-      # hence the rm -rf before staging.
-      - name: Assemble the Pages artifact
+      # Published under its URL paths: the landing page at the root, the
+      # released demo under app/. Staging onto the fetched gh-pages tree
+      # (by pathspec, never `git add .`) is what preserves the branch
+      # deploys under branches/ owned by pages-branches.yml. The site
+      # commit is authored via plumbing with no parent and force-pushed:
+      # history stays a single deploy deep.
+      - name: Publish to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          rm -rf build/pages
-          mkdir -p build/pages/app
-          cp pages/index.html build/pages/index.html
-          cp -a build/web/. build/pages/app/
-
-      - uses: actions/configure-pages@v6
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: build/pages
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+          auth_git() {
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)" "$@"
+          }
+          # pages/index.html is tracked in the app repo but absent from
+          # the gh-pages tree, so both landing paths below (detach or
+          # orphan `git rm`) wipe it out of the checkout; a copy outside
+          # the repo survives the switch.
+          cp -a pages "$RUNNER_TEMP/landing"
+          rc=0
+          git ls-remote --exit-code origin refs/heads/gh-pages >/dev/null || rc=$?
+          case $rc in
+            0)
+              auth_git fetch --depth 1 origin gh-pages
+              git checkout -q --detach FETCH_HEAD
+              ;;
+            2)
+              git checkout -q --orphan gh-pages-deploy
+              git rm -rqf .
+              ;;
+            *)
+              echo "Could not read refs/heads/gh-pages on the remote (git exit $rc)" >&2
+              exit "$rc"
+              ;;
+          esac
+          rm -rf app
+          mkdir -p app
+          cp "$RUNNER_TEMP/landing/index.html" index.html
+          cp -a build/web/. app/
+          # Branch-source publishing runs Jekyll processing unless this
+          # marker exists at the root; the app's asset tree must be served
+          # verbatim.
+          touch .nojekyll
+          git add -A -- index.html .nojekyll app
+          tree=$(git write-tree)
+          commit=$(git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit-tree "$tree" -m "Publish web demo to Pages ($WEB_REF)")
+          auth_git push -q --force origin "$commit:refs/heads/gh-pages"
