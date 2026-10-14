@@ -481,7 +481,18 @@ Do **not** start until Android went through Phases B–F at least once.
    artifacts still exist) or re-dispatch a Release run on a release
    branch whose head is reset to the original commit, then run the
    publish script as usual.
-7. **Post-release PR into `development` (automated; verify it)** — after
+7. **Web deploy to GitHub Pages (automatic)** — publishing the release in
+   step 6 triggers the **Pages** workflow: it checks out the published
+   tag, rebuilds the web app (same `tool/flutter-version` pin as the APK
+   build), and publishes it under
+   `https://BenediktBurger.github.io/cycle-app/app/`, so the released
+   demo mirrors the shipped APK version with no extra operator step;
+   the deploy replaces `app/` wholesale and the development deploys
+   under `branches/` carry through untouched.
+   Fallback for a failed run or a re-deploy: Actions → **Pages** → Run
+   workflow, branch `main`, `ref` input = the published tag (or any
+   tag, branch name, or commit SHA to publish that ref's build).
+8. **Post-release PR into `development` (automated; verify it)** — after
    publishing (create or re-attach), the publish script opens the PR
    `release/vX.Y.Z` → `development` (title "Release vX.Y.Z") and queues
    its auto-merge. What the operator verifies:
@@ -501,7 +512,7 @@ Do **not** start until Android went through Phases B–F at least once.
      (`gh pr create …` / `gh pr merge --merge --auto release/vX.Y.Z`)
      instead of aborting, and an "already exists" answer is handled
      leniently (it just ensures auto-merge).
-8. **F-Droid tasks (operator)** — the fdroiddata MR (Phase E) with the
+9. **F-Droid tasks (operator)** — the fdroiddata MR (Phase E) with the
    new `Builds:` entry: its `commit:` is the **same commit SHA the
    release tag points at** — that equality is what makes the signature
    comparison meaningful — and its `binary:` URLs name the just-published
@@ -513,7 +524,7 @@ Do **not** start until Android went through Phases B–F at least once.
    `-Wl,--build-id=none` to the jni plugin's CMake shared-linker flags, so
    only the remaining knobs above are open) and
    rerun the loop: re-dispatch → re-sign → re-attach → re-verify.
-9. **Distribute & observe** — sideload to testers first; Play internal
+10. **Distribute & observe** — sideload to testers first; Play internal
    track when involved (its AAB is built locally,
    `flutter build appbundle --release`; no automated Play upload); F-Droid
    ships when verification passed. Confirm the store dashboards show the
@@ -549,6 +560,47 @@ Do **not** start until Android went through Phases B–F at least once.
   directory (e.g. a repo rename → `/home/runner/work/<new>/<new>`) must
   be mirrored in the same change to the fdroiddata recipe — and vice
   versa.
+
+## Stakeholder branches (branch deploys on GitHub Pages)
+
+Feature branches can be published as web deploys next to the released
+demo ([ADR-0012](adr/0012-public-web-demo-github-pages.md), "Branch
+deploys"): publish before merging, compare side-by-side, never disturb
+the rest of the site — a deploy writes only its own branch's directory
+under `branches/`.
+
+**One-time owner step after merging the gh-pages workflows:** the first
+push to `main` boots the whole site — the **Pages branch** workflow
+finds no `gh-pages` branch yet and creates it in one commit: the
+landing page at the root, `.nojekyll`, and the `main` deploy. Then
+switch repo Settings → Pages → Source to **Deploy from branch**
+(branch `gh-pages`, folder `/`).
+Actions-artifact and branch publishing are mutually exclusive;
+afterwards the URLs stay the same (`/cycle-app/app/`,
+`/cycle-app/branches/main/`, landing page at the root). `/app/` itself
+stays absent until the first release publishes (or the owner dispatches
+the Pages workflow with `ref` — see the web-deploy step of the
+per-release checklist): the landing page's released-demo link 404s
+until then, and a release publish replaces `/app/` wholesale with the
+released build.
+
+Per branch:
+
+1. **Publish** — dispatch the **Pages branch** workflow (Actions tab →
+   Pages branch → Run workflow → select your branch; mode `deploy`).
+   CI builds the web app with the deploy's base href and commits it to
+   `gh-pages`. `main` needs no dispatch: every push to `main` redeploys
+   `/cycle-app/branches/main/` automatically.
+2. **Share the URL** — the slug is the branch name lowercased, every
+   non-`[a-z0-9-]` character replaced by a dash, published at
+   `https://BenediktBurger.github.io/cycle-app/branches/<slug>/`. Each
+   deploy keeps its own browser storage, derived from that slug, so a
+   branch demo is separated from the released app and from other
+   branches; see the ADR's update.
+3. **Clean up** — dispatch the same workflow with mode `cleanup`, or just
+   delete the branch: the delete event removes `branches/<slug>/`
+   automatically. Several deploys coexist under `branches/`; removing
+   one leaves the others untouched.
 
 ## Fresh-machine recovery (the handover note)
 
@@ -587,4 +639,7 @@ Related: [ADR-0002](adr/0002-package-name-cycle-app-placeholder.md)
 (placeholder name), [ADR-0003](adr/0003-target-platforms-web-iteration.md)
 (platform targets), [ADR-0006](adr/0006-ci.md) (CI scope),
 [ADR-0009](adr/0009-release-pipeline-and-signing.md) (this document is its
-enactable companion).
+enactable companion),
+[ADR-0012](adr/0012-public-web-demo-github-pages.md) (the released demo,
+its development mirror, and the stakeholder branch deploys are all served
+from GitHub Pages).

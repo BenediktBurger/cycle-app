@@ -53,10 +53,15 @@ import 'package:path_provider/path_provider.dart'
 import 'cipher_setup.dart';
 import 'cycle_database.dart';
 import 'db_key.dart';
+import 'web_storage_name.dart';
 
 /// Storage file/stream name of this app's drift database. On native this
 /// becomes `cycle_storage.sqlite` inside the application documents
-/// directory; on web it names the OPFS/IndexedDB storage slot.
+/// directory; on web the name comes from [webDatabaseName]
+/// (web_storage_name.dart) for every deployment. Its pinned `/app` default
+/// `'cycle_storage'` is an independent literal (not this const),
+/// deliberately identical to it so changing one slot never moves the other
+/// tier's data; the derivation returns that prefix verbatim only for `/app`.
 const String databaseName = 'cycle_storage';
 
 /// Opens the platform-appropriate database.
@@ -74,7 +79,7 @@ Future<CycleDatabase> openCycleDatabase() async {
   if (kIsWeb) {
     return CycleDatabase(
       driftDatabase(
-        name: databaseName,
+        name: webDatabaseName(Uri.base),
         web: DriftWebOptions(
           sqlite3Wasm: Uri.parse('sqlite3.wasm'),
           driftWorker: Uri.parse('drift_worker.js'),
