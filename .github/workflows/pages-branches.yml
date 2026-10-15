@@ -6,9 +6,9 @@ name: Pages branch
 # branch deploys on dispatch (deploy + cleanup modes); a deleted branch's
 # deploy is cleaned up automatically. Normal deploys write only under
 # branches/<slug>/ — app/, .nojekyll, the landing page, and the Pages
-# root belong to the Pages workflow. The one-time exception is the
-# first-ever deploy (gh-pages does not exist yet): it bootstraps the
-# whole site in a single commit — landing page, .nojekyll, and the
+# root belong to the Pages workflow. When gh-pages is absent (fresh
+# setup, deletion, or a fork), the branch deploy creates the whole
+# site in a single commit instead — landing page, .nojekyll, and the
 # branch deploy.
 on:
   push:
@@ -163,8 +163,8 @@ jobs:
         run: flutter build web --base-href /cycle-app/branches/$SLUG/
 
       # Normal deploys stage only this branch's directory by pathspec on
-      # top of the fetched gh-pages tree; the bootstrap branch below is
-      # the only writer of the root or .nojekyll.
+      # top of the fetched gh-pages tree; the bootstrap path below
+      # (gh-pages absent) is the only writer of the root or .nojekyll.
       - name: Publish the branch deploy to gh-pages
         if: steps.source-branch.outputs.checked != 'false'
         env:
@@ -178,8 +178,9 @@ jobs:
           }
           # pages/ is tracked in the build checkout but absent from the
           # gh-pages tree: both lands below (detaching onto it, or the
-          # bootstrap's orphan rm) wipe it out of the worktree — the
-          # landing page travels through a copy outside the repo.
+          # orphan rm when gh-pages is absent) wipe it out of the
+          # worktree — the landing page travels through a copy outside
+          # the repo.
           cp -a pages "$RUNNER_TEMP/landing"
           rc=0
           git ls-remote --exit-code origin refs/heads/gh-pages >/dev/null || rc=$?
@@ -189,10 +190,10 @@ jobs:
               git checkout -q --detach FETCH_HEAD
               ;;
             2)
-              # First-ever deploy: the site does not exist yet, so the
-              # branch deploy brings it up instead of failing. The
-              # landing page and .nojekyll are staged here and never
-              # again; pushing a new gh-pages needs no --force.
+              # gh-pages is absent: the branch deploy creates the site
+              # instead of failing. The landing page and .nojekyll are
+              # staged here only (see the pathspec note above); pushing
+              # a new gh-pages needs no --force.
               bootstrap=1
               git checkout -q --orphan gh-pages-deploy
               git rm -rqf .
@@ -242,10 +243,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # Before the first branch deploy bootstraps gh-pages, no such
-      # branch exists, and a cleanup for a deploy that was never
-      # published is not an error: the job skips quietly instead of
-      # failing on the checkout below.
+      # When gh-pages is absent, no branch deploy exists either, and a
+      # cleanup for a deploy that was never published is not an error:
+      # the job skips quietly instead of failing on the checkout below.
       - name: Check gh-pages exists on the remote
         id: gh-pages
         run: |
