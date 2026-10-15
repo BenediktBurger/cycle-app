@@ -569,16 +569,21 @@ deploys"): publish before merging, compare side-by-side, never disturb
 the rest of the site — a deploy writes only its own branch's directory
 under `branches/`.
 
-**One-time owner step after merging the gh-pages workflows:** the first
-push to `main` boots the whole site — the **Pages branch** workflow
-finds no `gh-pages` branch yet and creates it in one commit: the
-landing page at the root, `.nojekyll`, and the `main` deploy. Then
-switch repo Settings → Pages → Source to **Deploy from branch**
-(branch `gh-pages`, folder `/`).
+**Owner setup when `gh-pages` does not exist (fresh setup, after
+deletion, or a fork):** a push to `main` boots the whole site — the
+**Pages branch** workflow finds no `gh-pages` branch and creates it in
+one commit: the landing page at the root, `.nojekyll`, and the `main`
+deploy. Then switch repo Settings → Pages → Source to
+**Deploy from branch** (branch `gh-pages`, folder `/`), and protect
+the branch against
+accidental deletion with a branch ruleset without bypass actors
+(Settings → Rules → Rulesets → New branch ruleset; target branches by
+name `gh-pages`; status Active; only **Restrict deletions** enabled —
+content stays unrestricted (see [ADR-0012](adr/0012-public-web-demo-github-pages.md))).
 Actions-artifact and branch publishing are mutually exclusive;
 afterwards the URLs stay the same (`/cycle-app/app/`,
 `/cycle-app/branches/main/`, landing page at the root). `/app/` itself
-stays absent until the first release publishes (or the owner dispatches
+stays absent until a release publishes (or the owner dispatches
 the Pages workflow with `ref` — see the web-deploy step of the
 per-release checklist): the landing page's released-demo link 404s
 until then, and a release publish replaces `/app/` wholesale with the

@@ -4,11 +4,14 @@ name: Pages
 # release — or a manual workflow_dispatch run with the ref input below —
 # checks out the resolved ref, rebuilds the app under app/, and refreshes
 # the landing page from that commit — so /app/ mirrors the published APK,
-# and the branches/ subtree owned by pages-branches.yml carries through
-# untouched. The current development version lives under branches/main/,
-# served by pages-branches.yml. The assembled site is committed straight
-# to the gh-pages branch (Pages source "deploy from branch";
-# Actions-artifact and branch publishing are mutually exclusive).
+# and the branches/ subtree owned by pages-branches.yml is carried through
+# into the rebuilt site: every release deploy reconciles the whole
+# gh-pages tree, so stray root entries (e.g. a human push to the branch)
+# are wiped by the next release deployment. The current development
+# version lives under branches/main/, served by pages-branches.yml. The
+# assembled site is committed straight to the gh-pages branch (Pages
+# source "deploy from branch"; Actions-artifact and branch publishing
+# are mutually exclusive).
 on:
   release:
     types: [published]
@@ -102,11 +105,15 @@ jobs:
         run: flutter build web --base-href /cycle-app/app/
 
       # Published under its URL paths: the landing page at the root, the
-      # released demo under app/. Staging onto the fetched gh-pages tree
-      # (by pathspec, never `git add .`) is what preserves the branch
-      # deploys under branches/ owned by pages-branches.yml. The site
-      # commit is authored via plumbing with no parent and force-pushed:
-      # history stays a single deploy deep.
+      # released demo under app/, the branch previews under branches/.
+      # The fetched gh-pages tree is reconciled whole before staging the
+      # new site: staging by prefix pathspec would leave any entry a
+      # human pushed outside those prefixes in the index, so the
+      # canonical survivors (branches/) are copied out of the repo, the
+      # index is emptied, and only the canonical contents are re-staged
+      # from the copies and the fresh build. The site commit is authored
+      # via plumbing with no parent and force-pushed: history stays a
+      # single deploy deep.
       - name: Publish to gh-pages
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -115,9 +122,8 @@ jobs:
             git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)" "$@"
           }
           # pages/index.html is tracked in the app repo but absent from
-          # the gh-pages tree, so both landing paths below (detach or
-          # orphan `git rm`) wipe it out of the checkout; a copy outside
-          # the repo survives the switch.
+          # the gh-pages tree; both the checkout switch and the wipe
+          # below would clear it, so the staging comes from this copy.
           cp -a pages "$RUNNER_TEMP/landing"
           rc=0
           git ls-remote --exit-code origin refs/heads/gh-pages >/dev/null || rc=$?
@@ -127,14 +133,27 @@ jobs:
               git checkout -q --detach FETCH_HEAD
               ;;
             2)
+              # gh-pages is absent (fresh setup, deletion, or a fork):
+              # there is no fetched tree; checkout --orphan keeps the
+              # app repo's index, which the shared wipe below empties —
+              # no second rm lives in this arm.
               git checkout -q --orphan gh-pages-deploy
-              git rm -rqf .
               ;;
             *)
               echo "Could not read refs/heads/gh-pages on the remote (git exit $rc)" >&2
               exit "$rc"
               ;;
           esac
+          # branches/ exists only when pages-branches.yml has already
+          # deployed a preview; the copy-out must precede the wipe,
+          # which removes it from the worktree (the orphan arm has no
+          # branches dir to carry).
+          if [ -d branches ]; then
+            cp -a branches "$RUNNER_TEMP/branches"
+          fi
+          # The wipe, not prefix pathspec staging, is what keeps out the
+          # root entries a human may have pushed to the branch.
+          git rm -rqf .
           rm -rf app
           mkdir -p app
           cp "$RUNNER_TEMP/landing/index.html" index.html
@@ -143,7 +162,15 @@ jobs:
           # marker exists at the root; the app's asset tree must be served
           # verbatim.
           touch .nojekyll
-          git add -A -- index.html .nojekyll app
+          # Only what was copied out of the fetched tree may come back,
+          # so the branches pathspec joins the add only when its copy
+          # exists — git add errors on a pathspec matching nothing.
+          paths="index.html .nojekyll app"
+          if [ -d "$RUNNER_TEMP/branches" ]; then
+            cp -a "$RUNNER_TEMP/branches" branches
+            paths="$paths branches"
+          fi
+          git add -A -- $paths
           tree=$(git write-tree)
           commit=$(git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit-tree "$tree" -m "Publish web demo to Pages ($WEB_REF)")
           auth_git push -q --force origin "$commit:refs/heads/gh-pages"

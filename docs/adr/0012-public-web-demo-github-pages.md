@@ -72,8 +72,17 @@ modes are mutually exclusive, so the source is a one-time owner switch in
 the repo settings (see [`docs/release.md`](../release.md)). All Pages
 workflows commit to the branch instead of uploading an artifact. The
 release-tier deploy force-pushes a fresh orphan commit each time, so
-`gh-pages` carries no history, and `gh-pages` is protected for
-Actions-only writes (humans push to the app repo, never to `gh-pages`).
+`gh-pages` carries no history. A branch ruleset (deletion-only, no
+bypass actors) protects the branch; it targets `gh-pages` by name.
+Write restrictions stay off because they would also
+bind the Pages workflows' server-side `GITHUB_TOKEN` — branch rulesets
+cannot bypass-list the GitHub Actions app — and break the force-push
+deploys. In practice only the Pages workflows commit to `gh-pages`: the
+branch deployer fast-forwards and stages only its own
+`branches/<slug>/` subtree, and any stray push is wiped by the next
+release deployment. Restricting writes
+via a deploy-key bypass remains a future option, rejected for now
+because it would reintroduce a repo secret.
 
 ### Tiered layout
 
@@ -117,10 +126,10 @@ before it merges and compare it side-by-side with the released demo:
   `/cycle-app/branches/<slug>/`, built with the matching base href.
 - Isolation: normal deploys of the branch workflow write only under
   `branches/<slug>/` — `app/`, the landing page, `.nojekyll`, and the
-  Pages root stay the release deploy's paths; the one-time bootstrap of
-  an empty `gh-pages` tree is the exception, and it stages only the
-  landing page and `.nojekyll` alongside the first branch deploy (see
-  below). The release deploy in turn
+  Pages root stay the release deploy's paths; when `gh-pages` is
+  absent (fresh setup, deletion, or a fork), the branch deploy creates
+  the whole site instead, staging the landing page and `.nojekyll`
+  alongside its own deploy (see below). The release deploy in turn
   stages onto the current `gh-pages` tree, so existing branch deploys
   survive it. The workflows share one concurrency group, so their writes
   to `gh-pages` serialize instead of racing.
@@ -133,20 +142,16 @@ before it merges and compare it side-by-side with the released demo:
   its own deploy. A manual `cleanup` dispatch with an explicit slug
   stays the operator's escape hatch and skips the marker check.
 
-### Pre-release `/app/` and no downgrade guard
+### The released `/app/` tier and the no downgrade guard
 
-Until the first release publishes, the released-demo tier has no build to
-serve: `/app/` 404s, and the landing page's released-demo link with it.
-That is deliberate — an interim `/app/` built from development source
-would hand the released tier's address to a development build that opens
-its own empty storage slot (below), masquerading as the released app
-while not even offering the earlier `/app` users their data. The owner's
-lever for the gap is the Pages workflow's `ref` dispatch: dispatching it
-with `ref: main` (or a commit SHA, or a lightweight tag) publishes the
-current development state to `/app/` without creating a version tag, an
-Android release, or a GitHub release — entirely at the owner's
-discretion. Every real release publish then replaces `app/` wholesale
-(`rm -rf app` before staging).
+The released-demo tier always serves the newest published release: every
+release publish, and every explicit `ref` dispatch of `pages.yml`, rewrites
+`app/` wholesale (`rm -rf app` before staging). The tier's first build
+arrives with the first release publish — until then, `/app/` and the
+landing page's released-demo link 404. A `ref` dispatch with `ref: main`,
+a commit SHA, or a lightweight tag can publish the current development
+state to `/app/` — no version tag, no Android release, no GitHub release —
+entirely at the owner's discretion.
 
 Releases and `ref` dispatches deploy unconditionally — deliberately
 without a version comparison anywhere in the deployer: every run
@@ -155,13 +160,16 @@ currently served build. The owner fixes forward instead of ever
 intending to ship an older version; a comparison-based guard would
 silently withhold a deploy and turn a mistaken tag into a persistent
 wrong `/app/`, with an unclear distinction between the bug and the
-guard firing.
+guard firing. Redeploys stay continuous for existing demo users: the
+`/app/` build opens the `cycle_storage` browser-storage slot (below),
+so a release deploy leaves their data in place.
 
 ### Browser storage per deployment
 
 Storage is per deployment, not shared: a `/app` page opens the historical
-`cycle_storage` slot — users of the earlier `/app` build see their data
-again once a release actually publishes — and every
+`cycle_storage` slot — users of the released `/app` build keep their
+existing `cycle_storage` data across every release, because redeploys
+preserve the slot and their data stays in place — and every
 `/branches/<slug>/` deployment opens `cycle_storage-<slug>`. The slug
 derivation is deliberately loose: any path segment sequence containing an
 exact `branches` segment yields the following segment as the slug,
