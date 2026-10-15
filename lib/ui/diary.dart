@@ -24,6 +24,7 @@ import 'bleeding_symbol.dart';
 import 'measurement_method_dialog.dart';
 import 'mucus_symbol.dart';
 import 'stream_error.dart';
+import 'section_header.dart';
 
 class TagebuchScreen extends ConsumerStatefulWidget {
   const TagebuchScreen({super.key});
@@ -452,6 +453,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // below ~300 dp of form width the printed label drops and
               // the clock icon carries the meaning; a narrow-width test
               // pins that this line stays overflow-free.
+              SectionHeader(
+                title: l10n.temperature,
+                info: l10n.diaryInfoTemperature,
+              ),
+              const SizedBox(height: 8),
               LayoutBuilder(
                 builder: (context, lineConstraints) {
                   return Row(
@@ -591,7 +597,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // --- bleeding --------------------------------------------
               // Wrap of ChoiceChips: a six-label SegmentedButton risks
               // overflowing small phone widths.
-              Text(l10n.termBleeding),
+              SectionHeader(
+                title: l10n.termBleeding,
+                info: l10n.diaryInfoBleeding,
+              ),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 6,
@@ -639,7 +648,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // with S, so the quality picker appears only while S is
               // selected.
               if (track.mucus) ...[
-                Text(l10n.termMucus),
+                SectionHeader(title: l10n.termMucus, info: l10n.diaryInfoMucus),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
@@ -669,7 +678,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
                 if (_sign == MucusSign.s) ...[
                   const SizedBox(height: 8),
-                  Text(l10n.mucusQuality),
+                  Text(
+                    l10n.mucusQuality,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 4),
                   Wrap(
                     key: const ValueKey('mucusQualityRow'),
@@ -696,8 +708,15 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               // the unset chip plus the tap-again-deselect rule returns to
               // the no-observation state, like the mucus quality chips.
               if (track.cervix) ...[
-                Text(l10n.termCervixPosition),
+                SectionHeader(
+                  title: l10n.termCervix,
+                  info: l10n.diaryInfoCervix,
+                ),
                 const SizedBox(height: 4),
+                Text(
+                  l10n.termCervixPosition,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
@@ -727,7 +746,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(l10n.cervixOpening),
+                Text(
+                  l10n.cervixOpening,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
@@ -746,11 +768,18 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                           children: [
                             Text(cervixOpeningSymbol(opening)!),
                             const SizedBox(width: 4),
-                            Text(switch (opening) {
-                              CervixOpening.closed => l10n.cervixOpeningClosed,
-                              CervixOpening.middle => l10n.cervixOpeningMiddle,
-                              CervixOpening.open => l10n.cervixOpeningOpen,
-                            }),
+                            // Loose flex: at large font scales the word
+                            // wraps inside the chip width instead of
+                            // overflowing.
+                            Flexible(
+                              child: Text(switch (opening) {
+                                CervixOpening.closed =>
+                                  l10n.cervixOpeningClosed,
+                                CervixOpening.middle =>
+                                  l10n.cervixOpeningMiddle,
+                                CervixOpening.open => l10n.cervixOpeningOpen,
+                              }),
+                            ),
                           ],
                         ),
                         selected: _cervixOpening == opening,
@@ -761,7 +790,10 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(l10n.termCervixFirmness),
+                Text(
+                  l10n.termCervixFirmness,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
@@ -796,7 +828,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 // several slots at once. No bits = not recorded — a time-less
                 // "sex happened" is deliberately not representable (see
                 // DailyEntry.sexTimings).
-                Text(l10n.termSex),
+                SectionHeader(title: l10n.termSex, info: l10n.diaryInfoSex),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
@@ -823,7 +855,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               const SizedBox(height: 12),
               if (track.pain) ...[
                 // --- pain toggles ----------------------------------------
-                Text(l10n.termPain),
+                SectionHeader(title: l10n.termPain, info: l10n.diaryInfoPain),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 6,
