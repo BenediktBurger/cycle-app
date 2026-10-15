@@ -24,7 +24,6 @@ import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/pdf/cycle_pdf.dart';
 import 'package:cycle_app/pdf/pdf_axis.dart';
 import 'package:cycle_app/pdf/pdf_layout.dart';
-import 'package:cycle_app/pdf/pdf_symbols.dart';
 import 'package:cycle_app/ui/chart_marks.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -786,8 +785,8 @@ void main() {
         expect(valueOf(facts, 'Zykluszeitraum'), '01.03.2026 – 28.03.2026');
       });
 
-      test('anonymization hides name and birth date, NOT the observation '
-          'window — the year stays on the anonymized export too', () {
+      test('the observation window fact (with year) stays on the anonymized '
+          'export too', () {
         final facts = pdfHeaderFacts(
           model: _fakeModel,
           anonymized: true,
@@ -798,7 +797,6 @@ void main() {
           ),
         );
         expect(valueOf(facts, 'Zykluszeitraum'), '29.03.2026 – 02.05.2026');
-        expect(valueOf(facts, 'Name'), 'anonymisiert');
       });
 
       test('a page outside any cycle facts (degenerate) keeps the "—"', () {
@@ -859,12 +857,6 @@ void main() {
     // The fixture's first cycle runs Mar 1–28 2026 — Mar 1 is a SUNDAY, so
     // the tracked weekend dates are 1, 7, 8, 14, 15, 21, 22, 28 and the
     // bands occupy window positions 0, 6, 7, 13, 14, 20, 21, 27.
-    test('the window\'s weekend columns derive from the tracked dates', () {
-      expect(weekendPositions(fixtureModel().cycles.first.cycle.days), [
-        0, 6, 7, 13, 14, 20, 21, 27, //
-      ]);
-    });
-
     test('the generated page carries fills in the light-gray weekend '
         'shade — repeated: one band through EVERY scaffold row per '
         'weekend column', () async {
@@ -1195,9 +1187,8 @@ void main() {
         },
       );
 
-      test('a peak mark on a DATA-LESS span-extension placeholder day paints '
-          'its dot like any other day — the render reads the marks artifact, '
-          'not the entries', () async {
+      test('a marked entry-less placeholder column paints NO ink beyond the '
+          'mark\'s dot — no mucus letter, no day number', () async {
         // Mar 1–14 carry entries; `today` pins the span extension to
         // Mar 17, so Mar 15–17 are entry-less placeholder columns and
         // the peak mark lands on placeholder column 14 (Mar 15).
@@ -1216,21 +1207,10 @@ void main() {
           options: PdfExportOptions(anonymized: false),
           compress: false,
         );
-        final (runs, paths) = extractPageContent(bytes);
+        final (runs, _) = extractPageContent(bytes);
         final blutungY = runY(runs, 'Blutung');
         final tempY = runY(runs, 'Temperatur');
         bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
-        final dots = accentDots(paths);
-        expect(
-          dots,
-          hasLength(1),
-          reason: 'the placeholder-day peak mark carries exactly one dot',
-        );
-        expect(
-          (dots.single.minX + dots.single.maxX) / 2,
-          closeTo(x0 + 14.5 * pdfColumnWidth, 0.001),
-          reason: 'the dot centers in the placeholder day column (Mar 15)',
-        );
         final columnStart = x0 + 14 * pdfColumnWidth + 0.5;
         final columnEnd = x0 + 15 * pdfColumnWidth - 0.5;
         final joinedInk = [

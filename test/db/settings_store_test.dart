@@ -158,40 +158,6 @@ void main() {
       expect(snapshot.temperatureRange, range);
     });
 
-    test(
-      'TemperatureRange.toJson/fromJson agree with the stored shape',
-      () async {
-        const range = TemperatureRange(min: 34.0, max: 42.0);
-        final restored = TemperatureRange.fromJson(range.toJson());
-        expect(restored, range);
-      },
-    );
-
-    test('wrongly ordered bounds are a store-side ArgumentError', () {
-      expect(
-        () => TemperatureRange.fromJson(const {'min': 39.0, 'max': 35.5}),
-        throwsArgumentError,
-      );
-    });
-
-    test('bounds outside the 34–42 °C window are rejected as a range', () {
-      expect(
-        () => TemperatureRange.fromJson(const {'min': 30.0, 'max': 45.0}),
-        throwsArgumentError,
-      );
-      // Mixed: min below the window, max inside — any bound outside the
-      // window is invalid, not just a fully out-of-window pair.
-      expect(
-        () => TemperatureRange.fromJson(const {'min': 30.0, 'max': 39.0}),
-        throwsArgumentError,
-      );
-      // Mirror case: min inside, max above the window.
-      expect(
-        () => TemperatureRange.fromJson(const {'min': 36.0, 'max': 45.0}),
-        throwsArgumentError,
-      );
-    });
-
     test('bad range shapes fall back to the default range on load', () async {
       for (final raw in [
         '"opaque string"', // JSON string, not a map

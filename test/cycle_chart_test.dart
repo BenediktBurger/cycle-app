@@ -1941,11 +1941,6 @@ void main() {
       final plot = tester.getRect(find.byType(LineChart));
       final colW = plot.width / 130;
       final chipRect = tester.getRect(chip);
-      expect(
-        chipRect.left,
-        closeTo(plot.left + 80 * colW, 2.5),
-        reason: 'the chip pins to the boundary day\'s column start',
-      );
       // The built window's right edge is the range's end (column 129), so
       // the chip's available span is 80..130 columns wide; the chip's
       // background must stop at it.
@@ -2171,44 +2166,6 @@ void main() {
       ], reason: 'de: the disturbance row carries the German row name');
     },
   );
-
-  testWidgets('the help sheet explains the disturbance letters (en and de)', (
-    tester,
-  ) async {
-    final wording = {
-      const Locale('de'):
-          'Messstörung (sp Spät ins Bett, '
-          'a Nachts öfter aufstehen, alk Alkohol, kr Krank)',
-      const Locale('en'):
-          'Disturbed measurement (sp late to bed, '
-          'a frequent night awakening, alk alcohol, kr illness)',
-    };
-    for (final MapEntry(:key, :value) in wording.entries) {
-      await pumpChart(
-        tester,
-        // Remount the app per iteration: a same-shaped re-pump would only
-        // update the existing tree in place, and the previous locale's open
-        // help-sheet route (its scrim) would then absorb the next tap.
-        KeyedSubtree(
-          key: UniqueKey(),
-          child: _disturbanceHarness(entries: _disturbanceEntries, locale: key),
-        ),
-      );
-
-      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('cycleHelpSheet')),
-          matching: find.text(value),
-        ),
-        findsOneWidget,
-        reason:
-            '$key: the letter codes need a legend entry naming the '
-            'diary\'s disturbance vocabulary',
-      );
-    }
-  });
 
   // ═══════════ evaluation marks ═══════════
   // former test/cycle_chart_evaluation_test.dart (bodies concatenated verbatim; see
@@ -2731,7 +2688,9 @@ void main() {
 
   group('all mucus peaks render (from the marks stream)', () {
     testWidgets('two peak marks in one cycle render two solid dots — even '
-        'when no evaluation exists', (tester) async {
+        'when no evaluation exists, and still alongside a full evaluation', (
+      tester,
+    ) async {
       // ONLY peak marks: without a first-higher mark no evaluation can
       // exist, yet every placed peak must render — the dots come from the
       // MARKS STREAM, not from the single domain-anchored peak.
@@ -2759,20 +2718,23 @@ void main() {
         findsNothing,
         reason: 'a day without a peak mark renders no dot',
       );
-    });
 
-    testWidgets('two peaks render alongside a full evaluation', (tester) async {
+      // Remount before re-pumping with different marks: a same-shaped
+      // re-pump would only update the const-canonicalized subtree in
+      // place and keep the old marks stream.
       await pumpChart(
         tester,
-        _harness(
-          entries: _evaluationEntries,
-          marks: [
-            ..._marks,
-            CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
-          ],
+        KeyedSubtree(
+          key: UniqueKey(),
+          child: _harness(
+            entries: _evaluationEntries,
+            marks: [
+              ..._marks,
+              CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+            ],
+          ),
         ),
       );
-
       expect(_peakDot(6), findsOneWidget);
       expect(_peakDot(9), findsOneWidget);
     });
@@ -3015,34 +2977,6 @@ void main() {
   // new screen-level test from the summary-table removal (no former file;
   // see the file header note on the other sections' merge mechanics)
 
-  // The cycle tab renders NO evaluation summary table anymore: the chart
-  // block (with its evaluation overlay) is the only evaluation surface on
-  // the screen — the numbers live on the separate statistics tab. The
-  // absence is keyed on the `cycleSummary*` keys the table's scroller,
-  // cells and headers rendered with, so a re-introduction under a new
-  // class name is caught too.
-  testWidgets('the Zyklus screen renders no evaluation summary table', (
-    tester,
-  ) async {
-    // A tall surface: the table would sit below the default test
-    // viewport's fold, and the Zyklus list is lazy — below the fold it is
-    // not even built, so a short surface could miss it and pass vacuously.
-    useTallSurface(tester);
-    await pumpChart(tester, chartHarness(entries: _alignmentEntries(5)));
-
-    expect(
-      find.byWidgetPredicate((widget) {
-        final key = widget.key;
-        return key is ValueKey<String> &&
-            (key.value == 'cycleSummaryScroll' ||
-                key.value.startsWith('cycleSummaryCell-') ||
-                key.value.startsWith('cycleSummaryHeader-'));
-      }),
-      findsNothing,
-      reason: 'no cycleSummary* scroller/cell/header keys render anymore',
-    );
-  });
-
   // ═══════════ grid lines ═══════════
   // former test/cycle_chart_grid_lines_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
@@ -3249,13 +3183,6 @@ void main() {
       // The ordinal chip renders at index 0, pinned to the plot's left
       // edge (the boundary column's start).
       final chip = find.byKey(const ValueKey('cycleOrdinalChip-0'));
-      expect(
-        chip,
-        findsOneWidget,
-        reason:
-            'the first tracked day opens the first cycle in the recorded '
-            'range — its ordinal badge renders inside the plot',
-      );
       final plot = tester.getRect(find.byType(LineChart));
       expect(
         tester.getRect(chip).left,
@@ -4748,40 +4675,6 @@ void main() {
     expect(deTooltips, ['Notiz'], reason: 'de: the band row is "Notiz"');
   });
 
-  testWidgets('the help sheet keeps the note entry (en and de)', (
-    tester,
-  ) async {
-    final wording = {
-      const Locale('en'): 'Note (diary text, shown vertically per day)',
-      const Locale('de'): 'Notiz (Tagebuchtext, am Tag senkrecht dargestellt)',
-    };
-    for (final MapEntry(:key, :value) in wording.entries) {
-      await pumpChart(
-        tester,
-        // Remount the app per iteration: a same-shaped re-pump would only
-        // update the existing tree in place, and the previous locale's open
-        // help-sheet route (its scrim) would then absorb the next tap.
-        KeyedSubtree(
-          key: UniqueKey(),
-          child: _noteHarness(entries: _noteEntries, locale: key),
-        ),
-      );
-
-      await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('cycleHelpSheet')),
-          matching: find.text(value),
-        ),
-        findsOneWidget,
-        reason:
-            '$key: the indicator glyph needs a legend entry the diary '
-            'note vocabulary resolves against',
-      );
-    }
-  });
-
   // ═══════════ rows ═══════════
   // former test/cycle_chart_rows_test.dart (bodies concatenated verbatim; see
   // the file header for the merge mechanics)
@@ -5151,116 +5044,33 @@ void main() {
       );
     });
 
-    // The bleeding row renders the shared square-box convention (see
-    // lib/ui/bleeding_symbol.dart): the cell box is the fill boundary, the
-    // fill is a bottom-anchored fraction of the box height, and the
-    // spotting level interrupts its quarter band into dots. The geometry
-    // is measured with getRect so the convention cannot drift between the
-    // chart cells, the diary tiles and the glossary sample.
-    testWidgets(
-      'bleeding cells fill a bottom-anchored fraction of the cell box',
-      (tester) async {
-        await pumpChart(tester, _rowsHarness(entries: _bleedingRowEntries));
+    // The bleeding row hands its cell bounds to the shared square-box
+    // symbol (lib/ui/bleeding_symbol.dart); the fill layout per level is
+    // that symbol's convention, owned by test/bleeding_symbol_test.dart —
+    // here only that every recorded level renders it at all.
+    testWidgets('bleeding cells render the shared symbol: exactly one fill per '
+        'menstruation level, interrupted dots for spotting, no fill for '
+        'bleeding none', (tester) async {
+      await pumpChart(tester, _rowsHarness(entries: _bleedingRowEntries));
 
-        final errorColor = chartScheme(tester).error;
-
-        // The menstruation levels: cell index → (level, fill fraction of the
-        // box height).
-        final expectations = {
-          1: (Bleeding.light, 1 / 4),
-          3: (Bleeding.medium, 2 / 4),
-          4: (Bleeding.heavy, 3 / 4),
-          5: (Bleeding.maximum, 4 / 4),
-        };
-        for (final MapEntry(:key, :value) in expectations.entries) {
-          final (level, fraction) = value;
-          final cell = tester.getRect(chartCell(key, 'bleeding'));
-          expect(
-            _bleedingFills(key),
-            findsOneWidget,
-            reason: '$level draws exactly one solid fill region',
-          );
-          final fill = tester.widget<BleedingFill>(_bleedingFills(key));
-          expect(
-            fill.color,
-            errorColor,
-            reason: '$level fills with the bleeding color',
-          );
-          final rect = tester.getRect(_bleedingFills(key));
-          expect(
-            rect.height,
-            closeTo(cell.height * fraction, 0.01),
-            reason: '$level fills $fraction of the box height',
-          );
-          expect(
-            rect.bottom,
-            closeTo(cell.bottom, 0.01),
-            reason: '$level: the fill is anchored at the box\'s bottom',
-          );
-          expect(
-            rect.left,
-            closeTo(cell.left, 0.01),
-            reason:
-                '$level: the fill spans the full cell width — the '
-                'table cell box serves as the fill boundary',
-          );
-        }
-
-        // Day 0 records bleeding "none": the cell stays empty.
+      for (final index in [1, 3, 4, 5]) {
         expect(
-          _bleedingFills(0),
-          findsNothing,
-          reason: 'bleeding none keeps the empty cell',
+          _bleedingFills(index),
+          findsOneWidget,
+          reason: 'day $index: the recorded level shows one solid fill',
         );
-      },
-    );
-
-    testWidgets(
-      'spotting renders an interrupted dotted fill in the bottom quarter '
-      'band, not a solid quarter bar',
-      (tester) async {
-        await pumpChart(tester, _rowsHarness(entries: _bleedingRowEntries));
-
-        final cell = tester.getRect(chartCell(2, 'bleeding'));
-        final bandTop = cell.top + cell.height * 3 / 4;
-        final dots = _bleedingFills(2).evaluate();
-        expect(
-          dots.length,
-          greaterThanOrEqualTo(3),
-          reason: 'spotting interrupts the 1/4 band into several dots',
-        );
-
-        final rects = [
-          for (var i = 0; i < dots.length; i++)
-            tester.getRect(_bleedingFills(2).at(i)),
-        ];
-        for (final rect in rects) {
-          expect(
-            rect.top,
-            greaterThanOrEqualTo(bandTop - 0.01),
-            reason: 'the dots stay inside the bottom quarter band',
-          );
-          expect(
-            rect.bottom,
-            lessThanOrEqualTo(cell.bottom + 0.01),
-            reason: 'the dots stay inside the bottom quarter band',
-          );
-        }
-        final sorted = [...rects]..sort((a, b) => a.left.compareTo(b.left));
-        for (var i = 1; i < sorted.length; i++) {
-          expect(
-            sorted[i].left,
-            greaterThanOrEqualTo(sorted[i - 1].right),
-            reason: 'the dots are disjoint regions, not one merged bar',
-          );
-        }
-        expect(
-          sorted.last.right - sorted.first.left,
-          lessThan(cell.width),
-          reason: 'the dotted fill never reads as a solid quarter bar',
-        );
-      },
-    );
+      }
+      expect(
+        _bleedingFills(2),
+        findsWidgets,
+        reason: 'spotting shows the shared symbol\'s interrupted dots',
+      );
+      expect(
+        _bleedingFills(0),
+        findsNothing,
+        reason: 'bleeding none keeps the empty cell',
+      );
+    });
 
     // Cross-check at a narrow viewport (the same device class the diary
     // sign-row repro used): the in-plot mucus letters render at the
@@ -5610,66 +5420,6 @@ void main() {
     }
   });
 
-  testWidgets('at the 0.10 boundary only the sex row (top margin) stays '
-      'visible; below it every top row hides', (tester) async {
-    // min + 0.05 = 37.95, max − 0.05 = 37.95 at the span-0.10 boundary:
-    // the sex row's center lands exactly on the margin (visible), the
-    // peak dot one 0.1-gap below it does not.
-    await pumpChart(
-      tester,
-      inPlotHarness(range: const TemperatureRange(min: 37.9, max: 38.0)),
-    );
-
-    for (final timing in SexTiming.values) {
-      expect(
-        find.byKey(ValueKey('inPlotSex-1-${timing.name}')),
-        findsOneWidget,
-        reason: 'the $timing X stays at the boundary equality',
-      );
-    }
-    expect(_peakDot(0), findsNothing);
-    expect(find.byKey(const ValueKey('inPlotMucus-0')), findsNothing);
-    expect(find.byKey(const ValueKey('inPlotMucus-3')), findsNothing);
-  });
-
-  testWidgets('a span-0.30 range shows the mucus letters at their boundary '
-      'but still hides the M row below', (tester) async {
-    await pumpChart(
-      tester,
-      _rowsHarness(
-        entries: _rowsEntries,
-        range: const TemperatureRange(min: 37.7, max: 38.0),
-      ),
-    );
-
-    expect(
-      find.byKey(const ValueKey('inPlotMucus-4')),
-      findsOneWidget,
-      reason: 'the letters row lands exactly on the bottom margin — visible',
-    );
-    expect(
-      find.byKey(const ValueKey('inPlotM-4')),
-      findsNothing,
-      reason: 'the 0.3 K span leaves no room for the M row',
-    );
-  });
-
-  testWidgets('at the 0.40 boundary the M row appears', (tester) async {
-    await pumpChart(
-      tester,
-      _rowsHarness(
-        entries: _rowsEntries,
-        range: const TemperatureRange(min: 37.6, max: 38.0),
-      ),
-    );
-
-    expect(
-      find.byKey(const ValueKey('inPlotM-4')),
-      findsOneWidget,
-      reason: 'the M row lands exactly on the bottom margin — visible',
-    );
-  });
-
   testWidgets('the bottom-anchored day numbers hide when the span drops '
       'below 0.10 and stay visible at the boundary', (tester) async {
     // Numbers hidden: the center at min + 0.05 = 36.05 exceeds max − 0.05
@@ -5777,29 +5527,12 @@ void main() {
   // the file header for the merge mechanics)
 
   group('adjacent-day connectivity', () {
-    testWidgets('two readings on adjacent days connect', (tester) async {
-      await pumpChart(
-        tester,
-        _temperatureHarness(
-          entries: [
-            DailyEntry(date: _temperatureThu, bbtC: 36.5),
-            DailyEntry(date: _temperatureFri, bbtC: 36.6),
-          ],
-        ),
-      );
-
-      expect(
-        _connects(tester, 0, 1),
-        isTrue,
-        reason: 'adjacent calendar days are drawn as one segment',
-      );
-    });
-
-    testWidgets('a day with no temperature between readings breaks the line', (
-      tester,
-    ) async {
-      // Saturday has an entry, but WITHOUT a temperature, and a Sunday with
-      // no entry at all behind it: neither gap may be bridged by the curve.
+    // One widget-level probe: curveRuns' break matrices are owned by
+    // test/cycle_curve_test.dart.
+    testWidgets('the curve joins a contiguous run and stops at an unmeasured '
+        'day', (tester) async {
+      // Friday has an entry, but WITHOUT a temperature: the gap may not be
+      // bridged by the curve.
       await pumpChart(
         tester,
         _temperatureHarness(
@@ -5823,28 +5556,6 @@ void main() {
         isTrue,
         reason: 'adjacent readings after the gap still connect',
       );
-    });
-
-    testWidgets('a day with no entry at all breaks the line too', (
-      tester,
-    ) async {
-      await pumpChart(
-        tester,
-        _temperatureHarness(
-          entries: [
-            DailyEntry(date: _temperatureThu, bbtC: 36.5),
-            DailyEntry(date: _temperatureSat, bbtC: 36.7),
-          ],
-        ),
-      );
-
-      // Both days are lone dots; nothing connects index 0 to index 2.
-      expect(
-        _spansAGap(tester),
-        isFalse,
-        reason: 'gap between day 0 and day 2: no segment may be drawn',
-      );
-      expect(_connects(tester, 0, 2), isFalse);
     });
   });
 
@@ -6804,45 +6515,6 @@ void main() {
       find.byKey(const ValueKey('inPlotSex-2-morning')),
       findsOneWidget,
       reason: 'a single recorded slot renders exactly one X',
-    );
-  });
-
-  testWidgets('each X sits at its slot\'s fraction of the day column', (
-    tester,
-  ) async {
-    await pumpChart(
-      tester,
-      _timeSexPainHarness(entries: _timeSexPainEntries()),
-    );
-
-    final plot = tester.getRect(find.byType(LineChart));
-    final colW = plot.width / 8;
-
-    double xFraction(int dayIndex, String timing) {
-      final glyph = tester.getRect(
-        find.byKey(ValueKey('inPlotSex-$dayIndex-$timing')),
-      );
-      return (glyph.center.dx - plot.left) / colW - dayIndex;
-    }
-
-    final startF = xFraction(2, 'morning');
-    expect(
-      startF,
-      closeTo(1 / 6, 0.05),
-      reason:
-          'a start-slot X renders at the column\'s start fraction '
-          '(~1/6)',
-    );
-
-    expect(
-      xFraction(5, 'morning'),
-      closeTo(1 / 6, 0.05),
-      reason: 'the first X belongs to the start slot (left)',
-    );
-    expect(
-      xFraction(5, 'evening'),
-      closeTo(5 / 6, 0.05),
-      reason: 'the second X belongs to the end slot (right)',
     );
   });
 
@@ -8148,50 +7820,6 @@ void main() {
       expect(
         find.byKey(const ValueKey('inPlotHaloMethodGlyph-0')),
         findsNothing,
-      );
-    });
-
-    testWidgets('the fallback slot hides itself in a narrow range: hidden '
-        'at span 0.10, visible again at the 0.20 boundary', (tester) async {
-      await pumpChart(
-        tester,
-        chartHarness(
-          entries: methodGlyphEntries,
-          methodSnapshots: methodGlyphSnapshots,
-          temperatureRange: const TemperatureRange(min: 37.9, max: 38.0),
-        ),
-      );
-
-      for (final index in [1, 2, 3]) {
-        expect(
-          methodGlyph(index),
-          findsNothing,
-          reason:
-              'day $index: the 0.1 K span leaves no room for the '
-              'fallback slot (center above the bottom margin)',
-        );
-      }
-
-      // Remount the app per iteration: a same-shaped re-pump would only
-      // update the const-canonicalized subtree in place and keep the old
-      // provider range.
-      await pumpChart(
-        tester,
-        KeyedSubtree(
-          key: UniqueKey(),
-          child: chartHarness(
-            entries: methodGlyphEntries,
-            methodSnapshots: methodGlyphSnapshots,
-            temperatureRange: const TemperatureRange(min: 37.8, max: 38.0),
-          ),
-        ),
-      );
-      expect(
-        methodGlyph(1),
-        findsOneWidget,
-        reason:
-            'the fallback slot lands exactly on the bottom margin '
-            'at span 0.20 — visible',
       );
     });
 

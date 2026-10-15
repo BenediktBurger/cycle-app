@@ -24,7 +24,6 @@ import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/pdf/pdf_curve.dart';
-import 'package:cycle_app/pdf/pdf_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DateTime day(int n) => DateTime.utc(2026, 3, n);
@@ -189,48 +188,52 @@ void main() {
         }
       });
 
-      test(
-        'the arrow-up glyph hangs CLEAR of the dot it marks: the tip sits '
-        'the dot\'s radius plus a fixed clearance below the dot\'s center',
-        () {
-          // The one arrow candidate in the index-space group below also pins
-          // the drop; here the tolerance semantics live on the draw list.
-          final arrowFixture = [
-            for (var i = 0; i < 7; i++)
-              DailyEntry(date: day(1 + i), bbtC: i == 5 ? 37.9 : 36.2),
-          ];
-          final model = buildPdfExportModel(
-            entries: arrowFixture,
-            marks: [
-              CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
-              CycleMark(
-                date: day(6),
-                type: CycleMarkTypes.firstHigherMeasurement,
-              ),
-            ],
-          );
-          final drawing = pdfCurveDrawing(
-            cycle: model.cycles[0],
-            overlay: model.overlays[0],
-            range: _range,
-            windowFirstIndex: 0,
-            windowDayCount: 7,
-            computedSuz: (suzBegins: null, suzRule: null),
-          );
-          expect(drawing.arrows, hasLength(1));
-          final arrow = drawing.arrows.single;
-          expect(
-            arrow.tipDropPt,
-            closeTo(pdfCurveDotRadiusPt + pdfArrowClearanceBelowDotPt, 1e-9),
-            reason:
-                'the tip drops the dot\'s radius (its bottom edge) PLUS the '
-                'clearance gap — the glyph must never touch the dot',
-          );
-          expect(pdfArrowClearanceBelowDotPt, greaterThan(0));
-          expect(arrow.index, 5);
-          expect(arrow.value, 37.9);
-        },
-      );
+      test('an ARROW candidate below its dot: without a mucus peak the '
+          'first-higher kind is the arrow-up glyph, never a ring, and the '
+          'tip clears the dot by its radius plus the fixed gap', () {
+        final arrowFixture = [
+          for (var i = 0; i < 7; i++)
+            DailyEntry(date: day(1 + i), bbtC: i == 5 ? 37.9 : 36.2),
+        ];
+        final model = buildPdfExportModel(
+          entries: arrowFixture,
+          marks: [
+            CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
+            CycleMark(
+              date: day(6),
+              type: CycleMarkTypes.firstHigherMeasurement,
+            ),
+          ],
+        );
+        final drawing = pdfCurveDrawing(
+          cycle: model.cycles[0],
+          overlay: model.overlays[0],
+          range: _range,
+          windowFirstIndex: 0,
+          windowDayCount: 7,
+          computedSuz: (suzBegins: null, suzRule: null),
+        );
+        expect(drawing.arrows, hasLength(1));
+        final arrow = drawing.arrows.single;
+        expect(
+          arrow.tipDropPt,
+          closeTo(pdfCurveDotRadiusPt + pdfArrowClearanceBelowDotPt, 1e-9),
+          reason:
+              'the tip drops the dot\'s radius (its bottom edge) PLUS the '
+              'clearance gap — the glyph must never touch the dot',
+        );
+        expect(pdfArrowClearanceBelowDotPt, greaterThan(0));
+        expect(arrow.index, 5);
+        expect(arrow.value, 37.9);
+        expect(model.overlays[0].arrowIndexes, {
+          5,
+        }, reason: 'without the peak the first-higher kind stays an arrow');
+        expect(
+          drawing.rings,
+          isEmpty,
+          reason: 'rings need the mucus-peak-backed R1 rule — none here',
+        );
+      });
 
       test('the 1–6 low numbers land under their low dots', () {
         expect(drawing.lowNumbers, {
@@ -330,76 +333,9 @@ void main() {
         expect(piece.endX, inInclusiveRange(0, 5));
       }
     });
-
-    test('overlay artifacts map to window-relative positions or drop out', () {
-      expect(drawing.lowNumbers, {4: 1, 3: 2, 2: 3, 1: 4, 0: 5});
-      expect(drawing.peakIndexes, {4});
-      expect(drawing.rings, isEmpty);
-      expect(
-        drawing.suzBars.map((b) => b.x).toSet(),
-        {0.5},
-        reason:
-            'the evening mark of cycle day 6 sits on this page\'s '
-            'first column; the morning mark (day 4) is page 1\'s business',
-      );
-    });
-
-    test('the baseline piece clips to the window', () {
-      final piece = drawing.baseline.single;
-      expect(
-        piece.startX,
-        0.0,
-        reason:
-            'the segment opens on page 1 (its window-relative start '
-            'sits before this window)',
-      );
-      expect(
-        piece.endX,
-        closeTo(5.0, 1e-9),
-        reason:
-            'it runs to the window\'s right edge; the candidate\'s '
-            'half column continues on page 2',
-      );
-      expect(piece.value, 36.2);
-      final line = drawing.suzLine!;
-      expect(
-        line.x,
-        closeTo(5.0, 1e-9),
-        reason: 'the suzBegins line clamps to the window edge',
-      );
-      expect(line.ruleLetter, 'E');
-    });
   });
 
   group('index space (calendar offsets vs. tracked positions)', () {
-    // Nested fixture group first — see below.
-    test('arrow candidates: with the mucus peak unset the domain kind is the '
-        'arrow-up glyph BELOW the dot', () {
-      // Seven tracked days (Mar 1–7): five low measurements (36.2), the
-      // marked rise on day 5 — no mucus-peak mark anywhere.
-      final entries = [
-        for (var i = 0; i < 7; i++)
-          DailyEntry(date: day(1 + i), bbtC: i == 5 ? 36.9 : 36.2),
-      ];
-      final marks = [
-        CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: day(6), type: CycleMarkTypes.firstHigherMeasurement),
-      ];
-      final model = buildPdfExportModel(entries: entries, marks: marks);
-      final drawing = pdfCurveDrawing(
-        cycle: model.cycles[0],
-        overlay: model.overlays[0],
-        range: _range,
-        windowFirstIndex: 0,
-        windowDayCount: 7,
-        computedSuz: (suzBegins: null, suzRule: null),
-      );
-      expect(model.overlays[0].arrowIndexes, {5});
-      expect(drawing.arrows.single.index, 5);
-      expect(drawing.arrows.single.value, 36.9);
-      expect(drawing.rings, isEmpty);
-    });
-
     test('a mark on an untracked gap day drops out instead of rendering on '
         'a neighboring day; marks on the last tracked day survive the '
         'gap-shifted calendar span', () {
@@ -518,11 +454,12 @@ void main() {
   group('continuation-page slicing (long cycle over several pages)', () {
     // A gapless 45-tracked-day cycle (Mar 1 – Apr 14): the default 40-day
     // column budget splits it into windows [40, 5] — page 1 tracks day
-    // indexes 0–39, page 2 the trailing 40–44. One placed mark on cycle
-    // index 42 (page 2's third column) and a baseline segment spanning
-    // indexes 20–44 (it OPENS on page 1 and RUNS THROUGH page 2) pin the
-    // window-relative mapping the page builder applies to every overlay
-    // artifact: subtract firstDayIndex, filter to the window.
+    // indexes 0–39, page 2 the trailing 40–44. A peak mark, a low number
+    // and an evening SUZ mark on cycle index 42 (page 2's third column)
+    // and a baseline segment spanning indexes 20–44 (it OPENS on page 1
+    // and RUNS THROUGH page 2) pin the window-relative mapping the page
+    // builder applies to every overlay artifact: subtract firstDayIndex,
+    // filter to the window.
     final base = DateTime.utc(2026, 3, 1); // 45 days: Mar 1 – Apr 14
     final entries = [
       for (var i = 0; i < 45; i++)
@@ -545,24 +482,19 @@ void main() {
       today: base.add(const Duration(days: 44)),
     );
     final cycle = model.cycles.single;
-    test('the planner splits 45 span days into windows [40, 5]', () {
-      final plan = planCyclePages([cycleSpanDays(cycle.cycle).length]);
-      expect(plan.map((w) => (w.firstDayIndex, w.dayCount)), [
-        (0, 40),
-        (40, 5),
-      ]);
-    });
 
     // The overlay is assembled BY HAND (not derived): the point here is
     // the page builder's slice of the draw list, not the domain rule set.
     const overlay = PdfCycleOverlay(
       peakIndexes: {42},
+      numbersByIndex: {42: 3},
+      suzMarks: [SuzOverlayMark(dayIndex: 42, morning: false)],
       baselineSegments: [
         BaselineSegment(startIndex: 20, endIndex: 44, value: 36.5),
       ],
     );
 
-    test('window 2 (indexes 40–44) carries the day-42 marker at index 2', () {
+    test('overlay artifacts map to window-relative positions or drop out', () {
       final drawing = pdfCurveDrawing(
         cycle: cycle,
         overlay: overlay,
@@ -575,9 +507,28 @@ void main() {
         2,
       }, reason: 'the cycle index 42 sits at page 2\'s column 3');
       expect(drawing.dots.map((d) => d.index), [0, 1, 2, 3, 4]);
+      expect(drawing.lowNumbers, {2: 3});
+      expect(
+        drawing.suzBars.map((b) => b.x),
+        [2.5],
+        reason: 'the evening SUZ mark rides its window-relative column middle',
+      );
       expect(drawing.rings, isEmpty);
       expect(drawing.arrows, isEmpty);
-      expect(drawing.lowNumbers, isEmpty);
+
+      // Window 1 sees none of the day-42 artifacts: they are page 2's
+      // business, so they drop out of the earlier page's draw list.
+      final window1 = pdfCurveDrawing(
+        cycle: cycle,
+        overlay: overlay,
+        range: _range,
+        windowFirstIndex: 0,
+        windowDayCount: 40,
+        computedSuz: (suzBegins: null, suzRule: null),
+      );
+      expect(window1.peakIndexes, isEmpty);
+      expect(window1.lowNumbers, isEmpty);
+      expect(window1.suzBars, isEmpty);
     });
 
     test('window 2 carries the baseline piece for the cycle\'s tail', () {
@@ -607,15 +558,20 @@ void main() {
       expect(piece.value, 36.5);
     });
 
-    test('window 1 (indexes 0–39) carries the baseline piece 20–39 and no '
-        'day-42 marker', () {
+    test('window 1 (indexes 0–39) clips the overlay pieces at the planner\'s '
+        'window edge', () {
       final drawing = pdfCurveDrawing(
         cycle: cycle,
         overlay: overlay,
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: 40,
-        computedSuz: (suzBegins: null, suzRule: null),
+        // suzBegins at cycle index 42 rides page 2: page 1 must clamp the
+        // line to its own right edge.
+        computedSuz: (
+          suzBegins: base.add(const Duration(days: 42)),
+          suzRule: SuzRule.d,
+        ),
       );
       expect(
         drawing.peakIndexes,
@@ -631,6 +587,13 @@ void main() {
             "the piece clips at the window edge — the segment "
             'continues onto page 2',
       );
+      final line = drawing.suzLine!;
+      expect(
+        line.x,
+        closeTo(40.0, 1e-9),
+        reason: 'the suzBegins line clamps to the same window edge',
+      );
+      expect(line.ruleLetter, 'D');
     });
   });
 }

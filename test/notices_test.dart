@@ -3,7 +3,7 @@
 // local-only storage, nothing ever sent, GDPR rights exercisable directly in
 // the app. Its single surface is the about/onboarding content page (reached
 // via the settings pane's AppBar info action); the settings pane itself
-// carries no notice card anymore (the settings layout test pins that).
+// carries no notice card anymore (pinned in the DSGVO group below).
 //
 // German device locale mirrors the app's German-first posture.
 import 'package:cycle_app/db/cycle_database.dart';

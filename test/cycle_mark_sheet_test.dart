@@ -184,6 +184,11 @@ void main() {
         reason: 'the day tap shows the non-modal day options panel',
       );
       expect(
+        find.byType(BottomSheet),
+        findsNothing,
+        reason: 'the panel is NOT a modal route — the chart stays reachable',
+      );
+      expect(
         cycleDayPanelEditButton(),
         findsOneWidget,
         reason: 'the form jump stays reachable via "edit day"',

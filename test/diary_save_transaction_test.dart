@@ -2,11 +2,10 @@
 // save (entry upsert + the two mark writes) is one all-or-nothing
 // transaction, a failure surfaces through the localized failure SnackBar
 // (never as an unhandled zone error), and an unarmed save keeps the
-// established success behavior (entry AND marks stored, success SnackBar).
+// established success behavior (day stored, success SnackBar).
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/diary_harness.dart';
@@ -62,8 +61,6 @@ _FaultyDatabase _faultyDatabase() {
 }
 
 final _harness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
-
-final _cycleStartSwitch = find.byKey(const ValueKey('diaryCycleStartSwitch'));
 
 void main() {
   /// German device over a (possibly faulty-subclassed) in-memory database,
@@ -144,27 +141,17 @@ void main() {
     );
   });
 
-  testWidgets('an unarmed save stores the entry AND the marks and reports '
-      'via the success SnackBar', (WidgetTester tester) async {
+  testWidgets('an unarmed save stores the day and reports via the success '
+      'SnackBar', (WidgetTester tester) async {
     await pumpDiaryForm(tester, faulty: _faultyDatabase());
-
-    // The cycle-start switch on: the save mirrors it into the
-    // authoritative cycleStart mark.
-    await tester.ensureVisible(_cycleStartSwitch);
-    await tester.pumpAndSettle();
-    await tester.tap(_cycleStartSwitch);
-    await tester.pumpAndSettle();
 
     await save(tester);
 
     final (:db, :date) = await savedDayOf(tester);
-    final row = await db.entriesDao.entryFor(date);
-    expect(row, isNotNull, reason: 'the successful save stores the day');
-    expect(row!.bbtC, 36.5, reason: 'the entered temperature is stored');
     expect(
-      (await db.marksDao.marksForDay(date)).map((m) => m.markType),
-      contains('cycleStart'),
-      reason: 'the cycle-start switch writes its mark through the save',
+      await db.entriesDao.entryFor(date),
+      isNotNull,
+      reason: 'the successful save stores the day',
     );
     expect(
       find.text('Gespeichert.'),

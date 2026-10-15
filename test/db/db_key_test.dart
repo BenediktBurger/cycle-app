@@ -75,16 +75,22 @@ void main() {
       expect(second, first);
     });
 
-    test(
-      'a failed read surfaces loudly — no fallback to a plaintext DB',
-      () async {
-        final store = _FakeStore()..readError = Exception('keystore locked');
-        await expectLater(
-          loadOrCreateDbKey(store: store),
-          throwsA(isA<DbKeyException>()),
-        );
-      },
-    );
+    test('a failed read surfaces loudly — named phase and cause, no fallback '
+        'to a plaintext DB', () async {
+      final store = _FakeStore()..readError = Exception('keystore locked');
+      await expectLater(
+        loadOrCreateDbKey(store: store),
+        throwsA(
+          isA<DbKeyException>()
+              .having((e) => e.message, 'message', contains('read'))
+              .having(
+                (e) => e.toString(),
+                'toString',
+                contains('keystore locked'),
+              ),
+        ),
+      );
+    });
 
     test('a failed write surfaces loudly and stores nothing', () async {
       final store = _FakeStore()..writeError = Exception('disk full');
@@ -93,17 +99,6 @@ void main() {
         throwsA(isA<DbKeyException>()),
       );
       expect(store.values, isEmpty, reason: 'no half-persisted key');
-    });
-
-    test('the exception names the failing phase and the cause', () async {
-      final store = _FakeStore()..readError = Exception('keystore locked');
-      try {
-        await loadOrCreateDbKey(store: store);
-        fail('expected DbKeyException');
-      } on DbKeyException catch (e) {
-        expect(e.message, contains('read'));
-        expect(e.toString(), contains('keystore locked'));
-      }
     });
 
     test(

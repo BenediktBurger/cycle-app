@@ -2,9 +2,9 @@
 // the card ORDER (general information -> paper history -> the remaining
 // settings -> the export action card), the field grouping (name + birth
 // date live in the general card, not under a "PDF-Export" title), the
-// anonymization note's home (inside the export card, at its switch) and
-// the absence of the standalone privacy card (the about page owns that
-// text — see notices_test.dart for the copy pins).
+// anonymization note's home (inside the export card, at its switch).
+// The absence of the standalone privacy card is pinned in
+// notices_test.dart together with the notice copy it owns.
 //
 // German device locale + full-app pump mirror the other settings tests;
 // the pane is a lazy ListView, so the tests enlarge the surface (the
@@ -176,27 +176,6 @@ void main() {
           reason:
               'the anonymization explanation lives at the control it '
               'explains — the anonymize switch inside the export card',
-        );
-      },
-    );
-  });
-
-  group('privacy notice', () {
-    testWidgets(
-      'the settings pane carries no Datenschutzhinweis card (the about '
-      'page owns the text; see notices_test.dart)',
-      (WidgetTester tester) async {
-        await tester.binding.setSurfaceSize(const Size(900, 2400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        await pumpGermanSettingsPane(tester);
-
-        expect(
-          find.text('Datenschutz'),
-          findsNothing,
-          reason:
-              'the standalone privacy card is removed from the settings '
-              'pane — the notice stays reachable via the AppBar info '
-              'action (about page)',
         );
       },
     );

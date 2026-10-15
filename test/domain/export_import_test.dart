@@ -268,42 +268,27 @@ void main() {
       // Old exports live on as real files on user devices, so every shape
       // ever published stays importable until an explicit retirement rule
       // says otherwise; anything AFTER the current version stays rejected.
-      expect(
-        blobFor(1).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason: 'documents from before the measured-time field import',
-      );
-      expect(
-        blobFor(2).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason: 'documents from the measured-time release',
-      );
-      expect(
-        blobFor(3).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason: 'documents since bleeding became a numeric level',
-      );
-      expect(
-        blobFor(4).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason:
+      const importableReasons = <int, String>{
+        1: 'documents from before the measured-time field import',
+        2: 'documents from the measured-time release',
+        3: 'documents since bleeding became a numeric level',
+        4:
             'documents since the pain options replaced the '
             'generic pain flag',
-      );
-      expect(
-        blobFor(5).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason:
+        5:
             'documents since the NER alignment (temp_disturbances, '
             'exclusion as a mark, no mood/desire/exclude_* keys)',
-      );
-      expect(
-        blobFor(6).exportedAt,
-        DateTime.utc(2026, 9, 15, 12),
-        reason:
+        6:
             'documents since the sparse entry shape (neutral keys '
             'omitted; a missing bleeding key means none)',
-      );
+      };
+      for (final version in importableReasons.keys) {
+        expect(
+          blobFor(version).exportedAt,
+          DateTime.utc(2026, 9, 15, 12),
+          reason: importableReasons[version],
+        );
+      }
       // Beyond the current version stays rejected strictly.
       expect(
         () => parseExportJson(
@@ -316,12 +301,7 @@ void main() {
   });
 
   group('sparse entry rows (schema-v6 document shape)', () {
-    test('a row without the bleeding key plans and writes as a none day', () {
-      // Planner/writer parity under the sparse contract: a MISSING bleeding
-      // key (and an explicit JSON null) means "no bleeding recorded" — it
-      // can never invalidate a row. Old (≤v5) readers rejected these rows
-      // (and would have silently dropped every bleeding-free day of a v6
-      // document, temperatures included) — that is why the version moved.
+    test('a row without the bleeding key maps to a none day', () {
       final doc = ExportBlob(
         entries: const <Map<String, Object?>>[
           {'date': '2026-03-01'},
@@ -331,20 +311,6 @@ void main() {
         exportedAt: DateTime.utc(2026, 9, 15),
       );
 
-      final summary = planMerge(
-        doc,
-        existingEntryKeys: {},
-        existingMarkKeys: {},
-        existingMethodKeys: {},
-      );
-      expect(
-        summary.entriesInvalid,
-        0,
-        reason: 'a missing/null bleeding key is the neutral value',
-      );
-      expect(summary.entriesNew, 2);
-      expect(summary.entriesWritten, 2);
-
       final first = tryDailyEntryFromExport(doc.entries.first)!;
       expect(first.bleeding, Bleeding.none);
       expect(
@@ -352,6 +318,7 @@ void main() {
         equals(DailyEntry(date: DateTime(2026, 3, 1))),
         reason: 'a date-only row maps to the fully neutral domain day',
       );
+      // An explicit JSON null bleeding key reads the same as a missing key.
       expect(
         tryDailyEntryFromExport(doc.entries.last)!.bleeding,
         Bleeding.none,

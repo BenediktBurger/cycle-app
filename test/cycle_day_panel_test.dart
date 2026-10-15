@@ -1,17 +1,16 @@
-// Widget tests of the non-modal day options panel on the cycle tab (the
-// converted former modal bottom sheet): tapping a chart day shows the
-// day's options in a panel docked at the bottom of the screen, tapping
-// ANOTHER day retargets the panel without dismissing it (and without
-// touching the marks), the close button clears it, and the mark chips
-// write through the real MarksDao exactly like the former sheet did.
+// Widget tests of the non-modal day options panel's dock behavior on the
+// cycle tab: tapping ANOTHER day retargets the panel without dismissing it
+// (and without touching the marks), the close button clears it, a long
+// note caps the dock to its body share, and a day tap never scrolls the
+// chart list. The panel-open content and the chip write-through live in
+// test/cycle_mark_sheet_test.dart.
 //
-// Harness: both files share support/cycle_list_harness.dart (the real
-// MarksDao against an in-memory database, so every write surfaces in the
-// stream that re-renders the panel and the chart, plus the scenario
+// Harness: shared with that file in support/cycle_list_harness.dart (the
+// real MarksDao against an in-memory database, so every write surfaces in
+// the stream that re-renders the panel and the chart, plus the scenario
 // constants and the day taps).
 import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,45 +18,6 @@ import 'support/cycle_list_harness.dart';
 import 'support/finders.dart';
 
 void main() {
-  testWidgets('tapping a chart day shows the day options in a NON-MODAL panel '
-      'docked at the bottom of the screen', (tester) async {
-    final (_, _) = await pumpCycleList(
-      tester,
-      entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
-    );
-
-    await tapCycleDay(tester, 4); // 9/10, a numbered low (4)
-
-    // The panel is the form-jump + mark-toggle surface, keyed for the tests.
-    final panel = find.byKey(const ValueKey('cycleDayPanel'));
-    expect(
-      panel,
-      findsOneWidget,
-      reason: 'the day tap shows the day options panel',
-    );
-    expect(
-      find.byType(BottomSheet),
-      findsNothing,
-      reason: 'the panel is NOT a modal route — the chart stays reachable',
-    );
-    expect(
-      cycleDayPanelEditButton(),
-      findsOneWidget,
-      reason: 'the form jump stays reachable via "edit day"',
-    );
-    expect(
-      find.text('Low measurement 4'),
-      findsOneWidget,
-      reason: "A's options carry the day's computed info line",
-    );
-    // Non-modal: the chart still fills the screen under the docked panel
-    // (an overlaying dock, never a modal route), and the evaluation summary
-    // table that used to sit under the chart is gone.
-    expect(find.byKey(const ValueKey('cycleSummaryScroll')), findsNothing);
-    expect(find.byType(LineChart), findsOneWidget);
-  });
-
   testWidgets(
     'tapping another day retargets the panel — A stays marked, B takes '
     'over the options',
@@ -115,47 +75,6 @@ void main() {
       reason: 'the close button dismisses the panel',
     );
     expect(cycleDayPanelEditButton(), findsNothing);
-  });
-
-  testWidgets('a mark chip inside the panel writes through the MarksDao — the '
-      'first tap places the mark, the second removes it', (tester) async {
-    final (db, _) = await pumpCycleList(
-      tester,
-      entries: scenarioEntries,
-    ); // no marks yet
-
-    await tapCycleDay(tester, 6); // 9/12, the day to mark
-    final chip = cycleSheetChip('mucusPeakDay');
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
-
-    expect(
-      await storedMarkTypes(db, scenarioDay(12)),
-      contains('mucusPeakDay'),
-      reason: 'the mark is persisted through marksDao',
-    );
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
-    expect(
-      await storedMarkTypes(db, scenarioDay(12)),
-      isEmpty,
-      reason: 'the second tap on the selected chip removes the mark',
-    );
-
-    // R6: placing the peak renders the solid in-plot dot.
-    await tester.tap(chip);
-    await tester.pumpAndSettle();
-    expect(
-      await storedMarkTypes(db, scenarioDay(12)),
-      contains('mucusPeakDay'),
-    );
-    expect(
-      find.byKey(const ValueKey('inPlotPeakDot-6')),
-      findsOneWidget,
-      reason:
-          'the chart overlay re-renders from the marks stream '
-          'while the panel stays open',
-    );
   });
 
   testWidgets(

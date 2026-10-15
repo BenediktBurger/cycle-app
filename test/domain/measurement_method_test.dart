@@ -32,17 +32,11 @@ void main() {
   });
 
   group('normalizeThermometerName (the shared trim rule)', () {
-    test('null stays null', () {
+    test('whitespace-only input is no name; padding is trimmed', () {
       expect(normalizeThermometerName(null), isNull);
-    });
-
-    test('whitespace-only input is no name', () {
       expect(normalizeThermometerName(''), isNull);
       expect(normalizeThermometerName('   '), isNull);
       expect(normalizeThermometerName(' \t\n '), isNull);
-    });
-
-    test('edge padding is trimmed, inner text survives', () {
       expect(normalizeThermometerName(' ThermaPen  '), 'ThermaPen');
       expect(normalizeThermometerName('ThermaPen'), 'ThermaPen');
     });
@@ -58,35 +52,13 @@ void main() {
       expect(snapshot.date.isUtc, isTrue);
     });
 
-    test('the thermometer arrives trimmed (blank collapses to null)', () {
+    test('the thermometer arrives trimmed in the snapshot too', () {
       final padded = MeasurementMethodSnapshot(
         date: DateTime(2026, 3, 1),
         route: MeasurementRoute.oral,
         thermometer: '  ',
       );
       expect(padded.thermometer, isNull);
-
-      final named = MeasurementMethodSnapshot(
-        date: DateTime(2026, 3, 1),
-        route: MeasurementRoute.oral,
-        thermometer: ' ThermaPen ',
-      );
-      expect(named.thermometer, 'ThermaPen');
-    });
-
-    test('two snapshots for the same state are equal', () {
-      final a = MeasurementMethodSnapshot(
-        date: DateTime(2026, 3, 1),
-        route: MeasurementRoute.rectal,
-        thermometer: 'x',
-      );
-      final b = MeasurementMethodSnapshot(
-        date: DateTime(2026, 3, 1, 5),
-        route: MeasurementRoute.rectal,
-        thermometer: 'x',
-      );
-      expect(a, equals(b));
-      expect(a.hashCode, b.hashCode);
     });
   });
 

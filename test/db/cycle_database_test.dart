@@ -90,24 +90,6 @@ void main() {
       );
     });
 
-    test("mucus_quality is engine-rejected together with an 'fs' sign "
-        "(fs carries no quality)", () async {
-      // f/S is NOT the S sign: like every non-S sign it must never carry a
-      // quality qualifier.
-      await expectLater(
-        db.customStatement(
-          "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20000, 'fs', 'w')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Sanity: fs WITHOUT a quality goes through.
-      await db.customStatement(
-        "INSERT INTO cycle_entries (date, mucus_sign) "
-        "VALUES (20006, 'fs')",
-      );
-    });
-
     test(
       'a bare one-day row inserts (the entries upsert key is the day)',
       () async {
@@ -141,30 +123,42 @@ void main() {
       },
     );
 
-    test('mucus_quality is engine-rejected without an S sign and outside the '
-        'vocabulary', () async {
-      // Quality with any sign other than s: rejected (quality-requires-s).
-      await expectLater(
-        db.customStatement(
+    test(
+      'mucus_quality is engine-rejected with every sign other than s',
+      () async {
+        // Quality-requires-s, engine-level: every non-'s' storage token must
+        // never carry a quality qualifier. Each case gets its own day so a
+        // broken CHECK cannot hide behind a duplicate-key failure on a reused
+        // day. ('fs' contains s but is its own sign, deliberately quality-free.)
+        var day = 20000;
+        for (final sign in MucusSign.values) {
+          if (sign == MucusSign.s) continue;
+          await expectLater(
+            db.customStatement(
+              "INSERT INTO cycle_entries (date, mucus_sign, "
+              "mucus_quality) VALUES ($day, '${sign.name}', 'w')",
+            ),
+            throwsA(isA<Exception>()),
+            reason:
+                "'${sign.name}' is not the S sign — it never carries a quality",
+          );
+          day++;
+        }
+        // Quality with s but outside the quality vocabulary: rejected as well.
+        await expectLater(
+          db.customStatement(
+            "INSERT INTO cycle_entries (date, mucus_sign, "
+            "mucus_quality) VALUES ($day, 's', 'stretchy')",
+          ),
+          throwsA(isA<Exception>()),
+        );
+        // Sanity: s with an in-vocabulary quality goes through.
+        await db.customStatement(
           "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20000, 'f', 'w')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Quality with s but outside the vocabulary: rejected as well.
-      await expectLater(
-        db.customStatement(
-          "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20002, 's', 'stretchy')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Sanity: s with an in-vocabulary quality goes through.
-      await db.customStatement(
-        "INSERT INTO cycle_entries (date, mucus_sign, "
-        "mucus_quality) VALUES (20003, 's', 'ew')",
-      );
-    });
+          "mucus_quality) VALUES (${day + 1}, 's', 'ew')",
+        );
+      },
+    );
 
     test('bleeding round-trips as each of the six levels', () async {
       for (final (index, level) in Bleeding.values.indexed) {
@@ -181,41 +175,39 @@ void main() {
       }
     });
 
-    test(
-      'raw SQL INSERT stores level 5 that reads back as the top level',
-      () async {
-        // Hand-written SQL (e.g. a future import path) stores the int directly:
-        // 5 must read back as the top bleeding level (by LEVEL, not by
-        // declaration index), and writing that member back must store 5 again.
+    test('raw SQL INSERT stores integer levels that read back by level, not '
+        'declaration order', () async {
+      // Hand-written SQL (e.g. a future import path) stores the int directly:
+      // the member must resolve by LEVEL — by declaration index, 4 would be
+      // the wrong member entirely. Distinct days per case: on a reused day
+      // a later insert could fail on UNIQUE instead of its own assertion,
+      // masking which level actually misread.
+      // Day 20000 = 2024-10-04; +n days per level n.
+      const byLevel = <int, Bleeding>{4: Bleeding.heavy, 5: Bleeding.maximum};
+      for (final MapEntry(:key, :value) in byLevel.entries) {
         await db.customStatement(
           'INSERT INTO cycle_entries (date, bleeding) '
-          'VALUES (20002, 5)',
+          'VALUES (${20000 + key}, $key)',
         );
         final row = await db.entriesDao.entryFor(
-          DateTime(2024, 10, 6),
-        ); // day 20002
-        expect(
-          row!.bleeding.level,
-          5,
-          reason: 'level 5 is a valid stored bleeding level',
-        );
-        expect(row.bleeding, Bleeding.values.where((b) => b.level == 5).single);
+          DateTime(2024, 10, 4 + key),
+        ); // day 20000 + key
+        expect(row!.bleeding, value);
+      }
 
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2024, 10, 6), bleeding: row.bleeding),
-        );
-        final raw = await db
-            .customSelect(
-              'SELECT bleeding FROM cycle_entries WHERE date = 20002',
-            )
-            .getSingle();
-        expect(
-          raw.data['bleeding'],
-          5,
-          reason: 'the converter writes the new top level as integer 5',
-        );
-      },
-    );
+      // Writing a raw-read member back must store its level again.
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2024, 10, 10), bleeding: Bleeding.maximum),
+      );
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries WHERE date = 20006')
+          .getSingle();
+      expect(
+        raw.data['bleeding'],
+        5,
+        reason: 'the converter writes the top level as integer 5',
+      );
+    });
 
     test(
       'bleeding is stored as the numeric level, never a string token',
@@ -233,23 +225,6 @@ void main() {
               'the decided storage representation is the integer level '
               '(4), not a vocabulary name',
         );
-      },
-    );
-
-    test(
-      'raw SQL INSERT stores an integer level that reads back heavy',
-      () async {
-        // Hand-written SQL (e.g. a future import path) stores the int directly:
-        // 4 must read back as Bleeding.heavy (by LEVEL, not by declaration
-        // index).
-        await db.customStatement(
-          'INSERT INTO cycle_entries (date, bleeding) '
-          'VALUES (20000, 4)',
-        );
-        final row = await db.entriesDao.entryFor(
-          DateTime(2024, 10, 4),
-        ); // day 20000
-        expect(row!.bleeding, Bleeding.heavy);
       },
     );
 
@@ -1029,18 +1004,6 @@ void main() {
           expect(dailyEntryFromDrift(stored).mucusSign, MucusSign.a);
         },
       );
-
-      test('a quality token stays engine-rejected on an A sign', () async {
-        // Quality remains exclusive to S — the CHECK below still encodes
-        // mucus_sign = 's', so 'a' with a quality cannot be written.
-        await expectLater(
-          db.customStatement(
-            "INSERT INTO cycle_entries (date, mucus_sign, "
-            "mucus_quality) VALUES (20000, 'a', 'w')",
-          ),
-          throwsA(isA<Exception>()),
-        );
-      });
     });
   });
 

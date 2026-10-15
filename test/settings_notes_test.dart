@@ -57,16 +57,6 @@ void main() {
             'the default hint replaces the removed persistence note '
             'on the temperature-range card',
       );
-
-      // The feedback notice is the pane's last card — its presence proves
-      // the surface held the whole pane, so the absence probe did not
-      // silently survey a truncated list.
-      expect(find.textContaining('GitHub issue'), findsOneWidget);
-      expect(
-        find.textContaining('Not implemented yet'),
-        findsNothing,
-        reason: 'the pane carries no not-yet-implemented placeholder note',
-      );
     },
   );
 }

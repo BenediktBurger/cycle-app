@@ -7,15 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('one cycle per page (small cycles)', () {
-    test('a short cycle takes exactly one page', () {
-      final plan = planCyclePages([10]);
-      expect(plan.length, 1);
-      expect(plan.single.cycleIndex, 0);
-      expect(plan.single.pageIndexInCycle, 0);
-      expect(plan.single.firstDayIndex, 0);
-      expect(plan.single.dayCount, 10);
-    });
-
     test('every cycle opens its own page — no page carries days of two '
         'cycles', () {
       // One, two and one page: 10-day, 40-day, 5-day cycles -> 4 pages,
@@ -83,14 +74,20 @@ void main() {
 
   group('defaults & guards', () {
     test('the default column budget is the paper sheet’s 40 day columns: a '
-        '31-day cycle fits on ONE page', () {
-      final plan = planCyclePages([31]);
+        'cycle within it takes exactly one page', () {
+      final plan = planCyclePages([10]);
+      expect(plan.length, 1);
+      expect(plan.single.cycleIndex, 0);
+      expect(plan.single.pageIndexInCycle, 0);
+      expect(plan.single.firstDayIndex, 0);
+      expect(plan.single.dayCount, 10);
+      final plan31 = planCyclePages([31]);
       expect(
-        plan.length,
+        plan31.length,
         1,
         reason: 'defaultMaxDaysPerPage = 40: no continuation page needed',
       );
-      expect(plan.single.dayCount, 31);
+      expect(plan31.single.dayCount, 31);
     });
 
     test('a 45-day cycle under the default budget: full page + remainder', () {

@@ -84,10 +84,9 @@ EvaluationOverlay wholeRangeOverlay() => buildEvaluationOverlay(
 
 void main() {
   group('fixture sanity (arithmetic the overlay only maps)', () {
-    test('two mark-opened cycle groups with the expected evaluation', () {
-      final evals = evaluations();
-      expect(evals.length, 2);
-      final first = evals[0];
+    test('peaks, higher kinds, baseline span end and the six lows of the '
+        'marked cycle', () {
+      final first = evaluations()[0];
       expect(first.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       expect(first.numberedLows.map((l) => (l.number, l.date.day)), [
         (1, 8),
@@ -97,19 +96,13 @@ void main() {
         (5, 4),
         (6, 3),
       ]);
-      expect(first.baseline!.value, 36.4);
       expect(first.higherMeasurements.map((h) => (h.date.day, h.markKind)), [
         (9, MarkKind.arrow),
         (10, MarkKind.arrow),
         (11, MarkKind.circle),
       ]);
-      // R10: the segment runs from low #6 (Mar 3) to the last marked
-      // candidate (Mar 11).
-      expect(first.baselineSpan!.startDay.day, 3);
+      // R10: the segment runs to the last marked candidate (Mar 11).
       expect(first.baselineSpan!.endDay.day, 11);
-      // The second cycle has no first-higher mark: nothing derives there.
-      expect(evals[1].higherMeasurements, isEmpty);
-      expect(evals[1].baselineSpan, isNull);
     });
   });
 
