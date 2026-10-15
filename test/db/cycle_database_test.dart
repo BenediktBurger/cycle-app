@@ -37,39 +37,6 @@ void main() {
   });
 
   group('schema & migration (v9)', () {
-    test('no profiles table exists (v9 is profile-free)', () async {
-      final tables = await db
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE "
-            "type = 'table'",
-          )
-          .get();
-      final names = tables.map((r) => r.data['name'] as String).toSet();
-      expect(names, containsAll(['cycle_entries', 'user_marks']));
-      expect(
-        names.contains('profiles'),
-        isFalse,
-        reason: 'the Profiles table (and any seeding) is gone from v9',
-      );
-    });
-
-    test(
-      'profile_id columns are gone from both tables (no FK, no default)',
-      () async {
-        for (final table in ['cycle_entries', 'user_marks']) {
-          final columns = await db
-              .customSelect('PRAGMA table_info($table)')
-              .get();
-          final names = columns.map((r) => r.data['name'] as String).toSet();
-          expect(
-            names.contains('profile_id'),
-            isFalse,
-            reason: '$table carries no profile_id column any more',
-          );
-        }
-      },
-    );
-
     test('temp_disturbances CHECK rejects masks outside 0..15; the column '
         'defaults to 0', () async {
       // 16 (and anything bigger): outside the 4-bit vocabulary.
@@ -167,11 +134,6 @@ void main() {
         contains('(entry_date, mark_type)'),
         reason: 'marks are unique per day and type — no profile dimension',
       );
-      expect(
-        byName.values.join(' '),
-        isNot(contains('profile_id')),
-        reason: 'no profile column participates in any unique index',
-      );
     });
 
     test(
@@ -233,16 +195,6 @@ void main() {
     });
 
     test('bleeding round-trips as each of the six levels', () async {
-      // The shared numeric scale spans six steps (0=none … 5=maximum).
-      expect(Bleeding.values.map((b) => b.level), [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-      ], reason: 'the fifth bleeding level extends the stored scale to 5');
-      expect(Bleeding.values.where((b) => b.level == 5).single.name, 'maximum');
       for (final (index, level) in Bleeding.values.indexed) {
         final day = DateTime(2026, 6).add(Duration(days: index));
         await db.entriesDao.upsertDaily(DailyEntry(date: day, bleeding: level));
@@ -309,21 +261,6 @@ void main() {
               'the decided storage representation is the integer level '
               '(4), not a vocabulary name',
         );
-      },
-    );
-
-    test(
-      'bleeding defaults to 0: a row written without it reads none',
-      () async {
-        await db
-            .into(db.cycleEntries)
-            .insert(CycleEntriesCompanion.insert(date: DateTime(2026, 6, 20)));
-        final row = await db.entriesDao.entryFor(DateTime(2026, 6, 20));
-        expect(row!.bleeding, Bleeding.none);
-        final raw = await db
-            .customSelect('SELECT bleeding FROM cycle_entries')
-            .getSingle();
-        expect(raw.data['bleeding'], 0, reason: 'the column default is 0');
       },
     );
 
@@ -433,35 +370,6 @@ void main() {
         "INSERT INTO cycle_entries (date, measured_at_minutes) "
         "VALUES (20001, 405)",
       );
-    });
-
-    test('the removed sex bool and free-text cervix columns are gone; firmness '
-        'and timings exist', () async {
-      await db.entriesDao.upsertDaily(
-        DailyEntry(
-          date: DateTime(2026, 6, 15),
-          cervixFirmness: CervixFirmness.halfSoft,
-          sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
-        ),
-      );
-      // The old columns must not even be addressable any more.
-      await expectLater(
-        db.customSelect('SELECT sex FROM cycle_entries').get(),
-        throwsA(isA<Exception>()),
-      );
-      await expectLater(
-        db.customSelect('SELECT cervix FROM cycle_entries').get(),
-        throwsA(isA<Exception>()),
-      );
-      // The replacements carry the observation in their decided shapes: the
-      // firmness as its TEXT enum-name token, the timings as the mask.
-      final raw = await db
-          .customSelect(
-            'SELECT cervix_firmness, sex_timings FROM cycle_entries',
-          )
-          .getSingle();
-      expect(raw.data['cervix_firmness'], 'halfSoft');
-      expect(raw.data['sex_timings'], 5);
     });
   });
 

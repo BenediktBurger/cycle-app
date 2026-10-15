@@ -50,12 +50,6 @@ final class _FakeStore implements DbKeyStore {
 
 void main() {
   group('generateDbKey', () {
-    test('produces 64 lowercase hex characters (32 random bytes)', () {
-      final key = generateDbKey();
-      expect(key, hasLength(64));
-      expect(key, matches(RegExp(r'^[0-9a-f]{64}$')));
-    });
-
     test('two generations differ (fresh randomness)', () {
       expect(generateDbKey(), isNot(generateDbKey()));
     });

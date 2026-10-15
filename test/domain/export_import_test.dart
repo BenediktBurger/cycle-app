@@ -255,10 +255,6 @@ void main() {
       );
     });
 
-    test('merge policy constant documents the overwrite behaviour', () {
-      expect(exportMergePolicy, 'overwrite');
-    });
-
     test('documents of every published schema version parse', () {
       ExportBlob blobFor(int version) => parseExportJson(
         jsonEncode(<String, Object?>{

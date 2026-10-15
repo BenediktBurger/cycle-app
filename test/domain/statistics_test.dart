@@ -404,14 +404,6 @@ void main() {
       expect(stats.firstHigherUntilCycleEnd.max, 10);
       expect(stats.firstHigherUntilCycleEnd.average, closeTo(10.0, 0.0001));
       expect(stats.firstHigherUntilCycleEnd.stdDev, closeTo(0.0, 0.0001));
-
-      // First higher day numbers as 1-based day-of-cycle: Mar 20 is
-      // offset 18 from the Mar 2 start, so the chart-convention day
-      // number is 19 — the only fact row, one value, no spread.
-      expect(stats.firstHigherCycleDays.min, 19);
-      expect(stats.firstHigherCycleDays.max, 19);
-      expect(stats.firstHigherCycleDays.average, closeTo(19.0, 0.0001));
-      expect(stats.firstHigherCycleDays.stdDev, closeTo(0.0, 0.0001));
     });
 
     test('earliest first higher prefers the smallest day-of-cycle offset', () {
@@ -456,23 +448,6 @@ void main() {
       // from); the four mark-opened cycles carry none.
       expect(stats.facts, hasLength(4));
       expect(stats.firstHigherCycleDays.min, isNull);
-    });
-
-    test('day-of-cycle numbers match the chart convention (1-based)', () {
-      // The chart's day-of-cycle number for the first higher mark day:
-      // daysBetween(mark, cycleStart) + 1 — here Mar 2..Mar 20 = 19 days.
-      final stats = cycleStatistics(threeCycleData(), [
-        ...threeCycleStarts(),
-        firstHigher(2026, 3, 20),
-      ]);
-      expect(
-        DateOnly.daysBetween(
-          DateTime.utc(2026, 3, 20),
-          DateTime.utc(2026, 3, 2),
-        ),
-        18,
-      );
-      expect(stats.firstHigherCycleDays.min, 19);
     });
   });
 

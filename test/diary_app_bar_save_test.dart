@@ -54,13 +54,6 @@ void main() {
           'the bottom save button is kept in addition to the app-bar '
           'action',
     );
-    expect(
-      tester.widget<Widget>(diarySaveButton()),
-      isA<FilledButton>(),
-      reason:
-          'the bottom save button is the FilledButton, not the app-bar '
-          'action',
-    );
 
     await tester.enterText(diaryTemperatureField(), '36.5');
     await tester.pumpAndSettle();

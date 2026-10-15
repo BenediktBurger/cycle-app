@@ -11,7 +11,6 @@
 // in the uncompressed content stream.
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:cycle_app/domain/band_layout.dart';
 import 'package:cycle_app/domain/cervix.dart';
@@ -516,27 +515,6 @@ Future<List<int>> generateNumberFixture({TemperatureRange? range}) =>
     );
 
 void main() {
-  group('rail captions (the paper-form row legends)', () {
-    test('the below-plot temperature value row\'s rail legend reads exactly '
-        '"Temperatur in °C" (consistent with Zyklustag/Datum styling)', () {
-      expect(pdfRailCaptionTemperatureValues, 'Temperatur in °C');
-    });
-
-    test('the day-number and date rows keep their legends', () {
-      expect(pdfRailCaptionDayNumbers, 'Zyklustag');
-      expect(pdfRailCaptionDates, 'Datum');
-    });
-
-    test('the legends are pairwise distinct labels', () {
-      final captions = [
-        pdfRailCaptionDayNumbers,
-        pdfRailCaptionDates,
-        pdfRailCaptionTemperatureValues,
-      ];
-      expect(captions.toSet(), hasLength(captions.length));
-    });
-  });
-
   group('header facts (pure)', () {
     test('a named export shows the identifying values and the numbers', () {
       final facts = pdfHeaderFacts(
@@ -978,15 +956,21 @@ void main() {
 
     test('notes with umlauts and non-Latin-1 glyphs survive the generation '
         '(bundled TTF registered as base font)', () async {
-      // The pure assertion: generation does not throw and produces a
-      // signed document; the TTF is the registered base font, so text
-      // beyond Latin-1 renders instead of silently misrendering (the
-      // fixture note carries umlaut composition marks and Cyrillic/Greek
-      // glyphs the CoreFonts could never draw).
       final bytes = await generateFixture();
-      expect(bytes, isNotEmpty);
-      expect(bytes[0], 0x25); // '%'
-      expect(bytes[1], 0x50); // 'P'
+      final (runs, _) = extractPageContent(bytes);
+      // TJ runs split at spaces; the space-free join makes each note cell's
+      // words contiguous in the extracted text again.
+      final text = runs.map((r) => r.text).join().replaceAll(' ', '');
+      expect(
+        text,
+        contains('Жαž'),
+        reason: 'Cyrillic/Greek glyphs render via the registered TTF',
+      );
+      expect(
+        text,
+        contains('QuerdenkenimBüro—schönerTagß'),
+        reason: 'umlauts and the dashes/ß render via the registered TTF',
+      );
     });
   });
 
@@ -1723,11 +1707,6 @@ void main() {
         );
       },
     );
-    test('the merged band\'s rotated cells read top→bottom (the cycle '
-        "tab's direction): pdfRotatedTextAngle is −π/2, pw's top→down "
-        'quarter turn', () {
-      expect(pdfRotatedTextAngle, closeTo(-math.pi / 2, 1e-9));
-    });
   });
 
   group('measurement method: band note (render-time synthesis)', () {

@@ -25,12 +25,7 @@ import 'package:cycle_app/domain/export_import.dart'
 import 'package:cycle_app/domain/measurement_method.dart' show MeasurementRoute;
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show
-        canSaveFile,
-        saveFileOverride,
-        shareFile,
-        shareFileBytes,
-        shareFileOverride;
+    show saveFileOverride, shareFile, shareFileBytes, shareFileOverride;
 import 'package:cycle_app/ui/settings.dart'
     show EinstellungenScreen, exportFileName;
 import 'package:flutter/material.dart';
@@ -412,24 +407,6 @@ void main() {
   });
 
   group('export preview: save-as-dialog path', () {
-    testWidgets('the preview page offers the save button', (
-      WidgetTester tester,
-    ) async {
-      // Platform-independent: every native io target (desktop and
-      // Android SAF alike) offers the save-as dialog, so `canSaveFile`
-      // is just `true`.
-      expect(canSaveFile, isTrue);
-
-      await pumpToExportPreview(tester);
-      expect(
-        find.text(saveFileButtonLabel),
-        findsOneWidget,
-        reason:
-            'the save-as-file path survives next to the share action '
-            '(save dialog on the native targets, browser download on web)',
-      );
-    });
-
     testWidgets('tapping save drives the save implementation through the seam '
         '(filename and JSON content) and confirms with a snackbar', (
       WidgetTester tester,

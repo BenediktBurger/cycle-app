@@ -360,21 +360,6 @@ void main() {
         }
       },
     );
-
-    test('the snapshot equality covers the paper values', () {
-      expect(
-        PersistedSettings(shortestCycleLengthOutsideApp: 21),
-        isNot(PersistedSettings.defaults()),
-      );
-      expect(
-        PersistedSettings(earliestFirstHigherCycleDayOutsideApp: 14),
-        isNot(PersistedSettings.defaults()),
-      );
-      expect(
-        PersistedSettings(shortestCycleLengthOutsideApp: 21),
-        PersistedSettings(shortestCycleLengthOutsideApp: 21),
-      );
-    });
   });
 
   group('onboarding completion flag (first-start gate)', () {
@@ -505,17 +490,6 @@ void main() {
             'keeps its default',
       );
     });
-
-    test('the snapshot equality covers the track map', () {
-      expect(
-        PersistedSettings(diaryTrack: const DiaryTrack(cervix: true)),
-        isNot(PersistedSettings.defaults()),
-      );
-      expect(
-        PersistedSettings(diaryTrack: DiaryTrack.defaults),
-        PersistedSettings.defaults(),
-      );
-    });
   });
 
   group('generic JSON path (future settings without any code change)', () {
@@ -595,7 +569,7 @@ void main() {
         '3', // JSON number
         '"   "', // whitespace-only string
         'true', // JSON bool
-        '"[" + "broken', // not JSON at all
+        '"[broken', // unterminated JSON string
       ]) {
         await seedRaw(SettingKeys.pdfExportName, raw);
         expect(

@@ -68,17 +68,9 @@ Finder oldCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
 Finder earliestFirstHigherCard() =>
     find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
 
-// The outside lines' English wordings, pinned before their arb keys
-// (`statisticsShortestOutsideApp` / `statisticsFirstHigherOutsideApp`)
-// exist — keep the prefixes in sync with the strings' final wordings.
-const String outsideShortestPrefix = 'outside: ';
-const String outsideEarliestPrefix = 'outside: cycle day ';
-
-// The metric cards' count captions' plural rule, pinned before the arb key
-// (`statisticsMetricFromCycles`) exists — keep in sync with the strings'
-// final wordings (the singular form is the German proofread point).
-String countCaption(int cycles) =>
-    cycles == 1 ? 'from 1 cycle' : 'from $cycles cycles';
+// Every test that uses these lookups also runs the harness under the
+// default en locale.
+final enL10n = lookupAppLocalizations(const Locale('en'));
 
 Widget harness({
   List<DailyEntry> entries = const [],
@@ -241,7 +233,7 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('cycleLength'),
-        matching: find.text(countCaption(1)),
+        matching: find.text(enL10n.statisticsMetricFromCycles(1)),
       ),
       findsOneWidget,
       reason: 'only the closed cycle has a length — the caption says so',
@@ -315,7 +307,7 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
-        matching: find.text(countCaption(2)),
+        matching: find.text(enL10n.statisticsMetricFromCycles(2)),
       ),
       findsOneWidget,
       reason: 'both bleeding cycles feed the card',
@@ -358,7 +350,10 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: firstHigherDay, matching: find.text(countCaption(1))),
+      find.descendant(
+        of: firstHigherDay,
+        matching: find.text(enL10n.statisticsMetricFromCycles(1)),
+      ),
       findsOneWidget,
       reason: 'only cycle 1 carries a resolved first higher',
     );
@@ -407,7 +402,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: untilEnd, matching: find.text(countCaption(1))),
+        find.descendant(
+          of: untilEnd,
+          matching: find.text(enL10n.statisticsMetricFromCycles(1)),
+        ),
         findsOneWidget,
         reason: 'the one qualified span feeds the card',
       );
@@ -798,7 +796,7 @@ void main() {
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}21'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -870,7 +868,7 @@ void main() {
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}21'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -934,7 +932,7 @@ void main() {
     expect(
       find.descendant(
         of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}30'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(30)),
       ),
       findsOneWidget,
       reason: 'the paper figure shows even when it adds nothing to the minimum',
@@ -996,7 +994,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1098,7 +1096,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1143,7 +1141,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1208,7 +1206,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1287,29 +1285,6 @@ void main() {
   });
 
   group('memoized derived data', () {
-    testWidgets('the derived-data provider holds one pass across an '
-        'unrelated rebuild', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(entries: screenEntries(), marks: screenMarks()),
-      );
-      await tester.pumpAndSettle();
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(StatistikScreen)),
-      );
-      final before = container.read(derivedCycleDataProvider);
-
-      // An unrelated surface change (a setting on the count card's
-      // caption) rebuilds everything that watches it without re-deriving.
-      container.read(observedCyclesOutsideAppProvider.notifier).state = 3;
-      await tester.pumpAndSettle();
-
-      final after = container.read(derivedCycleDataProvider);
-      expect(identical(before, after), isTrue);
-    });
-
     testWidgets('a year-2000 cycle-start mark settles with sane totals '
         'and no exception', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1800));

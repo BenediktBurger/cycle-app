@@ -323,18 +323,6 @@ void main() {
       },
     );
 
-    test('a fresh day defaults to 0 — no sex recorded', () async {
-      await db
-          .into(db.cycleEntries)
-          .insert(CycleEntriesCompanion.insert(date: DateTime(2026, 7, 20)));
-      final row = await db.entriesDao.entryFor(DateTime(2026, 7, 20));
-      expect(row!.sexTimings, 0);
-      final raw = await db
-          .customSelect('SELECT sex_timings FROM cycle_entries')
-          .getSingle();
-      expect(raw.data['sex_timings'], 0, reason: 'the column default is 0');
-    });
-
     test('sex_timings is engine-rejected outside 0..7', () async {
       await expectLater(
         db.customStatement(

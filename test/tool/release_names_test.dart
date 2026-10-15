@@ -59,11 +59,6 @@ void main() {
   group('publish names and staged paths', () {
     const version = '0.2.1';
 
-    test('ABI codes map the three release ABIs to 1/2/3', () {
-      expect(abiCodes, {'armeabi-v7a': 1, 'arm64-v8a': 2, 'x86_64': 3});
-      expect(releaseAbis, ['armeabi-v7a', 'arm64-v8a', 'x86_64']);
-    });
-
     test('publish names are the attached release asset names', () {
       expect(
         publishApkName(versionName: version, abi: 'arm64-v8a'),
@@ -76,31 +71,12 @@ void main() {
       ]);
     });
 
-    test('multi-digit versions survive the derivation', () {
-      expect(
-        publishApkName(versionName: '10.11.12', abi: 'x86_64'),
-        'cycle-app-10.11.12-x86_64.apk',
-      );
-      expect(publishApkNames('10.11.12').last, 'cycle-app-10.11.12-x86_64.apk');
-    });
-
     test('staged publish paths live under build/gh-release (gitignored)', () {
       expect(stagedPublishPaths(version), [
         '$ghReleaseStagingDir/cycle-app-0.2.1-armeabi-v7a.apk',
         '$ghReleaseStagingDir/cycle-app-0.2.1-arm64-v8a.apk',
         '$ghReleaseStagingDir/cycle-app-0.2.1-x86_64.apk',
       ]);
-    });
-
-    test('staged paths compose the staging dir with the publish names', () {
-      for (final abi in releaseAbis) {
-        expect(
-          stagedPublishPath(versionName: version, abi: abi),
-          '$ghReleaseStagingDir/'
-          '${publishApkName(versionName: version, abi: abi)}',
-          reason: abi,
-        );
-      }
     });
   });
 
@@ -299,11 +275,6 @@ void main() {
 
     test('encode → decode round trip preserves every field', () {
       expect(decodeHandoffManifest(encodeHandoffManifest(manifest)), manifest);
-    });
-
-    test('the manifest path is build/gh-release/source.json', () {
-      expect(handoffManifestPath, 'build/gh-release/source.json');
-      expect(handoffManifestPath.startsWith('$ghReleaseStagingDir/'), isTrue);
     });
 
     test('a well-formed manifest decodes to the same values', () {

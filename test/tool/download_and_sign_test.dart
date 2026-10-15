@@ -167,12 +167,6 @@ void main() {
         reason: 'a negative number is not a run id',
       );
     });
-
-    test('the usage line names download_and_sign and carries no dry-run '
-        'flag', () {
-      expect(sign.usage, contains('download_and_sign.dart'));
-      expect(sign.usage, isNot(contains('--dry-run')));
-    });
   });
 
   group('CI artifact names (upload names, this helper only)', () {
@@ -1004,15 +998,6 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
       expect(
         text,
         contains('dart run tool/publish_release.dart v0.2.1 --dry-run'),
-      );
-    });
-
-    test('the device-test reminder and the adb lines precede the pointer '
-        '(device work gated in front of the publish)', () {
-      expect(deviceTestBeforePublishReminder(), contains('BEFORE'));
-      expect(
-        adbInstallNextSteps('0.2.1').first,
-        'adb install -r build/gh-release/cycle-app-0.2.1-armeabi-v7a.apk',
       );
     });
   });

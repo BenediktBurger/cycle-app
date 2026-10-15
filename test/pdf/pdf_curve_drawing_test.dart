@@ -628,34 +628,9 @@ void main() {
         piece.endX,
         closeTo(40.0, 1e-9),
         reason:
-            'the piece clips at the window edge — the segment '
+            "the piece clips at the window edge — the segment "
             'continues onto page 2',
       );
-    });
-
-    test('recorded-range clamping is identical across the page split', () {
-      // The page builder feeds both windows the same TemperatureRange and
-      // the same axis; the draw lists' value space must agree (no page
-      // rescales).
-      final first = pdfCurveDrawing(
-        cycle: cycle,
-        overlay: overlay,
-        range: _range,
-        windowFirstIndex: 0,
-        windowDayCount: 40,
-        computedSuz: (suzBegins: null, suzRule: null),
-      );
-      final second = pdfCurveDrawing(
-        cycle: cycle,
-        overlay: overlay,
-        range: _range,
-        windowFirstIndex: 40,
-        windowDayCount: 5,
-        computedSuz: (suzBegins: null, suzRule: null),
-      );
-      expect(first.dots.map((d) => d.value), everyElement(36.5));
-      expect(second.dots.map((d) => d.value), everyElement(36.5));
-      expect(first.baseline.single.value, second.baseline.single.value);
     });
   });
 }

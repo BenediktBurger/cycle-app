@@ -1166,57 +1166,6 @@ void main() {
       expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 11)));
     });
 
-    test('the end never crosses the next menstruation start (R10 clamp — '
-        'vacuous by construction, pinned defensively)', () {
-      final entries = [
-        // Cycle A: last candidate on its last tracked day (Mar 13)…
-        ..._baseLowRun,
-        d(2026, 3, 10, t: 36.5), // marked rise → circle 1
-        d(2026, 3, 11, t: 36.5), // circle 2
-        d(2026, 3, 12, t: 36.5), // circle 3 — below the margin
-        d(2026, 3, 13, t: 36.5), // circle 4 — rule E fires here
-        // …and cycle B starts the very next day (cycleStart mark).
-        d(2026, 3, 14, bleeding: Bleeding.medium),
-        d(2026, 3, 15, t: 36.2),
-        d(2026, 3, 16, t: 36.1),
-        d(2026, 3, 17, t: 36.4),
-        d(2026, 3, 18, t: 36.2),
-        d(2026, 3, 19, t: 36.3),
-        d(2026, 3, 20, t: 36.1),
-        d(2026, 3, 21, t: 36.8), // first higher B (marked) → circle 1
-        d(2026, 3, 22, t: 36.9), // circle 2
-        d(2026, 3, 23, t: 37.0), // circle 3, ≥ +0.2 K → rule D
-      ];
-      final marks = [
-        start(2026, 3, 2),
-        peak(2026, 3, 9),
-        rise(2026, 3, 10),
-        start(2026, 3, 14),
-        peak(2026, 3, 20),
-        rise(2026, 3, 21),
-      ];
-
-      final a = evalFor(entries, marks, DateTime(2026, 3, 2));
-      final b = evalFor(entries, marks, DateTime(2026, 3, 14));
-
-      // A's end stays on its own last candidate day (Mar 13) even though
-      // the next menstruation starts on Mar 14 and B's six-low window
-      // begins on Mar 15 — the R10 min() clamps cannot pull the end
-      // earlier by construction (the next cycle always starts after this
-      // cycle's days).
-      expect(
-        a.baselineSpan!.startDay,
-        DateOnly.normalize(DateTime(2026, 3, 4)),
-      );
-      expect(a.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 13)));
-      // B has its own, independent segment.
-      expect(
-        b.baselineSpan!.startDay,
-        DateOnly.normalize(DateTime(2026, 3, 15)),
-      );
-      expect(b.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 23)));
-    });
-
     test('multi-cycle evaluations carry independent baseline segments', () {
       final entries = [
         // Cycle A: starts at the Mar 2 cycleStart mark

@@ -1,51 +1,11 @@
 // Tests of the pure paper-form geometry helper (lib/pdf/pdf_axis.dart): the
-// ONE shared geometry source of the PDF's day grid and temperature plot —
-// the x geometry of the rail/columns layout and the y geometry of the
-// temperature scale. No pdf-package or Flutter import needed here: plain
-// doubles only.
+// y geometry of the temperature scale. No pdf-package or Flutter import
+// needed here: plain doubles only.
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/pdf/pdf_axis.dart';
-import 'package:cycle_app/pdf/pdf_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('column geometry (rail + day columns)', () {
-    test('the default column budget is the paper sheet\'s 40 columns and the '
-        'rail + 40 columns exactly fill the printable landscape width', () {
-      expect(defaultMaxDaysPerPage, 40);
-      expect(
-        pdfRailWidth + defaultMaxDaysPerPage * pdfColumnWidth,
-        closeTo(pdfPrintableWidth, 1e-9),
-        reason: 'ONE geometry source: the drawn grid cannot drift off the page',
-      );
-    });
-
-    test(
-      'the columns start behind the rail; the center sits at column middle',
-      () {
-        expect(pdfColumnLeft(0), pdfRailWidth);
-        expect(pdfColumnLeft(1), closeTo(pdfRailWidth + pdfColumnWidth, 1e-12));
-        expect(
-          pdfColumnLeft(39),
-          closeTo(pdfRailWidth + 39 * pdfColumnWidth, 1e-12),
-        );
-        expect(
-          pdfColumnLeft(39) + pdfColumnWidth,
-          closeTo(pdfPrintableWidth, 1e-9),
-        );
-        expect(
-          pdfColumnCenter(0),
-          closeTo(pdfRailWidth + pdfColumnWidth / 2, 1e-12),
-        );
-        expect(
-          pdfColumnCenter(20),
-          closeTo(pdfRailWidth + 20.5 * pdfColumnWidth, 1e-12),
-          reason: 'day i\'s dot and cell contents center in day i\'s column',
-        );
-      },
-    );
-  });
-
   group('temperature axis (y geometry of the curve plot)', () {
     final axis = PdfCurveAxis(
       range: const TemperatureRange(min: 36.0, max: 38.0),

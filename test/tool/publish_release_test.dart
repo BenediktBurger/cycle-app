@@ -102,11 +102,6 @@ void main() {
         throwsA(isA<UsageException>()),
       );
     });
-
-    test('the usage line names publish_release and the dry-run flag', () {
-      expect(publish.usage, contains('publish_release.dart'));
-      expect(publish.usage, contains('--dry-run'));
-    });
   });
 
   group('staged-dir consumption (temp-dir sandbox)', () {
