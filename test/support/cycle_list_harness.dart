@@ -53,7 +53,9 @@ final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
 ///
 /// [marksStreamFactory] replaces the real marks stream: invoked once per
 /// provider (re-)subscription, so a stream-error retry test can hand out a
-/// failing stream on the first attempt and a valid one afterwards.
+/// failing stream on the first attempt and a valid one afterwards (the
+/// shared attempt-counter fixture: `StreamRetryFixture` in
+/// provider_fixtures.dart).
 ///
 /// The derived pass's `today` ([nowProvider]) is pinned to the latest date
 /// among [entries] and [seedMarks]: the cycle span then ends AT the last

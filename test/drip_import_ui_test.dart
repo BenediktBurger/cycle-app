@@ -9,45 +9,18 @@ import 'package:cycle_app/ui/settings.dart';
 import 'package:cycle_app/ui/settings/drip_import_card.dart';
 import 'package:cycle_app/ui/settings/export_import_card.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
 
-ProviderScope _appScope([Locale? locale]) => appScope(locale: locale);
-
 void main() {
   testWidgets('drip import card sits below the JSON import card and its '
       'dialog requires CSV text before applying', (WidgetTester tester) async {
-    await tester.pumpWidget(_appScope(const Locale('de')));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
-    // Tap scoped to the navigation bar: all tabs stay mounted (IndexedStack),
-    // so the 'Einstellungen' label also matches the offstage screen's AppBar
-    // — and in tree order that AppBar precedes the bar, so a bare .first tap
-    // would miss.
-    await tester.tap(navLabel('Einstellungen'));
-    await tester.pumpAndSettle();
-
-    // The settings list is a lazy ListView; scroll down until the drip
-    // card's launch button is built (the list is
-    // allowed to grow above the drip card — e.g. the theme-mode switcher —
-    // so fixed-amount drag loops would be brittle; the card ORDER assertion
-    // below does not depend on how much content sits above). The scrollable
-    // is scoped to the settings screen: with the shell keeping every tab
-    // mounted, the diary and statistics screens bring their own scrollables
-    // and ListViews into the tree.
-    await tester.scrollUntilVisible(
-      settingsImportDripButton(),
-      200,
-      scrollable: find
-          .descendant(
-            of: find.byType(EinstellungenScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
+    await openSettingsTab(tester);
+    await scrollSettingsCardIntoView(tester, settingsImportDripButton());
     expect(find.text('Drip-Daten importieren'), findsWidgets);
 
     // … and it comes AFTER the JSON export/import card in the card config.

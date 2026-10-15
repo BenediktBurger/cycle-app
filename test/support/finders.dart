@@ -1,5 +1,8 @@
 // Shared finders and chart-view-state helpers for the widget tests — the
 // interaction helpers the chart and shell tests kept copy-pasting.
+import 'dart:math' as math;
+
+import 'package:cycle_app/ui/cycle_marks.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -235,3 +238,31 @@ FlDotPainter dotPainter(WidgetTester tester, int dayIndex) {
   if (painter == null) fail('no temperature dot at day index $dayIndex');
   return painter;
 }
+
+/// The evaluation-candidate dot kinds, keyed by day index: which days render
+/// a RING (circled candidate) and which an ARROW (first-higher candidate).
+/// Days outside both sets have plain (or no) temperature dots.
+({Set<int> rings, Set<int> arrows}) candidateKinds(WidgetTester tester) {
+  var maxDay = -1;
+  for (final bar in dotBars(tester)) {
+    for (final spot in bar.spots) {
+      maxDay = math.max(maxDay, spot.x.round());
+    }
+  }
+  final kinds = (rings: <int>{}, arrows: <int>{});
+  for (var day = 0; day <= maxDay; day++) {
+    final painter = dotPainterOrNull(tester, day);
+    if (painter is RingDotPainter) kinds.rings.add(day);
+    if (painter is ArrowUpDotPainter) kinds.arrows.add(day);
+  }
+  return kinds;
+}
+
+/// The tooltip messages rendered under [of] — the localized row/corner names
+/// (and header-prototype names) the chart's rail slots carry.
+List<String> tooltipMessages(WidgetTester tester, Finder of) => tester
+    .widgetList<Tooltip>(
+      find.descendant(of: of, matching: find.byType(Tooltip)),
+    )
+    .map((t) => t.message!)
+    .toList();

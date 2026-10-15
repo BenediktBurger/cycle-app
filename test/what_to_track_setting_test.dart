@@ -13,14 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
-
-/// The settings pane is one scroll list (a lazy ListView); the cards far
-/// down the pane render only when the surface is large enough. Same
-/// reasoning as settings_persistence_test.dart's copy.
-Future<void> enlargeViewport(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(900, 2400));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
-}
+import 'support/viewport.dart';
 
 /// The [SwitchListTile] state of one tracked item's settings switch.
 bool switchState(WidgetTester tester, DiaryItem item) => tester
@@ -32,7 +25,7 @@ void main() {
     testWidgets('a fresh start shows the default tracking configuration', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       await tester.pumpWidget(appScope(locale: const Locale('de')));
       await tester.pumpAndSettle();
@@ -64,7 +57,7 @@ void main() {
     testWidgets('flipping switches writes through as the JSON map', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       CycleDatabase? db;
       await tester.pumpWidget(
@@ -98,7 +91,7 @@ void main() {
     testWidgets('a persisted diaryTrack row hydrates into the card on start', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistDiaryTrack(

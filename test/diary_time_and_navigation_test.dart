@@ -27,9 +27,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'support/diary_harness.dart';
 import 'support/database.dart';
-import 'support/finders.dart';
-import 'support/viewport.dart';
 import 'support/error_collector.dart';
+import 'support/finders.dart';
+import 'support/formatting.dart';
+import 'support/viewport.dart';
 
 // Widget tests for the time-of-measurement feature on the Tagebuch screen.
 //
@@ -93,23 +94,6 @@ String _bbtText(WidgetTester tester) => tester
     .widget<TextFormField>(find.byType(TextFormField).first)
     .controller!
     .text;
-
-// The header date button's German label, exactly as the diary renders it.
-// No host-timezone shifting: the label is host-TZ-independent because the
-// diary formats the UTC-midnight dates verbatim, each read by its own
-// fields.
-String _dayLabel(DateTime day, {DateTime? today}) {
-  final date = DateFormat.yMMMEd('de').format(DateOnly.normalize(day));
-  final isToday =
-      today != null &&
-      DateOnly.sameDay(DateOnly.normalize(day), DateOnly.normalize(today));
-  // The de prefix value mirrors the ARB ("todayDate" de) — resolved
-  // through the real bundle so a wording change breaks the test, not the
-  // user.
-  return isToday
-      ? lookupAppLocalizations(const Locale('de')).todayDate(date)
-      : date;
-}
 
 /// The navigation IconButton for [icon] — widgetWithIcon so the cast sees
 /// the IconButton itself, not the bare Icon inside it.
@@ -558,7 +542,7 @@ void main() {
             'comma-prefilled (display follows the locale)',
       );
       expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
+        find.widgetWithText(OutlinedButton, germanDayLabel(_day1)),
         findsOneWidget,
       );
 
@@ -574,7 +558,7 @@ void main() {
         reason: 'the next button moves the selection one day forward',
       );
       expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day2)),
+        find.widgetWithText(OutlinedButton, germanDayLabel(_day2)),
         findsOneWidget,
         reason: 'the date button shows the new day',
       );
@@ -592,7 +576,7 @@ void main() {
 
       expect(container.read(selectedDateProvider), _day1);
       expect(
-        find.widgetWithText(OutlinedButton, _dayLabel(_day1)),
+        find.widgetWithText(OutlinedButton, germanDayLabel(_day1)),
         findsOneWidget,
       );
       expect(_bbtText(tester), '36,4');
@@ -722,7 +706,7 @@ void main() {
       expect(
         find.widgetWithText(
           OutlinedButton,
-          _dayLabel(_dayNavNow, today: _dayNavNow),
+          germanDayLabel(_dayNavNow, today: _dayNavNow),
         ),
         findsOneWidget,
         reason:
@@ -746,11 +730,12 @@ void main() {
       // Checked on the picker window's edge too: tomorrow, "measured
       // just after midnight" is still not today.
       for (final day in [_day1, DateOnly.addDays(_dayNavNow, 1)]) {
-        final plain = _dayLabel(day);
+        final plain = germanDayLabel(day);
         expect(
           plain,
           isNot(contains('Heute')),
-          reason: 'guard: ${_dayLabel(day)} must not carry the today prefix',
+          reason:
+              'guard: ${germanDayLabel(day)} must not carry the today prefix',
         );
         // Full teardown in between: repumping a ProviderScope over an
         // existing one updates the same element in place and the old
@@ -769,7 +754,7 @@ void main() {
         expect(
           find.widgetWithText(
             OutlinedButton,
-            _dayLabel(_dayNavNow, today: _dayNavNow),
+            germanDayLabel(_dayNavNow, today: _dayNavNow),
           ),
           findsNothing,
           reason:

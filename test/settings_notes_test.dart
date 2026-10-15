@@ -2,12 +2,12 @@
 // app's local storage" notes under the language, theme-mode and
 // temperature-range cards are gone (users expect settings to persist), and
 // the temperature-range card keeps only the useful default hint.
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
+import 'support/viewport.dart';
 
 ProviderScope _appScope() => appScope();
 
@@ -26,8 +26,7 @@ void main() {
     (tester) async {
       // The temperature card sits below the pane's top cards (lazy
       // ListView — enlarge the surface so the whole card list is built).
-      await tester.binding.setSurfaceSize(const Size(900, 2400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      useTallSurface(tester, width: 900);
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
       await _openSettings(tester);

@@ -11,7 +11,7 @@ import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/pdf/cycle_pdf.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'cycle_pdf_test.dart'
+import '../support/pdf_content.dart'
     show PdfTextRun, countPageMarkers, extractPageContent;
 
 DateTime d(int y, int m, int day) => DateTime.utc(y, m, day);

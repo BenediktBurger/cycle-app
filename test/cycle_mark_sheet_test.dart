@@ -32,8 +32,6 @@ import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,6 +40,7 @@ import 'package:intl/intl.dart';
 import 'dart:ui' show Tristate;
 
 import 'support/cycle_list_harness.dart';
+import 'support/faulty_db.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
 import 'support/viewport.dart';
@@ -92,64 +91,6 @@ String dayLabelOf(int day) =>
 
 /// The day header's close button (the explicit panel close affordance).
 Finder panelCloseButton() => find.byKey(const ValueKey('cycleDayPanelClose'));
-
-/// Fault injection for the mark writes: the real in-memory database whose
-/// mark writes can be armed to fail AFTER the harness was pumped — the
-/// test flips the flag at exactly the point the fault should occur (the
-/// same seam the save-flow and delete-data tests use).
-class _FaultyDatabase extends CycleDatabase {
-  _FaultyDatabase(super.executor);
-
-  bool failMarkWrites = false;
-
-  late final _FaultyMarksDao _faultyMarksDao = _FaultyMarksDao(this);
-
-  @override
-  MarksDao get marksDao => _faultyMarksDao;
-}
-
-class _FaultyMarksDao extends MarksDao {
-  _FaultyMarksDao(this._faulty) : super(_faulty);
-
-  final _FaultyDatabase _faulty;
-
-  @override
-  Future<UserMark> addMark(
-    DateTime date,
-    String markType, {
-    String author = 'user',
-  }) {
-    if (_faulty.failMarkWrites) {
-      throw StateError('injected mark write failure');
-    }
-    return super.addMark(date, markType, author: author);
-  }
-
-  @override
-  Future<bool> toggleMark(DateTime date, String markType) {
-    if (_faulty.failMarkWrites) {
-      throw StateError('injected mark write failure');
-    }
-    return super.toggleMark(date, markType);
-  }
-
-  @override
-  Future<int> deleteMark(DateTime date, String markType) {
-    if (_faulty.failMarkWrites) {
-      throw StateError('injected mark write failure');
-    }
-    return super.deleteMark(date, markType);
-  }
-}
-
-_FaultyDatabase _faultyDatabase() {
-  return _FaultyDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
 
 /// The panel's keyed temperature-exclusion group (test-visible key) —
 /// used for the chip-icon scoping and the exclusion-group tests.
@@ -2058,7 +1999,7 @@ void main() {
         'a failing mark toggle surfaces the failure message and stores '
         'nothing — never an unhandled error',
         (tester) async {
-          final faulty = _faultyDatabase();
+          final faulty = FaultyCycleDatabase();
           final (db, _) = await _pump(
             tester,
             entries: scenarioEntries,
@@ -2097,7 +2038,7 @@ void main() {
         'a failing SUZ write surfaces the same failure message, stores no '
         'mark, and stays free of unhandled errors',
         (tester) async {
-          final faulty = _faultyDatabase();
+          final faulty = FaultyCycleDatabase();
           final (db, _) = await _pump(
             tester,
             entries: scenarioEntries,

@@ -33,22 +33,200 @@ double? _pickerValue(WidgetTester tester, ValueKey<String> key) => tester
     )
     .value;
 
-/// The settings pane is one scroll list (a lazy ListView); the cards far
-/// down the pane render only when the surface is large enough, so the
-/// tests that assert deep cards render the full pane height in one
-/// viewport instead of scrolling into position (with the general-
-/// information and paper-history cards on top, that includes the
-/// language/theme/range cards themselves).
-Future<void> enlargeViewport(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(900, 2400));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+/// One validated text field's write-through fixtures: the keyed field and
+/// error line, the storage key a valid entry writes to, and the
+/// valid → rejected → corrected input cycle.
+class _ValidatedField {
+  final String title;
+  final String fieldKey;
+
+  /// The keyed error line the field surfaces for rejected entries — null
+  /// when the field validates nothing (then no error is ever shown).
+  final String? errorKey;
+  final String storageKey;
+  final String validInput;
+  final Object validStored;
+  final String validReason;
+  final List<({String input, String reason})> rejectedInputs;
+  final String correctedInput;
+  final Object correctedStored;
+  final String correctedReason;
+
+  const _ValidatedField(
+    this.title, {
+    required this.fieldKey,
+    required this.errorKey,
+    required this.storageKey,
+    required this.validInput,
+    required this.validStored,
+    required this.validReason,
+    required this.rejectedInputs,
+    required this.correctedInput,
+    required this.correctedStored,
+    required this.correctedReason,
+  });
+}
+
+const _observedCyclesField = _ValidatedField(
+  'entering a count writes through as an integer row; an invalid entry does '
+  'not (validation 0 <= n)',
+  fieldKey: 'observedCyclesOutsideAppField',
+  errorKey: 'observedCyclesOutsideAppFieldError',
+  storageKey: SettingKeys.observedCyclesOutsideApp,
+  validInput: '3',
+  validStored: 3,
+  validReason:
+      'a valid non-negative integer is written through to '
+      'app_settings as a JSON integer',
+  rejectedInputs: [
+    (input: '-2', reason: 'a negative entry is rejected and never written'),
+    (input: '2.5', reason: 'a non-integer entry is rejected and never written'),
+  ],
+  correctedInput: '9',
+  correctedStored: 9,
+  correctedReason: 'a corrected entry writes through again',
+);
+
+const _paperShortestField = _ValidatedField(
+  'a valid shortest-cycle entry writes through; an entry below 1 is rejected '
+  'with the error line and never written',
+  fieldKey: 'paperShortestCycleLengthField',
+  errorKey: 'paperShortestCycleLengthFieldError',
+  storageKey: SettingKeys.shortestCycleLengthOutsideApp,
+  validInput: '24',
+  validStored: 24,
+  validReason: 'a valid paper shortest cycle writes through as a JSON integer',
+  rejectedInputs: [
+    (input: '0', reason: 'an entry below 1 is rejected and never written'),
+  ],
+  correctedInput: '26',
+  correctedStored: 26,
+  correctedReason: 'a corrected entry writes through again',
+);
+
+const _paperEarliestField = _ValidatedField(
+  'a valid earliest-first-higher entry writes through; a non-integer is '
+  'rejected with the error line and never written',
+  fieldKey: 'paperEarliestFirstHigherCycleDayField',
+  errorKey: 'paperEarliestFirstHigherCycleDayFieldError',
+  storageKey: SettingKeys.earliestFirstHigherCycleDayOutsideApp,
+  validInput: '12',
+  validStored: 12,
+  validReason:
+      'a valid paper earliest first higher writes through as a '
+      'JSON integer',
+  rejectedInputs: [
+    (input: '2.5', reason: 'a non-integer entry is rejected and never written'),
+  ],
+  correctedInput: '15',
+  correctedStored: 15,
+  correctedReason: 'a corrected entry writes through again',
+);
+
+const _pdfExportNameField = _ValidatedField(
+  'a name writes through (the field validates nothing — no entry to reject)',
+  fieldKey: 'pdfExportNameField',
+  errorKey: null,
+  storageKey: SettingKeys.pdfExportName,
+  validInput: 'Ada',
+  validStored: 'Ada',
+  validReason: 'a valid name writes through to app_settings as a JSON string',
+  rejectedInputs: [],
+  correctedInput: 'Ada Lovelace',
+  correctedStored: 'Ada Lovelace',
+  correctedReason: 'a second valid entry writes through as well',
+);
+
+const _pdfExportBirthDateField = _ValidatedField(
+  'a valid birth date writes through; an invalid date stays local (error '
+  'line, no row write)',
+  fieldKey: 'pdfExportBirthDateField',
+  errorKey: 'pdfExportBirthDateFieldError',
+  storageKey: SettingKeys.pdfExportBirthDate,
+  validInput: '1990-01-02',
+  validStored: '1990-01-02',
+  validReason: 'a valid birth date writes through as the ISO date string',
+  rejectedInputs: [
+    (
+      input: '1990-02-30',
+      reason: 'an invalid date entry is rejected and never written',
+    ),
+  ],
+  correctedInput: '2001-03-15',
+  correctedStored: '2001-03-15',
+  correctedReason: 'a corrected entry writes through again',
+);
+
+/// The write-through cycle of one validated field: a valid entry writes
+/// through to the storage key, every rejected entry leaves the stored value
+/// standing, and a corrected entry writes again (clearing the keyed error
+/// line where the field has one).
+Future<void> _validatedWriteThroughCycle(
+  WidgetTester tester,
+  _ValidatedField field,
+) async {
+  useTallSurface(tester, width: 900);
+  useDeviceLocales(tester, const [Locale('de')]);
+
+  CycleDatabase? db;
+  await tester.pumpWidget(appScope(onCreated: (created) => db = created));
+  await tester.pumpAndSettle();
+
+  await tester.tap(navLabel('Einstellungen'));
+  await tester.pumpAndSettle();
+
+  final fieldUnderTest = find.byKey(ValueKey<String>(field.fieldKey));
+  final errorLine = field.errorKey == null
+      ? null
+      : find.byKey(ValueKey<String>(field.errorKey!));
+  final store = SettingsStore(db!.settingsDao);
+
+  await tester.enterText(fieldUnderTest, field.validInput);
+  await tester.pumpAndSettle();
+  expect(
+    await store.readSetting(field.storageKey),
+    field.validStored,
+    reason: field.validReason,
+  );
+
+  for (final rejected in field.rejectedInputs) {
+    await tester.enterText(fieldUnderTest, rejected.input);
+    await tester.pumpAndSettle();
+    expect(
+      await store.readSetting(field.storageKey),
+      field.validStored,
+      reason: rejected.reason,
+    );
+  }
+  if (errorLine != null) {
+    expect(
+      errorLine,
+      findsOneWidget,
+      reason: 'the validation error is visible for the rejected entry',
+    );
+  }
+
+  await tester.enterText(fieldUnderTest, field.correctedInput);
+  await tester.pumpAndSettle();
+  expect(
+    await store.readSetting(field.storageKey),
+    field.correctedStored,
+    reason: field.correctedReason,
+  );
+  if (errorLine != null) {
+    expect(
+      errorLine,
+      findsNothing,
+      reason: 'the error clears once the entry is valid again',
+    );
+  }
 }
 
 void main() {
   group('observed cycles outside the app', () {
     testWidgets('a persisted outside-app count hydrates into the settings '
         'field on start', (WidgetTester tester) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
       useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) =>
@@ -76,80 +254,16 @@ void main() {
       );
     });
 
-    testWidgets('entering a count writes through as an integer row, an '
-        'invalid entry does not (validation 0 <= n)', (
-      WidgetTester tester,
-    ) async {
-      await enlargeViewport(tester);
-      useDeviceLocales(tester, const [Locale('de')]);
-
-      CycleDatabase? db;
-      await tester.pumpWidget(
-        appScope(
-          locale: const Locale('de'),
-          onCreated: (created) => db = created,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(navLabel('Einstellungen'));
-      await tester.pumpAndSettle();
-
-      final field = find.byKey(const ValueKey('observedCyclesOutsideAppField'));
-      await tester.enterText(field, '3');
-      await tester.pumpAndSettle();
-
-      final store = SettingsStore(db!.settingsDao);
-      expect(
-        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
-        3,
-        reason:
-            'a valid non-negative integer is written through to '
-            'app_settings as a JSON integer',
-      );
-
-      // Invalid input: negative and non-integer entries must not write, and
-      // the field surfaces the validation error.
-      await tester.enterText(field, '-2');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
-        3,
-        reason: 'a negative entry is rejected and never written',
-      );
-      expect(
-        find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
-        findsOneWidget,
-        reason: 'the validation error is visible for the rejected entry',
-      );
-
-      await tester.enterText(field, '2.5');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
-        3,
-        reason: 'a non-integer entry is rejected and never written',
-      );
-
-      await tester.enterText(field, '9');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.observedCyclesOutsideApp),
-        9,
-        reason: 'a corrected entry writes through again',
-      );
-      expect(
-        find.byKey(const ValueKey('observedCyclesOutsideAppFieldError')),
-        findsNothing,
-        reason: 'the error clears once the entry is valid again',
-      );
-    });
+    testWidgets(
+      _observedCyclesField.title,
+      (tester) => _validatedWriteThroughCycle(tester, _observedCyclesField),
+    );
 
     testWidgets(
       'an external value change resyncs the untouched field and stops '
       'resyncing once the user has typed',
       (WidgetTester tester) async {
-        await enlargeViewport(tester);
+        useTallSurface(tester, width: 900);
         useDeviceLocales(tester, const [Locale('de')]);
 
         await tester.pumpWidget(appScope(locale: const Locale('de')));
@@ -197,7 +311,7 @@ void main() {
       'higher)', () {
     testWidgets('persisted paper values hydrate into the settings fields '
         'on start', (WidgetTester tester) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
       useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) async {
@@ -236,102 +350,12 @@ void main() {
       );
     });
 
-    testWidgets('valid paper entries write through; a value < 1 (and a '
-        'non-integer) is rejected with the error line and never written', (
-      WidgetTester tester,
-    ) async {
-      await enlargeViewport(tester);
-      useDeviceLocales(tester, const [Locale('de')]);
-
-      CycleDatabase? db;
-      await tester.pumpWidget(appScope(onCreated: (created) => db = created));
-      await tester.pumpAndSettle();
-
-      await tester.tap(navLabel('Einstellungen'));
-      await tester.pumpAndSettle();
-
-      final shortest = find.byKey(
-        const ValueKey('paperShortestCycleLengthField'),
+    for (final field in [_paperShortestField, _paperEarliestField]) {
+      testWidgets(
+        field.title,
+        (tester) => _validatedWriteThroughCycle(tester, field),
       );
-      final earliest = find.byKey(
-        const ValueKey('paperEarliestFirstHigherCycleDayField'),
-      );
-      await tester.enterText(shortest, '24');
-      await tester.pumpAndSettle();
-      await tester.enterText(earliest, '12');
-      await tester.pumpAndSettle();
-
-      final store = SettingsStore(db!.settingsDao);
-      expect(
-        await store.readSetting(SettingKeys.shortestCycleLengthOutsideApp),
-        24,
-        reason:
-            'a valid paper shortest cycle writes through as a JSON '
-            'integer',
-      );
-      expect(
-        await store.readSetting(
-          SettingKeys.earliestFirstHigherCycleDayOutsideApp,
-        ),
-        12,
-      );
-
-      // Rejected: below the >= 1 floor and a non-integer; the fields
-      // surface the keyed error line and leave the stored values standing.
-      await tester.enterText(shortest, '0');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.shortestCycleLengthOutsideApp),
-        24,
-        reason: 'an entry below 1 is rejected and never written',
-      );
-      expect(
-        find.byKey(const ValueKey('paperShortestCycleLengthFieldError')),
-        findsOneWidget,
-        reason: 'the validation error is visible for the rejected entry',
-      );
-      await tester.enterText(earliest, '2.5');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(
-          SettingKeys.earliestFirstHigherCycleDayOutsideApp,
-        ),
-        12,
-      );
-      expect(
-        find.byKey(
-          const ValueKey('paperEarliestFirstHigherCycleDayFieldError'),
-        ),
-        findsOneWidget,
-      );
-
-      // Corrected entries write through again and clear the errors.
-      await tester.enterText(shortest, '26');
-      await tester.pumpAndSettle();
-      await tester.enterText(earliest, '15');
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.shortestCycleLengthOutsideApp),
-        26,
-      );
-      expect(
-        await store.readSetting(
-          SettingKeys.earliestFirstHigherCycleDayOutsideApp,
-        ),
-        15,
-      );
-      expect(
-        find.byKey(const ValueKey('paperShortestCycleLengthFieldError')),
-        findsNothing,
-        reason: 'the error clears once the entry is valid again',
-      );
-      expect(
-        find.byKey(
-          const ValueKey('paperEarliestFirstHigherCycleDayFieldError'),
-        ),
-        findsNothing,
-      );
-    });
+    }
   });
 
   group('hydration', () {
@@ -339,7 +363,7 @@ void main() {
       WidgetTester tester,
     ) async {
       // The switchers/pickers sit below the pane's top cards.
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
       // An English device on purpose: the stored non-default choices must
       // beat the device defaults, not merely repeat them.
       useDeviceLocales(tester, const [Locale('en')]);
@@ -431,7 +455,7 @@ void main() {
       WidgetTester tester,
     ) async {
       // The switchers/pickers sit below the pane's top cards.
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
       // A German device on purpose: switching to English is then a real
       // change away from the system default (and the starting UI is
       // German, which decides the labels used below).
@@ -491,7 +515,7 @@ void main() {
   group('PDF export identifying values (name & birth date)', () {
     testWidgets('a persisted name and birth date hydrate into the '
         'PDF-export card on start', (WidgetTester tester) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
       useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) async {
@@ -530,76 +554,11 @@ void main() {
       );
     });
 
-    testWidgets('name and birth date write through; an invalid date stays '
-        'local (error line, no row write)', (WidgetTester tester) async {
-      await enlargeViewport(tester);
-      useDeviceLocales(tester, const [Locale('de')]);
-
-      CycleDatabase? db;
-      await tester.pumpWidget(appScope(onCreated: (created) => db = created));
-      await tester.pumpAndSettle();
-
-      await tester.tap(navLabel('Einstellungen'));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.byKey(const ValueKey('pdfExportNameField')),
-        'Ada',
+    for (final field in [_pdfExportNameField, _pdfExportBirthDateField]) {
+      testWidgets(
+        field.title,
+        (tester) => _validatedWriteThroughCycle(tester, field),
       );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('pdfExportBirthDateField')),
-        '1990-01-02',
-      );
-      await tester.pumpAndSettle();
-
-      final store = SettingsStore(db!.settingsDao);
-      expect(
-        await store.readSetting(SettingKeys.pdfExportName),
-        'Ada',
-        reason:
-            'a valid name writes through to app_settings as a JSON '
-            'string',
-      );
-      expect(
-        await store.readSetting(SettingKeys.pdfExportBirthDate),
-        '1990-01-02',
-        reason: 'a valid birth date writes through as the ISO date string',
-      );
-
-      // Invalid: not a real day. The error line shows, the stored value
-      // keeps standing.
-      await tester.enterText(
-        find.byKey(const ValueKey('pdfExportBirthDateField')),
-        '1990-02-30',
-      );
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.pdfExportBirthDate),
-        '1990-01-02',
-        reason: 'an invalid date entry is rejected and never written',
-      );
-      expect(
-        find.byKey(const ValueKey('pdfExportBirthDateFieldError')),
-        findsOneWidget,
-        reason: 'the validation error is visible for the rejected entry',
-      );
-
-      await tester.enterText(
-        find.byKey(const ValueKey('pdfExportBirthDateField')),
-        '2001-03-15',
-      );
-      await tester.pumpAndSettle();
-      expect(
-        await store.readSetting(SettingKeys.pdfExportBirthDate),
-        '2001-03-15',
-        reason: 'a corrected entry writes through again',
-      );
-      expect(
-        find.byKey(const ValueKey('pdfExportBirthDateFieldError')),
-        findsNothing,
-        reason: 'the error clears once the entry is valid again',
-      );
-    });
+    }
   });
 }

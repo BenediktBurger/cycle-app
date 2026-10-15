@@ -64,17 +64,9 @@ void main() {
       'cycle-list area while the entry form stays intact; retry renders '
       'the list', (tester) async {
     useTallSurface(tester);
-    var attempt = 0;
+    final marksRetry = StreamRetryFixture(_diaryMarks);
     await tester.pumpWidget(
-      errorScope(
-        entries: _diaryEntries,
-        marksStreamFactory: () {
-          attempt++;
-          return attempt == 1
-              ? Stream<List<CycleMark>>.error(StateError('injected error'))
-              : Stream.value(_diaryMarks);
-        },
-      ),
+      errorScope(entries: _diaryEntries, marksStreamFactory: marksRetry.stream),
     );
     await tester.pumpAndSettle();
 
@@ -98,22 +90,21 @@ void main() {
           'the retry re-subscribed the marks provider and the list '
           'rendered again',
     );
-    expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
+    expect(
+      marksRetry.attempts,
+      2,
+      reason: 'the retry re-invoked the stream factory',
+    );
   });
 
   testWidgets('an entries stream error carries the retry affordance; retry '
       'renders the cycle list', (tester) async {
     useTallSurface(tester);
-    var attempt = 0;
+    final entriesRetry = StreamRetryFixture(_diaryEntries);
     await tester.pumpWidget(
       errorScope(
         entries: _diaryEntries,
-        entriesStreamFactory: () {
-          attempt++;
-          return attempt == 1
-              ? Stream<List<DailyEntry>>.error(StateError('injected error'))
-              : Stream.value(_diaryEntries);
-        },
+        entriesStreamFactory: entriesRetry.stream,
       ),
     );
     await tester.pumpAndSettle();
@@ -129,6 +120,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ExpansionTile), findsOneWidget);
-    expect(attempt, 2);
+    expect(entriesRetry.attempts, 2);
   });
 }

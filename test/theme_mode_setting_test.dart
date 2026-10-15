@@ -14,9 +14,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'support/finders.dart';
-
 import 'support/database.dart';
+import 'support/finders.dart';
+import 'support/settings_switcher.dart';
 import 'support/viewport.dart';
 
 /// App scope for the theme-mode tests. A null [themeMode] means: leave the
@@ -73,77 +73,65 @@ void main() {
   testWidgets(
     'settings switcher renders System/Light/Dark and switches between them',
     (WidgetTester tester) async {
-      // No test value to set: the dispatcher defaults to light. The
-      // switcher sits below the pane's top cards (lazy ListView — enlarge
-      // the surface so the whole card list is built).
-      await tester.binding.setSurfaceSize(const Size(900, 2400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_appScope());
-      await tester.pumpAndSettle();
-      // Tap through the shared navigation finder (nav surface, both adaptive
-      // surfaces match — see finders.dart): all tabs stay mounted
-      // (IndexedStack), so the 'Settings' label also matches the offstage
-      // screen's AppBar — and in tree order that AppBar precedes the shell's
-      // navigation surface, so a bare .first tap would miss.
-      await tester.tap(navLabel('Settings'));
-      await tester.pumpAndSettle();
+      // No test value to set: the dispatcher defaults to light — the System
+      // segment follows it, Dark and Light override it.
+      await pumpSettingsPane(tester, 'Settings');
 
-      // The keyed switcher (the language switcher also renders in the
-      // settings pane; scoping by key keeps this one unambiguous).
       final themeSwitcher = settingsThemeSwitcher();
       expect(
-        themeSwitcher,
-        findsOneWidget,
-        reason: 'The theme-mode switcher must be on the settings screen',
+        tester
+            .widget<SegmentedButton<ThemeMode>>(themeSwitcher)
+            .segments
+            .map((segment) => segment.value),
+        [ThemeMode.system, ThemeMode.light, ThemeMode.dark],
+        reason: 'The switcher must offer System, Light and Dark',
       );
-      final switcher = tester.widget<SegmentedButton<ThemeMode>>(themeSwitcher);
-      expect(switcher.segments.map((segment) => segment.value), [
-        ThemeMode.system,
-        ThemeMode.light,
-        ThemeMode.dark,
-      ], reason: 'The switcher must offer System, Light and Dark');
-      expect(switcher.selected, {
-        ThemeMode.system,
-      }, reason: 'The default selection must be "System"');
 
-      // Switching to dark applies it immediately, overriding the light device.
-      await tester.tap(settingsThemeSegment('dark'));
-      await tester.pumpAndSettle();
-      expect(
-        materializedBrightness(tester),
-        Brightness.dark,
-        reason: 'Selecting Dark must switch the app to dark immediately',
+      // Switching applies the choice immediately, overriding the light
+      // device; the System step returns to the device brightness.
+      await exerciseSwitcher<ThemeMode>(
+        tester,
+        switcher: themeSwitcher,
+        defaultSelected: const {ThemeMode.system},
+        steps: [
+          SwitcherStep(
+            segment: settingsThemeSegment('dark'),
+            selected: const {ThemeMode.dark},
+            outcome: (tester) async {
+              expect(
+                materializedBrightness(tester),
+                Brightness.dark,
+                reason:
+                    'Selecting Dark must switch the app to dark immediately',
+              );
+            },
+          ),
+          SwitcherStep(
+            segment: settingsThemeSegment('light'),
+            selected: const {ThemeMode.light},
+            outcome: (tester) async {
+              expect(
+                materializedBrightness(tester),
+                Brightness.light,
+                reason:
+                    'Selecting Light must switch the app to light immediately',
+              );
+            },
+          ),
+          SwitcherStep(
+            segment: settingsThemeSegment('system'),
+            selected: const {ThemeMode.system},
+            outcome: (tester) async {
+              expect(
+                materializedBrightness(tester),
+                Brightness.light,
+                reason:
+                    'Selecting System must follow the device brightness again',
+              );
+            },
+          ),
+        ],
       );
-      final switcher2 = tester.widget<SegmentedButton<ThemeMode>>(
-        themeSwitcher,
-      );
-      expect(switcher2.selected, {ThemeMode.dark});
-
-      // Back to light explicitly.
-      await tester.tap(settingsThemeSegment('light'));
-      await tester.pumpAndSettle();
-      expect(
-        materializedBrightness(tester),
-        Brightness.light,
-        reason: 'Selecting Light must switch the app to light immediately',
-      );
-      final switcher3 = tester.widget<SegmentedButton<ThemeMode>>(
-        themeSwitcher,
-      );
-      expect(switcher3.selected, {ThemeMode.light});
-
-      // Back to the system default: the light device brightness returns.
-      await tester.tap(settingsThemeSegment('system'));
-      await tester.pumpAndSettle();
-      expect(
-        materializedBrightness(tester),
-        Brightness.light,
-        reason: 'Selecting System must follow the device brightness again',
-      );
-      final switcher4 = tester.widget<SegmentedButton<ThemeMode>>(
-        themeSwitcher,
-      );
-      expect(switcher4.selected, {ThemeMode.system});
     },
   );
 }

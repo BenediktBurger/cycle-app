@@ -51,62 +51,26 @@
 // selected date changed through the provider while the diary tab is hidden).
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart' show pickFileTextOverride;
-import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
 
 import 'support/database.dart';
+import 'support/error_collector.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
+import 'support/formatting.dart';
 import 'support/viewport.dart';
-
-/// Runs [body] with a collector installed in place of [FlutterError.onError];
-/// after [body] returns, the whole widget tree is torn down INSIDE the
-/// collected window (element unmount is where an inherited-widget teardown
-/// assertion would fire), so the caller can assert over everything the
-/// framework reported during the whole scenario INCLUDING teardown.
-Future<List<FlutterErrorDetails>> collectLifecycleErrors(
-  WidgetTester tester,
-  Future<void> Function() body,
-) async {
-  final errors = <FlutterErrorDetails>[];
-  final original = FlutterError.onError;
-  FlutterError.onError = (details) => errors.add(details);
-  try {
-    await body();
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-  } finally {
-    FlutterError.onError = original;
-  }
-  return errors;
-}
-
-/// The German header day label exactly as the diary renders it.
-///
-/// No host-timezone shifting: the screen formats the UTC-midnight dates
-/// verbatim, each read by its own fields.
-String germanDayLabel(DateTime day, {DateTime? today}) {
-  final date = DateFormat.yMMMEd('de').format(DateOnly.normalize(day));
-  final isToday =
-      today != null &&
-      DateOnly.sameDay(DateOnly.normalize(day), DateOnly.normalize(today));
-  return isToday
-      ? lookupAppLocalizations(const Locale('de')).todayDate(date)
-      : date;
-}
 
 /// Pumps the real app shell (in-memory database, German pin, every tab
 /// mounted) and settles it; the pump must stay overflow-free, which the
 /// no-exception check below pins. Everything after this call, on any
 /// interaction and at teardown, belongs to the lifecycle scenarios and is
-/// additionally collected by [collectLifecycleErrors]. [seedDays] seeds one
+/// additionally collected by [collectFrameworkErrors] (with
+/// `teardownWhenDone`). [seedDays] seeds one
 /// plain temperature-only entry per UTC date so the diary's cycle list has
 /// a group with day tiles.
 Future<void> pumpShell(
@@ -141,25 +105,14 @@ Future<void> openImportDialog(
   WidgetTester tester, {
   required String buttonLabel,
 }) async {
-  await tester.tap(navLabel('Einstellungen'));
-  await tester.pumpAndSettle();
-  final cardButton = find.widgetWithText(FilledButton, buttonLabel);
-  await tester.scrollUntilVisible(
-    cardButton,
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
+  await openSettingsTab(tester);
+  await scrollSettingsCardIntoView(
+    tester,
+    find.widgetWithText(FilledButton, buttonLabel),
   );
-  await tester.pumpAndSettle();
   // The card button is the only match of its label while no dialog is open
   // (the dialog's apply button carries the drip label, so once it opens the
-  // label matches twice — the card stays .first in tree order). .first must
-  // not be evaluated while the finder is still empty (the list is lazy below
-  // the cache extent), so the .first restriction happens only at tap time.
+  // label matches twice — the card stays .first in tree order).
   await tester.tap(find.widgetWithText(FilledButton, buttonLabel).first);
   await tester.pumpAndSettle();
 }
@@ -178,7 +131,7 @@ void main() {
       (WidgetTester tester) async {
         useSmallAndroidViewport(tester);
         await pumpShell(tester, seedDays: {});
-        final errors = await collectLifecycleErrors(tester, () async {
+        final errors = await collectFrameworkErrors(tester, () async {
           await openImportDialog(tester, buttonLabel: 'Import');
           expect(
             find.byType(AlertDialog),
@@ -195,7 +148,7 @@ void main() {
           await tester.tapAt(const Offset(10, 10));
           await tester.pumpAndSettle();
           expect(find.byType(AlertDialog), findsNothing);
-        });
+        }, teardownWhenDone: true);
 
         expect(
           errors,
@@ -216,7 +169,7 @@ void main() {
         pickFileTextOverride = (accept) async => sampleDripCsv;
         addTearDown(() => pickFileTextOverride = null);
         await pumpShell(tester, seedDays: {});
-        final errors = await collectLifecycleErrors(tester, () async {
+        final errors = await collectFrameworkErrors(tester, () async {
           await openImportDialog(tester, buttonLabel: 'CSV importieren');
           expect(find.byType(AlertDialog), findsOneWidget);
           // Pick the sample CSV through the hermetic override, then apply.
@@ -241,7 +194,7 @@ void main() {
             findsOneWidget,
             reason: 'the raced dismissal must leave the home route intact',
           );
-        });
+        }, teardownWhenDone: true);
 
         expect(
           errors,
@@ -274,7 +227,7 @@ void main() {
         Finder dateButton(DateTime day) =>
             inDiary(find.widgetWithText(OutlinedButton, germanDayLabel(day)));
 
-        final errors = await collectLifecycleErrors(tester, () async {
+        final errors = await collectFrameworkErrors(tester, () async {
           // --- select sign S + a quality (unsaved form state) ------------
           final sChip = inDiary(diaryChip('mucusSign', 's'));
           await tester.scrollUntilVisible(
@@ -334,7 +287,7 @@ void main() {
             inDiary(find.byKey(const ValueKey('mucusQualityRow'))),
             findsNothing,
           );
-        });
+        }, teardownWhenDone: true);
 
         expect(
           errors,
@@ -355,7 +308,7 @@ void main() {
         pickFileTextOverride = (accept) async => sampleDripCsv;
         addTearDown(() => pickFileTextOverride = null);
         await pumpShell(tester, seedDays: {});
-        final errors = await collectLifecycleErrors(tester, () async {
+        final errors = await collectFrameworkErrors(tester, () async {
           await openImportDialog(tester, buttonLabel: 'CSV importieren');
           await tester.tap(
             dialogChild(find.widgetWithText(OutlinedButton, 'Datei wählen')),
@@ -381,7 +334,7 @@ void main() {
           await tester.tapAt(const Offset(10, 10));
           await tester.pumpAndSettle();
           expect(find.byType(AlertDialog), findsNothing);
-        });
+        }, teardownWhenDone: true);
 
         expect(
           errors,

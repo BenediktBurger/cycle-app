@@ -24,8 +24,7 @@ void main() {
   /// the not-there assertion would pass vacuously while the card merely sat
   /// below the fold unbuilt).
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(900, 2400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    useTallSurface(tester, width: 900);
     useDeviceLocales(tester, const [Locale('de')]);
 
     Future<void> seed(CycleDatabase db) =>

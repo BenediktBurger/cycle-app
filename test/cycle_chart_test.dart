@@ -2111,59 +2111,39 @@ void main() {
     'the disturbance row has a rail corner slot with the localized row '
     'name (en and de)',
     (tester) async {
-      await pumpChart(
-        tester,
-        _disturbanceHarness(entries: _disturbanceEntries),
-      );
+      final wording = {
+        const Locale('en'): 'Disturbed measurement',
+        const Locale('de'): 'Messstörung',
+      };
+      for (final MapEntry(:key, :value) in wording.entries) {
+        await pumpFreshChart(
+          tester,
+          () => _disturbanceHarness(entries: _disturbanceEntries, locale: key),
+        );
 
-      expect(chartCellCorner('disturbance'), findsOneWidget);
-      final tooltips = tester
-          .widgetList<Tooltip>(
-            find.descendant(
-              of: chartCellCorner('disturbance'),
-              matching: find.byType(Tooltip),
-            ),
-          )
-          .map((t) => t.message)
-          .toList();
-      expect(tooltips, [
-        'Disturbed measurement',
-      ], reason: 'the disturbance corner carries the localized row name');
+        expect(chartCellCorner('disturbance'), findsOneWidget);
+        expect(tooltipMessages(tester, chartCellCorner('disturbance')), [
+          value,
+        ], reason: '$key: the corner carries the localized row name');
 
-      // Vertical alignment with its row (shared row heights, like every
-      // other rail glyph).
-      final cornerCenter = tester
-          .getRect(chartCellCorner('disturbance'))
-          .center
-          .dy;
-      final cellCenter = tester.getRect(chartCell(3, 'disturbance')).center.dy;
-      expect(
-        cornerCenter,
-        closeTo(cellCenter, 0.5),
-        reason:
-            'the disturbance rail glyph is vertically centered on the '
-            'row',
-      );
-
-      await pumpChart(
-        tester,
-        _disturbanceHarness(
-          entries: _disturbanceEntries,
-          locale: const Locale('de'),
-        ),
-      );
-      final deTooltips = tester
-          .widgetList<Tooltip>(
-            find.descendant(
-              of: chartCellCorner('disturbance'),
-              matching: find.byType(Tooltip),
-            ),
-          )
-          .map((t) => t.message)
-          .toList();
-      expect(deTooltips, [
-        'Messstörung',
-      ], reason: 'de: the disturbance row carries the German row name');
+        // Vertical alignment with its row (shared row heights, like every
+        // other rail glyph).
+        final cornerCenter = tester
+            .getRect(chartCellCorner('disturbance'))
+            .center
+            .dy;
+        final cellCenter = tester
+            .getRect(chartCell(3, 'disturbance'))
+            .center
+            .dy;
+        expect(
+          cornerCenter,
+          closeTo(cellCenter, 0.5),
+          reason:
+              'the disturbance rail glyph is vertically centered on the '
+              'row',
+        );
+      }
     },
   );
 
@@ -2199,26 +2179,15 @@ void main() {
         _harness(entries: _evaluationEntries, marks: _marks),
       );
 
-      // Walk every temperature dot: a ring appears exactly on the three
-      // circled candidates (idx 8..10), never on the peak day (idx 6).
-      final ringIndexes = <int>{};
-      for (final bar in dotBars(tester)) {
-        for (final spot in bar.spots) {
-          final painter = bar.dotData.getDotPainter(
-            spot,
-            0,
-            bar,
-            bar.spots.indexOf(spot),
-          );
-          if (painter is RingDotPainter) ringIndexes.add(spot.x.round());
-        }
-      }
-      expect(ringIndexes, {
+      // A ring appears exactly on the three circled candidates (idx
+      // 8..10), never on the peak day (idx 6).
+      final rings = candidateKinds(tester).rings;
+      expect(rings, {
         8,
         9,
         10,
       }, reason: 'rings wrap only the circled candidates (R6/R1)');
-      for (final index in ringIndexes) {
+      for (final index in rings) {
         final painter = dotPainter(tester, index) as RingDotPainter;
         expect(
           painter.ringColor,
@@ -2281,21 +2250,12 @@ void main() {
         findsOneWidget,
         reason: 'the dot rides the mark, entry or not',
       );
-      for (final bar in dotBars(tester)) {
-        for (final spot in bar.spots) {
-          final painter = bar.dotData.getDotPainter(
-            spot,
-            0,
-            bar,
-            bar.spots.indexOf(spot),
-          );
-          // The circled candidates (idx 8..10) are unaffected by the
-          // missing peak entry; what must be ABSENT is the peak ring —
-          // i.e. no ring in the mucus color family (tertiary).
-          if (painter is RingDotPainter) {
-            expect(painter.ringColor, isNot(chartScheme(tester).tertiary));
-          }
-        }
+      // The circled candidates (idx 8..10) are unaffected by the missing
+      // peak entry; what must be ABSENT is the peak ring — i.e. no ring in
+      // the mucus color family (tertiary).
+      for (final index in candidateKinds(tester).rings) {
+        final painter = dotPainter(tester, index) as RingDotPainter;
+        expect(painter.ringColor, isNot(chartScheme(tester).tertiary));
       }
     });
   });
@@ -2354,17 +2314,7 @@ void main() {
         );
       }
       // Nothing is circled anywhere.
-      for (final bar in dotBars(tester)) {
-        for (final spot in bar.spots) {
-          final painter = bar.dotData.getDotPainter(
-            spot,
-            0,
-            bar,
-            bar.spots.indexOf(spot),
-          );
-          expect(painter, isNot(isA<RingDotPainter>()));
-        }
-      }
+      expect(candidateKinds(tester).rings, isEmpty);
     });
 
     testWidgets('the 4th CIRCLED candidate renders when rule E fires '
@@ -2415,20 +2365,7 @@ void main() {
       await pumpChart(tester, _harness(entries: entries, marks: marks));
 
       // Collected kinds across the whole curve, indexed by day.
-      final arrows = <int>{};
-      final circles = <int>{};
-      for (final bar in dotBars(tester)) {
-        for (final spot in bar.spots) {
-          final painter = bar.dotData.getDotPainter(
-            spot,
-            0,
-            bar,
-            bar.spots.indexOf(spot),
-          );
-          if (painter is ArrowUpDotPainter) arrows.add(spot.x.round());
-          if (painter is RingDotPainter) circles.add(spot.x.round());
-        }
-      }
+      final (:arrows, rings: circles) = candidateKinds(tester);
 
       // At or before the peak day (9/14, 9/15): arrows.
       expect(
@@ -2671,18 +2608,9 @@ void main() {
         );
         expect(_peakDot(i), findsNothing, reason: 'no marks -> no peak dot');
       }
-      for (final bar in dotBars(tester)) {
-        for (final spot in bar.spots) {
-          final painter = bar.dotData.getDotPainter(
-            spot,
-            0,
-            bar,
-            bar.spots.indexOf(spot),
-          );
-          expect(painter, isNot(isA<RingDotPainter>()));
-          expect(painter, isNot(isA<ArrowUpDotPainter>()));
-        }
-      }
+      final kinds = candidateKinds(tester);
+      expect(kinds.rings, isEmpty);
+      expect(kinds.arrows, isEmpty);
     });
   });
 
@@ -2719,20 +2647,14 @@ void main() {
         reason: 'a day without a peak mark renders no dot',
       );
 
-      // Remount before re-pumping with different marks: a same-shaped
-      // re-pump would only update the const-canonicalized subtree in
-      // place and keep the old marks stream.
-      await pumpChart(
+      await pumpFreshChart(
         tester,
-        KeyedSubtree(
-          key: UniqueKey(),
-          child: _harness(
-            entries: _evaluationEntries,
-            marks: [
-              ..._marks,
-              CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
-            ],
-          ),
+        () => _harness(
+          entries: _evaluationEntries,
+          marks: [
+            ..._marks,
+            CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
+          ],
         ),
       );
       expect(_peakDot(6), findsOneWidget);
@@ -2937,18 +2859,7 @@ void main() {
           ),
         );
 
-        final rings = <int>{};
-        for (final bar in dotBars(tester)) {
-          for (final spot in bar.spots) {
-            final painter = bar.dotData.getDotPainter(
-              spot,
-              0,
-              bar,
-              bar.spots.indexOf(spot),
-            );
-            if (painter is RingDotPainter) rings.add(spot.x.round());
-          }
-        }
+        final rings = candidateKinds(tester).rings;
         expect(
           rings,
           {10},
@@ -3851,18 +3762,13 @@ void main() {
           ),
         ];
         for (final (locale, glossary, orderReason) in orders) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            // Remount the app per iteration: a same-shaped re-pump would
-            // only update the existing tree in place, and the previous
-            // locale's open help-sheet route (its scrim) would then absorb
-            // the next tap.
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _helpSheetHarness(
-                entries: _helpSheetEntries(5),
-                locale: locale,
-              ),
+            // The previous locale's open help-sheet route (its scrim) would
+            // absorb the next tap without a remount.
+            () => _helpSheetHarness(
+              entries: _helpSheetEntries(5),
+              locale: locale,
             ),
           );
           await tester.tap(find.byKey(const ValueKey('cycleHelpAction')));
@@ -4095,14 +4001,9 @@ void main() {
               :labelsReason,
             )
             in cases) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            // Remount per case so no previous case's chart state can leak
-            // into the next pump.
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _leftRailHarness(entries: _leftRailEntries, range: range),
-            ),
+            () => _leftRailHarness(entries: _leftRailEntries, range: range),
           );
 
           final data = tester.widget<LineChart>(find.byType(LineChart)).data;
@@ -4129,14 +4030,11 @@ void main() {
       'the scale labels follow the device locale: de renders the German '
       'comma, the en default keeps the dot (same ticks, separator only)',
       (tester) async {
-        await pumpChart(
+        await pumpFreshChart(
           tester,
-          KeyedSubtree(
-            key: UniqueKey(),
-            child: _leftRailHarness(
-              entries: _leftRailEntries,
-              locale: const Locale('de'),
-            ),
+          () => _leftRailHarness(
+            entries: _leftRailEntries,
+            locale: const Locale('de'),
           ),
         );
 
@@ -4241,9 +4139,9 @@ void main() {
           const Locale('de'): ['Datum', 'Zyklustag'],
         };
         for (final MapEntry(:key, :value) in wording.entries) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            _leftRailHarness(entries: _leftRailEntries, locale: key),
+            () => _leftRailHarness(entries: _leftRailEntries, locale: key),
           );
 
           final corner = find.byKey(const ValueKey('dayHeaderCorner'));
@@ -4263,14 +4161,8 @@ void main() {
             findsOneWidget,
           );
 
-          final tooltips = tester
-              .widgetList<Tooltip>(
-                find.descendant(of: corner, matching: find.byType(Tooltip)),
-              )
-              .map((t) => t.message)
-              .toList();
           expect(
-            tooltips,
+            tooltipMessages(tester, corner),
             containsAll(value),
             reason: 'both prototypes keep their localized tooltips ($key)',
           );
@@ -4326,15 +4218,9 @@ void main() {
       'stays inside the rail without clipping (en and de)',
       (tester) async {
         for (final locale in const [Locale('en'), Locale('de')]) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _leftRailHarness(
-                entries: _leftRailEntries,
-                locale: locale,
-              ),
-            ),
+            () => _leftRailHarness(entries: _leftRailEntries, locale: locale),
           );
 
           final rail = tester.getRect(_rail());
@@ -4635,44 +4521,29 @@ void main() {
 
   testWidgets('the notes band has a rail corner slot with the localized row '
       'name (en and de)', (tester) async {
-    await pumpChart(tester, _noteHarness(entries: _noteEntries));
+    final wording = {const Locale('en'): 'Note', const Locale('de'): 'Notiz'};
+    for (final MapEntry(:key, :value) in wording.entries) {
+      await pumpFreshChart(
+        tester,
+        () => _noteHarness(entries: _noteEntries, locale: key),
+      );
 
-    expect(chartCellCorner('notesBand'), findsOneWidget);
-    final tooltips = tester
-        .widgetList<Tooltip>(
-          find.descendant(
-            of: chartCellCorner('notesBand'),
-            matching: find.byType(Tooltip),
-          ),
-        )
-        .map((t) => t.message)
-        .toList();
-    expect(tooltips, [
-      'Note',
-    ], reason: 'the band corner carries the localized row name');
+      expect(chartCellCorner('notesBand'), findsOneWidget);
+      expect(tooltipMessages(tester, chartCellCorner('notesBand')), [
+        value,
+      ], reason: '$key: the band corner carries the localized row name');
 
-    final cornerCenter = tester.getRect(chartCellCorner('notesBand')).center.dy;
-    final cellCenter = tester.getRect(chartCell(1, 'notesBand')).center.dy;
-    expect(
-      cornerCenter,
-      closeTo(cellCenter, 0.5),
-      reason: 'the band rail glyph is vertically centered on the row',
-    );
-
-    await pumpChart(
-      tester,
-      _noteHarness(entries: _noteEntries, locale: const Locale('de')),
-    );
-    final deTooltips = tester
-        .widgetList<Tooltip>(
-          find.descendant(
-            of: chartCellCorner('notesBand'),
-            matching: find.byType(Tooltip),
-          ),
-        )
-        .map((t) => t.message)
-        .toList();
-    expect(deTooltips, ['Notiz'], reason: 'de: the band row is "Notiz"');
+      final cornerCenter = tester
+          .getRect(chartCellCorner('notesBand'))
+          .center
+          .dy;
+      final cellCenter = tester.getRect(chartCell(1, 'notesBand')).center.dy;
+      expect(
+        cornerCenter,
+        closeTo(cellCenter, 0.5),
+        reason: 'the band rail glyph is vertically centered on the row',
+      );
+    }
   });
 
   // ═══════════ rows ═══════════
@@ -4852,16 +4723,7 @@ void main() {
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
         expect(find.byKey(ValueKey('${key}Corner')), findsOneWidget);
-        final tooltips = tester
-            .widgetList<Tooltip>(
-              find.descendant(
-                of: chartCellCorner(key),
-                matching: find.byType(Tooltip),
-              ),
-            )
-            .map((t) => t.message)
-            .toList();
-        expect(tooltips, [
+        expect(tooltipMessages(tester, chartCellCorner(key)), [
           value,
         ], reason: 'row $key\'s corner slot carries the localized row name');
         expect(
@@ -4924,16 +4786,9 @@ void main() {
         'notesBand': 'Notiz',
       };
       for (final MapEntry(:key, :value) in rowNames.entries) {
-        final tooltips = tester
-            .widgetList<Tooltip>(
-              find.descendant(
-                of: chartCellCorner(key),
-                matching: find.byType(Tooltip),
-              ),
-            )
-            .map((t) => t.message)
-            .toList();
-        expect(tooltips, [value], reason: 'de: row $key is $value');
+        expect(tooltipMessages(tester, chartCellCorner(key)), [
+          value,
+        ], reason: '$key: the corner slot carries the German row name');
       }
     });
 
@@ -5441,18 +5296,12 @@ void main() {
     }
 
     // Boundary span 0.10: the center at min + 0.05 = max − 0.05 — visible.
-    // Remount the app per iteration: a same-shaped re-pump would only
-    // update the const-canonicalized subtree in place and keep the old
-    // provider range.
-    await pumpChart(
+    await pumpFreshChart(
       tester,
-      KeyedSubtree(
-        key: UniqueKey(),
-        child: _harness(
-          entries: _evaluationEntries,
-          marks: _marks,
-          range: const TemperatureRange(min: 36.0, max: 36.1),
-        ),
+      () => _harness(
+        entries: _evaluationEntries,
+        marks: _marks,
+        range: const TemperatureRange(min: 36.0, max: 36.1),
       ),
     );
     expect(
@@ -5893,14 +5742,9 @@ void main() {
           TemperatureRange? range,
           required List<DailyEntry> entries,
         }) async {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            // Remount per case so no previous case's chart state can leak
-            // into the next pump.
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _temperatureHarness(entries: entries, range: range),
-            ),
+            () => _temperatureHarness(entries: entries, range: range),
           );
           return chartHeight(tester);
         }
@@ -6144,15 +5988,9 @@ void main() {
               extras,
             )
             in boundaryCases) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            // Remount the app per fixture: a same-shaped re-pump would
-            // only update the existing tree in place and carry the
-            // previous fixture's clip shape into the next one.
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _temperatureHarness(entries: rangeEntries(values)),
-            ),
+            () => _temperatureHarness(entries: rangeEntries(values)),
           );
 
           if (boundaryDotRenders) {
@@ -6330,15 +6168,9 @@ void main() {
               everyCellRotates,
             )
             in orientationCases) {
-          await pumpChart(
+          await pumpFreshChart(
             tester,
-            // Remount the app per iteration: a same-shaped re-pump would only
-            // update the existing tree in place and carry the previous
-            // column width (and its scroll offset) into the next fixture.
-            KeyedSubtree(
-              key: UniqueKey(),
-              child: _timeSexPainHarness(entries: entries),
-            ),
+            () => _timeSexPainHarness(entries: entries),
           );
 
           expect(
@@ -6685,14 +6517,9 @@ void main() {
             ),
           ];
       for (final (:entries, :selected, :lengthReason, :bands) in cases) {
-        await pumpChart(
+        await pumpFreshChart(
           tester,
-          // Remount per case so no previous case's fixture can leak into
-          // the next pump.
-          KeyedSubtree(
-            key: UniqueKey(),
-            child: _weekendHarness(entries: entries, selected: selected),
-          ),
+          () => _weekendHarness(entries: entries, selected: selected),
         );
 
         final actualBands = _weekendBands(tester).toList()
@@ -6729,12 +6556,7 @@ void main() {
       // rebuild the theme in the test env).
       if (dark) useDarkDeviceBrightness(tester);
 
-      await pumpChart(
-        tester,
-        // Remount per variant so no previous variant's scheme can leak
-        // into the next pump.
-        KeyedSubtree(key: UniqueKey(), child: _weekendHarness()),
-      );
+      await pumpFreshChart(tester, _weekendHarness);
 
       final bands = _weekendBands(tester);
       expect(bands, isNotEmpty);

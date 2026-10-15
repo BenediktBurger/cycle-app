@@ -14,6 +14,27 @@ import 'package:cycle_app/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart';
 
+/// The attempt-counter stream factory behind the retry-surface tests: the
+/// provider override wires [stream] in as the stream factory, which fails
+/// the FIRST subscription attempt with an error and delivers [data] on
+/// every later (re-)subscription. [attempts] counts the invocations —
+/// after a successful retry tap the tests pin it at 2 ("the retry
+/// re-invoked the stream factory").
+class StreamRetryFixture<T> {
+  StreamRetryFixture(List<T> data) : _data = data;
+
+  final List<T> _data;
+
+  int attempts = 0;
+
+  Stream<List<T>> stream() {
+    attempts++;
+    return attempts == 1
+        ? Stream<List<T>>.error(StateError('injected error'))
+        : Stream.value(_data);
+  }
+}
+
 Override localePin(Locale? value) =>
     localeProvider.overrideWith(() => _FixedLocale(value));
 

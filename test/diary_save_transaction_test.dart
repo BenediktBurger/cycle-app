@@ -3,71 +3,20 @@
 // transaction, a failure surfaces through the localized failure SnackBar
 // (never as an unhandled zone error), and an unarmed save keeps the
 // established success behavior (day stored, success SnackBar).
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/diary_harness.dart';
+import 'support/faulty_db.dart';
 import 'support/finders.dart';
-
-/// Fault injection for the save flow: the real in-memory database whose
-/// mark writes can be armed to fail AFTER the harness was pumped — the
-/// test flips the flag at exactly the point the fault should occur.
-class _FaultyDatabase extends CycleDatabase {
-  _FaultyDatabase(super.executor);
-
-  bool failMarkWrites = false;
-
-  late final _FaultyMarksDao _faultyMarksDao = _FaultyMarksDao(this);
-
-  @override
-  MarksDao get marksDao => _faultyMarksDao;
-}
-
-class _FaultyMarksDao extends MarksDao {
-  _FaultyMarksDao(this._faulty) : super(_faulty);
-
-  final _FaultyDatabase _faulty;
-
-  @override
-  Future<UserMark> addMark(
-    DateTime date,
-    String markType, {
-    String author = 'user',
-  }) {
-    if (_faulty.failMarkWrites) {
-      throw StateError('injected mark write failure');
-    }
-    return super.addMark(date, markType, author: author);
-  }
-
-  @override
-  Future<int> deleteMark(DateTime date, String markType) {
-    if (_faulty.failMarkWrites) {
-      throw StateError('injected mark write failure');
-    }
-    return super.deleteMark(date, markType);
-  }
-}
-
-_FaultyDatabase _faultyDatabase() {
-  return _FaultyDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
 
 final _harness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
 
 void main() {
-  /// German device over a (possibly faulty-subclassed) in-memory database,
-  /// a temperature already entered in the form.
-  Future<_FaultyDatabase> pumpDiaryForm(
+  /// German device over a fault-injectable in-memory database, a
+  /// temperature already entered in the form.
+  Future<FaultyCycleDatabase> pumpDiaryForm(
     WidgetTester tester, {
-    required _FaultyDatabase faulty,
+    required FaultyCycleDatabase faulty,
   }) async {
     _harness.tallSurface(tester);
     await tester.pumpWidget(_harness.scope(builder: () => faulty));
@@ -87,7 +36,7 @@ void main() {
       'success one, and nothing leaks as an unhandled error', (
     WidgetTester tester,
   ) async {
-    final faulty = await pumpDiaryForm(tester, faulty: _faultyDatabase());
+    final faulty = await pumpDiaryForm(tester, faulty: FaultyCycleDatabase());
     faulty.failMarkWrites = true;
 
     await save(tester);
@@ -118,7 +67,7 @@ void main() {
       'whole save rolled back, never a half-saved day', (
     WidgetTester tester,
   ) async {
-    final faulty = await pumpDiaryForm(tester, faulty: _faultyDatabase());
+    final faulty = await pumpDiaryForm(tester, faulty: FaultyCycleDatabase());
     faulty.failMarkWrites = true;
 
     await save(tester);
@@ -143,7 +92,7 @@ void main() {
 
   testWidgets('an unarmed save stores the day and reports via the success '
       'SnackBar', (WidgetTester tester) async {
-    await pumpDiaryForm(tester, faulty: _faultyDatabase());
+    await pumpDiaryForm(tester, faulty: FaultyCycleDatabase());
 
     await save(tester);
 

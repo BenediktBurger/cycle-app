@@ -7,8 +7,8 @@
 // notices_test.dart together with the notice copy it owns.
 //
 // German device locale + full-app pump mirror the other settings tests;
-// the pane is a lazy ListView, so the tests enlarge the surface (the
-// setSurfaceSize pattern of settings_persistence_test.dart) and assert
+// the pane is a lazy ListView, so the tests enlarge the surface
+// (useTallSurface, like settings_persistence_test.dart) and assert
 // the built children directly — never on compact-view assumptions.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
@@ -36,7 +36,7 @@ void main() {
   }
 
   /// The pane's card widgets in tree order. Called only when the enlarged
-  /// surface has built the whole list (see the per-test enlargeViewport).
+  /// surface has built the whole list (see the per-test useTallSurface).
   Iterable<Card> cards(WidgetTester tester) =>
       tester.widgetList<Card>(find.byType(Card));
 
@@ -56,8 +56,7 @@ void main() {
         'card after them, delete data stays the last card', (
       WidgetTester tester,
     ) async {
-      await tester.binding.setSurfaceSize(const Size(900, 2400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      useTallSurface(tester, width: 900);
       await pumpGermanSettingsPane(tester);
 
       final generalCard = find.byKey(const ValueKey('generalInfoCard'));
@@ -107,8 +106,7 @@ void main() {
       'carries the name and birth-date fields plus the optional/usage '
       'caption, and no PDF-titled identifying card remains',
       (WidgetTester tester) async {
-        await tester.binding.setSurfaceSize(const Size(900, 2400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+        useTallSurface(tester, width: 900);
         await pumpGermanSettingsPane(tester);
 
         final generalCard = find.byKey(const ValueKey('generalInfoCard'));
@@ -159,8 +157,7 @@ void main() {
       'the note sits inside the export card, together with the anonymize '
       'switch (not at the data entry)',
       (WidgetTester tester) async {
-        await tester.binding.setSurfaceSize(const Size(900, 2400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+        useTallSurface(tester, width: 900);
         await pumpGermanSettingsPane(tester);
 
         final note = find.text(

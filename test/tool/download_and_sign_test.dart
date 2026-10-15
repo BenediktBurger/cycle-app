@@ -19,12 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/download_and_sign.dart' as sign;
 import '../../tool/release_names.dart';
-
-/// The pinned release-certificate fingerprint, duplicated here from the
-/// committed [pinFilePath] content so the parser tests pin the exact trust
-/// anchor this helper must enforce.
-const pinnedReleaseFingerprint =
-    '0aa5749804b8ed9e3c207f851b5902775d762207d60c2485a26b5d75eff5355b';
+import 'release_fixtures.dart'
+    show badTagList, pinnedReleaseFingerprint, validHeadSha;
 
 /// Builds a synthetic signed-APK-like byte buffer: [prefix] (the ZIP entry
 /// area stand-in), a signing block carrying [blockPairs] (each an arbitrary
@@ -96,17 +92,7 @@ void main() {
     });
 
     test('rejects malformed tags (shared tag-key semantics)', () {
-      const badTags = [
-        'v1.2',
-        '1.2.3',
-        'v1.2.3.4',
-        '',
-        'vx.y.z',
-        'v1.2.3-rc1',
-        'V1.2.3',
-        'v1.2.3+4',
-      ];
-      for (final tag in badTags) {
+      for (final tag in badTagList) {
         expect(
           () => sign.parseArguments([tag]),
           throwsA(isA<UsageException>()),
@@ -299,25 +285,25 @@ void main() {
   });
 
   group('head-SHA capture (gh run view --json headSha output)', () {
-    const headSha = '978dbc5b9ee19ff0aedfc03594a603013f0e034a';
-
     test('extracts the SHA from the JSON envelope', () {
-      expect(sign.parseHeadSha('{"headSha":"$headSha"}'), headSha);
+      expect(sign.parseHeadSha('{"headSha":"$validHeadSha"}'), validHeadSha);
       expect(
-        sign.parseHeadSha('{\n  "runNumber": 3,\n  "headSha": "$headSha"\n}\n'),
-        headSha,
+        sign.parseHeadSha(
+          '{\n  "runNumber": 3,\n  "headSha": "$validHeadSha"\n}\n',
+        ),
+        validHeadSha,
       );
     });
 
     test('tolerates the raw `-q .headSha` form too', () {
-      expect(sign.parseHeadSha('$headSha\n'), headSha);
-      expect(sign.parseHeadSha(' $headSha '), headSha);
+      expect(sign.parseHeadSha('$validHeadSha\n'), validHeadSha);
+      expect(sign.parseHeadSha(' $validHeadSha '), validHeadSha);
     });
 
     test('submits a lowercase 40-char SHA usable as --target', () {
       expect(
-        sign.parseHeadSha('{"headSha":"${headSha.toUpperCase()}"}'),
-        headSha,
+        sign.parseHeadSha('{"headSha":"${validHeadSha.toUpperCase()}"}'),
+        validHeadSha,
         reason:
             'gh case-wraps or uppercases nothing, but the parser is '
             'lenient — the emitted SHA must be plain lowercase hex for '
@@ -954,7 +940,7 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         versionName: '0.2.1',
         versionCodeBase: 3,
         runId: 1234567890,
-        headSha: '978dbc5b9ee19ff0aedfc03594a603013f0e034a',
+        headSha: validHeadSha,
       );
       sign.writeHandoffManifest(root: root, manifest: manifest);
       final file = File('${root.path}/$handoffManifestPath');
@@ -977,7 +963,7 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         versionName: '0.2.1',
         versionCodeBase: runPubspec.build,
         runId: 1234567890,
-        headSha: '978dbc5b9ee19ff0aedfc03594a603013f0e034a',
+        headSha: validHeadSha,
       );
       expect(manifest.versionCodeBase, 3);
       expect(decodeHandoffManifest(encodeHandoffManifest(manifest)), manifest);

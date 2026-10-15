@@ -8,20 +8,26 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Override (the inMemoryDatabase return type) ships from the misc entry in
 // Riverpod 3.x — the main import doesn't export it.
 import 'package:flutter_riverpod/misc.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'finders.dart';
 import 'provider_fixtures.dart';
 
-/// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
+/// The connection every test-side CycleDatabase runs over: in-memory, no
+/// files, no platform channels, no FFI paths.
 ///
 /// `closeStreamsSynchronously: true` is drift's documented remedy for widget
 /// tests failing with "A Timer is still pending even after the widget tree
@@ -29,17 +35,16 @@ import 'provider_fixtures.dart';
 /// event-loop turn (Timer.run), and streams cancelled while Riverpod disposes
 /// the ProviderScope during tree teardown can never reach that turn in the
 /// test's fake async zone.
+DatabaseConnection inMemoryConnection() => DatabaseConnection(
+  NativeDatabase.memory(),
+  closeStreamsSynchronously: true,
+);
+
+/// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
 ///
 /// The scope override closes the instance together with the test's
 /// ProviderScope (same closing semantics as the production provider).
-CycleDatabase inMemoryCycleDatabase() {
-  return CycleDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
+CycleDatabase inMemoryCycleDatabase() => CycleDatabase(inMemoryConnection());
 
 /// The databaseProvider override: a fresh in-memory database per scope.
 ///
@@ -129,4 +134,63 @@ ProviderScope appScope({
     ],
     child: const CycleApp(),
   );
+}
+
+/// The settings screen with the exact MaterialApp configuration of the app
+/// shell (sans the shell itself) over the in-memory database. [seed]
+/// provides the device-side data the surface under test previews against;
+/// [builder] swaps in a fault-injectable database (support/faulty_db.dart).
+Widget settingsHarness({
+  Future<void> Function(CycleDatabase db)? seed,
+  CycleDatabase Function()? builder,
+}) => ProviderScope(
+  overrides: [inMemoryDatabase(seed: seed, builder: builder)],
+  child: MaterialApp(
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
+    ),
+    locale: const Locale('de'),
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en'), Locale('de')],
+    home: const EinstellungenScreen(),
+  ),
+);
+
+/// Navigates a pumped app shell to the settings tab and settles. The tab
+/// goes through the shared [navLabel] finder: all tabs stay mounted in the
+/// shell's IndexedStack, so a bare 'Einstellungen' text finder would also
+/// match the offstage screen's AppBar title — and in tree order that AppBar
+/// precedes the bar, so the scoped tap is what lands on the destination.
+Future<void> openSettingsTab(WidgetTester tester) async {
+  await tester.tap(navLabel('Einstellungen'));
+  await tester.pumpAndSettle();
+}
+
+/// Scrolls the settings screen's lazy list until [card] is built and
+/// visible — the list is allowed to grow above the card (e.g. the
+/// theme-mode switcher), so fixed-amount drag loops would be brittle. The
+/// scrollable is scoped to the settings screen: with the shell keeping
+/// every tab mounted, the diary and statistics screens bring their own
+/// scrollables and ListViews into the tree, and [settingsHarness] mounts
+/// the screen directly (the scope costs nothing there).
+Future<void> scrollSettingsCardIntoView(
+  WidgetTester tester,
+  Finder card,
+) async {
+  await tester.scrollUntilVisible(
+    card,
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byType(EinstellungenScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
 }

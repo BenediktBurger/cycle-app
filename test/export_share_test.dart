@@ -23,20 +23,15 @@ import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/export_import.dart'
     show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/domain/measurement_method.dart' show MeasurementRoute;
-import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show saveFileOverride, shareFile, shareFileBytes, shareFileOverride;
-import 'package:cycle_app/ui/settings.dart'
-    show EinstellungenScreen, exportFileName;
+import 'package:cycle_app/ui/settings.dart' show exportFileName;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 
 import 'support/database.dart';
+import 'support/faulty_db.dart';
 import 'support/fixtures.dart';
 
 /// The l10n strings the tests drive through (German is authoritative):
@@ -53,97 +48,22 @@ const emptyExportSnackbarLabel = 'Datenbank ist leer — nichts zu exportieren.'
 const previewTitleLabel = 'JSON-Vorschau';
 const exportButtonLabel = 'Export';
 
-/// Fault injection for the export build: the real in-memory database whose
-/// data reads can be armed to fail AFTER the harness was pumped — the test
-/// flips the flag at exactly the point the fault should occur. The export
-/// reads through the DAOs, so arming the entries read covers the build.
-class _FaultyDatabase extends CycleDatabase {
-  _FaultyDatabase(super.executor);
-
-  bool failReads = false;
-
-  late final _FaultyEntriesDao _faultyEntriesDao = _FaultyEntriesDao(this);
-
-  @override
-  EntriesDao get entriesDao => _faultyEntriesDao;
+/// The default seed of the settings harness: the evaluation scenario's
+/// first entry keeps the export from being rejected as empty.
+Future<void> _defaultSeed(CycleDatabase db) async {
+  await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
 }
-
-class _FaultyEntriesDao extends EntriesDao {
-  _FaultyEntriesDao(this._faulty) : super(_faulty);
-
-  final _FaultyDatabase _faulty;
-
-  @override
-  Future<List<CycleEntry>> allEntries() {
-    if (_faulty.failReads) {
-      throw StateError('injected read failure');
-    }
-    return super.allEntries();
-  }
-}
-
-_FaultyDatabase _faultyDatabase() {
-  return _FaultyDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
-
-/// The settings screen with the exact MaterialApp configuration of the app
-/// shell (sans the shell itself) over the in-memory database. [builder]
-/// swaps the database subclass for fault injection, like the delete-data
-/// tests build theirs.
-Widget settingsHarness({
-  CycleDatabase Function()? builder,
-  Future<void> Function(CycleDatabase db)? seed,
-}) => ProviderScope(
-  overrides: [
-    inMemoryDatabase(
-      builder: builder,
-      seed:
-          seed ??
-          (db) async {
-            await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
-          },
-    ),
-  ],
-  child: MaterialApp(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-    ),
-    locale: const Locale('de'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    supportedLocales: const [Locale('en'), Locale('de')],
-    home: const EinstellungenScreen(),
-  ),
-);
 
 /// Pumps the settings screen and navigates through Export onto the
 /// export preview page (the seeded entry keeps the export from being
 /// rejected as empty). The preview page is on top when this returns.
 Future<void> pumpToExportPreview(WidgetTester tester) async {
-  await tester.pumpWidget(settingsHarness());
+  await tester.pumpWidget(settingsHarness(seed: _defaultSeed));
   await tester.pumpAndSettle();
-  // Scroll the lazy settings list until the export button is built; the
-  // scroller is scoped to the settings screen.
-  await tester.scrollUntilVisible(
+  await scrollSettingsCardIntoView(
+    tester,
     find.widgetWithText(FilledButton, exportButtonLabel),
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
   );
-  await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
   await tester.pumpAndSettle();
   expect(
@@ -165,22 +85,17 @@ void main() {
         'keeps the settings screen (no preview page, no unhandled error)', (
       WidgetTester tester,
     ) async {
-      final faulty = _faultyDatabase();
-      await tester.pumpWidget(settingsHarness(builder: () => faulty));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, exportButtonLabel),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(EinstellungenScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+      final faulty = FaultyCycleDatabase();
+      await tester.pumpWidget(
+        settingsHarness(seed: _defaultSeed, builder: () => faulty),
       );
       await tester.pumpAndSettle();
+      await scrollSettingsCardIntoView(
+        tester,
+        find.widgetWithText(FilledButton, exportButtonLabel),
+      );
 
-      faulty.failReads = true;
+      faulty.failEntryReads = true;
       await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
       await tester.pumpAndSettle();
 
@@ -223,18 +138,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final scroller = find
-          .descendant(
-            of: find.byType(EinstellungenScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await scrollSettingsCardIntoView(
+        tester,
         find.widgetWithText(FilledButton, exportButtonLabel),
-        200,
-        scrollable: scroller,
       );
-      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
       await tester.pumpAndSettle();
 
@@ -262,21 +169,10 @@ void main() {
   testWidgets('a cancelled import dialog leaves the export path intact', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(settingsHarness());
+    await tester.pumpWidget(settingsHarness(seed: _defaultSeed));
     await tester.pumpAndSettle();
-    final scroller = find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first;
     const importButton = Key('settingsImportJsonButton');
-    await tester.scrollUntilVisible(
-      find.byKey(importButton),
-      200,
-      scrollable: scroller,
-    );
-    await tester.pumpAndSettle();
+    await scrollSettingsCardIntoView(tester, find.byKey(importButton));
     await tester.tap(find.byKey(importButton));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
@@ -315,12 +211,10 @@ void main() {
 
     // The export action after the cancelled import opens the preview page
     // with the seeded entry, exactly as before the dialog existed.
-    await tester.scrollUntilVisible(
+    await scrollSettingsCardIntoView(
+      tester,
       find.widgetWithText(FilledButton, exportButtonLabel),
-      200,
-      scrollable: scroller,
     );
-    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, exportButtonLabel));
     await tester.pumpAndSettle();
 
