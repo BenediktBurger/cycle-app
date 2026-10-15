@@ -6,7 +6,10 @@
 //
 // Patterns and harnesses match test/db/cycle_database_test.dart: pure Dart
 // against NativeDatabase.memory(), one group per vocabulary.
+import 'dart:convert';
+
 import 'package:cycle_app/domain/cervix.dart';
+import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
@@ -130,8 +133,8 @@ void main() {
   });
 
   group('Muttermund fields at the export document boundary', () {
-    test('export carries the stored tokens and a v4 document round-trips '
-        'them to schema_version 6', () async {
+    test('export carries the stored tokens; a v4 document round-trips them '
+        'to the current schema version', () async {
       await db.entriesDao.upsertDaily(
         DailyEntry(
           date: DateTime(2026, 4, 2),
@@ -142,12 +145,13 @@ void main() {
       await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 4, 3)));
 
       final json = await exportDatabaseToJson(db);
+      final decoded = jsonDecode(json) as Map<String, Object?>;
       expect(
-        json,
-        contains('"schema_version": 6'),
+        decoded['schema_version'],
+        exportSchemaVersion,
         reason:
-            "v6 is the sparse-entry/profile-free release; the "
-            "additive Muttermund fields still ride the entries",
+            'the sparse-entry/profile-free release stamps its version; '
+            'the additive Muttermund fields still ride the entries',
       );
       expect(json, contains('"cervix_position": "veryHigh"'));
       expect(json, contains('"cervix_opening": "open"'));

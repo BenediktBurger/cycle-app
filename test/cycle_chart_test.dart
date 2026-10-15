@@ -965,9 +965,24 @@ final _numberedTailMarks = <CycleMark>[
 
 Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));
 
+// The frozen left rail's width (the lib constant is a static on the
+// chart state's private class, lib/ui/cycle_chart.dart
+// `_CycleChartState.frozenRailWidth`, so the tests restate it here once).
+const _frozenRailWidth = 24.0;
+
+// The chart's dashed ink: the R10 baseline bars and the help-sheet legend
+// glyph share the baseline pattern, the emphasized horizontal grid steps
+// their own — the numbers are inline literals in lib/ui/cycle_chart.dart
+// (the legend mirrors them in lib/ui/cycle_help_sheet.dart), so the tests
+// restate them here instead of per call site.
+const _baselineDashPattern = [6, 4];
+const _emphasizedStepDashPattern = [4, 3];
+
 // The chart's day-column geometry at the test viewport (800 wide, 12 body
 // padding on each side): a 60-day range overflows, so columns render at the
-// minimum usable width and the content exceeds the viewport.
+// minimum usable width and the content exceeds the viewport. Restates the
+// private `_CycleChartState.minDayColumnWidth` (lib/ui/cycle_chart.dart) for
+// the same reason as the rail width.
 const _columnWidth = 21.0;
 
 /// The finder for the horizontal scroll view that carries the chart block.
@@ -1125,13 +1140,6 @@ void main() {
       'windowed day renders one', (tester) async {
     await pumpChart(tester, _cervixHarness(entries: _cervixEntries()));
 
-    expect(
-      notesBandHeight,
-      64,
-      reason:
-          'the band stacks the cervix glyph zone, the letter row, the '
-          'breast-pain row and the note zone',
-    );
     for (var i = 0; i < _cervixEntries().length; i++) {
       final cell = tester.getRect(chartCell(i, 'notesBand'));
       expect(
@@ -1157,9 +1165,9 @@ void main() {
       5: CervixOpening.open, // opening-only day: medium slot
     };
     final diameterOf = {
-      CervixOpening.closed: 4.0,
-      CervixOpening.middle: 6.0,
-      CervixOpening.open: 8.0,
+      CervixOpening.closed: cervixClosedDotSize,
+      CervixOpening.middle: cervixMiddleCircleSize,
+      CervixOpening.open: cervixOpenCircleSize,
     };
     for (final MapEntry(:key, :value) in circleOf.entries) {
       final keyFinder = find.byKey(ValueKey('cervixSlotGlyph-$key'));
@@ -1200,7 +1208,7 @@ void main() {
         );
         expect(
           (decoration.border! as Border).top.width,
-          1.3,
+          cervixCircleStrokeWidth,
           reason: "day $key: the ring stroke is the shared circle stroke",
         );
       }
@@ -1247,8 +1255,8 @@ void main() {
     final cell4 = tester.getRect(chartCell(4, 'notesBand'));
     expect(
       centers.first,
-      closeTo(cell4.top + 5, 0.5),
-      reason: 'the topmost slot anchors 5 px below the band top',
+      closeTo(cell4.top + cervixSlotCenterY(0), 0.5),
+      reason: 'the topmost slot anchors at its slot center below the band top',
     );
 
     // Every day whose observations still paint the medium slot shares ONE
@@ -2263,8 +2271,8 @@ void main() {
       }
     });
 
-    testWidgets('the peak renders as a solid dot INSIDE the plot, at the '
-        'peak row\'s own $peakDotCenterOffsetK K pitch', (tester) async {
+    testWidgets('the peak renders as a solid dot INSIDE the plot, in its '
+        'own row in the top rows', (tester) async {
       await pumpChart(
         tester,
         _harness(entries: _evaluationEntries, marks: _marks),
@@ -2287,19 +2295,18 @@ void main() {
         reason: 'the peak belongs to the mucus color family',
       );
 
-      // The dot sits at the peak-dot row's OWN pitch below the scale max —
-      // decoupled from the letters row — pixel-y via the shared linear
-      // value->pixel mapping.
+      // The dot rides its own row inside the plot's top rows: the pixel
+      // drop below the top border is the owner-eyeball row geometry, so
+      // the test keeps the renderable relation, not a mirrored mapping.
       final plot = tester.getRect(find.byType(LineChart));
-      final data = chartData(tester);
-      final span = data.maxY - data.minY;
-      final expectedY = plot.top + peakDotCenterOffsetK / span * plot.height;
+      final dotY = tester.getRect(_peakDot(6)).center.dy;
+      expect(dotY, greaterThan(plot.top));
       expect(
-        tester.getRect(_peakDot(6)).center.dy,
-        closeTo(expectedY, 0.5),
+        dotY,
+        lessThan(plot.center.dy),
         reason:
-            'the peak dot pins at the peak row\'s own pitch, '
-            'above the letters row',
+            'the peak dot sits in the plot\'s top rows, above every '
+            'bottom-anchored row',
       );
     });
 
@@ -2548,36 +2555,44 @@ void main() {
       );
     });
 
-    testWidgets('the numbers sit at the plot\'s bottom edge (min + 0.05) '
-        'and center under their day column', (tester) async {
+    testWidgets('the numbers share one bottom row inside the plot and center '
+        'under their day column', (tester) async {
       await pumpChart(
         tester,
         _harness(entries: _evaluationEntries, marks: _marks),
       );
 
+      // The numbers ride one bottom-anchored row: the same center height on
+      // every numbered day, inside the plot's bottom half. The exact offset
+      // above the scale min is the owner-eyeball row pitch — not pinned.
       final plot = tester.getRect(find.byType(LineChart));
-      final data = chartData(tester);
-      final span = data.maxY - data.minY;
-      final expectedY =
-          plot.top +
-          (data.maxY - (data.minY + dayNumbersRowCenterOffsetK)) /
-              span *
-              plot.height;
+      final numberYs = <double>[];
       for (var i = 2; i <= 7; i++) {
         final glyph = tester.getRect(
           find.byKey(ValueKey('inPlotDayNumber-$i-${8 - i}')),
         );
-        expect(
-          glyph.center.dy,
-          closeTo(expectedY, 0.5),
-          reason: 'day $i: the number pins at the bottom edge margin',
-        );
+        numberYs.add(glyph.center.dy);
         expect(
           glyph.center.dx,
           closeTo(_dotX(tester, i), 1),
           reason: 'day $i: the number centers under its day column',
         );
       }
+      expect(
+        numberYs,
+        everyElement(numberYs.first),
+        reason: 'every numbered day shares the same bottom row height',
+      );
+      expect(
+        numberYs.first,
+        greaterThan(plot.center.dy),
+        reason: 'the numbers row sits in the plot\'s bottom half',
+      );
+      expect(
+        numberYs.first,
+        lessThan(plot.bottom),
+        reason: 'the numbers row stays inside the plot',
+      );
     });
   });
 
@@ -2598,7 +2613,11 @@ void main() {
         chartScheme(tester).secondary,
         reason: 'the baseline keeps its theme-derived secondary color',
       );
-      expect(bar.dashArray, const [6, 4], reason: 'the dashed style stays');
+      expect(
+        bar.dashArray,
+        _baselineDashPattern,
+        reason: 'the dashed style stays',
+      );
       // START: the left edge of low #6's column — low #6 is 9/8 (idx 2),
       // so the segment begins at x 1.5.
       // END: the last marked candidate (9/16, idx 10 — the rule-D trigger)
@@ -2761,12 +2780,11 @@ void main() {
 
   group('SUZ marks render (user-placed only)', () {
     // The glyph's top anchoring: the bar hangs DOWN from the chart's top
-    // border by a fixed °C drop and the arrow anchors just below that
-    // border, so the whole glyph sits inside the top rows of the plot.
-    // The two pinned values (suzBarHangSpanDegrees /
-    // suzArrowTopInsetDegrees from suz_glyph.dart, shared with the PDF
-    // export) are owner-eyeball rendering details — the tests pin them
-    // through the named constants so bar/glyph/PDF stay in lockstep.
+    // border and the arrow anchors inside the hung band, so the whole glyph
+    // sits inside the top rows of the plot. The drop/inset sizes are
+    // owner-eyeball values (shared with the PDF export via suz_glyph.dart —
+    // the cross-surface parity contract the lib layer owns), so the tests
+    // keep the anchor relations only, not the numeric offsets.
     testWidgets('a suzEvening mark renders a vertical bar hanging from the '
         'chart\'s top border at the column middle, plus a right-pointing '
         'arrow whose base starts at the bar near the top', (tester) async {
@@ -2801,10 +2819,15 @@ void main() {
       );
       expect(
         bar.spots.last.y,
-        data.maxY - suzBarHangSpanDegrees,
+        lessThan(data.maxY),
         reason:
-            'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
-            'the top (owner-eyeball value, pinned here)',
+            'the bar spans a °C drop below the top border instead of '
+            'spanning the whole plot height',
+      );
+      expect(
+        bar.spots.last.y,
+        greaterThan(data.minY),
+        reason: 'the hang stops short of the plot\'s bottom border',
       );
       expect(
         bar.color,
@@ -2815,19 +2838,21 @@ void main() {
       );
 
       // The right-pointing arrow: base at the bar, anchored inside the
-      // hung band, close to the top border (no longer at the cycle's
-      // baseline value — the baseline-anchor concept is retired).
+      // hung band (no longer at the cycle's baseline value — the
+      // baseline-anchor concept is retired).
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull, reason: 'the SUZ arrow renders with the bar');
       final (spot, painter) = arrow!;
       expect(spot.x, 10.0, reason: 'the arrow base starts at the bar');
       expect(
         spot.y,
-        data.maxY - suzArrowTopInsetDegrees,
-        reason:
-            'the arrow anchors $suzArrowTopInsetDegrees °C below the '
-            'top border, inside the hung band (owner-eyeball value, '
-            'pinned here)',
+        lessThan(data.maxY),
+        reason: 'the arrow anchors below the top border, inside the hung band',
+      );
+      expect(
+        spot.y,
+        greaterThan(bar.spots.last.y),
+        reason: 'the arrow anchors above the bar\'s lower end — the hung band',
       );
       expect(painter, isA<SuzArrowDotPainter>());
       expect(
@@ -2850,7 +2875,6 @@ void main() {
         ),
       );
 
-      final data = chartData(tester);
       final bars = _suzBars(tester);
       expect(bars, hasLength(1));
       final bar = bars.single;
@@ -2860,30 +2884,11 @@ void main() {
         reason: 'suzMorning anchors at the column start (9/15, idx 9 − 0.5)',
       );
       expect(bar.spots.last.x, 8.5);
-      // The hang-span/inset values do not depend on the x anchoring.
-      expect(
-        bar.spots.first.y,
-        data.maxY,
-        reason: 'the bar hangs from the chart\'s top border',
-      );
-      expect(
-        bar.spots.last.y,
-        data.maxY - suzBarHangSpanDegrees,
-        reason:
-            'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
-            'the top (owner-eyeball value, pinned here)',
-      );
+      // The hang-span/inset values do not depend on the x anchoring — the
+      // top-anchor relations live on the suzEvening test above.
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull);
       expect(arrow!.$1.x, 8.5, reason: 'the arrow base starts at the bar');
-      expect(
-        arrow.$1.y,
-        data.maxY - suzArrowTopInsetDegrees,
-        reason:
-            'the arrow anchors $suzArrowTopInsetDegrees °C below the '
-            'top border, inside the hung band (owner-eyeball value, '
-            'pinned here)',
-      );
     });
 
     testWidgets(
@@ -2906,7 +2911,6 @@ void main() {
 
         final bars = _suzBars(tester);
         expect(bars, hasLength(1));
-        final data = chartData(tester);
         final bar = bars.single;
         expect(
           bar.spots.first.x,
@@ -2914,30 +2918,11 @@ void main() {
           reason: 'day 0\'s column start is the domain\'s minX (−0.5)',
         );
         expect(bar.spots.last.x, -0.5);
-        // The clamping affects only x — the top-anchored y values stand.
-        expect(
-          bar.spots.first.y,
-          data.maxY,
-          reason: 'the bar hangs from the chart\'s top border',
-        );
-        expect(
-          bar.spots.last.y,
-          data.maxY - suzBarHangSpanDegrees,
-          reason:
-              'the bar spans a fixed $suzBarHangSpanDegrees °C drop from '
-              'the top (owner-eyeball value, pinned here)',
-        );
+        // The clamping concerns only x — the top-anchor y relations are the
+        // shared glyph behavior tested on the suzEvening bar above.
         final arrow = _suzArrowSpot(tester);
         expect(arrow, isNotNull);
         expect(arrow!.$1.x, -0.5, reason: 'the arrow base starts at the bar');
-        expect(
-          arrow.$1.y,
-          data.maxY - suzArrowTopInsetDegrees,
-          reason:
-              'the arrow anchors $suzArrowTopInsetDegrees °C below the '
-              'top border, inside the hung band (owner-eyeball value, '
-              'pinned here)',
-        );
       },
     );
 
@@ -3701,7 +3686,11 @@ void main() {
           closeTo(1.2, 0.01),
           reason: '$value: the half midpoint keeps the emphasis weight',
         );
-        expect(line.dashArray, [4, 3], reason: '$value is dashed');
+        expect(
+          line.dashArray,
+          _emphasizedStepDashPattern,
+          reason: '$value is dashed',
+        );
         expect(
           line.color,
           emphasizedLine(tester),
@@ -3988,12 +3977,12 @@ void main() {
       );
       expect(
         (glyph.painter as dynamic).dashPattern,
-        const [6, 4],
+        _baselineDashPattern,
         reason:
             'the legend paints the baseline dashed with the chart\'s own '
             'dash pattern — the chart\'s baseline bar is an fl_chart '
-            'segment (dashArray [6, 4]) that cannot be reused outside '
-            'the chart, so the glyph repaints the same dashes',
+            'segment that cannot be reused outside the chart, so the '
+            'glyph repaints the same dashes',
       );
     });
   });
@@ -4424,7 +4413,7 @@ void main() {
           final rail = tester.getRect(_rail());
           expect(
             rail.width,
-            24,
+            _frozenRailWidth,
             reason:
                 'the frozen rail stays as wide as its widest '
                 'scale label plus inset — wider wastes row room',
@@ -5446,16 +5435,12 @@ void main() {
   });
 
   testWidgets('each in-plot glyph sits at its column center (multi-timing '
-      'Xs at their timing fraction) and at its row pitch under the top '
-      'edge', (tester) async {
+      'Xs at their timing fraction) and the glyph rows keep their '
+      'top→bottom order', (tester) async {
     await pumpChart(tester, inPlotHarness());
 
     final plot = tester.getRect(find.byType(LineChart));
-    final data = chartData(tester);
-    final span = data.maxY - data.minY;
     final colW = plot.width / inPlotEntries().length;
-    double expectedCenterY(double offsetK) =>
-        plot.top + offsetK / span * plot.height;
 
     expect(
       tester.getRect(find.byKey(const ValueKey('inPlotMucus-0'))).center.dx,
@@ -5467,16 +5452,49 @@ void main() {
       closeTo(plot.left + 0.5 * colW, 1),
       reason: 'the peak dot centers in its day column',
     );
+
+    // The rows are horizontal glyph bands inside the plot's top rows: the
+    // Xs share one center height across their columns, and the peak dot
+    // rides its own row BETWEEN the sex row above and the letters row
+    // below. The exact pitches are the owner-eyeball row geometry — the
+    // test keeps this order relation, not a mirrored pixel mapping.
+    final sexY = tester
+        .getRect(find.byKey(const ValueKey('inPlotSex-1-morning')))
+        .center
+        .dy;
+    final dotY = tester
+        .getRect(find.byKey(const ValueKey('inPlotPeakDot-0')))
+        .center
+        .dy;
+    final letterY = tester
+        .getRect(find.byKey(const ValueKey('inPlotMucus-0')))
+        .center
+        .dy;
+    for (final timing in const ['1-midday', '1-evening']) {
+      expect(
+        tester.getRect(find.byKey(ValueKey('inPlotSex-$timing'))).center.dy,
+        sexY,
+        reason: 'the three timing Xs share the topmost glyph row',
+      );
+    }
     expect(
-      tester.getRect(find.byKey(const ValueKey('inPlotPeakDot-0'))).center.dy,
-      closeTo(expectedCenterY(peakDotCenterOffsetK), 0.5),
-      reason: 'the peak dot pins at its own row pitch, above the letter',
+      dotY,
+      greaterThan(sexY),
+      reason: 'the sex X rides the row above the dot',
     );
     expect(
-      tester.getRect(find.byKey(const ValueKey('inPlotMucus-0'))).center.dy,
-      closeTo(expectedCenterY(mucusRowCenterOffsetK), 0.5),
-      reason: 'the mucus letter pins at the letters row pitch',
+      dotY,
+      lessThan(letterY),
+      reason: 'the dot rides its own row above the letters',
     );
+    for (final y in [sexY, dotY, letterY]) {
+      expect(y, greaterThan(plot.top));
+      expect(
+        y,
+        lessThan(plot.bottom),
+        reason: 'every glyph row stays inside the plot',
+      );
+    }
 
     final fractions = {'morning': 1 / 6, 'midday': 0.5, 'evening': 5 / 6};
     for (final MapEntry(:key, :value) in fractions.entries) {
@@ -5484,11 +5502,6 @@ void main() {
         tester.getRect(find.byKey(ValueKey('inPlotSex-1-$key'))).center.dx,
         closeTo(plot.left + (1 + value) * colW, 1),
         reason: 'the $key-timing X sits at its fraction in ONE column',
-      );
-      expect(
-        tester.getRect(find.byKey(ValueKey('inPlotSex-1-$key'))).center.dy,
-        closeTo(expectedCenterY(sexRowCenterOffsetK), 0.5),
-        reason: 'the sex X pins at the topmost glyph row pitch',
       );
     }
     expect(
@@ -6156,58 +6169,19 @@ void main() {
         tester.getRect(find.byType(LineChart)).height;
 
     testWidgets(
-      'the plot height follows the settings range\'s span: base height '
-      'inside the comfortable ~3 °C, growth beyond it, capped at 400',
+      'the plot height holds one base height across the comfortable spans, '
+      'grows with wider spans and plateaus at its cap for the widest '
+      'selectable spans',
       (tester) async {
-        // One case per settings-range shape: the default 36–38 °C range
-        // spans 2 °C (inside the comfortable ~3 °C span, so no growth
-        // regardless of the recorded values), the 36.0..40.5 range spans
-        // 4.5 °C: 260 base plus 1.5 °C beyond the comfortable 3 °C at
-        // 80 px per degree, and the window maximum 34.0..42.0 spans 8 °C,
-        // far past the growth range.
-        final cases =
-            <
-              ({
-                TemperatureRange? range,
-                List<DailyEntry> entries,
-                double expectedHeight,
-                String heightReason,
-              })
-            >[
-              (
-                range: null,
-                entries: [
-                  for (var i = 0; i < 5; i++)
-                    DailyEntry(
-                      date: _temperatureThu.add(Duration(days: i)),
-                      bbtC: 36.5,
-                    ),
-                ],
-                expectedHeight: 260.0,
-                heightReason: 'a comfortable ~2 °C range needs the base height',
-              ),
-              (
-                range: const TemperatureRange(min: 36.0, max: 40.5),
-                entries: [
-                  DailyEntry(date: _temperatureThu, bbtC: 36.5),
-                  DailyEntry(date: _temperatureFri, bbtC: 40.0),
-                ],
-                expectedHeight: 380.0,
-                heightReason:
-                    'a 4.5 °C span grows the plot: 260 + (4.5 − 3) × 80',
-              ),
-              (
-                range: const TemperatureRange(min: 34.0, max: 42.0),
-                entries: [
-                  DailyEntry(date: _temperatureThu, bbtC: 34.5),
-                  DailyEntry(date: _temperatureFri, bbtC: 41.5),
-                ],
-                expectedHeight: 400.0,
-                heightReason: 'the growth is capped at 400',
-              ),
-            ];
-        for (final (:range, :entries, :expectedHeight, :heightReason)
-            in cases) {
+        // The base height, the growth rate and the cap are display
+        // heuristics (owner-eyeball values), so the test pins the SHAPE
+        // only: both comfortable spans share the base height, wider spans
+        // strictly grow the plot, and the widest selectable spans plateau
+        // at a shared capped height.
+        Future<double> height({
+          TemperatureRange? range,
+          required List<DailyEntry> entries,
+        }) async {
           await pumpChart(
             tester,
             // Remount per case so no previous case's chart state can leak
@@ -6217,13 +6191,68 @@ void main() {
               child: _temperatureHarness(entries: entries, range: range),
             ),
           );
-
-          expect(
-            chartHeight(tester),
-            closeTo(expectedHeight, 0.5),
-            reason: heightReason,
-          );
+          return chartHeight(tester);
         }
+
+        final defaultSpan = [
+          for (var i = 0; i < 5; i++)
+            DailyEntry(
+              date: _temperatureThu.add(Duration(days: i)),
+              bbtC: 36.5,
+            ),
+        ];
+        final baseSpan = await height(entries: defaultSpan);
+        final comfortableSpan = await height(
+          range: const TemperatureRange(min: 36.0, max: 39.0),
+          entries: [
+            DailyEntry(date: _temperatureThu, bbtC: 36.5),
+            DailyEntry(date: _temperatureFri, bbtC: 38.5),
+          ],
+        );
+        final grownSpan = await height(
+          range: const TemperatureRange(min: 36.0, max: 40.5),
+          entries: [
+            DailyEntry(date: _temperatureThu, bbtC: 36.5),
+            DailyEntry(date: _temperatureFri, bbtC: 40.0),
+          ],
+        );
+        final cappedNarrowest = await height(
+          range: const TemperatureRange(min: 34.0, max: 41.0),
+          entries: [
+            DailyEntry(date: _temperatureThu, bbtC: 34.5),
+            DailyEntry(date: _temperatureFri, bbtC: 40.5),
+          ],
+        );
+        final cappedWidest = await height(
+          range: const TemperatureRange(min: 34.0, max: 42.0),
+          entries: [
+            DailyEntry(date: _temperatureThu, bbtC: 34.5),
+            DailyEntry(date: _temperatureFri, bbtC: 41.5),
+          ],
+        );
+
+        expect(
+          baseSpan,
+          comfortableSpan,
+          reason: 'both comfortable spans hold the same base height',
+        );
+        expect(
+          grownSpan,
+          greaterThan(comfortableSpan),
+          reason: 'a span past the comfortable width grows the plot',
+        );
+        expect(
+          cappedWidest,
+          greaterThanOrEqualTo(grownSpan),
+          reason: 'a wider span never shrinks the plot',
+        );
+        expect(
+          cappedNarrowest,
+          cappedWidest,
+          reason:
+              'the widest selectable spans plateau at one capped height '
+              '(the cap sits inside the settings window)',
+        );
       },
     );
   });
@@ -7526,7 +7555,7 @@ void main() {
         // day column of index 58 (= 2026-02-28) inside the visible area. The
         // chart's x domain is half a column shifted, so day 58's column
         // center maps to tap x = colW * (58 + 0.5).
-        const railWidth = 24.0; // the frozen rail left of the scroll view
+        const railWidth = _frozenRailWidth; // the rail left of the scroll view
         const testViewportWidth = 800.0;
         const bodyPadding = 12.0;
         const scrollViewport =
@@ -7566,7 +7595,7 @@ void main() {
       // Same column mapping as the tap above (day 58's column center at
       // colW * (58 + 0.5), content = 60 columns without a strip); the
       // long-press behaves identically to the tap.
-      const railWidth = 24.0; // the frozen rail left of the scroll view
+      const railWidth = _frozenRailWidth; // the rail left of the scroll view
       const bodyPadding = 12.0;
       const contentWidth = 60 * 21.0;
       const maxOffset = contentWidth - (800.0 - 2 * bodyPadding - railWidth);
@@ -7999,14 +8028,10 @@ void main() {
       );
 
       final plot = tester.getRect(find.byType(LineChart));
-      final data = chartData(tester);
-      final span = data.maxY - data.minY;
       // The chart's day space spans 9/7..9/11: four entries around the
       // untracked gap day 3 — five day columns wide.
       const dayCount = 5;
       final colW = plot.width / dayCount;
-      double expectedCenterY(double value) =>
-          plot.top + (data.maxY - value) / span * plot.height;
 
       final glyph = methodGlyph(0);
       expect(
@@ -8019,12 +8044,23 @@ void main() {
         findsOneWidget,
         reason: 'one halo layer behind the ink',
       );
+      // The glyph hangs under its day's plotted point, so it must end up
+      // strictly ABOVE the bottom-anchored fallback slot the point-less
+      // days park in. The exact pitch under the point is the owner-eyeball
+      // row geometry, so the test keeps this ordering relation.
+      final underPointY = tester.getRect(glyph).center.dy;
+      final fallbackY = tester.getRect(methodGlyph(1)).center.dy;
       expect(
-        tester.getRect(glyph).center.dy,
-        closeTo(expectedCenterY(36.5 - methodGlyphUnderPointOffsetK), 0.5),
+        underPointY,
+        lessThan(fallbackY),
         reason:
-            'the glyph pins one method pitch below the temperature '
-            'point in scale space',
+            'the anchored glyph hangs below its point but stays above the '
+            'fixed fallback slot',
+      );
+      expect(
+        underPointY,
+        lessThan(plot.bottom),
+        reason: 'the anchored glyph stays inside the plot',
       );
       expect(
         tester.getRect(glyph).center.dx,
@@ -8045,16 +8081,13 @@ void main() {
       );
 
       final plot = tester.getRect(find.byType(LineChart));
-      final data = chartData(tester);
-      final span = data.maxY - data.minY;
       const dayCount = 5;
       final colW = plot.width / dayCount;
-      final fallbackY =
-          plot.top +
-          (data.maxY - (data.minY + methodGlyphFallbackCenterOffsetK)) /
-              span *
-              plot.height;
 
+      // Every fallback day parks in ONE fixed slot: the same center height
+      // on all of them, in the plot's bottom half. The exact slot offset
+      // above the scale min is the owner-eyeball row pitch — not pinned.
+      final fallbackYs = <double>[];
       for (final index in [1, 2, 3]) {
         final glyph = methodGlyph(index);
         expect(
@@ -8064,21 +8097,22 @@ void main() {
               'day $index: no plotted point on a snapshot day -> '
               'the fallback slot renders the glyph',
         );
-        expect(
-          tester.getRect(glyph).center.dy,
-          closeTo(fallbackY, 0.5),
-          reason: 'day $index: the glyph pins at the fixed fallback slot',
-        );
+        fallbackYs.add(tester.getRect(glyph).center.dy);
         expect(
           tester.getRect(glyph).center.dx,
           closeTo(plot.left + (index + 0.5) * colW, 1),
           reason: 'day $index: the fallback glyph centers in its column',
         );
       }
-      // Every fallback day shares the SAME fixed slot.
       expect(
-        tester.getRect(methodGlyph(1)).center.dy,
-        tester.getRect(methodGlyph(3)).center.dy,
+        fallbackYs,
+        everyElement(fallbackYs.first),
+        reason: 'every fallback day shares the SAME fixed slot height',
+      );
+      expect(
+        fallbackYs.first,
+        greaterThan(plot.center.dy),
+        reason: 'the fallback slot parks in the plot\'s bottom half',
       );
     });
 

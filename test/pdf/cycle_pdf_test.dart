@@ -12,7 +12,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cycle_app/domain/band_layout.dart';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
@@ -26,6 +25,7 @@ import 'package:cycle_app/pdf/cycle_pdf.dart';
 import 'package:cycle_app/pdf/pdf_axis.dart';
 import 'package:cycle_app/pdf/pdf_layout.dart';
 import 'package:cycle_app/pdf/pdf_symbols.dart';
+import 'package:cycle_app/ui/chart_marks.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DateTime d(int month, int day) => DateTime.utc(2026, month, day);
@@ -114,10 +114,15 @@ List<List<double>> fillColorTuples(String stream) => [
     ],
 ];
 
-/// The print-friendly weekend shade: near-white Light GRAY (all three
-/// channels equal, luminance ~230) — never a pale color, and far from
-/// every ink/accent darkness so nothing above it loses legibility.
-const _weekendShade = 230 / 255;
+/// Whether a fill tuple is the weekend shade ([pdfWeekendShade]); the pdf
+/// package's number formatting is absorbed by the comparison tolerance.
+bool isWeekendShadeFill(List<double> t) {
+  bool near(double channel, double reference) =>
+      (channel - reference).abs() < 0.002;
+  return near(t[0], pdfWeekendShade.red) &&
+      near(t[1], pdfWeekendShade.green) &&
+      near(t[2], pdfWeekendShade.blue);
+}
 
 /// The generated fixture document, uncompressed so the content streams
 /// stay verbatim (byte-level checks).
@@ -828,13 +833,17 @@ void main() {
       expect(labels, isNotEmpty, reason: 'the fixture must carry facts to pin');
       final bytes = await generateFixture();
       final (runs, _) = extractPageContent(bytes);
-      // The fact lines paint at 6.4 pt inside the top header block
-      // (page height 595 − 28 margin − 58 header); fragments join in
-      // paint order, the lost TJ spaces stripped.
-      final bandTop = 595 - 28 - 58;
+      // The fact lines paint at the header font inside the top header
+      // block: the A4 landscape page height (PdfPageFormat.a4.landscape,
+      // inline in cycle_pdf.dart's page builder) minus the page margin and
+      // the header height; fragments join in paint order, the lost TJ
+      // spaces stripped.
+      final bandTop = 595 - pdfPageMargin - pdfHeaderHeight;
       final factText = [
         for (final run in runs)
-          if ((run.fontSize - 6.4).abs() < 0.05 && run.y > bandTop) run.text,
+          if ((run.fontSize - pdfHeaderFactFontSize).abs() < 0.05 &&
+              run.y > bandTop)
+            run.text,
       ].join().replaceAll(' ', '');
       for (final label in labels) {
         expect(
@@ -863,7 +872,7 @@ void main() {
       final tuples = fillColorTuples(firstPageContentStream(bytes));
       final weekendFills = [
         for (final t in tuples)
-          if (t.every((c) => (c - _weekendShade).abs() < 0.002)) t,
+          if (isWeekendShadeFill(t)) t,
       ];
       expect(weekendFills, isNotEmpty);
       // Cycle 1's page: 8 weekend columns × the rows the band runs
@@ -978,22 +987,25 @@ void main() {
     'in-plot chart marks (sex X / mucus letters / peak dot / M / day numbers)',
     () {
       // The settled geometry: the text glyph rows pitch between the 0.1 °C
-      // grid lines, BELOW the plot's top border (offsets −0.05 X / −0.15
-      // peak dot / −0.25 letters / −0.35 Mittelschmerz M from the scale
-      // max), while the day numbers anchor from the BOTTOM at
-      // min + 0.05 — all INSIDE the plot. The page's pinned row seams frame
-      // the plot REGION: the bleeding row's caption above, the temperature
-      // value row's below (the sheet's strip rows end at bleeding — the M
-      // and the numbers are in-plot glyphs). Rail-bound page x: margin (28)
-      // + rail (58) + the day fraction × pdfColumnWidth.
-      const x0 = 28 + 58;
-      const plotHeightPt = 185; // the PDF plot's painted height
-      const defaultSpan = 2.0; // the default display range 36–38 °C
-      // The letters center (max − 0.25) sits span − 0.30 above the numbers
-      // center (min + 0.05); the two rows' ink baselines track that gap on
-      // the plot's °C scale.
-      const lettersToNumbersGapPt =
-          (defaultSpan - 0.30) * plotHeightPt / defaultSpan;
+      // grid lines, BELOW the plot's top border (the chart-marks row
+      // offsets at the sex X / peak dot / letters / Mittelschmerz M
+      // pitches), while the day numbers anchor from the BOTTOM at
+      // min + the day-numbers pitch — all INSIDE the plot. The page's
+      // pinned row seams frame the plot REGION: the bleeding row's caption
+      // above, the temperature value row's below (the sheet's strip rows
+      // end at bleeding — the M and the numbers are in-plot glyphs).
+      // Rail-bound page x: the page margin + the rail + the day fraction ×
+      // pdfColumnWidth.
+      const x0 = pdfPageMargin + pdfRailWidth;
+      const plotHeightPt = pdfCurvePlotHeight;
+      final defaultSpan = TemperatureRange.defaults.span;
+      // The letters' center sits span − (mucus + day-numbers pitches)
+      // above the numbers' center; the two rows' ink baselines track that
+      // gap on the plot's °C scale.
+      final lettersToNumbersGapPt =
+          (defaultSpan - (mucusRowCenterOffsetK + dayNumbersRowCenterOffsetK)) *
+          plotHeightPt /
+          defaultSpan;
 
       double runY(List<PdfTextRun> runs, String exact) => runs
           .firstWhere(
@@ -1055,10 +1067,10 @@ void main() {
       }
 
       /// The evaluation day-number ink runs: the digits 1–6 at the
-      /// low-number band's ink size (the numbers' family in the export).
+      /// numbers' tiny ink size.
       bool isNumberRun(PdfTextRun r) =>
           {'1', '2', '3', '4', '5', '6'}.contains(r.text) &&
-          (r.fontSize - 5.2).abs() < 0.05;
+          (r.fontSize - pdfTinyFontSize).abs() < 0.05;
 
       test(
         'the sex X marks render in the plot at their per-timing slots',
@@ -1097,9 +1109,9 @@ void main() {
         final blutungY = runY(runs, 'Blutung');
         final tempY = runY(runs, 'Temperatur');
         bool inPlot(PdfTextRun r) => r.y > tempY && r.y < blutungY;
-        final s = runOf(runs, 'S', 6.5);
-        final fs = runOf(runs, 'f/S', 6.5);
-        final quality = runOf(runs, 'EW', 4.8);
+        final s = runOf(runs, 'S', pdfLabelFontSize);
+        final fs = runOf(runs, 'f/S', pdfLabelFontSize);
+        final quality = runOf(runs, 'EW', pdfMucusQualityFontSize);
         expect(
           s,
           isNotNull,
@@ -1118,14 +1130,19 @@ void main() {
         }
         // Both letter baselines share the mucus row; the quality superscript
         // rides raised (the rows' composed glyph, token raised by its offset).
-        expect((s.y - fs.y).abs(), lessThan(0.8));
+        expect((s.y - fs.y).abs(), lessThan(0.001));
         expect(quality.y, greaterThan(s.y + 0.5));
-        // The settled row pitches: the X row center at max − 0.05, the letters
-        // at max − 0.25 → 0.2 K apart on the plot's °C scale.
-        final sexY = runOf(runs, 'X', 6.5)!.y;
+        // The settled row pitches: the letters ride the mucus pitch BELOW
+        // the X's sex row — 0.2 K apart, mapped by the plot's °C scale.
+        final sexY = runOf(runs, 'X', pdfLabelFontSize)!.y;
         expect(
           sexY - s.y,
-          closeTo((0.25 - 0.05) * plotHeightPt / defaultSpan, 0.8),
+          closeTo(
+            (mucusRowCenterOffsetK - sexRowCenterOffsetK) *
+                plotHeightPt /
+                defaultSpan,
+            0.001,
+          ),
         );
         // The letters center in their day columns (S on day 5, f/S on day 6;
         // the run boxes are width-constrained, so the baselines fall inside
@@ -1153,8 +1170,8 @@ void main() {
           final bytes = await generateMarkFixture();
           final (runs, paths) = extractPageContent(bytes);
           final blutungY = runY(runs, 'Blutung');
-          final s = runOf(runs, 'S', 6.5);
-          final sexY = runOf(runs, 'X', 6.5)!.y;
+          final s = runOf(runs, 'S', pdfLabelFontSize);
+          final sexY = runOf(runs, 'X', pdfLabelFontSize)!.y;
           final dots = accentDots(paths);
           expect(
             dots,
@@ -1164,9 +1181,10 @@ void main() {
           final dot = dots.single;
           final centerX = (dot.minX + dot.maxX) / 2;
           final centerY = (dot.minY + dot.maxY) / 2;
-          // The dot rides the peak day's column center (day 5), above the letter
-          // row but below the sex row — the shared −0.15 K gap.
-          expect(centerX, closeTo(x0 + 5.5 * pdfColumnWidth, 1.2));
+          // The dot rides the peak day's column center (day 5), its own
+          // row pitch ([peakDotCenterOffsetK]) between the letter
+          // row and the sex row.
+          expect(centerX, closeTo(x0 + 5.5 * pdfColumnWidth, 0.001));
           expect(
             centerY,
             lessThan(blutungY),
@@ -1210,7 +1228,7 @@ void main() {
         );
         expect(
           (dots.single.minX + dots.single.maxX) / 2,
-          closeTo(x0 + 14.5 * pdfColumnWidth, 1.2),
+          closeTo(x0 + 14.5 * pdfColumnWidth, 0.001),
           reason: 'the dot centers in the placeholder day column (Mar 15)',
         );
         final columnStart = x0 + 14 * pdfColumnWidth + 0.5;
@@ -1220,7 +1238,11 @@ void main() {
             if (inPlot(r) &&
                 r.x > columnStart &&
                 r.x < columnEnd &&
-                {4.8, 5.2, 6.5}.any((s) => (r.fontSize - s).abs() < 0.05))
+                {
+                  pdfMucusQualityFontSize,
+                  pdfTinyFontSize,
+                  pdfLabelFontSize,
+                }.any((s) => (r.fontSize - s).abs() < 0.05))
               r,
         ];
         expect(
@@ -1230,9 +1252,9 @@ void main() {
         );
       });
 
-      test('the Mittelschmerz letter M renders INSIDE the plot at the −0.35 '
-          'pitch, below the mucus letters, centered in its record day\'s '
-          'column', () async {
+      test('the Mittelschmerz letter M renders INSIDE the plot at the M '
+          'row pitch ([mRowCenterOffsetK]), below the mucus letters, '
+          'centered in its record day\'s column', () async {
         final bytes = await generateMarkFixture();
         final (runs, _) = extractPageContent(bytes);
         final blutungY = runY(runs, 'Blutung');
@@ -1250,14 +1272,19 @@ void main() {
         final m = mRuns.single;
         expect(
           m.fontSize,
-          closeTo(6.5, 0.05),
-          reason: "the M shares the in-plot letters' ink family (_label)",
+          closeTo(pdfLabelFontSize, 0.05),
+          reason: "the M shares the in-plot letters' ink family",
         );
-        // The M pitch: 0.1 K below the letters row.
-        final s = runOf(runs, 'S', 6.5)!;
+        // The M pitch: the letters' row minus one grid line (0.1 K).
+        final s = runOf(runs, 'S', pdfLabelFontSize)!;
         expect(
           s.y - m.y,
-          closeTo((0.35 - 0.25) * plotHeightPt / defaultSpan, 0.8),
+          closeTo(
+            (mRowCenterOffsetK - mucusRowCenterOffsetK) *
+                plotHeightPt /
+                defaultSpan,
+            0.001,
+          ),
         );
         expect(
           m.x,
@@ -1292,7 +1319,7 @@ void main() {
           );
           expect(
             numberRuns.first.fontSize,
-            closeTo(5.2, 0.05),
+            closeTo(pdfTinyFontSize, 0.05),
             reason: 'the numbers render in the low-number band\'s ink family',
           );
           for (final run in numberRuns) {
@@ -1313,10 +1340,16 @@ void main() {
                   "the number '${run.text}' centers in its low day's column",
             );
           }
-          // The numbers ride the BOTTOM gridline gap: their ink baseline sits
-          // `(span − 0.30) K` of plot scale below the letters row's baseline.
-          final s = runOf(runs, 'S', 6.5)!;
-          expect(s.y - numberRuns.first.y, closeTo(lettersToNumbersGapPt, 2.5));
+          // The numbers ride the BOTTOM gridline gap: their ink baseline
+          // sits the mucus+numbers row pitch of plot scale below the
+          // letters row's baseline. The rows' different ink sizes shift
+          // their baselines by their fonts' different ascent-to-box
+          // offsets — bounded by one em of the size gap (the epsilon).
+          final s = runOf(runs, 'S', pdfLabelFontSize)!;
+          expect(
+            s.y - numberRuns.first.y,
+            closeTo(lettersToNumbersGapPt, pdfLabelFontSize - pdfTinyFontSize),
+          );
           // On the in-plot seam each glyph renders on its halo backing.
           for (final (index, run) in numberRuns.indexed) {
             expect(
@@ -1334,7 +1367,7 @@ void main() {
         () async {
           final bytes = await generateMarkFixture();
           final (runs, paths) = extractPageContent(bytes);
-          final s = runOf(runs, 'S', 6.5)!;
+          final s = runOf(runs, 'S', pdfLabelFontSize)!;
           final m = [
             for (final r in runs)
               if (r.text == 'M') r,
@@ -1351,7 +1384,8 @@ void main() {
             reason: 'the M rides a backing in its column',
           );
           // The peak dot's halo circle: bigger than the dot and exactly
-          // centered under it — dot diameter + 2 × the shared halo width.
+          // centered under it — dot diameter + the shared halo stroke
+          // width on both sides.
           final circle = [
             for (final p in whiteBackings(paths))
               if (((p.minX + p.maxX) / 2 - (dot.minX + dot.maxX) / 2).abs() <
@@ -1367,7 +1401,10 @@ void main() {
           );
           expect(
             circle.single.maxX - circle.single.minX,
-            allOf(greaterThan(dot.maxX - dot.minX), lessThan(11)),
+            allOf(
+              greaterThan(dot.maxX - dot.minX),
+              lessThan(dot.maxX - dot.minX + 4 * chartMarkHaloStrokeWidth),
+            ),
             reason: 'the halo circle outgrows the ink dot without blotting out',
           );
         },
@@ -1402,8 +1439,8 @@ void main() {
         const kept = [
           // The calendar day-number row: the cycle-day labels above the
           // plot, distinct from the evaluation numbering inside it.
-          'Zyklustag',
-          'Datum',
+          pdfRailCaptionDayNumbers,
+          pdfRailCaptionDates,
           'Blutung',
           // The exporter draws words as separate runs; the caption's anchor
           // word is 'Temperatur'.
@@ -1412,7 +1449,7 @@ void main() {
           'Störung',
           // The merged band's one rail caption — the cervix and pain zones
           // share it.
-          'Notizen',
+          pdfRailCaptionNotesBand,
         ];
         for (final caption in kept) {
           expect(
@@ -1527,7 +1564,7 @@ void main() {
   );
 
   group('merged notes band (cervix zones, pain and notes in one row)', () {
-    const x0 = 28 + 58;
+    const x0 = pdfPageMargin + pdfRailWidth;
 
     double runYOf(List<PdfTextRun> runs, String exact) => runs
         .firstWhere(
@@ -1571,17 +1608,17 @@ void main() {
           .where((r) => r.text == text && (r.fontSize - size).abs() < 0.05)
           .toList();
       expect(
-        byText('w', 5.2),
+        byText('w', pdfTinyFontSize),
         isNotEmpty,
         reason: "day 0's soft firmness 'w' renders its letter",
       );
       expect(
-        byText('h-w', 5.2),
+        byText('h-w', pdfTinyFontSize),
         isNotEmpty,
         reason: "day 1's halfSoft firmness 'h-w' renders its letter",
       );
       expect(
-        byText('B', 5.2),
+        byText('B', pdfTinyFontSize),
         isNotEmpty,
         reason: "the breast-pain days' B renders in the band's pain zone",
       );
@@ -1670,11 +1707,12 @@ void main() {
         // pain day's noteTop is 12 pt (pain row only). The TJ runs split
         // words, so the lookup anchors on the notes' FIRST fragments (the
         // fragment of the line's start).
-        final captionY = runYOf(runs, 'Notizen');
+        final captionY = runYOf(runs, pdfRailCaptionNotesBand);
         final day2NoteY = runs
             .firstWhere(
               (r) =>
-                  r.text.contains('Zweite') && (r.fontSize - 5.2).abs() < 0.05,
+                  r.text.contains('Zweite') &&
+                  (r.fontSize - pdfTinyFontSize).abs() < 0.05,
               orElse: () => throw TestFailure(
                 "no day-2 note text run ('Zweite' fragment) rendered",
               ),
@@ -1692,7 +1730,8 @@ void main() {
         final day0NoteY = runs
             .firstWhere(
               (r) =>
-                  r.text.contains('Erste') && (r.fontSize - 5.2).abs() < 0.05,
+                  r.text.contains('Erste') &&
+                  (r.fontSize - pdfTinyFontSize).abs() < 0.05,
               orElse: () => throw TestFailure(
                 "no day-0 note text run ('Erste' fragment) rendered",
               ),
@@ -1710,9 +1749,9 @@ void main() {
   });
 
   group('measurement method: band note (render-time synthesis)', () {
-    const x0 = 28 + 58;
+    const x0 = pdfPageMargin + pdfRailWidth;
 
-    /// The 5.2 pt runs whose line sits in [column]'s x window at the
+    /// The tiny ink runs whose line sits in [column]'s x window at the
     /// band's own height, joined in reading order (a rotated vertical line
     /// descends the page, so the earlier fragments have the larger y).
     /// The threshold reaches a hairline past the band's top edge (the
@@ -1721,11 +1760,12 @@ void main() {
     /// never fall in. Word runs the TJ operator split lose their
     /// separating spaces — comparisons strip them ([compact]).
     String cellText(List<PdfTextRun> runs, int column) {
-      final bandTopY = runs.firstWhere((r) => r.text == 'Notizen').y + 7;
+      final bandTopY =
+          runs.firstWhere((r) => r.text == pdfRailCaptionNotesBand).y + 7;
       final left = x0 + column * pdfColumnWidth;
       final fragments =
           runs
-              .where((r) => (r.fontSize - 5.2).abs() < 0.05)
+              .where((r) => (r.fontSize - pdfTinyFontSize).abs() < 0.05)
               .where((r) => r.y < bandTopY)
               .where((r) => r.x > left && r.x < left + pdfColumnWidth)
               .toList()
@@ -1894,7 +1934,7 @@ void main() {
       expect(countPageMarkers(bytes), 2);
       final (runs, _) = extractPageContent(bytes, page: 1);
       final page2Text = runs
-          .where((r) => (r.fontSize - 5.2).abs() < 0.05)
+          .where((r) => (r.fontSize - pdfTinyFontSize).abs() < 0.05)
           .map((r) => r.text)
           .join(' ');
       expect(page2Text, contains('andere'));

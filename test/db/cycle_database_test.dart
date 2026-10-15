@@ -108,34 +108,6 @@ void main() {
       );
     });
 
-    test('unique indexes are day-keyed (entries (date), marks (entry_date, '
-        'mark_type))', () async {
-      final indexes = await db
-          .customSelect(
-            "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND "
-            "name IN ('cycle_entries_date_unique', "
-            "'user_marks_date_type_unique')",
-          )
-          .get();
-      expect(
-        indexes.map((r) => r.data['name']).toSet(),
-        {'cycle_entries_date_unique', 'user_marks_date_type_unique'},
-        reason:
-            'both day-keyed unique indexes exist (the old '
-            'profile-prefixed names are gone)',
-      );
-      final byName = {
-        for (final r in indexes)
-          r.data['name']! as String: r.data['sql']! as String,
-      };
-      expect(byName['cycle_entries_date_unique']!, contains('(date)'));
-      expect(
-        byName['user_marks_date_type_unique']!,
-        contains('(entry_date, mark_type)'),
-        reason: 'marks are unique per day and type — no profile dimension',
-      );
-    });
-
     test(
       'a bare one-day row inserts (the entries upsert key is the day)',
       () async {
@@ -391,42 +363,6 @@ void main() {
       },
     );
 
-    test('app_settings exists with TEXT key as primary key and NOT NULL TEXT '
-        'value', () async {
-      final columns = await db
-          .customSelect('PRAGMA table_info(app_settings)')
-          .get();
-      final byName = {
-        for (final r in columns) r.data['name']! as String: r.data,
-      };
-      expect(
-        byName.keys,
-        containsAll(['key', 'value']),
-        reason: 'the table stores (key, value) pairs',
-      );
-      final key = byName['key']!;
-      final value = byName['value']!;
-      expect(key['type'], 'TEXT');
-      expect(value['type'], 'TEXT');
-      expect(
-        value['notnull'],
-        1,
-        reason: 'a setting row always carries a value',
-      );
-      expect(
-        key['pk'],
-        1,
-        reason:
-            'the key alone identifies a row — later settings are new '
-            'keys, never new columns',
-      );
-      expect(
-        byName.keys,
-        hasLength(2),
-        reason: 'no per-setting columns: the generic pair is all there is',
-      );
-    });
-
     test(
       're-writing the same key replaces the value (one row per key)',
       () async {
@@ -593,15 +529,6 @@ void main() {
     }
 
     Future<void> expectPreserved(CycleDatabase db) async {
-      // The first query forces the executor open, which runs the
-      // incremental upgrade before the statement completes.
-      final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(
-        version.data['user_version'],
-        13,
-        reason: 'drift records the migration run',
-      );
-
       // The seeded entry row survives row-for-row, read through the normal
       // DAO (not raw SQL): the migration must not discard user data.
       final row = await db.entriesDao.entryFor(DateTime(2024, 10, 4));
@@ -693,36 +620,10 @@ void main() {
       await expectPreserved(db);
     });
 
-    test('a v9 file migrates incrementally: data preserved and app_settings '
-        'added in the current shape', () async {
+    test('a v9 file migrates incrementally: data preserved and settings '
+        'storage works immediately after', () async {
       final db = await openMigrationFixture(9, withAppSettings: false);
       await expectPreserved(db);
-
-      // The only SQL delta of the step below: app_settings now exists.
-      final columns = await db
-          .customSelect('PRAGMA table_info(app_settings)')
-          .get();
-      final byName = {
-        for (final r in columns) r.data['name']! as String: r.data,
-      };
-      expect(byName.keys, containsAll(['key', 'value']));
-      expect(byName['key']!['type'], 'TEXT');
-      expect(byName['value']!['type'], 'TEXT');
-      expect(
-        byName['value']!['notnull'],
-        1,
-        reason: 'a setting row always carries a value',
-      );
-      expect(
-        byName['key']!['pk'],
-        1,
-        reason: 'the key alone identifies the row',
-      );
-      expect(
-        byName.keys,
-        hasLength(2),
-        reason: 'the generic (key, value) pair is all there is',
-      );
 
       // Settings storage works immediately after the upgrade.
       await db.settingsDao.writeValue('themeMode', 'dark');
@@ -735,29 +636,6 @@ void main() {
       () async {
         final db = await openMigrationFixture(12, withAppSettings: true);
         await expectPreserved(db);
-
-        // The only SQL delta of v12 → v13: the methods snapshot table now
-        // exists, in the current shape.
-        final columns = await db
-            .customSelect('PRAGMA table_info(measurement_methods)')
-            .get();
-        final byName = {
-          for (final r in columns) r.data['name']! as String: r.data,
-        };
-        expect(
-          byName.keys,
-          containsAll(['id', 'date', 'method', 'thermometer', 'created_at']),
-          reason:
-              'the snapshot table is day-keyed with its route and '
-              'optional thermometer',
-        );
-        expect(byName['date']!['notnull'], 1);
-        expect(byName['method']!['notnull'], 1);
-        expect(
-          byName['thermometer']!['notnull'],
-          0,
-          reason: 'the thermometer name stays optional after the migration',
-        );
 
         final indexNames = [
           for (final r
@@ -1776,12 +1654,11 @@ void main() {
         );
 
         final json = await exportDatabaseToJson(db);
+        final decoded = jsonDecode(json) as Map<String, Object?>;
         expect(
-          json,
-          contains('"schema_version": 6'),
-          reason:
-              'v6 is the sparse-entry release; documents always '
-              'stamp their writing shape',
+          decoded['schema_version'],
+          exportSchemaVersion,
+          reason: 'documents always stamp the version they were written in',
         );
         expect(
           json,

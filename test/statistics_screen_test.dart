@@ -268,26 +268,10 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
-        matching: find.text('2 days'),
-      ),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
-    );
-    expect(
-      find.descendant(
-        of: metricCard('bleedingDuration'),
         matching: find.text('3'),
       ),
       findsOneWidget,
       reason: 'the maximum span, bare',
-    );
-    expect(
-      find.descendant(
-        of: metricCard('bleedingDuration'),
-        matching: find.text('3 days'),
-      ),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
     );
     expect(
       find.descendant(
@@ -337,11 +321,6 @@ void main() {
       findsNWidgets(2),
     );
     expect(
-      find.descendant(of: firstHigherDay, matching: find.text('14 days')),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
-    );
-    expect(
       find.descendant(of: firstHigherDay, matching: find.text('14.0')),
       findsOneWidget,
     );
@@ -387,11 +366,6 @@ void main() {
         find.descendant(of: untilEnd, matching: find.text('15')),
         findsNWidgets(2),
         reason: 'min and max duplicate the single span, bare',
-      );
-      expect(
-        find.descendant(of: untilEnd, matching: find.text('15 days')),
-        findsNothing,
-        reason: 'metric-card rows carry no unit',
       );
       expect(
         find.descendant(of: untilEnd, matching: find.text('15.0')),

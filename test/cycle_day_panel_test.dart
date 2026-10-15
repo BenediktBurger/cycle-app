@@ -9,6 +9,7 @@
 // MarksDao against an in-memory database, so every write surfaces in the
 // stream that re-renders the panel and the chart, plus the scenario
 // constants and the day taps).
+import 'package:cycle_app/ui/cycle.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -295,8 +296,8 @@ void main() {
     );
   });
 
-  testWidgets('a very long note caps the docked panel — the content scrolls '
-      'internally instead of the dock growing', (tester) async {
+  testWidgets('a very long note caps the docked panel to its body share — '
+      'above the cap the content scrolls internally', (tester) async {
     final raw = List.generate(40, (i) => 'note line $i').join('\n');
     final entries = [...scenarioEntries];
     entries[4] = entries[4].copyWith(notes: raw);
@@ -304,58 +305,40 @@ void main() {
 
     await tapCycleDay(tester, 4); // 9/10, the noted day
 
-    // Default test surface 600 logical px tall, no system bottom inset:
-    // the AppBar's share and the dock's 12 px bottom offset come off the
-    // surface before the ~60% factor.
-    final cappedHeight = (600 - kToolbarHeight - 12.0) * 0.6;
-    expect(
-      tester.getRect(cycleDayPanel()).height,
-      lessThanOrEqualTo(cappedHeight),
-      reason:
-          'the dock never exceeds about 60% of the body space above '
-          'its bottom offset',
-    );
-    expect(
-      find.descendant(
-        of: cycleDayPanel(),
-        matching: find.byType(SingleChildScrollView),
-      ),
-      findsOneWidget,
-      reason: 'above the cap the dock content scrolls internally',
-    );
-    expect(
-      find.text(raw),
-      findsOneWidget,
-      reason: 'the full note stays in the tree inside the capped dock',
-    );
-  });
+    for (final surfaceHeight in const [600.0, 160.0]) {
+      final dpr = tester.view.devicePixelRatio;
+      tester.view.physicalSize = Size(800 * dpr, surfaceHeight * dpr);
+      addTearDown(tester.view.reset);
+      await tester.pumpAndSettle();
 
-  testWidgets('short window: the cap tracks the body constraints, so the '
-      'dock never grows into the AppBar', (tester) async {
-    // 160 logical px tall: 60% of the FULL surface (96 px) would exceed
-    // the body space above the dock's bottom offset
-    // (160 - AppBar - 12 = 92 px) and top-clip the dock into the AppBar.
-    final dpr = tester.view.devicePixelRatio;
-    tester.view.physicalSize = Size(800 * dpr, 160 * dpr);
-    addTearDown(tester.view.reset);
-
-    final raw = List.generate(40, (i) => 'note line $i').join('\n');
-    final entries = [...scenarioEntries];
-    entries[4] = entries[4].copyWith(notes: raw);
-    await pumpCycleList(tester, entries: entries);
-
-    await tapCycleDay(tester, 4); // 9/10, the noted day
-
-    final panelRect = tester.getRect(cycleDayPanel());
-    expect(
-      panelRect.height,
-      lessThanOrEqualTo((160 - kToolbarHeight - 12.0) * 0.6),
-      reason: 'the cap follows the body space above the bottom offset',
-    );
-    expect(
-      panelRect.top,
-      greaterThanOrEqualTo(kToolbarHeight),
-      reason: 'the dock stays inside the body, below the AppBar',
-    );
+      final panelRect = tester.getRect(cycleDayPanel());
+      // The short surface is the one that separates a body-space cap from
+      // a full-surface cap: the latter would top-clip the dock into the
+      // AppBar.
+      expect(
+        panelRect.height,
+        lessThanOrEqualTo(
+          (surfaceHeight - kToolbarHeight - cycleDayDockBottomInset) *
+              cycleDayDockHeightFactor,
+        ),
+        reason:
+            'the dock never exceeds its share of the body space above '
+            'the bottom offset',
+      );
+      expect(
+        panelRect.top,
+        greaterThanOrEqualTo(kToolbarHeight),
+        reason: 'the dock stays inside the body, below the AppBar',
+      );
+      expect(
+        find.descendant(
+          of: cycleDayPanel(),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+        reason: 'above the cap the dock content scrolls internally',
+      );
+      expect(find.text(raw), findsOneWidget);
+    }
   });
 }

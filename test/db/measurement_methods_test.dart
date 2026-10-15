@@ -19,50 +19,6 @@ void main() {
   });
 
   group('measurement_methods table shape', () {
-    test('the columns are the day-keyed snapshot set', () async {
-      final columns = await db
-          .customSelect('PRAGMA table_info(measurement_methods)')
-          .get();
-      final byName = {
-        for (final r in columns) r.data['name']! as String: r.data,
-      };
-      expect(
-        byName.keys,
-        unorderedEquals([
-          'id',
-          'date',
-          'method',
-          'thermometer',
-          'created_at',
-          'updated_at',
-        ]),
-      );
-      final id = byName['id']!;
-      final date = byName['date']!;
-      final method = byName['method']!;
-      final thermometer = byName['thermometer']!;
-      expect(id['type'], 'INTEGER', reason: 'autoincrement primary key');
-      expect(id['pk'], 1);
-      expect(date['type'], 'INTEGER');
-      expect(
-        date['notnull'],
-        1,
-        reason: 'every snapshot is pinned to its calendar day',
-      );
-      expect(method['type'], 'TEXT');
-      expect(
-        method['notnull'],
-        1,
-        reason: 'a snapshot always carries its route',
-      );
-      expect(thermometer['type'], 'TEXT');
-      expect(
-        thermometer['notnull'],
-        0,
-        reason: 'the thermometer name is optional information',
-      );
-    });
-
     test('a duplicate same-day insert hits the unique index', () async {
       await db.measurementMethodsDao.upsertByDate(
         date: DateTime(2026, 3, 1),

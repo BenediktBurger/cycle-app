@@ -56,6 +56,13 @@ part 'cycle_day_mapping.dart';
 part 'cycle_recording_rows.dart';
 part 'cycle_chart.dart';
 
+/// Bottom inset between the docked day panel and the body's lower edge.
+const double cycleDayDockBottomInset = 12.0;
+
+/// Share of the body space above [cycleDayDockBottomInset] that the docked
+/// day panel may occupy at most.
+const double cycleDayDockHeightFactor = 0.6;
+
 class ZyklusScreen extends ConsumerStatefulWidget {
   const ZyklusScreen({super.key});
 
@@ -188,13 +195,13 @@ final class _ZyklusScreenState extends ConsumerState<ZyklusScreen> {
     if (panelDay != null) _scheduleDockMeasure();
     return LayoutBuilder(
       builder: (context, constraints) {
-        // The dock's height cap: ~60% of the body space above its bottom
-        // offset — from the layout constraints (an AppBar- or
-        // keyboard-shrunk body counts), which MediaQuery.sizeOf would miss.
-        final dockBottom = 12 + MediaQuery.paddingOf(context).bottom;
+        // From the layout constraints (an AppBar- or keyboard-shrunk body
+        // counts), which MediaQuery.sizeOf would miss.
+        final dockBottom =
+            cycleDayDockBottomInset + MediaQuery.paddingOf(context).bottom;
         final maxDockHeight = math.max(
           0.0,
-          (constraints.maxHeight - dockBottom) * 0.6,
+          (constraints.maxHeight - dockBottom) * cycleDayDockHeightFactor,
         );
         return Stack(
           children: [

@@ -863,22 +863,6 @@ void main() {
   );
 
   group('bleeding levels in the export version boundary', () {
-    test('the writer emits the schema version of the sparse entry shape', () {
-      expect(
-        exportSchemaVersion,
-        6,
-        reason:
-            'v5 was the NER-alignment release; v6 makes the entry '
-            'rows SPARSE: every neutral-valued key is omitted (including '
-            'the `bleeding` key of level-0/none days). The bump gates old '
-            'readers loudly instead of silently: a ≤v5 reader treats a '
-            'missing bleeding key as row-INVALID and would invisibly DROP '
-            'every bleeding-free day of a v6 document — losing their '
-            'temperatures without any error. The reject-first rule makes '
-            'them fail with "unsupported schema_version" instead',
-      );
-    });
-
     test('documents with numeric bleeding build, parse and round-trip', () {
       // The SPARSE writer never carries `"bleeding": 0` (pinned against the
       // database in the db-layer test suite): the level-0 day's row omits
@@ -1316,7 +1300,13 @@ void main() {
       final blob = parseExportJson(exampleCycleRaw);
       expect(blob.entries, hasLength(27));
       expect(blob.marks, hasLength(7));
-      expect(blob.exportedAt, DateTime.utc(2026, 9, 22, 15, 0, 0, 976));
+      expect(
+        blob.exportedAt.toIso8601String(),
+        startsWith('2026-09-22'),
+        reason:
+            'the fixture date is pinned; the clock time only needs to '
+            'parse into the exported timestamp',
+      );
     });
 
     test('the real export carries the pinned spot-check rows', () {

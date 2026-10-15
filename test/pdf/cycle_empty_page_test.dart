@@ -39,12 +39,13 @@ PdfExportModel emptyCycleModel() => buildPdfExportModel(
   today: _today,
 );
 
-/// The scaffold's day-number labels (cycleDayNumberLabel) in the doc's
-/// 5.2 pt style — the runs a span-wide blank sheet must carry. (The pdf
+/// The scaffold's day-number labels (cycleDayNumberLabel) in the sheet's
+/// tiny ink style — the runs a span-wide blank sheet must carry. (The pdf
 /// package splits "1. Tag" at the space into '1.' + 'Tag'; the digit run
 /// is the predicate's subject.)
 bool _dayNumberRun(PdfTextRun run) =>
-    (run.fontSize - 5.2).abs() < 0.05 && RegExp(r'^\d+\.$').hasMatch(run.text);
+    (run.fontSize - pdfTinyFontSize).abs() < 0.05 &&
+    RegExp(r'^\d+\.$').hasMatch(run.text);
 
 void main() {
   test('the exported data-less cycle keeps its empty tracked list; its '
