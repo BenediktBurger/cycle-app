@@ -19,7 +19,7 @@
 // tapping another day retargets the dock in place.
 //
 // The chart renders a VIEWPORT-LIMITED WINDOW of days: day columns keep a
-// minimum usable width (see _CycleChartState.minDayColumnWidth), so long
+// minimum usable width (see minDayColumnWidth in cycle_chart.dart), so long
 // recorded ranges scroll horizontally as one unit while a FROZEN LEFT RAIL
 // (the paper sheet's fixed left margin) carries the header prototypes, the
 // temperature scale and the rows' name glyphs. Data outside the window is

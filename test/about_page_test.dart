@@ -20,11 +20,8 @@
 // app-fact, not an INER fact, so it is identical in every locale.
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/licenses.dart';
-import 'package:cycle_app/main.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
@@ -32,7 +29,6 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 import 'support/database.dart';
 import 'support/finders.dart';
 import 'support/viewport.dart';
-import 'support/provider_fixtures.dart';
 
 /// Offline-safe recording fake for the launcher platform interface: every
 /// launch is intercepted and only recorded, so no test ever touches a real
@@ -54,24 +50,17 @@ class RecordingLauncher extends UrlLauncherPlatform {
 }
 
 void main() {
-  // MUST stay the FIRST test of this file — see the comment below — and it
-  // deliberately bypasses the shared harness.
   testWidgets('the version line hides when the package-info lookup fails', (
     WidgetTester tester,
   ) async {
-    // The harness (appScope) seeds PackageInfo mock values in ONE static
-    // that nothing can clear again, and the mock must be answered for every
-    // harness-pumping test. This failure path needs the plugin call to
-    // ERROR like on a broken/unanswerable device install, so this case
-    // pumps the app directly (no harness) — and since the harness's mock
-    // cannot be undone, it must run before any other test of this file
-    // touches the harness.
+    // The harness answers the package-info channel with an ERROR like on a
+    // broken/unanswerable device install (the channel handler is re-set per
+    // scope call, so this failure posture is order-independent); the
+    // first-start page (onboardingCompleted: false) is the surface that
+    // also renders the version line.
     useDeviceLocales(tester, const [Locale('de')]);
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [inMemoryDatabase(), onboardingPin(false)],
-        child: const CycleApp(),
-      ),
+      appScope(onboardingCompleted: false, packageInfoFailure: true),
     );
     await tester.pumpAndSettle();
 
@@ -94,66 +83,39 @@ void main() {
     );
   });
 
-  /// Same exception as the first test: the harness's PackageInfo mock values
-  /// cannot be cleared again, so this failure-path test pumps the app
-  /// directly and must keep its place BEFORE any harness-pumping test of
-  /// this file.
   testWidgets('the license-details row still opens the license page when the '
       'package-info lookup fails', (WidgetTester tester) async {
-    const packageInfoChannel = MethodChannel(
-      'dev.fluttercommunity.plus/package_info',
+    useDeviceLocales(tester, const [Locale('de')]);
+    await tester.pumpWidget(
+      appScope(onboardingCompleted: false, packageInfoFailure: true),
     );
-    // The platform channel answers with an error instead of values — the
-    // closest model of a broken/unanswerable device install (the unmocked
-    // channel would just never answer in the test loop, which exercises no
-    // failure path at all).
-    try {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        packageInfoChannel,
-        (call) async => throw MissingPluginException(
-          'no package metadata on this (test) device',
-        ),
-      );
-      useDeviceLocales(tester, const [Locale('de')]);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [inMemoryDatabase(), onboardingPin(false)],
-          child: const CycleApp(),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
 
-      // The version line hides (same failure posture as the first test), but
-      // the license-details row must still work: the page opening is only
-      // decorated with the metadata, never made dependent on it.
-      await tester.dragUntilVisible(
-        find.text('Lizenzdetails'),
-        find.byType(ListView),
-        const Offset(0, -200),
-      );
-      final listTile = find.ancestor(
-        of: find.text('Lizenzdetails'),
-        matching: find.byType(ListTile),
-      );
-      await tester.ensureVisible(listTile);
-      await tester.pumpAndSettle();
-      await tester.tap(listTile);
-      await tester.pumpAndSettle();
+    // The version line hides (same failure posture as the first test), but
+    // the license-details row must still work: the page opening is only
+    // decorated with the metadata, never made dependent on it.
+    await tester.dragUntilVisible(
+      find.text('Lizenzdetails'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    final listTile = find.ancestor(
+      of: find.text('Lizenzdetails'),
+      matching: find.byType(ListTile),
+    );
+    await tester.ensureVisible(listTile);
+    await tester.pumpAndSettle();
+    await tester.tap(listTile);
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byType(LicensePage),
-        findsOneWidget,
-        reason:
-            'a failing package-info lookup must not skip opening the license '
-            'page — it only loses the version line',
-      );
-      expect(find.textContaining('0.1.0'), findsNothing);
-    } finally {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        packageInfoChannel,
-        null,
-      );
-    }
+    expect(
+      find.byType(LicensePage),
+      findsOneWidget,
+      reason:
+          'a failing package-info lookup must not skip opening the license '
+          'page — it only loses the version line',
+    );
+    expect(find.textContaining('0.1.0'), findsNothing);
   });
 
   /// Opens the app on the settings pane (German device locale, seeded
@@ -163,7 +125,6 @@ void main() {
     WidgetTester tester, {
     double? surfaceHeight,
   }) async {
-    useDeviceLocales(tester, const [Locale('de')]);
     // A tall surface keeps the lazy page list's lower sections BUILT —
     // callers reaching below-the-fold content (contact rows) pass one.
     if (surfaceHeight != null) {
@@ -253,16 +214,16 @@ void main() {
       reason: 'the copyright holder (LICENSE line)',
     );
 
-    // The simplified body: the font license is no longer named in the body
-    // (its text ships in the binary and is readable via the details row);
-    // bundled fonts and the Flutter engine are the named examples.
+    // The body names no per-font licenses: each font's license text ships
+    // in the binary and is readable via the details row; bundled fonts and
+    // the Flutter engine are the named examples.
     expect(
       find.textContaining('Schriftlizenz'),
       findsNothing,
       reason:
-          'the body no longer names the Noto Sans font license — the '
-          'license text ships in the binary and is shown via the '
-          'license-details row, so the in-body enumeration is obsolete',
+          'the body names no font license (Schriftlizenz) — the license '
+          'text ships in the binary and is shown via the license-details '
+          'row',
     );
     expect(
       find.textContaining('gebündelte Schriften'),
@@ -288,15 +249,15 @@ void main() {
       find.textContaining('im Repository gesammelt'),
       findsNothing,
       reason:
-          'the obsolete framing that pub-package licenses are only '
-          'collected in the repository is gone',
+          'the body never implies pub-package licenses are only '
+          'collected in the repository — they are readable in-app',
     );
     expect(
       find.textContaining('Datei LICENSE'),
       findsNothing,
       reason:
-          'the old repository-FILE pointer wording is replaced by '
-          'the in-app reading',
+          'the body names no repository license FILE — the in-app '
+          'license-details row is the reading path',
     );
 
     // The license-details row: its own tappable row below the body.
@@ -328,7 +289,7 @@ void main() {
 
     // The feedback footer: send-nothing stance plus the issue tracker,
     // rendered as SELECTABLE text so the URL can be copied. The footer's
-    // address now has a TAPPABLE sibling row showing the same URL as
+    // address has a TAPPABLE sibling row showing the same URL as
     // plain row text, so the URL assertion uses the footer text's
     // parenthesized form (… cycle-app/issues) — the row's plain URL text
     // does not match it. The crash/Privacy-layers overlap (the privacy
@@ -369,7 +330,6 @@ void main() {
   testWidgets('English about page asserts the same sections via the '
       'English keys', (WidgetTester tester) async {
     final l10n = lookupAppLocalizations(const Locale('en'));
-    useDeviceLocales(tester, const [Locale('en')]);
     await tester.pumpWidget(appScope(locale: const Locale('en')));
     await tester.pumpAndSettle();
 
@@ -416,16 +376,16 @@ void main() {
     expect(find.textContaining('© 2026'), findsOneWidget);
     expect(find.textContaining('Benedikt Burger'), findsOneWidget);
 
-    // The simplified body: the font license is no longer named in the body
-    // (its text ships in the binary and is readable via the details row);
-    // bundled fonts and the Flutter engine are the named examples.
+    // The body names no per-font licenses: each font's license text ships
+    // in the binary and is readable via the details row; bundled fonts and
+    // the Flutter engine are the named examples.
     expect(
       find.textContaining('Open Font License'),
       findsNothing,
       reason:
-          'the body no longer names the Noto Sans font license — the '
+          'the body names no font license (Open Font License) — the '
           'license text ships in the binary and is shown via the '
-          'license-details row, so the in-body enumeration is obsolete',
+          'license-details row',
     );
     expect(
       find.textContaining('bundled fonts'),
@@ -451,15 +411,15 @@ void main() {
       find.textContaining('collected in the repository'),
       findsNothing,
       reason:
-          'the obsolete framing that pub-package licenses are only '
-          'collected in the repository is gone',
+          'the body never implies pub-package licenses are only '
+          'collected in the repository — they are readable in-app',
     );
     expect(
       find.textContaining("repository's LICENSE file"),
       findsNothing,
       reason:
-          'the old repository-FILE pointer wording is replaced by '
-          'the in-app reading',
+          'the body names no repository license FILE — the in-app '
+          'license-details row is the reading path',
     );
 
     // The license-details row: its own tappable row below the body.
@@ -669,7 +629,6 @@ void main() {
     addTearDown(() => UrlLauncherPlatform.instance = originalLauncher);
     UrlLauncherPlatform.instance = launcher;
 
-    useDeviceLocales(tester, const [Locale('en')]);
     // The contact section sits below the fold on the default surface; the
     // tall surface keeps the lazy page list building it at once.
     useViewportSize(tester, const Size(800, 4000));

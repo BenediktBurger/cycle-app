@@ -4,8 +4,8 @@
 // normalizes/drops the time, and copyWith/equality inherit that), the
 // sex-time bitmask, the cervix firmness fields, and the
 // temp_disturbances mask (the NER-aligned raw-data disturbance flags
-// sp/a/alk/kr — an int mask 0..15; the ANALYSIS exclusion is no longer
-// driven by entry flags but by the ignoreTemperature mark, see
+// sp/a/alk/kr — an int mask 0..15; the ANALYSIS exclusion is driven by the
+// ignoreTemperature mark, not by these entry flags (see
 // lib/domain/cycle_grouping.dart). DB mappers, the export/import writers
 // and any future writer all build DailyEntries, so they cannot store a
 // stray time or an out-of-range mask either.
@@ -174,7 +174,7 @@ void main() {
       expect(TempDisturbance.kr.bit, 8);
     });
 
-    test('token set is exactly the four disturbance flags (Reise is gone)', () {
+    test('token set is exactly the four disturbance flags', () {
       expect(
         TempDisturbance.values.map((t) => t.token),
         unorderedEquals(const ['sp', 'a', 'alk', 'kr']),
@@ -354,7 +354,7 @@ void main() {
     });
   });
 
-  group('equality/hashCode include the new fields', () {
+  group('equality/hashCode include the sex-timing and firmness fields', () {
     test('entries differing only in sexTimings differ', () {
       final a = DailyEntry(date: day, sexTimings: SexTiming.morning.bit);
       final b = DailyEntry(date: day, sexTimings: SexTiming.evening.bit);
@@ -382,7 +382,7 @@ void main() {
       );
     });
 
-    test('a copyWith-modified new field participates in equality', () {
+    test('a copyWith-modified field participates in equality', () {
       final base = DailyEntry(
         date: day,
         cervixFirmness: CervixFirmness.halfSoft,

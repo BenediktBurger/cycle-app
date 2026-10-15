@@ -1,54 +1,21 @@
-// Lifecycle regression matrix for the dialog and the tab shell: the Android
-// field report for this cluster was a Flutter framework assertion
-// (`_dependents.isEmpty` in InheritedElement unmount — an inherited widget
-// element taken down while widgets still depend on it), most plausibly tied
-// to a dismissal race around a dialog route or to the diary form reloading
-// mid-flight. The import dialogs themselves had already been refactored into
-// fully self-contained stateful widgets (screen-level controllers and manual
-// disposal after `await showDialog` were the earlier structural suspect), so
-// this matrix drives the *remaining* interaction surface through the real
-// app shell with ALL tabs mounted in the IndexedStack:
+// Lifecycle regression matrix for the dialog and the tab shell, driven
+// through the real app shell with ALL tabs mounted in the IndexedStack:
 //
 //   a) JSON import dialog: type into the textarea, dismiss via the scrim.
 //   b) drip CSV import dialog: picker content, Apply while the import runs,
 //      fast scrim dismissal through the still-running apply.
 //   c) diary form: pick a mucus sign + a quality, then change the selected
-//      date OFFSTAGE (provider write while the diary is mounted but hidden
+//      date offstage (provider write while the diary is mounted but hidden
 //      behind the cycle tab — the chart-tap path, exercised directly at the
 //      provider) and check the mid-form reload through the listener.
 //   d) drip import: apply, fast scrim dismissal, RE-OPEN immediately.
 //
 // Each subtest installs a `FlutterError.onError` collector for its scenario
 // INCLUDING the explicit tree teardown (`tester.pumpWidget(SizedBox)`)
-// inside the collected window (the reported assertion class fires during
-// element unmount, so teardown is where it would surface) and ends asserting
-// the collected error list is empty.
-//
-// RESULT OF THE INVESTIGATION (plain language):
-// Subtests (b) and (d) reproduced a real dismissal defect. Fast scrim
-// dismissal racing the running import popped the ENTIRE route stack out
-// from under the app: right after the second tap the MaterialApp rendered
-// an empty Navigator — no scaffold, no shell, no bottom navigation. Cause:
-// the dialogs' apply closure runs on the settings screen and pops the DIALOG
-// by the dialog's context once the import lands. After a fast dismissal the
-// dialog route is already popped by the barrier tap, but its elements are
-// not yet torn down — `dialogContext.mounted` is still true, so the old
-// `mounted`-guarded pop went through, `Navigator.of(dialogContext)` still
-// resolved to the root navigator (the context's ancestor chain is intact
-// until finalization) and popped whatever was on top now: the HOME route.
-// On a device, the same race tears the whole visible UI down with the
-// dialog — the churn through the route's inherited-element teardown (the
-// dialog route's MediaQuery/Localizations/riverpod scope dependents being
-// disassembled while still registering dependents) is precisely the class
-// of field-reported framework assertion this matrix was hunting.
-// The fix: the success-path pop only fires while the dialog route is still
-// the current route (`ModalRoute.of(...).isCurrent` in the settings screen's
-// apply handlers); the import summary still appears as a snackbar from the
-// screen context either way.
-// Subtests (a) and (c) pass before and after the fix and stay as regression
-// guards: (a) covers a plain typed-then-dismissed dialog, (c) covers the
-// mid-form listener reload of the entry form (S + quality selected, then the
-// selected date changed through the provider while the diary tab is hidden).
+// inside the collected window (element-unmount assertions surface there,
+// not on-screen) and ends asserting the collected error list is empty.
+// Why subtests (b) and (d) additionally require the HOME route to survive
+// the raced dismissal: docs/dev-notes.md, "Dialog scrim-dismissal race".
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/providers.dart';

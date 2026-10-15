@@ -14,7 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/database.dart';
 import 'support/faulty_db.dart';
 import 'support/finders.dart';
-import 'support/viewport.dart';
 
 void main() {
   /// German device, already onboarded, seeded with two tracked days, two
@@ -24,8 +23,6 @@ void main() {
     WidgetTester tester, {
     CycleDatabase Function()? builder,
   }) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
     CycleDatabase? db;
     Future<void> seed(CycleDatabase database) async {
       db = database;

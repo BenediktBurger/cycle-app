@@ -15,6 +15,8 @@ import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show MethodChannel, MissingPluginException;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Override (the inMemoryDatabase return type) ships from the misc entry in
@@ -68,6 +70,14 @@ Override inMemoryDatabase({
   });
 }
 
+/// The package-info channel the about/onboarding pages read their version
+/// through. The harness decides per scope call how it answers — mock
+/// handlers registered at the messenger override one another, so both
+/// postures (seeded values / deliberate failure) stay test order-independent.
+const MethodChannel packageInfoChannel = MethodChannel(
+  'dev.fluttercommunity.plus/package_info',
+);
+
 /// App scope for the widget smoke tests: wraps the real app in a
 /// ProviderScope over a fresh in-memory database. Every pin is optional and
 /// null means "leave the provider at its real default":
@@ -92,20 +102,20 @@ Override inMemoryDatabase({
 /// that pump CycleApp directly (without [appScope]) override the provider
 /// themselves.
 ///
-/// The harness also seeds the PackageInfo mock values BEFORE pumping: the
-/// about/onboarding page reads the app version from the installed binary via
-/// package_info_plus, and the metadata plugin call must be answered in the
-/// test binding or the version line hides (its designed failure path). The
-/// values mirror a real 0.1.0+1 device install: version without the build
-/// suffix, buildNumber without the `+`. NOTE: PackageInfo caches these
-/// values in one static that nothing can clear again — the failure-path run
-/// that needs the plugin call to fail must not go through this harness (and
-/// must run before any harness-pumping test in its file).
+/// The harness also answers the package-info channel on every scope call:
+/// the default seeds the mock values of a real 0.1.0+1 device install
+/// (version without the build suffix, buildNumber without the `+`) so the
+/// version line renders; [packageInfoFailure] answers instead with an
+/// error — the closest model of a broken/unanswerable device install — and
+/// the version line hides (its designed failure path). Each scope call
+/// (re-)sets the channel handler, so whichever posture a test needs wins
+/// over what earlier tests in the file seeded.
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
   DiaryTrack? diaryTrack,
   bool? onboardingCompleted,
+  bool packageInfoFailure = false,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
   CycleDatabase Function()? builder,
@@ -113,13 +123,23 @@ ProviderScope appScope({
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
 }) {
-  PackageInfo.setMockInitialValues(
-    appName: '',
-    packageName: '',
-    version: '0.1.0',
-    buildNumber: '1',
-    buildSignature: '',
-  );
+  if (packageInfoFailure) {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(packageInfoChannel, (call) async {
+          throw MissingPluginException(
+            'no package metadata on this (test) device',
+          );
+        });
+  } else {
+    PackageInfo.setMockInitialValues(
+      appName: '',
+      packageName: '',
+      version: '0.1.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+  }
   return ProviderScope(
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),

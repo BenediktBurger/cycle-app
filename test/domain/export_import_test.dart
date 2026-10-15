@@ -5,10 +5,10 @@
 // which is a pure row-map function exercising the domain vocabulary helpers
 // (still no database needed).
 //
-// v5 document shape (profiles REMOVED): the document root is exactly
+// v5 document shape: the document root is exactly
 // schema_version / exported_at / entries / marks — no `profiles` list, no
-// `profile_id` keys on any row. Old-document `profile_id`/`profiles` keys
-// are accepted and IGNORED (verified in the old-document group below).
+// `profile_id` keys on any row. Old documents still carrying those keys
+// parse fine: the keys are accepted and IGNORED (old-document group below).
 
 import 'dart:convert';
 import 'dart:io';
@@ -158,7 +158,7 @@ void main() {
           // Unknown vocabulary — the db writer drops this row.
           {'date': '2026-03-01', 'bleeding': 'heavy'},
           // Out-of-range level — the db writer drops this row. (A MISSING
-          // key no longer belongs here: the sparse contract parses it as
+          // key is not junk: the sparse contract parses it as
           // bleeding-none, see the sparse-entry tests below.)
           {'date': '2026-03-02', 'bleeding': 6},
           {'date': '2026-03-03', 'bleeding': 'none'},
@@ -728,7 +728,7 @@ void main() {
         },
       );
 
-      test('reader: the old boolean `sex` flag is gone from the shape', () {
+      test('reader: a legacy `sex` boolean does not yield timings', () {
         // v4 was redefined in place pre-release (no published v4 documents
         // exist): `sex_timings` REPLACES `sex`. A row still carrying the old
         // flag loses it silently — no shim, the row stays valid.

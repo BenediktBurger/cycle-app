@@ -1,19 +1,11 @@
 // Widget tests of the Tagebuch screen's time and navigation behavior —
-// the whole family in one file: the measured-time picker (conditional
-// visibility, stamp-at-entry, round-trip, clearing, day-tile display), the
-// previous/next day chevrons (with their edit-discard semantics) and the
-// entry form's explicit cycle-start switch (the disturbance flags'
-// analysis-exclusion marking works without any auto behavior — see
-// test/diary_temperature_exclude_group_test.dart's manual exclude switch).
-//
-// Each section below (kicked off by a `════ former` banner) carries
-// the former file's header comments verbatim; test bodies were
-// concatenated, not rewritten. Colliding top-level names (`harness`,
-// `_fixedNow`) were prefixed per former file.
-
-// No assertion was edited: run the full gate and diff the collected
-// test names against the pre-merge report — only the suite-path
-// prefix changed.
+// three sections in one file, each with its own clock pin: the
+// measured-time picker (conditional visibility, stamp-at-entry, round-trip,
+// clearing, day-tile display), the previous/next day chevrons (with their
+// edit-discard semantics) and the entry form's explicit cycle-start switch
+// (the disturbance flags' analysis-exclusion marking works without any auto
+// behavior — see test/diary_temperature_exclude_group_test.dart's manual
+// exclude switch).
 
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/marks.dart';
@@ -25,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
+import 'package:cycle_app/db/cycle_database.dart';
 import 'support/diary_harness.dart';
 import 'support/database.dart';
 import 'support/error_collector.dart';
@@ -50,10 +43,18 @@ import 'support/viewport.dart';
 // The German locale is pinned (like the sibling widget tests) so the 24 h
 // format assertions stay deterministic.
 
-// Injected "now" for every test in this file.
-final _measuredTimeNow = DateTime(2026, 4, 10, 14, 35); // 14:35
+// The measured-time and day-navigation sections' pinned clock.
+final _now = DateTime(2026, 4, 10, 14, 35); // 14:35
 
-final _measuredTimeHarness = DiaryHarness(now: _measuredTimeNow);
+// One harness serves all three sections: every scope() call builds a fresh
+// in-memory database and rebinds it to the harness, so the sections' tests
+// can't see each other; the cycle-start section passes its own `now` and
+// selected day.
+final _harness = DiaryHarness(now: _now);
+
+// The cycle-start section's pins: the switch assertions run on a later
+// calendar day.
+final _switchNow = DateTime(2026, 9, 15, 10, 30);
 
 // Widget tests for the previous/next day navigation on the Tagebuch entry
 // form: the chevron buttons beside the date button must move the form to
@@ -67,26 +68,28 @@ final _measuredTimeHarness = DiaryHarness(now: _measuredTimeNow);
 // the measured-time section. The German locale is pinned so the date
 // label and tooltip assertions stay deterministic.
 
-// Injected "now" for every test in this file.
-final _dayNavNow = DateTime(2026, 4, 10, 14, 35); // Friday, 10.4.2026
-
 // The two days the form navigates between (both before "today" so the
 // cycle-group tiles can render them as recorded days).
 final _day1 = DateOnly.normalize(DateTime(2026, 4, 8));
 final _day2 = DateOnly.normalize(DateTime(2026, 4, 9));
 
-final _dayNavHarness = DiaryHarness(now: _dayNavNow);
+ProviderScope _dayNavScope({required DateTime selectedDay}) => _harness.scope(
+  seed: (db) async {
+    // Two adjacent days with distinct temperatures: the form must show
+    // the one belonging to the currently selected day.
+    await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
+    await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
+  },
+  selectedDay: selectedDay,
+);
 
-ProviderScope _dayNavScope({required DateTime selectedDay}) =>
-    _dayNavHarness.scope(
-      seed: (db) async {
-        // Two adjacent days with distinct temperatures: the form must show
-        // the one belonging to the currently selected day.
-        await db.entriesDao.upsertDaily(DailyEntry(date: _day1, bbtC: 36.4));
-        await db.entriesDao.upsertDaily(DailyEntry(date: _day2, bbtC: 36.9));
-      },
-      selectedDay: selectedDay,
-    );
+// The entry form's selected calendar day in the cycle-start section.
+final _day = DateTime.utc(2026, 9, 15);
+
+/// The cycle-start section's scope: the switch tests run the form on
+/// 2026-09-15, away from the earlier sections' clock.
+ProviderScope _switchScope({Future<void> Function(CycleDatabase db)? seed}) =>
+    _harness.scope(seed: seed, now: _switchNow, selectedDay: _day);
 
 /// The BBT field is the first form field; its controller text is the
 /// round-trip signal for "which day's entry is loaded".
@@ -121,14 +124,6 @@ IconButton _chevron(WidgetTester tester, IconData icon) =>
 // measured-time section; the German locale is pinned so the
 // switch-label assertion stays deterministic.
 
-// Selected calendar day of the entry form.
-final _day = DateTime.utc(2026, 9, 15);
-
-final _toggleHarness = DiaryHarness(
-  now: DateTime(2026, 9, 15, 10, 30),
-  selectedDay: _day,
-);
-
 /// The cycle-start switch of the entry form (test-visible key).
 Finder get _cycleStartSwitch =>
     find.byKey(const ValueKey('diaryCycleStartSwitch'));
@@ -139,8 +134,6 @@ bool _cycleStartSwitchValue(WidgetTester tester) =>
 
 void main() {
   // ═══════════ measured time ═══════════
-  // former test/diary_measured_time_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   /// Types into the temperature field (the first form field) and lets the
   /// controller listener rebuild the form (the time row's visibility
@@ -153,7 +146,7 @@ void main() {
   testWidgets('the time row appears only once a temperature is entered', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(_measuredTimeHarness.scope());
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     // The time row's visibility rides on the keyed picker button: both the
@@ -186,9 +179,9 @@ void main() {
   testWidgets('entering a temperature on a past day stamps no time', (
     WidgetTester tester,
   ) async {
-    _measuredTimeHarness.tallSurface(tester);
+    _harness.tallSurface(tester);
     final pastDay = DateOnly.normalize(DateTime(2026, 1, 6));
-    await tester.pumpWidget(_measuredTimeHarness.scope(selectedDay: pastDay));
+    await tester.pumpWidget(_harness.scope(selectedDay: pastDay));
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '36.5');
@@ -212,12 +205,12 @@ void main() {
       'unset, editing the text stamps the current time', (
     WidgetTester tester,
   ) async {
-    _measuredTimeHarness.tallSurface(tester);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
-      _measuredTimeHarness.scope(
+      _harness.scope(
         seed: (db) async {
           await db.entriesDao.upsertDaily(
-            DailyEntry(date: _measuredTimeHarness.selectedDay, bbtC: 36.4),
+            DailyEntry(date: _harness.selectedDay, bbtC: 36.4),
           );
         },
       ),
@@ -246,8 +239,8 @@ void main() {
     'compact density: the temperature field and the measured-time row '
     'share one visual line',
     (WidgetTester tester) async {
-      _measuredTimeHarness.tallSurface(tester);
-      await tester.pumpWidget(_measuredTimeHarness.scope());
+      _harness.tallSurface(tester);
+      await tester.pumpWidget(_harness.scope());
       await tester.pumpAndSettle();
 
       await enterTemperature(tester, '36.5');
@@ -277,7 +270,7 @@ void main() {
     (WidgetTester tester) async {
       useNarrowPhoneViewport(tester);
 
-      await tester.pumpWidget(_measuredTimeHarness.scope());
+      await tester.pumpWidget(_harness.scope());
       await tester.pumpAndSettle();
 
       expect(
@@ -331,7 +324,7 @@ void main() {
     // The row mirrors the validator's plausibility gate (isWithinBbtRange):
     // "999" parses as a number but can never be saved as a temperature, so
     // no measurement time may be recorded for it.
-    await tester.pumpWidget(_measuredTimeHarness.scope());
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '999');
@@ -349,11 +342,11 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      _measuredTimeHarness.scope(
+      _harness.scope(
         seed: (db) async {
           await db.entriesDao.upsertDaily(
             DailyEntry(
-              date: _measuredTimeHarness.selectedDay,
+              date: _harness.selectedDay,
               bbtC: 36.4,
               measuredAtMinutes: 407, // 06:47 — measured in the early morning
             ),
@@ -381,13 +374,13 @@ void main() {
   testWidgets('clearing the time is possible and stores null', (
     WidgetTester tester,
   ) async {
-    _measuredTimeHarness.tallSurface(tester);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
-      _measuredTimeHarness.scope(
+      _harness.scope(
         seed: (db) async {
           await db.entriesDao.upsertDaily(
             DailyEntry(
-              date: _measuredTimeHarness.selectedDay,
+              date: _harness.selectedDay,
               bbtC: 36.4,
               measuredAtMinutes: 407,
             ),
@@ -407,8 +400,8 @@ void main() {
     await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
-      _measuredTimeHarness.selectedDay,
+    final stored = (await _harness.db!.entriesDao.entryFor(
+      _harness.selectedDay,
     ))!;
     expect(stored.bbtC, 36.4, reason: 'the temperature itself is kept');
     expect(
@@ -420,8 +413,8 @@ void main() {
 
   testWidgets('a temperature-less save stores no time, even after '
       'a time was stamped', (WidgetTester tester) async {
-    _measuredTimeHarness.tallSurface(tester);
-    await tester.pumpWidget(_measuredTimeHarness.scope());
+    _harness.tallSurface(tester);
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     // The user starts typing a temperature (the time row appears with the
@@ -438,8 +431,8 @@ void main() {
     await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
-      _measuredTimeHarness.selectedDay,
+    final stored = (await _harness.db!.entriesDao.entryFor(
+      _harness.selectedDay,
     ))!;
     expect(stored.bbtC, isNull);
     expect(stored.mucusSign, 's');
@@ -456,16 +449,16 @@ void main() {
   testWidgets('saving a temperature stores the stamped time with it', (
     WidgetTester tester,
   ) async {
-    _measuredTimeHarness.tallSurface(tester);
-    await tester.pumpWidget(_measuredTimeHarness.scope());
+    _harness.tallSurface(tester);
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     await enterTemperature(tester, '36.5');
     await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
-    final stored = (await _measuredTimeHarness.db!.entriesDao.entryFor(
-      _measuredTimeHarness.selectedDay,
+    final stored = (await _harness.db!.entriesDao.entryFor(
+      _harness.selectedDay,
     ))!;
     expect(stored.bbtC, 36.5);
     expect(
@@ -482,9 +475,9 @@ void main() {
   ) async {
     // The time lives on a DIFFERENT day than the selected one, so the only
     // possible source of the string is the tile, not the form.
-    _measuredTimeHarness.tallSurface(tester);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
-      _measuredTimeHarness.scope(
+      _harness.scope(
         seed: (db) async {
           await db.entriesDao.upsertDaily(
             DailyEntry(
@@ -525,8 +518,6 @@ void main() {
   });
 
   // ═══════════ day navigation ═══════════
-  // former test/diary_day_navigation_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   testWidgets(
     'next/previous change the loaded day and its entry, back and forth',
@@ -592,7 +583,7 @@ void main() {
   ) async {
     // The picker window (see _pickDate) ends at now + 1 day: selecting
     // tomorrow must not offer a next day — no unbounded future.
-    final tomorrow = DateOnly.addDays(_dayNavNow, 1);
+    final tomorrow = DateOnly.addDays(_now, 1);
     await tester.pumpWidget(_dayNavScope(selectedDay: tomorrow));
     await tester.pumpAndSettle();
 
@@ -683,8 +674,8 @@ void main() {
       reason: 'the discarded edit never reached the database',
     );
 
-    final stored1 = await _dayNavHarness.db!.entriesDao.entryFor(_day1);
-    final stored2 = await _dayNavHarness.db!.entriesDao.entryFor(_day2);
+    final stored1 = await _harness.db!.entriesDao.entryFor(_day1);
+    final stored2 = await _harness.db!.entriesDao.entryFor(_day2);
     expect(
       stored1!.bbtC,
       36.4,
@@ -700,14 +691,11 @@ void main() {
       // No explicit selectedDay: the harness defaults it to the pinned
       // "now" (2026-04-10), so the today branch fires deterministically
       // through the nowProvider seam.
-      await tester.pumpWidget(_dayNavHarness.scope());
+      await tester.pumpWidget(_harness.scope());
       await tester.pumpAndSettle();
 
       expect(
-        find.widgetWithText(
-          OutlinedButton,
-          germanDayLabel(_dayNavNow, today: _dayNavNow),
-        ),
+        find.widgetWithText(OutlinedButton, germanDayLabel(_now, today: _now)),
         findsOneWidget,
         reason:
             'the selected day == pinned now, so the button shows the '
@@ -729,7 +717,7 @@ void main() {
 
       // Checked on the picker window's edge too: tomorrow, "measured
       // just after midnight" is still not today.
-      for (final day in [_day1, DateOnly.addDays(_dayNavNow, 1)]) {
+      for (final day in [_day1, DateOnly.addDays(_now, 1)]) {
         final plain = germanDayLabel(day);
         expect(
           plain,
@@ -754,7 +742,7 @@ void main() {
         expect(
           find.widgetWithText(
             OutlinedButton,
-            germanDayLabel(_dayNavNow, today: _dayNavNow),
+            germanDayLabel(_now, today: _now),
           ),
           findsNothing,
           reason:
@@ -771,20 +759,16 @@ void main() {
     // One en assertion guards the template/fallback ordering of the
     // todayDate key.
     await tester.pumpWidget(
-      appScope(
-        locale: const Locale('en'),
-        now: () => _dayNavNow,
-        selectedDay: _dayNavNow,
-      ),
+      appScope(locale: const Locale('en'), now: () => _now, selectedDay: _now),
     );
     await tester.pumpAndSettle();
 
     expect(
       find.widgetWithText(
         OutlinedButton,
-        lookupAppLocalizations(const Locale('en')).todayDate(
-          DateFormat.yMMMEd('en').format(DateOnly.normalize(_dayNavNow)),
-        ),
+        lookupAppLocalizations(
+          const Locale('en'),
+        ).todayDate(DateFormat.yMMMEd('en').format(DateOnly.normalize(_now))),
       ),
       findsOneWidget,
       reason: 'the en locale shows "Today, Fri, Apr 10, 2026" on today',
@@ -792,15 +776,12 @@ void main() {
   });
 
   // ═══════════ cycle-start switch ═══════════
-  // former test/diary_cycle_start_prompt_test.dart — rewritten: the
-  // bleeding-suggested confirm dialog is replaced by the form's explicit
-  // cycle-start switch (see the section comment above).
 
   testWidgets('the form offers a "Zyklusbeginn" switch, off on a fresh day', (
     tester,
   ) async {
-    _toggleHarness.tallSurface(tester);
-    await tester.pumpWidget(_toggleHarness.scope());
+    _harness.tallSurface(tester);
+    await tester.pumpWidget(_switchScope());
     await tester.pumpAndSettle();
 
     expect(
@@ -829,12 +810,12 @@ void main() {
     'toggling the switch on and saving places a user-authored cycleStart '
     'mark',
     (tester) async {
-      _toggleHarness.tallSurface(tester);
-      await tester.pumpWidget(_toggleHarness.scope());
+      _harness.tallSurface(tester);
+      await tester.pumpWidget(_switchScope());
       await tester.pumpAndSettle();
 
       expect(
-        await _toggleHarness.storedMarkTypes(_day),
+        await _harness.storedMarkTypes(_day),
         isEmpty,
         reason: 'guard: a fresh day carries no marks',
       );
@@ -844,7 +825,7 @@ void main() {
       await tester.tap(diarySaveButton());
       await tester.pumpAndSettle();
 
-      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
+      final marks = await _harness.db!.marksDao.marksForDay(_day);
       expect(
         marks.map((m) => m.markType),
         contains(CycleMarkTypes.cycleStart),
@@ -867,9 +848,9 @@ void main() {
 
   testWidgets('toggling the switch off and saving REMOVES a pre-existing '
       'cycleStart mark (both directions)', (tester) async {
-    _toggleHarness.tallSurface(tester);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
-      _toggleHarness.scope(
+      _switchScope(
         seed: (db) async {
           await db.marksDao.addMark(
             _day,
@@ -893,7 +874,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      await _toggleHarness.storedMarkTypes(_day),
+      await _harness.storedMarkTypes(_day),
       isEmpty,
       reason:
           'the switch off -> save removes the mark in the same save '
@@ -906,9 +887,9 @@ void main() {
     'a pre-seeded cycleStart mark loads the switch on and an untouched '
     'save keeps the mark exactly as it was',
     (tester) async {
-      _toggleHarness.tallSurface(tester);
+      _harness.tallSurface(tester);
       await tester.pumpWidget(
-        _toggleHarness.scope(
+        _switchScope(
           seed: (db) async {
             await db.marksDao.addMark(
               _day,
@@ -931,7 +912,7 @@ void main() {
       await tester.tap(diarySaveButton());
       await tester.pumpAndSettle();
 
-      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
+      final marks = await _harness.db!.marksDao.marksForDay(_day);
       expect(
         marks.map((m) => m.markType),
         [CycleMarkTypes.cycleStart],
@@ -951,25 +932,24 @@ void main() {
     'saving a suggested menstruation-level bleeding day WITHOUT touching '
     'the switch places no mark and shows no dialog',
     (tester) async {
-      _toggleHarness.tallSurface(tester);
-      await tester.pumpWidget(_toggleHarness.scope());
+      _harness.tallSurface(tester);
+      await tester.pumpWidget(_switchScope());
       await tester.pumpAndSettle();
 
       // First recorded day, bleeding "leicht" (level 2): the shared
-      // suggestion predicate would flag this day as a cycle start — the
-      // old prompt fired here. Bleeding no longer implies or asks for a
-      // cycle start on the diary.
-      await _toggleHarness.saveWithBleeding(tester, Bleeding.light);
+      // suggestion predicate would flag this day as a cycle start, yet
+      // bleeding neither implies nor asks for a cycle start on the diary.
+      await _harness.saveWithBleeding(tester, Bleeding.light);
 
       expect(
         find.byType(AlertDialog),
         findsNothing,
         reason:
             'no cycle-start prompt ever appears — bleeding only '
-            'suggested, and the diary no longer asks',
+            'suggests, the diary never asks',
       );
       expect(
-        await _toggleHarness.storedMarkTypes(_day),
+        await _harness.storedMarkTypes(_day),
         isEmpty,
         reason:
             'a plain bleeding save places no cycleStart mark — only the '
@@ -982,9 +962,9 @@ void main() {
     'an ignoreTemperature-seeded day plus the switch toggled on keeps '
     'BOTH marks after one save (no coupling in either direction)',
     (tester) async {
-      _toggleHarness.tallSurface(tester);
+      _harness.tallSurface(tester);
       await tester.pumpWidget(
-        _toggleHarness.scope(
+        _switchScope(
           seed: (db) async {
             // The day already carries the temperature-ignore mark: it is
             // scoped to the temperature evaluation and must not couple
@@ -1004,7 +984,7 @@ void main() {
       await tester.tap(diarySaveButton());
       await tester.pumpAndSettle();
 
-      final marks = await _toggleHarness.db!.marksDao.marksForDay(_day);
+      final marks = await _harness.db!.marksDao.marksForDay(_day);
       expect(
         marks.map((m) => m.markType),
         unorderedEquals([

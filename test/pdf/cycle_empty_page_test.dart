@@ -3,8 +3,6 @@
 // mark day to the next mark / today), so the page plan counts that span and
 // the sheet renders it as blank columns with day numbers counted from the
 // opening mark day.
-import 'dart:io';
-
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
@@ -13,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/pdf_content.dart'
     show PdfTextRun, countPageMarkers, extractPageContent;
+import '../support/pdf_fixtures.dart' show fixtureFontBytes;
 
 DateTime d(int y, int m, int day) => DateTime.utc(y, m, day);
 
@@ -26,11 +25,6 @@ List<CycleMark> _farPastMarks() => [
   CycleMark(date: d(2020, 2, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(2020, 3, 1), type: CycleMarkTypes.cycleStart),
 ];
-
-/// Read from the checkout rather than rootBundle: the generator takes bare
-/// font bytes.
-List<int> fixtureFontBytes() =>
-    File('assets/fonts/NotoSans-Regular.ttf').readAsBytesSync();
 
 PdfExportModel emptyCycleModel() => buildPdfExportModel(
   entries: const [],

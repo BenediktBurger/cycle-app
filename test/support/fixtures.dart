@@ -15,9 +15,19 @@ final String sampleDripCsv = File(
   'examples/drip-export-sample.csv',
 ).readAsStringSync();
 
-/// The shared evaluation scenario (used by the evaluation section of
-/// test/cycle_chart_test.dart and cycle_mark_sheet_test.dart for the
-/// write-through): days
+/// 2026-09-03 is a Thursday: indexes 0..4 run Thu..Mon, so weekday strips,
+/// weekend-in-the-middle and alignment scenarios all sit on one calendar
+/// block.
+DateTime septThreeDay(int index) =>
+    DateTime.utc(2026, 9, 3).add(Duration(days: index));
+
+/// 2026-09-07 is a Monday: the compact multi-day block most chart fixtures
+/// sit on (five day columns fit the default viewport).
+DateTime septSevenDay(int index) => DateTime.utc(2026, 9, 7 + index);
+
+/// The shared evaluation scenario (used by
+/// test/cycle_chart_evaluation_test.dart and cycle_mark_sheet_test.dart for
+/// the write-through): days
 /// 2026-09-06..16 with
 ///
 ///  - 9/6 (idx 0): the rise BEFORE the marked first higher — never a
@@ -65,7 +75,7 @@ List<DailyEntry> longRangeEntries([int count = 60]) => [
 ];
 
 /// Nine chart days covering one recorded fact per signal (the per-signal
-/// rows fixture of the chart test's rows section):
+/// rows fixture of test/cycle_chart_rows_test.dart):
 ///  0: temperature WITH a recorded measurement time (6:30)
 ///  1: bleeding light
 ///  2: bleeding spotting

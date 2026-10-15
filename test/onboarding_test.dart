@@ -28,8 +28,6 @@ void main() {
   testWidgets('first start shows the onboarding page with the method warning', (
     WidgetTester tester,
   ) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
     await tester.pumpWidget(
       appScope(locale: const Locale('de'), onboardingCompleted: false),
     );
@@ -62,8 +60,6 @@ void main() {
   testWidgets('continue enters the shell and persists the flag', (
     WidgetTester tester,
   ) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
     CycleDatabase? db;
     await tester.pumpWidget(
       appScope(
@@ -111,8 +107,6 @@ void main() {
   testWidgets('second start shows nothing (the persisted flag is hydrated)', (
     WidgetTester tester,
   ) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
     Future<void> seed(CycleDatabase db) =>
         SettingsStore(db.settingsDao).persistOnboardingCompleted(true);
 
@@ -269,8 +263,6 @@ void main() {
   testWidgets(
     'the settings pane app bar opens the about page with the SAME content',
     (WidgetTester tester) async {
-      useDeviceLocales(tester, const [Locale('de')]);
-
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistOnboardingCompleted(true);
 

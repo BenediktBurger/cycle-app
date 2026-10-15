@@ -64,7 +64,6 @@ List<CycleMark> divergentMarks() => [
 
 Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
 Finder metricCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
-Finder oldCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
 Finder earliestFirstHigherCard() =>
     find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
 
@@ -743,15 +742,15 @@ void main() {
     // One open in-app cycle: no countable in-app length — the summary row
     // still renders (the paper-only-shortest gate), with the in-app main
     // figure dashing and the paper figure only on the outside line.
-    expect(oldCard('shortest'), findsOneWidget);
+    expect(metricCard('shortest'), findsOneWidget);
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('—')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('—')),
       findsOneWidget,
       reason: 'the in-app main figure has no value to show',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
@@ -759,7 +758,7 @@ void main() {
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
       findsNothing,
@@ -813,13 +812,13 @@ void main() {
     // Shortest card: the in-app minimum stays the main figure untouched,
     // the paper figure shows on its own outside line.
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('28')),
       findsOneWidget,
       reason: 'the in-app minimum is the main figure',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
@@ -827,14 +826,14 @@ void main() {
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
       findsNothing,
       reason: 'summary cards carry no count caption',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('21')),
       findsNothing,
       reason: 'the paper figure is never a bare second figure',
     );
@@ -873,20 +872,20 @@ void main() {
       paperShortestCycleLength: 30,
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('28')),
       findsOneWidget,
       reason: 'the smaller in-app minimum stays the main figure',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.text(enL10n.statisticsShortestOutsideApp(30)),
       ),
       findsOneWidget,
       reason: 'the paper figure shows even when it adds nothing to the minimum',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('30')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('30')),
       findsNothing,
       reason: 'the paper figure is never a bare second figure',
     );
@@ -1165,7 +1164,7 @@ void main() {
     expect(
       find.textContaining('no first higher measurement'),
       findsNothing,
-      reason: 'the real-variant note is gone from the screen',
+      reason: 'the screen states nothing about the real variant',
     );
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),

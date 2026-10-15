@@ -227,7 +227,6 @@ void main() {
     testWidgets('a persisted outside-app count hydrates into the settings '
         'field on start', (WidgetTester tester) async {
       useTallSurface(tester, width: 900);
-      useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistObservedCyclesOutsideApp(5);
@@ -264,7 +263,6 @@ void main() {
       'resyncing once the user has typed',
       (WidgetTester tester) async {
         useTallSurface(tester, width: 900);
-        useDeviceLocales(tester, const [Locale('de')]);
 
         await tester.pumpWidget(appScope(locale: const Locale('de')));
         await tester.pumpAndSettle();
@@ -312,7 +310,6 @@ void main() {
     testWidgets('persisted paper values hydrate into the settings fields '
         'on start', (WidgetTester tester) async {
       useTallSurface(tester, width: 900);
-      useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) async {
         final store = SettingsStore(db.settingsDao);
@@ -428,8 +425,6 @@ void main() {
     testWidgets('a live explicit choice is not clobbered by hydration', (
       WidgetTester tester,
     ) async {
-      useDeviceLocales(tester, const [Locale('de')]);
-
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistLocale(const Locale('de'));
 
@@ -516,7 +511,6 @@ void main() {
     testWidgets('a persisted name and birth date hydrate into the '
         'PDF-export card on start', (WidgetTester tester) async {
       useTallSurface(tester, width: 900);
-      useDeviceLocales(tester, const [Locale('de')]);
 
       Future<void> seed(CycleDatabase db) async {
         final store = SettingsStore(db.settingsDao);

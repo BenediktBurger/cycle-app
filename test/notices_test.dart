@@ -6,8 +6,6 @@
 // carries no notice card anymore (pinned in the DSGVO group below).
 //
 // German device locale mirrors the app's German-first posture.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/db/settings_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,8 +14,9 @@ import 'support/finders.dart';
 import 'support/viewport.dart';
 
 void main() {
-  /// German device + seeded onboarding flag: the shell is reachable and the
-  /// settings pane is the navigation surface both groups start from.
+  /// German device locale + the German UI: the shell is reachable (the
+  /// harness defaults to an onboarded install) and the settings pane is the
+  /// navigation surface both groups start from.
   ///
   /// The pane is a lazy ListView: an "absent from the pane" pin must enlarge
   /// the surface so the whole card list is BUILT in one viewport (otherwise
@@ -25,12 +24,8 @@ void main() {
   /// below the fold unbuilt).
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
     useTallSurface(tester, width: 900);
-    useDeviceLocales(tester, const [Locale('de')]);
 
-    Future<void> seed(CycleDatabase db) =>
-        SettingsStore(db.settingsDao).persistOnboardingCompleted(true);
-
-    await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
 
     await tester.tap(navLabel('Einstellungen'));
@@ -51,9 +46,9 @@ void main() {
       (WidgetTester tester) async {
         await pumpGermanSettingsPane(tester);
 
-        // The pane's dedicated card is gone: no Datenschutz heading anywhere
-        // on the settings surface (asserted BEFORE the about page is pushed,
-        // so later finds cannot spill over from the pushed page).
+        // The pane carries no dedicated notice card: no Datenschutz heading
+        // anywhere on the settings surface (asserted BEFORE the about page
+        // is pushed, so later finds cannot spill over from the pushed page).
         expect(
           find.text('Datenschutz'),
           findsNothing,

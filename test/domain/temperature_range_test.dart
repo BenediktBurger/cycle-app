@@ -1,8 +1,7 @@
 // Pure-Dart unit tests of the temperature display range's value-type
 // semantics: TemperatureRange.fromJson is the validation seam every reader
-// of persisted material goes through (the settings store catches its
-// ArgumentError and keeps the default — fallback cases live in
-// test/db/settings_store_test.dart).
+// of persisted material goes through; readers catch its ArgumentError and
+// keep the default.
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:flutter_test/flutter_test.dart';
 

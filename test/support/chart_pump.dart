@@ -23,6 +23,11 @@ import 'provider_fixtures.dart';
 /// reach the same ColorScheme the charts render with.
 const chartSeedColor = Color(0xFF6750A4);
 
+/// The R10 baseline bars' dash pattern (an inline literal in
+/// lib/ui/cycle_chart.dart; the help sheet's legend glyph repaints the same
+/// dashes, so the chart and help-sheet tests assert these numbers).
+const baselineDashPattern = [6, 4];
+
 /// Builds the pumpable widget tree for a chart test.
 ///
 ///  - [entries], [marks] and [selectedDate] (default: [entries]' first day)

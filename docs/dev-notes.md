@@ -42,6 +42,37 @@ A related tripwire lives in `pubspec.yaml`: if that file ever reverts to
 "A new Flutter project" defaults, a `flutter create` run has clobbered it —
 restore from git history.
 
+## Dialog scrim-dismissal race (test/dialog_and_shell_lifecycle_test.dart)
+
+An Android field report for the dialog/diary cluster described a Flutter
+framework assertion (`_dependents.isEmpty` in InheritedElement unmount — an
+inherited widget element taken down while widgets still depend on it). The
+lifecycle regression matrix in `test/dialog_and_shell_lifecycle_test.dart`
+drives the dialog and diary interaction surface through the real app shell
+(all tabs mounted in the IndexedStack) with an error collector wrapped
+around each scenario INCLUDING the explicit teardown, and reproduced the
+defect deterministically:
+
+Fast scrim dismissal racing the running drip-import popped the ENTIRE route
+stack out from under the app — right after the second tap the MaterialApp
+rendered an empty Navigator (no scaffold, no shell, no bottom navigation).
+Cause: the dialogs' apply closure runs on the settings screen and pops the
+DIALOG by the dialog's context once the import lands. After a fast dismissal
+the dialog route is already popped by the barrier tap, but its elements are
+not yet torn down — `dialogContext.mounted` is still true, so the
+mounted-guarded pop went through, `Navigator.of(dialogContext)` still
+resolved to the root navigator (the context's ancestor chain is intact until
+route finalization) and popped whatever was on top now: the HOME route. On a
+device, the same race tears the whole visible UI down with the dialog; the
+churn through the route's inherited-element teardown (the dialog route's
+MediaQuery/Localizations/riverpod scope dependents being disassembled while
+still registering dependents) is the class of field-reported assertion.
+
+Fix policy: the success-path pop only fires while the dialog route is still
+the current route (`ModalRoute.of(...).isCurrent` in the settings screen's
+apply handlers); the import summary still appears as a snackbar from the
+screen context either way.
+
 ## Lesson learned: `flutter test` and loopback sockets (2026-09-15, resolved)
 
 `flutter_tester` (spawned by `flutter test`) opens a temporary loopback

@@ -2,6 +2,7 @@
 // interaction helpers the chart and shell tests kept copy-pasting.
 import 'dart:math' as math;
 
+import 'package:cycle_app/ui/bleeding_symbol.dart';
 import 'package:cycle_app/ui/cycle_marks.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -266,3 +267,57 @@ List<String> tooltipMessages(WidgetTester tester, Finder of) => tester
     )
     .map((t) => t.message!)
     .toList();
+
+// --- cycle-chart invariants shared across the chart subject files ----------
+
+/// The day/cycle header label cell of day column [index].
+Finder dayLabel(int index) => find.byKey(ValueKey('dayLabel-$index'));
+
+/// The text [text] inside day column [index]'s day label cell.
+Finder dayLabelText(int index, String text) =>
+    find.descendant(of: dayLabel(index), matching: find.text(text));
+
+/// The rendered global x of [dayIndex]'s chart dot: the chart maps its x
+/// domain linearly onto the plot area, which spans the chart widget's full
+/// width — the stripless scroll content starts at the plot's left edge (the
+/// frozen rail sits outside).
+double chartDotX(WidgetTester tester, int dayIndex) {
+  final rect = tester.getRect(find.byType(LineChart));
+  final data = chartData(tester);
+  final t = (dayIndex - data.minX) / (data.maxX - data.minX);
+  return rect.left + t * rect.width;
+}
+
+/// The in-plot mucus-peak dot of [dayIndex].
+Finder inPlotPeakDot(int dayIndex) =>
+    find.byKey(ValueKey('inPlotPeakDot-$dayIndex'));
+
+/// The in-plot evaluation day-number glyph of [dayIndex] carrying [number].
+Finder dayNumberGlyph(int dayIndex, int number) =>
+    find.byKey(ValueKey('inPlotDayNumber-$dayIndex-$number'));
+
+/// The number rendered in-plot at [dayIndex], or null when none: the
+/// glyphs key their value (`inPlotDayNumber-$index-$n`), so absence is a
+/// prefix sweep.
+String? numberUnder(WidgetTester tester, int dayIndex) {
+  final prefix = 'inPlotDayNumber-$dayIndex-';
+  final numbers = [
+    for (final widget in tester.widgetList(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith(prefix),
+      ),
+    ))
+      (widget.key! as ValueKey<String>).value.substring(prefix.length),
+  ];
+  return numbers.isEmpty ? null : numbers.single;
+}
+
+/// All bleed-fill regions (the shared symbol's fill widgets) inside the
+/// bleeding cell of [index]: the solid bottom bar of a menstruation-level
+/// day, or the dots of a spotting day.
+Finder bleedingFills(int index) => find.descendant(
+  of: chartCell(index, 'bleeding'),
+  matching: find.byType(BleedingFill),
+);

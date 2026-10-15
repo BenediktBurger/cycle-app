@@ -58,6 +58,17 @@ void main() {
     });
   });
 
+  group('equality', () {
+    test('equal values are equal and hash alike', () {
+      expect(DiaryTrack.fromJson({}), DiaryTrack.fromJson({}));
+      expect(
+        DiaryTrack.fromJson({}).hashCode,
+        DiaryTrack.fromJson({}).hashCode,
+      );
+      expect(DiaryTrack.defaults, isNot(const DiaryTrack(cervix: true)));
+    });
+  });
+
   group('fromJson fallbacks', () {
     test('missing items fall back item-by-item to their defaults', () {
       final partial = DiaryTrack.fromJson({'cervix': true});
@@ -115,15 +126,6 @@ void main() {
         const DiaryTrack(mucus: true, cervix: true, sex: false),
         reason: 'unknown item keys never change the known items',
       );
-    });
-
-    test('equal values are equal and hash alike', () {
-      expect(DiaryTrack.fromJson({}), DiaryTrack.fromJson({}));
-      expect(
-        DiaryTrack.fromJson({}).hashCode,
-        DiaryTrack.fromJson({}).hashCode,
-      );
-      expect(DiaryTrack.defaults, isNot(const DiaryTrack(cervix: true)));
     });
   });
 }

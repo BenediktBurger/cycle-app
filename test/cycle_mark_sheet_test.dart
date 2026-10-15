@@ -1,30 +1,12 @@
 // Widget tests of the day options panel on the cycle tab (Mode M, ADR-0001):
-// tapping a chart day shows a NON-MODAL panel docked at the bottom of the
-// cycle screen with a single
-// header row (the day's locale-formatted label, then the compact "edit day"
-// icon button, then the close button) and the mark toggles as Material
-// FilterChips in ONE shared two-column grid of equal column widths
-// (three columns on viewports from 600 dp of grid width) — ALL six chips
-// (the five mark chips AND the temperature-exclusion chip, which keeps its
-// keyed group cell inside the grid) — each chip carries the STATIC mark-name
-// label plus its mark type's identifying leading icon and shows the mark
-// state itself (the selected fill, announced as selected to screen readers;
-// the canvas-drawn check is off): the mucus peak, the first higher
-// measurement, the SUZ
-// start, the cycle start (the authoritative cycle boundary — bleeding only
-// suggests it) and the temperature exclusion — plus the computed info block
-// (derived artifacts such as the baseline value, the 1-6 low numbering, the
-// difference to the baseline for marked candidates and the stopped-evaluation
-// notice, between the header and the chip grid) and the tapped day's note at
-// the very bottom of the panel. Formerly a modal bottom sheet; the
-// fixture/scenarios and all write paths are unchanged by the conversion.
-//
-// Unlike the evaluation section of test/cycle_chart_test.dart (fixed
-// marks streams), these tests write through the REAL MarksDao against an
-// in-memory database — the panel must persist and the surface (chart
-// overlay, chip states, info lines) must re-render from the marks stream
-// after every write. The harness body (scope, day taps, stored readback)
-// and the scenario constants are shared once with
+// a NON-MODAL panel docked at the bottom of the cycle screen showing the
+// tapped day's mark toggles (FilterChips), the computed info block between
+// header and chips, and the day note at the bottom. Unlike the evaluation
+// tests in test/cycle_chart_evaluation_test.dart (fixed marks streams), these
+// tests write through the REAL MarksDao against an in-memory database — the
+// chip states, info lines and chart overlay must re-render from the marks
+// stream after every write. The harness body (scope, day taps, stored
+// readback) and the scenario constants are shared with
 // test/cycle_day_panel_test.dart in support/cycle_list_harness.dart.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
@@ -43,6 +25,7 @@ import 'support/cycle_list_harness.dart';
 import 'support/faulty_db.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
+import 'support/provider_fixtures.dart';
 import 'support/viewport.dart';
 
 /// The standard scenario pump: the shared write-through harness with the
@@ -166,7 +149,7 @@ void main() {
   testWidgets('the header shows the selected day next to the close button — no '
       'measurement-time line even when one is recorded', (tester) async {
     // The chart's time row spells the recorded time on wide columns itself;
-    // the panel header names the DAY and no longer repeats the time.
+    // the panel header names the DAY and never repeats the time.
     final entries = [...scenarioEntries];
     entries[4] = entries[4].copyWith(measuredAtMinutes: 6 * 60 + 30);
     final (_, _) = await _pump(tester, entries: entries);
@@ -821,8 +804,8 @@ void main() {
               '"edit day" sits between the title and the close button '
               '(the icon buttons\' tap targets touch in the row)',
         );
-        // The former full-width "edit day" action above the chips is gone —
-        // the compact header icon button replaces it.
+        // The header's compact "edit day" icon sits inside the header row —
+        // the chip grid has no action row of its own above it.
         expect(
           find.descendant(
             of: cycleDayPanel(),
@@ -1427,7 +1410,7 @@ void main() {
           find.text('Excluded from the evaluation'),
           findsNothing,
           reason:
-              'the stale exclusion-group heading is gone — the chip '
+              'no exclusion-group heading — the chip '
               'label already says what it does',
         );
         expect(
@@ -1498,7 +1481,7 @@ void main() {
         find.text('Excluded from the evaluation'),
         findsNothing,
         reason:
-            'the stale exclusion-group heading is gone, also without '
+            'no exclusion-group heading, also without '
             'flags',
       );
       expect(
@@ -1507,7 +1490,7 @@ void main() {
           matching: find.text('No temperature disturbance recorded'),
         ),
         findsNothing,
-        reason: 'the explicit empty line is gone — nothing replaces it',
+        reason: 'no empty line renders — nothing replaces it',
       );
       // Read-only concept stays: the panel never EDITS the flags (data
       // entry stays in the diary) — the group chip is the ONLY chip in the
@@ -2082,16 +2065,13 @@ void main() {
     'a marks stream error shows the retry surface in the panel instead of '
     'the all-unselected chip grid, and retry restores the chips',
     (tester) async {
-      var attempt = 0;
+      final marksRetry = StreamRetryFixture<CycleMark>(
+        evaluationScenarioMarks(),
+      );
       final (_, container) = await _pump(
         tester,
         entries: scenarioEntries,
-        marksStreamFactory: () {
-          attempt++;
-          return attempt == 1
-              ? Stream<List<CycleMark>>.error(StateError('injected error'))
-              : Stream.value(evaluationScenarioMarks());
-        },
+        marksStreamFactory: marksRetry.stream,
       );
 
       // The panel is opened by writing its targeting provider directly —
@@ -2138,7 +2118,11 @@ void main() {
             'the retry re-subscribed the marks provider and the chips '
             'render from the real data',
       );
-      expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
+      expect(
+        marksRetry.attempts,
+        2,
+        reason: 'the retry re-invoked the stream factory',
+      );
     },
   );
 }

@@ -10,8 +10,6 @@
 // the pane is a lazy ListView, so the tests enlarge the surface
 // (useTallSurface, like settings_persistence_test.dart) and assert
 // the built children directly — never on compact-view assumptions.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/db/settings_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,15 +18,11 @@ import 'support/finders.dart';
 import 'support/viewport.dart';
 
 void main() {
-  /// German device + seeded onboarding flag: the shell is reachable and the
-  /// settings pane is the navigation surface both groups start from.
+  /// German device locale + the German UI: the shell is reachable (the
+  /// harness defaults to an onboarded install) and the settings pane is the
+  /// navigation surface both groups start from.
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
-    Future<void> seed(CycleDatabase db) =>
-        SettingsStore(db.settingsDao).persistOnboardingCompleted(true);
-
-    await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+    await tester.pumpWidget(appScope(locale: const Locale('de')));
     await tester.pumpAndSettle();
 
     await tester.tap(navLabel('Einstellungen'));
@@ -144,9 +138,8 @@ void main() {
           find.text('PDF-Export'),
           findsOneWidget,
           reason:
-              'the PDF export title now belongs to the ACTION card only — '
-              'the identifying-values card (formerly also titled '
-              '"PDF-Export") is gone',
+              'the PDF-Export title belongs to the export ACTION card '
+              'only — the identifying-values card is untitled',
         );
       },
     );

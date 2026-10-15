@@ -74,8 +74,8 @@ void main() {
     });
 
     test('lengths are mark-driven, not bleeding-driven', () {
-      // The old rule split at menstruation-level bleeding onsets; now only
-      // the user-placed cycleStart marks anchor the lengths — the bleeding
+      // Only the user-placed cycleStart marks anchor the lengths (never the
+      // bleeding onsets) — the bleeding pattern below as cycle-start
       // pattern below would have produced different boundaries. (Raw
       // disturbance flags on the middle day would not matter either:
       // statistics are purely mark-driven.)
@@ -707,18 +707,22 @@ void main() {
       // R2 gap-stopped evaluation: no candidate after the peak exists —
       // the real variant qualifies nowhere, the "any" variant keeps the
       // marked rise day.
-      earliest = earliestFirstHigherCycleDay(
-        evaluateCycles(
-          [
-            for (var day = 1; day <= 4; day++) d(2026, 3, day, bbtC: 36.4),
-            d(2026, 3, 5, bbtC: 36.7),
-            d(2026, 3, 8, bbtC: 36.7),
-          ],
-          [start(2026, 3, 1), mucusPeak(2026, 3, 20), firstHigher(2026, 3, 5)],
-        ),
+      final stopped = evaluateCycles(
+        [
+          for (var day = 1; day <= 4; day++) d(2026, 3, day, bbtC: 36.4),
+          d(2026, 3, 5, bbtC: 36.7),
+          d(2026, 3, 8, bbtC: 36.7),
+        ],
+        [start(2026, 3, 1), mucusPeak(2026, 3, 20), firstHigher(2026, 3, 5)],
       );
+      earliest = earliestFirstHigherCycleDay(stopped);
       expect(earliest.any, 5);
       expect(earliest.afterMucusPeak, isNull);
+      expect(
+        stopped.single.evaluationStopped,
+        isTrue,
+        reason: 'the qualifying variant outcomes ride on the stop itself',
+      );
     });
 
     test('a qualifying day can never collide with the next cycle start', () {

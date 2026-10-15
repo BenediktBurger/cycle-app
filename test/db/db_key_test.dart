@@ -2,9 +2,8 @@
 //
 // The load-or-create flow is exercised against an in-memory fake store —
 // no platform channels involved, so these run everywhere the suite runs.
-// The real store (flutter_secure_storage) is exercised only at runtime on a
-// device; that on-device verification is still pending (no physical
-// Android/iOS device has run this yet).
+// The real store (flutter_secure_storage) needs a physical device; that
+// verification is still open — see docs/adr/0005-storage-and-encryption.md.
 import 'dart:math';
 
 import 'package:cycle_app/db/db_key.dart';
