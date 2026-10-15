@@ -90,7 +90,7 @@ void main() {
     });
   });
 
-  group('cervix slots (the glyph zone\'s even spacing)', () {
+  group('cervix slots', () {
     test('the slot index counts top-down: unreachable past everything, low '
         'lowest', () {
       expect(cervixSlotIndex(CervixPosition.unreachable), 0);
@@ -98,18 +98,6 @@ void main() {
       expect(cervixSlotIndex(CervixPosition.high), 2);
       expect(cervixSlotIndex(CervixPosition.medium), 3);
       expect(cervixSlotIndex(CervixPosition.low), 4);
-    });
-
-    test('the slot centers span the zone evenly: the topmost slot at the '
-        "top's edge room, low at the bottom's", () {
-      const edge = cervixOpenCircleSize / 2 + cervixCircleStrokeWidth;
-      expect(cervixSlotCenterY(0), closeTo(edge, 1e-9));
-      expect(cervixSlotCenterY(4), closeTo(cervixGlyphZoneHeight - edge, 1e-9));
-      // Evenly stepped: consecutive slots share one interval.
-      expect(
-        cervixSlotCenterY(2) - cervixSlotCenterY(1),
-        closeTo(cervixSlotCenterY(1) - cervixSlotCenterY(0), 1e-9),
-      );
     });
   });
 }

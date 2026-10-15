@@ -4,6 +4,19 @@
 
 part of 'cycle.dart';
 
+/// Narrowest day column still considered usable: every label is
+/// FittedBox-squeezed rather than clipped, but the day/cycle header
+/// stack needs about this much ink to stay readable, so a longer
+/// recorded range scrolls (never shrinks further).
+const double minDayColumnWidth = 21;
+
+/// The frozen left rail's width (the paper sheet's fixed left margin).
+/// The chart reserves NO axis width; the scroll content holds day columns
+/// only and the plot spans its full width. The width is the widest scale
+/// label's paint width ("36.5" at fontSize 10: 19.5 px Roboto) + the
+/// labels' 3 px right inset + 1 px rounding safety.
+const double frozenRailWidth = 24;
+
 /// fl_chart line chart over all measured days plus a per-day symbol row.
 ///
 /// X is a plain day index over the recorded range, half a column SHIFTED
@@ -53,19 +66,6 @@ final class _CycleChart extends StatefulWidget {
 }
 
 final class _CycleChartState extends State<_CycleChart> {
-  /// Narrowest day column still considered usable: every label is
-  /// FittedBox-squeezed rather than clipped, but the day/cycle header
-  /// stack needs about this much ink to stay readable, so a longer
-  /// recorded range scrolls (never shrinks further).
-  static const double minDayColumnWidth = 21;
-
-  /// The frozen left rail's width (the paper sheet's fixed left margin).
-  /// The chart reserves NO axis width; the scroll content holds day columns
-  /// only and the plot spans its full width. The width is the widest scale
-  /// label's paint width ("36.5" at fontSize 10: 19.5 px Roboto) + the
-  /// labels' 3 px right inset + 1 px rounding safety.
-  static const double frozenRailWidth = 24;
-
   /// The fixed height of the day/cycle header segment (day of month above,
   /// day of cycle underneath) — shared between the scrolling header row and
   /// the rail's prototype slot so both stay vertically in step.
@@ -1391,7 +1391,7 @@ final class _LeftRail extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return SizedBox(
       key: const ValueKey('leftRail'),
-      width: _CycleChartState.frozenRailWidth,
+      width: frozenRailWidth,
       child: DecoratedBox(
         // The rail's right-edge hairline, mirroring the day-grid hairlines.
         decoration: BoxDecoration(
@@ -1413,7 +1413,7 @@ final class _LeftRail extends StatelessWidget {
             SizedBox(
               key: const ValueKey('dayHeaderCorner'),
               height: _CycleChartState.dayHeaderRowHeight,
-              width: _CycleChartState.frozenRailWidth,
+              width: frozenRailWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1442,7 +1442,7 @@ final class _LeftRail extends StatelessWidget {
                   for (final value in scale.ticks)
                     Positioned(
                       left: 0,
-                      width: _CycleChartState.frozenRailWidth,
+                      width: frozenRailWidth,
                       top: scale.pixelFor(value) - 6,
                       height: 12,
                       child: _railScaleLabel(scale, value),
@@ -1451,7 +1451,7 @@ final class _LeftRail extends StatelessWidget {
                   // the lower edge of the topmost value's slot.
                   Positioned(
                     left: 0,
-                    width: _CycleChartState.frozenRailWidth,
+                    width: frozenRailWidth,
                     top: 7,
                     height: 10,
                     child: ExcludeSemantics(

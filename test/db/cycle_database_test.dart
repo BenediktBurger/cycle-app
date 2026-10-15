@@ -1,28 +1,24 @@
-// DB-layer tests: schema, DAOs, constraints.
+// DB-layer tests: the schema CHECK-constraint matrix, DAO CRUD round trips
+// and the vocabulary tripwires (mucus tokens, bleeding levels, mark types).
+// On-disk migration choreography and the export document boundary live in
+// test/db/migration_test.dart / export_adapter_test.dart.
 //
 // Pure Dart against NativeDatabase.memory() — no platform channels, no web.
 // Runs with a normal `flutter pub get && flutter test` (on Linux, package
 // sqlite3 additionally needs the system sqlite library — see the apt step in
 // .github/workflows/ci.yml; macOS ships it, Linux CI/dev hosts install it).
 
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
-import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
-import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/db/converters.dart';
 import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/db/tables.dart';
 
@@ -37,39 +33,6 @@ void main() {
   });
 
   group('schema & migration (v9)', () {
-    test('no profiles table exists (v9 is profile-free)', () async {
-      final tables = await db
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE "
-            "type = 'table'",
-          )
-          .get();
-      final names = tables.map((r) => r.data['name'] as String).toSet();
-      expect(names, containsAll(['cycle_entries', 'user_marks']));
-      expect(
-        names.contains('profiles'),
-        isFalse,
-        reason: 'the Profiles table (and any seeding) is gone from v9',
-      );
-    });
-
-    test(
-      'profile_id columns are gone from both tables (no FK, no default)',
-      () async {
-        for (final table in ['cycle_entries', 'user_marks']) {
-          final columns = await db
-              .customSelect('PRAGMA table_info($table)')
-              .get();
-          final names = columns.map((r) => r.data['name'] as String).toSet();
-          expect(
-            names.contains('profile_id'),
-            isFalse,
-            reason: '$table carries no profile_id column any more',
-          );
-        }
-      },
-    );
-
     test('temp_disturbances CHECK rejects masks outside 0..15; the column '
         'defaults to 0', () async {
       // 16 (and anything bigger): outside the 4-bit vocabulary.
@@ -123,57 +86,6 @@ void main() {
       );
     });
 
-    test("mucus_quality is engine-rejected together with an 'fs' sign "
-        "(fs carries no quality)", () async {
-      // f/S is NOT the S sign: like every non-S sign it must never carry a
-      // quality qualifier.
-      await expectLater(
-        db.customStatement(
-          "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20000, 'fs', 'w')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Sanity: fs WITHOUT a quality goes through.
-      await db.customStatement(
-        "INSERT INTO cycle_entries (date, mucus_sign) "
-        "VALUES (20006, 'fs')",
-      );
-    });
-
-    test('unique indexes are day-keyed (entries (date), marks (entry_date, '
-        'mark_type))', () async {
-      final indexes = await db
-          .customSelect(
-            "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND "
-            "name IN ('cycle_entries_date_unique', "
-            "'user_marks_date_type_unique')",
-          )
-          .get();
-      expect(
-        indexes.map((r) => r.data['name']).toSet(),
-        {'cycle_entries_date_unique', 'user_marks_date_type_unique'},
-        reason:
-            'both day-keyed unique indexes exist (the old '
-            'profile-prefixed names are gone)',
-      );
-      final byName = {
-        for (final r in indexes)
-          r.data['name']! as String: r.data['sql']! as String,
-      };
-      expect(byName['cycle_entries_date_unique']!, contains('(date)'));
-      expect(
-        byName['user_marks_date_type_unique']!,
-        contains('(entry_date, mark_type)'),
-        reason: 'marks are unique per day and type — no profile dimension',
-      );
-      expect(
-        byName.values.join(' '),
-        isNot(contains('profile_id')),
-        reason: 'no profile column participates in any unique index',
-      );
-    });
-
     test(
       'a bare one-day row inserts (the entries upsert key is the day)',
       () async {
@@ -207,42 +119,44 @@ void main() {
       },
     );
 
-    test('mucus_quality is engine-rejected without an S sign and outside the '
-        'vocabulary', () async {
-      // Quality with any sign other than s: rejected (quality-requires-s).
-      await expectLater(
-        db.customStatement(
+    test(
+      'mucus_quality is engine-rejected with every sign other than s',
+      () async {
+        // Quality-requires-s, engine-level: every non-'s' storage token must
+        // never carry a quality qualifier. Each case gets its own day so a
+        // broken CHECK cannot hide behind a duplicate-key failure on a reused
+        // day. ('fs' contains s but is its own sign, deliberately quality-free.)
+        var day = 20000;
+        for (final sign in MucusSign.values) {
+          if (sign == MucusSign.s) continue;
+          await expectLater(
+            db.customStatement(
+              "INSERT INTO cycle_entries (date, mucus_sign, "
+              "mucus_quality) VALUES ($day, '${sign.name}', 'w')",
+            ),
+            throwsA(isA<Exception>()),
+            reason:
+                "'${sign.name}' is not the S sign — it never carries a quality",
+          );
+          day++;
+        }
+        // Quality with s but outside the quality vocabulary: rejected as well.
+        await expectLater(
+          db.customStatement(
+            "INSERT INTO cycle_entries (date, mucus_sign, "
+            "mucus_quality) VALUES ($day, 's', 'stretchy')",
+          ),
+          throwsA(isA<Exception>()),
+        );
+        // Sanity: s with an in-vocabulary quality goes through.
+        await db.customStatement(
           "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20000, 'f', 'w')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Quality with s but outside the vocabulary: rejected as well.
-      await expectLater(
-        db.customStatement(
-          "INSERT INTO cycle_entries (date, mucus_sign, "
-          "mucus_quality) VALUES (20002, 's', 'stretchy')",
-        ),
-        throwsA(isA<Exception>()),
-      );
-      // Sanity: s with an in-vocabulary quality goes through.
-      await db.customStatement(
-        "INSERT INTO cycle_entries (date, mucus_sign, "
-        "mucus_quality) VALUES (20003, 's', 'ew')",
-      );
-    });
+          "mucus_quality) VALUES (${day + 1}, 's', 'ew')",
+        );
+      },
+    );
 
     test('bleeding round-trips as each of the six levels', () async {
-      // The shared numeric scale spans six steps (0=none … 5=maximum).
-      expect(Bleeding.values.map((b) => b.level), [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-      ], reason: 'the fifth bleeding level extends the stored scale to 5');
-      expect(Bleeding.values.where((b) => b.level == 5).single.name, 'maximum');
       for (final (index, level) in Bleeding.values.indexed) {
         final day = DateTime(2026, 6).add(Duration(days: index));
         await db.entriesDao.upsertDaily(DailyEntry(date: day, bleeding: level));
@@ -257,41 +171,39 @@ void main() {
       }
     });
 
-    test(
-      'raw SQL INSERT stores level 5 that reads back as the top level',
-      () async {
-        // Hand-written SQL (e.g. a future import path) stores the int directly:
-        // 5 must read back as the top bleeding level (by LEVEL, not by
-        // declaration index), and writing that member back must store 5 again.
+    test('raw SQL INSERT stores integer levels that read back by level, not '
+        'declaration order', () async {
+      // Hand-written SQL (e.g. a future import path) stores the int directly:
+      // the member must resolve by LEVEL — by declaration index, 4 would be
+      // the wrong member entirely. Distinct days per case: on a reused day
+      // a later insert could fail on UNIQUE instead of its own assertion,
+      // masking which level actually misread.
+      // Day 20000 = 2024-10-04; +n days per level n.
+      const byLevel = <int, Bleeding>{4: Bleeding.heavy, 5: Bleeding.maximum};
+      for (final MapEntry(:key, :value) in byLevel.entries) {
         await db.customStatement(
           'INSERT INTO cycle_entries (date, bleeding) '
-          'VALUES (20002, 5)',
+          'VALUES (${20000 + key}, $key)',
         );
         final row = await db.entriesDao.entryFor(
-          DateTime(2024, 10, 6),
-        ); // day 20002
-        expect(
-          row!.bleeding.level,
-          5,
-          reason: 'level 5 is a valid stored bleeding level',
-        );
-        expect(row.bleeding, Bleeding.values.where((b) => b.level == 5).single);
+          DateTime(2024, 10, 4 + key),
+        ); // day 20000 + key
+        expect(row!.bleeding, value);
+      }
 
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2024, 10, 6), bleeding: row.bleeding),
-        );
-        final raw = await db
-            .customSelect(
-              'SELECT bleeding FROM cycle_entries WHERE date = 20002',
-            )
-            .getSingle();
-        expect(
-          raw.data['bleeding'],
-          5,
-          reason: 'the converter writes the new top level as integer 5',
-        );
-      },
-    );
+      // Writing a raw-read member back must store its level again.
+      await db.entriesDao.upsertDaily(
+        DailyEntry(date: DateTime(2024, 10, 10), bleeding: Bleeding.maximum),
+      );
+      final raw = await db
+          .customSelect('SELECT bleeding FROM cycle_entries WHERE date = 20006')
+          .getSingle();
+      expect(
+        raw.data['bleeding'],
+        5,
+        reason: 'the converter writes the top level as integer 5',
+      );
+    });
 
     test(
       'bleeding is stored as the numeric level, never a string token',
@@ -309,38 +221,6 @@ void main() {
               'the decided storage representation is the integer level '
               '(4), not a vocabulary name',
         );
-      },
-    );
-
-    test(
-      'bleeding defaults to 0: a row written without it reads none',
-      () async {
-        await db
-            .into(db.cycleEntries)
-            .insert(CycleEntriesCompanion.insert(date: DateTime(2026, 6, 20)));
-        final row = await db.entriesDao.entryFor(DateTime(2026, 6, 20));
-        expect(row!.bleeding, Bleeding.none);
-        final raw = await db
-            .customSelect('SELECT bleeding FROM cycle_entries')
-            .getSingle();
-        expect(raw.data['bleeding'], 0, reason: 'the column default is 0');
-      },
-    );
-
-    test(
-      'raw SQL INSERT stores an integer level that reads back heavy',
-      () async {
-        // Hand-written SQL (e.g. a future import path) stores the int directly:
-        // 4 must read back as Bleeding.heavy (by LEVEL, not by declaration
-        // index).
-        await db.customStatement(
-          'INSERT INTO cycle_entries (date, bleeding) '
-          'VALUES (20000, 4)',
-        );
-        final row = await db.entriesDao.entryFor(
-          DateTime(2024, 10, 4),
-        ); // day 20000
-        expect(row!.bleeding, Bleeding.heavy);
       },
     );
 
@@ -434,91 +314,9 @@ void main() {
         "VALUES (20001, 405)",
       );
     });
-
-    test('the removed sex bool and free-text cervix columns are gone; firmness '
-        'and timings exist', () async {
-      await db.entriesDao.upsertDaily(
-        DailyEntry(
-          date: DateTime(2026, 6, 15),
-          cervixFirmness: CervixFirmness.halfSoft,
-          sexTimings: SexTiming.morning.bit | SexTiming.evening.bit,
-        ),
-      );
-      // The old columns must not even be addressable any more.
-      await expectLater(
-        db.customSelect('SELECT sex FROM cycle_entries').get(),
-        throwsA(isA<Exception>()),
-      );
-      await expectLater(
-        db.customSelect('SELECT cervix FROM cycle_entries').get(),
-        throwsA(isA<Exception>()),
-      );
-      // The replacements carry the observation in their decided shapes: the
-      // firmness as its TEXT enum-name token, the timings as the mask.
-      final raw = await db
-          .customSelect(
-            'SELECT cervix_firmness, sex_timings FROM cycle_entries',
-          )
-          .getSingle();
-      expect(raw.data['cervix_firmness'], 'halfSoft');
-      expect(raw.data['sex_timings'], 5);
-    });
   });
 
-  group('schema & migration: version pin + app_settings key-value store', () {
-    test(
-      'the schema version is 13 (the measurement_methods snapshot table)',
-      () async {
-        final version = await db
-            .customSelect('PRAGMA user_version')
-            .getSingle();
-        expect(
-          version.data['user_version'],
-          13,
-          reason:
-              'v13 adds the measurement_methods table; an existing '
-              'install gains it through the incremental create, so the '
-              'step is a real migration',
-        );
-      },
-    );
-
-    test('app_settings exists with TEXT key as primary key and NOT NULL TEXT '
-        'value', () async {
-      final columns = await db
-          .customSelect('PRAGMA table_info(app_settings)')
-          .get();
-      final byName = {
-        for (final r in columns) r.data['name']! as String: r.data,
-      };
-      expect(
-        byName.keys,
-        containsAll(['key', 'value']),
-        reason: 'the table stores (key, value) pairs',
-      );
-      final key = byName['key']!;
-      final value = byName['value']!;
-      expect(key['type'], 'TEXT');
-      expect(value['type'], 'TEXT');
-      expect(
-        value['notnull'],
-        1,
-        reason: 'a setting row always carries a value',
-      );
-      expect(
-        key['pk'],
-        1,
-        reason:
-            'the key alone identifies a row — later settings are new '
-            'keys, never new columns',
-      );
-      expect(
-        byName.keys,
-        hasLength(2),
-        reason: 'no per-setting columns: the generic pair is all there is',
-      );
-    });
-
+  group('app_settings key-value store', () {
     test(
       're-writing the same key replaces the value (one row per key)',
       () async {
@@ -569,341 +367,6 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
       expect(await db.select(db.appSettings).get(), isEmpty);
-    });
-  });
-
-  group('incremental upgrade from an older schemaVersion', () {
-    late Directory tempDir;
-    late File dbFile;
-    CycleDatabase? upgraded;
-    // The CURRENT DDL, dumped from the fresh in-memory `db` in setUp (the
-    // rows carry 'type' + 'name' + the CREATE statement).
-    List<Map<String, Object?>> currentDdl = const [];
-
-    setUp(() async {
-      tempDir = Directory.systemTemp.createTempSync('cycle_upgrade_fixt_');
-      addTearDown(() => tempDir.deleteSync(recursive: true));
-      dbFile = File('${tempDir.path}/old.db');
-      addTearDown(() async {
-        await upgraded?.close();
-        upgraded = null;
-      });
-      // Dump the CURRENT DDL instead of hand-writing it: the fixture
-      // executes these statements into the temp file, so it tracks the
-      // schema as it evolves. Auto-indexes (sql IS NULL) are skipped —
-      // they are created implicitly together with their tables.
-      currentDdl = [
-        for (final r
-            in await db
-                .customSelect(
-                  "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT "
-                  "NULL AND tbl_name IN "
-                  "('cycle_entries', 'user_marks', 'app_settings', "
-                  "'measurement_methods')",
-                )
-                .get())
-          {
-            'type': r.data['type']! as String,
-            'name': r.data['name']! as String,
-            'sql': r.data['sql']! as String,
-          },
-      ];
-      // The outer `db` is now unused — this group works on its own
-      // file-backed database — so close it here to avoid drift's
-      // multiple-databases warning (idempotent: the outer tearDown is a
-      // no-op afterwards).
-      await db.close();
-    });
-
-    /// Builds a temp-file database stamped with the stale [from]
-    /// user_version, whose DDL is the CURRENT schema (dumped in setUp) with
-    /// ONE rewrite: pre-v12 files do not carry the bleeding column's
-    /// engine-level CHECK, so the replayed `cycle_entries` statement is
-    /// stripped back to the plain `NOT NULL DEFAULT 0` column (the regex
-    /// matches the column definition up to the next comma, whatever the
-    /// rest of the statement looks like). Per the documented history, the
-    /// remaining DDL of a v9/v10/v11/v12-shaped file is the current DDL —
-    /// v9→v10 adds only `app_settings`, v10→v11 changes no SQL, v11→v12
-    /// touches only the bleeding column, and the `measurement_methods`
-    /// snapshot table is NEW in v13, so no pre-v13 file carries it (the
-    /// fixture never replays it; the migration is what must create it).
-    /// These deltas are all the fixture controls. The seeded user data is
-    /// written with raw SQL and explicit
-    /// created_at/updated_at values so the rows are individually
-    /// identifiable (a table recreated from the current schema cannot
-    /// answer them, which is what makes the data-preservation pin
-    /// meaningful).
-    Future<CycleDatabase> openMigrationFixture(
-      int from, {
-      required bool withAppSettings,
-      int seedBleeding = 4,
-    }) async {
-      final statements = [
-        for (final r in currentDdl)
-          if ((withAppSettings || r['name'] != 'app_settings') &&
-              // All of the methods table's DDL (its index included) is the
-              // v13 delta — no pre-v13 file carries any of it.
-              r['name'] != 'measurement_methods' &&
-              r['name'] != 'measurement_methods_date_unique')
-            (
-              tableFirst: r['type'] == 'table' ? 0 : 1,
-              sql: r['type'] == 'table' && r['name'] == 'cycle_entries'
-                  ? (r['sql']! as String).replaceAllMapped(
-                      RegExp(r'"bleeding" INTEGER[^,]*'),
-                      (_) => '"bleeding" INTEGER NOT NULL DEFAULT 0',
-                    )
-                  : r['sql']! as String,
-            ),
-      ]..sort((a, b) => a.tableFirst - b.tableFirst); // tables before indexes
-      final raw = sqlite3.open(dbFile.path);
-      try {
-        for (final stmt in statements) {
-          raw.execute(stmt.sql);
-        }
-        raw.execute(
-          'INSERT INTO cycle_entries (date, temp_disturbances, bbt_c, '
-          'measured_at_minutes, bleeding, mucus_sign, mucus_quality, '
-          'cervix_position, cervix_opening, cervix_firmness, pain_breast, '
-          'pain_mittelschmerz, sex_timings, notes, created_at, updated_at) '
-          "VALUES (20000, 5, 36.55, 405, $seedBleeding, 's', 'ew', 'high', "
-          "'middle', 'soft', 1, 0, 5, 'seeded row', 1767225600, 1767229200)",
-        );
-        raw.execute(
-          "INSERT INTO user_marks (entry_date, mark_type, author) "
-          "VALUES (20001, 'cycleStart', 'user')",
-        );
-        raw.execute('PRAGMA user_version = $from;');
-      } finally {
-        raw.close();
-      }
-      final db = CycleDatabase(NativeDatabase(dbFile));
-      upgraded = db;
-      // The migration runs lazily on the first query, so the caller forces
-      // the open (or — in the migration-failure test — asserts on the
-      // thrown failure) itself.
-      return db;
-    }
-
-    Future<void> expectPreserved(CycleDatabase db) async {
-      // The first query forces the executor open, which runs the
-      // incremental upgrade before the statement completes.
-      final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(
-        version.data['user_version'],
-        13,
-        reason: 'drift records the migration run',
-      );
-
-      // The seeded entry row survives row-for-row, read through the normal
-      // DAO (not raw SQL): the migration must not discard user data.
-      final row = await db.entriesDao.entryFor(DateTime(2024, 10, 4));
-      expect(row, isNotNull, reason: 'day 20000 carries the seeded row');
-      expect(row!.bleeding, Bleeding.heavy, reason: 'level 4 is preserved');
-      expect(row.bbtC, 36.55);
-      expect(row.tempDisturbances, 5);
-      expect(row.measuredAtMinutes, 405);
-      expect(row.mucusSign, 's');
-      expect(row.mucusQuality, 'ew');
-      expect(row.cervixPosition, 'high');
-      expect(row.cervixOpening, 'middle');
-      expect(row.cervixFirmness, 'soft');
-      expect(row.painBreast, isTrue);
-      expect(row.painMittelschmerz, isFalse);
-      expect(row.sexTimings, 5);
-      expect(row.notes, 'seeded row');
-      expect(
-        row.createdAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1)),
-        isTrue,
-        reason: 'the explicit created_at survives the migration verbatim',
-      );
-      expect(
-        row.updatedAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1, 1)),
-        isTrue,
-        reason: 'the explicit updated_at survives the migration verbatim',
-      );
-
-      // The table recreation must not lose the unique index the EntriesDao
-      // upsert path relies on.
-      final indexNames = [
-        for (final r
-            in await db
-                .customSelect(
-                  "SELECT name FROM sqlite_master WHERE type = 'index' AND "
-                  "name = 'cycle_entries_date_unique'",
-                )
-                .get())
-          r.data['name']! as String,
-      ];
-      expect(
-        indexNames,
-        hasLength(1),
-        reason: 'the day-keyed unique index survives the table recreation',
-      );
-
-      // A day upsert after the upgrade still replaces the row IN PLACE: it
-      // must hit the surviving unique index (no second row, stable id).
-      final updated = await db.entriesDao.upsertDaily(
-        DailyEntry(date: DateTime(2024, 10, 4), bleeding: Bleeding.spotting),
-      );
-      expect(
-        updated.id,
-        row.id,
-        reason:
-            'the upsert keyed by the surviving unique index replaces '
-            'the same row',
-      );
-      expect(
-        await db.entriesDao.allEntries(),
-        hasLength(1),
-        reason: 'no second row appeared for the already-tracked day',
-      );
-      expect(
-        (await db.entriesDao.entryFor(DateTime(2024, 10, 4)))!.bleeding,
-        Bleeding.spotting,
-      );
-
-      // The seeded mark survives too.
-      final marks = await db.marksDao.marksForDay(DateTime(2024, 10, 5));
-      expect(
-        marks,
-        hasLength(1),
-        reason: 'the (entry_date, mark_type) row is preserved',
-      );
-      expect(marks.single.markType, 'cycleStart');
-      expect(marks.single.author, 'user');
-
-      // beforeOpen keeps foreign-keys enforcement after an upgrade.
-      final foreignKeys = await db
-          .customSelect('PRAGMA foreign_keys')
-          .getSingle();
-      expect(foreignKeys.data['foreign_keys'], 1);
-    }
-
-    test('a v10 file migrates incrementally: seeded data preserved, nothing '
-        'dropped or recreated', () async {
-      final db = await openMigrationFixture(10, withAppSettings: true);
-      await expectPreserved(db);
-    });
-
-    test('a v9 file migrates incrementally: data preserved and app_settings '
-        'added in the current shape', () async {
-      final db = await openMigrationFixture(9, withAppSettings: false);
-      await expectPreserved(db);
-
-      // The only SQL delta of the step below: app_settings now exists.
-      final columns = await db
-          .customSelect('PRAGMA table_info(app_settings)')
-          .get();
-      final byName = {
-        for (final r in columns) r.data['name']! as String: r.data,
-      };
-      expect(byName.keys, containsAll(['key', 'value']));
-      expect(byName['key']!['type'], 'TEXT');
-      expect(byName['value']!['type'], 'TEXT');
-      expect(
-        byName['value']!['notnull'],
-        1,
-        reason: 'a setting row always carries a value',
-      );
-      expect(
-        byName['key']!['pk'],
-        1,
-        reason: 'the key alone identifies the row',
-      );
-      expect(
-        byName.keys,
-        hasLength(2),
-        reason: 'the generic (key, value) pair is all there is',
-      );
-
-      // Settings storage works immediately after the upgrade.
-      await db.settingsDao.writeValue('themeMode', 'dark');
-      expect(await db.settingsDao.readValue('themeMode'), 'dark');
-    });
-
-    test(
-      'a v12 file migrates incrementally: the methods table appears with '
-      'its day key, vocabulary CHECK and the tracked data preserved',
-      () async {
-        final db = await openMigrationFixture(12, withAppSettings: true);
-        await expectPreserved(db);
-
-        // The only SQL delta of v12 → v13: the methods snapshot table now
-        // exists, in the current shape.
-        final columns = await db
-            .customSelect('PRAGMA table_info(measurement_methods)')
-            .get();
-        final byName = {
-          for (final r in columns) r.data['name']! as String: r.data,
-        };
-        expect(
-          byName.keys,
-          containsAll(['id', 'date', 'method', 'thermometer', 'created_at']),
-          reason:
-              'the snapshot table is day-keyed with its route and '
-              'optional thermometer',
-        );
-        expect(byName['date']!['notnull'], 1);
-        expect(byName['method']!['notnull'], 1);
-        expect(
-          byName['thermometer']!['notnull'],
-          0,
-          reason: 'the thermometer name stays optional after the migration',
-        );
-
-        final indexNames = [
-          for (final r
-              in await db
-                  .customSelect(
-                    "SELECT name FROM sqlite_master WHERE type = 'index' AND "
-                    "name = 'measurement_methods_date_unique'",
-                  )
-                  .get())
-            r.data['name']! as String,
-        ];
-        expect(
-          indexNames,
-          hasLength(1),
-          reason: 'the day key is unique — one snapshot per calendar day',
-        );
-
-        // The engine CHECK survives the incremental create: foreign data
-        // cannot write an impossible route into a migrated file.
-        final rawDate = 20000;
-        await expectLater(
-          db.customStatement(
-            "INSERT INTO measurement_methods (date, method) "
-            "VALUES ($rawDate, 'anal')",
-          ),
-          throwsA(isA<Exception>()),
-        );
-        await db.customStatement(
-          "INSERT INTO measurement_methods (date, method) "
-          "VALUES ($rawDate, 'oral')",
-        );
-        expect(
-          await db.measurementMethodsDao.snapshotFor(DateTime(2024, 10, 4)),
-          isNotNull,
-          reason: 'the migrated table answers the DAO immediately',
-        );
-      },
-    );
-
-    test('a pre-existing out-of-range bleeding row fails the migration '
-        'loudly', () async {
-      // The old-shape file admits such a corrupt row (its bleeding column
-      // still carries no CHECK). The migration copies the rows into the
-      // CHECK-shaped table and must FAIL on the corrupt one — no clamping,
-      // no dropping, no silent continuation: the streams reading that
-      // converter were already broken, so surfacing the failure on the
-      // database gate is the consistent posture.
-      final db = await openMigrationFixture(
-        10,
-        withAppSettings: true,
-        seedBleeding: 6,
-      );
-      // The first query forces the open; the upgrade must reject it there.
-      await expectLater(db.entriesDao.allEntries(), throwsA(isA<Exception>()));
     });
   });
 
@@ -1243,18 +706,6 @@ void main() {
           expect(dailyEntryFromDrift(stored).mucusSign, MucusSign.a);
         },
       );
-
-      test('a quality token stays engine-rejected on an A sign', () async {
-        // Quality remains exclusive to S — the CHECK below still encodes
-        // mucus_sign = 's', so 'a' with a quality cannot be written.
-        await expectLater(
-          db.customStatement(
-            "INSERT INTO cycle_entries (date, mucus_sign, "
-            "mucus_quality) VALUES (20000, 'a', 'w')",
-          ),
-          throwsA(isA<Exception>()),
-        );
-      });
     });
   });
 
@@ -1555,785 +1006,5 @@ void main() {
         expect(events.last.single.markType, CycleMarkTypes.mucusPeakDay);
       },
     );
-  });
-
-  group('export adapter: import/export without profiles', () {
-    // v5 documents carry NO profile keys anywhere — the document root is
-    // exactly schema_version / exported_at / entries / marks.
-    ExportBlob simpleDoc() => ExportBlob(
-      exportedAt: DateTime.utc(2026, 4, 1),
-      entries: const [
-        {'date': '2026-04-02', 'bleeding': 'period'},
-        {'date': '2026-04-10', 'bleeding': 'period', 'bbt_c': 36.4},
-      ],
-      marks: const [
-        {
-          'entry_date': '2026-04-20',
-          'mark_type': 'mucusPeakDay',
-          'author': 'user',
-        },
-      ],
-    );
-
-    test(
-      'a profile-free document imports day-keyed, no profile handling',
-      () async {
-        final summary = await importJsonToDatabase(
-          db,
-          buildExportJson(simpleDoc()),
-        );
-        expect(summary.entriesNew, 2);
-        expect(summary.marksNew, 1);
-        final rows = await db.entriesDao.allEntries();
-        expect(rows, hasLength(2));
-        final byKey = {for (final r in rows) formatIsoDay(r.date): r};
-        expect(
-          byKey['2026-04-10']!.bbtC,
-          36.4,
-          reason: 'the row lands on its day, identified by the day alone',
-        );
-        final mark = (await db.marksDao.allMarks()).single;
-        expect(DateOnly.sameDay(mark.entryDate, DateTime(2026, 4, 20)), isTrue);
-      },
-    );
-
-    test(
-      're-importing the same document is idempotent (day/type keys)',
-      () async {
-        final doc = buildExportJson(simpleDoc());
-        await importJsonToDatabase(db, doc);
-
-        final second = await importJsonToDatabase(db, doc);
-        expect(second.entriesNew, 0);
-        expect(second.entriesOverwritten, 2);
-        expect(second.marksNew, 0);
-        expect(
-          second.marksSkipped,
-          1,
-          reason:
-              'marks are skip-idempotent on the (entry_date, mark_type) '
-              'key',
-        );
-
-        final rows = await db.entriesDao.allEntries();
-        expect(rows, hasLength(2), reason: 'no duplicate days on re-import');
-        expect(await db.marksDao.allMarks(), hasLength(1));
-      },
-    );
-
-    test('old-document profile keys are accepted and ignored', () async {
-      // v1–4 documents carry `profile_id` on every row and a root
-      // `profiles` list. The v5 reader tolerates both keys (unknown keys
-      // never error) and NEVER reads them: rows merge by day /
-      // (entry_date, mark_type) alone.
-      const oldJson =
-          '{"schema_version": 3, '
-          '"exported_at": "2026-04-01T00:00:00Z", '
-          '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
-          '"entries": [{"profile_id": 1, "date": "2026-04-02", '
-          '"bleeding": 3}], '
-          '"marks": [{"profile_id": 1, "entry_date": "2026-04-03", '
-          '"mark_type": "mucusPeakDay", "author": "user"}]}';
-      final summary = await importJsonToDatabase(db, oldJson);
-      expect(summary.entriesNew, 1);
-      expect(summary.marksNew, 1);
-
-      final rows = await db.entriesDao.allEntries();
-      expect(rows, hasLength(1));
-      expect(
-        DateOnly.sameDay(rows.single.date, DateTime(2026, 4, 2)),
-        isTrue,
-        reason: 'the day merge key holds regardless of profile_id',
-      );
-      expect(await db.marksDao.allMarks(), hasLength(1));
-    });
-
-    test('old-document exclude_* keys derive an ignoreTemperature mark '
-        "(author 'import')", () async {
-      // The old-document translation (inside the import transaction):
-      // any of the four true exclude_* keys derives the analysis mark for
-      // that day — and the current mark token is ignoreTemperature
-      // (temperature-evaluation-scoped only — the mark does not affect
-      // cycle-start suggestions any more). The derived token is pinned
-      // here (a rename of the
-      // stored vocabulary is a data-visible change, even with no schema
-      // bump).
-      const oldJson =
-          '{"schema_version": 3, '
-          '"exported_at": "2026-04-01T00:00:00Z", '
-          '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
-          '"entries": [{"profile_id": 1, "date": "2026-04-02", '
-          '"bleeding": 3, "exclude_travel": true}], '
-          '"marks": []}';
-      final summary = await importJsonToDatabase(db, oldJson);
-      expect(summary.entriesNew, 1);
-      expect(
-        summary.marksNew,
-        0,
-        reason:
-            'the derived marks ride inside the transaction without '
-            'being counted (document rows only)',
-      );
-
-      final marks = await db.marksDao.allMarks();
-      expect(
-        marks,
-        hasLength(1),
-        reason: 'exclude_travel=true derives the temperature-ignore mark',
-      );
-      expect(
-        marks.single.markType,
-        CycleMarkTypes.ignoreTemperature,
-        reason:
-            'the derived mark token is the RENAMED one — the old '
-            'name is gone from the production vocabulary (an escape '
-            'hatch of the open-TEXT column would fail this pin)',
-      );
-      expect(marks.single.author, 'import');
-    });
-
-    test('old rows differing only by profile_id collapse to one day key '
-        '(first occurrence wins)', () async {
-      // Consequence of ignoring the profile dimension: two same-day rows
-      // that differed only by profile_id now share ONE merge key; the plan
-      // counts the second as a duplicate and the first occurrence wins.
-      final doc = buildExportJson(
-        ExportBlob(
-          exportedAt: DateTime.utc(2026, 4, 1),
-          entries: [
-            {'profile_id': 1, 'date': '2026-04-02', 'bleeding': 3},
-            {'profile_id': 3, 'date': '2026-04-02', 'bleeding': 0},
-          ],
-          marks: const [],
-        ),
-      );
-      final summary = await planDatabaseImport(db, doc);
-      expect(
-        summary.duplicateEntryRows,
-        1,
-        reason: 'the (profile, day) key collapsed to the day key',
-      );
-      expect(summary.entriesNew, 1);
-
-      await importJsonToDatabase(db, doc);
-      final rows = await db.entriesDao.allEntries();
-      expect(rows, hasLength(1));
-      expect(
-        rows.single.bleeding,
-        Bleeding.medium,
-        reason: 'the FIRST occurrence wins (bleeding level 3 = medium)',
-      );
-    });
-
-    test(
-      'unparsable bleeding rows are reported invalid and NOT written',
-      () async {
-        // The counting-vs-writing guarantee for field-level gates: the plan
-        // counts exactly the rows the writer produces, so a row the writer
-        // drops (unknown bleeding vocabulary) must appear in the invalid
-        // bucket and must not reach the database.
-        final doc = buildExportJson(
-          ExportBlob(
-            exportedAt: DateTime.utc(2026, 4, 1),
-            entries: [
-              {'date': '2026-05-01', 'bleeding': 'heavy'},
-              {'date': '2026-05-02', 'bleeding': 'period'},
-            ],
-            marks: const [
-              {
-                'entry_date': '2026-05-03',
-                'mark_type': 'mucusPeakDay',
-                'author': 'user',
-              },
-            ],
-          ),
-        );
-
-        final summary = await planDatabaseImport(db, doc);
-        expect(summary.entriesInvalid, 1);
-        expect(summary.entriesNew, 1);
-        expect(summary.entriesWritten, 1);
-
-        final summary2 = await importJsonToDatabase(db, doc);
-        expect(summary2.entriesInvalid, 1);
-        expect(summary2.entriesNew, 1);
-        final rows = await db.entriesDao.allEntries();
-        expect(
-          rows,
-          hasLength(1),
-          reason: 'the unparsable-bleeding row is never stored',
-        );
-        expect(
-          DateOnly.sameDay(rows.single.date, DateTime(2026, 5, 2)),
-          isTrue,
-        );
-        // The mark row was untouched by the entry gate.
-        expect(await db.marksDao.allMarks(), hasLength(1));
-      },
-    );
-
-    group('measured time-of-day in the EXPORT version boundary', () {
-      test(
-        'export carries the stored minutes; fresh db keeps it on import',
-        () async {
-          await db.entriesDao.upsertDaily(
-            DailyEntry(
-              date: DateTime(2026, 4, 2),
-              bbtC: 36.4,
-              measuredAtMinutes: 405, // 06:45
-            ),
-          );
-
-          final json = await exportDatabaseToJson(db);
-          expect(json, contains('"measured_at_minutes": 405'));
-
-          final target = CycleDatabase(NativeDatabase.memory());
-          addTearDown(target.close);
-          final summary = await importJsonToDatabase(target, json);
-          expect(summary.entriesNew, 1);
-          final row = await target.entriesDao.entryFor(DateTime(2026, 4, 2));
-          expect(row!.measuredAtMinutes, 405);
-        },
-      );
-
-      test(
-        'export normalizes a stored time without a temperature to null',
-        () async {
-          // A legacy-style row (raw SQL): time stored without a temperature,
-          // e.g. written before the app enforced the pairing. The export
-          // document must not carry the stray time — what it carries is what
-          // a re-import would store.
-          final legacyDay = DateTime(2026, 6, 20);
-          final legacyEpochDay = DateOnly.normalize(
-            legacyDay,
-          ).difference(DateTime.utc(1970)).inDays;
-          await db.customStatement(
-            'INSERT INTO cycle_entries (date, measured_at_minutes) '
-            'VALUES ($legacyEpochDay, 405)',
-          );
-
-          final blob = await exportDatabaseToBlob(db);
-          final legacyRow = blob.entries.singleWhere(
-            (e) => e['date'] == formatIsoDay(legacyDay),
-          );
-          expect(legacyRow['bbt_c'], isNull);
-          expect(
-            legacyRow['measured_at_minutes'],
-            isNull,
-            reason:
-                'the export document never carries a time without its '
-                'temperature',
-          );
-        },
-      );
-
-      test(
-        'old export documents without the field import with no time',
-        () async {
-          // A v1 document (shape published before the field existed). Raw
-          // JSON on purpose: this pins the backward compatibility of the
-          // actual file content (note the old profile keys: tolerated and
-          // ignored), not a hand-built blob.
-          const oldJson =
-              '{"schema_version": 1, '
-              '"exported_at": "2026-04-01T00:00:00Z", '
-              '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
-              '"entries": [{"profile_id": 1, "date": "2026-05-01", '
-              '"bbt_c": 36.4, "bleeding": "none"}], '
-              '"marks": []}';
-          final summary = await importJsonToDatabase(db, oldJson);
-          expect(summary.entriesNew, 1);
-
-          final row = await db.entriesDao.entryFor(DateTime(2026, 5, 1));
-          expect(row!.bbtC, 36.4);
-          expect(
-            row.measuredAtMinutes,
-            isNull,
-            reason:
-                'pre-field exports carry no time; that must not fail '
-                'and must not fabricate one either',
-          );
-        },
-      );
-    });
-
-    group('bleeding levels in the export version boundary', () {
-      test('export carries numeric bleeding levels and the current schema'
-          ' version', () async {
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 4, 2), bleeding: Bleeding.heavy),
-        );
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 4, 3), bleeding: Bleeding.none),
-        );
-
-        final json = await exportDatabaseToJson(db);
-        expect(
-          json,
-          contains('"schema_version": 6'),
-          reason:
-              'v6 is the sparse-entry release; documents always '
-              'stamp their writing shape',
-        );
-        expect(
-          json,
-          contains('"bleeding": 4'),
-          reason: 'heavy is exported as its numeric level',
-        );
-        expect(
-          json,
-          isNot(contains('"bleeding": 0')),
-          reason:
-              'the sparse shape omits the bleeding key of none days '
-              'entirely — the reader treats a missing key as no bleeding '
-              'recorded',
-        );
-        expect(
-          json,
-          isNot(contains('"bleeding": "')),
-          reason: 'documents no longer carry bleeding string tokens',
-        );
-        // The v5 document carries no profile keys at all.
-        expect(json, isNot(contains('profile_id')));
-        expect(json, isNot(contains('profiles')));
-      });
-
-      test(
-        'legacy v1 token documents import and read back as mapped levels',
-        () async {
-          // A v1 document (published before heaviness existed) with the legacy
-          // token vocabulary; the profile keys are tolerated and ignored.
-          // Raw JSON on purpose: pins the actual file content of old exports,
-          // not a hand-built blob.
-          const oldJson =
-              '{"schema_version": 1, '
-              '"exported_at": "2026-04-01T00:00:00Z", '
-              '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
-              '"entries": ['
-              '{"profile_id": 1, "date": "2026-05-01", "bleeding": "period"}, '
-              '{"profile_id": 1, "date": "2026-05-02", "bleeding": "spotting"}], '
-              '"marks": []}';
-          final summary = await importJsonToDatabase(db, oldJson);
-          expect(summary.entriesInvalid, 0);
-          expect(summary.entriesWritten, 2);
-
-          expect(
-            (await db.entriesDao.entryFor(DateTime(2026, 5, 1)))!.bleeding,
-            Bleeding.medium,
-            reason: 'period (generic menstruation) degrades to medium',
-          );
-          expect(
-            (await db.entriesDao.entryFor(DateTime(2026, 5, 2)))!.bleeding,
-            Bleeding.spotting,
-          );
-        },
-      );
-
-      test(
-        'export → import round trip preserves all six levels exactly',
-        () async {
-          // One day per level; the heavy/medium days prove there is no
-          // medium-degradation through the document.
-          final levels = Bleeding.values;
-          for (var i = 0; i < levels.length; i++) {
-            await db.entriesDao.upsertDaily(
-              DailyEntry(date: DateTime(2026, 6, 1 + i), bleeding: levels[i]),
-            );
-          }
-
-          final json = await exportDatabaseToJson(db);
-          final target = CycleDatabase(NativeDatabase.memory());
-          addTearDown(target.close);
-          final summary = await importJsonToDatabase(target, json);
-          expect(summary.entriesInvalid, 0);
-          expect(summary.entriesWritten, levels.length);
-
-          final sourceRows = await db.entriesDao.allEntries();
-          final targetRows = await target.entriesDao.allEntries();
-          expect(targetRows, hasLength(levels.length));
-          for (var i = 0; i < levels.length; i++) {
-            final source = sourceRows.singleWhere(
-              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)),
-            );
-            final imported = targetRows.singleWhere(
-              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)),
-            );
-            expect(
-              imported.bleeding,
-              source.bleeding,
-              reason:
-                  '${levels[i].name} must survive the round trip exactly '
-                  '(no degradation to medium)',
-            );
-          }
-        },
-      );
-    });
-
-    group('sparse entry rows at the export document boundary', () {
-      test('the writer omits every neutral key and the round trip is '
-          'lossless (idempotence)', () async {
-        // A fully neutral day (level-0 bleeding, no temperature, no other
-        // observation) — the sparse document carries ONLY its date.
-        await db.entriesDao.upsertDaily(DailyEntry(date: DateTime(2026, 4, 2)));
-        // A rich day with every observation at a non-neutral value.
-        await db.entriesDao.upsertDaily(
-          DailyEntry(
-            date: DateTime(2026, 4, 3),
-            bbtC: 36.4,
-            measuredAtMinutes: 405,
-            bleeding: Bleeding.medium,
-            tempDisturbances: TempDisturbance.kr.bit,
-            mucusSign: MucusSign.s,
-            mucusQuality: MucusQuality.ew,
-            cervixPosition: CervixPosition.veryHigh,
-            cervixOpening: CervixOpening.open,
-            cervixFirmness: CervixFirmness.soft,
-            painBreast: true,
-            painMittelschmerz: true,
-            sexTimings: SexTiming.midday.bit,
-            notes: 'rich day',
-          ),
-        );
-
-        final json = await exportDatabaseToJson(db);
-        expect(
-          json,
-          isNot(contains('"bleeding": 0')),
-          reason:
-              'the sparse shape never writes the neutral bleeding '
-              'level — a level-0 day leaves the key out entirely',
-        );
-        expect(
-          json,
-          isNot(contains(': null')),
-          reason:
-              'entry rows carry no null-valued keys in the sparse '
-              'shape',
-        );
-
-        final decoded = jsonDecode(json) as Map<String, Object?>;
-        final rows = [
-          for (final raw in decoded['entries'] as List)
-            Map<String, Object?>.from(raw as Map),
-        ];
-        final neutral = rows.singleWhere((r) => r['date'] == '2026-04-02');
-        expect(neutral.keys, {
-          'date',
-        }, reason: 'a fully neutral day exports only its date');
-        final rich = rows.singleWhere((r) => r['date'] == '2026-04-03');
-        expect(rich.keys, {
-          'date',
-          'bbt_c',
-          'measured_at_minutes',
-          'bleeding',
-          'temp_disturbances',
-          'mucus_sign',
-          'mucus_quality',
-          'cervix_position',
-          'cervix_opening',
-          'cervix_firmness',
-          'pain_breast',
-          'pain_mittelschmerz',
-          'sex_timings',
-          'notes',
-        });
-        expect(rich.values, everyElement(isNotNull));
-
-        // Master criterion: export → parse → import → exactly the same
-        // DailyEntry set; a re-export of the imported data stays sparse
-        // with the same underlying row maps.
-        final target = CycleDatabase(NativeDatabase.memory());
-        addTearDown(target.close);
-        final summary = await importJsonToDatabase(target, json);
-        expect(summary.entriesInvalid, 0);
-        expect(summary.entriesWritten, 2);
-        // The export document carries only observation keys — never the
-        // createdAt/updatedAt audit columns — and importing the day stamps
-        // fresh audit values for it. The round trip is therefore compared on
-        // the stored day data (via dailyEntryFromDrift), not on the audit
-        // columns, which keeps this deterministic instead of wall-clock
-        // dependent.
-        expect(
-          [
-            for (final row in await target.entriesDao.allEntries())
-              dailyEntryFromDrift(row),
-          ],
-          unorderedEquals([
-            for (final row in await db.entriesDao.allEntries())
-              dailyEntryFromDrift(row),
-          ]),
-          reason: 'import stores exactly the source day set',
-        );
-
-        Map<String, Map<String, Object?>> byDay(
-          List<Map<String, Object?>> exported,
-        ) => {for (final row in exported) row['date']! as String: row};
-        final firstExport = await exportDatabaseToBlob(db);
-        final reExported = await exportDatabaseToBlob(target);
-        expect(
-          byDay(reExported.entries),
-          byDay(firstExport.entries),
-          reason: 'a previously sparse dataset re-exports sparse',
-        );
-        expect(reExported.marks, firstExport.marks);
-      });
-    });
-
-    group('measurement method snapshots at the export boundary', () {
-      test(
-        'a snapshot-free database exports exactly the four root keys',
-        () async {
-          // The byte-compatibility decision: a dataset without snapshots
-          // emits NO methods key at all, so the pinned four-key document
-          // shape survives unchanged.
-          final json = await exportDatabaseToJson(db);
-          final decoded = jsonDecode(json) as Map<String, Object?>;
-          expect(decoded.keys.toSet(), {
-            'schema_version',
-            'exported_at',
-            'entries',
-            'marks',
-          });
-        },
-      );
-
-      test('export carries seeded snapshots in the sparse row shape', () async {
-        await db.measurementMethodsDao.upsertByDate(
-          date: DateTime(2026, 2, 1),
-          route: MeasurementRoute.vaginal,
-          thermometer: 'ThermaPen',
-        );
-        await db.measurementMethodsDao.upsertByDate(
-          date: DateTime(2026, 3, 15),
-          route: MeasurementRoute.oral,
-        );
-
-        final json = await exportDatabaseToJson(db);
-        expect(json, contains('"methods"'));
-        expect(
-          json,
-          isNot(contains(': null')),
-          reason: 'the thermometer key is omitted when null, never null',
-        );
-
-        final decoded = jsonDecode(json) as Map<String, Object?>;
-        final rows = [
-          for (final raw in decoded['methods']! as List)
-            Map<String, Object?>.from(raw as Map),
-        ];
-        expect(rows, [
-          {
-            'date': '2026-02-01',
-            'method': 'vaginal',
-            'thermometer': 'ThermaPen',
-          },
-          // The sparse shape: no thermometer key on the name-less row.
-          {'date': '2026-03-15', 'method': 'oral'},
-        ], reason: 'ordered by day');
-      });
-
-      test(
-        'import writes snapshots via the DAO, overwriting stored days',
-        () async {
-          await db.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 2, 1),
-            route: MeasurementRoute.vaginal,
-            thermometer: 'ThermaPen',
-          );
-          await db.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 3, 15),
-            route: MeasurementRoute.oral,
-          );
-
-          final target = CycleDatabase(NativeDatabase.memory());
-          addTearDown(target.close);
-          // A stored snapshot on a day the document also carries: the
-          // entries merge rule — overwrite, never a duplicate row.
-          await target.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 2, 1),
-            route: MeasurementRoute.other,
-            thermometer: 'Obsolete',
-          );
-
-          final json = await exportDatabaseToJson(db);
-          final summary = await importJsonToDatabase(target, json);
-          expect(summary.methodsNew, 1, reason: '2026-03-15 is new');
-          expect(summary.methodsOverwritten, 1, reason: '2026-02-01 stored');
-          expect(summary.methodsWritten, 2);
-
-          // Read back through the domain mapper (same read the rest of the
-          // app uses), ordered ascending by day — two rows, no duplicate.
-          final rows = [
-            for (final row in await target.measurementMethodsDao.allSnapshots())
-              measurementSnapshotFromDrift(row),
-          ];
-          expect(rows, [
-            MeasurementMethodSnapshot(
-              date: DateTime(2026, 2, 1),
-              route: MeasurementRoute.vaginal,
-              thermometer: 'ThermaPen',
-            ),
-            MeasurementMethodSnapshot(
-              date: DateTime(2026, 3, 15),
-              route: MeasurementRoute.oral,
-            ),
-          ]);
-        },
-      );
-
-      test(
-        'an old (pre-methods) document leaves stored methods untouched',
-        () async {
-          // The additive root key: a document that simply omits it must not
-          // touch the device's snapshots (missing key = no snapshots).
-          await db.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 2, 1),
-            route: MeasurementRoute.rectal,
-            thermometer: 'Alt',
-          );
-          const oldJson =
-              '{"schema_version": 3, '
-              '"exported_at": "2026-04-01T00:00:00Z", '
-              '"profiles": [{"id": 1, "name": "main", "ordinal": 0}], '
-              '"entries": [{"profile_id": 1, "date": "2026-04-02", '
-              '"bleeding": 3}], '
-              '"marks": []}';
-
-          final summary = await importJsonToDatabase(db, oldJson);
-          expect(summary.entriesNew, 1);
-          expect(summary.methodsNew, 0);
-
-          final rows = [
-            for (final row in await db.measurementMethodsDao.allSnapshots())
-              measurementSnapshotFromDrift(row),
-          ];
-          expect(rows, [
-            MeasurementMethodSnapshot(
-              date: DateTime(2026, 2, 1),
-              route: MeasurementRoute.rectal,
-              thermometer: 'Alt',
-            ),
-          ]);
-        },
-      );
-
-      test(
-        'invalid method rows are counted AND skipped (counted == written)',
-        () async {
-          final doc = buildExportJson(
-            ExportBlob(
-              exportedAt: DateTime.utc(2026, 4, 1),
-              entries: const [],
-              marks: const [],
-              methods: [
-                {'date': '2026-05-01', 'method': 'vaginal'},
-                // The SQL CHECK cannot store this token — a plan that
-                // counted it as a write would break the writer-parity rule.
-                {'date': '2026-05-02', 'method': 'sublingual'},
-              ],
-            ),
-          );
-
-          final plan = await planDatabaseImport(db, doc);
-          expect(plan.methodsInvalid, 1);
-          expect(plan.methodsWritten, 1);
-
-          final summary = await importJsonToDatabase(db, doc);
-          expect(summary.methodsInvalid, 1);
-          expect(summary.methodsWritten, 1);
-          final rows = [
-            for (final row in await db.measurementMethodsDao.allSnapshots())
-              measurementSnapshotFromDrift(row),
-          ];
-          expect(rows, hasLength(1));
-          expect(rows.single.route, MeasurementRoute.vaginal);
-        },
-      );
-
-      test(
-        'the duplicate first-wins rule holds for same-day document rows',
-        () async {
-          final doc = buildExportJson(
-            ExportBlob(
-              exportedAt: DateTime.utc(2026, 4, 1),
-              entries: const [],
-              marks: const [],
-              methods: const [
-                {'date': '2026-05-01', 'method': 'vaginal'},
-                {'date': '2026-05-01', 'method': 'oral'},
-              ],
-            ),
-          );
-
-          final summary = await importJsonToDatabase(db, doc);
-          expect(summary.methodsNew, 1);
-          expect(summary.duplicateMethodRows, 1);
-          final rows = [
-            for (final row in await db.measurementMethodsDao.allSnapshots())
-              measurementSnapshotFromDrift(row),
-          ];
-          expect(rows, hasLength(1));
-          expect(
-            rows.single.route,
-            MeasurementRoute.vaginal,
-            reason: 'the FIRST occurrence wins (the entries merge rule)',
-          );
-        },
-      );
-
-      test(
-        'planDatabaseImport preview counts include the methods fields',
-        () async {
-          await db.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 5, 5),
-            route: MeasurementRoute.other,
-          );
-          final json = await exportDatabaseToBlob(db).then(buildExportJson);
-
-          final target = CycleDatabase(NativeDatabase.memory());
-          addTearDown(target.close);
-          await target.measurementMethodsDao.upsertByDate(
-            date: DateTime(2026, 5, 5),
-            route: MeasurementRoute.oral,
-          );
-
-          final plan = await planDatabaseImport(target, json);
-          expect(plan.methodsNew, 0);
-          expect(plan.methodsOverwritten, 1);
-          expect(plan.methodsInvalid, 0);
-          expect(plan.methodsWritten, 1);
-        },
-      );
-    });
-
-    test('unexpected errors surface as ImportFailedException', () async {
-      // Nothing half-imported survives a mid-transaction failure: the
-      // wrapper turns any engine error into the typed failure the UI can
-      // message instead of a raw crash. The engine fails here because the
-      // database is closed.
-      // The `broken` instance is alive next to the per-test `db` for this
-      // one test, so drift's singleton debug warning would print on every
-      // run — scope-limited suppression. The flag must be set BEFORE the
-      // database is constructed (the warning fires at construction time)
-      // and is restored by the harness afterwards.
-      final previousWarningFlag =
-          driftRuntimeOptions.dontWarnAboutMultipleDatabases;
-      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-      addTearDown(
-        () => driftRuntimeOptions.dontWarnAboutMultipleDatabases =
-            previousWarningFlag,
-      );
-      final broken = CycleDatabase(NativeDatabase.memory());
-      // Ensure the lazy native executor has actually opened before closing —
-      // closing a never-opened database is a no-op for drift, and the import
-      // below would casually reopen it.
-      await broken.entriesDao.allEntries();
-      await broken.close();
-      await expectLater(
-        importJsonToDatabase(broken, buildExportJson(simpleDoc())),
-        throwsA(isA<ImportFailedException>()),
-      );
-    });
   });
 }

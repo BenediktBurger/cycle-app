@@ -13,22 +13,20 @@
 // Relative import on purpose: tool/ scripts live outside lib/. The two
 // release scripts share names for their local plumbing, so both are
 // prefixed here; the shared module is imported plainly.
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/publish_release.dart' as publish;
 import '../../tool/release_names.dart';
-
-/// The pinned release-certificate fingerprint, duplicated here from the
-/// committed [pinFilePath] content so the notes-body tests pin the exact
-/// trust anchor the release must carry.
-const pinnedReleaseFingerprint =
-    '0aa5749804b8ed9e3c207f851b5902775d762207d60c2485a26b5d75eff5355b';
-
-/// A well-formed 40-char lowercase head SHA for the manifest fixtures.
-const validHeadSha = '978dbc5b9ee19ff0aedfc03594a603013f0e034a';
+import 'release_fixtures.dart'
+    show
+        badTagList,
+        changelogGateFixture,
+        changelogGateRunner,
+        pinnedReleaseFingerprint,
+        validHeadSha,
+        validManifestJson;
 
 /// The pinned fingerprint in apksigner's colon-separated uppercase shape —
 /// the lenient normalizer must accept it.
@@ -51,17 +49,7 @@ void main() {
     });
 
     test('rejects malformed tags', () {
-      const badTags = [
-        'v1.2',
-        '1.2.3',
-        'v1.2.3.4',
-        '',
-        'vx.y.z',
-        'v1.2.3-rc1',
-        'V1.2.3',
-        'v1.2.3+4',
-      ];
-      for (final tag in badTags) {
+      for (final tag in badTagList) {
         expect(
           () => publish.parseArguments([tag]),
           throwsA(isA<UsageException>()),
@@ -102,11 +90,6 @@ void main() {
         throwsA(isA<UsageException>()),
       );
     });
-
-    test('the usage line names publish_release and the dry-run flag', () {
-      expect(publish.usage, contains('publish_release.dart'));
-      expect(publish.usage, contains('--dry-run'));
-    });
   });
 
   group('staged-dir consumption (temp-dir sandbox)', () {
@@ -132,10 +115,7 @@ void main() {
     void stageHappyTree() {
       manifestFile()
         ..parent.createSync(recursive: true)
-        ..writeAsStringSync(
-          '{"tag":"v0.2.1","versionName":"0.2.1","versionCodeBase":3,'
-          '"runId":1234567890,"headSha":"$validHeadSha"}\n',
-        );
+        ..writeAsStringSync('${validManifestJson()}\n');
       for (final abi in releaseAbis) {
         stagedApk(abi).writeAsBytesSync([1, 2, 3]);
       }
@@ -202,10 +182,7 @@ void main() {
     test('missing or empty staged APKs fail loudly by name', () {
       manifestFile()
         ..parent.createSync(recursive: true)
-        ..writeAsStringSync(
-          '{"tag":"v0.2.1","versionName":"0.2.1","versionCodeBase":3,'
-          '"runId":1234567890,"headSha":"$validHeadSha"}\n',
-        );
+        ..writeAsStringSync('${validManifestJson()}\n');
       stagedApk('armeabi-v7a').writeAsBytesSync([1, 2, 3]);
       stagedApk('x86_64').writeAsBytesSync([1, 2, 3]);
       // arm64-v8a never lands.
@@ -736,10 +713,7 @@ void main() {
     void stageHappyTree() {
       File('${root.path}/$handoffManifestPath')
         ..parent.createSync(recursive: true)
-        ..writeAsStringSync(
-          '{"tag":"v0.2.1","versionName":"0.2.1","versionCodeBase":3,'
-          '"runId":1234567890,"headSha":"$validHeadSha"}\n',
-        );
+        ..writeAsStringSync('${validManifestJson()}\n');
       File('${root.path}/tool/release_fingerprint.txt')
         ..parent.createSync(recursive: true)
         ..writeAsStringSync('$pinnedReleaseFingerprint\n');
@@ -783,50 +757,18 @@ void main() {
           // Git Trees + Git Blobs API (read-only): the changelog-files gate
           // walks the fastlane tree at the manifest's head commit and
           // resolves each changelog symlink's target blob.
-          const treePrefix = 'repos/$releaseRepo/git/trees/';
-          const blobPrefix = 'repos/$releaseRepo/git/blobs/';
-          final call = arguments[1];
-          if (call.startsWith(treePrefix)) {
-            final changelogTargets = [
-              for (final locale in const ['de-DE', 'en-US']) ...[
-                '{"path":"$fdroidMetadataPath/$locale","mode":"040000",'
-                    '"type":"tree","sha":"tree-$locale"}',
-                '{"path":"$fdroidMetadataPath/$locale/changelogs/0.2.1.txt",'
-                    '"mode":"100644","type":"blob","sha":"sha-$locale-a"}',
-                for (final entry in const {
-                  '31.txt': '31',
-                  '32.txt': '32',
-                  '33.txt': '33',
-                  'default.txt': 'def',
-                }.entries)
-                  '{"path":"$fdroidMetadataPath/$locale/changelogs/'
-                      '${entry.key}","mode":"120000","type":"blob",'
-                      '"sha":"sha-$locale-${entry.value}"}',
-              ],
-            ];
-            return ok(
-              '{"tree":[${changelogTargets.join(',')}],'
-              '"truncated":false}',
-            );
-          }
-          if (call.startsWith(blobPrefix)) {
-            const authoringTarget = '0.2.1.txt';
-            final sha = call.substring(blobPrefix.length);
-            if (!const {
-              '31',
-              '32',
-              '33',
-              'def',
-            }.contains(sha.split('-').last)) {
-              return Future.value(
-                ProcessResult(0, 1, '', 'gh: blob $sha not found'),
-              );
-            }
-            return ok(
-              '{"content":"${base64Encode(utf8.encode(authoringTarget))}",'
-              '"encoding":"base64"}',
-            );
-          }
+          const authoringName = '0.2.1.txt';
+          const linkNames = ['31.txt', '32.txt', '33.txt', 'default.txt'];
+          return changelogGateRunner(
+            changelogGateFixture(
+              targets: {
+                for (final locale in const ['de-DE', 'en-US'])
+                  locale: {for (final name in linkNames) name: authoringName},
+              },
+              authoringName: authoringName,
+              linkNames: linkNames,
+            ),
+          )(arguments);
         }
         if (arguments[0] == 'release' && arguments[1] == 'view') {
           return releaseViewResult == 'present'

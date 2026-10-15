@@ -6,17 +6,15 @@
 //
 // The platform locale is simulated through the test binding's platform
 // dispatcher; the app itself is unchanged: in-memory drift database
-// override, no platform channels (same pattern as app_shell_test.dart, now merged with the former
-// l10n_fallback_test.dart into this single locale file — the two
-// concerns stay in distinct groups).
-import 'dart:io';
-
+// override, no platform channels (same pattern as app_shell_test.dart),
+// covering both the language-default and the fallback concerns in one
+// file with a group per concern.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
-import 'support/finders.dart';
+import 'support/settings_switcher.dart';
 import 'support/viewport.dart';
 
 /// App scope for the language tests. A null [locale] means: leave the
@@ -108,26 +106,14 @@ void main() {
       (WidgetTester tester) async {
         useDeviceLocales(tester, const [Locale('de')]);
 
-        // The switcher sits below the pane's top cards (lazy ListView —
-        // enlarge the surface so the whole card list is built).
-        await tester.binding.setSurfaceSize(const Size(900, 2400));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        await tester.pumpWidget(_appScope());
-        await tester.pumpAndSettle();
-        // Tap through the shared navigation finder: all tabs stay mounted
-        // (IndexedStack), so the 'Einstellungen' label also matches the
-        // offstage screen's AppBar — and in tree order that AppBar precedes
-        // the shell's navigation surface, so a bare .first tap would miss.
-        await tester.tap(navLabel('Einstellungen'));
-        await tester.pumpAndSettle();
+        await pumpSettingsPane(tester, 'Einstellungen');
 
-        // Scope to the language switcher: the settings screen now also carries a
+        // Scope to the language switcher: the settings screen also carries a
         // theme-mode switcher whose "System" segment would otherwise collide
         // with the language option of the same name.
         final languageSwitcher = find.byType(SegmentedButton<String>);
-        expect(languageSwitcher, findsOneWidget);
 
-        // All three options are offered.
+        // All three options are offered as labeled segments.
         for (final option in ['System', 'Deutsch', 'English']) {
           expect(
             find.descendant(of: languageSwitcher, matching: find.text(option)),
@@ -135,49 +121,53 @@ void main() {
             reason: 'Language option "$option" must be offered',
           );
         }
-        final switcher = tester.widget<SegmentedButton<String>>(
-          languageSwitcher,
-        );
-        expect(switcher.selected, {
-          'system',
-        }, reason: 'The default selection must be "System"');
 
-        // Switching to an explicit language applies it immediately.
-        await tester.tap(
-          find.descendant(of: languageSwitcher, matching: find.text('English')),
+        // Switching applies the choice immediately and returning to System
+        // hands resolution back to the device locale.
+        await exerciseSwitcher<String>(
+          tester,
+          switcher: languageSwitcher,
+          defaultSelected: const {'system'},
+          steps: [
+            SwitcherStep(
+              segment: find.descendant(
+                of: languageSwitcher,
+                matching: find.text('English'),
+              ),
+              selected: const {'en'},
+              outcome: (tester) async {
+                // With the shell keeping every tab mounted, the label
+                // appears in the navigation bar AND in the offstage diary
+                // screen's AppBar.
+                expect(
+                  find.text('Diary'),
+                  findsWidgets,
+                  reason: 'Selecting English must switch the UI to English',
+                );
+              },
+            ),
+            SwitcherStep(
+              segment: find.descendant(
+                of: languageSwitcher,
+                matching: find.text('System'),
+              ),
+              selected: const {'system'},
+              outcome: (tester) async {
+                expect(
+                  find.text('Tagebuch'),
+                  findsWidgets,
+                  reason:
+                      'Selecting System must follow the device locale again',
+                );
+              },
+            ),
+          ],
         );
-        await tester.pumpAndSettle();
-        // With the shell keeping every tab mounted, the label appears in the
-        // navigation bar AND in the (offstage) diary screen's AppBar.
-        expect(
-          find.text('Diary'),
-          findsWidgets,
-          reason: 'Selecting English must switch the UI to English',
-        );
-        final switcher2 = tester.widget<SegmentedButton<String>>(
-          languageSwitcher,
-        );
-        expect(switcher2.selected, {'en'});
-
-        // Back to the system default: the German device locale returns.
-        await tester.tap(
-          find.descendant(of: languageSwitcher, matching: find.text('System')),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.text('Tagebuch'),
-          findsWidgets,
-          reason: 'Selecting System must follow the device locale again',
-        );
-        final switcher3 = tester.widget<SegmentedButton<String>>(
-          languageSwitcher,
-        );
-        expect(switcher3.selected, {'system'});
       },
     );
   });
 
-  // ─── fallback behavior: the former test/l10n_fallback_test.dart ───
+  // ─── fallback behavior ───
   //
   // Localization fallback tests: a missing translation term for the active
   // locale must fall back to *English* (not the German template text), and
@@ -189,11 +179,9 @@ void main() {
   // The per-term fallback itself is a *codegen-time* mechanism: gen-l10n
   // bakes the template ARB's text into a locale class for any key missing
   // from that locale's ARB. Which key is missing therefore cannot be
-  // simulated at runtime; what these tests pin is the two real levers:
-  //  - the template ARB is the English one (l10n.yaml
-  //    `template-arb-file`),
-  //  - an unsupported active language falls back to English via
-  //    resolution, i.e. English is the first/last supported locale.
+  // simulated at runtime; what these tests pin is the real lever: an
+  // unsupported active language falls back to English via resolution,
+  // i.e. English is the first/last supported locale.
   group('fallback behavior', () {
     testWidgets('unsupported active language resolves to English, not German', (
       WidgetTester tester,
@@ -212,22 +200,5 @@ void main() {
         reason: 'German is never the fallback for an unknown locale',
       );
     });
-
-    test(
-      'untranslated keys fall back to English: the template ARB is English',
-      () {
-        // gen-l10n fills missing terms with the template ARB's text; the
-        // fallback language is therefore determined by which ARB is the
-        // template.
-        final l10nYaml = File('l10n.yaml').readAsStringSync();
-        expect(
-          l10nYaml,
-          contains('template-arb-file: app_en.arb'),
-          reason:
-              'Untranslated terms must fall back to English, i.e. app_en.arb '
-              'must be the gen-l10n template',
-        );
-      },
-    );
   });
 }

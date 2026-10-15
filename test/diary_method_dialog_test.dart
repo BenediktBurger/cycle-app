@@ -9,18 +9,16 @@
 // selection — no picker lives inside the dialog. German strings are pinned
 // through the harness's de locale.
 
-import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
 import 'support/diary_harness.dart';
 import 'support/error_collector.dart';
+import 'support/faulty_db.dart';
 import 'support/viewport.dart';
 
 final _now = DateTime(2026, 4, 10, 7, 30);
@@ -56,70 +54,12 @@ Finder _thermometerField() =>
 
 Finder _deleteButton() => find.byKey(const ValueKey('methodDeleteButton'));
 
-/// Fault injection for the dialog's database access (the delete-data
-/// tests' subclassing seam): each of the dialog's three calls — load,
-/// save, delete — can be armed to fail AFTER the pane is pumped.
-class _FaultyMethodsDatabase extends CycleDatabase {
-  _FaultyMethodsDatabase(super.executor);
-
-  bool failLoad = false;
-  bool failSave = false;
-  bool failDelete = false;
-
-  late final _FaultyMethodsDao _faultyDao = _FaultyMethodsDao(this);
-
-  @override
-  MeasurementMethodsDao get measurementMethodsDao => _faultyDao;
-}
-
-class _FaultyMethodsDao extends MeasurementMethodsDao {
-  _FaultyMethodsDao(this._faulty) : super(_faulty);
-
-  final _FaultyMethodsDatabase _faulty;
-
-  @override
-  Future<List<MeasurementMethod>> allSnapshots() {
-    if (_faulty.failLoad) throw StateError('injected load failure');
-    return super.allSnapshots();
-  }
-
-  @override
-  Future<MeasurementMethod> upsertByDate({
-    required DateTime date,
-    required MeasurementRoute route,
-    String? thermometer,
-  }) {
-    if (_faulty.failSave) throw StateError('injected save failure');
-    return super.upsertByDate(
-      date: date,
-      route: route,
-      thermometer: thermometer,
-    );
-  }
-
-  @override
-  Future<int> deleteByDate(DateTime date) {
-    if (_faulty.failDelete) throw StateError('injected delete failure');
-    return super.deleteByDate(date);
-  }
-}
-
 /// Pumps the diary over a fault-injectable database and hands the instance
-/// back (the same seam the delete-data tests use: flags flip after the
-/// pump, so each test arms exactly its fault).
-Future<_FaultyMethodsDatabase> _pumpFaultyDiary(WidgetTester tester) async {
-  await tester.pumpWidget(
-    _harness.scope(
-      builder: () => _FaultyMethodsDatabase(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      ),
-    ),
-  );
+/// back (flags flip after the pump, so each test arms exactly its fault).
+Future<FaultyCycleDatabase> _pumpFaultyDiary(WidgetTester tester) async {
+  await tester.pumpWidget(_harness.scope(builder: FaultyCycleDatabase.new));
   await tester.pumpAndSettle();
-  return _harness.db! as _FaultyMethodsDatabase;
+  return _harness.db! as FaultyCycleDatabase;
 }
 
 Future<void> _openDialog(WidgetTester tester) async {
@@ -494,7 +434,7 @@ void main() {
       await tester.tap(_routeChip('oral'));
       await tester.pumpAndSettle();
 
-      db.failSave = true;
+      db.failMethodSave = true;
       await tester.tap(find.byKey(const ValueKey('methodSaveButton')));
       await tester.pumpAndSettle();
 
@@ -512,7 +452,7 @@ void main() {
 
       // The dialog stays usable: disarming the fault lets the same press
       // succeed and close.
-      db.failSave = false;
+      db.failMethodSave = false;
       await tester.tap(find.byKey(const ValueKey('methodSaveButton')));
       await tester.pumpAndSettle();
 
@@ -532,7 +472,7 @@ void main() {
       );
       await _openDialog(tester);
 
-      db.failDelete = true;
+      db.failMethodDelete = true;
       await tester.tap(_deleteButton());
       await tester.pumpAndSettle();
 
@@ -553,7 +493,7 @@ void main() {
     testWidgets('a failed load shows the loadFailed message in the dialog '
         'body instead of spinning forever', (tester) async {
       final db = await _pumpFaultyDiary(tester);
-      db.failLoad = true;
+      db.failMethodLoad = true;
 
       await _openDialog(tester);
 

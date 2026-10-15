@@ -1,11 +1,11 @@
 // Unit tests of the pure in-chart glyph layer (lib/ui/chart_marks.dart):
 // the per-day observations records (sex timing slots, mucus letters,
-// Mittelschmerz M flag) and the narrow-range visibility predicates for
-// the top-anchored rows and the bottom-anchored numbers row — consumed
-// by the cycle chart and the PDF export, who render the peak dot and
-// the day numbers from the overlay artifacts themselves. The letter
-// vocabulary stays mucusDisplay's — the tests pin that the mapper adds
-// no second mapping.
+// Mittelschmerz M flag) and the narrow-range visibility predicates for the
+// top-anchored rows and the bottom-anchored rows (day numbers, the method
+// glyph's fallback slot) — consumed by the cycle chart and the PDF export,
+// who render the peak dot and the day numbers from the overlay artifacts
+// themselves. The letter vocabulary stays mucusDisplay's — the tests pin
+// that the mapper adds no second mapping.
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -82,11 +82,6 @@ void main() {
       expect(marks[0]!.sexSlots[1].columnFraction, closeTo(0.5, 1e-9));
       expect(marks[0]!.sexSlots[2].columnFraction, closeTo(5 / 6, 1e-9));
     });
-
-    test('a day absent from the entries has no placement record at all', () {
-      final marks = chartDayMarks({0: _entry(0, sexTimings: 7)});
-      expect(marks[1], isNull);
-    });
   });
 
   group('chartDayMarks — mucus letters (mucusDisplay vocabulary)', () {
@@ -128,9 +123,26 @@ void main() {
       expect(marks.keys.toSet(), {0, 2});
     });
 
-    test('a day absent from the entries stays record-less', () {
-      final marks = chartDayMarks({0: _entry(0)});
-      expect(marks[1], isNull);
+    /// A day outside the entries' keys gets NO record at all — no X
+    /// slots, no mucus glyph, no M, nothing.
+    test('a day absent from the entries has no record at all', () {
+      final marks = chartDayMarks({
+        0: _entry(
+          0,
+          sign: MucusSign.s,
+          quality: MucusQuality.ew,
+          sexTimings: SexTiming.values.fold(0, (m, t) => m | t.bit),
+          mittelschmerz: true,
+        ),
+        1: _entry(1),
+        3: _entry(3),
+      });
+      expect(marks.keys.toSet(), {0, 1, 3});
+      expect(
+        marks[2],
+        isNull,
+        reason: 'the gapped day gets no placement record',
+      );
     });
   });
 
@@ -144,10 +156,20 @@ void main() {
       final marks = chartDayMarks({0: _entry(0)});
       expect(marks[0]!.mittelschmerz, isFalse);
     });
+  });
 
-    test('a day absent from the entries renders no M', () {
-      final marks = chartDayMarks({0: _entry(0, mittelschmerz: true)});
-      expect(marks[1], isNull);
+  group('methodGlyphFallbackRowVisible — the fallback slot\'s pitch', () {
+    test('a span below 0.20 hides the fallback slot; at span 0.20 it '
+        'reappears', () {
+      expect(
+        methodGlyphFallbackRowVisible(TemperatureRange(min: 37.9, max: 38.0)),
+        isFalse,
+      );
+      expect(
+        methodGlyphFallbackRowVisible(TemperatureRange(min: 37.8, max: 38.0)),
+        isTrue,
+        reason: 'at span 0.20 the slot\'s center sits on the margin — visible',
+      );
     });
   });
 

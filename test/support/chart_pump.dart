@@ -23,6 +23,11 @@ import 'provider_fixtures.dart';
 /// reach the same ColorScheme the charts render with.
 const chartSeedColor = Color(0xFF6750A4);
 
+/// The R10 baseline bars' dash pattern (an inline literal in
+/// lib/ui/cycle_chart.dart; the help sheet's legend glyph repaints the same
+/// dashes, so the chart and help-sheet tests assert these numbers).
+const baselineDashPattern = [6, 4];
+
 /// Builds the pumpable widget tree for a chart test.
 ///
 ///  - [entries], [marks] and [selectedDate] (default: [entries]' first day)
@@ -155,4 +160,18 @@ Widget chartHarness({
 Future<void> pumpChart(WidgetTester tester, Widget widget) async {
   await tester.pumpWidget(widget);
   await tester.pumpAndSettle();
+}
+
+/// Re-pumps a FRESH harness instance: [build] runs per call so changed
+/// fixture data materializes as a new subtree under a fresh key.
+///
+/// A plain same-shaped re-pump (same widget type and children) would only
+/// update the const-canonicalized subtree in place — keeping the previous
+/// pump's stream/provider/locale state — so re-pump sites with changed
+/// streams, marks, ranges, locales or fixtures go through this remount.
+Future<void> pumpFreshChart(
+  WidgetTester tester,
+  Widget Function() build,
+) async {
+  await pumpChart(tester, KeyedSubtree(key: UniqueKey(), child: build()));
 }

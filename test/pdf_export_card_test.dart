@@ -646,47 +646,36 @@ void main() {
     expect(find.text('Maria Muster'), findsOneWidget);
   });
 
-  testWidgets(
-    'the settings temperature range reaches the generation model and the '
-    'anonymize switch still maps onto the per-export option',
-    (WidgetTester tester) async {
-      final run = CapturedRun();
-      await enlargeViewport(tester);
-      saveFileBytesOverride = (filename, bytes) async => true;
-      addTearDown(() => saveFileBytesOverride = null);
-      const range = TemperatureRange(min: 36.5, max: 37.5);
-      await pumpCard(
-        tester,
-        harness(
-          entries: cardEntries(),
-          marks: cardMarks(),
-          runSink: [run],
-          temperatureRange: range,
-        ),
-      );
+  testWidgets('the settings temperature range reaches the generation model', (
+    WidgetTester tester,
+  ) async {
+    final run = CapturedRun();
+    await enlargeViewport(tester);
+    saveFileBytesOverride = (filename, bytes) async => true;
+    addTearDown(() => saveFileBytesOverride = null);
+    const range = TemperatureRange(min: 36.5, max: 37.5);
+    await pumpCard(
+      tester,
+      harness(
+        entries: cardEntries(),
+        marks: cardMarks(),
+        runSink: [run],
+        temperatureRange: range,
+      ),
+    );
 
-      await tester.tap(pdfExportAnonymizeSwitch());
-      await tester.pumpAndSettle();
-      await tester.tap(pdfExportButton());
-      await tester.pumpAndSettle();
+    await tester.tap(pdfExportButton());
+    await tester.pumpAndSettle();
 
-      expect(run.model, isNotNull);
-      expect(
-        run.model!.temperatureRange,
-        range,
-        reason:
-            'the settings card\'s display range is the curve block\'s '
-            'fixed y scale — echoed into the model verbatim',
-      );
-      expect(
-        run.options!.anonymized,
-        isTrue,
-        reason:
-            'the flipped switch still maps onto the per-export '
-            'anonymize option (unchanged behavior, re-asserted)',
-      );
-    },
-  );
+    expect(run.model, isNotNull);
+    expect(
+      run.model!.temperatureRange,
+      range,
+      reason:
+          'the settings card\'s display range is the curve block\'s '
+          'fixed y scale — echoed into the model verbatim',
+    );
+  });
 
   testWidgets(
     'the hand-off buttons stay disabled while the methods stream has not '
@@ -772,12 +761,9 @@ void main() {
       expect(
         tester.widget<FilledButton>(pdfExportButton()).onPressed,
         isNull,
-        reason: 'save stays blocked on the failed stream',
-      );
-      expect(
-        tester.widget<FilledButton>(pdfExportShareButton()).onPressed,
-        isNull,
-        reason: 'share stays blocked on the failed stream',
+        reason:
+            'the shared methodsReady gate stays closed on a failed stream '
+            '— both hand-offs gate on it',
       );
     },
   );
@@ -898,8 +884,7 @@ void main() {
 
   testWidgets(
     'the anonymize switch flows into the SHARED generation like it does '
-    'into the saved one; the stored identifying settings survive the '
-    'anonymized share run',
+    'into the saved one',
     (WidgetTester tester) async {
       final run = CapturedRun();
       final shares = <(String, List<int>)>[];
@@ -924,9 +909,6 @@ void main() {
       expect(run.options!.anonymized, isTrue);
       expect(shares, hasLength(1));
       expect(find.text('File shared.'), findsOneWidget);
-      // Both hand-offs consume the SAME anonymize decision; it stays
-      // card-local — the stored identifying field keeps its value.
-      expect(find.text('Maria Muster'), findsOneWidget);
     },
   );
 

@@ -1,9 +1,10 @@
 // The "What to track" diary-settings card: end-to-end (the REAL CycleApp
 // against the in-memory drift database override, same shape as
 // settings_persistence_test.dart) — defaults on a fresh start, a switch
-// flip writing through to the app_settings table, a persisted row
-// hydrating into the card on restart, and a live choice never clobbered
-// by hydration.
+// flip writing through to the app_settings table, and a persisted row
+// hydrating into the card on restart. That a live explicit choice is
+// never clobbered by hydration is the shared rule pinned in
+// settings_persistence_test.dart's hydration group.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/diary_track.dart';
@@ -12,14 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
-
-/// The settings pane is one scroll list (a lazy ListView); the cards far
-/// down the pane render only when the surface is large enough. Same
-/// reasoning as settings_persistence_test.dart's copy.
-Future<void> enlargeViewport(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(900, 2400));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
-}
+import 'support/viewport.dart';
 
 /// The [SwitchListTile] state of one tracked item's settings switch.
 bool switchState(WidgetTester tester, DiaryItem item) => tester
@@ -31,7 +25,7 @@ void main() {
     testWidgets('a fresh start shows the default tracking configuration', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       await tester.pumpWidget(appScope(locale: const Locale('de')));
       await tester.pumpAndSettle();
@@ -63,7 +57,7 @@ void main() {
     testWidgets('flipping switches writes through as the JSON map', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       CycleDatabase? db;
       await tester.pumpWidget(
@@ -97,7 +91,7 @@ void main() {
     testWidgets('a persisted diaryTrack row hydrates into the card on start', (
       WidgetTester tester,
     ) async {
-      await enlargeViewport(tester);
+      useTallSurface(tester, width: 900);
 
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistDiaryTrack(
@@ -119,42 +113,6 @@ void main() {
       expect(switchState(tester, DiaryItem.cervix), isTrue);
       expect(switchState(tester, DiaryItem.sex), isFalse);
       expect(switchState(tester, DiaryItem.pain), isFalse);
-    });
-
-    testWidgets('hydration cannot clobber a live switch choice', (
-      WidgetTester tester,
-    ) async {
-      await enlargeViewport(tester);
-
-      Future<void> seed(CycleDatabase db) =>
-          SettingsStore(db.settingsDao).persistDiaryTrack(
-            const DiaryTrack(mucus: true, cervix: true, sex: true),
-          );
-
-      // The pin stands for an older live choice (mucus untracked): the
-      // seeded snapshot (cervix tracked) must not overwrite it.
-      await tester.pumpWidget(
-        appScope(
-          locale: const Locale('de'),
-          seed: seed,
-          diaryTrack: const DiaryTrack(mucus: false, cervix: false, sex: true),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(navLabel('Einstellungen'));
-      await tester.pumpAndSettle();
-
-      expect(
-        switchState(tester, DiaryItem.mucus),
-        isFalse,
-        reason: 'the live choice (mucus untracked) wins over the row',
-      );
-      expect(
-        switchState(tester, DiaryItem.cervix),
-        isFalse,
-        reason: 'the seeded row must not overwrite the live choice',
-      );
     });
   });
 }

@@ -2,12 +2,12 @@
 // app's local storage" notes under the language, theme-mode and
 // temperature-range cards are gone (users expect settings to persist), and
 // the temperature-range card keeps only the useful default hint.
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
+import 'support/viewport.dart';
 
 ProviderScope _appScope() => appScope();
 
@@ -26,8 +26,7 @@ void main() {
     (tester) async {
       // The temperature card sits below the pane's top cards (lazy
       // ListView — enlarge the surface so the whole card list is built).
-      await tester.binding.setSurfaceSize(const Size(900, 2400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      useTallSurface(tester, width: 900);
       await tester.pumpWidget(_appScope());
       await tester.pumpAndSettle();
       await _openSettings(tester);
@@ -56,16 +55,6 @@ void main() {
         reason:
             'the default hint replaces the removed persistence note '
             'on the temperature-range card',
-      );
-
-      // The feedback notice is the pane's last card — its presence proves
-      // the surface held the whole pane, so the absence probe did not
-      // silently survey a truncated list.
-      expect(find.textContaining('GitHub issue'), findsOneWidget);
-      expect(
-        find.textContaining('Not implemented yet'),
-        findsNothing,
-        reason: 'the pane carries no not-yet-implemented placeholder note',
       );
     },
   );

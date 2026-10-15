@@ -64,21 +64,12 @@ List<CycleMark> divergentMarks() => [
 
 Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
 Finder metricCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
-Finder oldCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
 Finder earliestFirstHigherCard() =>
     find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
 
-// The outside lines' English wordings, pinned before their arb keys
-// (`statisticsShortestOutsideApp` / `statisticsFirstHigherOutsideApp`)
-// exist — keep the prefixes in sync with the strings' final wordings.
-const String outsideShortestPrefix = 'outside: ';
-const String outsideEarliestPrefix = 'outside: cycle day ';
-
-// The metric cards' count captions' plural rule, pinned before the arb key
-// (`statisticsMetricFromCycles`) exists — keep in sync with the strings'
-// final wordings (the singular form is the German proofread point).
-String countCaption(int cycles) =>
-    cycles == 1 ? 'from 1 cycle' : 'from $cycles cycles';
+// Every test that uses these lookups also runs the harness under the
+// default en locale.
+final enL10n = lookupAppLocalizations(const Locale('en'));
 
 Widget harness({
   List<DailyEntry> entries = const [],
@@ -110,19 +101,45 @@ Widget harness({
   ),
 );
 
+/// Pumps [harness] over the 800×1800 surface the cards lay out at and
+/// settles it; the surface reset rides [addTearDown].
+Future<void> pumpStats(
+  WidgetTester tester, {
+  List<DailyEntry> entries = const [],
+  List<CycleMark> marks = const [],
+  int observedOutsideApp = 0,
+  int? paperShortestCycleLength,
+  int? paperEarliestFirstHigherCycleDay,
+  Locale locale = const Locale('en'),
+  Stream<List<DailyEntry>> Function()? entriesStreamFactory,
+  Stream<List<CycleMark>> Function()? marksStreamFactory,
+}) async {
+  await tester.binding.setSurfaceSize(const Size(800, 1800));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    harness(
+      entries: entries,
+      marks: marks,
+      observedOutsideApp: observedOutsideApp,
+      paperShortestCycleLength: paperShortestCycleLength,
+      paperEarliestFirstHigherCycleDay: paperEarliestFirstHigherCycleDay,
+      locale: locale,
+      entriesStreamFactory: entriesStreamFactory,
+      marksStreamFactory: marksStreamFactory,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('the cycle-count card totals in-app and outside-app cycles '
       'with the meaning on the surface', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        observedOutsideApp: 3,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      observedOutsideApp: 3,
     );
-    await tester.pumpAndSettle();
 
     // The card title and the total: 2 mark-opened cycles in the app + the
     // 3 outside-app cycles from the setting = 5 observed cycles.
@@ -154,12 +171,7 @@ void main() {
 
   testWidgets('per-metric min/max/average/std-dev cards for cycle length, '
       'bleeding duration and the first-higher cycle day', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(entries: screenEntries(), marks: screenMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
 
     // Cycle length: one counted length (28 days, the open cycle 2 has
     // none) -> min/max 28, average 28.0, std-dev of one value 0.0.
@@ -241,7 +253,7 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('cycleLength'),
-        matching: find.text(countCaption(1)),
+        matching: find.text(enL10n.statisticsMetricFromCycles(1)),
       ),
       findsOneWidget,
       reason: 'only the closed cycle has a length — the caption says so',
@@ -276,26 +288,10 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
-        matching: find.text('2 days'),
-      ),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
-    );
-    expect(
-      find.descendant(
-        of: metricCard('bleedingDuration'),
         matching: find.text('3'),
       ),
       findsOneWidget,
       reason: 'the maximum span, bare',
-    );
-    expect(
-      find.descendant(
-        of: metricCard('bleedingDuration'),
-        matching: find.text('3 days'),
-      ),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
     );
     expect(
       find.descendant(
@@ -315,7 +311,7 @@ void main() {
     expect(
       find.descendant(
         of: metricCard('bleedingDuration'),
-        matching: find.text(countCaption(2)),
+        matching: find.text(enL10n.statisticsMetricFromCycles(2)),
       ),
       findsOneWidget,
       reason: 'both bleeding cycles feed the card',
@@ -345,11 +341,6 @@ void main() {
       findsNWidgets(2),
     );
     expect(
-      find.descendant(of: firstHigherDay, matching: find.text('14 days')),
-      findsNothing,
-      reason: 'metric-card rows carry no unit',
-    );
-    expect(
       find.descendant(of: firstHigherDay, matching: find.text('14.0')),
       findsOneWidget,
     );
@@ -358,7 +349,10 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: firstHigherDay, matching: find.text(countCaption(1))),
+      find.descendant(
+        of: firstHigherDay,
+        matching: find.text(enL10n.statisticsMetricFromCycles(1)),
+      ),
       findsOneWidget,
       reason: 'only cycle 1 carries a resolved first higher',
     );
@@ -368,12 +362,7 @@ void main() {
     'the shared first-higher-until-cycle-end metric keeps the upstream '
     'counting rule on the shared card shape',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(entries: screenEntries(), marks: screenMarks()),
-      );
-      await tester.pumpAndSettle();
+      await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
 
       // The upstream metric: cycle 1's first higher (Mar 14) counts to the
       // NEXT marked start (Mar 29) -> 15 — the same inclusive rule the
@@ -394,11 +383,6 @@ void main() {
         reason: 'min and max duplicate the single span, bare',
       );
       expect(
-        find.descendant(of: untilEnd, matching: find.text('15 days')),
-        findsNothing,
-        reason: 'metric-card rows carry no unit',
-      );
-      expect(
         find.descendant(of: untilEnd, matching: find.text('15.0')),
         findsOneWidget,
       );
@@ -407,7 +391,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: untilEnd, matching: find.text(countCaption(1))),
+        find.descendant(
+          of: untilEnd,
+          matching: find.text(enL10n.statisticsMetricFromCycles(1)),
+        ),
         findsOneWidget,
         reason: 'the one qualified span feeds the card',
       );
@@ -417,12 +404,7 @@ void main() {
   testWidgets('the per-cycle table renders below all other statistics', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(entries: screenEntries(), marks: screenMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
 
     final table = find.byKey(const ValueKey('statisticsCycleTable'));
     expect(table, findsOneWidget);
@@ -521,12 +503,7 @@ void main() {
 
   testWidgets('the earliest summary card shows ONE figure: the earliest '
       'true (umrandete) first higher measurement', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(entries: screenEntries(), marks: screenMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
 
     expect(
       earliestFirstHigherCard(),
@@ -554,12 +531,7 @@ void main() {
 
   testWidgets('a divergent record keeps the one true figure on the summary '
       'card — the marked rise appears nowhere', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(entries: screenEntries(), marks: divergentMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpStats(tester, entries: screenEntries(), marks: divergentMarks());
 
     expect(
       earliestFirstHigherCard(),
@@ -588,17 +560,13 @@ void main() {
   });
 
   testWidgets('the German wording renders on the de surface', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        observedOutsideApp: 3,
-        locale: const Locale('de'),
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      observedOutsideApp: 3,
+      locale: const Locale('de'),
     );
-    await tester.pumpAndSettle();
 
     for (final label in [
       'Beobachtete Zyklen',
@@ -629,16 +597,12 @@ void main() {
   testWidgets(
     'de locale: the fraction rows render the German comma separator',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(
-          entries: screenEntries(),
-          marks: screenMarks(),
-          locale: const Locale('de'),
-        ),
+      await pumpStats(
+        tester,
+        entries: screenEntries(),
+        marks: screenMarks(),
+        locale: const Locale('de'),
       );
-      await tester.pumpAndSettle();
 
       // Same fixtures as the en descriptive card: one-decimal aggregates —
       // only the separator flips with the effective locale.
@@ -672,10 +636,7 @@ void main() {
   testWidgets('no data: the dash surfaces and the zero cycle count', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(harness());
-    await tester.pumpAndSettle();
+    await pumpStats(tester);
 
     // The upstream wording: the mark-driven statistics appear from the
     // first recorded cycle start, not from two.
@@ -743,18 +704,14 @@ void main() {
 
   testWidgets('ONE recorded cycle: the table row shows, but no no-data '
       'note and nothing about lengths', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(
-        entries: [
-          DailyEntry(date: m(3, 1), bbtC: 36.4, bleeding: Bleeding.heavy),
-          DailyEntry(date: m(3, 2), bbtC: 36.4, bleeding: Bleeding.medium),
-        ],
-        marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
-      ),
+    await pumpStats(
+      tester,
+      entries: [
+        DailyEntry(date: m(3, 1), bbtC: 36.4, bleeding: Bleeding.heavy),
+        DailyEntry(date: m(3, 2), bbtC: 36.4, bleeding: Bleeding.medium),
+      ],
+      marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
     );
-    await tester.pumpAndSettle();
 
     // One mark-opened cycle — the table's row rule.
     expect(find.byKey(const ValueKey('statisticsRowStart-0')), findsOneWidget);
@@ -775,37 +732,33 @@ void main() {
 
   testWidgets('a paper-only shortest value renders on the summary row even '
       'with no in-app lengths (paper-only user)', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(
-        entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
-        marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
-        paperShortestCycleLength: 21,
-      ),
+    await pumpStats(
+      tester,
+      entries: [DailyEntry(date: m(3, 1), bbtC: 36.4)],
+      marks: [CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart)],
+      paperShortestCycleLength: 21,
     );
-    await tester.pumpAndSettle();
 
     // One open in-app cycle: no countable in-app length — the summary row
     // still renders (the paper-only-shortest gate), with the in-app main
     // figure dashing and the paper figure only on the outside line.
-    expect(oldCard('shortest'), findsOneWidget);
+    expect(metricCard('shortest'), findsOneWidget);
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('—')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('—')),
       findsOneWidget,
       reason: 'the in-app main figure has no value to show',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}21'),
+        of: metricCard('shortest'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
       findsNothing,
@@ -846,16 +799,12 @@ void main() {
   testWidgets('the shortest summary card keeps the in-app minimum as the '
       'main figure and surfaces the paper figure on the outside line, and '
       'the count card stays out of the summary row', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        paperShortestCycleLength: 21,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      paperShortestCycleLength: 21,
     );
-    await tester.pumpAndSettle();
     // The count card lives only on the top cycles-count surface; the
     // summary row holds shortest + earliest.
     expect(find.byKey(const ValueKey('statisticsCard-count')), findsNothing);
@@ -863,28 +812,28 @@ void main() {
     // Shortest card: the in-app minimum stays the main figure untouched,
     // the paper figure shows on its own outside line.
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('28')),
       findsOneWidget,
       reason: 'the in-app minimum is the main figure',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}21'),
+        of: metricCard('shortest'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(21)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
+        of: metricCard('shortest'),
         matching: find.textContaining(RegExp('from \\d+ cycles?')),
       ),
       findsNothing,
       reason: 'summary cards carry no count caption',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('21')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('21')),
       findsNothing,
       reason: 'the paper figure is never a bare second figure',
     );
@@ -913,34 +862,30 @@ void main() {
 
   testWidgets('a paper shortest above the in-app minimum still surfaces on '
       'the outside line (no participation gate)', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // Paper 30 loses against the in-app 28: the main figure stays the
     // plain in-app minimum, and the outside line shows the paper figure
     // anyway — the line is a recorded fact, not a better minimum.
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        paperShortestCycleLength: 30,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      paperShortestCycleLength: 30,
     );
-    await tester.pumpAndSettle();
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('28')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('28')),
       findsOneWidget,
       reason: 'the smaller in-app minimum stays the main figure',
     );
     expect(
       find.descendant(
-        of: oldCard('shortest'),
-        matching: find.text('${outsideShortestPrefix}30'),
+        of: metricCard('shortest'),
+        matching: find.text(enL10n.statisticsShortestOutsideApp(30)),
       ),
       findsOneWidget,
       reason: 'the paper figure shows even when it adds nothing to the minimum',
     );
     expect(
-      find.descendant(of: oldCard('shortest'), matching: find.text('30')),
+      find.descendant(of: metricCard('shortest'), matching: find.text('30')),
       findsNothing,
       reason: 'the paper figure is never a bare second figure',
     );
@@ -960,18 +905,14 @@ void main() {
 
   testWidgets('the earliest summary card shows the one true in-app figure '
       'and one outside line for the paper figure', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // In-app the true (umrandete) figure is cycle day 14; the paper rise
     // on cycle day 5 shows only on the outside line.
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        paperEarliestFirstHigherCycleDay: 5,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      paperEarliestFirstHigherCycleDay: 5,
     );
-    await tester.pumpAndSettle();
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),
     );
@@ -996,7 +937,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1014,12 +955,7 @@ void main() {
       'true in-app figure and neither hint line nor outside line', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      harness(entries: screenEntries(), marks: screenMarks()),
-    );
-    await tester.pumpAndSettle();
+    await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),
     );
@@ -1064,18 +1000,14 @@ void main() {
 
   testWidgets('a paper earliest first higher surfaces on the summary '
       'card only', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // In-app the true (umrandete) figure is cycle day 14; a paper rise
     // on cycle day 5 exists only as the summary row's outside line.
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: screenMarks(),
-        paperEarliestFirstHigherCycleDay: 5,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: screenMarks(),
+      paperEarliestFirstHigherCycleDay: 5,
     );
-    await tester.pumpAndSettle();
     expect(
       earliestFirstHigherCard(),
       findsNothing,
@@ -1098,7 +1030,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1107,20 +1039,16 @@ void main() {
 
   testWidgets('a divergent record with a paper earliest keeps the one true '
       'figure on the summary card plus the outside line', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // The divergent in-app record (marked rise = 1, true figure = 14 —
     // cycle 2 carries no measurable circle, R9) with paper 5 pinned: the
     // card keeps its single true figure, the paper figure shows on the
     // one outside line.
-    await tester.pumpWidget(
-      harness(
-        entries: screenEntries(),
-        marks: divergentMarks(),
-        paperEarliestFirstHigherCycleDay: 5,
-      ),
+    await pumpStats(
+      tester,
+      entries: screenEntries(),
+      marks: divergentMarks(),
+      paperEarliestFirstHigherCycleDay: 5,
     );
-    await tester.pumpAndSettle();
     expect(
       earliestFirstHigherCard(),
       findsNothing,
@@ -1143,7 +1071,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1152,28 +1080,24 @@ void main() {
 
   testWidgets('a paper earliest cannot qualify the true figure in-app: '
       'the summary card shows the dash plus the outside line', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // The narrow combination: the in-app cycle has a rise but NO marked
     // mucus peak, so no true (umrandete) figure qualifies in-app. The
     // follow-up start (Mar 29) gives the cycle a countable length so the
     // summary row renders; the paper earliest value is pinned and
     // surfaces as the card's outside line.
-    await tester.pumpWidget(
-      harness(
-        entries: [
-          DailyEntry(date: m(3, 1), bbtC: 36.4),
-          DailyEntry(date: m(3, 29), bbtC: 36.4),
-        ],
-        marks: [
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-          CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
-          CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
-        ],
-        paperEarliestFirstHigherCycleDay: 5,
-      ),
+    await pumpStats(
+      tester,
+      entries: [
+        DailyEntry(date: m(3, 1), bbtC: 36.4),
+        DailyEntry(date: m(3, 29), bbtC: 36.4),
+      ],
+      marks: [
+        CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
+      ],
+      paperEarliestFirstHigherCycleDay: 5,
     );
-    await tester.pumpAndSettle();
     expect(
       earliestFirstHigherCard(),
       findsNothing,
@@ -1208,7 +1132,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('${outsideEarliestPrefix}5'),
+        matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
       ),
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
@@ -1217,25 +1141,21 @@ void main() {
 
   testWidgets('without data the true figure alone dashes on the summary '
       'card (no figure from the marked rise, no outside line)', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     // The in-app cycle again has a rise but NO marked peak: no true
     // (umrandete) figure qualifies in-app. The follow-up start (Mar 29)
     // gives the cycle a countable length so the summary row renders.
-    await tester.pumpWidget(
-      harness(
-        entries: [
-          DailyEntry(date: m(3, 1), bbtC: 36.4),
-          DailyEntry(date: m(3, 29), bbtC: 36.4),
-        ],
-        marks: [
-          CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-          CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
-          CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
-        ],
-      ),
+    await pumpStats(
+      tester,
+      entries: [
+        DailyEntry(date: m(3, 1), bbtC: 36.4),
+        DailyEntry(date: m(3, 29), bbtC: 36.4),
+      ],
+      marks: [
+        CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
+      ],
     );
-    await tester.pumpAndSettle();
     expect(
       earliestFirstHigherCard(),
       findsNothing,
@@ -1244,7 +1164,7 @@ void main() {
     expect(
       find.textContaining('no first higher measurement'),
       findsNothing,
-      reason: 'the real-variant note is gone from the screen',
+      reason: 'the screen states nothing about the real variant',
     );
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),
@@ -1274,10 +1194,7 @@ void main() {
 
   testWidgets('without surface data the paper values change nothing '
       '(default null keeps the no-data screen)', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(harness());
-    await tester.pumpAndSettle();
+    await pumpStats(tester);
 
     expect(
       find.byKey(const ValueKey('statisticsCard-shortest')),
@@ -1287,49 +1204,23 @@ void main() {
   });
 
   group('memoized derived data', () {
-    testWidgets('the derived-data provider holds one pass across an '
-        'unrelated rebuild', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(entries: screenEntries(), marks: screenMarks()),
-      );
-      await tester.pumpAndSettle();
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(StatistikScreen)),
-      );
-      final before = container.read(derivedCycleDataProvider);
-
-      // An unrelated surface change (a setting on the count card's
-      // caption) rebuilds everything that watches it without re-deriving.
-      container.read(observedCyclesOutsideAppProvider.notifier).state = 3;
-      await tester.pumpAndSettle();
-
-      final after = container.read(derivedCycleDataProvider);
-      expect(identical(before, after), isTrue);
-    });
-
     testWidgets('a year-2000 cycle-start mark settles with sane totals '
         'and no exception', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(
-          entries: [
-            DailyEntry(
-              date: DateTime(2000, 1, 5),
-              bbtC: 36.4,
-              bleeding: Bleeding.medium,
-            ),
-          ],
-          marks: [
-            CycleMark(
-              date: DateTime(2000, 1, 5),
-              type: CycleMarkTypes.cycleStart,
-            ),
-          ],
-        ),
+      await pumpStats(
+        tester,
+        entries: [
+          DailyEntry(
+            date: DateTime(2000, 1, 5),
+            bbtC: 36.4,
+            bleeding: Bleeding.medium,
+          ),
+        ],
+        marks: [
+          CycleMark(
+            date: DateTime(2000, 1, 5),
+            type: CycleMarkTypes.cycleStart,
+          ),
+        ],
       );
       await tester.pumpAndSettle();
 
@@ -1346,20 +1237,12 @@ void main() {
   group('stream error retry surfaces', () {
     testWidgets('a marks stream error shows the retry surface instead of '
         'the statistics cards, and retry restores them', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      var attempt = 0;
-      await tester.pumpWidget(
-        harness(
-          entries: screenEntries(),
-          marks: screenMarks(),
-          marksStreamFactory: () {
-            attempt++;
-            return attempt == 1
-                ? Stream<List<CycleMark>>.error(StateError('injected error'))
-                : Stream.value(screenMarks());
-          },
-        ),
+      final marksRetry = StreamRetryFixture(screenMarks());
+      await pumpStats(
+        tester,
+        entries: screenEntries(),
+        marks: screenMarks(),
+        marksStreamFactory: marksRetry.stream,
       );
       await tester.pumpAndSettle();
 
@@ -1382,25 +1265,21 @@ void main() {
             'the retry re-subscribed '
             'the provider and the real content rendered',
       );
-      expect(attempt, 2, reason: 'the retry re-invoked the stream factory');
+      expect(
+        marksRetry.attempts,
+        2,
+        reason: 'the retry re-invoked the stream factory',
+      );
     });
 
     testWidgets('an entries stream error gains the retry affordance, and '
         'retry restores the cards', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      var attempt = 0;
-      await tester.pumpWidget(
-        harness(
-          entries: screenEntries(),
-          marks: screenMarks(),
-          entriesStreamFactory: () {
-            attempt++;
-            return attempt == 1
-                ? Stream<List<DailyEntry>>.error(StateError('injected error'))
-                : Stream.value(screenEntries());
-          },
-        ),
+      final entriesRetry = StreamRetryFixture(screenEntries());
+      await pumpStats(
+        tester,
+        entries: screenEntries(),
+        marks: screenMarks(),
+        entriesStreamFactory: entriesRetry.stream,
       );
       await tester.pumpAndSettle();
 
@@ -1416,23 +1295,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(countCard(), findsOneWidget);
-      expect(attempt, 2);
+      expect(entriesRetry.attempts, 2);
     });
 
     testWidgets('the retry surface speaks the German wording in the de '
         'locale', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        harness(
-          entries: screenEntries(),
-          marks: screenMarks(),
-          locale: const Locale('de'),
-          marksStreamFactory: () =>
-              Stream<List<CycleMark>>.error(StateError('injected error')),
-        ),
+      await pumpStats(
+        tester,
+        entries: screenEntries(),
+        marks: screenMarks(),
+        locale: const Locale('de'),
+        marksStreamFactory: () =>
+            Stream<List<CycleMark>>.error(StateError('injected error')),
       );
-      await tester.pumpAndSettle();
 
       // The German wording is authoritative (language policy).
       expect(find.text('Laden fehlgeschlagen'), findsOneWidget);

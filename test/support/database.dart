@@ -8,20 +8,28 @@
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show MethodChannel, MissingPluginException;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Override (the inMemoryDatabase return type) ships from the misc entry in
 // Riverpod 3.x — the main import doesn't export it.
 import 'package:flutter_riverpod/misc.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'finders.dart';
 import 'provider_fixtures.dart';
 
-/// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
+/// The connection every test-side CycleDatabase runs over: in-memory, no
+/// files, no platform channels, no FFI paths.
 ///
 /// `closeStreamsSynchronously: true` is drift's documented remedy for widget
 /// tests failing with "A Timer is still pending even after the widget tree
@@ -29,17 +37,16 @@ import 'provider_fixtures.dart';
 /// event-loop turn (Timer.run), and streams cancelled while Riverpod disposes
 /// the ProviderScope during tree teardown can never reach that turn in the
 /// test's fake async zone.
+DatabaseConnection inMemoryConnection() => DatabaseConnection(
+  NativeDatabase.memory(),
+  closeStreamsSynchronously: true,
+);
+
+/// Creates the in-memory [CycleDatabase] used by the widget-test harnesses.
 ///
 /// The scope override closes the instance together with the test's
 /// ProviderScope (same closing semantics as the production provider).
-CycleDatabase inMemoryCycleDatabase() {
-  return CycleDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
+CycleDatabase inMemoryCycleDatabase() => CycleDatabase(inMemoryConnection());
 
 /// The databaseProvider override: a fresh in-memory database per scope.
 ///
@@ -62,6 +69,14 @@ Override inMemoryDatabase({
     return db;
   });
 }
+
+/// The package-info channel the about/onboarding pages read their version
+/// through. The harness decides per scope call how it answers — mock
+/// handlers registered at the messenger override one another, so both
+/// postures (seeded values / deliberate failure) stay test order-independent.
+const MethodChannel packageInfoChannel = MethodChannel(
+  'dev.fluttercommunity.plus/package_info',
+);
 
 /// App scope for the widget smoke tests: wraps the real app in a
 /// ProviderScope over a fresh in-memory database. Every pin is optional and
@@ -87,20 +102,20 @@ Override inMemoryDatabase({
 /// that pump CycleApp directly (without [appScope]) override the provider
 /// themselves.
 ///
-/// The harness also seeds the PackageInfo mock values BEFORE pumping: the
-/// about/onboarding page reads the app version from the installed binary via
-/// package_info_plus, and the metadata plugin call must be answered in the
-/// test binding or the version line hides (its designed failure path). The
-/// values mirror a real 0.1.0+1 device install: version without the build
-/// suffix, buildNumber without the `+`. NOTE: PackageInfo caches these
-/// values in one static that nothing can clear again — the failure-path run
-/// that needs the plugin call to fail must not go through this harness (and
-/// must run before any harness-pumping test in its file).
+/// The harness also answers the package-info channel on every scope call:
+/// the default seeds the mock values of a real 0.1.0+1 device install
+/// (version without the build suffix, buildNumber without the `+`) so the
+/// version line renders; [packageInfoFailure] answers instead with an
+/// error — the closest model of a broken/unanswerable device install — and
+/// the version line hides (its designed failure path). Each scope call
+/// (re-)sets the channel handler, so whichever posture a test needs wins
+/// over what earlier tests in the file seeded.
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
   DiaryTrack? diaryTrack,
   bool? onboardingCompleted,
+  bool packageInfoFailure = false,
   Future<void> Function(CycleDatabase db)? seed,
   void Function(CycleDatabase db)? onCreated,
   CycleDatabase Function()? builder,
@@ -108,13 +123,23 @@ ProviderScope appScope({
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
 }) {
-  PackageInfo.setMockInitialValues(
-    appName: '',
-    packageName: '',
-    version: '0.1.0',
-    buildNumber: '1',
-    buildSignature: '',
-  );
+  if (packageInfoFailure) {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(packageInfoChannel, (call) async {
+          throw MissingPluginException(
+            'no package metadata on this (test) device',
+          );
+        });
+  } else {
+    PackageInfo.setMockInitialValues(
+      appName: '',
+      packageName: '',
+      version: '0.1.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+  }
   return ProviderScope(
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
@@ -129,4 +154,63 @@ ProviderScope appScope({
     ],
     child: const CycleApp(),
   );
+}
+
+/// The settings screen with the exact MaterialApp configuration of the app
+/// shell (sans the shell itself) over the in-memory database. [seed]
+/// provides the device-side data the surface under test previews against;
+/// [builder] swaps in a fault-injectable database (support/faulty_db.dart).
+Widget settingsHarness({
+  Future<void> Function(CycleDatabase db)? seed,
+  CycleDatabase Function()? builder,
+}) => ProviderScope(
+  overrides: [inMemoryDatabase(seed: seed, builder: builder)],
+  child: MaterialApp(
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
+    ),
+    locale: const Locale('de'),
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en'), Locale('de')],
+    home: const EinstellungenScreen(),
+  ),
+);
+
+/// Navigates a pumped app shell to the settings tab and settles. The tab
+/// goes through the shared [navLabel] finder: all tabs stay mounted in the
+/// shell's IndexedStack, so a bare 'Einstellungen' text finder would also
+/// match the offstage screen's AppBar title — and in tree order that AppBar
+/// precedes the bar, so the scoped tap is what lands on the destination.
+Future<void> openSettingsTab(WidgetTester tester) async {
+  await tester.tap(navLabel('Einstellungen'));
+  await tester.pumpAndSettle();
+}
+
+/// Scrolls the settings screen's lazy list until [card] is built and
+/// visible — the list is allowed to grow above the card (e.g. the
+/// theme-mode switcher), so fixed-amount drag loops would be brittle. The
+/// scrollable is scoped to the settings screen: with the shell keeping
+/// every tab mounted, the diary and statistics screens bring their own
+/// scrollables and ListViews into the tree, and [settingsHarness] mounts
+/// the screen directly (the scope costs nothing there).
+Future<void> scrollSettingsCardIntoView(
+  WidgetTester tester,
+  Finder card,
+) async {
+  await tester.scrollUntilVisible(
+    card,
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byType(EinstellungenScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
 }

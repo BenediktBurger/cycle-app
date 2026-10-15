@@ -50,7 +50,12 @@ plumbing uninitialized outside our control and is out of scope).
   product's privacy guarantee — native mobile is where the real
   confidentiality bar applies and SQLCipher later meets it.
 - The export/import feature (JSON in Settings) doubles as a user-controlled
-  backup path, which also mitigates browser-storage risks on web.
+  backup path, which also mitigates browser-storage risks on web. Export
+  documents carry an explicit `schema_version` that is gated REJECT-first:
+  entry rows are sparse from v6 on (neutral-valued keys omitted), so a ≤v5
+  reader would silently drop every bleeding-free day of a sparse document,
+  temperatures included — failing visibly with "unsupported schema_version"
+  is preferred over losing data invisibly.
 - Migration to SQLCipher later must include a data-remigration/story from
   unencrypted → encrypted DB (handled in the later milestone that introduces
   it, not swept under the rug).

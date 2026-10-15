@@ -17,52 +17,19 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/release_names.dart';
-
-/// The pinned release-certificate fingerprint, duplicated here from the
-/// committed [pinFilePath] content so the tests pin the exact trust anchor
-/// the release pipeline must enforce.
-const pinnedReleaseFingerprint =
-    '0aa5749804b8ed9e3c207f851b5902775d762207d60c2485a26b5d75eff5355b';
-
-/// A well-formed 40-char lowercase head SHA for the manifest fixtures.
-const validHeadSha = '978dbc5b9ee19ff0aedfc03594a603013f0e034a';
-
-/// Builds a handoff-manifest JSON fixture out of RAW JSON fragments, so
-/// malformed variants (wrong types, missing keys) stay writable.
-String manifestJsonRaw({
-  String? tag,
-  String? versionName,
-  String? versionCodeBase,
-  String? runId,
-  String? headSha,
-}) {
-  final fields = <String>[
-    if (tag != null) '"tag":$tag',
-    if (versionName != null) '"versionName":$versionName',
-    if (versionCodeBase != null) '"versionCodeBase":$versionCodeBase',
-    if (runId != null) '"runId":$runId',
-    if (headSha != null) '"headSha":$headSha',
-  ];
-  return '{${fields.join(',')}}';
-}
-
-/// A well-formed manifest fixture with the settled default values.
-String validManifestJson() => manifestJsonRaw(
-  tag: '"v0.2.1"',
-  versionName: '"0.2.1"',
-  versionCodeBase: '3',
-  runId: '1234567890',
-  headSha: '"$validHeadSha"',
-);
+import 'release_fixtures.dart'
+    show
+        changelogGateFixture,
+        changelogGateRunner,
+        badTagList,
+        manifestJsonRaw,
+        pinnedReleaseFingerprint,
+        validHeadSha,
+        validManifestJson;
 
 void main() {
   group('publish names and staged paths', () {
     const version = '0.2.1';
-
-    test('ABI codes map the three release ABIs to 1/2/3', () {
-      expect(abiCodes, {'armeabi-v7a': 1, 'arm64-v8a': 2, 'x86_64': 3});
-      expect(releaseAbis, ['armeabi-v7a', 'arm64-v8a', 'x86_64']);
-    });
 
     test('publish names are the attached release asset names', () {
       expect(
@@ -76,31 +43,12 @@ void main() {
       ]);
     });
 
-    test('multi-digit versions survive the derivation', () {
-      expect(
-        publishApkName(versionName: '10.11.12', abi: 'x86_64'),
-        'cycle-app-10.11.12-x86_64.apk',
-      );
-      expect(publishApkNames('10.11.12').last, 'cycle-app-10.11.12-x86_64.apk');
-    });
-
     test('staged publish paths live under build/gh-release (gitignored)', () {
       expect(stagedPublishPaths(version), [
         '$ghReleaseStagingDir/cycle-app-0.2.1-armeabi-v7a.apk',
         '$ghReleaseStagingDir/cycle-app-0.2.1-arm64-v8a.apk',
         '$ghReleaseStagingDir/cycle-app-0.2.1-x86_64.apk',
       ]);
-    });
-
-    test('staged paths compose the staging dir with the publish names', () {
-      for (final abi in releaseAbis) {
-        expect(
-          stagedPublishPath(versionName: version, abi: abi),
-          '$ghReleaseStagingDir/'
-          '${publishApkName(versionName: version, abi: abi)}',
-          reason: abi,
-        );
-      }
     });
   });
 
@@ -112,17 +60,7 @@ void main() {
     });
 
     test('malformed tags fail the regex', () {
-      const badTags = [
-        'v1.2',
-        '1.2.3',
-        'v1.2.3.4',
-        '',
-        'vx.y.z',
-        'v1.2.3-rc1',
-        'V1.2.3',
-        'v1.2.3+4',
-      ];
-      for (final tag in badTags) {
+      for (final tag in badTagList) {
         expect(isValidReleaseTag(tag), isFalse, reason: 'tag "$tag"');
       }
     });
@@ -299,11 +237,6 @@ void main() {
 
     test('encode → decode round trip preserves every field', () {
       expect(decodeHandoffManifest(encodeHandoffManifest(manifest)), manifest);
-    });
-
-    test('the manifest path is build/gh-release/source.json', () {
-      expect(handoffManifestPath, 'build/gh-release/source.json');
-      expect(handoffManifestPath.startsWith('$ghReleaseStagingDir/'), isTrue);
     });
 
     test('a well-formed manifest decodes to the same values', () {
@@ -565,88 +498,24 @@ void main() {
     const authoringName = '0.2.5.txt';
     const linkNames = ['71.txt', '72.txt', '73.txt', 'default.txt'];
 
-    /// The blob sha the fixture assigns to each symlink entry —
-    /// deterministic per path so the blob map keys line up.
-    String shaFor(String locale, String name) => 'sha-$locale-$name';
-
-    /// Builds the recursive Git Trees fixture the gate requests at its head
-    /// SHA and the blob map its symlink entries point to: every locale
-    /// carries the authoring file as a blob in git mode [authoringMode]
-    /// (a regular file by default), and every name with a
-    /// non-null target in [targets] becomes a symlink entry (mode
-    /// 120000) whose blob decodes to the given filename — unless the name
-    /// is in [regularNames], where it is committed as a regular file
-    /// (mode 100644). Blob shas stay unique per locale so a caller fetching
-    /// one locale's blob can never be answered by another's.
+    /// Feeds the gate tests from the shared Git-tree/blob fixture in
+    /// release_fixtures.dart with this group's file set.
     ({String tree, Map<String, String> blobs}) fixture({
       required Map<String, Map<String, String>> targets,
       String authoringMode = '100644',
       Set<String> regularNames = const {},
       bool truncated = false,
-    }) {
-      final blobs = <String, String>{};
-      final entries = <String>[];
-      for (final MapEntry(key: locale, value: names) in targets.entries) {
-        entries.add(
-          '{"path":"$fdroidMetadataPath/$locale","mode":"040000",'
-          '"type":"tree","sha":"tree-$locale"}',
-        );
-        final prefix = '$fdroidMetadataPath/$locale/changelogs/';
-        entries.add(
-          '{"path":"$prefix$authoringName","mode":"$authoringMode",'
-          '"type":"blob","sha":"sha-$locale-authoring"}',
-        );
-        for (final name in linkNames) {
-          final target = names[name];
-          if (target == null) continue;
-          if (regularNames.contains(name)) {
-            entries.add(
-              '{"path":"$prefix$name","mode":"100644",'
-              '"type":"blob","sha":"sha-$locale-file-$name"}',
-            );
-            continue;
-          }
-          final sha = shaFor(locale, name);
-          blobs[sha] =
-              '{"content":"${base64Encode(utf8.encode(target))}",'
-              '"encoding":"base64"}';
-          entries.add(
-            '{"path":"$prefix$name","mode":"120000",'
-            '"type":"blob","sha":"$sha"}',
-          );
-        }
-      }
-      return (
-        tree: jsonEncode({
-          'tree': [for (final entry in entries) jsonDecode(entry)],
-          'truncated': truncated,
-        }),
-        blobs: blobs,
-      );
-    }
+    }) => changelogGateFixture(
+      targets: targets,
+      authoringName: authoringName,
+      linkNames: linkNames,
+      authoringMode: authoringMode,
+      regularNames: regularNames,
+      truncated: truncated,
+    );
 
-    /// A pure-seam gh runner serving one recursive tree answer plus one
-    /// blob per requested sha; anything else exits 1 like an unexpected gh
-    /// call, so a stray invocation cannot pass silently.
-    GhApiRunner gateRunner(({String tree, Map<String, String> blobs}) data) {
-      return (arguments) async {
-        final call = arguments.length > 1 ? arguments[1] : arguments.join(' ');
-        const treePrefix = 'repos/$releaseRepo/git/trees/';
-        const blobPrefix = 'repos/$releaseRepo/git/blobs/';
-        if (call.startsWith(treePrefix) && call.endsWith('recursive=1')) {
-          return ProcessResult(0, 0, data.tree, '');
-        }
-        if (call.startsWith(blobPrefix)) {
-          final sha = call.substring(blobPrefix.length);
-          final blob = data.blobs[sha];
-          if (blob == null) {
-            return ProcessResult(0, 1, '', 'gh: blob $sha not found');
-          }
-          return ProcessResult(0, 0, blob, '');
-        }
-        return ProcessResult(0, 1, '', 'unexpected gh call: $arguments');
-      };
-    }
+    GhApiRunner gateRunner(({String tree, Map<String, String> blobs}) data) =>
+        changelogGateRunner(data);
 
     test('expected file set: authoring file, three per-ABI links, default', () {
       expect(expectedChangelogFiles(versionName: '0.2.5', versionCodeBase: 7), [

@@ -3,16 +3,15 @@
 // mark day to the next mark / today), so the page plan counts that span and
 // the sheet renders it as blank columns with day numbers counted from the
 // opening mark day.
-import 'dart:io';
-
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/pdf/cycle_pdf.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'cycle_pdf_test.dart'
+import '../support/pdf_content.dart'
     show PdfTextRun, countPageMarkers, extractPageContent;
+import '../support/pdf_fixtures.dart' show fixtureFontBytes;
 
 DateTime d(int y, int m, int day) => DateTime.utc(y, m, day);
 
@@ -27,11 +26,6 @@ List<CycleMark> _farPastMarks() => [
   CycleMark(date: d(2020, 3, 1), type: CycleMarkTypes.cycleStart),
 ];
 
-/// Read from the checkout rather than rootBundle: the generator takes bare
-/// font bytes.
-List<int> fixtureFontBytes() =>
-    File('assets/fonts/NotoSans-Regular.ttf').readAsBytesSync();
-
 PdfExportModel emptyCycleModel() => buildPdfExportModel(
   entries: const [],
   marks: _farPastMarks(),
@@ -39,12 +33,13 @@ PdfExportModel emptyCycleModel() => buildPdfExportModel(
   today: _today,
 );
 
-/// The scaffold's day-number labels (cycleDayNumberLabel) in the doc's
-/// 5.2 pt style — the runs a span-wide blank sheet must carry. (The pdf
+/// The scaffold's day-number labels (cycleDayNumberLabel) in the sheet's
+/// tiny ink style — the runs a span-wide blank sheet must carry. (The pdf
 /// package splits "1. Tag" at the space into '1.' + 'Tag'; the digit run
 /// is the predicate's subject.)
 bool _dayNumberRun(PdfTextRun run) =>
-    (run.fontSize - 5.2).abs() < 0.05 && RegExp(r'^\d+\.$').hasMatch(run.text);
+    (run.fontSize - pdfTinyFontSize).abs() < 0.05 &&
+    RegExp(r'^\d+\.$').hasMatch(run.text);
 
 void main() {
   test('the exported data-less cycle keeps its empty tracked list; its '

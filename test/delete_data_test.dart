@@ -8,61 +8,12 @@ import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/faulty_db.dart';
 import 'support/finders.dart';
-import 'support/viewport.dart';
-
-/// Fault injection for the delete-data flow: the real in-memory database
-/// whose pre-reads (the confirmation dialog's counts) and/or the wipe call
-/// can be armed to fail AFTER the pane was pumped and seeded — the tests
-/// flip the flags at exactly the point the fault should occur.
-class _FaultyDatabase extends CycleDatabase {
-  _FaultyDatabase(super.executor);
-
-  bool failReads = false;
-  bool failWipe = false;
-
-  late final _FaultyEntriesDao _faultyEntriesDao = _FaultyEntriesDao(this);
-
-  @override
-  EntriesDao get entriesDao => _faultyEntriesDao;
-
-  @override
-  Future<({int entries, int marks, int methods})> deleteAllTrackedData() {
-    if (failWipe) {
-      throw StateError('injected wipe failure');
-    }
-    return super.deleteAllTrackedData();
-  }
-}
-
-class _FaultyEntriesDao extends EntriesDao {
-  _FaultyEntriesDao(this._faulty) : super(_faulty);
-
-  final _FaultyDatabase _faulty;
-
-  @override
-  Future<List<CycleEntry>> allEntries() {
-    if (_faulty.failReads) {
-      throw StateError('injected read failure');
-    }
-    return super.allEntries();
-  }
-}
-
-_FaultyDatabase _faultyDatabase() {
-  return _FaultyDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-  );
-}
 
 void main() {
   /// German device, already onboarded, seeded with two tracked days, two
@@ -72,8 +23,6 @@ void main() {
     WidgetTester tester, {
     CycleDatabase Function()? builder,
   }) async {
-    useDeviceLocales(tester, const [Locale('de')]);
-
     CycleDatabase? db;
     Future<void> seed(CycleDatabase database) async {
       db = database;
@@ -114,16 +63,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(navLabel('Einstellungen'));
-    await tester.pumpAndSettle();
-
-    // The danger card sits below the fold — scroll it into view.
-    await tester.dragUntilVisible(
+    await openSettingsTab(tester);
+    await scrollSettingsCardIntoView(
+      tester,
       find.byKey(const ValueKey('settingsDeleteDataButton')),
-      find.byType(ListView),
-      const Offset(0, -200),
     );
-    await tester.pumpAndSettle();
     return db!;
   }
 
@@ -254,7 +198,7 @@ void main() {
       'dialog, and changes NOTHING (no unhandled error)', (
     WidgetTester tester,
   ) async {
-    final faulty = _faultyDatabase();
+    final faulty = FaultyCycleDatabase();
     final db = await pumpSeededSettingsPane(tester, builder: () => faulty);
     faulty.failWipe = true;
 
@@ -301,9 +245,9 @@ void main() {
     'a failing pre-read (before the dialog) reports the failure instead '
     'of aborting silently',
     (WidgetTester tester) async {
-      final faulty = _faultyDatabase();
+      final faulty = FaultyCycleDatabase();
       final db = await pumpSeededSettingsPane(tester, builder: () => faulty);
-      faulty.failReads = true;
+      faulty.failEntryReads = true;
 
       await tester.tap(find.byKey(const ValueKey('settingsDeleteDataButton')));
       await tester.pumpAndSettle();
@@ -329,7 +273,7 @@ void main() {
             'no confirmation dialog opened when the pre-read already '
             'failed',
       );
-      faulty.failReads = false;
+      faulty.failEntryReads = false;
       expect(
         await db.entriesDao.allEntries(),
         hasLength(2),

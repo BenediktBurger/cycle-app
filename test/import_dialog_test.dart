@@ -21,40 +21,17 @@ import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/export_import.dart'
     show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/domain/models.dart' show DailyEntry;
-import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show acceptExtensions, pickFileTextOverride;
-import 'package:cycle_app/ui/settings.dart';
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart' show NativeDatabase;
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
+import 'support/error_collector.dart';
+import 'support/faulty_db.dart';
 import 'support/finders.dart';
 import 'support/fixtures.dart';
 import 'support/viewport.dart';
-
-/// Runs [pump] with a collector installed in place of
-/// [FlutterError.onError]; returns everything the framework reported so the
-/// caller can assert none of it happened (assertions happen after this
-/// returns, so the handler is restored by then).
-Future<List<FlutterErrorDetails>> collectFrameworkErrors(
-  WidgetTester tester,
-  Future<void> Function() pump,
-) async {
-  final errors = <FlutterErrorDetails>[];
-  final original = FlutterError.onError;
-  FlutterError.onError = (details) => errors.add(details);
-  try {
-    await pump();
-  } finally {
-    FlutterError.onError = original;
-  }
-  return errors;
-}
 
 /// Simulates the IME opening: a ~300 cp bottom inset applied to the test
 /// view (the dialogs below relayout into the reduced area, as on a device).
@@ -65,65 +42,20 @@ Future<void> showKeyboardUp(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// The settings screen with the exact MaterialApp configuration of the app
-/// shell (sans the shell itself, see the file header). [seed] provides the
-/// device-side data the pasted document previews against.
-Widget settingsHarness({
-  Future<void> Function(CycleDatabase db)? seed,
-  CycleDatabase Function()? builder,
-}) => ProviderScope(
-  overrides: [inMemoryDatabase(seed: seed, builder: builder)],
-  child: MaterialApp(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-    ),
-    locale: const Locale('de'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    supportedLocales: const [Locale('en'), Locale('de')],
-    home: const EinstellungenScreen(),
-  ),
-);
-
 /// Pumps the app shell, opens the settings tab and the drip CSV import
 /// dialog.
-///
-/// The tab goes through the shared navigation finder (nav surface, both
-/// adaptive surfaces match — see finders.dart): all tabs stay mounted
-/// (IndexedStack), so the 'Einstellungen' label also matches the offstage
-/// screen's AppBar.
 Future<void> pumpAndOpenDripDialogInShell(WidgetTester tester) async {
   await tester.pumpWidget(appScope(locale: const Locale('de')));
   await tester.pumpAndSettle();
-  await tester.tap(navLabel('Einstellungen'));
-  await tester.pumpAndSettle();
-
-  // Scroll the lazy settings list until the drip button is built; the
-  // scrollable is scoped to the settings screen (the shell keeps the other
-  // tabs' scrollables in the tree).
-  await tester.scrollUntilVisible(
-    settingsImportDripButton(),
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
-  await tester.pumpAndSettle();
+  await openSettingsTab(tester);
+  await scrollSettingsCardIntoView(tester, settingsImportDripButton());
   await tester.tap(settingsImportDripButton());
   await tester.pumpAndSettle();
 }
 
 /// Pumps the settings screen and opens the JSON import dialog. [seed]
 /// loads the device-side data the pasted document interacts with, [builder]
-/// swaps in a database subclass (fault/plan-timing injection, same seam as
-/// the delete-data tests).
+/// swaps in a fault-injectable database (support/faulty_db.dart).
 Future<void> pumpAndOpenJsonDialog(
   WidgetTester tester, {
   Future<void> Function(CycleDatabase db)? seed,
@@ -131,17 +63,7 @@ Future<void> pumpAndOpenJsonDialog(
 }) async {
   await tester.pumpWidget(settingsHarness(seed: seed, builder: builder));
   await tester.pumpAndSettle();
-  await tester.scrollUntilVisible(
-    settingsImportJsonButton(),
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
-  await tester.pumpAndSettle();
+  await scrollSettingsCardIntoView(tester, settingsImportJsonButton());
   await tester.tap(settingsImportJsonButton());
   await tester.pumpAndSettle();
   expect(
@@ -159,17 +81,7 @@ Future<void> pumpAndOpenDripDialog(
 }) async {
   await tester.pumpWidget(settingsHarness(seed: seed));
   await tester.pumpAndSettle();
-  await tester.scrollUntilVisible(
-    settingsImportDripButton(),
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(EinstellungenScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
-  await tester.pumpAndSettle();
+  await scrollSettingsCardIntoView(tester, settingsImportDripButton());
   await tester.tap(settingsImportDripButton());
   await tester.pumpAndSettle();
   expect(
@@ -198,48 +110,6 @@ Finder applyButton() => find.descendant(
 Finder overwritePreview() =>
     find.byKey(const ValueKey('importOverwritePreview'));
 
-/// Database with a controllable planning read: every entries read waits
-/// for [entryReadGate] (the read a plan blocks on) and turns into the
-/// read failure planning can hit when [failEntryReads] is set.
-final class _GatedPlanDatabase extends CycleDatabase {
-  _GatedPlanDatabase(super.executor, {required this.entryReadGate});
-
-  final Completer<void> entryReadGate;
-  bool failEntryReads = false;
-
-  late final _GatedPlanEntriesDao _gatedEntriesDao = _GatedPlanEntriesDao(this);
-
-  @override
-  EntriesDao get entriesDao => _gatedEntriesDao;
-}
-
-final class _GatedPlanEntriesDao extends EntriesDao {
-  _GatedPlanEntriesDao(this._db) : super(_db);
-
-  final _GatedPlanDatabase _db;
-
-  @override
-  Future<List<CycleEntry>> allEntries() {
-    final gate = _db.entryReadGate.future;
-    if (_db.failEntryReads) {
-      return gate.then((_) => throw StateError('injected plan read failure'));
-    }
-    return gate.then((_) => super.allEntries());
-  }
-}
-
-/// Builds the [_GatedPlanDatabase] the same way the harness builds its
-/// in-memory database (no files, no platform channels).
-_GatedPlanDatabase _gatedPlanDatabase(Completer<void> gate) {
-  return _GatedPlanDatabase(
-    DatabaseConnection(
-      NativeDatabase.memory(),
-      closeStreamsSynchronously: true,
-    ),
-    entryReadGate: gate,
-  );
-}
-
 void main() {
   group('import dialogs', () {
     testWidgets(
@@ -250,17 +120,7 @@ void main() {
         final errors = await collectFrameworkErrors(tester, () async {
           await tester.pumpWidget(settingsHarness());
           await tester.pumpAndSettle();
-          await tester.scrollUntilVisible(
-            settingsImportDripButton(),
-            200,
-            scrollable: find
-                .descendant(
-                  of: find.byType(EinstellungenScreen),
-                  matching: find.byType(Scrollable),
-                )
-                .first,
-          );
-          await tester.pumpAndSettle();
+          await scrollSettingsCardIntoView(tester, settingsImportDripButton());
           await tester.tap(settingsImportDripButton());
           await tester.pumpAndSettle();
           // The dialog is open; now the keyboard slides in and the dialog
@@ -546,7 +406,7 @@ void main() {
         final gate = Completer<void>();
         await pumpAndOpenJsonDialog(
           tester,
-          builder: () => _gatedPlanDatabase(gate),
+          builder: () => FaultyCycleDatabase(entryReadGate: gate),
           seed: (db) async {
             await db.entriesDao.upsertDaily(evaluationScenarioEntries().first);
           },
@@ -573,7 +433,7 @@ void main() {
       'apply path can report the failed import',
       (WidgetTester tester) async {
         final gate = Completer<void>();
-        final db = _gatedPlanDatabase(gate);
+        final db = FaultyCycleDatabase(entryReadGate: gate);
         db.failEntryReads = true;
         await pumpAndOpenJsonDialog(
           tester,

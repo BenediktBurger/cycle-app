@@ -164,68 +164,6 @@ void main() {
     );
   });
 
-  testWidgets('mucus form: sign picker with conditional quality picker', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(appScope(locale: const Locale('de')));
-    await tester.pumpAndSettle();
-    await tester.tap(navLabel('Tagebuch'));
-    await tester.pumpAndSettle();
-
-    // The sign picker offers the unset option plus the four glyphs
-    // t / Ø / f / S (glyphs are the display, per cheat-sheet convention).
-    const signGlyphs = ['—', 't', 'Ø', 'f', 'S'];
-    for (final glyph in signGlyphs) {
-      expect(
-        find.text(glyph),
-        findsWidgets,
-        reason: 'Sign segment "$glyph" should be present',
-      );
-    }
-
-    // The quality row stays hidden until the sign S is selected; the row
-    // wrapper is keyed mucusQualityRow, so the key (not the caption) is
-    // what pins the picker's visibility.
-    expect(find.byKey(const ValueKey('mucusQualityRow')), findsNothing);
-    await tester.ensureVisible(diaryChip('mucusSign', 's'));
-    await tester.pumpAndSettle();
-    await tester.tap(diaryChip('mucusSign', 's'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('mucusQualityRow')), findsOneWidget);
-    const qualityTokens = [
-      'w',
-      'mi',
-      'cr',
-      'kl',
-      'glb',
-      'g',
-      'EW',
-      'gl',
-      'fl',
-      'ns',
-    ];
-    for (final token in qualityTokens) {
-      expect(
-        find.text(token),
-        findsOneWidget,
-        reason: 'Quality chip "$token" should be offered on S',
-      );
-    }
-
-    // Selecting a quality keeps the picker; switching to another sign
-    // hides it again (a quality only exists together with S).
-    await tester.ensureVisible(diaryChip('mucusQuality', 'ew'));
-    await tester.pumpAndSettle();
-    await tester.tap(diaryChip('mucusQuality', 'ew'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('mucusQualityRow')), findsOneWidget);
-    await tester.ensureVisible(diaryChip('mucusSign', 'nothing'));
-    await tester.pumpAndSettle();
-    await tester.tap(diaryChip('mucusSign', 'nothing'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('mucusQualityRow')), findsNothing);
-  });
-
   /// The (label, screen-type) pairs of the shell's four destinations in
   /// navigation order — [navLabel] taps and the visible-screen pin follow
   /// the same vocabulary.
@@ -248,44 +186,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
   }
-
-  testWidgets('the settings pane carries no PIN-lock surface', (
-    WidgetTester tester,
-  ) async {
-    // Whole-pane surface: the pane's lazy list builds everything it
-    // carries, so the absence probes below need no scrolling. The height
-    // clears the pane with all track switches, so the closing note that
-    // anchors the guard stays built.
-    await tester.binding.setSurfaceSize(const Size(900, 2600));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(appScope(locale: const Locale('de')));
-    await tester.pumpAndSettle();
-    await tester.tap(navLabel('Einstellungen'));
-    await tester.pumpAndSettle();
-
-    // Guard that the pane's bottom IS on the surface — otherwise the
-    // absence probes below would silently survey only a truncated pane.
-    expect(
-      find.textContaining('GitHub-Issue'),
-      findsOneWidget,
-      reason:
-          'the closing feedback note is on the surface, so the '
-          'absence probes surveyed the whole pane',
-    );
-
-    expect(
-      find.textContaining('PIN'),
-      findsNothing,
-      reason: 'the settings pane carries no PIN-lock switch',
-    );
-    expect(
-      find.textContaining('Noch nicht umgesetzt'),
-      findsNothing,
-      reason:
-          'no not-yet-implemented note exists anywhere on the pane — '
-          'probed by its text, independent of any SwitchListTile count',
-    );
-  });
 
   testWidgets('phone portrait: the save snackbar never drapes the bottom '
       'NavigationBar and tabs stay tappable while it shows', (

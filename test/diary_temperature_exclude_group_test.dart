@@ -1,7 +1,6 @@
 // Widget tests for the MANUAL temperature-exclusion coupling on the
-// Tagebuch screen (owner decision 2026-09-19: the old flag-driven auto-set
-// of the ignoreTemperature mark is DELETED — the linkage between the
-// disturbance flags and the exclusion mark is MANUAL ONLY).
+// Tagebuch screen (owner decision): the linkage between the disturbance
+// flags and the ignoreTemperature mark is MANUAL ONLY.
 //
 // The disturbance flags (sp/a/alk/kr) and the exclude switch live in ONE
 // labelled group so flagging and excluding are visibly one decision, but
@@ -14,29 +13,21 @@
 //   - clearing the flags never auto-clears a present mark.
 //
 // Import paths (drip CSV, old export documents) derive the mark
-// independently and are covered elsewhere; the REVERSE-direction
-// no-auto-removal of the old engine (mark survives flag clears) is also
-// pinned by test/diary_time_and_navigation_test.dart (the pre-existing
-// mark survives the untouched save there).
-//
-// The database is an in-memory override and the German locale is pinned,
-// same harness pattern as test/diary_measured_time_test.dart.
-import 'package:cycle_app/db/cycle_database.dart';
-import 'package:cycle_app/domain/date_only.dart';
+// independently and are covered elsewhere; the untouched-save-keeps-a-mark
+// side is also pinned by test/diary_time_and_navigation_test.dart.
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'support/database.dart';
+import 'support/diary_harness.dart';
 import 'support/finders.dart';
-import 'support/viewport.dart';
 
-final _fixedNow = DateTime(2026, 4, 10, 14, 35);
-final _selectedDay = DateOnly.normalize(_fixedNow);
+/// The shared pinned-harness (German locale, pinned clock and selected day,
+/// in-memory database — see DiaryHarness).
+final _harness = DiaryHarness(now: DateTime(2026, 4, 10, 14, 35));
 
-CycleDatabase? _db;
+DateTime get _selectedDay => _harness.selectedDay;
 
 /// The exclude switch inside the diary's disturbance group (test-visible
 /// key on the SwitchListTile).
@@ -46,19 +37,6 @@ Finder get _excludeSwitch =>
 /// The current value of the exclude switch, read from its widget.
 bool _switchValue(WidgetTester tester) =>
     tester.widget<SwitchListTile>(_excludeSwitch).value;
-
-/// German locale, pinned "now" and selected day over the shared appScope
-/// harness — the pins this file's German assertions need, without the
-/// per-file scope copy.
-ProviderScope _scope({Future<void> Function(CycleDatabase db)? seed}) {
-  return appScope(
-    now: () => _fixedNow,
-    selectedDay: _selectedDay,
-    locale: const Locale('de'),
-    onCreated: (db) => _db = db,
-    seed: seed,
-  );
-}
 
 void main() {
   /// Selects the disturbance chip [token] (sp / a / alk / kr) —
@@ -73,22 +51,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// The stored mark types for the selected day (from the real database).
-  Future<List<String>> storedMarkTypes() async =>
-      (await _db!.marksDao.marksForDay(
-        _selectedDay,
-      )).map((m) => m.markType).toList();
-
   testWidgets('saving a flagged day WITHOUT the exclude switch does NOT create '
       'the ignoreTemperature mark (no auto-set in any direction)', (
     tester,
   ) async {
-    useTallSurface(tester);
-    await tester.pumpWidget(_scope());
+    _harness.tallSurface(tester);
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     expect(
-      await storedMarkTypes(),
+      await _harness.storedMarkTypes(_selectedDay),
       isEmpty,
       reason: 'guard: a fresh day carries no marks',
     );
@@ -97,13 +69,13 @@ void main() {
     await save(tester);
 
     expect(
-      await storedMarkTypes(),
+      await _harness.storedMarkTypes(_selectedDay),
       isEmpty,
       reason:
           'a disturbance flag alone never excludes the day from the '
           'analysis — the explicit exclude switch decides',
     );
-    final entry = await _db!.entriesDao.entryFor(_selectedDay);
+    final entry = await _harness.db!.entriesDao.entryFor(_selectedDay);
     expect(
       entry!.tempDisturbances,
       TempDisturbance.sp.bit,
@@ -114,15 +86,15 @@ void main() {
   testWidgets('the exclude switch inside the disturbance group writes the '
       'ignoreTemperature mark on save — even without any flag, and '
       'idempotently', (tester) async {
-    useTallSurface(tester);
-    await tester.pumpWidget(_scope());
+    _harness.tallSurface(tester);
+    await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
     await tester.tap(_excludeSwitch);
     await tester.pumpAndSettle();
     await save(tester);
 
-    final marks = await _db!.marksDao.marksForDay(_selectedDay);
+    final marks = await _harness.db!.marksDao.marksForDay(_selectedDay);
     expect(
       marks.map((m) => m.markType),
       [CycleMarkTypes.ignoreTemperature],
@@ -137,7 +109,7 @@ void main() {
           'the diary save is user-placed data — the mark is '
           'user-authored like every sheet toggle',
     );
-    final entry = await _db!.entriesDao.entryFor(_selectedDay);
+    final entry = await _harness.db!.entriesDao.entryFor(_selectedDay);
     expect(
       entry!.tempDisturbances,
       0,
@@ -149,7 +121,7 @@ void main() {
     // Re-save with the switch untouched: addMark is idempotent.
     await save(tester);
     expect(
-      (await _db!.marksDao.marksForDay(_selectedDay)),
+      (await _harness.db!.marksDao.marksForDay(_selectedDay)),
       hasLength(1),
       reason:
           'repeated saves with the switch on stay at one mark '
@@ -161,9 +133,9 @@ void main() {
     'the switch seeds from the day\'s existing mark; switching it off '
     'and saving REMOVES the mark',
     (tester) async {
-      useTallSurface(tester);
+      _harness.tallSurface(tester);
       await tester.pumpWidget(
-        _scope(
+        _harness.scope(
           seed: (db) async {
             await db.marksDao.addMark(
               _selectedDay,
@@ -187,7 +159,7 @@ void main() {
       await save(tester);
 
       expect(
-        await storedMarkTypes(),
+        await _harness.storedMarkTypes(_selectedDay),
         isEmpty,
         reason:
             'the switch off -> save removes the pre-existing mark '
@@ -200,9 +172,9 @@ void main() {
     'a flagged save keeps an externally placed mark intact (the switch '
     'seeds on, so the save re-affirms instead of auto-deciding)',
     (tester) async {
-      useTallSurface(tester);
+      _harness.tallSurface(tester);
       await tester.pumpWidget(
-        _scope(
+        _harness.scope(
           seed: (db) async {
             await db.marksDao.addMark(
               _selectedDay,
@@ -222,7 +194,7 @@ void main() {
       await toggleDisturbanceChip(tester, 'sp');
       await save(tester);
 
-      final marks = await _db!.marksDao.marksForDay(_selectedDay);
+      final marks = await _harness.db!.marksDao.marksForDay(_selectedDay);
       expect(
         marks.map((m) => m.markType),
         [CycleMarkTypes.ignoreTemperature],
@@ -236,9 +208,9 @@ void main() {
 
   testWidgets('removing the disturbance flags never auto-clears a present mark '
       '(the switch drives the mark, not the mask)', (tester) async {
-    useTallSurface(tester);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
-      _scope(
+      _harness.scope(
         seed: (db) async {
           await db.entriesDao.upsertDaily(
             DailyEntry(
@@ -260,7 +232,7 @@ void main() {
     await toggleDisturbanceChip(tester, 'alk'); // deselect
     await save(tester);
 
-    final marks = await _db!.marksDao.marksForDay(_selectedDay);
+    final marks = await _harness.db!.marksDao.marksForDay(_selectedDay);
     expect(
       marks.map((m) => m.markType),
       [CycleMarkTypes.ignoreTemperature],
@@ -268,7 +240,7 @@ void main() {
           'clearing the flags never lifts the exclusion — only the '
           'switch does',
     );
-    final entry = await _db!.entriesDao.entryFor(_selectedDay);
+    final entry = await _harness.db!.entriesDao.entryFor(_selectedDay);
     expect(
       entry!.tempDisturbances,
       0,

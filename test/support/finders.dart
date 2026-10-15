@@ -1,5 +1,9 @@
 // Shared finders and chart-view-state helpers for the widget tests — the
 // interaction helpers the chart and shell tests kept copy-pasting.
+import 'dart:math' as math;
+
+import 'package:cycle_app/ui/bleeding_symbol.dart';
+import 'package:cycle_app/ui/cycle_marks.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,9 +22,9 @@ Finder navLabel(String label) => find.descendant(
   matching: find.text(label),
 );
 
-/// The non-modal day options panel on the cycle screen (the converted
-/// former modal bottom sheet): keyed card the Zyklus screen docks at the
-/// bottom of the surface while a tapped day's options are showing.
+/// The non-modal day options panel on the cycle screen: keyed card the
+/// Zyklus screen docks at the bottom of the surface in front of the chart
+/// list while a tapped day's options are showing.
 Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 
 /// The day options panel's "edit day" icon button (the form-jump affordance
@@ -235,3 +239,83 @@ FlDotPainter dotPainter(WidgetTester tester, int dayIndex) {
   if (painter == null) fail('no temperature dot at day index $dayIndex');
   return painter;
 }
+
+/// The evaluation-candidate dot kinds, keyed by day index: which days render
+/// a RING (circled candidate) and which an ARROW (first-higher candidate).
+/// Days outside both sets have plain (or no) temperature dots.
+({Set<int> rings, Set<int> arrows}) candidateKinds(WidgetTester tester) {
+  var maxDay = -1;
+  for (final bar in dotBars(tester)) {
+    for (final spot in bar.spots) {
+      maxDay = math.max(maxDay, spot.x.round());
+    }
+  }
+  final kinds = (rings: <int>{}, arrows: <int>{});
+  for (var day = 0; day <= maxDay; day++) {
+    final painter = dotPainterOrNull(tester, day);
+    if (painter is RingDotPainter) kinds.rings.add(day);
+    if (painter is ArrowUpDotPainter) kinds.arrows.add(day);
+  }
+  return kinds;
+}
+
+/// The tooltip messages rendered under [of] — the localized row/corner names
+/// (and header-prototype names) the chart's rail slots carry.
+List<String> tooltipMessages(WidgetTester tester, Finder of) => tester
+    .widgetList<Tooltip>(
+      find.descendant(of: of, matching: find.byType(Tooltip)),
+    )
+    .map((t) => t.message!)
+    .toList();
+
+/// The day/cycle header label cell of day column [index].
+Finder dayLabel(int index) => find.byKey(ValueKey('dayLabel-$index'));
+
+/// The text [text] inside day column [index]'s day label cell.
+Finder dayLabelText(int index, String text) =>
+    find.descendant(of: dayLabel(index), matching: find.text(text));
+
+/// The rendered global x of [dayIndex]'s chart dot: the chart maps its x
+/// domain linearly onto the plot area, which spans the chart widget's full
+/// width — the stripless scroll content starts at the plot's left edge (the
+/// frozen rail sits outside).
+double chartDotX(WidgetTester tester, int dayIndex) {
+  final rect = tester.getRect(find.byType(LineChart));
+  final data = chartData(tester);
+  final t = (dayIndex - data.minX) / (data.maxX - data.minX);
+  return rect.left + t * rect.width;
+}
+
+/// The in-plot mucus-peak dot of [dayIndex].
+Finder inPlotPeakDot(int dayIndex) =>
+    find.byKey(ValueKey('inPlotPeakDot-$dayIndex'));
+
+/// The in-plot evaluation day-number glyph of [dayIndex] carrying [number].
+Finder dayNumberGlyph(int dayIndex, int number) =>
+    find.byKey(ValueKey('inPlotDayNumber-$dayIndex-$number'));
+
+/// The number rendered in-plot at [dayIndex], or null when none: the
+/// glyphs key their value (`inPlotDayNumber-$index-$n`), so absence is a
+/// prefix sweep.
+String? numberUnder(WidgetTester tester, int dayIndex) {
+  final prefix = 'inPlotDayNumber-$dayIndex-';
+  final numbers = [
+    for (final widget in tester.widgetList(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith(prefix),
+      ),
+    ))
+      (widget.key! as ValueKey<String>).value.substring(prefix.length),
+  ];
+  return numbers.isEmpty ? null : numbers.single;
+}
+
+/// All bleed-fill regions (the shared symbol's fill widgets) inside the
+/// bleeding cell of [index]: the solid bottom bar of a menstruation-level
+/// day, or the dots of a spotting day.
+Finder bleedingFills(int index) => find.descendant(
+  of: chartCell(index, 'bleeding'),
+  matching: find.byType(BleedingFill),
+);

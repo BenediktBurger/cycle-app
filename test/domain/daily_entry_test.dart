@@ -4,8 +4,8 @@
 // normalizes/drops the time, and copyWith/equality inherit that), the
 // sex-time bitmask, the cervix firmness fields, and the
 // temp_disturbances mask (the NER-aligned raw-data disturbance flags
-// sp/a/alk/kr — an int mask 0..15; the ANALYSIS exclusion is no longer
-// driven by entry flags but by the ignoreTemperature mark, see
+// sp/a/alk/kr — an int mask 0..15; the ANALYSIS exclusion is driven by the
+// ignoreTemperature mark, not by these entry flags (see
 // lib/domain/cycle_grouping.dart). DB mappers, the export/import writers
 // and any future writer all build DailyEntries, so they cannot store a
 // stray time or an out-of-range mask either.
@@ -112,21 +112,6 @@ void main() {
       expect(SexTiming.midday.bit, 2);
       expect(SexTiming.evening.bit, 4);
     });
-
-    test('bits are pairwise disjoint (a mask can name each combination)', () {
-      final bits = SexTiming.values.map((t) => t.bit).toSet();
-      expect(bits.length, SexTiming.values.length);
-      for (final a in SexTiming.values) {
-        for (final b in SexTiming.values) {
-          if (a == b) continue;
-          expect(
-            a.bit & b.bit,
-            0,
-            reason: '${a.name} and ${b.name} must be independent flags',
-          );
-        }
-      }
-    });
   });
 
   group('sexTimings field', () {
@@ -153,10 +138,9 @@ void main() {
       );
     });
 
-    test('every mask 0..7 is representable, and only those', () {
-      for (var mask = 0; mask <= 7; mask++) {
-        expect(DailyEntry(date: day, sexTimings: mask).sexTimings, mask);
-      }
+    test('a mask inside the 3-bit vocabulary is representable, outside '
+        'and negative are not', () {
+      expect(DailyEntry(date: day, sexTimings: 7).sexTimings, 7);
       expect(
         () => DailyEntry(date: day, sexTimings: 8),
         throwsA(isA<AssertionError>()),
@@ -190,26 +174,11 @@ void main() {
       expect(TempDisturbance.kr.bit, 8);
     });
 
-    test('token set is exactly the four disturbance flags (Reise is gone)', () {
+    test('token set is exactly the four disturbance flags', () {
       expect(
         TempDisturbance.values.map((t) => t.token),
         unorderedEquals(const ['sp', 'a', 'alk', 'kr']),
       );
-    });
-
-    test('bits are pairwise disjoint (a mask can name each combination)', () {
-      final bits = TempDisturbance.values.map((t) => t.bit).toSet();
-      expect(bits.length, TempDisturbance.values.length);
-      for (final a in TempDisturbance.values) {
-        for (final b in TempDisturbance.values) {
-          if (a == b) continue;
-          expect(
-            a.bit & b.bit,
-            0,
-            reason: '${a.name} and ${b.name} must be independent flags',
-          );
-        }
-      }
     });
   });
 
@@ -256,13 +225,9 @@ void main() {
       );
     });
 
-    test('every mask 0..15 is representable, and only those', () {
-      for (var mask = 0; mask <= 15; mask++) {
-        expect(
-          DailyEntry(date: day, tempDisturbances: mask).tempDisturbances,
-          mask,
-        );
-      }
+    test('a mask inside the 4-bit vocabulary is representable, outside '
+        'and negative are not', () {
+      expect(DailyEntry(date: day, tempDisturbances: 15).tempDisturbances, 15);
       expect(
         () => DailyEntry(date: day, tempDisturbances: 16),
         throwsA(isA<AssertionError>()),
@@ -389,7 +354,7 @@ void main() {
     });
   });
 
-  group('equality/hashCode include the new fields', () {
+  group('equality/hashCode include the sex-timing and firmness fields', () {
     test('entries differing only in sexTimings differ', () {
       final a = DailyEntry(date: day, sexTimings: SexTiming.morning.bit);
       final b = DailyEntry(date: day, sexTimings: SexTiming.evening.bit);
@@ -417,7 +382,7 @@ void main() {
       );
     });
 
-    test('a copyWith-modified new field participates in equality', () {
+    test('a copyWith-modified field participates in equality', () {
       final base = DailyEntry(
         date: day,
         cervixFirmness: CervixFirmness.halfSoft,

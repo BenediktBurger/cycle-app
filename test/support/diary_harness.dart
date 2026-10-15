@@ -62,7 +62,8 @@ class DiaryHarness {
   /// The app scope with the pinned overrides; [seed] runs inside the
   /// database future (the form, reading through databaseProvider.future,
   /// sees the seeded day); a per-call [selectedDay] overrides the harness
-  /// default.
+  /// default, a per-call [now] overrides the harness clock (for files whose
+  /// sections pin different dates on one harness).
   /// [builder] passes a subclassed database through (fault injection —
   /// the same seam delete-data tests use); the default stays the plain
   /// in-memory instance.
@@ -71,11 +72,12 @@ class DiaryHarness {
     DateTime? selectedDay,
     DiaryTrack? diaryTrack,
     CycleDatabase Function()? builder,
+    DateTime? now,
   }) => appScope(
     seed: seed,
     builder: builder,
     onCreated: (db) => this.db = db,
-    now: () => now,
+    now: () => now ?? this.now,
     selectedDay: selectedDay ?? this.selectedDay,
     diaryTrack: diaryTrack,
     locale: const Locale('de'),

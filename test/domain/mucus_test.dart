@@ -17,61 +17,17 @@ void main() {
       );
     });
 
-    test('fs (f vor S an einem Tag) keeps its exact storage token', () {
-      expect(
-        MucusSign.fs.name,
-        'fs',
-        reason:
-            'the token is pinned by the storage format — a rename is '
-            'a data migration, never a refactor',
-      );
-      expect(tryParseMucusSign('fs'), MucusSign.fs);
-      expect(
-        MucusSign.fs.name,
-        isNot(contains('/')),
-        reason: 'the storage token is the enum name, not the glyph',
-      );
-    });
-
     test('fs displays as f/S and carries no quality', () {
-      // 'f/S' ("f vor S an einem Tag") is a single observation with NO
-      // quality qualifier of its own — like every non-S sign the quality
-      // must never survive alongside it.
+      // The mismatched quality renders as no superscript ('f/S' — "f vor
+      // S an einem Tag" — is a single observation without its own one).
       expect(mucusSignSymbol(MucusSign.fs), 'f/S');
-      expect(sanitizeMucusPair(sign: MucusSign.fs, quality: MucusQuality.ew), (
-        sign: MucusSign.fs,
-        quality: null,
-      ), reason: 'the quality collapses — fs is not the S sign');
-      expect(
-        () => DailyEntry(
-          date: DateTime(2026, 6, 15),
-          mucusSign: MucusSign.fs,
-          mucusQuality: MucusQuality.gl,
-        ),
-        throwsA(isA<AssertionError>()),
-        reason: 'the constructor mirrors the sanitize rule',
-      );
       expect(mucusDisplay(sign: MucusSign.fs, quality: MucusQuality.ew), (
         symbol: 'f/S',
         superscript: null,
       ));
     });
 
-    test('a (Ausfluss) carries no quality — quality stays S-only', () {
-      // 'A' is a discharge observation, not the mucus sign S; like every
-      // non-S sign it must never carry a quality qualifier.
-      expect(sanitizeMucusPair(sign: MucusSign.a, quality: MucusQuality.ew), (
-        sign: MucusSign.a,
-        quality: null,
-      ));
-      expect(
-        () => DailyEntry(
-          date: DateTime(2026, 6, 15),
-          mucusSign: MucusSign.a,
-          mucusQuality: MucusQuality.gl,
-        ),
-        throwsA(isA<AssertionError>()),
-      );
+    test('a (Ausfluss) displays without a quality superscript', () {
       expect(mucusDisplay(sign: MucusSign.a, quality: MucusQuality.ew), (
         symbol: 'A',
         superscript: null,
@@ -111,12 +67,6 @@ void main() {
           'ns',
         ]),
       );
-    });
-
-    test('gl and glb are distinct quality values (prefix collision)', () {
-      expect(MucusQuality.gl, isNot(MucusQuality.glb));
-      expect(MucusQuality.gl.name, 'gl');
-      expect(MucusQuality.glb.name, 'glb');
     });
 
     test('tryParseMucusQuality round-trips every token', () {

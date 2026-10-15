@@ -89,7 +89,7 @@ void main() {
 
     test('defaults to the committed vendoring location', () {
       final options = parseArguments(['check']);
-      expect(options.vendoredDir, defaultVendoredDir);
+      expect(options.vendoredDir, 'native/sqlite3mc');
       expect(options.offline, isFalse);
     });
 

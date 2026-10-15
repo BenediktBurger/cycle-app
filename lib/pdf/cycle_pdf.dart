@@ -241,7 +241,7 @@ Future<List<int>> generatePdfBytes({
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(_pageMargin),
+        margin: const pw.EdgeInsets.all(pdfPageMargin),
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
@@ -268,7 +268,7 @@ Future<List<int>> generatePdfBytes({
               drawing: drawing,
               axis: PdfCurveAxis(
                 range: model.temperatureRange,
-                plotHeight: _curvePlotHeight,
+                plotHeight: pdfCurvePlotHeight,
               ),
             ),
           ],
@@ -287,8 +287,12 @@ Future<List<int>> generatePdfBytes({
 // child — so the grid never overflows the page).
 // ---------------------------------------------------------------------------
 
-const double _pageMargin = 28;
-const double _headerHeight = 58;
+/// Landscape A4's margin on all four sides, pt — the header block's fixed
+/// height and the printable width (pdf_axis.dart) both key on it.
+const double pdfPageMargin = 28;
+
+/// The header block's fixed height, pt.
+const double pdfHeaderHeight = 58;
 const double _dayNumberRowHeight = 10;
 const double _dateRowHeight = 14;
 const double _bleedingRowHeight = 12;
@@ -297,7 +301,7 @@ const double _tempValueRowHeight = 12;
 /// The curve block's painted plot region (fine scale + curve + overlay
 /// marks + the in-plot glyph rows: sex X, mucus letters, peak dot, the
 /// Mittelschmerz M and the evaluation day numbers).
-const double _curvePlotHeight = 185;
+const double pdfCurvePlotHeight = 185;
 
 /// The below-plot strip rows.
 const double _timeRowHeight = 15;
@@ -309,10 +313,25 @@ const double _disturbanceRowHeight = 14;
 /// −π/2).
 const double pdfRotatedTextAngle = -math.pi / 2;
 
-final pw.TextStyle _label = const pw.TextStyle(fontSize: 6.5);
-final pw.TextStyle _tiny = const pw.TextStyle(fontSize: 5.2);
+/// The in-plot glyph rows' ink size, pt (the sex X, the mucus letters and
+/// the Mittelschmerz M).
+const double pdfLabelFontSize = 6.5;
+
+/// The paper sheet's small-cell ink size, pt (rail captions, band cells,
+/// rotated notes) — shared with the accent runs inside the plot (the
+/// evaluation day numbers' tiny style).
+const double pdfTinyFontSize = 5.2;
+
+/// The header block's fact lines' ink size, pt.
+const double pdfHeaderFactFontSize = 6.4;
+
+/// The raised mucus quality token's ink size, pt.
+const double pdfMucusQualityFontSize = 4.8;
+
+final pw.TextStyle _label = const pw.TextStyle(fontSize: pdfLabelFontSize);
+final pw.TextStyle _tiny = const pw.TextStyle(fontSize: pdfTinyFontSize);
 final pw.TextStyle _tinyAccent = const pw.TextStyle(
-  fontSize: 5.2,
+  fontSize: pdfTinyFontSize,
   fontWeight: pw.FontWeight.bold,
   color: PdfColor.fromInt(0xFF3556A8),
 );
@@ -346,12 +365,12 @@ pw.Widget _cycleHeader({
   required List<({String label, String value})> facts,
 }) {
   const bold = pw.TextStyle(fontSize: 10.5);
-  const normal = pw.TextStyle(fontSize: 6.4);
+  const normal = pw.TextStyle(fontSize: pdfHeaderFactFontSize);
   final continuation = pagesInCycle > 1
       ? ' — Blatt ${pageInCycle + 1}/$pagesInCycle'
       : '';
   return pw.SizedBox(
-    height: _headerHeight,
+    height: pdfHeaderHeight,
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -383,7 +402,7 @@ pw.Widget _cycleHeader({
 /// the sheet. The paper-form reading order flows down the left column
 /// then the right.
 pw.Widget _factColumns(List<({String label, String value})> facts) {
-  const normal = pw.TextStyle(fontSize: 6.4);
+  const normal = pw.TextStyle(fontSize: pdfHeaderFactFontSize);
   final lines = [
     for (final fact in facts)
       pw.Text('${fact.label}: ${fact.value}', style: normal),
@@ -715,7 +734,7 @@ pw.Widget _curveBlock(
   List<int> weekend,
 ) {
   return pw.Container(
-    height: _curvePlotHeight,
+    height: pdfCurvePlotHeight,
     decoration: const pw.BoxDecoration(border: pw.Border(top: _hairline)),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -731,7 +750,7 @@ pw.Widget _curveBlock(
                   right: 3,
                   top: (axis.yFor(label.value) - 3.4).clamp(
                     0.0,
-                    _curvePlotHeight - 7,
+                    pdfCurvePlotHeight - 7,
                   ),
                   child: pw.Text(
                     label.text,
@@ -744,7 +763,7 @@ pw.Widget _curveBlock(
         ),
         pw.Expanded(
           child: pw.CustomPaint(
-            size: PdfPoint(pdfGridRightEdge - pdfRailWidth, _curvePlotHeight),
+            size: PdfPoint(pdfGridRightEdge - pdfRailWidth, pdfCurvePlotHeight),
             painter: (canvas, size) => _paintCurveBlock(
               canvas,
               size.x,
@@ -973,7 +992,9 @@ const double _mucusHaloBox = 12;
 const double _peakHaloSize = _peakDotSize + 2 * chartMarkHaloStrokeWidth;
 
 /// The mucus quality tokens ride raised at this smaller size.
-final pw.TextStyle _mucusQualityStyle = const pw.TextStyle(fontSize: 4.8);
+final pw.TextStyle _mucusQualityStyle = const pw.TextStyle(
+  fontSize: pdfMucusQualityFontSize,
+);
 
 /// All painted geometry of the plot region: the 0.1 °C graduation (light),
 /// the dashed window bounds, the column hairlines, the curve (dots +

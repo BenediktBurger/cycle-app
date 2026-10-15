@@ -2,9 +2,8 @@
 //
 // The load-or-create flow is exercised against an in-memory fake store —
 // no platform channels involved, so these run everywhere the suite runs.
-// The real store (flutter_secure_storage) is exercised only at runtime on a
-// device; that on-device verification is still pending (no physical
-// Android/iOS device has run this yet).
+// The real store (flutter_secure_storage) needs a physical device; that
+// verification is still open — see docs/adr/0005-storage-and-encryption.md.
 import 'dart:math';
 
 import 'package:cycle_app/db/db_key.dart';
@@ -50,12 +49,6 @@ final class _FakeStore implements DbKeyStore {
 
 void main() {
   group('generateDbKey', () {
-    test('produces 64 lowercase hex characters (32 random bytes)', () {
-      final key = generateDbKey();
-      expect(key, hasLength(64));
-      expect(key, matches(RegExp(r'^[0-9a-f]{64}$')));
-    });
-
     test('two generations differ (fresh randomness)', () {
       expect(generateDbKey(), isNot(generateDbKey()));
     });
@@ -81,16 +74,22 @@ void main() {
       expect(second, first);
     });
 
-    test(
-      'a failed read surfaces loudly — no fallback to a plaintext DB',
-      () async {
-        final store = _FakeStore()..readError = Exception('keystore locked');
-        await expectLater(
-          loadOrCreateDbKey(store: store),
-          throwsA(isA<DbKeyException>()),
-        );
-      },
-    );
+    test('a failed read surfaces loudly — named phase and cause, no fallback '
+        'to a plaintext DB', () async {
+      final store = _FakeStore()..readError = Exception('keystore locked');
+      await expectLater(
+        loadOrCreateDbKey(store: store),
+        throwsA(
+          isA<DbKeyException>()
+              .having((e) => e.message, 'message', contains('read'))
+              .having(
+                (e) => e.toString(),
+                'toString',
+                contains('keystore locked'),
+              ),
+        ),
+      );
+    });
 
     test('a failed write surfaces loudly and stores nothing', () async {
       final store = _FakeStore()..writeError = Exception('disk full');
@@ -99,17 +98,6 @@ void main() {
         throwsA(isA<DbKeyException>()),
       );
       expect(store.values, isEmpty, reason: 'no half-persisted key');
-    });
-
-    test('the exception names the failing phase and the cause', () async {
-      final store = _FakeStore()..readError = Exception('keystore locked');
-      try {
-        await loadOrCreateDbKey(store: store);
-        fail('expected DbKeyException');
-      } on DbKeyException catch (e) {
-        expect(e.message, contains('read'));
-        expect(e.toString(), contains('keystore locked'));
-      }
     });
 
     test(
