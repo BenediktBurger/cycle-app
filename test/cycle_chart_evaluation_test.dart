@@ -96,13 +96,14 @@ void main() {
       );
 
       // 9/12 (idx 6) carries the mucus-peak mark: the curve dot there is
-      // an ORDINARY temperature dot — the ring painter is gone from the
-      // peak day (R6).
+      // an ORDINARY temperature dot, no ring (R6).
       final painter = dotPainter(tester, 6);
       expect(
         painter,
         isNot(isA<RingDotPainter>()),
-        reason: 'the peak ring was removed from the temperature curve',
+        reason:
+            'the mucus-peak day renders a plain temperature dot, '
+            'not a ring',
       );
       expect(painter, isNot(isA<ArrowUpDotPainter>()));
     });
@@ -253,7 +254,7 @@ void main() {
     });
 
     testWidgets('the 4th CIRCLED candidate renders when rule E fires '
-        '(the 3rd was below the 0.2 K margin)', (tester) async {
+        '(the 3rd stays below the 0.2 K margin)', (tester) async {
       // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd candidate is
       // below the rule-D margin, so the 4th candidate triggers rule E —
       // and all four render as circles. The 5th (9/18) stays unmarked.
@@ -447,7 +448,7 @@ void main() {
       // so the segment begins at x 1.5.
       // END: the last marked candidate (9/16, idx 10 — the rule-D trigger)
       // plus half a day = x 10.5 — the domain extends half a column past
-      // the last day, so the clamp no longer bites here.
+      // the last day, so the clamp does not bite here.
       final first = bar.spots.first;
       final last = bar.spots.last;
       expect(
@@ -661,8 +662,7 @@ void main() {
       );
 
       // The right-pointing arrow: base at the bar, anchored inside the
-      // hung band (no longer at the cycle's baseline value — the
-      // baseline-anchor concept is retired).
+      // hung band — not at the cycle's baseline.
       final arrow = _suzArrowSpot(tester);
       expect(arrow, isNotNull, reason: 'the SUZ arrow renders with the bar');
       final (spot, painter) = arrow!;

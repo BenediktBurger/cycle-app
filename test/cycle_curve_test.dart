@@ -4,8 +4,8 @@
 // interruption flag comes from the IGNORED-DAY-INDEX set passed to
 // curveRuns: the set is computed by the chart from the ignoreTemperature
 // marks (owner decision 2026-09-19 — the MARK is the rendering key, not
-// the raw tempDisturbances mask). A flagged day whose mark was removed
-// renders normally; a marked day without flags renders lighter.
+// the raw tempDisturbances mask). A flagged day without the mark renders
+// at full weight; a marked day without flags renders lighter.
 //
 // The visible-range groups pin the new split of responsibilities: curveRuns
 // keeps every point's RAW measured value (an out-of-range reading is NOT
@@ -21,8 +21,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Entry for chart day index [i] (2026-09-03 = index 0); the helpers are
 /// day-index driven, so dates only provide the calendar offset.
-/// [flagged] sets the raw disturbance mask (rendering-irrelevant since the
-/// mark keying — kept here to prove the mask no longer drives the flag).
+/// [flagged] sets the raw disturbance mask — rendering-irrelevant: the
+/// ignored-day-index set keys the flag, the mask does not.
 DailyEntry _entry(int i, {double? bbt, bool flagged = false}) => DailyEntry(
   date: DateTime.utc(2026, 9, 3).add(Duration(days: i)),
   bbtC: bbt,
@@ -116,7 +116,9 @@ void main() {
       expect(
         flaggedUnmarked.single.points[1].excluded,
         isFalse,
-        reason: 'raw flags are no longer a rendering input',
+        reason:
+            'only the ignored-day-index set flags a date, and flagging is '
+            'what renders the day at reduced weight',
       );
 
       // Marked AND flagged (the typical manually excluded day): lighter.

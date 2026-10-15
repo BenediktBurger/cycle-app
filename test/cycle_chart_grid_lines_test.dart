@@ -32,8 +32,8 @@ final _twoCycleEntries = <DailyEntry>[
     ),
 ];
 
-/// The cycleStart marks of the two-cycle scenario (at the marked days 5
-/// and 9 — the same days that used to be bleeding onsets).
+/// The cycleStart marks of the two-cycle scenario: the heavy-bleeding
+/// days 5 and 9 carry the cycleStart mark.
 final _twoCycleMarks = <CycleMark>[
   CycleMark(date: septSevenDay(5), type: CycleMarkTypes.cycleStart),
   CycleMark(date: septSevenDay(9), type: CycleMarkTypes.cycleStart),
@@ -470,8 +470,8 @@ void main() {
         reason: 'the label ends inside the hugging background',
       );
 
-      // The last cycle ran columns 9..11 before: with the shrink-wrap the
-      // chip no longer runs to the plot's right edge either.
+      // The last cycle's chip shrink-wraps to its label, so it does not
+      // run to the plot's right edge.
       final last = tester.getRect(
         find.byKey(const ValueKey('cycleOrdinalChip-9')),
       );
@@ -479,8 +479,8 @@ void main() {
         last.right,
         lessThan(plot.right),
         reason:
-            'day-index 9: the last cycle\'s chip hugs its label, it '
-            'no longer runs to the plot\'s right edge',
+            'day-index 9: the last cycle\'s chip hugs its label '
+            'instead of running to the plot\'s right edge',
       );
     });
 

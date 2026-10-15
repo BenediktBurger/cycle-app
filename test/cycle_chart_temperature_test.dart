@@ -19,10 +19,9 @@ import 'support/viewport.dart';
 // ignoreTemperature MARK — the rendering is keyed to the mark, NOT to the
 // raw disturbance mask, owner decision 2026-09-19) count as measured
 // days, keep the line continuous, but render lighter (dot AND touching
-// segments). The
-// mark makes the state visible on the graph: a marked day without flags
-// renders lighter, and a flagged day whose mark was removed renders
-// normally again.
+// segments). The mark makes the state visible on the graph: a marked day
+// without flags renders lighter, and an unmarked flagged day renders at
+// full weight.
 
 // 2026-09-03 is a Thursday: Thu..Sun as a compact adjacent-day strip.
 final _temperatureThu = septThreeDay(0);
@@ -267,7 +266,7 @@ void main() {
           1.0,
           reason:
               'flags without the mark render at full alpha — the '
-              'raw mask is no longer a rendering input',
+              'raw mask is not a rendering input',
         );
       }
       final dotBars = [

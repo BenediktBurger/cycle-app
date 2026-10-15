@@ -23,7 +23,8 @@ DateTime septThreeDay(int index) =>
 
 /// 2026-09-07 is a Monday: the compact multi-day block most chart fixtures
 /// sit on (five day columns fit the default viewport).
-DateTime septSevenDay(int index) => DateTime.utc(2026, 9, 7 + index);
+DateTime septSevenDay(int index) =>
+    DateTime.utc(2026, 9, 7).add(Duration(days: index));
 
 /// The shared evaluation scenario (used by
 /// test/cycle_chart_evaluation_test.dart and cycle_mark_sheet_test.dart for

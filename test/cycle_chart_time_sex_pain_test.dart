@@ -89,8 +89,8 @@ void main() {
     testWidgets(
       'the time STILL renders at every column width — rotated vertically '
       '(RotatedBox) under the width threshold, horizontal above it '
-      '(regression: the time used to be dropped entirely at the space '
-      'constraint)',
+      '(regression: the time must render at every column width even when '
+      'space is tight)',
       (tester) async {
         List<DailyEntry> timedEntries(int count) => [
           // Give EVERY day a recorded measurement time so the narrow checks
@@ -410,7 +410,7 @@ void main() {
     expect(
       find.byKey(const ValueKey('cervixSlotGlyph-7')),
       findsNothing,
-      reason: 'no slot glyph on a day whose opening was never recorded',
+      reason: 'a day without a recorded opening renders no slot glyph',
     );
   });
 }

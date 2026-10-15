@@ -22,9 +22,9 @@ Finder navLabel(String label) => find.descendant(
   matching: find.text(label),
 );
 
-/// The non-modal day options panel on the cycle screen (the converted
-/// former modal bottom sheet): keyed card the Zyklus screen docks at the
-/// bottom of the surface while a tapped day's options are showing.
+/// The non-modal day options panel on the cycle screen: keyed card the
+/// Zyklus screen docks at the bottom of the surface in front of the chart
+/// list while a tapped day's options are showing.
 Finder cycleDayPanel() => find.byKey(const ValueKey('cycleDayPanel'));
 
 /// The day options panel's "edit day" icon button (the form-jump affordance
@@ -267,8 +267,6 @@ List<String> tooltipMessages(WidgetTester tester, Finder of) => tester
     )
     .map((t) => t.message!)
     .toList();
-
-// --- cycle-chart invariants shared across the chart subject files ----------
 
 /// The day/cycle header label cell of day column [index].
 Finder dayLabel(int index) => find.byKey(ValueKey('dayLabel-$index'));

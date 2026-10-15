@@ -69,15 +69,14 @@ void main() {
       }
     });
 
-    test('every axis label carries the °C suffix (unit per label, decoded '
-        'caption row removed)', () {
+    test('every axis label carries the °C suffix (unit per label)', () {
       final labels = axis.axisLabels();
       expect(
         labels.map((l) => l.text).toList(),
         everyElement(endsWith(' °C')),
         reason:
-            'the rail labels carry the unit themselves — the old '
-            'standalone "°C" caption is redundant and was removed',
+            'each rail label carries its own unit — no standalone '
+            '"°C" caption row renders',
       );
     });
 

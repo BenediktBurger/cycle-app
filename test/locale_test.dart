@@ -6,9 +6,9 @@
 //
 // The platform locale is simulated through the test binding's platform
 // dispatcher; the app itself is unchanged: in-memory drift database
-// override, no platform channels (same pattern as app_shell_test.dart, now merged with the former
-// l10n_fallback_test.dart into this single locale file — the two
-// concerns stay in distinct groups).
+// override, no platform channels (same pattern as app_shell_test.dart),
+// covering both the language-default and the fallback concerns in one
+// file with a group per concern.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -167,7 +167,7 @@ void main() {
     );
   });
 
-  // ─── fallback behavior: the former test/l10n_fallback_test.dart ───
+  // ─── fallback behavior ───
   //
   // Localization fallback tests: a missing translation term for the active
   // locale must fall back to *English* (not the German template text), and

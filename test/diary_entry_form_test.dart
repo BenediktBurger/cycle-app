@@ -5,15 +5,8 @@
 // sex time-of-day chips (including the mucus-A-segment check the
 // firmness picker shares its form with).
 //
-// Each section below (kicked off by a `════ former` banner) carries
-// the former file's header comments verbatim; test bodies were
-// concatenated, not rewritten. Every section pumps the app the same way
-// through diarySelectorScope (support/diary_harness.dart); German labels
-// are pinned (locale de).
-
-// No assertion was edited: run the full gate and diff the collected
-// test names against the pre-merge report — only the suite-path
-// prefix changed.
+// Every section pumps the app the same way through diarySelectorScope
+// (support/diary_harness.dart); German labels are pinned (locale de).
 
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/diary_track.dart';
@@ -36,9 +29,6 @@ import 'support/error_collector.dart';
 //
 // An in-memory drift database is injected (provider-override pattern from
 // app_shell_test.dart), so the test stays file-free and platform-channel-free.
-
-// The tests call diarySelectorScope (support/diary_harness.dart) directly —
-// the one-hundred-percent alias this file used to carry is gone.
 
 // The cervix pickers sit behind the What-to-track setting (cervix off by
 // default), so the cervix sections below pin that item on.
@@ -81,8 +71,6 @@ const _cervixTracked = DiaryTrack(cervix: true);
 
 void main() {
   // ═══════════ bleeding selector ═══════════
-  // former test/diary_bleeding_selector_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   testWidgets('bleeding selector offers all six levels and stores heavy', (
     WidgetTester tester,
@@ -164,8 +152,6 @@ void main() {
   });
 
   // ═══════════ cervix position and opening ═══════════
-  // former test/diary_cervix_selector_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   testWidgets('Muttermund position and opening are offered and persist', (
     WidgetTester tester,
@@ -256,8 +242,6 @@ void main() {
   });
 
   // ═══════════ pain options (B, M) ═══════════
-  // former test/diary_pain_selector_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   testWidgets('pain options B and M are offered and survive the save path', (
     WidgetTester tester,
@@ -320,8 +304,6 @@ void main() {
   });
 
   // ═══════════ firmness and sex timing ═══════════
-  // former test/diary_firmness_sex_timing_test.dart (bodies concatenated verbatim; see
-  // the file header for the merge mechanics)
 
   testWidgets('the mucus sign picker offers the A (Ausfluss) segment', (
     WidgetTester tester,

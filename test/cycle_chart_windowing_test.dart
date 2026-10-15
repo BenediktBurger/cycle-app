@@ -309,8 +309,8 @@ void main() {
         );
         // The scroll viewport: block width (800 test viewport, 12 body
         // padding on each side) minus the frozen rail left of the scroll.
-        const scrollViewport = 800.0 - 2 * 12 - frozenRailWidth; // 752
-        final marginDays = (scrollViewport / _columnWidth).ceil(); // 36
+        const scrollViewport = 800.0 - 2 * 12 - frozenRailWidth;
+        final marginDays = (scrollViewport / _columnWidth).ceil();
 
         // Fresh park 1: the initial auto-scroll landed at the newest days;
         // the left margin is unclamped and ends exactly one extra
@@ -383,7 +383,7 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
-      const scrollViewport = 800.0 - 2 * 12 - frozenRailWidth; // 752
+      const scrollViewport = 800.0 - 2 * 12 - frozenRailWidth;
       final marginDays = (scrollViewport / _columnWidth).ceil();
       final maxExtent = state.position.maxScrollExtent;
       final freshVisible = (maxExtent / _columnWidth).floor();
@@ -400,8 +400,8 @@ void main() {
       state.position.jumpTo(maxExtent - 240.0);
       await tester.pumpAndSettle();
 
-      // The parked window keeps sitting at the SAME boundary — it was not
-      // re-parked around the new position (that is what keeps the rebuild
+      // The parked window keeps sitting at the SAME boundary — it is not
+      // re-parked around the new position (that keeps the rebuild
       // rare during a fling).
       expect(_bleedingCell(parkedStart), findsOneWidget);
       expect(
@@ -557,13 +557,11 @@ void main() {
         const railWidth = frozenRailWidth; // the rail left of the scroll view
         const testViewportWidth = 800.0;
         const bodyPadding = 12.0;
-        const scrollViewport =
-            testViewportWidth - 2 * bodyPadding - railWidth; // 752
-        const contentWidth = 60 * minDayColumnWidth; // 1260
-        const maxOffset = contentWidth - scrollViewport; // 508
+        const scrollViewport = testViewportWidth - 2 * bodyPadding - railWidth;
+        const contentWidth = 60 * minDayColumnWidth;
+        const maxOffset = contentWidth - scrollViewport;
         final tapContentX = minDayColumnWidth * (58 + 0.5);
-        final tapScreenX =
-            bodyPadding + railWidth + (tapContentX - maxOffset); // 756.5
+        final tapScreenX = bodyPadding + railWidth + (tapContentX - maxOffset);
         final chartTop = tester.getRect(find.byType(LineChart)).top;
 
         await tester.tapAt(Offset(tapScreenX, chartTop + 100));
