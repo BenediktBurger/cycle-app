@@ -509,7 +509,10 @@ void main() {
         for (final e in _evaluationEntries)
           e.date.isAfter(_sun13) ? DailyEntry(date: e.date, bbtC: 36.4) : e,
       ];
-      await pumpChart(tester, chartHarness(entries: flat, marks: _marks));
+      await pumpFreshChart(
+        tester,
+        () => chartHarness(entries: flat, marks: _marks),
+      );
       expect(
         _baselineBars(tester),
         isEmpty,
