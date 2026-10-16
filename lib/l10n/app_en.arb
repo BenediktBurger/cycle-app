@@ -773,7 +773,7 @@
   "@diaryInfoTemperature": {
     "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
   },
-  "diaryInfoBleeding": "Observe your bleeding and its strength day by day. The first day of serious bleeding after a high temperature is the first cycle day and is marked as the cycle start with the cycle-start switch. If the bleeding starts late evening (after 9/10 pm), the cycle starts the next day.",
+  "diaryInfoBleeding": "Observe your bleeding and its strength day by day. The first day of serious bleeding after a high temperature is the first cycle day and is marked as the cycle start with the cycle-start switch.",
   "@diaryInfoBleeding": {
     "description": "Info-Text zum Blutungs-Abschnitt im Tagebuch-Eingabeformular: die Beobachtung der Blutung und der Bezug zur Zyklusbeginn-Markierung."
   },

@@ -682,7 +682,7 @@
   "@diaryInfoTemperature": {
     "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
   },
-  "diaryInfoBleeding": "Tägliche Beobachtung der Blutung und ihrer Stärke. Der erste Tag einer richtigen Blutung nach einer Hochlage ist der erste Zyklustag und wird über den Zyklusbeginn-Schalter als Zyklusbeginn markiert. Wenn die Blutung erst spät abends (so ab 21/22 Uhr) einsetzt, beginnt der Zyklus erst am nächsten Tag.",
+  "diaryInfoBleeding": "Tägliche Beobachtung der Blutung und ihrer Stärke. Der erste Tag einer richtigen Blutung nach einer Hochlage ist der erste Zyklustag und wird über den Zyklusbeginn-Schalter als Zyklusbeginn markiert.",
   "@diaryInfoBleeding": {
     "description": "Info-Text zum Blutungs-Abschnitt im Tagebuch-Eingabeformular: die Beobachtung der Blutung und der Bezug zur Zyklusbeginn-Markierung."
   },
