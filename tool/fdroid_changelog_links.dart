@@ -2,8 +2,8 @@
 // `dart run tool/fdroid_changelog_links.dart [<repo-root>]`.
 //
 // Reads `version: X.Y.Z+N` from pubspec.yaml (the authoring names) and, for
-// every locale under `fastlane/metadata/android/`, ensures the changelog
-// names the stores key on exist:
+// every locale under `fastlane/metadata/android/`, ensures the numeric
+// changelog names the stores key on exist:
 //
 // - `<versionName>.txt` — the authoring file; the release notes are
 //   written by hand there (docs/release.md's changelog-files step).
@@ -11,8 +11,11 @@
 //   arm64-v8a → 2, x86_64 → 3, mirroring android/app/build.gradle.kts) —
 //   F-Droid matches a changelog file against every versionCode its Builds
 //   entries produce, so each split versionCode needs its own file.
-// - `default.txt` — the latest-build fallback so an unlisted next build
-//   still shows the newest notes.
+//
+// `default.txt` is NOT generated: it is the hand-maintained fallback text
+// the stores show for a versionCode without its own changelog entry, living
+// as a regular file alongside the links (docs/release.md changelog-files
+// step).
 //
 // Every generated file is a relative symlink to the authoring file: the
 // notes exist once, in each locale, and stay in sync by construction. The
@@ -54,8 +57,6 @@ const Map<String, int> abiCodes = {
 /// The metadata root the script operates on, relative to the repository
 /// root.
 const String fdroidMetadataRoot = 'fastlane/metadata/android';
-
-const String defaultChangelogName = 'default.txt';
 
 /// Parsed `version: X.Y.Z+N` line from pubspec.yaml.
 ({String versionName, int versionCode}) parsePubspecVersion(
@@ -133,9 +134,9 @@ void rejectForeignNumericFiles(
     }
     throw ChangelogLinksException(
       'unowned numeric changelog file: ${entity.path} — the all-digits '
-      'names are generated-only (the per-ABI versionCodes plus '
-      '$defaultChangelogName), and no pending versionCode claims this '
-      'name. Resolve it by hand (this script never deletes data).',
+      'names are generated-only (the per-ABI versionCodes), and no pending '
+      'versionCode claims this name. Resolve it by hand (this script never '
+      'deletes data).',
     );
   }
 }
@@ -163,12 +164,8 @@ void run(List<String> arguments) {
   final generatedNames = [
     for (final entry in abiCodes.entries)
       '${version.versionCode * 10 + entry.value}.txt',
-    defaultChangelogName,
   ];
-  final expectedNumericNames = {
-    for (final name in generatedNames)
-      if (RegExp(r'^\d+\.txt$').hasMatch(name)) name,
-  };
+  final expectedNumericNames = generatedNames.toSet();
 
   final metadataRoot = Directory('${root.path}/$fdroidMetadataRoot');
   if (!metadataRoot.existsSync()) {

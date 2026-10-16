@@ -167,6 +167,7 @@ class HandoffManifest {
     required this.versionCodeBase,
     required this.runId,
     required this.headSha,
+    required this.defaultChangelogOnly,
   });
 
   /// The release tag the signing run was pointed at: `vX.Y.Z`.
@@ -187,6 +188,13 @@ class HandoffManifest {
   /// `gh release create --target` needs.
   final String headSha;
 
+  /// Whether the changelog-files gate ran in default-changelog-only mode
+  /// (minor-release run: only the hand-maintained `default.txt` verified).
+  /// Staged by `tool/download_and_sign.dart` from its CLI flag and read as
+  /// authoritative by `tool/publish_release.dart`, so the two helpers
+  /// cannot disagree about the gate scope.
+  final bool defaultChangelogOnly;
+
   @override
   bool operator ==(Object other) =>
       other is HandoffManifest &&
@@ -194,11 +202,18 @@ class HandoffManifest {
       other.versionName == versionName &&
       other.versionCodeBase == versionCodeBase &&
       other.runId == runId &&
-      other.headSha == headSha;
+      other.headSha == headSha &&
+      other.defaultChangelogOnly == defaultChangelogOnly;
 
   @override
-  int get hashCode =>
-      Object.hash(tag, versionName, versionCodeBase, runId, headSha);
+  int get hashCode => Object.hash(
+    tag,
+    versionName,
+    versionCodeBase,
+    runId,
+    headSha,
+    defaultChangelogOnly,
+  );
 }
 
 /// The staged path of [HandoffManifest] relative to the repository root.
@@ -206,13 +221,15 @@ const String handoffManifestPath = '$ghReleaseStagingDir/source.json';
 
 /// Encodes [manifest] as the settled JSON shape ([jsonEncode] of a map
 /// literal — the declared field order is stable):
-/// `{"tag","versionName","versionCodeBase","runId","headSha"}`.
+/// `{"tag","versionName","versionCodeBase","runId","headSha",
+/// "defaultChangelogOnly"}`.
 String encodeHandoffManifest(HandoffManifest manifest) => jsonEncode({
   'tag': manifest.tag,
   'versionName': manifest.versionName,
   'versionCodeBase': manifest.versionCodeBase,
   'runId': manifest.runId,
   'headSha': manifest.headSha,
+  'defaultChangelogOnly': manifest.defaultChangelogOnly,
 });
 
 /// Decodes + validates a handoff manifest. Loud on anything unusable: a
@@ -233,14 +250,16 @@ HandoffManifest decodeHandoffManifest(String source) {
   if (decoded is! Map) {
     throw ReleaseToolException(
       'the handoff manifest must be a JSON object with the fields "tag", '
-      '"versionName", "versionCodeBase", "runId", "headSha".',
+      '"versionName", "versionCodeBase", "runId", "headSha", '
+      '"defaultChangelogOnly".',
     );
   }
   String stringField(String key) {
     if (!decoded.containsKey(key)) {
       throw ReleaseToolException(
         'handoff manifest field "$key" is missing — wanted '
-        '{"tag","versionName","versionCodeBase","runId","headSha"}.',
+        '{"tag","versionName","versionCodeBase","runId","headSha",'
+        '"defaultChangelogOnly"}.',
       );
     }
     final value = decoded[key];
@@ -257,7 +276,8 @@ HandoffManifest decodeHandoffManifest(String source) {
     if (!decoded.containsKey(key)) {
       throw ReleaseToolException(
         'handoff manifest field "$key" is missing — wanted '
-        '{"tag","versionName","versionCodeBase","runId","headSha"}.',
+        '{"tag","versionName","versionCodeBase","runId","headSha",'
+        '"defaultChangelogOnly"}.',
       );
     }
     final value = decoded[key];
@@ -270,11 +290,30 @@ HandoffManifest decodeHandoffManifest(String source) {
     return value;
   }
 
+  bool boolField(String key) {
+    if (!decoded.containsKey(key)) {
+      throw ReleaseToolException(
+        'handoff manifest field "$key" is missing — wanted '
+        '{"tag","versionName","versionCodeBase","runId","headSha",'
+        '"defaultChangelogOnly"}.',
+      );
+    }
+    final value = decoded[key];
+    if (value is! bool) {
+      throw ReleaseToolException(
+        'handoff manifest field "$key" must be a bool '
+        '(got ${value.runtimeType} — wanted: defaultChangelogOnly).',
+      );
+    }
+    return value;
+  }
+
   final tag = stringField('tag');
   final versionName = stringField('versionName');
   final versionCodeBase = intField('versionCodeBase');
   final runId = intField('runId');
   final headSha = stringField('headSha');
+  final defaultChangelogOnly = boolField('defaultChangelogOnly');
 
   if (!isValidReleaseTag(tag)) {
     throw ReleaseToolException(
@@ -307,6 +346,7 @@ HandoffManifest decodeHandoffManifest(String source) {
     versionCodeBase: versionCodeBase,
     runId: runId,
     headSha: headSha,
+    defaultChangelogOnly: defaultChangelogOnly,
   );
 }
 
@@ -351,16 +391,26 @@ String? parsePinFile(String pinFileContent) {
 /// repository root (same tree tool/fdroid_changelog_links.dart links).
 const String fdroidMetadataPath = 'fastlane/metadata/android';
 
+/// The hand-maintained fallback text every locale carries as a regular
+/// file: what a store shows for a versionCode without its own changelog
+/// entry (docs/release.md changelog-files step).
+const String defaultChangelogName = 'default.txt';
+
 /// The changelog names one complete locale must carry at a commit:
 /// `<versionName>.txt` (the authoring file), the three per-ABI versionCode
-/// links, and the `default.txt` fallback link.
+/// links, and the [defaultChangelogName] fallback file. A minor release
+/// ([defaultChangelogOnly]) ships no versionCode-specific entries — the
+/// fallback file is the whole set.
 List<String> expectedChangelogFiles({
   required String versionName,
   required int versionCodeBase,
+  required bool defaultChangelogOnly,
 }) => [
-  '$versionName.txt',
-  for (final abi in releaseAbis) '${versionCodeBase * 10 + abiCodes[abi]!}.txt',
-  'default.txt',
+  if (!defaultChangelogOnly) '$versionName.txt',
+  if (!defaultChangelogOnly)
+    for (final abi in releaseAbis)
+      '${versionCodeBase * 10 + abiCodes[abi]!}.txt',
+  defaultChangelogName,
 ];
 
 /// The process layer the Git Trees/Blobs answers run through. Injectable so
@@ -485,13 +535,16 @@ String _rawPreview(String apiOutput) =>
 /// changelog file set for the release ([versionName] / [versionCodeBase])
 /// — see [expectedChangelogFiles]. Verified by commit shape: each generated
 /// name must be a symlink (git mode `120000`) whose blob resolves to the
-/// `<versionName>.txt` filename; the authoring file itself must be a
-/// regular-file blob (git mode `100644`). Prints one ok line per locale through
+/// `<versionName>.txt` filename; the authoring file and default.txt must be
+/// regular-file blobs (git mode `100644`). A minor release (set
+/// [defaultChangelogOnly]) narrows the requirement to default.txt only.
+/// Prints one ok line per locale through
 /// [sink]; throws [ReleaseToolException] naming every gap plus the fix path
 /// otherwise.
 Future<void> requireChangelogFiles({
   required String versionName,
   required int versionCodeBase,
+  required bool defaultChangelogOnly,
   required String headSha,
   GhApiRunner? ghApiRunner,
   void Function(String line)? sink,
@@ -501,6 +554,7 @@ Future<void> requireChangelogFiles({
   final expected = expectedChangelogFiles(
     versionName: versionName,
     versionCodeBase: versionCodeBase,
+    defaultChangelogOnly: defaultChangelogOnly,
   );
   final authoringFileName = '$versionName.txt';
 
@@ -570,6 +624,17 @@ Future<void> requireChangelogFiles({
         }
         continue;
       }
+      if (name == defaultChangelogName) {
+        if (entry.mode != '100644') {
+          problems.add(
+            '$locale: ${entry.path} has git mode ${entry.mode} instead of '
+            'a regular-file blob (100644) — default.txt is the '
+            'hand-maintained fallback text; fix or replace it by hand, not '
+            'with tool/fdroid_changelog_links.dart.',
+          );
+        }
+        continue;
+      }
       if (entry.mode == '100644') {
         problems.add(
           '$locale: $name is a regular file — remove or rename it by hand, '
@@ -593,10 +658,7 @@ Future<void> requireChangelogFiles({
       }
     }
     if (!problems.any((problem) => problem.startsWith('$locale:'))) {
-      out(
-        'changelog files at $headSha: $locale ok '
-        '(${expected.where((n) => n != 'default.txt').join(' ')})',
-      );
+      out('changelog files at $headSha: $locale ok (${expected.join(' ')})');
     }
   }
   if (problems.isNotEmpty) {
@@ -604,10 +666,14 @@ Future<void> requireChangelogFiles({
       'the F-Droid changelog files for $versionName (versionCode base '
       '$versionCodeBase) are not correct at commit $headSha:\n'
       '${problems.map((problem) => '  $problem').join('\n')}\n'
-      'Fix path: run `dart run tool/fdroid_changelog_links.dart` on the '
-      'release branch (its authoring file is what these links point at), '
-      'commit, wait for the new CI run, then re-run this helper — the '
-      '--run-id re-attach flow composes with the new run.',
+      'Fix path: repair the flagged files on the release branch (the '
+      'per-ABI links with `dart run tool/fdroid_changelog_links.dart`, the '
+      'authoring file and default.txt by hand), commit, wait for the new '
+      'CI run, then re-run this helper — the --run-id re-attach flow '
+      'composes with the new run. A minor release that ships only the '
+      'default changelog skips the authoring file and per-ABI names: both '
+      'release helpers accept --default-changelog-only and the handoff '
+      'manifest carries that decision.',
     );
   }
 }
