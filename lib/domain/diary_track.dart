@@ -7,10 +7,11 @@
 /// a later item joins by adding one enum value, one field and one decoder
 /// default here. A stored map missing a later-added key decodes to the new
 /// item's default; unknown item keys are ignored.
-enum DiaryItem { mucus, cervix, sex, pain }
+enum DiaryItem { temperature, mucus, cervix, sex, pain }
 
 final class DiaryTrack {
   const DiaryTrack({
+    this.temperature = true,
     this.mucus = true,
     this.cervix = false,
     this.sex = true,
@@ -19,12 +20,14 @@ final class DiaryTrack {
 
   static const DiaryTrack defaults = DiaryTrack();
 
+  final bool temperature;
   final bool mucus;
   final bool cervix;
   final bool sex;
   final bool pain;
 
   bool isTracked(DiaryItem item) => switch (item) {
+    DiaryItem.temperature => temperature,
     DiaryItem.mucus => mucus,
     DiaryItem.cervix => cervix,
     DiaryItem.sex => sex,
@@ -34,25 +37,36 @@ final class DiaryTrack {
   /// A copy with exactly one item's tracking flipped — the write the
   /// settings card's switches issue.
   DiaryTrack withTracked(DiaryItem item, bool tracked) => switch (item) {
+    DiaryItem.temperature => DiaryTrack(
+      temperature: tracked,
+      mucus: mucus,
+      cervix: cervix,
+      sex: sex,
+      pain: pain,
+    ),
     DiaryItem.mucus => DiaryTrack(
+      temperature: temperature,
       mucus: tracked,
       cervix: cervix,
       sex: sex,
       pain: pain,
     ),
     DiaryItem.cervix => DiaryTrack(
+      temperature: temperature,
       mucus: mucus,
       cervix: tracked,
       sex: sex,
       pain: pain,
     ),
     DiaryItem.sex => DiaryTrack(
+      temperature: temperature,
       mucus: mucus,
       cervix: cervix,
       sex: tracked,
       pain: pain,
     ),
     DiaryItem.pain => DiaryTrack(
+      temperature: temperature,
       mucus: mucus,
       cervix: cervix,
       sex: sex,
@@ -70,6 +84,7 @@ final class DiaryTrack {
   /// missing or mistyped items fall back item-by-item to their defaults,
   /// unknown keys (a newer app version's items) are ignored.
   static DiaryTrack fromJson(Map<String, Object?> json) => DiaryTrack(
+    temperature: _boolOr(json['temperature'], true),
     mucus: _boolOr(json['mucus'], true),
     cervix: _boolOr(json['cervix'], false),
     sex: _boolOr(json['sex'], true),
@@ -82,11 +97,12 @@ final class DiaryTrack {
   @override
   bool operator ==(Object other) =>
       other is DiaryTrack &&
+      other.temperature == temperature &&
       other.mucus == mucus &&
       other.cervix == cervix &&
       other.sex == sex &&
       other.pain == pain;
 
   @override
-  int get hashCode => Object.hash(mucus, cervix, sex, pain);
+  int get hashCode => Object.hash(temperature, mucus, cervix, sex, pain);
 }

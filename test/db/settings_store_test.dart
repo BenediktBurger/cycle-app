@@ -389,7 +389,7 @@ void main() {
       await store.persistDiaryTrack(tracked);
       expect(
         await db.settingsDao.readValue(SettingKeys.diaryTrack),
-        '{"mucus":false,"cervix":true,"sex":false,"pain":true}',
+        '{"temperature":true,"mucus":false,"cervix":true,"sex":false,"pain":true}',
         reason: 'the value column stores the JSON map, exactly',
       );
       final snapshot = await store.load();
@@ -445,6 +445,24 @@ void main() {
         reason: 'a stored map predating the pain item keeps pain visible',
       );
     });
+
+    test(
+      'a pre-temperature row without the temperature key decodes temperature '
+      'tracked',
+      () async {
+        await seedRaw(
+          SettingKeys.diaryTrack,
+          '{"mucus":false,"cervix":true,"sex":false,"pain":true}',
+        );
+        expect(
+          (await store.load()).diaryTrack.temperature,
+          isTrue,
+          reason:
+              'a stored map predating the temperature item keeps the '
+              'temperature section visible',
+        );
+      },
+    );
 
     test('a partially typed row keeps its valid items', () async {
       await seedRaw(SettingKeys.diaryTrack, '{"cervix":true,"sex":false}');

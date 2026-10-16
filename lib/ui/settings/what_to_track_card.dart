@@ -44,6 +44,7 @@ final class WhatToTrackCard extends ConsumerWidget {
   }
 
   String _itemLabel(DiaryItem item, AppLocalizations l10n) => switch (item) {
+    DiaryItem.temperature => l10n.temperature,
     DiaryItem.mucus => l10n.settingsTrackMucus,
     DiaryItem.cervix => l10n.settingsTrackCervix,
     DiaryItem.sex => l10n.settingsTrackSex,

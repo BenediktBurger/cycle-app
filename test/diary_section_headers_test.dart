@@ -154,6 +154,12 @@ void main() {
   group('untracked sections hide with their headers', () {
     final cases = [
       (
+        'temperature',
+        const DiaryTrack(temperature: false),
+        _temperatureHeader,
+        const ValueKey('diaryTemperatureField'),
+      ),
+      (
         'mucus',
         const DiaryTrack(mucus: false),
         _mucusHeader,
