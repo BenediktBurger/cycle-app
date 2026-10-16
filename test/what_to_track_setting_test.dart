@@ -50,6 +50,26 @@ void main() {
         isTrue,
         reason: 'pain defaults to tracked',
       );
+      const temperatureSwitch = ValueKey('trackSwitch-temperature');
+      expect(
+        find.byKey(temperatureSwitch),
+        findsOneWidget,
+        reason: 'the card renders the temperature switch',
+      );
+      expect(
+        switchState(tester, DiaryItem.temperature),
+        isTrue,
+        reason: 'temperature defaults to tracked',
+      );
+      expect(
+        tester.getTopLeft(find.byKey(temperatureSwitch)).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const ValueKey('trackSwitch-mucus'))).dy,
+        ),
+        reason:
+            'temperature is the first switch on the card, matching the '
+            'diary form section order',
+      );
     });
   });
 
@@ -79,6 +99,7 @@ void main() {
 
       final store = SettingsStore(db!.settingsDao);
       expect(await store.readSetting(SettingKeys.diaryTrack), {
+        'temperature': true,
         'mucus': false,
         'cervix': true,
         'sex': true,
@@ -96,6 +117,7 @@ void main() {
       Future<void> seed(CycleDatabase db) =>
           SettingsStore(db.settingsDao).persistDiaryTrack(
             const DiaryTrack(
+              temperature: false,
               mucus: false,
               cervix: true,
               sex: false,
@@ -109,6 +131,7 @@ void main() {
       await tester.tap(navLabel('Einstellungen'));
       await tester.pumpAndSettle();
 
+      expect(switchState(tester, DiaryItem.temperature), isFalse);
       expect(switchState(tester, DiaryItem.mucus), isFalse);
       expect(switchState(tester, DiaryItem.cervix), isTrue);
       expect(switchState(tester, DiaryItem.sex), isFalse);
