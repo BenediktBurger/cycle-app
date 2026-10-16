@@ -62,11 +62,16 @@ import 'release_names.dart';
 const String prBaseBranch = 'main';
 
 const String usage =
-    'usage: dart run tool/publish_release.dart vX.Y.Z [--dry-run]';
+    'usage: dart run tool/publish_release.dart vX.Y.Z [--dry-run] '
+    '[--default-changelog-only]';
 
 /// Parsed command line.
 class Options {
-  const Options({required this.tag, required this.dryRun});
+  const Options({
+    required this.tag,
+    required this.dryRun,
+    required this.defaultChangelogOnly,
+  });
 
   /// The release tag, `vX.Y.Z` — must agree with the handoff manifest's tag.
   final String tag;
@@ -75,6 +80,13 @@ class Options {
   /// per-APK checksums, and every would-be `gh` command — and stops before
   /// anything mutates the release or opens PRs.
   final bool dryRun;
+
+  /// Minor-release agreement flag (`--default-changelog-only`): the flag is
+  /// NOT the authoritative source — the handoff manifest's
+  /// `defaultChangelogOnly` decides the gate scope. The flag only has to
+  /// AGREE: flag + manifest-false aborts loudly; manifest-true runs the
+  /// narrowed gate with or without the flag.
+  final bool defaultChangelogOnly;
 }
 
 /// Validates and normalizes the command line. Pure — throws [UsageException]
@@ -84,11 +96,14 @@ class Options {
 Options parseArguments(List<String> arguments) {
   String? tag;
   var dryRun = false;
+  var defaultChangelogOnly = false;
 
   for (final argument in arguments) {
     switch (argument) {
       case '--dry-run':
         dryRun = true;
+      case '--default-changelog-only':
+        defaultChangelogOnly = true;
       default:
         if (argument.startsWith('-')) {
           throw UsageException('unknown flag: $argument', usage: usage);
@@ -112,7 +127,11 @@ Options parseArguments(List<String> arguments) {
       usage: usage,
     );
   }
-  return Options(tag: tag, dryRun: dryRun);
+  return Options(
+    tag: tag,
+    dryRun: dryRun,
+    defaultChangelogOnly: defaultChangelogOnly,
+  );
 }
 
 // --- plumbing -------------------------------------------------------------------
@@ -566,6 +585,41 @@ Future<void> runPublishRelease(
     '`dart run tool/download_and_sign.dart`; docs/release.md).',
   );
 
+  // --- stage 1: consume build/gh-release loudly ----------------------------
+  // BEFORE any gh call: the gate scope and the tag identity come from this
+  // file, so a mismatch must fail before even `gh auth status`.
+  final manifest = consumeStagedRelease(
+    root: repoRoot,
+    tag: tag,
+    printer: printer,
+  );
+  if (options.defaultChangelogOnly && !manifest.defaultChangelogOnly) {
+    throw UsageException(
+      'the staging says this was NOT a --default-changelog-only signing '
+      'run: $handoffManifestPath carries defaultChangelogOnly=false, but '
+      'the publish invocation passed the flag — a full-release gate '
+      '(authoring file + per-ABI links) ran during downloading and '
+      'signing. Abort here instead of publishing with a misstated gate: '
+      'rerun tool/download_and_sign.dart with the flag for a genuine '
+      'minor release, or drop it to publish the full-release staging.',
+      usage: usage,
+    );
+  }
+  out(
+    'handoff manifest resolved: tag=${manifest.tag} '
+    'versionName=${manifest.versionName} '
+    'versionCodeBase=${manifest.versionCodeBase} runId=${manifest.runId} '
+    'headSha=${manifest.headSha} '
+    'defaultChangelogOnly=${manifest.defaultChangelogOnly}',
+  );
+  if (manifest.defaultChangelogOnly) {
+    out(
+      'default-changelog-only: the changelog gate verifies only the '
+      'hand-maintained default.txt per locale — the manifest carries this '
+      'decision from tool/download_and_sign.dart.',
+    );
+  }
+
   // --- preconditions ---------------------------------------------
   out('preconditions …');
   final authStatus = await runGh(['auth', 'status']);
@@ -580,26 +634,15 @@ Future<void> runPublishRelease(
   }
   out('gh auth: authenticated');
 
-  // --- stage 1: consume build/gh-release loudly ----------------------------
-  final manifest = consumeStagedRelease(
-    root: repoRoot,
-    tag: tag,
-    printer: printer,
-  );
-  out(
-    'handoff manifest resolved: tag=${manifest.tag} '
-    'versionName=${manifest.versionName} '
-    'versionCodeBase=${manifest.versionCodeBase} runId=${manifest.runId} '
-    'headSha=${manifest.headSha}',
-  );
-
   // F-Droid requires one changelog file per shipped per-ABI versionCode
   // (N*10 + abiCode); re-verified at the manifest's head commit before
-  // anything is created or attached.
+  // anything is created or attached. The manifest's defaultChangelogOnly
+  // narrows this to default.txt-only for a minor release.
   out("verifying the changelog files at the run's commit …");
   await requireChangelogFiles(
     versionName: manifest.versionName,
     versionCodeBase: manifest.versionCodeBase,
+    defaultChangelogOnly: manifest.defaultChangelogOnly,
     headSha: manifest.headSha,
     ghApiRunner: runGh,
     sink: out,

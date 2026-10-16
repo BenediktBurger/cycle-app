@@ -1,5 +1,6 @@
 // Release helper 1 of 2 (docs/release.md's local half, everything through
-// signing): `dart run tool/download_and_sign.dart vX.Y.Z [--run-id <id>]`.
+// signing): `dart run tool/download_and_sign.dart vX.Y.Z [--run-id <id>]
+// [--default-changelog-only]`.
 //
 // It resolves the Release workflow run (a push of a release/** branch —
 // convention release/v<semver> — or a workflow_dispatch starts the CI build;
@@ -116,11 +117,16 @@ const String ciArtifactsDir = 'build/ci-artifacts';
 const int maxApksignerBuildToolsMajor = 34;
 
 const String usage =
-    'usage: dart run tool/download_and_sign.dart vX.Y.Z [--run-id <id>]';
+    'usage: dart run tool/download_and_sign.dart vX.Y.Z '
+    '[--run-id <id>] [--default-changelog-only]';
 
 /// Parsed command line.
 class Options {
-  const Options({required this.tag, required this.runId});
+  const Options({
+    required this.tag,
+    required this.runId,
+    required this.defaultChangelogOnly,
+  });
 
   /// The release tag, `vX.Y.Z`.
   final String tag;
@@ -129,6 +135,12 @@ class Options {
   /// and downloads from exactly this run (e.g. a re-run whose artifact set
   /// is the intended one — the v0.2.1 re-attach path).
   final int? runId;
+
+  /// Minor-release mode (`--default-changelog-only`): the changelog gate
+  /// verifies only the hand-maintained `default.txt` per locale — the
+  /// authoring file and per-ABI links are absent by design. The value
+  /// travels into the handoff manifest so publish inherits it.
+  final bool defaultChangelogOnly;
 }
 
 /// Validates and normalizes the command line. Pure — throws [UsageException]
@@ -138,10 +150,13 @@ class Options {
 Options parseArguments(List<String> arguments) {
   String? tag;
   int? runId;
+  var defaultChangelogOnly = false;
 
   for (var i = 0; i < arguments.length; i++) {
     final argument = arguments[i];
     switch (argument) {
+      case '--default-changelog-only':
+        defaultChangelogOnly = true;
       case '--run-id':
         if (i + 1 >= arguments.length) {
           throw UsageException(
@@ -184,7 +199,11 @@ Options parseArguments(List<String> arguments) {
       usage: usage,
     );
   }
-  return Options(tag: tag, runId: runId);
+  return Options(
+    tag: tag,
+    runId: runId,
+    defaultChangelogOnly: defaultChangelogOnly,
+  );
 }
 
 // --- CI artifact names (this helper only) --------------------------------------
@@ -991,11 +1010,19 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
 
   // F-Droid requires one changelog file per shipped per-ABI versionCode
   // (N*10 + abiCode); verified at this same commit, before any download
-  // or signing.
+  // or signing. A minor release (options.defaultChangelogOnly) ships no
+  // versionCode-specific entries — only default.txt is verified.
+  if (options.defaultChangelogOnly) {
+    print(
+      'minor-release mode: the changelog gate verifies only '
+      'default.txt per locale (--default-changelog-only).',
+    );
+  }
   print("verifying the changelog files at the run's commit …");
   await requireChangelogFiles(
     versionName: versionName,
     versionCodeBase: runPubspec.build,
+    defaultChangelogOnly: options.defaultChangelogOnly,
     headSha: headSha,
   );
 
@@ -1289,6 +1316,7 @@ Future<void> runDownloadAndSign(List<String> arguments) async {
       versionCodeBase: runPubspec.build,
       runId: runId,
       headSha: headSha,
+      defaultChangelogOnly: options.defaultChangelogOnly,
     ),
   );
   print('handoff manifest written: $handoffManifestPath');

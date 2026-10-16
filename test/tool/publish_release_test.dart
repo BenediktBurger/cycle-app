@@ -24,6 +24,7 @@ import 'release_fixtures.dart'
         badTagList,
         changelogGateFixture,
         changelogGateRunner,
+        manifestJsonRaw,
         pinnedReleaseFingerprint,
         validHeadSha,
         validManifestJson;
@@ -89,6 +90,16 @@ void main() {
         () => publish.parseArguments(['v1.2.3', 'v2.0.0']),
         throwsA(isA<UsageException>()),
       );
+    });
+
+    test('accepts --default-changelog-only (the minor-release agreement '
+        'flag) and defaults to off without it', () {
+      final options = publish.parseArguments([
+        'v1.2.3',
+        '--default-changelog-only',
+      ]);
+      expect(options.defaultChangelogOnly, isTrue);
+      expect(publish.parseArguments(['v1.2.3']).defaultChangelogOnly, isFalse);
     });
   });
 
@@ -740,6 +751,7 @@ void main() {
     /// cannot pass silently.
     Future<ProcessResult> Function(List<String>) ghFixture({
       required String releaseViewResult, // 'missing' | 'present'
+      bool changelogOnlyGate = false,
       int createExit = 0,
       int uploadExit = 0,
       int editExit = 0,
@@ -759,6 +771,20 @@ void main() {
           // resolves each changelog symlink's target blob.
           const authoringName = '0.2.1.txt';
           const linkNames = ['31.txt', '32.txt', '33.txt', 'default.txt'];
+          if (changelogOnlyGate) {
+            return changelogGateRunner(
+              changelogGateFixture(
+                targets: {
+                  for (final locale in const ['de-DE', 'en-US'])
+                    locale: const {'default.txt': 'fallback text'},
+                },
+                authoringName: authoringName,
+                linkNames: const ['default.txt'],
+                includeAuthoringEntry: false,
+                regularNames: const {'default.txt'},
+              ),
+            )(arguments);
+          }
           return changelogGateRunner(
             changelogGateFixture(
               targets: {
@@ -767,6 +793,7 @@ void main() {
               },
               authoringName: authoringName,
               linkNames: linkNames,
+              regularNames: const {'default.txt'},
             ),
           )(arguments);
         }
@@ -1041,6 +1068,80 @@ void main() {
         () => publish.pinnedFingerprintForNotes(pinFileContent: 'nope'),
         throwsA(isA<ReleaseToolException>()),
       );
+    });
+
+    group('default-changelog-only flow (the manifest is authoritative)', () {
+      /// stageHappyTree() with the manifest rewritten to carry the given
+      /// `defaultChangelogOnly` value.
+      void stageTreeWithManifest({required bool defaultChangelogOnly}) {
+        stageHappyTree();
+        File('${root.path}/$handoffManifestPath').writeAsStringSync(
+          '${manifestJsonRaw(tag: '"v0.2.1"', versionName: '"0.2.1"', versionCodeBase: '3', runId: '1234567890', headSha: '"$validHeadSha"', defaultChangelogOnly: '$defaultChangelogOnly')}\n',
+        );
+      }
+
+      test(
+        'CLI flag + manifest false is a loud exit BEFORE any gh call',
+        () async {
+          stageHappyTree();
+          Object? caught;
+          try {
+            await publish.runPublishRelease(
+              ['v0.2.1', '--default-changelog-only'],
+              root: root,
+              ghRunner: ghFixture(releaseViewResult: 'missing'),
+              sha256Runner: fakeSha256Runner,
+              printer: (_) {},
+            );
+          } on UsageException catch (error) {
+            caught = error;
+          }
+          expect(caught, isNotNull, reason: 'the mismatch must abort loudly');
+          expect(ghInvocations, isEmpty);
+        },
+      );
+
+      test('manifest true without the CLI flag proceeds in skip mode with '
+          'the info line', () async {
+        stageTreeWithManifest(defaultChangelogOnly: true);
+        final lines = <String>[];
+        await publish.runPublishRelease(
+          ['v0.2.1', '--dry-run'],
+          root: root,
+          ghRunner: ghFixture(
+            releaseViewResult: 'missing',
+            changelogOnlyGate: true,
+          ),
+          sha256Runner: fakeSha256Runner,
+          printer: lines.add,
+        );
+        final output = lines.join('\n');
+        expect(
+          output,
+          contains('default-changelog-only'),
+          reason: 'the run says which gate scope the manifest drove',
+        );
+        expect(output, contains('handoff manifest resolved:'));
+        expect(output, contains('dry run complete'));
+      });
+
+      test('CLI flag + manifest true: both agree, skip mode runs', () async {
+        stageTreeWithManifest(defaultChangelogOnly: true);
+        final lines = <String>[];
+        await publish.runPublishRelease(
+          ['v0.2.1', '--dry-run', '--default-changelog-only'],
+          root: root,
+          ghRunner: ghFixture(
+            releaseViewResult: 'missing',
+            changelogOnlyGate: true,
+          ),
+          sha256Runner: fakeSha256Runner,
+          printer: lines.add,
+        );
+        final output = lines.join('\n');
+        expect(output, contains('default-changelog-only'));
+        expect(output, contains('dry run complete'));
+      });
     });
   });
 }

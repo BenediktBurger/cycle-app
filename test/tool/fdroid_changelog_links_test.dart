@@ -20,9 +20,13 @@ import '../../tool/fdroid_changelog_links.dart';
 /// android/app/build.gradle.kts).
 const fixedPubspec = 'name: cycle_app\nversion: 0.2.5+7\n';
 
-/// The link names each locale's changelog dir must carry for a released
-/// 0.2.5+7: one per ABI versionCode plus the unlisted-build fallback.
-const generatedNames = {'71.txt', '72.txt', '73.txt', 'default.txt'};
+/// The link names each locale's changelog dir must carry as generated
+/// symlinks for a released 0.2.5+7: one per ABI versionCode.
+const generatedNames = {'71.txt', '72.txt', '73.txt'};
+
+/// The hand-maintained default fallback text present in every locale, kept
+/// out of the script's generated name space.
+const defaultFallbackName = 'default.txt';
 
 const baseLocales = ['de-DE', 'en-US'];
 
@@ -122,6 +126,9 @@ void main() {
             '${dir.path}/$authoringName',
           ).writeAsStringSync('notes for $locale\n');
         }
+        File(
+          '${dir.path}/$defaultFallbackName',
+        ).writeAsStringSync('default fallback text for $locale\n');
       }
     }
 
@@ -129,8 +136,9 @@ void main() {
     /// lines.
     List<String> runLinks() => capturePrint(() => run([root.path]));
 
-    test('a fresh tree gets the three per-ABI links plus default.txt as '
-        'relative symlinks to the authoring file of each locale', () {
+    test('a fresh tree gets the three per-ABI links as relative symlinks to '
+        'the authoring file of each locale and leaves the default fallback '
+        'text alone', () {
       stageTree();
       final lines = runLinks();
 
@@ -157,6 +165,22 @@ void main() {
                 'relative form the store resolves inside that locale',
           );
         }
+        expect(
+          FileSystemEntity.typeSync(
+            '${dir.path}/$defaultFallbackName',
+            followLinks: false,
+          ),
+          FileSystemEntityType.file,
+          reason:
+              '$locale/$defaultFallbackName is the hand-maintained fallback '
+              'text, not a generated name — the run must not touch it',
+        );
+        expect(
+          File('${dir.path}/$defaultFallbackName').readAsStringSync(),
+          'default fallback text for $locale\n',
+          reason: 'the staged default text must survive the run byte-identical',
+        );
+        expect(output, isNot(contains(defaultFallbackName)), reason: output);
         expect(
           File('${dir.path}/71.txt').readAsStringSync(),
           'notes for $locale\n',
@@ -201,13 +225,6 @@ void main() {
         output,
         contains(
           'ok: $fdroidMetadataRoot/de-DE/changelogs/71.txt -> $authoringName',
-        ),
-      );
-      expect(
-        output,
-        contains(
-          'ok: $fdroidMetadataRoot/en-US/changelogs/default.txt -> '
-          '$authoringName',
         ),
       );
     });

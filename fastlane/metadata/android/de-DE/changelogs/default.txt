@@ -1,1 +1,2 @@
-0.3.0.txt
+- Kleinere Korrekturen und Verbesserungen
+- Euer Feedback fließt in jedes Update ein – danke dafür

@@ -39,6 +39,7 @@ String manifestJsonRaw({
   String? versionCodeBase,
   String? runId,
   String? headSha,
+  String? defaultChangelogOnly,
 }) {
   final fields = <String>[
     if (tag != null) '"tag":$tag',
@@ -46,6 +47,8 @@ String manifestJsonRaw({
     if (versionCodeBase != null) '"versionCodeBase":$versionCodeBase',
     if (runId != null) '"runId":$runId',
     if (headSha != null) '"headSha":$headSha',
+    if (defaultChangelogOnly != null)
+      '"defaultChangelogOnly":$defaultChangelogOnly',
   ];
   return '{${fields.join(',')}}';
 }
@@ -57,6 +60,7 @@ String validManifestJson() => manifestJsonRaw(
   versionCodeBase: '3',
   runId: '1234567890',
   headSha: '"$validHeadSha"',
+  defaultChangelogOnly: 'false',
 );
 
 /// Builds the recursive Git Trees fixture the changelog-files gate requests
@@ -66,12 +70,15 @@ String validManifestJson() => manifestJsonRaw(
 /// non-null target in that locale's map becomes a symlink entry (mode
 /// 120000) whose blob decodes to the given filename — unless the name is in
 /// [regularNames], where it is committed as a regular file (mode 100644).
-/// Blob shas stay unique per locale so a caller fetching one locale's blob
-/// can never be answered by another's.
+/// [includeAuthoringEntry] drops the authoring blob itself, for the
+/// default-changelog-only trees whose gate must not require the authoring
+/// file. Blob shas stay unique per locale so a caller fetching one
+/// locale's blob can never be answered by another's.
 ({String tree, Map<String, String> blobs}) changelogGateFixture({
   required String authoringName,
   required List<String> linkNames,
   required Map<String, Map<String, String>> targets,
+  bool includeAuthoringEntry = true,
   String authoringMode = '100644',
   Set<String> regularNames = const {},
   bool truncated = false,
@@ -84,10 +91,12 @@ String validManifestJson() => manifestJsonRaw(
       '"type":"tree","sha":"tree-$locale"}',
     );
     final prefix = '$fdroidMetadataPath/$locale/changelogs/';
-    entries.add(
-      '{"path":"$prefix$authoringName","mode":"$authoringMode",'
-      '"type":"blob","sha":"sha-$locale-authoring"}',
-    );
+    if (includeAuthoringEntry) {
+      entries.add(
+        '{"path":"$prefix$authoringName","mode":"$authoringMode",'
+        '"type":"blob","sha":"sha-$locale-authoring"}',
+      );
+    }
     for (final name in linkNames) {
       final target = names[name];
       if (target == null) continue;

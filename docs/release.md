@@ -109,20 +109,18 @@ the gitignored `android/key.properties`. **Release builds fail without
 that provisioning**: the Gradle signing gate raises instead of ever
 signing a release artifact with the debug key. The one opt-in is
 `-PallowDebugSigning` (the release workflow's CI build passes it —
-see the invariants
-["Keystore never on GitHub"](#keystore-never-on-github) — because the CI
-run has no keystore; its debug key signature blocks are replaced entirely
-by the local apksigner step and never reach the published assets). Any
+["Keystore never on GitHub"](#release-invariants--hard-gates-supporting-detail) explains how a
+keystore-less CI run still produces publishable assets). Any
 other source build without `key.properties` (e.g. a future F-Droid
 buildserver recipe) needs the same explicit opt-in in its Gradle
 invocation.
 
 **Still outstanding before the first signed build:** fill the two literal
 `CHANGE-ME` passwords in `android/key.properties` from the password
-manager. Also check `storeFile`: the signing gate verifies the keystore
-path exists at build time, and the keystore itself lives outside the
-repo (`~/keystores/cycleapp-release.jks`, absolute path in
-`key.properties`). The release certificate fingerprint is pinned in the committed
+manager. Also check `storeFile` in `key.properties`: it must name the
+keystore as an absolute path (outside the repo), and the signing gate
+verifies the path exists at build time. The release certificate
+fingerprint is pinned in the committed
 `tool/release_fingerprint.txt`; the
 [download-and-sign script](#per-release-checklist-every-distribution-update)
 refuses to attach any APK whose certificate does not match that pin (see
@@ -181,8 +179,8 @@ device", for which ABI a device needs).
    enter representative data (bleeding, temperature, marks, journal).
 2. `adb install -r` the new release **over it**.
 3. Verify: journal/chart intact, schema migration ran, export → import
-   round-trip still works (`tool/smoke_export_import.dart` logic mirrors
-   this; the device test is the real-environment proof).
+   round-trip still works (`tool/smoke_export_import.dart` mirrors this
+   logic).
 4. Only then ship.
 
 **Numbers discipline: `version: X.Y.Z+N` in `pubspec.yaml`** — bump `+N`
@@ -217,10 +215,21 @@ for every distributed build (Play and F-Droid see the same versionCode).
    step of the per-release checklist) verifies each split APK's embedded
    versionCode against `N*10 + {1, 2, 3}`.
 - The F-Droid recipe is split-based and anchors the per-ABI APKs, so the
-  store-facing changelog files must exist for every shipped versionCode
-  `N*10 + abiCode` — authored once as `<versionName>.txt` (the
-  changelog-files step) and linked to the numeric names by
-  `tool/fdroid_changelog_links.dart`. Play is exempt on both counts: it
+  store-facing changelog files are matched per shipped versionCode
+  `N*10 + abiCode` when the file exists — authored once as
+  `<versionName>.txt` (the changelog-files step) and linked to the numeric
+  names by `tool/fdroid_changelog_links.dart`. A versionCode with no file
+  of its own shows the hand-maintained `changelogs/default.txt` instead:
+  fastlane supply documents the fallback ("You can also provide default
+  notes that will be used if no files match the version code by adding a
+  `default.txt` file", fastlane supply docs, Changelogs section), and
+  fdroidserver applies it for F-Droid ("Use default.txt as fallback
+  changelog when inserting fastlane metadata", fdroidserver CHANGELOG
+  2.2.0; MR !1240 closing issue
+  [fdroid/fdroidserver#1061](https://gitlab.com/fdroid/fdroidserver/-/issues/1061)).
+  This fallback is what a **minor release** can lean on: skip the
+  authoring file and the links run and ship only default.txt
+  (changelog-files step). Play is exempt on both counts: it
   consumes the AAB whose versionCode is the bare `N`, and its release notes
   travel through a Play-specific metadata tree at upload time — never the
   F-Droid fastlane tree, whose all-digits filenames are F-Droid
@@ -336,29 +345,42 @@ Do **not** start until Android went through Phases B–F at least once.
    Version bump: `version: X.Y.Z+N` in `pubspec.yaml` — always bump the
    versionCode `+N`; change the versionName `X.Y.Z` depending on the
    change — and commit it on the branch. The branch name `release/vX.Y.Z`
-   triggers the Release workflow, the download-and-sign
-   script selects the run by exactly this branch, and it re-checks the
-   requested `X.Y.Z` against pubspec at the run's own commit.
-2. **Changelog files (release notes, manual)** — write the authoring
-   changelog file
+   triggers the Release workflow, and the download-and-sign script selects
+   the run by exactly this branch.
+2. **Changelog files (release notes, manual)** — for a **full (feature)
+   release**, write the authoring changelog file
    `fastlane/metadata/android/<locale>/changelogs/<versionName>.txt`
    (versionName from pubspec, e.g. `0.2.5.txt`) for all locales present
    under `fastlane/metadata/android/`. Content: a short plain-text summary
    of what shipped (keep it ≤ 500 characters) — this file is the F-Droid
-   store changelog and the basis for the Play release notes. The
-   store-facing filenames are versionCodes, so
+   store changelog and the basis for the Play release notes. Next to it,
+   each locale carries the hand-maintained `changelogs/default.txt`, which
+   the stores show for any versionCode without its own file; keep it short
+   like the release entries. The store-facing filenames are versionCodes, so
 
    ```sh
    dart run tool/fdroid_changelog_links.dart
    ```
 
    generates the per-ABI versionCode entries (`N*10 + abiCode`, e.g.
-   `71.txt` for build number 7 and armeabi-v7a) plus `default.txt` as
-   relative symlinks to the authoring file. Skipping this step no longer
+   `71.txt` for build number 7 and armeabi-v7a) as relative symlinks to the
+   authoring file. Skipping this step never
    reaches a tag: the download-and-sign script refuses to run when the
    changelog set is not complete at the run's commit. Store-metadata layout
    context: Phase E step 4 and
    [`fastlane/metadata/android/README.md`](../fastlane/metadata/android/README.md).
+
+   For a **minor release** (bugfix-only, nothing note-worthy per version),
+   skip the authoring file and the links run entirely — each locale's
+   `changelogs/default.txt` is the whole F-Droid changelog set. Run
+   `tool/download_and_sign.dart` with `--default-changelog-only` on the
+   release branch: the changelog gate then verifies only `default.txt` per
+   locale, and the decision travels in the handoff manifest
+   (`defaultChangelogOnly`) — `tool/publish_release.dart` inherits it, so
+   both helpers verify the same (narrowed) set. Do not run
+   `tool/fdroid_changelog_links.dart` in this mode: it requires the
+   authoring file, which is exactly the loud failure that catches an
+   accidental full-release run.
 3. **Push the branch → CI builds unsigned (NO tag exists yet)** —
 
    ```sh
@@ -390,9 +412,12 @@ Do **not** start until Android went through Phases B–F at least once.
    # the script's process harness)
    ```
 
-   This local step performs no builds and no tests — the artifact already
-   passed the CI gate; the script's stages are pure download, validation,
-   and signing. It verifies the changelog files are complete at the run's
+   On a minor release, run the same command with `--default-changelog-only`
+   (mechanics: the changelog-files step).
+
+   The artifact already passed the CI gate, so the script here is pure
+   download, validation, and signing. It verifies the changelog files
+   are complete at the run's
    head commit (GitHub API, loud gate — see the changelog-files step) before
    downloading anything. It downloads the three artifacts, re-checks each
    APK's
@@ -413,9 +438,9 @@ Do **not** start until Android went through Phases B–F at least once.
    never attach; the CI build's debug-signing fallback blocks are gone by
    then), and one APK is signed a second time and compared with the staged
    one everywhere except the signing-block interior (determinism sanity,
-   aborts on any other difference — the release key is EC, and ECDSA
-   randomizes every signature by design, so byte-for-byte equality is not
-   attainable; identical ZIP content still is). Mismatched or corrupt
+   aborts on any other difference — byte-for-byte equality is not
+   attainable given the ECDSA randomization above; identical ZIP content
+   still is). Mismatched or corrupt
    artifacts abort before anything is staged. The script ends by writing
    the handoff manifest `build/gh-release/source.json` (the run id and
    head SHA the publish step will use) and printing the adb install
@@ -429,15 +454,13 @@ Do **not** start until Android went through Phases B–F at least once.
    ```
 
    Run the Phase D upgrade test against the **previously installed
-   release**: previous released version with representative data entered
-   → `adb install -r` the newly signed device-matching APK **over it** →
-   journal/chart intact, schema migration ran, export → import
-   round-trip still works (`tool/smoke_export_import.dart` logic mirrors
-   this). These CI-built, locally signed files are what ships and what
-   users download, so installing the device-matching one tests exactly
-   that. The publish script (Publish step) runs only once this test passed —
-   the break is a real script boundary, the checklist order is the
-   run order (attach is reversible; a data-loss incident is not).
+   release**, installing the newly signed device-matching APK from
+   `build/gh-release/` over it with `adb install -r`. These CI-built,
+   locally signed files are exactly what users download. The publish
+   script (Publish step) runs
+   only once this test passed — the break is a real script boundary, the
+   checklist order is the run order (attach is reversible; a data-loss
+   incident is not).
 6. **Publish — tag + release + assets, atomically at the built commit
    (`tool/publish_release.dart`)** —
 
@@ -468,8 +491,8 @@ Do **not** start until Android went through Phases B–F at least once.
    the exact commit the CI run built, so tag, release, and signed assets
    appear atomically and a failed publish leaves no dangling tag; the
    CI build stays the only thing a push triggers. The publish script
-   re-checks the changelog files at the manifest's head commit before
-   touching the release. The notes body is the
+   re-checks the changelog files at the manifest's head commit (scope per
+   the manifest) before touching the release. The notes body is the
    pinned fingerprint line plus one `APK SHA-256:` line per APK (GitHub
    appends the auto-generated changelog; the fingerprint is the trust
    anchor F-Droid metadata cross-checks). An already existing release is
@@ -585,9 +608,8 @@ afterwards the URLs stay the same (`/cycle-app/app/`,
 `/cycle-app/branches/main/`, landing page at the root). `/app/` itself
 stays absent until a release publishes (or the owner dispatches
 the Pages workflow with `ref` — see the web-deploy step of the
-per-release checklist): the landing page's released-demo link 404s
-until then, and a release publish replaces `/app/` wholesale with the
-released build.
+per-release checklist), so the landing page's released-demo link 404s
+until then.
 
 Per branch:
 
@@ -619,15 +641,14 @@ machine:
    depends only on a local Android SDK with build-tools ≤ 34
    (apksigner/aapt, resolved via `ANDROID_HOME`), an authenticated `gh`
    CLI, and the restored keystore below — not on a full local release
-   build. No tag is needed to rebuild a release either: dispatch a
-   Release run (`workflow_dispatch`) on a `release/**` branch — or push
-   the branch again — and the CI artifacts are there to download; the
-   tag itself is authored only at publish time, by
-   `tool/publish_release.dart`, at the head SHA the manifest written by
-   `tool/download_and_sign.dart` carries. A Flutter-version bump is a
-   one-file edit: change `tool/flutter-version` — both CI workflows and
-   the F-Droid recipe read that file directly; there are no per-workflow
-   mirror lines to update anymore.
+   build. No tag is needed to rebuild a release: dispatch a Release run
+   (`workflow_dispatch`) on a `release/**` branch (or push the branch
+   again), and the CI artifacts are there to download — the tag is
+   authored only at publish time, by `tool/publish_release.dart`, at the
+   head SHA the manifest from the download-and-sign script carries (see
+   the publish step). A Flutter-version bump is a one-file edit: change
+   `tool/flutter-version` (both CI workflows and the F-Droid recipe read
+   it; Phase E step 3).
 2. Restore the **keystore** from the offline backup (custody rules, Phase C)
    — without the `.jks` no update can be signed for the installed base.
 3. Recreate `android/key.properties` from the password-manager record

@@ -218,25 +218,40 @@ void main() {
   });
 
   group('handoff-manifest codec (build/gh-release/source.json)', () {
-    final manifest = const HandoffManifest(
+    const manifest = HandoffManifest(
       tag: 'v0.2.1',
       versionName: '0.2.1',
       versionCodeBase: 3,
       runId: 1234567890,
       headSha: validHeadSha,
+      defaultChangelogOnly: false,
     );
 
     test('encode produces the settled exact shape with the declared field '
-        'order', () {
+        'order, defaultChangelogOnly last', () {
       expect(
         encodeHandoffManifest(manifest),
         '{"tag":"v0.2.1","versionName":"0.2.1","versionCodeBase":3,'
-        '"runId":1234567890,"headSha":"$validHeadSha"}',
+        '"runId":1234567890,"headSha":"$validHeadSha",'
+        '"defaultChangelogOnly":false}',
       );
     });
 
-    test('encode → decode round trip preserves every field', () {
+    test('encode → decode round trip preserves every field, '
+        'defaultChangelogOnly included', () {
       expect(decodeHandoffManifest(encodeHandoffManifest(manifest)), manifest);
+      const skipManifest = HandoffManifest(
+        tag: 'v0.2.1',
+        versionName: '0.2.1',
+        versionCodeBase: 3,
+        runId: 1234567890,
+        headSha: validHeadSha,
+        defaultChangelogOnly: true,
+      );
+      expect(
+        decodeHandoffManifest(encodeHandoffManifest(skipManifest)),
+        skipManifest,
+      );
     });
 
     test('a well-formed manifest decodes to the same values', () {
@@ -246,6 +261,7 @@ void main() {
       expect(decoded.versionCodeBase, 3);
       expect(decoded.runId, 1234567890);
       expect(decoded.headSha, validHeadSha);
+      expect(decoded.defaultChangelogOnly, isFalse);
     });
 
     test('non-JSON or non-object manifests fail loudly', () {
@@ -258,37 +274,49 @@ void main() {
       }
     });
 
-    test('a missing field fails loudly (each of the five dropped once)', () {
+    test('a missing field fails loudly (each of the six dropped once)', () {
       final variants = <String>[
         manifestJsonRaw(
           versionName: '"0.2.1"',
           versionCodeBase: '3',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
           versionCodeBase: '3',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
           versionName: '"0.2.1"',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
           versionName: '"0.2.1"',
           versionCodeBase: '3',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
           versionName: '"0.2.1"',
           versionCodeBase: '3',
           runId: '1',
+          defaultChangelogOnly: 'false',
+        ),
+        manifestJsonRaw(
+          tag: '"v0.2.1"',
+          versionName: '"0.2.1"',
+          versionCodeBase: '3',
+          runId: '1',
+          headSha: '"$validHeadSha"',
         ),
       ];
       for (final variant in variants) {
@@ -313,6 +341,7 @@ void main() {
           versionCodeBase: '3',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
@@ -320,6 +349,7 @@ void main() {
           versionCodeBase: '3',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
@@ -327,6 +357,7 @@ void main() {
           versionCodeBase: '"3"',
           runId: '1',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
@@ -334,6 +365,7 @@ void main() {
           versionCodeBase: '3',
           runId: '"42"',
           headSha: '"$validHeadSha"',
+          defaultChangelogOnly: 'false',
         ),
         manifestJsonRaw(
           tag: '"v0.2.1"',
@@ -341,6 +373,15 @@ void main() {
           versionCodeBase: '3',
           runId: '1',
           headSha: '999',
+          defaultChangelogOnly: 'false',
+        ),
+        manifestJsonRaw(
+          tag: '"v0.2.1"',
+          versionName: '"0.2.1"',
+          versionCodeBase: '3',
+          runId: '1',
+          headSha: '"$validHeadSha"',
+          defaultChangelogOnly: '"false"',
         ),
       ];
       for (final variant in variants) {
@@ -496,7 +537,16 @@ void main() {
 
   group('F-Droid changelog files gate (both helpers)', () {
     const authoringName = '0.2.5.txt';
-    const linkNames = ['71.txt', '72.txt', '73.txt', 'default.txt'];
+    const linkNames = ['71.txt', '72.txt', '73.txt'];
+
+    /// default.txt is committed as a regular-file blob (mode 100644), not a
+    /// symlink: every complete fixture carries it next to the authoring
+    /// file, outside the [linkNames] symlink space.
+    const regularChangelogNames = {'default.txt'};
+
+    /// All changelog names one complete locale carries in the fixtures:
+    /// the per-ABI symlink names plus the regular default file.
+    const allChangelogNames = [...linkNames, 'default.txt'];
 
     /// Feeds the gate tests from the shared Git-tree/blob fixture in
     /// release_fixtures.dart with this group's file set.
@@ -508,23 +558,58 @@ void main() {
     }) => changelogGateFixture(
       targets: targets,
       authoringName: authoringName,
-      linkNames: linkNames,
+      linkNames: [...linkNames, ...regularChangelogNames, ...regularNames],
       authoringMode: authoringMode,
-      regularNames: regularNames,
+      regularNames: {...regularChangelogNames, ...regularNames},
       truncated: truncated,
     );
+
+    /// Per-locale targets for a complete set: every name points at the
+    /// authoring filename (the value is meaningless for regular-file blobs).
+    Map<String, String> completeTargets() => {
+      for (final name in allChangelogNames) name: authoringName,
+    };
 
     GhApiRunner gateRunner(({String tree, Map<String, String> blobs}) data) =>
         changelogGateRunner(data);
 
-    test('expected file set: authoring file, three per-ABI links, default', () {
-      expect(expectedChangelogFiles(versionName: '0.2.5', versionCodeBase: 7), [
-        '0.2.5.txt',
-        '71.txt',
-        '72.txt',
-        '73.txt',
-        'default.txt',
-      ]);
+    /// A tree stripped to the default-changelog-only expectation: per
+    /// locale, ONLY a regular-file `default.txt` blob — the authoring file
+    /// and the per-ABI names are absent, as a minor release skips them.
+    ({String tree, Map<String, String> blobs}) skipFixture({
+      Map<String, String> perLocale = const {'default.txt': 'fallback text'},
+    }) => changelogGateFixture(
+      targets: {
+        for (final locale in ['de-DE', 'en-US']) locale: perLocale,
+      },
+      authoringName: authoringName,
+      linkNames: const ['default.txt'],
+      includeAuthoringEntry: false,
+      regularNames: const {'default.txt'},
+    );
+
+    test('expected file set (full release): authoring file, three per-ABI '
+        'links, default', () {
+      expect(
+        expectedChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: false,
+        ),
+        ['0.2.5.txt', '71.txt', '72.txt', '73.txt', 'default.txt'],
+      );
+    });
+
+    test('expected file set (default-changelog-only): exactly the fallback '
+        'file, no authoring or per-ABI names', () {
+      expect(
+        expectedChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: true,
+        ),
+        ['default.txt'],
+      );
     });
 
     test('recursive tree JSON decodes to path/mode/type/sha entries', () {
@@ -582,18 +667,19 @@ void main() {
       }
     });
 
-    test('complete symlinks pointing at the authoring name pass with an ok '
-        'line per locale', () async {
+    test('a complete set — per-ABI symlinks plus a regular default.txt '
+        'blob — passes with an ok line per locale', () async {
       final lines = <String>[];
       await requireChangelogFiles(
         versionName: '0.2.5',
         versionCodeBase: 7,
+        defaultChangelogOnly: false,
         headSha: validHeadSha,
         ghApiRunner: gateRunner(
           fixture(
             targets: {
               for (final locale in ['de-DE', 'en-US'])
-                locale: {for (final name in linkNames) name: authoringName},
+                locale: completeTargets(),
             },
           ),
         ),
@@ -612,6 +698,7 @@ void main() {
           await requireChangelogFiles(
             versionName: '0.2.5',
             versionCodeBase: 7,
+            defaultChangelogOnly: false,
             headSha: validHeadSha,
             ghApiRunner: gateRunner(
               fixture(targets: {'de-DE': {}, 'en-US': {}}),
@@ -654,12 +741,13 @@ void main() {
         await requireChangelogFiles(
           versionName: '0.2.5',
           versionCodeBase: 7,
+          defaultChangelogOnly: false,
           headSha: validHeadSha,
           ghApiRunner: gateRunner(
             fixture(
               targets: {
                 for (final locale in ['de-DE', 'en-US'])
-                  locale: {for (final name in linkNames) name: authoringName},
+                  locale: completeTargets(),
               },
               regularNames: const {'72.txt'},
             ),
@@ -687,15 +775,13 @@ void main() {
         await requireChangelogFiles(
           versionName: '0.2.5',
           versionCodeBase: 7,
+          defaultChangelogOnly: false,
           headSha: validHeadSha,
           ghApiRunner: gateRunner(
             fixture(
               targets: {
                 for (final locale in ['de-DE', 'en-US'])
-                  locale: {
-                    for (final name in linkNames)
-                      name: name == '71.txt' ? '0.2.4.txt' : authoringName,
-                  },
+                  locale: {...completeTargets(), '71.txt': '0.2.4.txt'},
               },
             ),
           ),
@@ -724,12 +810,13 @@ void main() {
         await requireChangelogFiles(
           versionName: '0.2.5',
           versionCodeBase: 7,
+          defaultChangelogOnly: false,
           headSha: validHeadSha,
           ghApiRunner: gateRunner(
             fixture(
               targets: {
                 for (final locale in ['de-DE', 'en-US'])
-                  locale: {for (final name in linkNames) name: authoringName},
+                  locale: completeTargets(),
               },
               authoringMode: '120000',
             ),
@@ -750,6 +837,132 @@ void main() {
       expect(message, contains('git mode 120000'), reason: message);
     });
 
+    test('a default.txt symlink fails the gate loudly with the hand-fix '
+        'path for the fallback text', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: false,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            changelogGateFixture(
+              targets: {
+                for (final locale in ['de-DE', 'en-US'])
+                  locale: {
+                    for (final name in allChangelogNames) name: authoringName,
+                  },
+              },
+              authoringName: authoringName,
+              linkNames: allChangelogNames,
+            ),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a symlinked default.txt must fail the gate',
+      );
+      final message = '$caught';
+      expect(
+        message,
+        contains('de-DE: $fdroidMetadataPath/de-DE/changelogs/default.txt'),
+        reason: message,
+      );
+      expect(message, contains('git mode 120000'), reason: message);
+      expect(
+        message,
+        contains('hand-maintained'),
+        reason:
+            '$message — the fix path must name the fallback text as '
+            'hand-maintained, not shapeable by the link generator',
+      );
+    });
+
+    test('skip mode passes on a tree stripped to the regular default.txt '
+        'blob — absent authoring and per-ABI names are not checked', () async {
+      final lines = <String>[];
+      await requireChangelogFiles(
+        versionName: '0.2.5',
+        versionCodeBase: 7,
+        defaultChangelogOnly: true,
+        headSha: validHeadSha,
+        ghApiRunner: gateRunner(skipFixture()),
+        sink: lines.add,
+      );
+      expect(lines.length, 2, reason: lines.join('\n'));
+      expect(lines.join('\n'), contains('de-DE ok'));
+      expect(lines.join('\n'), contains('en-US ok'));
+    });
+
+    test('skip mode fails loudly naming ONLY the default.txt when it is '
+        'missing', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: true,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(skipFixture(perLocale: const {})),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a default.txt-less tree must fail the skip-mode gate',
+      );
+      final message = '$caught';
+      expect(message, contains('de-DE: missing default.txt'), reason: message);
+      expect(message, contains('en-US: missing default.txt'), reason: message);
+      expect(message, isNot(contains(authoringName)), reason: message);
+      expect(message, isNot(contains('71.txt')), reason: message);
+      expect(message, contains('--default-changelog-only'), reason: message);
+    });
+
+    test('skip mode keeps the default.txt mode check: a symlinked '
+        'default.txt fails loudly', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: true,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            changelogGateFixture(
+              targets: {
+                for (final locale in ['de-DE', 'en-US'])
+                  locale: {'default.txt': authoringName},
+              },
+              authoringName: authoringName,
+              linkNames: const ['default.txt'],
+              includeAuthoringEntry: false,
+            ),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a symlinked default.txt must fail the skip-mode gate too',
+      );
+      final message = '$caught';
+      expect(message, contains('git mode 120000'), reason: message);
+      expect(message, contains('hand-maintained'), reason: message);
+    });
+
     test(
       'a failed tree call aborts instead of counting as "missing"',
       () async {
@@ -758,6 +971,7 @@ void main() {
           await requireChangelogFiles(
             versionName: '0.2.5',
             versionCodeBase: 7,
+            defaultChangelogOnly: false,
             headSha: validHeadSha,
             ghApiRunner: (arguments) async =>
                 ProcessResult(0, 1, '', 'gh: HTTP 404'),
@@ -773,26 +987,32 @@ void main() {
       },
     );
 
-    test('a locale-less metadata tree fails loudly', () async {
-      Object? caught;
-      try {
-        await requireChangelogFiles(
-          versionName: '0.2.5',
-          versionCodeBase: 7,
-          headSha: validHeadSha,
-          ghApiRunner: gateRunner((
-            tree:
-                '{"tree":[{"path":"$fdroidMetadataPath/README.md",'
-                '"mode":"100644","type":"blob","sha":"sha-readme"}],'
-                '"truncated":false}',
-            blobs: const {},
-          )),
-          sink: (_) {},
-        );
-      } on ReleaseToolException catch (error) {
-        caught = error;
-      }
-      expect('$caught', contains('no locale directory'), reason: '$caught');
-    });
+    test(
+      'a locale-less metadata tree fails loudly in both gate modes',
+      () async {
+        for (final defaultChangelogOnly in [false, true]) {
+          Object? caught;
+          try {
+            await requireChangelogFiles(
+              versionName: '0.2.5',
+              versionCodeBase: 7,
+              defaultChangelogOnly: defaultChangelogOnly,
+              headSha: validHeadSha,
+              ghApiRunner: gateRunner((
+                tree:
+                    '{"tree":[{"path":"$fdroidMetadataPath/README.md",'
+                    '"mode":"100644","type":"blob","sha":"sha-readme"}],'
+                    '"truncated":false}',
+                blobs: const {},
+              )),
+              sink: (_) {},
+            );
+          } on ReleaseToolException catch (error) {
+            caught = error;
+          }
+          expect('$caught', contains('no locale directory'), reason: '$caught');
+        }
+      },
+    );
   });
 }

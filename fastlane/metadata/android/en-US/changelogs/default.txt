@@ -1,1 +1,2 @@
-0.3.0.txt
+- Small fixes and refinements
+- Your feedback keeps improving this app — thank you

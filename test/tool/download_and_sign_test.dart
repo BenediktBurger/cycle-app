@@ -127,6 +127,28 @@ void main() {
       );
     });
 
+    test('accepts --default-changelog-only (the minor-release gate scope) '
+        'and defaults to off without it', () {
+      final options = sign.parseArguments([
+        'v0.3.0',
+        '--default-changelog-only',
+      ]);
+      expect(options.defaultChangelogOnly, isTrue);
+      expect(sign.parseArguments(['v0.3.0']).defaultChangelogOnly, isFalse);
+    });
+
+    test('--default-changelog-only composes with --run-id in any order', () {
+      final options = sign.parseArguments([
+        '--run-id',
+        '7',
+        '--default-changelog-only',
+        'v0.3.0',
+      ]);
+      expect(options.tag, 'v0.3.0');
+      expect(options.runId, 7);
+      expect(options.defaultChangelogOnly, isTrue);
+    });
+
     test('rejects missing and extra positional arguments', () {
       expect(
         () => sign.parseArguments(const []),
@@ -941,11 +963,17 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         versionCodeBase: 3,
         runId: 1234567890,
         headSha: validHeadSha,
+        defaultChangelogOnly: false,
       );
       sign.writeHandoffManifest(root: root, manifest: manifest);
       final file = File('${root.path}/$handoffManifestPath');
       expect(file.existsSync(), isTrue);
       expect(file.readAsStringSync(), '${encodeHandoffManifest(manifest)}\n');
+      expect(
+        file.readAsStringSync(),
+        contains('"defaultChangelogOnly":false'),
+        reason: 'the written file carries the gate-scope decision',
+      );
       // The written file decodes back into the same manifest.
       expect(decodeHandoffManifest(file.readAsStringSync()), manifest);
     });
@@ -964,12 +992,20 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
         versionCodeBase: runPubspec.build,
         runId: 1234567890,
         headSha: validHeadSha,
+        defaultChangelogOnly: true,
       );
       expect(manifest.versionCodeBase, 3);
       expect(decodeHandoffManifest(encodeHandoffManifest(manifest)), manifest);
       expect(
         decodeHandoffManifest(encodeHandoffManifest(manifest)).tag,
         'v0.2.1',
+      );
+      expect(
+        decodeHandoffManifest(
+          encodeHandoffManifest(manifest),
+        ).defaultChangelogOnly,
+        isTrue,
+        reason: 'the minor-release decision round-trips through the codec',
       );
     });
   });
