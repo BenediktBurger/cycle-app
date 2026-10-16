@@ -12,6 +12,7 @@ import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/diary_track.dart';
+import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:flutter/material.dart';
@@ -150,7 +151,83 @@ void main() {
     });
   });
 
+  group('temperature untracked', () {
+    testWidgets('the section stays hidden with its header, the BBT field, '
+        'the method button and the exclude switch', (tester) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(
+        _harness.scope(diaryTrack: const DiaryTrack(temperature: false)),
+      );
+      await tester.pumpAndSettle();
+
+      // Exact match: the field label is 'Temperatur (°C)', so the bare
+      // 'Temperatur' inside the Form can only be the section header.
+      final formHeader = find.descendant(
+        of: find.byType(Form),
+        matching: find.text('Temperatur'),
+      );
+      expect(formHeader, findsNothing);
+      expect(diaryTemperatureField(), findsNothing);
+      expect(find.byKey(const ValueKey('diaryMethodButton')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('diaryExcludeTemperatureSwitch')),
+        findsNothing,
+      );
+    });
+  });
+
   group('hidden sections do not wipe a stored day (view-only hiding)', () {
+    testWidgets('a stored temperature measurement (with its disturbance '
+        'bits and exclude mark) survives a save with the section hidden', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      final disturbances = TempDisturbance.sp.bit | TempDisturbance.kr.bit;
+      await tester.pumpWidget(
+        _harness.scope(
+          diaryTrack: const DiaryTrack(temperature: false),
+          seed: (db) async {
+            await db.entriesDao.upsertDaily(
+              DailyEntry(
+                date: _day,
+                bbtC: 36.5,
+                measuredAtMinutes: 360,
+                tempDisturbances: disturbances,
+              ),
+            );
+            await db.marksDao.addMark(_day, CycleMarkTypes.ignoreTemperature);
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(diaryTemperatureField(), findsNothing);
+
+      // A visible edit proves the save path ran outside the hidden
+      // section.
+      await tester.tap(diaryChip('bleeding', 'medium'));
+      await tester.pumpAndSettle();
+      await tester.tap(diarySaveButton());
+      await tester.pumpAndSettle();
+
+      final stored = await storedDay(tester);
+      expect(
+        stored.bbtC,
+        36.5,
+        reason:
+            'hiding the temperature section must not drop the stored '
+            'temperature on save',
+      );
+      expect(stored.measuredAtMinutes, 360);
+      expect(stored.tempDisturbances, disturbances);
+      expect(
+        await _harness.storedMarkTypes(_day),
+        contains(CycleMarkTypes.ignoreTemperature),
+        reason: 'the exclude mark survives a save with the switch hidden',
+      );
+      expect(stored.bleeding, Bleeding.medium);
+    });
+
     testWidgets('a stored cervix observation survives a save with the '
         'pickers hidden', (WidgetTester tester) async {
       useTallSurface(tester);

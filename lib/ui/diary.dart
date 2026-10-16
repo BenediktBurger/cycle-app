@@ -440,159 +440,163 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              // --- BBT + measured time (compact one-line density) --------
-              // The measurement time is metadata OF the temperature (the
-              // domain model never stores it without one, see
-              // DailyEntry.measuredAtMinutes), so the time control shares
-              // the temperature's visual line and shows only while a
-              // savable temperature is entered — the same range gate the
-              // validator applies. Entering the temperature on today
-              // stamps the current time (see _onBbtChanged).
-              //
-              // Narrow content widths (small devices, wide font scaling):
-              // below ~300 dp of form width the printed label drops and
-              // the clock icon carries the meaning; a narrow-width test
-              // pins that this line stays overflow-free.
-              SectionHeader(
-                title: l10n.temperature,
-                info: l10n.diaryInfoTemperature,
-              ),
-              const SizedBox(height: 8),
-              LayoutBuilder(
-                builder: (context, lineConstraints) {
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          key: const ValueKey('diaryTemperatureField'),
-                          controller: _bbtController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: '${l10n.temperature} (°C)',
-                            // A suffix icon cannot overflow the way a
-                            // widget right of the field can — this line is
-                            // the temperature/time row whose narrow-width
-                            // layout a pinned test guards.
-                            suffixIcon: IconButton(
-                              key: const ValueKey('diaryMethodButton'),
-                              icon: const Icon(Icons.device_thermostat),
-                              tooltip: l10n.methodDialogTitle,
-                              onPressed: () =>
-                                  showMeasurementMethodDialog(context),
+              if (track.temperature) ...[
+                // --- BBT + measured time (compact one-line density) --------
+                // The measurement time is metadata OF the temperature (the
+                // domain model never stores it without one, see
+                // DailyEntry.measuredAtMinutes), so the time control shares
+                // the temperature's visual line and shows only while a
+                // savable temperature is entered — the same range gate the
+                // validator applies. Entering the temperature on today
+                // stamps the current time (see _onBbtChanged).
+                //
+                // Narrow content widths (small devices, wide font scaling):
+                // below ~300 dp of form width the printed label drops and
+                // the clock icon carries the meaning; a narrow-width test
+                // pins that this line stays overflow-free.
+                SectionHeader(
+                  title: l10n.temperature,
+                  info: l10n.diaryInfoTemperature,
+                ),
+                const SizedBox(height: 8),
+                LayoutBuilder(
+                  builder: (context, lineConstraints) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            key: const ValueKey('diaryTemperatureField'),
+                            controller: _bbtController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            decoration: InputDecoration(
+                              labelText: '${l10n.temperature} (°C)',
+                              // A suffix icon cannot overflow the way a
+                              // widget right of the field can — this line is
+                              // the temperature/time row whose narrow-width
+                              // layout a pinned test guards.
+                              suffixIcon: IconButton(
+                                key: const ValueKey('diaryMethodButton'),
+                                icon: const Icon(Icons.device_thermostat),
+                                tooltip: l10n.methodDialogTitle,
+                                onPressed: () =>
+                                    showMeasurementMethodDialog(context),
+                              ),
+                            ),
+                            validator: (value) {
+                              final parsed = parseDecimalInput(value ?? '');
+                              if (parsed == null) {
+                                return (value ?? '').trim().isEmpty
+                                    ? null // temperature stays optional
+                                    : l10n.errorTemperature;
+                              }
+                              return isWithinBbtRange(parsed)
+                                  ? null
+                                  : l10n.errorTemperatureRange;
+                            },
                           ),
-                          validator: (value) {
-                            final parsed = parseDecimalInput(value ?? '');
-                            if (parsed == null) {
-                              return (value ?? '').trim().isEmpty
-                                  ? null // temperature stays optional
-                                  : l10n.errorTemperature;
+                        ),
+                        const SizedBox(width: 8),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _bbtController,
+                          builder: (context, value, _) {
+                            final parsed = parseDecimalInput(value.text);
+                            if (parsed == null || !isWithinBbtRange(parsed)) {
+                              return const SizedBox.shrink();
                             }
-                            return isWithinBbtRange(parsed)
-                                ? null
-                                : l10n.errorTemperatureRange;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.schedule_outlined),
+                                const SizedBox(width: 4),
+                                OutlinedButton(
+                                  key: const ValueKey('measuredTimeField'),
+                                  onPressed: _pickTime,
+                                  child: Text(
+                                    _measuredAt == null
+                                        ? l10n.measuredTimeUnset
+                                        : MaterialLocalizations.of(
+                                            context,
+                                          ).formatTimeOfDay(_measuredAt!),
+                                  ),
+                                ),
+                                if (_measuredAt != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () =>
+                                        setState(() => _measuredAt = null),
+                                    tooltip: l10n.measuredTimeUnset,
+                                  ),
+                              ],
+                            );
                           },
                         ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                // --- temperature disturbance group (flags + exclude switch)
+                // The flag chips toggle raw tempDisturbances bits
+                // (interrupted-day data); the exclude switch is the only
+                // diary-side input that writes the ignoreTemperature mark on
+                // save (manual-only coupling — see _save).
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.disturbancesCaption,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      const SizedBox(width: 8),
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _bbtController,
-                        builder: (context, value, _) {
-                          final parsed = parseDecimalInput(value.text);
-                          if (parsed == null || !isWithinBbtRange(parsed)) {
-                            return const SizedBox.shrink();
-                          }
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.schedule_outlined),
-                              const SizedBox(width: 4),
-                              OutlinedButton(
-                                key: const ValueKey('measuredTimeField'),
-                                onPressed: _pickTime,
-                                child: Text(
-                                  _measuredAt == null
-                                      ? l10n.measuredTimeUnset
-                                      : MaterialLocalizations.of(
-                                          context,
-                                        ).formatTimeOfDay(_measuredAt!),
-                                ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final disturbance in TempDisturbance.values)
+                            FilterChip(
+                              key: ValueKey(
+                                'disturbanceChip-${disturbance.name}',
                               ),
-                              if (_measuredAt != null)
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () =>
-                                      setState(() => _measuredAt = null),
-                                  tooltip: l10n.measuredTimeUnset,
-                                ),
-                            ],
-                          );
-                        },
+                              label: Text(switch (disturbance) {
+                                TempDisturbance.sp => l10n.disturbanceLateToBed,
+                                TempDisturbance.a =>
+                                  l10n.disturbanceNightAwakening,
+                                TempDisturbance.alk => l10n.disturbanceAlcohol,
+                                TempDisturbance.kr => l10n.disturbanceIllness,
+                              }),
+                              selected:
+                                  _tempDisturbances & disturbance.bit != 0,
+                              onSelected: (selected) => setState(() {
+                                _tempDisturbances = selected
+                                    ? _tempDisturbances | disturbance.bit
+                                    : _tempDisturbances & ~disturbance.bit;
+                              }),
+                            ),
+                        ],
+                      ),
+                      SwitchListTile(
+                        key: const ValueKey('diaryExcludeTemperatureSwitch'),
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(l10n.diaryExcludeTemperatureSwitch),
+                        value: _excludeTemperature,
+                        onChanged: (v) =>
+                            setState(() => _excludeTemperature = v),
                       ),
                     ],
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              // --- temperature disturbance group (flags + exclude switch)
-              // The flag chips toggle raw tempDisturbances bits
-              // (interrupted-day data); the exclude switch is the only
-              // diary-side input that writes the ignoreTemperature mark on
-              // save (manual-only coupling — see _save).
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.disturbancesCaption,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final disturbance in TempDisturbance.values)
-                          FilterChip(
-                            key: ValueKey(
-                              'disturbanceChip-${disturbance.name}',
-                            ),
-                            label: Text(switch (disturbance) {
-                              TempDisturbance.sp => l10n.disturbanceLateToBed,
-                              TempDisturbance.a =>
-                                l10n.disturbanceNightAwakening,
-                              TempDisturbance.alk => l10n.disturbanceAlcohol,
-                              TempDisturbance.kr => l10n.disturbanceIllness,
-                            }),
-                            selected: _tempDisturbances & disturbance.bit != 0,
-                            onSelected: (selected) => setState(() {
-                              _tempDisturbances = selected
-                                  ? _tempDisturbances | disturbance.bit
-                                  : _tempDisturbances & ~disturbance.bit;
-                            }),
-                          ),
-                      ],
-                    ),
-                    SwitchListTile(
-                      key: const ValueKey('diaryExcludeTemperatureSwitch'),
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(l10n.diaryExcludeTemperatureSwitch),
-                      value: _excludeTemperature,
-                      onChanged: (v) => setState(() => _excludeTemperature = v),
-                    ),
-                  ],
-                ),
-              ),
+              ],
               const SizedBox(height: 12),
               // --- bleeding --------------------------------------------
               // Wrap of ChoiceChips: a six-label SegmentedButton risks
