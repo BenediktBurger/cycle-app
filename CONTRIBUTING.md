@@ -316,6 +316,23 @@ hash, doc comments) drift just as invisibly. Regenerate in the same commit
 as the annotation change and inspect the `.g.dart` diff; CI re-runs
 build_runner and fails the gate on any diff.
 
+## 7. Branch previews on the demo site
+
+Any branch can be published as a web preview next to the released demo:
+
+- In GitHub: Actions → "Pages branch" → Run workflow. The **branch dropdown
+  selects what gets built** — pick the branch to deploy, not `main`
+  (deploying from `main` republishes the development tier). Leave `mode` at
+  `deploy`; `slug` is optional and only names the destination directory,
+  never the source code.
+- The preview appears at
+  `https://BenediktBurger.github.io/cycle-app/branches/<slug>/` (slug
+  defaults to the sanitized branch name).
+- Deleting the branch removes its deploy automatically; to remove one
+  manually, run the workflow with `mode: cleanup`.
+- Design and ownership model (why two branches can't clobber each other's
+  deploy): [ADR-0012](docs/adr/0012-public-web-demo-github-pages.md).
+
 ## Conventions
 
 - **Architecture decisions** get an ADR under
