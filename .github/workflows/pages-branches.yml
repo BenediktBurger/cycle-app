@@ -16,13 +16,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Deploy this branch, or clean an existing deploy up
+        description: >-
+          deploy: build and publish the branch selected in the run dialog.
+          cleanup: remove an existing deploy — of this branch's slug, or of
+          the explicit slug below
         required: true
         default: deploy
         type: choice
         options: [deploy, cleanup]
       slug:
-        description: Explicit slug (defaults to the sanitized current branch name)
+        description: Optional. Directory under /cycle-app/branches/ to publish to; defaults to the sanitized branch name. Names the destination only — the built code always comes from the branch selected in the dialog. In cleanup mode, an explicit slug skips the ownership check (operator escape hatch)
         required: false
         type: string
   delete:
