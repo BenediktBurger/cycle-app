@@ -538,10 +538,12 @@ String _rawPreview(String apiOutput) =>
 /// `<versionName>.txt` filename; the authoring file and default.txt must be
 /// regular-file blobs (git mode `100644`). A minor release (set
 /// [defaultChangelogOnly]) narrows the requirement to default.txt only.
-/// Prints one ok line per locale through
+/// Returns the English changelog text at the same head commit (raw decoded
+/// `en-US/changelogs/<versionName>.txt` on a full release, `default.txt` in
+/// default-changelog-only mode). Prints one ok line per locale through
 /// [sink]; throws [ReleaseToolException] naming every gap plus the fix path
 /// otherwise.
-Future<void> requireChangelogFiles({
+Future<String> requireChangelogFiles({
   required String versionName,
   required int versionCodeBase,
   required bool defaultChangelogOnly,
@@ -676,6 +678,30 @@ Future<void> requireChangelogFiles({
       'manifest carries that decision.',
     );
   }
+
+  const summaryLocale = 'en-US';
+  if (!locales.contains(summaryLocale)) {
+    throw ReleaseToolException(
+      '$fdroidMetadataPath at $headSha has no $summaryLocale locale '
+      'directory — the release summary needs its changelog text.',
+    );
+  }
+  final summaryName = defaultChangelogOnly
+      ? defaultChangelogName
+      : authoringFileName;
+  final summaryPath =
+      '$fdroidMetadataPath/$summaryLocale/changelogs/$summaryName';
+  final summaryEntries = [
+    for (final entry in tree)
+      if (entry.type == 'blob' && entry.path == summaryPath) entry,
+  ];
+  if (summaryEntries.isEmpty) {
+    throw ReleaseToolException(
+      '$fdroidMetadataPath/$summaryLocale at $headSha has no changelog '
+      'file $summaryName — the release summary needs its text.',
+    );
+  }
+  return fetchBlobTarget(summaryEntries.single.sha);
 }
 
 // --- adb install next steps + device-test reminder ------------------------------

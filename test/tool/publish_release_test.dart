@@ -35,6 +35,21 @@ const pinnedFingerprintColonUppercase =
     '0A:A5:74:98:04:B8:ED:9E:3C:20:7F:85:1B:59:02:77:5D:76:22:07:D6:0C:24:85'
     ':A2:6B:5D:75:EF:F5:35:5B';
 
+/// The changelog text the summary embeds (untrimmed on purpose — the embed
+/// site must trim it).
+const whatsNewRaw =
+    '  New: the diary gained a summary view.\nFixed: a crash.  ';
+const whatsNewTrimmed =
+    'New: the diary gained a summary view.\nFixed: a crash.';
+
+/// The canonical summary block shape the release body pins.
+String summaryBlock(String content) =>
+    '<!-- release-summary -->\n'
+    "## What's new\n"
+    '\n'
+    '$content\n'
+    '<!-- /release-summary -->';
+
 void main() {
   group('argument parsing', () {
     test('accepts a well-formed tag plus --dry-run', () {
@@ -293,32 +308,23 @@ void main() {
   });
 
   group('release-notes body assembly (create path)', () {
-    test('lists the fingerprint once and one checksum line per APK in '
-        'attach order', () {
+    test('layers the fingerprint line, the checksum lines in attach order, '
+        'then a blank line and the what\'s-new block', () {
       final body = publish.buildNotesBody(
         certificateFingerprint: pinnedReleaseFingerprint,
         apkSha256ByPublishName: {
           for (final name in publishApkNames('0.2.1')) name: '99' * 32,
         },
-      );
-      expect(
-        'SHA-256 certificate fingerprint: '.allMatches(body).length,
-        1,
-        reason: 'all three APKs share one release key',
+        whatsNew: whatsNewRaw,
       );
       expect(
         body,
-        contains('SHA-256 certificate fingerprint: $pinnedReleaseFingerprint'),
-      );
-      expect('APK SHA-256: '.allMatches(body).length, 3);
-      // Attach order: armeabi-v7a → arm64-v8a → x86_64.
-      final checksumLines = RegExp(
-        r'^APK SHA-256: (\S+) ([0-9a-f]{64})$',
-        multiLine: true,
-      ).allMatches(body).toList();
-      expect(
-        checksumLines.map((match) => match.group(1)),
-        publishApkNames('0.2.1'),
+        'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint\n'
+        'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'99' * 32}\n'
+        'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'99' * 32}\n'
+        'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'99' * 32}\n'
+        '\n'
+        '${summaryBlock(whatsNewTrimmed)}',
       );
     });
   });
@@ -424,6 +430,113 @@ void main() {
     });
   });
 
+  group("summary block splice (what's new, re-attach)", () {
+    final fingerprintLine =
+        'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint';
+
+    test('a body that already carries the block gets it replaced whole, '
+        'checksum lines and surrounding prose untouched', () {
+      const oldContent = 'Stale old summary text.';
+      final body =
+          '$fingerprintLine\n'
+          'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'aa' * 32}\n'
+          '${summaryBlock(oldContent)}\n'
+          '\n'
+          "## What's Changed\n"
+          '\n'
+          '* generated entry\n';
+      final spliced = publish.spliceSummaryBlock(body, whatsNewRaw);
+      expect(
+        spliced,
+        '$fingerprintLine\n'
+        'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'aa' * 32}\n'
+        '${summaryBlock(whatsNewTrimmed)}\n'
+        '\n'
+        "## What's Changed\n"
+        '\n'
+        '* generated entry\n',
+      );
+      expect(spliced, isNot(contains(oldContent)));
+    });
+
+    test('a legacy body without the marker gets the block inserted after '
+        'the last checksum line, before the generated changelog', () {
+      final body =
+          '$fingerprintLine\n'
+          'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'aa' * 32}\n'
+          'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'bb' * 32}\n'
+          '\n'
+          "## What's Changed\n"
+          '\n'
+          '* generated entry\n';
+      final spliced = publish.spliceSummaryBlock(body, whatsNewRaw);
+      expect(
+        spliced,
+        '$fingerprintLine\n'
+        'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'aa' * 32}\n'
+        'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'bb' * 32}\n'
+        '\n'
+        '${summaryBlock(whatsNewTrimmed)}\n'
+        '\n'
+        "## What's Changed\n"
+        '\n'
+        '* generated entry\n',
+      );
+    });
+
+    test('a legacy body without checksum lines gets the block inserted '
+        'after the fingerprint line', () {
+      final body = '$fingerprintLine\n\n## What\'s Changed\n\n* entry\n';
+      final spliced = publish.spliceSummaryBlock(body, whatsNewRaw);
+      expect(
+        spliced,
+        '$fingerprintLine\n'
+        '\n'
+        '${summaryBlock(whatsNewTrimmed)}\n'
+        '\n'
+        "## What's Changed\n"
+        '\n'
+        '* entry\n',
+      );
+    });
+
+    test('a body with neither checksum nor fingerprint lines gets the '
+        'block appended at the end', () {
+      const body = '## Cycle App 0.2.1\n\nGenerated changelog.\n';
+      final spliced = publish.spliceSummaryBlock(body, whatsNewRaw);
+      expect(
+        spliced,
+        '## Cycle App 0.2.1\n\nGenerated changelog.\n\n'
+        '${summaryBlock(whatsNewTrimmed)}',
+      );
+    });
+
+    test('splicing a body that already carries the current block yields '
+        'the same body', () {
+      final body =
+          '$fingerprintLine\n'
+          'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'cc' * 32}\n'
+          '${summaryBlock(whatsNewTrimmed)}\n'
+          '\n'
+          'Prose.\n';
+      expect(publish.spliceSummaryBlock(body, whatsNewRaw), body);
+      final freshBody = publish.buildNotesBody(
+        certificateFingerprint: pinnedReleaseFingerprint,
+        apkSha256ByPublishName: {'cycle-app-0.2.1-x86_64.apk': 'cc' * 32},
+        whatsNew: whatsNewRaw,
+      );
+      expect(publish.spliceSummaryBlock(freshBody, whatsNewRaw), freshBody);
+    });
+
+    test('a start marker without its closing marker fails loudly', () {
+      const body = 'prose\n<!-- release-summary -->\ndangling content\n';
+      expect(
+        () => publish.spliceSummaryBlock(body, whatsNewRaw),
+        throwsA(isA<ReleaseToolException>()),
+      );
+    });
+  });
+
   group('release-existence probe (gh "not found" narrow route)', () {
     // Shaped like the stderr line gh prints when a release does not exist:
     // the API's 404 surfaces as "Not Found" in gh's own error text.
@@ -469,6 +582,7 @@ void main() {
     final body = publish.buildNotesBody(
       certificateFingerprint: pinnedReleaseFingerprint,
       apkSha256ByPublishName: fresh,
+      whatsNew: whatsNewRaw,
     );
 
     test('missing release: prints the would-be gh release create payload '
@@ -752,6 +866,8 @@ void main() {
     Future<ProcessResult> Function(List<String>) ghFixture({
       required String releaseViewResult, // 'missing' | 'present'
       bool changelogOnlyGate = false,
+      List<String> gateLocales = const ['de-DE', 'en-US'],
+      String enUsChangelogContent = whatsNewRaw,
       int createExit = 0,
       int uploadExit = 0,
       int editExit = 0,
@@ -775,25 +891,31 @@ void main() {
             return changelogGateRunner(
               changelogGateFixture(
                 targets: {
-                  for (final locale in const ['de-DE', 'en-US'])
+                  for (final locale in gateLocales)
                     locale: const {'default.txt': 'fallback text'},
                 },
                 authoringName: authoringName,
                 linkNames: const ['default.txt'],
                 includeAuthoringEntry: false,
                 regularNames: const {'default.txt'},
+                regularFileContents: {
+                  'en-US': {'default.txt': enUsChangelogContent},
+                },
               ),
             )(arguments);
           }
           return changelogGateRunner(
             changelogGateFixture(
               targets: {
-                for (final locale in const ['de-DE', 'en-US'])
+                for (final locale in gateLocales)
                   locale: {for (final name in linkNames) name: authoringName},
               },
               authoringName: authoringName,
               linkNames: linkNames,
               regularNames: const {'default.txt'},
+              regularFileContents: {
+                'en-US': {authoringName: enUsChangelogContent},
+              },
             ),
           )(arguments);
         }
@@ -897,6 +1019,23 @@ void main() {
         contains('APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'55' * 32}'),
       );
 
+      // The summary text is the en-US changelog fetched at the manifest's
+      // head commit.
+      expect(output, contains(summaryBlock(whatsNewTrimmed)));
+      expect(
+        output,
+        isNot(contains('fallback text')),
+        reason:
+            'the summary text is the en-US content blob, not the '
+            'fallback the other fixture entries serve',
+      );
+      final checksumIndex = output.indexOf(
+        'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'66' * 32}',
+      );
+      final summaryIndex = output.indexOf(publish.releaseSummaryStartMarker);
+      expect(checksumIndex, greaterThan(-1));
+      expect(summaryIndex, greaterThan(checksumIndex));
+
       // PR payloads are printed, never run.
       expect(output, contains('gh pr create --repo'));
       expect(output, contains('gh pr merge --merge --auto release/v0.2.1'));
@@ -941,6 +1080,67 @@ void main() {
       expect(
         output,
         contains('APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'55' * 32}'),
+      );
+      expect(
+        output,
+        contains(
+          'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'66' * 32}\n'
+          '\n'
+          '${summaryBlock(whatsNewTrimmed)}',
+        ),
+      );
+      expect(
+        publish.releaseSummaryStartMarker.allMatches(output).length,
+        1,
+        reason: 'exactly one summary block, no duplicate insertion',
+      );
+      expect(output, contains('dry run complete'));
+      for (final invocation in ghInvocations) {
+        final isReadOnly =
+            (invocation.first == 'auth') ||
+            (invocation.first == 'api') ||
+            (invocation[0] == 'release' && invocation[1] == 'view');
+        expect(isReadOnly, isTrue, reason: 'invocation: $invocation');
+      }
+    });
+
+    test('dry run on an existing release whose body already carries a '
+        'stale summary block: the block is replaced, not duplicated', () async {
+      stageHappyTree();
+      final oldBody =
+          'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint\n'
+          'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'bb' * 32}\n'
+          '${summaryBlock('Stale old summary text.')}\n'
+          '\n'
+          "## What's Changed\n"
+          '\n'
+          '* generated entry\n';
+      final lines = <String>[];
+      await publish.runPublishRelease(
+        ['v0.2.1', '--dry-run'],
+        root: root,
+        ghRunner: ghFixture(
+          releaseViewResult: 'present',
+          existingBody: oldBody,
+        ),
+        sha256Runner: fakeSha256Runner,
+        printer: lines.add,
+      );
+      final output = lines.join('\n');
+
+      expect(output, contains(summaryBlock(whatsNewTrimmed)));
+      expect(output, isNot(contains('Stale old summary text.')));
+      expect(
+        publish.releaseSummaryStartMarker.allMatches(output).length,
+        1,
+        reason: 'the stale block is replaced wholesale, not duplicated',
+      );
+      expect(
+        output,
+        contains(
+          'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'66' * 32}\n'
+          '${summaryBlock(whatsNewTrimmed)}',
+        ),
       );
       expect(output, contains('dry run complete'));
       for (final invocation in ghInvocations) {
@@ -990,20 +1190,18 @@ void main() {
           isTrue,
         );
 
-        // The notes file was staged under the publish tree with the
-        // fingerprint + checksum block.
+        // The notes file was staged under the publish tree: fingerprint +
+        // checksum block first, then the what's-new summary block.
         final notes = File('${root.path}/${publish.notesFilePath(tag)}');
         expect(notes.existsSync(), isTrue);
-        final notesBody = notes.readAsStringSync();
         expect(
-          notesBody,
-          contains(
-            'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint',
-          ),
-        );
-        expect(
-          notesBody,
-          contains('APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'44' * 32}'),
+          notes.readAsStringSync(),
+          'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint\n'
+          'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'44' * 32}\n'
+          'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'55' * 32}\n'
+          'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'66' * 32}\n'
+          '\n'
+          '${summaryBlock(whatsNewTrimmed)}',
         );
         expect(output, contains('created the release'));
       },
@@ -1014,8 +1212,13 @@ void main() {
         'the manual command (exit stays 0)', () async {
       stageHappyTree();
       final oldBody =
-          '## Cycle App 0.2.1\n'
-          'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'bb' * 32}\n';
+          'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint\n'
+          'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'bb' * 32}\n'
+          '${summaryBlock('Stale old summary text.')}\n'
+          '\n'
+          "## What's Changed\n"
+          '\n'
+          '* generated entry\n';
       final lines = <String>[];
       await publish.runPublishRelease(
         ['v0.2.1'],
@@ -1039,21 +1242,64 @@ void main() {
         (invocation) => invocation[0] == 'release' && invocation[1] == 'edit',
       );
       expect(edit, contains('--notes-file'));
-      // The updated notes were staged (stale hash gone, fresh one in).
+      // The updated notes were staged: fresh checksums, and the stale
+      // summary block replaced (never duplicated).
       final notesBody = File(
         '${root.path}/${publish.notesFilePath(tag)}',
       ).readAsStringSync();
-      expect(notesBody, isNot(contains('bb' * 32)));
+      // fetchReleaseBody trims the fetched body, so the staged file ends
+      // without a trailing newline.
       expect(
         notesBody,
-        contains('APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'55' * 32}'),
+        'SHA-256 certificate fingerprint: $pinnedReleaseFingerprint\n'
+        'APK SHA-256: cycle-app-0.2.1-armeabi-v7a.apk ${'44' * 32}\n'
+        'APK SHA-256: cycle-app-0.2.1-arm64-v8a.apk ${'55' * 32}\n'
+        'APK SHA-256: cycle-app-0.2.1-x86_64.apk ${'66' * 32}\n'
+        '${summaryBlock(whatsNewTrimmed)}\n'
+        '\n'
+        "## What's Changed\n"
+        '\n'
+        '* generated entry',
       );
+      expect(notesBody, isNot(contains('bb' * 32)));
+      expect(notesBody, isNot(contains('Stale old summary text.')));
       expect(output, contains('uploaded the APKs'));
       expect(output, contains('release notes updated'));
       // Soft-fail: the merge rejection printed the manual fallback command
       // and the run completed normally (no throw above).
       expect(output, contains('gh pr merge --merge --auto release/v0.2.1'));
       expect(output, contains('Allow auto-merge'));
+    });
+
+    test('a missing English changelog aborts the whole run before any '
+        'release create, upload, or edit', () async {
+      stageHappyTree();
+      final lines = <String>[];
+      await expectLater(
+        publish.runPublishRelease(
+          ['v0.2.1'],
+          root: root,
+          ghRunner: ghFixture(
+            releaseViewResult: 'missing',
+            gateLocales: const ['de-DE'],
+          ),
+          sha256Runner: fakeSha256Runner,
+          printer: lines.add,
+        ),
+        throwsA(
+          isA<ReleaseToolException>().having(
+            (error) => error.message,
+            'message',
+            contains('en-US'),
+          ),
+        ),
+      );
+      final mutating = ghInvocations.where(
+        (invocation) =>
+            invocation[0] == 'release' &&
+            const {'create', 'upload', 'edit'}.contains(invocation[1]),
+      );
+      expect(mutating, isEmpty, reason: 'invocations: $ghInvocations');
     });
 
     test('the notes fingerprint for a fresh create comes from the pin file '

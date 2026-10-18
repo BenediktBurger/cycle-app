@@ -73,7 +73,11 @@ String validManifestJson() => manifestJsonRaw(
 /// [includeAuthoringEntry] drops the authoring blob itself, for the
 /// default-changelog-only trees whose gate must not require the authoring
 /// file. Blob shas stay unique per locale so a caller fetching one
-/// locale's blob can never be answered by another's.
+/// locale's blob can never be answered by another's. The regular-file
+/// entries (authoring file in mode 100644 and the [regularNames] set)
+/// always serve a content blob — [regularFileContents] maps locale → file
+/// name → text, and an unlisted entry answers 'fallback text' so every
+/// gate fixture can serve the content fetch.
 ({String tree, Map<String, String> blobs}) changelogGateFixture({
   required String authoringName,
   required List<String> linkNames,
@@ -82,7 +86,12 @@ String validManifestJson() => manifestJsonRaw(
   String authoringMode = '100644',
   Set<String> regularNames = const {},
   bool truncated = false,
+  Map<String, Map<String, String>> regularFileContents = const {},
 }) {
+  String blobJson(String text) =>
+      '{"content":"${base64Encode(utf8.encode(text))}",'
+      '"encoding":"base64"}';
+  const fallbackContent = 'fallback text';
   final blobs = <String, String>{};
   final entries = <String>[];
   for (final MapEntry(key: locale, value: names) in targets.entries) {
@@ -96,14 +105,23 @@ String validManifestJson() => manifestJsonRaw(
         '{"path":"$prefix$authoringName","mode":"$authoringMode",'
         '"type":"blob","sha":"sha-$locale-authoring"}',
       );
+      if (authoringMode == '100644') {
+        blobs['sha-$locale-authoring'] = blobJson(
+          regularFileContents[locale]?[authoringName] ?? fallbackContent,
+        );
+      }
     }
     for (final name in linkNames) {
       final target = names[name];
       if (target == null) continue;
       if (regularNames.contains(name)) {
+        final contentSha = 'sha-$locale-file-$name';
+        blobs[contentSha] = blobJson(
+          regularFileContents[locale]?[name] ?? fallbackContent,
+        );
         entries.add(
           '{"path":"$prefix$name","mode":"100644",'
-          '"type":"blob","sha":"sha-$locale-file-$name"}',
+          '"type":"blob","sha":"$contentSha"}',
         );
         continue;
       }
