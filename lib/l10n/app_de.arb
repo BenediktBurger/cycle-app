@@ -41,7 +41,7 @@
   "@termPain": {
     "description": "Überschrift des Schmerz-Chips-Blocks (Brustschmerz, Mittelschmerz) im Tagebuch-Eingabeformular. TODO(user-review): Formulierung — prüfen, ob ein passenderer Titel passt."
   },
-  "termSex": "Sex",
+  "termSex": "Geschlechtsverkehr (X)",
   "todayDate": "Heute, {date}",
   "entryPreviousDay": "Voriger Tag",
   "entryNextDay": "Nächster Tag",
@@ -232,7 +232,7 @@
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend",
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh",
-  "cycleLegendSex": "Sex (X je Zeitpunkt)",
+  "cycleLegendSex": "Geschlechtsverkehr (X je Zeitpunkt)",
   "cycleLegendDisturbance": "Messstörung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (Tagebuchtext, am Tag senkrecht dargestellt)",
   "statisticsNote": "Nur Rechenwerte (Zykluslängen aus den gesetzten Zyklusbeginn-Markierungen, nicht aus gesetzter Blutung) — keine Bewertung oder Aussagen über Fruchtbarkeit.",
@@ -339,7 +339,7 @@
   "settingsTrackTitle": "Was aufzeichnen",
   "settingsTrackMucus": "Zervixschleim",
   "settingsTrackCervix": "Muttermund",
-  "settingsTrackSex": "Sex",
+  "settingsTrackSex": "Geschlechtsverkehr",
   "settingsTrackPain": "Schmerzen",
   "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
   "@settingsObservedCyclesOutsideApp": {
@@ -697,7 +697,7 @@
   },
   "diaryInfoSex": "Erfasst wird Geschlechtsverkehr mit Samenerguss in die Scheide. Der Zeitpunkt (morgens, mittags, abends) wird mit notiert, weil er fruchtbarkeitsrelevant ist: Samenzellen können mehrere Tage überleben, so dass auch Verkehr vor der fruchtbaren Zeit zur Schwangerschaft führen kann. Mehrere Zeitpunkte am selben Tag lassen sich gleichzeitig markieren.",
   "@diaryInfoSex": {
-    "description": "Info-Text zum Sex-Abschnitt im Tagebuch-Eingabeformular: im Zyklus-Kontext meint „Sex“ Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
+    "description": "Info-Text zum Geschlechtsverkehr-Abschnitt im Tagebuch-Eingabeformular (Titel: „Geschlechtsverkehr (X)“): im Zyklus-Kontext meint dies Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
   },
   "diaryInfoPain": "Zwei Schmerz-Beobachtungen: der zyklische Brustschmerz (typischerweise auftretender Spannungsschmerz in der zweiten Zyklushälfte) und der Mittelschmerz als möglicher Hinweis auf den Eisprung um die Zyklusmitte.",
   "@diaryInfoPain": {

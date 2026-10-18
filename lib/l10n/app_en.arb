@@ -44,7 +44,7 @@
   "@termPain": {
     "description": "Section header of the pain chips (breast pain, Mittelschmerz) on the diary entry form. TODO(user-review): wording — check whether a more specific title fits."
   },
-  "termSex": "Sex",
+  "termSex": "Sex (X)",
   "todayDate": "Today, {date}",
   "@todayDate": {
     "placeholders": {
@@ -791,7 +791,7 @@
   },
   "diaryInfoSex": "Recorded is intercourse with ejaculation into the vagina. The time of day (morning, midday, evening) is noted too because it is fertility-relevant: sperm can survive several days, so intercourse before the fertile time can lead to pregnancy. Several times of day can be selected together for the same day.",
   "@diaryInfoSex": {
-    "description": "Info-Text zum Sex-Abschnitt im Tagebuch-Eingabeformular: im Zyklus-Kontext meint „Sex“ Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
+    "description": "Info-Text zum Geschlechtsverkehr-Abschnitt im Tagebuch-Eingabeformular (Titel: „Geschlechtsverkehr (X)“): im Zyklus-Kontext meint dies Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
   },
   "diaryInfoPain": "Two pain observations: cyclical breast pain (the typical tension-type pain of the second half of the cycle) and mittelschmerz, the possible ovulation pain around mid-cycle.",
   "@diaryInfoPain": {
