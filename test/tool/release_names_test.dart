@@ -555,6 +555,7 @@ void main() {
       String authoringMode = '100644',
       Set<String> regularNames = const {},
       bool truncated = false,
+      Map<String, Map<String, String>> regularFileContents = const {},
     }) => changelogGateFixture(
       targets: targets,
       authoringName: authoringName,
@@ -562,6 +563,7 @@ void main() {
       authoringMode: authoringMode,
       regularNames: {...regularChangelogNames, ...regularNames},
       truncated: truncated,
+      regularFileContents: regularFileContents,
     );
 
     /// Per-locale targets for a complete set: every name points at the
@@ -578,6 +580,7 @@ void main() {
     /// and the per-ABI names are absent, as a minor release skips them.
     ({String tree, Map<String, String> blobs}) skipFixture({
       Map<String, String> perLocale = const {'default.txt': 'fallback text'},
+      Map<String, Map<String, String>> regularFileContents = const {},
     }) => changelogGateFixture(
       targets: {
         for (final locale in ['de-DE', 'en-US']) locale: perLocale,
@@ -586,6 +589,7 @@ void main() {
       linkNames: const ['default.txt'],
       includeAuthoringEntry: false,
       regularNames: const {'default.txt'},
+      regularFileContents: regularFileContents,
     );
 
     test('expected file set (full release): authoring file, three per-ABI '
@@ -1014,5 +1018,107 @@ void main() {
         }
       },
     );
+
+    test('the full-release gate returns the en-US authoring changelog text '
+        'fetched at the head commit', () async {
+      final content = await requireChangelogFiles(
+        versionName: '0.2.5',
+        versionCodeBase: 7,
+        defaultChangelogOnly: false,
+        headSha: validHeadSha,
+        ghApiRunner: gateRunner(
+          fixture(
+            targets: {
+              for (final locale in ['de-DE', 'en-US'])
+                locale: completeTargets(),
+            },
+            regularFileContents: {
+              'de-DE': {authoringName: 'de authoring body'},
+              'en-US': {authoringName: 'en-US authoring body'},
+            },
+          ),
+        ),
+        sink: (_) {},
+      );
+      expect(content, 'en-US authoring body');
+    });
+
+    test('the default-changelog-only gate returns the en-US default.txt '
+        'content', () async {
+      final content = await requireChangelogFiles(
+        versionName: '0.2.5',
+        versionCodeBase: 7,
+        defaultChangelogOnly: true,
+        headSha: validHeadSha,
+        ghApiRunner: gateRunner(
+          skipFixture(
+            regularFileContents: {
+              'en-US': {'default.txt': 'en-US fallback body'},
+            },
+          ),
+        ),
+        sink: (_) {},
+      );
+      expect(content, 'en-US fallback body');
+    });
+
+    test('a tree without an en-US locale directory fails loudly naming '
+        'en-US', () async {
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: false,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner(
+            fixture(targets: {'de-DE': completeTargets()}),
+          ),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a tree without en-US must abort the gate',
+      );
+      expect('$caught', contains('en-US'), reason: '$caught');
+    });
+
+    test('a failed content-blob fetch fails loudly naming the git-blob '
+        'fetch', () async {
+      final data = fixture(
+        targets: {
+          for (final locale in ['de-DE', 'en-US']) locale: completeTargets(),
+        },
+      );
+      final summaryBlobSha = 'sha-en-US-authoring';
+      expect(data.blobs.containsKey(summaryBlobSha), isTrue);
+      Object? caught;
+      try {
+        await requireChangelogFiles(
+          versionName: '0.2.5',
+          versionCodeBase: 7,
+          defaultChangelogOnly: false,
+          headSha: validHeadSha,
+          ghApiRunner: gateRunner((
+            tree: data.tree,
+            blobs: {...data.blobs}..remove(summaryBlobSha),
+          )),
+          sink: (_) {},
+        );
+      } on ReleaseToolException catch (error) {
+        caught = error;
+      }
+      expect(
+        caught,
+        isNotNull,
+        reason: 'a failed content-blob fetch must abort the gate',
+      );
+      expect('$caught', contains('git-blob fetch'), reason: '$caught');
+      expect('$caught', contains(summaryBlobSha), reason: '$caught');
+    });
   });
 }

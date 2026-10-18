@@ -492,13 +492,23 @@ Do **not** start until Android went through Phases B–F at least once.
    appear atomically and a failed publish leaves no dangling tag; the
    CI build stays the only thing a push triggers. The publish script
    re-checks the changelog files at the manifest's head commit (scope per
-   the manifest) before touching the release. The notes body is the
-   pinned fingerprint line plus one `APK SHA-256:` line per APK (GitHub
-   appends the auto-generated changelog; the fingerprint is the trust
-   anchor F-Droid metadata cross-checks). An already existing release is
-   **re-attached** instead: the signed APKs are uploaded with `--clobber`
-   and the fresh checksum lines are spliced into the existing notes body
-   (everything else preserved). The re-attach path needs no tag
+   the manifest) before touching the release. The notes body is three
+   layers, top to bottom: the pinned fingerprint line plus one
+   `APK SHA-256:` line per APK (the fingerprint is the trust anchor
+   F-Droid metadata cross-checks, so it stays first); below it, the
+   `## What's new` summary block — the text of the English (`en-US`)
+   fastlane changelog at that same head commit, the authoring
+   `<versionName>.txt` on a full release and the hand-maintained
+   `default.txt` on a minor release — fenced by the
+   `<!-- release-summary -->` … `<!-- /release-summary -->`
+   HTML-comment markers; and GitHub's auto-generated changelog, which
+   `gh release create --generate-notes` appends after this body. An
+   already existing release is **re-attached** instead: the signed APKs
+   are uploaded with `--clobber`, the fresh checksum lines are spliced
+   into the existing notes body, and the summary block between the
+   markers is replaced wholesale (a body predating the summary gets the
+   block inserted after the checksum lines; everything else
+   preserved). The re-attach path needs no tag
    delete/re-push games: re-sign from the original run via the
    download-and-sign script's `--run-id <original run>` (when the
    artifacts still exist) or re-dispatch a Release run on a release

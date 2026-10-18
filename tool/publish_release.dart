@@ -17,10 +17,13 @@
 // read-only, which is what makes the rehearsal exact); release assembly —
 // missing release → `gh release create vX.Y.Z <staged apks> --target
 // <headSha from the manifest> --generate-notes --notes-file <notes body
-// with the fingerprint line + fresh checksum lines>` (that one command
-// authors the TAG too, at the manifest's head SHA — tag, release, and
-// signed assets appear atomically), existing release → `gh release upload
-// --clobber` + checksum splice into the fetched notes body; post-release PR
+// with the fingerprint line + fresh checksum lines, then the What's new
+// summary block from the English fastlane changelog at the head commit;
+// --generate-notes appends the auto-generated changelog after that body>`
+// (that one command authors the TAG too, at the manifest's head SHA —
+// tag, release, and signed assets appear atomically), existing release →
+// `gh release upload --clobber` + checksum and summary splice into the
+// fetched notes body; post-release PR
 // plumbing (release/vX.Y.Z → development, `gh pr merge --merge --auto`,
 // lenient already-exists handling, SOFT-FAIL — once the release is out, PR
 // failures print the exact manual commands and never abort the run); post
@@ -201,14 +204,30 @@ Future<Map<String, String>> stagedChecksums({
 
 // --- notes body + checksum splice (checksum lines are this script's domain) -------
 
+/// Start and end of the embedded "What's new" summary in a release body;
+/// [spliceSummaryBlock] replaces everything between them wholesale.
+const String releaseSummaryStartMarker = '<!-- release-summary -->';
+const String releaseSummaryEndMarker = '<!-- /release-summary -->';
+
+/// The canonical summary block for [whatsNew] (expected already trimmed).
+String summaryBlock(String whatsNew) =>
+    '$releaseSummaryStartMarker\n'
+    "## What's new\n"
+    '\n'
+    '$whatsNew\n'
+    '$releaseSummaryEndMarker';
+
 /// Assembles the GitHub release notes body: the certificate fingerprint line
-/// (single release key shared by all three APKs) plus one checksum line per
-/// published APK name, in map order (the asset order). On `gh release create
-/// --generate-notes` the auto-generated changelog is appended after this
-/// body (documented behavior the runbook relies on).
+/// (single release key shared by all three APKs), one checksum line per
+/// published APK name in map order (the asset order), then a blank line and
+/// the "What's new" summary block ([whatsNew] trimmed of surrounding
+/// whitespace). On `gh release create --generate-notes` the auto-generated
+/// changelog is appended after this body (documented behavior the runbook
+/// relies on).
 String buildNotesBody({
   required String certificateFingerprint,
   required Map<String, String> apkSha256ByPublishName,
+  required String whatsNew,
 }) {
   final buffer = StringBuffer(
     'SHA-256 certificate fingerprint: '
@@ -217,7 +236,68 @@ String buildNotesBody({
   apkSha256ByPublishName.forEach((publishName, sha256) {
     buffer.write('APK SHA-256: $publishName ${normalizeFingerprint(sha256)}\n');
   });
+  buffer
+    ..write('\n')
+    ..write(summaryBlock(whatsNew.trim()));
   return buffer.toString();
+}
+
+/// Splices the fresh "What's new" summary into a fetched release body. A
+/// body that already carries the marker block gets it replaced
+/// start-marker-through-end-marker; a legacy body without markers gets the
+/// block inserted after the last `APK SHA-256:` line, else after the
+/// fingerprint line, else appended at the end — always blank-line separated
+/// (pre-summary releases must stay upgradeable in place).
+String spliceSummaryBlock(String releaseBody, String whatsNew) {
+  final block = summaryBlock(whatsNew.trim());
+  final startIndex = releaseBody.indexOf(releaseSummaryStartMarker);
+  if (startIndex != -1) {
+    final endIndex = releaseBody.indexOf(releaseSummaryEndMarker, startIndex);
+    if (endIndex == -1) {
+      throw ReleaseToolException(
+        'the release body carries $releaseSummaryStartMarker without '
+        '$releaseSummaryEndMarker — the summary block is malformed; fix '
+        'the release body by hand before re-running the publish helper.',
+      );
+    }
+    return releaseBody.replaceRange(
+      startIndex,
+      endIndex + releaseSummaryEndMarker.length,
+      block,
+    );
+  }
+
+  final lines = releaseBody.split('\n');
+  var anchorIndex = -1;
+  for (var i = 0; i < lines.length; i++) {
+    if (_checksumLinePattern.hasMatch(lines[i])) anchorIndex = i;
+  }
+  if (anchorIndex == -1) {
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('SHA-256 certificate fingerprint:')) {
+        anchorIndex = i;
+        break;
+      }
+    }
+  }
+  if (anchorIndex == -1) {
+    final needsLeadingNewline =
+        releaseBody.isNotEmpty && !releaseBody.endsWith('\n');
+    return '$releaseBody${needsLeadingNewline ? '\n' : ''}\n$block';
+  }
+  final following = anchorIndex + 1 < lines.length
+      ? lines[anchorIndex + 1]
+      : '';
+  final insertion = <String>[
+    '',
+    ...block.split('\n'),
+    if (following.isNotEmpty) '',
+  ];
+  return [
+    ...lines.take(anchorIndex + 1),
+    ...insertion,
+    ...lines.skip(anchorIndex + 1),
+  ].join('\n');
 }
 
 /// A checksum line as assembled by [buildNotesBody] (one per published APK).
@@ -639,7 +719,7 @@ Future<void> runPublishRelease(
   // anything is created or attached. The manifest's defaultChangelogOnly
   // narrows this to default.txt-only for a minor release.
   out("verifying the changelog files at the run's commit …");
-  await requireChangelogFiles(
+  final whatsNew = await requireChangelogFiles(
     versionName: manifest.versionName,
     versionCodeBase: manifest.versionCodeBase,
     defaultChangelogOnly: manifest.defaultChangelogOnly,
@@ -672,6 +752,7 @@ Future<void> runPublishRelease(
       final freshBody = buildNotesBody(
         certificateFingerprint: _pinnedNotesFingerprint(repoRoot),
         apkSha256ByPublishName: shaByPublishName,
+        whatsNew: whatsNew,
       );
       out(
         formatDryRunGhCreateCommand(
@@ -686,7 +767,10 @@ Future<void> runPublishRelease(
         formatDryRunGhUpdateCommands(
           tag,
           stagedPublishPaths(manifest.versionName),
-          spliceChecksumLines(existingBody, shaByPublishName),
+          spliceSummaryBlock(
+            spliceChecksumLines(existingBody, shaByPublishName),
+            whatsNew,
+          ),
         ),
       );
     }
@@ -705,6 +789,7 @@ Future<void> runPublishRelease(
     final freshBody = buildNotesBody(
       certificateFingerprint: _pinnedNotesFingerprint(repoRoot),
       apkSha256ByPublishName: shaByPublishName,
+      whatsNew: whatsNew,
     );
     final notesFile = notesFilePath(tag);
     final stagedNotesFile = File('${repoRoot.path}/$notesFile');
@@ -736,7 +821,10 @@ Future<void> runPublishRelease(
     }
     out('created the release: ${(create.stdout as String).trim()}');
   } else {
-    final updatedBody = spliceChecksumLines(existingBody, shaByPublishName);
+    final updatedBody = spliceSummaryBlock(
+      spliceChecksumLines(existingBody, shaByPublishName),
+      whatsNew,
+    );
     final notesFile = notesFilePath(tag);
     final stagedNotesFile = File('${repoRoot.path}/$notesFile');
     await stagedNotesFile.parent.create(recursive: true);
