@@ -21,6 +21,26 @@ class EntriesDao extends DatabaseAccessor<CycleDatabase>
     )..where((t) => t.date.equalsValue(_normalize(date)))).getSingleOrNull();
   }
 
+  /// The newest entry STRICTLY BEFORE [date]'s day that carries a
+  /// temperature — the diary's "suggestion from the previous day" source
+  /// (falls back past unmeasured days; the selected day itself never
+  /// counts). Null when no earlier day measured.
+  Future<CycleEntry?> latestTemperatureBefore(DateTime date) {
+    return (select(cycleEntries)
+          ..where(
+            (t) =>
+                t.bbtC.isNotNull() &
+                t.date.isSmallerThanValue(
+                  // Converter comparisons are on the raw epoch-day int,
+                  // like range() above.
+                  const EpochDayConverter().toSql(_normalize(date)),
+                ),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.date)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// Inserts the day entry, or FULLY replaces the row for the same day —
   /// the upsert semantics: every field present in [entry] is written as
   /// given (nulls included), the existing id and created_at are kept,
