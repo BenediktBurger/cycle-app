@@ -22,7 +22,7 @@ const _temperatureHeader = 'Temperatur';
 const _bleedingHeader = 'Blutung';
 const _mucusHeader = 'Fruchtbarkeitszeichen (Zervixschleim)';
 const _cervixHeader = 'Muttermund';
-const _sexHeader = 'Sex';
+const _sexHeader = 'Geschlechtsverkehr (X)';
 const _painHeader = 'Schmerzen';
 
 Finder _formHeader(String title) =>

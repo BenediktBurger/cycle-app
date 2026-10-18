@@ -52,7 +52,7 @@ const _glossaryDe = [
   'Fruchtbarkeitszeichen (Zervixschleim)',
   'Schleimhöhepunkt',
   'Mittelschmerz (M)',
-  'Sex (X je Zeitpunkt)',
+  'Geschlechtsverkehr (X je Zeitpunkt)',
   'Aufwachtemperatur in °C',
   'Temperatur ignoriert (heller gezeichnet)',
   'Umrandete höhere Messungen',
