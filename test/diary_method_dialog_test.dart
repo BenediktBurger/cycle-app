@@ -43,6 +43,12 @@ const _saveFailed =
 const _deleteFailed =
     'Löschen fehlgeschlagen — die Daten wurden nicht geändert.';
 const _loadFailed = 'Laden fehlgeschlagen';
+const _changeNote =
+    'Lege einen neuen Eintrag an, sobald sich an der Methode etwas ändert — '
+    'auch wenn Messort oder Thermometermodell gleich bleiben, zum Beispiel '
+    'nach dem Austausch des Thermometers gegen ein anderes desselben Modells. '
+    'Den Grund für einen neuen Eintrag kannst du in den Notizen des Tages '
+    'festhalten.';
 
 Finder _methodIcon() => find.byKey(const ValueKey('diaryMethodButton'));
 
@@ -504,6 +510,48 @@ void main() {
         reason: 'loading has ended — the failure is the outcome',
       );
       expect(find.text(_dialogTitle), findsOneWidget);
+    });
+  });
+
+  group('dialog change note', () {
+    testWidgets('the empty state shows the guidance note', (tester) async {
+      await tester.pumpWidget(_harness.scope());
+      await tester.pumpAndSettle();
+
+      await _openDialog(tester);
+      expect(
+        find.text(_changeNote),
+        findsOneWidget,
+        reason:
+            'the guidance applies generally — even the first entry is a '
+            'method change',
+      );
+    });
+
+    testWidgets('a day with its own snapshot shows the guidance note too', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness.scope(
+          seed: (db) async {
+            await db.measurementMethodsDao.upsertByDate(
+              date: _harness.selectedDay,
+              route: MeasurementRoute.oral,
+              thermometer: 'ThermaPen',
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _openDialog(tester);
+      expect(
+        find.text(_changeNote),
+        findsOneWidget,
+        reason:
+            'the note is shown in every dialog state — the guidance to '
+            'create a new entry on any change is not state-specific',
+      );
     });
   });
 

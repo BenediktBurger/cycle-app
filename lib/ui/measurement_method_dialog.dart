@@ -148,6 +148,7 @@ class _MeasurementMethodDialogState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final bodySmall = Theme.of(context).textTheme.bodySmall;
     final locale = Localizations.localeOf(context).toString();
     final selected = ref.watch(selectedDateProvider);
     final navigable =
@@ -171,66 +172,64 @@ class _MeasurementMethodDialogState
               height: 48,
               child: Center(child: CircularProgressIndicator()),
             )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (navigable)
-                  Tooltip(
-                    message: l10n.methodNavigateToChange,
-                    child: InkWell(
-                      key: const ValueKey('methodDateLine'),
-                      onTap: _navigateToSnapshotDay,
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: dateLine,
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (navigable)
+                    Tooltip(
+                      message: l10n.methodNavigateToChange,
+                      child: InkWell(
+                        key: const ValueKey('methodDateLine'),
+                        onTap: _navigateToSnapshotDay,
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: dateLine,
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  dateLine,
-                if (_notRecorded) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.methodNotRecorded,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final route in MeasurementRoute.values)
-                      ChoiceChip(
-                        key: ValueKey('methodRouteChip-${route.name}'),
-                        label: Text(switch (route) {
-                          MeasurementRoute.vaginal => l10n.methodRouteVaginal,
-                          MeasurementRoute.rectal => l10n.methodRouteRectal,
-                          MeasurementRoute.oral => l10n.methodRouteOral,
-                          MeasurementRoute.other => l10n.methodRouteOther,
-                        }),
-                        selected: _route == route,
-                        onSelected: (selected) =>
-                            setState(() => _route = selected ? route : null),
-                      ),
+                    )
+                  else
+                    dateLine,
+                  if (_notRecorded) ...[
+                    const SizedBox(height: 4),
+                    Text(l10n.methodNotRecorded, style: bodySmall),
                   ],
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  key: const ValueKey('methodThermometerField'),
-                  controller: _thermometer,
-                  decoration: InputDecoration(
-                    labelText: l10n.methodThermometerLabel,
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final route in MeasurementRoute.values)
+                        ChoiceChip(
+                          key: ValueKey('methodRouteChip-${route.name}'),
+                          label: Text(switch (route) {
+                            MeasurementRoute.vaginal => l10n.methodRouteVaginal,
+                            MeasurementRoute.rectal => l10n.methodRouteRectal,
+                            MeasurementRoute.oral => l10n.methodRouteOral,
+                            MeasurementRoute.other => l10n.methodRouteOther,
+                          }),
+                          selected: _route == route,
+                          onSelected: (selected) =>
+                              setState(() => _route = selected ? route : null),
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.methodHelperText,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    key: const ValueKey('methodThermometerField'),
+                    controller: _thermometer,
+                    decoration: InputDecoration(
+                      labelText: l10n.methodThermometerLabel,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(l10n.methodHelperText, style: bodySmall),
+                  const SizedBox(height: 4),
+                  Text(l10n.methodChangeNote, style: bodySmall),
+                ],
+              ),
             ),
       actions: [
         if (_dayHasSnapshot)
