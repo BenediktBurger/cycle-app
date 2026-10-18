@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/domain/models.dart';
 
 void main() {
@@ -23,20 +24,17 @@ void main() {
     addTearDown(db.close);
   });
 
-  test(
-    'the schema version is 13 (the measurement_methods snapshot table)',
-    () async {
-      final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(
-        version.data['user_version'],
-        13,
-        reason:
-            'v13 adds the measurement_methods table; an existing '
-            'install gains it through the incremental create, so the '
-            'step is a real migration',
-      );
-    },
-  );
+  test('the schema version is 14 (the custom_marks column)', () async {
+    final version = await db.customSelect('PRAGMA user_version').getSingle();
+    expect(
+      version.data['user_version'],
+      14,
+      reason:
+          'v14 adds the custom_marks column to cycle_entries; an '
+          'existing install gains it through the incremental addColumn, '
+          'so the step is a real migration',
+    );
+  });
   group('incremental upgrade from an older schemaVersion', () {
     late Directory tempDir;
     late File dbFile;
@@ -82,16 +80,19 @@ void main() {
 
     /// Builds a temp-file database stamped with the stale [from]
     /// user_version, whose DDL is the CURRENT schema (dumped in setUp) with
-    /// ONE rewrite: pre-v12 files do not carry the bleeding column's
+    /// up to TWO rewrites: pre-v12 files do not carry the bleeding column's
     /// engine-level CHECK, so the replayed `cycle_entries` statement is
     /// stripped back to the plain `NOT NULL DEFAULT 0` column (the regex
     /// matches the column definition up to the next comma, whatever the
-    /// rest of the statement looks like). Per the documented history, the
-    /// remaining DDL of a v9/v10/v11/v12-shaped file is the current DDL —
-    /// v9→v10 adds only `app_settings`, v10→v11 changes no SQL, v11→v12
-    /// touches only the bleeding column, and the `measurement_methods`
-    /// snapshot table is NEW in v13, so no pre-v13 file carries it (the
-    /// fixture never replays it; the migration is what must create it).
+    /// rest of the statement looks like), and pre-v14 files do not carry
+    /// the `custom_marks` column at all, so it is stripped from the
+    /// replayed `cycle_entries` statement the same way (the migration's
+    /// addColumn is what must create it). Per the documented history, the
+    /// remaining DDL of a v9/v10/v11/v12/v13-shaped file is the current
+    /// DDL — v9→v10 adds only `app_settings`, v10→v11 changes no SQL,
+    /// v11→v12 touches only the bleeding column, the `measurement_methods`
+    /// snapshot table is NEW in v13 (so no pre-v13 file carries it; the
+    /// fixture never replays it), and v13→v14 adds only `custom_marks`.
     /// These deltas are all the fixture controls. The seeded user data is
     /// written with raw SQL and explicit
     /// created_at/updated_at values so the rows are individually
@@ -103,6 +104,22 @@ void main() {
       required bool withAppSettings,
       int seedBleeding = 4,
     }) async {
+      // Pre-v14 files carry no custom_marks column: it is stripped from
+      // the replayed DDL so the migration's addColumn is the step that
+      // creates it (same trick as the bleeding CHECK strip).
+      String cycleEntriesSql(String sql) {
+        final bleedingStripped = sql.replaceAllMapped(
+          RegExp(r'"bleeding" INTEGER[^,]*'),
+          (_) => '"bleeding" INTEGER NOT NULL DEFAULT 0',
+        );
+        return from < 14
+            ? bleedingStripped.replaceAll(
+                RegExp(r',\s*"custom_marks" TEXT[^,]*'),
+                '',
+              )
+            : bleedingStripped;
+      }
+
       final statements = [
         for (final r in currentDdl)
           if ((withAppSettings || r['name'] != 'app_settings') &&
@@ -113,10 +130,7 @@ void main() {
             (
               tableFirst: r['type'] == 'table' ? 0 : 1,
               sql: r['type'] == 'table' && r['name'] == 'cycle_entries'
-                  ? (r['sql']! as String).replaceAllMapped(
-                      RegExp(r'"bleeding" INTEGER[^,]*'),
-                      (_) => '"bleeding" INTEGER NOT NULL DEFAULT 0',
-                    )
+                  ? cycleEntriesSql(r['sql']! as String)
                   : r['sql']! as String,
             ),
       ]..sort((a, b) => a.tableFirst - b.tableFirst); // tables before indexes
@@ -167,6 +181,11 @@ void main() {
       expect(row.painMittelschmerz, isFalse);
       expect(row.sexTimings, 5);
       expect(row.notes, 'seeded row');
+      expect(
+        dailyEntryFromDrift(row).customMarks,
+        isEmpty,
+        reason: 'the seeded pre-v14 row carries no custom marks',
+      );
       expect(
         row.createdAt.isAtSameMomentAs(DateTime.utc(2026, 1, 1)),
         isTrue,
@@ -295,6 +314,46 @@ void main() {
         );
       },
     );
+
+    test('a v13 file migrates incrementally: the custom_marks column appears '
+        'with the tracked data preserved', () async {
+      final db = await openMigrationFixture(13, withAppSettings: true);
+      await expectPreserved(db);
+
+      final columns = [
+        for (final r
+            in await db.customSelect('PRAGMA table_info(cycle_entries)').get())
+          r.data['name']! as String,
+      ];
+      expect(
+        columns,
+        contains('custom_marks'),
+        reason: 'the v13→v14 step adds the nullable column in place',
+      );
+      final raw = await db
+          .customSelect('SELECT custom_marks FROM cycle_entries')
+          .getSingle();
+      expect(
+        raw.data['custom_marks'],
+        isNull,
+        reason: 'the migrated pre-v14 row carries no custom marks',
+      );
+
+      // The new column round-trips through the normal DAO immediately
+      // after the upgrade.
+      const marks = {
+        'Sport': ['Joggen', 'Kraft'],
+      };
+      await db.entriesDao.upsertDaily(
+        DailyEntry(
+          date: DateTime(2024, 10, 4),
+          bleeding: Bleeding.heavy,
+          customMarks: marks,
+        ),
+      );
+      final row = (await db.entriesDao.entryFor(DateTime(2024, 10, 4)))!;
+      expect(dailyEntryFromDrift(row).customMarks, marks);
+    });
 
     test('a pre-existing out-of-range bleeding row fails the migration '
         'loudly', () async {

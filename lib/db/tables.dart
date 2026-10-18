@@ -161,6 +161,10 @@ class CycleEntries extends Table {
 
   TextColumn get notes => text().nullable()();
 
+  /// The day's user-defined category picks, stored as one JSON object
+  /// `{"Kategorie": ["Eintrag", …]}` (label-keyed, no IDs); NULL when the day records none.
+  TextColumn get customMarks => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }

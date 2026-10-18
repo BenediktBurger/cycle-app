@@ -1,4 +1,4 @@
-// The app's drift database (schema version 13, profile-free).
+// The app's drift database (schema version 14, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // measurement_methods_dao.dart, settings_dao.dart) are
@@ -58,7 +58,7 @@ class CycleDatabase extends _$CycleDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -89,12 +89,16 @@ class CycleDatabase extends _$CycleDatabase {
         // The `bleeding` column joins the engine-CHECK-guarded columns:
         // SQLite cannot add a CHECK to a column in place, so drift
         // recreates the table from the new definition and copies the rows
-        // (the column set is unchanged, and the unique index is
-        // re-established with the table). A pre-existing out-of-range row
+        // (the unique index is re-established with the table). The v14
+        // `custom_marks` column (see the v14 block below) does not exist
+        // in a pre-v12 file yet, so it is listed as new to keep the row
+        // copy off it; a pre-existing out-of-range bleeding row
         // makes the copy fail loudly — no clamping, no dropped row: the
         // fail-loud reading of such corrupt data is the settled posture
         // (ADR-0005, update 2026-09-25).
-        await m.alterTable(TableMigration(cycleEntries));
+        await m.alterTable(
+          TableMigration(cycleEntries, newColumns: [cycleEntries.customMarks]),
+        );
       }
 
       // Each future schema-version bump adds its own guarded block here
@@ -112,6 +116,13 @@ class CycleDatabase extends _$CycleDatabase {
         // belongs to the same delta and must be created with it.
         await m.createTable(measurementMethods);
         await m.createIndex(measurementMethodsDateUnique);
+      }
+
+      // The custom_marks column is NEW in v14 (see lib/db/tables.dart for
+      // the stored shape): a nullable ADD COLUMN needs no data copy, and
+      // a pre-v12 file already gains it with the table recreation above.
+      if (from >= 12 && from < 14) {
+        await m.addColumn(cycleEntries, cycleEntries.customMarks);
       }
     },
     // SQLite only enforces FOREIGN KEY constraints when the pragma is
