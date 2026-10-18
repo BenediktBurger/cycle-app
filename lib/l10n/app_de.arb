@@ -657,6 +657,7 @@
     "description": "Leerzustand des Messmethoden-Dialogs: Der Tag erbt noch keine Messmethode aus einer früheren Momentaufnahme — die erste Speicherung ist der Startwert."
   },
   "methodHelperText": "Zum Ändern oder Löschen einer früheren Angabe: navigiere im Tagebuch zum jeweiligen Tag.",
+  "methodChangeNote": "Lege einen neuen Eintrag an, sobald sich an der Methode etwas ändert — auch wenn Messort oder Thermometermodell gleich bleiben, zum Beispiel nach dem Austausch des Thermometers gegen ein anderes desselben Modells. Den Grund für einen neuen Eintrag kannst du in den Notizen des Tages festhalten.",
   "methodDeleteChange": "Änderung löschen",
   "@methodDeleteChange": {
     "description": "Aktion im Messmethoden-Dialog: entfernt nur die Momentaufnahme des ausgewählten Tages; die wirksame Methode fällt danach auf die frühere Angabe zurück."

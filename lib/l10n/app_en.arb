@@ -748,6 +748,10 @@
     "description": "Empty state of the measurement-method dialog: the day inherits no method from an earlier snapshot yet — the first save is the baseline."
   },
   "methodHelperText": "To change or delete a past entry, navigate the diary to that day.",
+  "methodChangeNote": "Create a new entry whenever anything about the method changes — even if the measurement place or thermometer model stays the same, for example after replacing the thermometer with another one of the same model. You can record the reason for a new entry in the day's notes.",
+  "@methodChangeNote": {
+    "description": "Guidance note in the measurement-method dialog, shown in every state: any change to the method requires a new entry (even a same-model thermometer swap), and the day's notes field is the place to record the reason."
+  },
   "methodDeleteChange": "Delete change",
   "@methodDeleteChange": {
     "description": "Action in the measurement-method dialog: removes only the selected day's snapshot; the effective method then falls back to the earlier entry."
