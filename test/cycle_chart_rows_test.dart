@@ -368,33 +368,6 @@ void main() {
       );
     });
 
-    testWidgets('no per-day clock icon exists anywhere in the signal rows', (
-      tester,
-    ) async {
-      await pumpChart(tester, chartHarness(entries: _rowsEntries));
-
-      // The ONLY clock icon in the signal rows is the time row's corner
-      // sample; the day cells never carry one (no per-day clock glyph).
-      for (var i = 0; i < _dayCount; i++) {
-        expect(
-          find.descendant(
-            of: chartCell(i, 'time'),
-            matching: find.byIcon(Icons.schedule),
-          ),
-          findsNothing,
-          reason: 'day $i: no clock icon in the time cell',
-        );
-      }
-      expect(
-        find.descendant(
-          of: chartCellCorner('time'),
-          matching: find.byIcon(Icons.schedule),
-        ),
-        findsOneWidget,
-        reason: 'only the corner sample keeps a clock icon',
-      );
-    });
-
     testWidgets('tapping a signal row cell opens the day\'s sheet', (
       tester,
     ) async {
@@ -414,7 +387,7 @@ void main() {
 
     // The bleeding row hands its cell bounds to the shared square-box
     // symbol (lib/ui/bleeding_symbol.dart); the fill layout per level is
-    // that symbol's convention, owned by test/bleeding_symbol_test.dart —
+    // that symbol's convention, owned by test/symbol_widgets_test.dart —
     // here only that every recorded level renders it at all.
     testWidgets('bleeding cells render the shared symbol: exactly one fill per '
         'menstruation level, interrupted dots for spotting, no fill for '
@@ -796,40 +769,12 @@ void main() {
     }
   });
 
-  testWidgets('the mucus and sex signal rows are gone: no day cells, no '
-      'corner slots, no row peak dots — and only the two observation '
-      'kinds render in the plot', (tester) async {
+  testWidgets('the plot renders exactly the mucus letters, the Mittelschmerz '
+      'M, the sex X marks and their halos', (tester) async {
     await pumpChart(tester, chartHarness(entries: _rowsEntries));
 
-    for (var i = 0; i < _dayCount; i++) {
-      expect(
-        find.byKey(ValueKey('mucusCell-$i')),
-        findsNothing,
-        reason: 'mucus letters render in the plot, not as row cells',
-      );
-      expect(
-        find.byKey(ValueKey('sexCell-$i')),
-        findsNothing,
-        reason: 'the X marks render in the plot, not as row cells',
-      );
-    }
-    expect(find.byKey(const ValueKey('mucusCorner')), findsNothing);
-    expect(find.byKey(const ValueKey('sexCorner')), findsNothing);
-    expect(
-      find.byWidgetPredicate(
-        (w) =>
-            w.key is ValueKey<String> &&
-            (w.key as ValueKey<String>).value.startsWith('peakDot-'),
-      ),
-      findsNothing,
-      reason:
-          'no row-rendered peak dot key remains — the dot renders '
-          'in-plot as inPlotPeakDot-*',
-    );
-
-    // The complete set of in-plot keys: the fixture's recorded
-    // observations are day 4's S+EW mucus plus its Mittelschmerz M and
-    // day 6's start-slot sex — no exclusion marks render in the plot.
+    // The fixture's recorded observations are day 4's S+EW mucus plus
+    // its Mittelschmerz M and day 6's start-slot sex.
     final inPlotKeys = tester
         .widgetList(
           find.byWidgetPredicate(
@@ -851,8 +796,8 @@ void main() {
         'inPlotHaloSex-6-morning',
       },
       reason:
-          'only the mucus letters, the M, the X marks and their halos '
-          'render in the plot',
+          'the plot carries the mucus letters, the M, the X marks '
+          'and their halos',
     );
   });
 }

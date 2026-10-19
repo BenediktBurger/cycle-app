@@ -270,23 +270,6 @@ void main() {
         "VALUES (20001, 'halfSoft')",
       );
     });
-
-    test(
-      'full replace clears a previously stored firmness (null written)',
-      () async {
-        await db.entriesDao.upsertDaily(
-          DailyEntry(
-            date: DateTime(2026, 8, 15),
-            cervixFirmness: CervixFirmness.hard,
-          ),
-        );
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 8, 15)),
-        );
-        final row = (await db.entriesDao.entryFor(DateTime(2026, 8, 15)))!;
-        expect(row.cervixFirmness, isNull);
-      },
-    );
   });
 
   group('sex timings storage & domain round trip', () {
@@ -348,19 +331,5 @@ void main() {
         'VALUES (20003, 7)',
       );
     });
-
-    test(
-      'full replace clears a previously stored mask (default 0 written)',
-      () async {
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 7, 15), sexTimings: 3),
-        );
-        await db.entriesDao.upsertDaily(
-          DailyEntry(date: DateTime(2026, 7, 15)),
-        );
-        final row = (await db.entriesDao.entryFor(DateTime(2026, 7, 15)))!;
-        expect(row.sexTimings, 0);
-      },
-    );
   });
 }

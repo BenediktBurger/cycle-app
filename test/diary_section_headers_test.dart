@@ -1,13 +1,10 @@
-// The diary entry form's section headers, integrated: every section block
-// opens with a SectionHeader (exactly one, at its top), the combined cervix
-// header replaces the three full-size picker labels, and an untracked
-// section disappears together with its header. The info buttons' bottom
-// sheets carry the section title and the (German) guidance text; a narrow
-// viewport and a large font scale pump the whole form overflow-free.
-//
-// The tests pump the real app through the diary harness (German locale,
-// pinned clock); the German section titles are asserted verbatim.
+// Section headers at both layers: the standalone SectionHeader widget
+// (title, info button, guidance bottom sheet, tap target) and the diary
+// form's integrated headers (one per block, combined cervix header, hidden
+// untracked sections, overflow pins).
 import 'package:cycle_app/domain/diary_track.dart';
+import 'package:cycle_app/l10n/app_localizations.dart';
+import 'package:cycle_app/ui/section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,6 +27,16 @@ Finder _formHeader(String title) =>
 
 Finder _infoButton(String headerTitle) =>
     find.byKey(ValueKey('diarySectionInfo-$headerTitle'));
+
+const _title = 'Temperature';
+const _info = 'Measure after waking, before getting up or any activity.';
+
+Widget _host(Widget header) => MaterialApp(
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  locale: const Locale('en'),
+  home: Scaffold(body: ListView(children: [header])),
+);
 
 void main() {
   group('every header renders exactly once at its block start', () {
@@ -231,5 +238,87 @@ void main() {
             'overflow-free at a large font scale',
       );
     });
+  });
+
+  testWidgets('renders the title once, left-aligned', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_host(const SectionHeader(title: _title)));
+
+    expect(find.text(_title), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text(_title)).dx,
+      0,
+      reason: 'the section title sits at the row start (left-aligned)',
+    );
+  });
+
+  testWidgets('shows no info button without info', (WidgetTester tester) async {
+    await tester.pumpWidget(_host(const SectionHeader(title: _title)));
+
+    expect(find.byIcon(Icons.info_outline), findsNothing);
+  });
+
+  testWidgets('shows the info button with the title as tooltip topic', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const SectionHeader(title: _title, info: _info)),
+    );
+
+    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    expect(
+      find.byTooltip('Information about $_title'),
+      findsOneWidget,
+      reason: 'the localized tooltip substitutes the section title as topic',
+    );
+  });
+
+  testWidgets('tapping the info button opens the guidance bottom sheet', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const SectionHeader(title: _title, info: _info)),
+    );
+
+    await tester.tap(find.byIcon(Icons.info_outline));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_info), findsOneWidget);
+    // The sheet repeats the section title above its body.
+    expect(find.text(_title), findsNWidgets(2));
+  });
+
+  testWidgets('dismissing the sheet leaves no widget state behind', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const SectionHeader(title: _title, info: _info)),
+    );
+    await tester.tap(find.byIcon(Icons.info_outline));
+    await tester.pumpAndSettle();
+
+    // Tap the barrier above the sheet to dismiss it.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_info), findsNothing);
+    expect(find.text(_title), findsOneWidget);
+  });
+
+  testWidgets('the info button tap target covers 48 dp', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const SectionHeader(title: _title, info: _info)),
+    );
+
+    final button = find.ancestor(
+      of: find.byIcon(Icons.info_outline),
+      matching: find.byType(IconButton),
+    );
+    final size = tester.getSize(button);
+    expect(size.width, greaterThanOrEqualTo(48));
+    expect(size.height, greaterThanOrEqualTo(48));
   });
 }

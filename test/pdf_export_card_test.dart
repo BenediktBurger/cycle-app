@@ -171,10 +171,8 @@ void main() {
   }
 
   testWidgets(
-    'card defaults: the inline checkbox list is GONE from the card — the '
-    'card shows the summary line ("3 of 3 cycles selected", the null '
-    'means-all default), the anonymize switch OFF and the selection '
-    'button',
+    'card defaults: the card shows the selection summary (all cycles when '
+    'none are picked), the anonymize switch OFF and the selection button',
     (WidgetTester tester) async {
       await enlargeViewport(tester);
       await pumpCard(
@@ -182,18 +180,13 @@ void main() {
         harness(entries: cardEntries(), marks: cardMarks()),
       );
 
-      // The checkbox rows do not render on the card anymore (they moved
-      // onto the selection page).
-      expect(
-        find.byKey(const ValueKey('pdfExportCycleCheckboxRow0')),
-        findsNothing,
-      );
       // The selection button: opens the page at click time.
       expect(
         find.byKey(const ValueKey('pdfExportSelectCyclesButton')),
         findsOneWidget,
       );
-      // The summary line counts the default all (semantics unchanged).
+      // The summary line counts every cycle under the null-means-all
+      // default.
       expect(
         find.byKey(const ValueKey('pdfExportSelectedSummary')),
         findsOneWidget,

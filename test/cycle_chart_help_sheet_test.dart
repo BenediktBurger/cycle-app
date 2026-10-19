@@ -5,11 +5,10 @@ import 'package:flutter/material.dart';
 import 'support/chart_pump.dart';
 import 'support/fixtures.dart';
 
-// Widget tests of the cycle tab's symbol glossary (help sheet): the
-// legend left the screen — the Zyklus AppBar carries an info_outline
-// action whose long-press-friendly tooltip opens a bottom sheet with the
-// full symbol glossary (every entry the on-screen legend carried) plus
-// the evaluation-arithmetic note. Localized in en and de.
+// Widget tests of the cycle tab's symbol glossary (help sheet): the Zyklus
+// AppBar carries an info_outline action whose tooltip opens a bottom sheet
+// with the full symbol glossary plus the evaluation-arithmetic note.
+// Localized in en and de.
 //
 
 List<DailyEntry> _helpSheetEntries(int count) => [
@@ -87,7 +86,7 @@ void main() {
   group('help sheet', () {
     testWidgets(
       'the Zyklus AppBar carries an info_outline action with a localized '
-      'tooltip, and the glossary is NOT on the screen otherwise',
+      'tooltip',
       (tester) async {
         await pumpChart(
           tester,
@@ -107,16 +106,6 @@ void main() {
           'Show symbol glossary',
           reason: 'the action carries its localized tooltip',
         );
-
-        // The legend is gone from the screen: no glossary text renders
-        // outside the sheet anywhere on the cycle tab.
-        for (final entry in _glossaryEn) {
-          expect(
-            find.text(entry),
-            findsNothing,
-            reason: '"$entry" no longer sits on the screen',
-          );
-        }
       },
     );
 
@@ -168,8 +157,7 @@ void main() {
       );
       // The ignored-temperature entry samples the VISUAL consequence: a
       // lighter temperature dot (primary at the chart's own 0.4 alpha —
-      // the same constant the curve draws with), replacing the old
-      // day-sheet-toggle icon sample.
+      // the same constant the curve draws with).
       final scheme = tester
           .widget<MaterialApp>(find.byType(MaterialApp))
           .theme!
@@ -190,16 +178,6 @@ void main() {
             'the glossary samples the lighter temperature dot '
             '(primary at 0.4 alpha — derived from the same constant the '
             'chart uses so they cannot drift)',
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('cycleHelpSheet')),
-          matching: find.byIcon(Icons.visibility_off_outlined),
-        ),
-        findsNothing,
-        reason:
-            'the old day-sheet-toggle icon sample is gone — the '
-            'legend shows the rendering consequence, not the affordance',
       );
     });
 

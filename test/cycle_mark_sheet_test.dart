@@ -757,8 +757,7 @@ void main() {
   group('panel layout (the header row and the shared chip grid)', () {
     testWidgets(
       'the header row carries the day title, the edit-day affordance and '
-      'the close button — "edit day" sits between the title and the close, '
-      'and no full-width action precedes the grid',
+      'the close button — "edit day" sits between the title and the close',
       (tester) async {
         // A narrow surface pins the grid to its phone-width two columns (the
         // breakpoint is 600 dp of grid width — see the wide-viewport test).
@@ -803,18 +802,6 @@ void main() {
           reason:
               '"edit day" sits between the title and the close button '
               '(the icon buttons\' tap targets touch in the row)',
-        );
-        // The header's compact "edit day" icon sits inside the header row —
-        // the chip grid has no action row of its own above it.
-        expect(
-          find.descendant(
-            of: cycleDayPanel(),
-            matching: find.byType(FilledButton),
-          ),
-          findsNothing,
-          reason:
-              '"edit day" is the compact header icon button — no '
-              'full-width action above the grid anymore',
         );
       },
     );

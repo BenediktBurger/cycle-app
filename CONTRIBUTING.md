@@ -22,8 +22,8 @@ details live in [AGENTS.md](AGENTS.md). In brief:
   scope.
 - **No work-package IDs** in code, docs, or tool/file names.
 - **Run the full test gate** before you consider work done:
-  `flutter analyze` and `flutter test --no-pub -r expanded` (why that
-  reporter: [AGENTS.md](AGENTS.md); commands: section 4 below).
+  `flutter analyze` and `flutter test --no-pub -j "$(nproc)" -r expanded`
+  (why that reporter: [AGENTS.md](AGENTS.md); commands: section 4 below).
 
 Setup path and daily commands below; open work is tracked in
 [`docs/roadmap.md`](docs/roadmap.md), architecture decisions in
@@ -238,13 +238,17 @@ The local gate mirrors [.github/workflows/ci.yml](.github/workflows/ci.yml)
 flutter pub get    # prerequisite of test runs (also runs gen-l10n)
 flutter analyze
 dart format --output=none --set-exit-if-changed .   # check-only
-flutter test
+flutter test --no-pub -j "$(nproc)" -r expanded
 flutter build web
 ```
 
 All four checks must pass before you push. To fix formatting instead of
 merely checking it, run a plain `dart format .` (only the check variant is
 part of the gate).
+
+`package:test` defaults to `nproc / 2` concurrent workers (2 on a 4-core
+machine), so pass `-j` explicitly to use every core — CI does the same. On
+macOS, `nproc` is absent; use `-j "$(sysctl -n hw.ncpu)"`.
 
 `flutter build apk --debug` is available locally as well once the local
 Android toolchain is green (§3 above, "Android toolchain") — the web build
@@ -266,6 +270,26 @@ failures):
 ~/flutter/bin/dart run tool/db_smoke.dart            # schema/DAO/domain
 ~/flutter/bin/dart run tool/smoke_export_import.dart # export/import round trip
 ```
+
+### Test layers
+
+Pick the cheapest layer that can prove the behavior:
+
+- **domain / db / pdf / tool unit tests** — pure logic, storage contracts,
+  and export shapes. They are the cheapest layer per behavior, so they are
+  the first choice; run them in a tight loop while iterating.
+- **Widget tests** — wiring and interaction: a screen with its providers,
+  then pump, tap, assert. Shared pump shapes live in `test/support/`; reuse
+  [`chart_pump.dart`](test/support/chart_pump.dart) for the chart and
+  [`cycle_list_harness.dart`](test/support/cycle_list_harness.dart) for the
+  day list instead of mounting the shell.
+- **One layout test per widget** owns geometry (sizes, offsets, ordering);
+  the widget's other tests do not repeat it.
+- **The full shell (`CycleApp`) is a thin integration tier** — navigation,
+  lifecycle, hydration, and snackbar placement only.
+- **Absence assertions are temporary** unless absence is itself the contract
+  (privacy, permission, or no-network guarantee) — the rule and its wording:
+  [AGENTS.md](AGENTS.md), "Tests".
 
 ## 5. JSON export/import limits
 

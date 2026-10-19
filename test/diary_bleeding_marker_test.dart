@@ -1,7 +1,7 @@
 // Widget test of the diary's day-tile bleeding marker: recorded bleeding
 // renders the shared square-box symbol (see lib/ui/bleeding_symbol.dart)
 // at the tile's 18 px size — the fill-fraction convention itself lives in
-// test/bleeding_symbol_test.dart. The interruption badge Stack around the
+// test/symbol_widgets_test.dart. The interruption badge Stack around the
 // marker and the faint none dot stay as they are.
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/models.dart';

@@ -1,12 +1,10 @@
-// Widget test of the settings pane's LAYOUT after the reorganization:
-// the card ORDER (general information -> paper history -> the remaining
-// settings -> the export action card), the field grouping (name + birth
-// date live in the general card, not under a "PDF-Export" title), the
-// anonymization note's home (inside the export card, at its switch).
-// The absence of the standalone privacy card is pinned in
-// notices_test.dart together with the notice copy it owns.
+// Widget tests of the settings pane's layout: the card order (general
+// information -> paper history -> the remaining settings -> the export
+// action card), the field grouping (name + birth date live in the general
+// card, not under a "PDF-Export" title), the temperature-range note, and
+// the anonymization note's home (inside the export card, at its switch).
 //
-// German device locale + full-app pump mirror the other settings tests;
+// German locale + direct settings-screen pump;
 // the pane is a lazy ListView, so the tests enlarge the surface
 // (useTallSurface, like settings_persistence_test.dart) and assert
 // the built children directly — never on compact-view assumptions.
@@ -18,14 +16,8 @@ import 'support/finders.dart';
 import 'support/viewport.dart';
 
 void main() {
-  /// German device locale + the German UI: the shell is reachable (the
-  /// harness defaults to an onboarded install) and the settings pane is the
-  /// navigation surface both groups start from.
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
-    await tester.pumpWidget(appScope(locale: const Locale('de')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(navLabel('Einstellungen'));
+    await tester.pumpWidget(settingsHarness());
     await tester.pumpAndSettle();
   }
 
@@ -143,6 +135,23 @@ void main() {
         );
       },
     );
+  });
+
+  group('temperature-range note', () {
+    testWidgets('the temperature-range card explains that the range bounds the '
+        'cycle-tab chart and names the default', (WidgetTester tester) async {
+      useTallSurface(tester, width: 900);
+      await pumpGermanSettingsPane(tester);
+
+      expect(
+        find.text(
+          'Sichtbarer Bereich des Temperaturdiagramms im Zyklus-Tab. '
+          'Standard: 36–38 °C.',
+        ),
+        findsOneWidget,
+        reason: 'the range setting states its effect and its 36–38 °C default',
+      );
+    });
   });
 
   group('anonymization note', () {

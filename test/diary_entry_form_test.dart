@@ -5,8 +5,9 @@
 // sex time-of-day chips (including the mucus-A-segment check the
 // firmness picker shares its form with).
 //
-// Every section pumps the app the same way through diarySelectorScope
-// (support/diary_harness.dart); German labels are pinned (locale de).
+// Every section pumps the Tagebuch screen the same way through
+// diarySelectorScope (support/diary_harness.dart); German labels are pinned
+// (locale de).
 
 import 'package:cycle_app/domain/cervix.dart';
 import 'package:cycle_app/domain/diary_track.dart';
@@ -78,9 +79,9 @@ void main() {
     await tester.pumpWidget(diarySelectorScope(const Locale('de')));
     await tester.pumpAndSettle();
 
-    // The Tagebuch screen is the shell's initial tab; the bleeding control
-    // sits on its entry form. All six levels of the numeric scale must be
-    // offered (German labels, per the pinned locale). NB "mittel" is also
+    // The bleeding control sits on the Tagebuch screen's entry form. All six
+    // levels of the numeric scale must be offered (German labels, per the
+    // pinned locale). NB "mittel" is also
     // the German label of one Muttermund position AND of the opening chip
     // "mittel" on the same form, so the strict one-match assertion does not
     // apply to that one word.
@@ -424,7 +425,7 @@ void main() {
       reason: 'the evening slot must be offered',
     );
 
-    // Select TWO slots at once — the old single bool is gone.
+    // Select two slots at once: each slot is stored independently.
     await tester.ensureVisible(diaryChip('sexTiming', 'morning'));
     await tester.pumpAndSettle();
     await tester.tap(diaryChip('sexTiming', 'morning'));
@@ -483,16 +484,15 @@ void main() {
   // Device-field reports show the sign row growing taller and painting a
   // partially visible overflow band on narrow Android widths: the row
   // divides the width evenly across all of its options, so the two-glyph
-  // f/S label reflows to two lines. The repro pumps the whole app shell at
+  // f/S label reflows to two lines. The repro pumps the Tagebuch screen at
   // a 320 x 800 dp viewport (physical = 960 x 2400 px, devicePixelRatio 3)
   // and walks every sign option — start width 320 dp, not decremented: the
   // error reproduces deterministically here.
   //
-  // The framework error collector is installed only after the shell has
-  // pumped and the form is scrolled to the sign row: the other shell tabs
-  // stay mounted and laid out (IndexedStack), so the collector's window
-  // covers just the row's interactions — the pump-time state is asserted
-  // separately below.
+  // The framework error collector is installed only after the screen has
+  // pumped and the form is scrolled to the sign row, so its window covers
+  // just the row's interactions — the pump-time state is asserted separately
+  // below.
 
   testWidgets(
     'the mucus sign row renders every sign without overflow at a narrow '
@@ -586,10 +586,10 @@ void main() {
   // token; the Tagebuch list's day tile renders a recorded observation as a
   // trailing chip whose row also holds the temperature and the measured
   // time. At a narrow width that trailing content is the tile's widest
-  // part, so this check pumps the shell at the same 320 x 800 dp viewport
-  // as the sign-row repro above and walks the recorded tiles with the
-  // framework error collector installed: any overflow here would be a real
-  // tile defect, not one of the entry form.
+  // part, so this check pumps the Tagebuch screen at the same 320 x 800 dp
+  // viewport as the sign-row repro above and walks the recorded tiles with
+  // the framework error collector installed: any overflow here would be a
+  // real tile defect, not one of the entry form.
 
   testWidgets('the day tile renders its mucus chip beside temperature and time '
       'without overflow at a narrow width', (WidgetTester tester) async {
@@ -631,7 +631,7 @@ void main() {
       tester.takeException(),
       isNull,
       reason:
-          'the whole shell, tiles included, pumps overflow-free '
+          'the screen, tiles included, pumps overflow-free '
           'at 320x800',
     );
 
