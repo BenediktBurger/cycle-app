@@ -14,7 +14,6 @@ import '../domain/cervix.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
-import '../domain/decimal_input.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
 import '../domain/mucus.dart';
@@ -25,6 +24,7 @@ import 'measurement_method_dialog.dart';
 import 'mucus_symbol.dart';
 import 'stream_error.dart';
 import 'section_header.dart';
+import 'temperature_wheel_field.dart';
 
 class TagebuchScreen extends ConsumerStatefulWidget {
   const TagebuchScreen({super.key});
@@ -35,13 +35,7 @@ class TagebuchScreen extends ConsumerStatefulWidget {
 
 final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _bbtController = TextEditingController();
   final _notesController = TextEditingController();
-
-  /// The resolved display locale, captured in [didChangeDependencies]:
-  /// entries load async before any build, so the prefill cannot resolve
-  /// the locale at write time and reads this cache instead.
-  String _displayLocale = 'en';
 
   /// The cycles whose day list is currently expanded, keyed by the
   /// normalized cycle start date. Widget state: expansions survive the
@@ -56,9 +50,14 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   MucusSign? _sign;
   MucusQuality? _quality;
 
-  /// True while [_applyEntry] seeds [_bbtController]: the stamp listener
-  /// must ignore that notification.
-  bool _suppressBbtStamp = false;
+  /// The selected day's own temperature: the loaded stored value until a
+  /// wheel commit replaces it with the committed grid value. A suggestion
+  /// never lands here — only a user scroll or nothing.
+  double? _bbtC;
+
+  /// The most recent earlier day's temperature, proposed while [_bbtC] is
+  /// absent. Display only.
+  double? _suggestion;
 
   CervixPosition? _cervixPosition;
   CervixOpening? _cervixOpening;
@@ -70,7 +69,6 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   @override
   void initState() {
     super.initState();
-    _bbtController.addListener(_onBbtChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadEntry(ref.read(selectedDateProvider));
@@ -80,37 +78,41 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   @override
   void dispose() {
-    _bbtController.removeListener(_onBbtChanged);
-    _bbtController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _displayLocale = Localizations.localeOf(context).toString();
+  /// Committing a wheel value is the entry event the measured-time stamp
+  /// follows: on today, while the form carries no time yet, the current
+  /// time is stamped — a loaded value is a fact of the stored day, not an
+  /// entry event (_applyEntry never routes through here). The wheel only
+  /// commits on-grid values inside the settings window, so every commit is
+  /// a plausible temperature by construction.
+  void _onBbtCommitted(double value) {
+    setState(() {
+      _bbtC = value;
+      final now = ref.read(nowProvider)();
+      if (_measuredAt != null ||
+          !DateOnly.sameDay(ref.read(selectedDateProvider), now)) {
+        return;
+      }
+      _measuredAt = TimeOfDay.fromDateTime(now);
+    });
   }
 
-  /// Entering a valid, in-range temperature stamps the current time while
-  /// the day is today and no time is in the form yet — a seeded (loaded)
-  /// temperature is a fact of the stored day, not an entry event.
-  void _onBbtChanged() {
-    if (_suppressBbtStamp || !mounted) return;
-    final parsed = parseDecimalInput(_bbtController.text);
-    final now = ref.read(nowProvider)();
-    if (parsed == null ||
-        !isWithinBbtRange(parsed) ||
-        _measuredAt != null ||
-        !DateOnly.sameDay(ref.read(selectedDateProvider), now)) {
-      return;
-    }
-    setState(() => _measuredAt = TimeOfDay.fromDateTime(now));
+  /// The explicit clear: the measured time is metadata of the temperature
+  /// and goes with it.
+  void _clearBbt() {
+    setState(() {
+      _bbtC = null;
+      _measuredAt = null;
+    });
   }
 
   Future<void> _loadEntry(DateTime date) async {
     final db = await ref.read(databaseProvider.future);
     final existing = await db.entriesDao.entryFor(date);
+    final previous = await db.entriesDao.latestTemperatureBefore(date);
     // The switches seed from the day's ACTUAL mark state, so marks placed
     // elsewhere (day sheet, imports) show up in the form.
     final dayMarks = await db.marksDao.marksForDay(date);
@@ -124,6 +126,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     setState(() {
       _applyEntry(
         existing == null ? null : dailyEntryFromDrift(existing),
+        previous?.bbtC,
         excludeMarked,
         cycleStartMarked,
       );
@@ -132,6 +135,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   void _applyEntry(
     DailyEntry? entry,
+    double? suggestion,
     bool excludeMarked,
     bool cycleStartMarked,
   ) {
@@ -150,15 +154,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _painBreast = entry?.painBreast ?? false;
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _sexTimings = entry?.sexTimings ?? 0;
-    final bbt = entry?.bbtC;
-    // The prefill follows the display locale ("36,4" in de / "36.4" in
-    // en); parseDecimalInput accepts both separators, so the comma form
-    // saves back identically.
-    _suppressBbtStamp = true;
-    _bbtController.text = bbt == null
-        ? ''
-        : formatDecimalPrefill(bbt, locale: _displayLocale);
-    _suppressBbtStamp = false;
+    // The stored value passes through untouched: an off-grid reading
+    // displays at its nearest wheel step but is only ever replaced by an
+    // actual wheel commit.
+    _bbtC = entry?.bbtC;
+    _suggestion = suggestion;
     _notesController.text = entry?.notes ?? '';
   }
 
@@ -215,7 +215,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     final (:sign, :quality) = sanitizeMucusPair(sign: _sign, quality: _quality);
     final entry = DailyEntry(
       date: date,
-      bbtC: parseDecimalInput(_bbtController.text),
+      bbtC: _bbtC,
       // The domain model drops a time without a temperature (see
       // DailyEntry.measuredAtMinutes) — clearing the temperature takes
       // the time with it.
@@ -441,100 +441,73 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
               ],
               const SizedBox(height: 12),
               if (track.temperature) ...[
-                // --- BBT + measured time (compact one-line density) --------
+                // --- BBT wheel + measured time -----------------------------
                 // The measurement time is metadata OF the temperature (the
-                // domain model never stores it without one, see
-                // DailyEntry.measuredAtMinutes), so the time control shares
-                // the temperature's visual line and shows only while a
-                // savable temperature is entered — the same range gate the
-                // validator applies. Entering the temperature on today
-                // stamps the current time (see _onBbtChanged).
-                //
-                // Narrow content widths (small devices, wide font scaling):
-                // below ~300 dp of form width the printed label drops and
-                // the clock icon carries the meaning; a narrow-width test
-                // pins that this line stays overflow-free.
+                // domain model never stores one without a value, see
+                // DailyEntry.measuredAtMinutes) — a time can never exist
+                // without one, so the row renders under the same condition.
+                // The parent Row's center alignment places it on the wheel's
+                // band — the inline clear × lines up with the selected
+                // temperature. The 320-dp width budget goes to the time
+                // label, so the row carries no clock glyph.
                 SectionHeader(
                   title: l10n.temperature,
                   info: l10n.diaryInfoTemperature,
                 ),
                 const SizedBox(height: 8),
-                LayoutBuilder(
-                  builder: (context, lineConstraints) {
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            key: const ValueKey('diaryTemperatureField'),
-                            controller: _bbtController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: '${l10n.temperature} (°C)',
-                              // A suffix icon cannot overflow the way a
-                              // widget right of the field can — this line is
-                              // the temperature/time row whose narrow-width
-                              // layout a pinned test guards.
-                              suffixIcon: IconButton(
-                                key: const ValueKey('diaryMethodButton'),
-                                icon: const Icon(Icons.device_thermostat),
-                                tooltip: l10n.methodDialogTitle,
-                                onPressed: () =>
-                                    showMeasurementMethodDialog(context),
+                Row(
+                  children: [
+                    TemperatureWheelField(
+                      key: const ValueKey('diaryTemperatureField'),
+                      value: _bbtC,
+                      suggestion: _suggestion,
+                      onChanged: _onBbtCommitted,
+                      onClear: _clearBbt,
+                    ),
+                    const SizedBox(width: 8),
+                    if (_bbtC != null)
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                key: const ValueKey('measuredTimeField'),
+                                onPressed: _pickTime,
+                                child: Text(
+                                  _measuredAt == null
+                                      ? l10n.measuredTimeUnset
+                                      : MaterialLocalizations.of(
+                                          context,
+                                        ).formatTimeOfDay(_measuredAt!),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                            validator: (value) {
-                              final parsed = parseDecimalInput(value ?? '');
-                              if (parsed == null) {
-                                return (value ?? '').trim().isEmpty
-                                    ? null // temperature stays optional
-                                    : l10n.errorTemperature;
-                              }
-                              return isWithinBbtRange(parsed)
-                                  ? null
-                                  : l10n.errorTemperatureRange;
-                            },
-                          ),
+                            if (_measuredAt != null)
+                              IconButton(
+                                key: const ValueKey('measuredTimeClearButton'),
+                                icon: const Icon(Icons.close),
+                                onPressed: () =>
+                                    setState(() => _measuredAt = null),
+                                tooltip: l10n.measuredTimeUnset,
+                              ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _bbtController,
-                          builder: (context, value, _) {
-                            final parsed = parseDecimalInput(value.text);
-                            if (parsed == null || !isWithinBbtRange(parsed)) {
-                              return const SizedBox.shrink();
-                            }
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.schedule_outlined),
-                                const SizedBox(width: 4),
-                                OutlinedButton(
-                                  key: const ValueKey('measuredTimeField'),
-                                  onPressed: _pickTime,
-                                  child: Text(
-                                    _measuredAt == null
-                                        ? l10n.measuredTimeUnset
-                                        : MaterialLocalizations.of(
-                                            context,
-                                          ).formatTimeOfDay(_measuredAt!),
-                                  ),
-                                ),
-                                if (_measuredAt != null)
-                                  IconButton(
-                                    icon: const Icon(Icons.close),
-                                    onPressed: () =>
-                                        setState(() => _measuredAt = null),
-                                    tooltip: l10n.measuredTimeUnset,
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                // The dialog title doubles as the button's visible label —
+                // self-describing without a tooltip.
+                TextButton.icon(
+                  key: const ValueKey('diaryMethodButton'),
+                  onPressed: () => showMeasurementMethodDialog(context),
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.device_thermostat),
+                  label: Text(l10n.methodDialogTitle),
                 ),
                 const SizedBox(height: 12),
                 // --- temperature disturbance group (flags + exclude switch)

@@ -79,13 +79,83 @@ Finder chartCellContent(int index, String row, Finder inner) =>
 Finder diaryChip(String group, String value) =>
     find.byKey(ValueKey('${group}Chip-$value'));
 
-/// The entry form's temperature input (the BBT field, the form's first
+/// The entry form's temperature input (the BBT wheel, the form's first
 /// field).
 Finder diaryTemperatureField() =>
     find.byKey(const ValueKey('diaryTemperatureField'));
 
-/// The entry form's measured-time button: visible only while a plausible
-/// temperature is entered, showing the recorded time.
+/// The temperature wheel's scroller (the drag target of the wheel tests).
+Finder diaryTemperatureWheel() =>
+    find.byKey(const ValueKey('diaryTemperatureWheel'));
+
+/// The temperature clear button — present only in the wheel's solid state
+/// (the shown value is the day's own, stored or just committed).
+Finder diaryTemperatureClearButton() =>
+    find.byKey(const ValueKey('diaryTemperatureClearButton'));
+
+/// The rendered label nearest the temperature wheel's vertical centre —
+/// the value the wheel is currently resting on, whether stored, suggested
+/// or the default. Its `data` is the locale-formatted grid value. Candidates
+/// must parse as bare numbers, so the selected item's unit Text (same dy as
+/// the number) can never win the nearest-centre tie.
+Text diaryTemperatureCenteredLabel(WidgetTester tester) {
+  final wheel = diaryTemperatureWheel();
+  final wheelBox = tester.renderObject<RenderBox>(wheel);
+  final wheelCenter = wheelBox
+      .localToGlobal(wheelBox.size.center(Offset.zero))
+      .dy;
+  final candidates = find
+      .descendant(of: wheel, matching: find.byType(Text))
+      .evaluate()
+      .where((element) {
+        final data = (element.widget as Text).data;
+        return data != null &&
+            double.tryParse(data.replaceAll(',', '.')) != null;
+      })
+      .toList();
+  var best = candidates.first.widget as Text;
+  var bestDistance = double.infinity;
+  for (final element in candidates) {
+    final box = element.renderObject! as RenderBox;
+    final distance =
+        (box.localToGlobal(box.size.center(Offset.zero)).dy - wheelCenter)
+            .abs();
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = element.widget as Text;
+    }
+  }
+  return best;
+}
+
+/// The grid value the temperature wheel is currently resting on, in the
+/// pinned locale's formatting — the round-trip signal for the form-level
+/// wheel tests (the wheel always renders, so this never returns null).
+String diaryTemperatureCenteredValue(WidgetTester tester) =>
+    diaryTemperatureCenteredLabel(tester).data!;
+
+/// The wheel's solid state: a value is committed for the day. The state
+/// carrier is the selection bar — its rules render the scheme's primary
+/// colour — and the clear button is present as the redundant second signal.
+/// False means gray (a suggestion or the default centre is shown; nothing
+/// is stored for the day).
+bool diaryTemperatureWheelSolid(WidgetTester tester) {
+  final context = tester.element(diaryTemperatureWheel());
+  final barRules = find.descendant(
+    of: find.byKey(const ValueKey('diaryTemperatureWheelBar')),
+    matching: find.byWidgetPredicate((w) => w is Container && w.color != null),
+  );
+  return barRules.evaluate().isNotEmpty &&
+      barRules.evaluate().every(
+        (rule) =>
+            (rule.widget as Container).color ==
+            Theme.of(context).colorScheme.primary,
+      ) &&
+      diaryTemperatureClearButton().evaluate().isNotEmpty;
+}
+
+/// The entry form's measured-time button: visible while a temperature
+/// value is present, showing the recorded time (or "not set").
 Finder measuredTimeField() => find.byKey(const ValueKey('measuredTimeField'));
 
 /// The entry form's bottom save button — NOT the AppBar's save action,

@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/diary_harness.dart';
 import 'support/finders.dart';
+import 'support/temperature_wheel.dart';
 
 final _harness = DiaryHarness(now: DateTime(2026, 9, 21, 10, 30));
 
@@ -55,7 +56,7 @@ void main() {
           'action',
     );
 
-    await tester.enterText(diaryTemperatureField(), '36.5');
+    await scrollTemperatureWheel(tester, from: 36.25, to: 36.50);
     await tester.pumpAndSettle();
 
     await tester.tap(_saveAction());

@@ -42,7 +42,6 @@ const whatsNewRaw =
 const whatsNewTrimmed =
     'New: the diary gained a summary view.\nFixed: a crash.';
 
-/// The canonical summary block shape the release body pins.
 String summaryBlock(String content) =>
     '<!-- release-summary -->\n'
     "## What's new\n"

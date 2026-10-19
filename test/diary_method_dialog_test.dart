@@ -1,6 +1,6 @@
 // Widget tests of the measurement-method dialog on the Tagebuch screen:
-// the always-visible thermometer icon at the temperature entry line opens
-// the dialog for the SELECTED diary day — seeded with that day's effective
+// the always-visible labeled method button below the temperature wheel row
+// opens the dialog for the SELECTED diary day — seeded with that day's effective
 // state (the day's own snapshot first, else the latest earlier one), saving
 // an upsert snapshot for that day and offering "Delete change" only while
 // the day itself carries a snapshot. The date line shows the day that
@@ -50,7 +50,14 @@ const _changeNote =
     'Den Grund für einen neuen Eintrag kannst du in den Notizen des Tages '
     'festhalten.';
 
-Finder _methodIcon() => find.byKey(const ValueKey('diaryMethodButton'));
+Finder _methodButton() => find.byKey(const ValueKey('diaryMethodButton'));
+
+/// The dialog's title text, scoped to the AlertDialog: the form's method
+/// button behind the dialog carries the same label.
+Finder _dialogTitleText() => find.descendant(
+  of: find.byType(AlertDialog),
+  matching: find.text(_dialogTitle),
+);
 
 Finder _routeChip(String route) =>
     find.byKey(ValueKey('methodRouteChip-$route'));
@@ -69,12 +76,12 @@ Future<FaultyCycleDatabase> _pumpFaultyDiary(WidgetTester tester) async {
 }
 
 Future<void> _openDialog(WidgetTester tester) async {
-  await tester.tap(_methodIcon());
+  await tester.tap(_methodButton());
   await tester.pumpAndSettle();
 }
 
 void main() {
-  group('thermometer icon', () {
+  group('method button', () {
     testWidgets(
       'is visible without an entry and opens the empty-state dialog',
       (tester) async {
@@ -82,15 +89,15 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          _methodIcon(),
+          _methodButton(),
           findsOneWidget,
           reason:
-              'the thermometer icon sits at the temperature entry line even '
+              'the method button sits below the temperature wheel row even '
               'on a day without any stored entry',
         );
 
         await _openDialog(tester);
-        expect(find.text(_dialogTitle), findsOneWidget);
+        expect(_dialogTitleText(), findsOneWidget);
         expect(
           find.text(_notRecorded),
           findsOneWidget,
@@ -120,9 +127,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        _methodIcon(),
+        _methodButton(),
         findsOneWidget,
-        reason: 'a recorded cycle day carries the icon too',
+        reason: 'a recorded cycle day carries the method button too',
       );
 
       await _openDialog(tester);
@@ -254,7 +261,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text(_dialogTitle),
+          _dialogTitleText(),
           findsNothing,
           reason: 'the navigation closes the dialog',
         );
@@ -306,7 +313,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text(_dialogTitle),
+          _dialogTitleText(),
           findsOneWidget,
           reason:
               'a plain date is inert — tapping it changes and closes nothing',
@@ -351,7 +358,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text(_dialogTitle),
+          _dialogTitleText(),
           findsNothing,
           reason: 'saving closes the dialog',
         );
@@ -446,7 +453,7 @@ void main() {
 
       expect(find.text(_saveFailed), findsOneWidget);
       expect(
-        find.text(_dialogTitle),
+        _dialogTitleText(),
         findsOneWidget,
         reason: 'a failed save must not close the dialog — nothing was written',
       );
@@ -462,7 +469,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('methodSaveButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text(_dialogTitle), findsNothing);
+      expect(_dialogTitleText(), findsNothing);
       expect(
         (await db.measurementMethodsDao.snapshotFor(_now))!.method,
         'oral',
@@ -484,7 +491,7 @@ void main() {
 
       expect(find.text(_deleteFailed), findsOneWidget);
       expect(
-        find.text(_dialogTitle),
+        _dialogTitleText(),
         findsOneWidget,
         reason:
             'a failed delete must not close the dialog — nothing was deleted',
@@ -509,7 +516,7 @@ void main() {
         findsNothing,
         reason: 'loading has ended — the failure is the outcome',
       );
-      expect(find.text(_dialogTitle), findsOneWidget);
+      expect(_dialogTitleText(), findsOneWidget);
     });
   });
 
@@ -568,7 +575,7 @@ void main() {
         tester,
         () async {
           await _openDialog(tester);
-          expect(find.text(_dialogTitle), findsOneWidget);
+          expect(_dialogTitleText(), findsOneWidget);
           await tester.tap(_routeChip('oral'));
           await tester.pumpAndSettle();
           await tester.enterText(_thermometerField(), 'ThermaPen');

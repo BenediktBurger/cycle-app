@@ -172,18 +172,18 @@ void main() {
     await tester.tap(navLabel('Tagebuch'));
     await tester.pumpAndSettle();
     // The empty-state line lives in the screen's scrollable below the
-    // entry form — bring it into the built viewport range.
-    final list = find
-        .descendant(
-          of: find.byType(CustomScrollView),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.dragUntilVisible(
-      find.textContaining('Noch keine Einträge'),
-      list,
-      const Offset(0, -200),
-    );
+    // entry form — bring it into the built viewport range. The drag starts
+    // LOW on the surface on purpose: the scrollable's center sits inside
+    // the temperature wheel, and the wheel would scroll instead of the
+    // list (same accommodation as the narrow-width diary form test).
+    for (
+      var i = 0;
+      i < 50 && find.textContaining('Noch keine Einträge').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.dragFrom(const Offset(400, 500), const Offset(0, -200));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     await tester.pumpAndSettle();
     expect(
       find.textContaining('Noch keine Einträge'),

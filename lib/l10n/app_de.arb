@@ -154,8 +154,6 @@
   "sexTimingMorning": "morgens",
   "sexTimingMidday": "mittags",
   "sexTimingEvening": "abends",
-  "errorTemperature": "Nur eine Temperatur mit Komma oder Punkt, zwei Dezimalstellen",
-  "errorTemperatureRange": "Plausibilität: Temperaturen zwischen 25 und 45 °C",
   "cycleGroupLeading": "Vor dem ersten Zyklusbeginn (bis {day})",
   "@cycleGroupLeading": {
     "placeholders": {
@@ -645,7 +643,7 @@
   "statisticsShortest": "Kürzester",
   "methodDialogTitle": "Messmethode",
   "@methodDialogTitle": {
-    "description": "Titel des Messmethoden-Dialogs im Tagebuch und Tooltip des Thermometer-Symbols an der Temperatur-Zeile. Der Dialog gilt für den ausgewählten Tagebuch-Tag; die Navigation im Tagebuch ist die Tagesauswahl."
+    "description": "Titel des Messmethoden-Dialogs im Tagebuch und Beschriftung des schlanken Methoden-Buttons unter der Temperatur-Wheel-Zeile. Der Dialog gilt für den ausgewählten Tagebuch-Tag; die Navigation im Tagebuch ist die Tagesauswahl."
   },
   "methodRouteVaginal": "vaginal",
   "methodRouteRectal": "rektal",
@@ -679,7 +677,7 @@
   "@termCervix": {
     "description": "Kombinierter Titel des Muttermund-Abschnitts im Tagebuch-Eingabeformular: Position, Öffnung und Festigkeit stehen als kleine Untertitel unter dieser einen Überschrift."
   },
-  "diaryInfoTemperature": "Messen sofort nach dem Aufwachen, vor dem Aufstehen und vor jeder Tätigkeit wie Sprechen, Sitzen oder Trinken. Möglichst immer zur selben Tageszeit und nach ausreichendem Schlaf. Unterbrechungen wie spätes Zubettgehen, nächtliches Aufwachen, Alkohol oder Krankheit werden als Messstörung gekennzeichnet.",
+  "diaryInfoTemperature": "Messen sofort nach dem Aufwachen, vor dem Aufstehen und vor jeder Tätigkeit wie Sprechen, Sitzen oder Trinken. Möglichst immer zur selben Tageszeit und nach ausreichendem Schlaf. Unterbrechungen wie spätes Zubettgehen, nächtliches Aufwachen, Alkohol oder Krankheit werden als Messstörung gekennzeichnet. Die Messung dauert 5 Minuten (vaginal oder rektal) bzw. 8 Minuten (oral). Die Temperatur wird in Schritten von 0,05 K erfasst — das genügt, denn Thermometer, auch digitale mit zwei Nachkommastellen, messen typischerweise nur auf 0,1 °C bis 0,05 °C genau: Werte von 36,68 bis 36,72 werden zu 36,70, Werte von 36,73 bis 36,77 zu 36,75.",
   "@diaryInfoTemperature": {
     "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
   },
@@ -702,5 +700,9 @@
   "diaryInfoPain": "Zwei Schmerz-Beobachtungen: der zyklische Brustschmerz (typischerweise auftretender Spannungsschmerz in der zweiten Zyklushälfte) und der Mittelschmerz als möglicher Hinweis auf den Eisprung um die Zyklusmitte.",
   "@diaryInfoPain": {
     "description": "Info-Text zum Schmerz-Abschnitt im Tagebuch-Eingabeformular: die beiden Beobachtungen Brustschmerz und Mittelschmerz."
+  },
+  "diaryTemperatureClear": "Temperatur entfernen",
+  "@diaryTemperatureClear": {
+    "description": "Tooltip/Semantics-Label des Löschknopfs am Temperatur-Rad des Tagebuchs (das Gegenstück zum Löschknopf der Messzeit-Zeile): entfernt die Temperatur des Tages; die Messzeit fällt beim Speichern mit weg."
   }
 }

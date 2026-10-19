@@ -641,19 +641,16 @@ void main() {
         // The cycle-group tiles start collapsed; bring the list into view
         // and expand every group so the recorded days' tiles build and lay
         // out at the narrow width. The list scroll view is lazy, so the
-        // group headers only exist once the scroll reaches them.
-        final list = find
-            .descendant(
-              of: find.byType(CustomScrollView),
-              matching: find.byType(Scrollable),
-            )
-            .first;
+        // group headers only exist once the scroll reaches them. The drag
+        // starts LOW on the surface on purpose: the scrollable's center
+        // sits inside the temperature wheel at this width, and the wheel
+        // would scroll instead of the list.
         final groupTiles = find.descendant(
           of: find.byType(TagebuchScreen),
           matching: find.byType(ExpansionTile),
         );
         for (var i = 0; i < 50 && groupTiles.evaluate().isEmpty; i++) {
-          await tester.drag(list, const Offset(0, -200));
+          await tester.dragFrom(const Offset(160, 700), const Offset(0, -200));
           await tester.pump(const Duration(milliseconds: 50));
         }
         await tester.pumpAndSettle();
@@ -669,7 +666,7 @@ void main() {
         // The lazy day list builds only the tiles it lays out: the recorded
         // days sit at the list's bottom, so walk the scroll there first.
         for (var i = 0; i < 50 && find.text('06:47').evaluate().isEmpty; i++) {
-          await tester.drag(list, const Offset(0, -300));
+          await tester.dragFrom(const Offset(160, 700), const Offset(0, -300));
           await tester.pump(const Duration(milliseconds: 50));
         }
         await tester.pumpAndSettle();

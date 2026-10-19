@@ -165,8 +165,6 @@
   "sexTimingMorning": "morning",
   "sexTimingMidday": "midday",
   "sexTimingEvening": "evening",
-  "errorTemperature": "One temperature using comma or dot, two decimals max",
-  "errorTemperatureRange": "Plausibility: temperatures between 25 and 45 °C",
   "cycleGroupLeading": "Before the first cycle start (until {day})",
   "@cycleGroupLeading": {
     "placeholders": {
@@ -736,7 +734,7 @@
   "statisticsShortest": "Shortest",
   "methodDialogTitle": "Measurement method",
   "@methodDialogTitle": {
-    "description": "Title of the measurement-method dialog in the diary and tooltip of the thermometer icon at the temperature line. The dialog applies to the selected diary day; diary navigation is the date selection."
+    "description": "Title of the measurement-method dialog in the diary and label of the slim method button below the temperature wheel row. The dialog applies to the selected diary day; diary navigation is the date selection."
   },
   "methodRouteVaginal": "vaginal",
   "methodRouteRectal": "rectal",
@@ -773,7 +771,7 @@
   "@termCervix": {
     "description": "Kombinierter Titel des Muttermund-Abschnitts im Tagebuch-Eingabeformular: Position, Öffnung und Festigkeit stehen als kleine Untertitel unter dieser einen Überschrift."
   },
-  "diaryInfoTemperature": "Measure immediately after waking, before getting up and before any activity such as speaking, sitting or drinking. Always at about the same time each morning and after sufficient sleep. Interruptions such as going to bed late, frequent night awakenings, alcohol or illness are marked as measurement disturbances.",
+  "diaryInfoTemperature": "Measure immediately after waking, before getting up and before any activity such as speaking, sitting or drinking. Always at about the same time each morning and after sufficient sleep. Interruptions such as going to bed late, frequent night awakenings, alcohol or illness are marked as measurement disturbances. The measurement takes 5 minutes (vaginal or rectal) or 8 minutes (oral). Temperature is entered in steps of 0.05 K — that is precise enough, because thermometers, even digital ones showing two decimal places, typically measure to an accuracy of only 0.1 °C to 0.05 °C: values from 36.68 to 36.72 become 36.70, and values from 36.73 to 36.77 become 36.75.",
   "@diaryInfoTemperature": {
     "description": "Info-Text zum Temperatur-Abschnitt im Tagebuch-Eingabeformular (geöffnet über die Info-Schaltfläche der Abschnittsüberschrift): das Messprotokoll der Basaltemperatur."
   },
@@ -796,5 +794,9 @@
   "diaryInfoPain": "Two pain observations: cyclical breast pain (the typical tension-type pain of the second half of the cycle) and mittelschmerz, the possible ovulation pain around mid-cycle.",
   "@diaryInfoPain": {
     "description": "Info-Text zum Schmerz-Abschnitt im Tagebuch-Eingabeformular: die beiden Beobachtungen Brustschmerz und Mittelschmerz."
+  },
+  "diaryTemperatureClear": "Remove temperature",
+  "@diaryTemperatureClear": {
+    "description": "Tooltip/semantics label of the diary temperature wheel's clear button (the counterpart to the measured-time row's clear affordance): removes the day's temperature; the measured time goes with it on save."
   }
 }

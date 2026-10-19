@@ -33,14 +33,15 @@ abstract final class TemperatureSteps {
   }
 
   /// The grid item closest to [temperature]; values outside the window
-  /// clamp to the nearer end. Off-grid stored values (imports, old typed
-  /// entries like 36.68) resolve here for DISPLAY only — the stored value
-  /// itself is never rewritten by the caller.
+  /// clamp to the nearer end — display only, the stored value is never
+  /// rewritten (pinned in test/diary_temperature_wheel_test.dart).
   static double nearest(double temperature) =>
       valueAt(nearestIndex(temperature));
 
   /// The index of the grid item closest to [temperature], clamped into
-  /// `0..count-1`.
+  /// `0..count-1`; a value exactly halfway between two steps (e.g. 36.675)
+  /// resolves to whichever neighbour its float representation rounds to —
+  /// display only, never stored.
   static int nearestIndex(double temperature) {
     final hundredths = (temperature * 100).round();
     final index = ((hundredths - _hundredthsLower) / _hundredthsPerStep)

@@ -33,10 +33,15 @@ Future<void> _seedTwoCycles(CycleDatabase db) async {
 final _harness = DiaryHarness(now: _now);
 
 void main() {
+  // The surface must hold BOTH cycles fully expanded with their day
+  // lists; 1600 already culls a header element mid-assertion, so the
+  // default 2400 is the smallest truthful surface here.
+  const double surfaceHeight = 2400;
+
   testWidgets('an expanded cycle keeps its header element when a sibling '
       'cycle expands (its day-list sliver inserts between the two '
       'headers)', (tester) async {
-    _harness.tallSurface(tester, height: 2400);
+    _harness.tallSurface(tester, height: surfaceHeight);
     await tester.pumpWidget(_harness.scope(seed: _seedTwoCycles));
     await tester.pumpAndSettle();
 
@@ -66,7 +71,7 @@ void main() {
   testWidgets('an expanded cycle keeps its header element when a sibling '
       'cycle collapses (its day-list sliver is removed above the '
       'header)', (tester) async {
-    _harness.tallSurface(tester, height: 2400);
+    _harness.tallSurface(tester, height: surfaceHeight);
     await tester.pumpWidget(_harness.scope(seed: _seedTwoCycles));
     await tester.pumpAndSettle();
 

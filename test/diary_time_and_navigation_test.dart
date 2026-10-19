@@ -23,19 +23,23 @@ import 'support/database.dart';
 import 'support/error_collector.dart';
 import 'support/finders.dart';
 import 'support/formatting.dart';
+import 'support/temperature_wheel.dart';
 import 'support/viewport.dart';
 
 // Widget tests for the time-of-measurement feature on the Tagebuch screen.
 //
 // The measurement time is metadata OF the temperature: the picker row only
-// appears while a temperature is entered, and a save without a temperature
-// stores no time (the domain model normalizes — see
+// appears while a temperature value is present, and a save without a
+// temperature stores no time (the domain model normalizes — see
 // test/domain/daily_entry_test.dart). Covered here: the conditional
-// visibility, the time stamped at entry when a temperature is entered on
+// visibility, the time stamped at commit when a value is committed on
 // today (no stamp on past days and no stamp while merely loading a day), a
 // stored time stays when the day is re-opened for editing, clearing the
 // time is possible, a temperature-less save keeps no time, and the day
 // tiles show the stored time.
+//
+// The temperature is driven through the wheel (scrollTemperatureWheel):
+// there is no text to type and no out-of-window value to type wrongly.
 //
 // The clock is pinned through the nowProvider override (the real wall clock
 // would make the stamped-time assertion race with the minute boundary); the
@@ -91,13 +95,6 @@ final _day = DateTime.utc(2026, 9, 15);
 ProviderScope _switchScope({Future<void> Function(CycleDatabase db)? seed}) =>
     _harness.scope(seed: seed, now: _switchNow, selectedDay: _day);
 
-/// The BBT field is the first form field; its controller text is the
-/// round-trip signal for "which day's entry is loaded".
-String _bbtText(WidgetTester tester) => tester
-    .widget<TextFormField>(find.byType(TextFormField).first)
-    .controller!
-    .text;
-
 /// The navigation IconButton for [icon] — widgetWithIcon so the cast sees
 /// the IconButton itself, not the bare Icon inside it.
 IconButton _chevron(WidgetTester tester, IconData icon) =>
@@ -135,14 +132,6 @@ bool _cycleStartSwitchValue(WidgetTester tester) =>
 void main() {
   // ═══════════ measured time ═══════════
 
-  /// Types into the temperature field (the first form field) and lets the
-  /// controller listener rebuild the form (the time row's visibility
-  /// follows the temperature).
-  Future<void> enterTemperature(WidgetTester tester, String text) async {
-    await tester.enterText(diaryTemperatureField(), text);
-    await tester.pumpAndSettle();
-  }
-
   testWidgets('the time row appears only once a temperature is entered', (
     WidgetTester tester,
   ) async {
@@ -150,7 +139,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The time row's visibility rides on the keyed picker button: both the
-    // label and the button exist only while the temperature is plausible.
+    // label and the button exist only while a value is committed.
     expect(
       measuredTimeField(),
       findsNothing,
@@ -160,7 +149,7 @@ void main() {
     );
     expect(find.text('14:35'), findsNothing);
 
-    await enterTemperature(tester, '36.5');
+    await scrollTemperatureWheel(tester, from: 36.25, to: 36.50);
 
     expect(
       measuredTimeField(),
@@ -171,7 +160,7 @@ void main() {
       find.text('14:35'),
       findsOneWidget,
       reason:
-          'entering the temperature on today stamps the injected '
+          'committing the temperature on today stamps the injected '
           'current time into the row',
     );
   });
@@ -184,7 +173,7 @@ void main() {
     await tester.pumpWidget(_harness.scope(selectedDay: pastDay));
     await tester.pumpAndSettle();
 
-    await enterTemperature(tester, '36.5');
+    await scrollTemperatureWheel(tester, from: 36.25, to: 36.50);
 
     expect(
       measuredTimeField(),
@@ -202,7 +191,7 @@ void main() {
   });
 
   testWidgets('a stored today temperature without a stored time: opening shows '
-      'unset, editing the text stamps the current time', (
+      'unset, committing a new value stamps the current time', (
     WidgetTester tester,
   ) async {
     _harness.tallSurface(tester);
@@ -224,49 +213,20 @@ void main() {
     );
     expect(find.text('14:35'), findsNothing);
 
-    await enterTemperature(tester, '36,45');
+    await scrollTemperatureWheel(tester, from: 36.40, to: 36.45);
 
     expect(
       find.text('14:35'),
       findsOneWidget,
       reason:
-          'a user edit of the temperature text on today stamps the '
+          'a user commit of the temperature wheel on today stamps the '
           'injected current time',
     );
   });
 
   testWidgets(
-    'compact density: the temperature field and the measured-time row '
-    'share one visual line',
-    (WidgetTester tester) async {
-      _harness.tallSurface(tester);
-      await tester.pumpWidget(_harness.scope());
-      await tester.pumpAndSettle();
-
-      await enterTemperature(tester, '36.5');
-
-      // The measured-time label must sit INSIDE the vertical span of the
-      // temperature field (beside it), not below it in its own row.
-      final tempField = find.byType(TextFormField).first;
-      final tempTop = tester.getTopLeft(tempField).dy;
-      final tempBottom = tester.getBottomRight(tempField).dy;
-      // Deliberate: this geometry pins the label's rect, not the control.
-      final timeTop = tester
-          .getTopLeft(find.byIcon(Icons.schedule_outlined))
-          .dy;
-      expect(
-        timeTop,
-        inInclusiveRange(tempTop, tempBottom),
-        reason:
-            'the temperature field and the measured-time row share one '
-            'visual line — the time row is not stacked below the field',
-      );
-    },
-  );
-
-  testWidgets(
-    'the one-line temperature/time row stays overflow-free at a narrow '
-    'viewport',
+    'the temperature wheel and the measured-time row stay overflow-free at '
+    'a narrow viewport',
     (WidgetTester tester) async {
       useNarrowPhoneViewport(tester);
 
@@ -284,59 +244,29 @@ void main() {
       await expectNoFrameworkErrors(
         tester,
         () async {
-          await enterTemperature(tester, '36.5');
-          // At this width the printed label drops (it is the widest part of
-          // the line); the control stays through icon, time button and the
-          // stamped time.
-          expect(
-            find.text('Gemessen um'),
-            findsNothing,
-            reason:
-                'narrow-width layout drops the printed label (documented '
-                'behavior) — it is the widest part of the line',
-          );
+          await scrollTemperatureWheel(tester, from: 36.25, to: 36.30);
           expect(
             find.text('14:35'),
             findsOneWidget,
             reason:
-                'the one-line row still renders the time control with the '
-                'stamped current time at the narrow width',
+                'the row below the wheel still renders the time control '
+                'with the stamped current time at the narrow width',
           );
           expect(
             find.byIcon(Icons.schedule_outlined),
-            findsOneWidget,
+            findsNothing,
             reason:
-                'the clock icon keeps carrying the meaning at narrow '
-                'widths',
+                'the clock icon is dropped — the button label alone '
+                'carries the meaning',
           );
         },
         reason:
-            'the compact temperature/time row must not introduce a new '
-            'RenderFlex overflow at narrow widths',
+            'the wheel row and the measured-time row must not introduce a '
+            'new RenderFlex overflow at narrow widths',
       );
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets('an implausible temperature keeps the time row hidden', (
-    WidgetTester tester,
-  ) async {
-    // The row mirrors the validator's plausibility gate (isWithinBbtRange):
-    // "999" parses as a number but can never be saved as a temperature, so
-    // no measurement time may be recorded for it.
-    await tester.pumpWidget(_harness.scope());
-    await tester.pumpAndSettle();
-
-    await enterTemperature(tester, '999');
-
-    expect(
-      measuredTimeField(),
-      findsNothing,
-      reason:
-          'a temperature outside the BBT range can never be saved, '
-          'so there is nothing to record a measurement time for',
-    );
-  });
 
   testWidgets('a stored time stays on re-open for editing (no re-stamp)', (
     WidgetTester tester,
@@ -360,13 +290,13 @@ void main() {
     // The injected "now" (14:35) must NOT overwrite the stored morning time.
     expect(find.text('14:35'), findsNothing);
 
-    // Editing the temperature text must not re-stamp either: the stored
+    // Committing a new wheel value must not re-stamp either: the stored
     // time is a set fact of the day and keeps winning over the entry stamp.
-    await enterTemperature(tester, '36,45');
+    await scrollTemperatureWheel(tester, from: 36.40, to: 36.45);
     expect(
       find.text('06:47'),
       findsOneWidget,
-      reason: 'the stored time is kept when the temperature is edited',
+      reason: 'the stored time is kept when the temperature is re-committed',
     );
     expect(find.text('14:35'), findsNothing);
   });
@@ -392,8 +322,9 @@ void main() {
 
     expect(find.text('06:47'), findsOneWidget);
 
-    // The clear affordance is the trailing close button of the time row.
-    await tester.tap(find.byIcon(Icons.close));
+    // The clear affordance is the keyed close button of the time row —
+    // keyed because the temperature value line carries its own close icon.
+    await tester.tap(find.byKey(const ValueKey('measuredTimeClearButton')));
     await tester.pumpAndSettle();
     expect(find.text('06:47'), findsNothing);
 
@@ -417,12 +348,13 @@ void main() {
     await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
-    // The user starts typing a temperature (the time row appears with the
-    // stamped current time), then removes the temperature again — e.g. the
-    // thermometer showed an unusable value — and saves the mucus-only day.
-    await enterTemperature(tester, '36.5');
+    // The user commits a temperature (the time row appears with the
+    // stamped current time), then clears it again — e.g. the thermometer
+    // showed an unusable value — and saves the mucus-only day.
+    await scrollTemperatureWheel(tester, from: 36.25, to: 36.50);
     expect(measuredTimeField(), findsOneWidget);
-    await enterTemperature(tester, '');
+    await tester.tap(diaryTemperatureClearButton());
+    await tester.pumpAndSettle();
     // Mucus sign S so the day is a real, meaningful entry (not an empty
     // form save).
     await tester.tap(diaryChip('mucusSign', 's'));
@@ -453,7 +385,7 @@ void main() {
     await tester.pumpWidget(_harness.scope());
     await tester.pumpAndSettle();
 
-    await enterTemperature(tester, '36.5');
+    await scrollTemperatureWheel(tester, from: 36.25, to: 36.50);
     await tester.tap(diarySaveButton());
     await tester.pumpAndSettle();
 
@@ -465,7 +397,7 @@ void main() {
       stored.measuredAtMinutes,
       14 * 60 + 35, // the injected "now"
       reason:
-          'the measurement time stamped at temperature entry is stored '
+          'the measurement time stamped at temperature commit is stored '
           'together with the temperature',
     );
   });
@@ -526,11 +458,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        _bbtText(tester),
-        '36,4',
+        diaryTemperatureCenteredValue(tester),
+        '36,40',
         reason:
-            'the form opens on the seeded first day, '
-            'comma-prefilled (display follows the locale)',
+            'the form opens on the seeded first day, its stored value '
+            'centred on the wheel (German separator, pinned locale)',
+      );
+      expect(
+        diaryTemperatureWheelSolid(tester),
+        isTrue,
+        reason: 'a stored value renders the wheel solid',
       );
       expect(
         find.widgetWithText(OutlinedButton, germanDayLabel(_day1)),
@@ -554,11 +491,9 @@ void main() {
         reason: 'the date button shows the new day',
       );
       expect(
-        _bbtText(tester),
-        '36,9',
-        reason:
-            'the new day\'s entry is loaded into the form '
-            '(comma-prefilled — display follows the locale)',
+        diaryTemperatureCenteredValue(tester),
+        '36,90',
+        reason: 'the new day\'s entry is loaded into the form',
       );
 
       // Previous: back to the first day, its entry reloaded.
@@ -570,7 +505,7 @@ void main() {
         find.widgetWithText(OutlinedButton, germanDayLabel(_day1)),
         findsOneWidget,
       );
-      expect(_bbtText(tester), '36,4');
+      expect(diaryTemperatureCenteredValue(tester), '36,40');
 
       // The chevron buttons carry localized tooltips (German pinned locale).
       expect(_chevron(tester, Icons.chevron_left).tooltip, 'Voriger Tag');
@@ -604,9 +539,17 @@ void main() {
       reason: 'a disabled button must not move the selection',
     );
     expect(
-      _bbtText(tester),
-      '',
-      reason: 'tomorrow has no stored entry — the fresh day stays loaded',
+      diaryTemperatureWheelSolid(tester),
+      isFalse,
+      reason:
+          'tomorrow has no stored entry — the previous day\'s value '
+          'shows only as the gray suggestion',
+    );
+    expect(diaryTemperatureClearButton(), findsNothing);
+    expect(
+      diaryTemperatureCenteredValue(tester),
+      '36,90',
+      reason: 'an empty day proposes the latest earlier temperature',
     );
 
     // Previous stays available from there (moving back is in-window).
@@ -648,10 +591,10 @@ void main() {
     await tester.pumpWidget(_dayNavScope(selectedDay: _day1));
     await tester.pumpAndSettle();
 
-    expect(_bbtText(tester), '36,4');
+    expect(diaryTemperatureCenteredValue(tester), '36,40');
 
-    // The user types a new temperature but does NOT save.
-    await tester.enterText(diaryTemperatureField(), '39.9');
+    // The user commits a new temperature but does NOT save.
+    await scrollTemperatureWheel(tester, from: 36.40, to: 36.45);
     await tester.pumpAndSettle();
 
     // Navigating away loads the next day fresh — the unsaved edit is gone
@@ -660,8 +603,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_right));
     await tester.pumpAndSettle();
     expect(
-      _bbtText(tester),
-      '36,9',
+      diaryTemperatureCenteredValue(tester),
+      '36,90',
       reason: 'the next day loads fresh, not with the unsaved edit',
     );
 
@@ -669,8 +612,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_left));
     await tester.pumpAndSettle();
     expect(
-      _bbtText(tester),
-      '36,4',
+      diaryTemperatureCenteredValue(tester),
+      '36,40',
       reason: 'the discarded edit never reached the database',
     );
 
