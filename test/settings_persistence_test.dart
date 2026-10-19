@@ -12,7 +12,9 @@
 // test/db/settings_store_test.dart.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
+import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -487,6 +489,70 @@ void main() {
         'min': 35.0,
         'max': 39.0,
       }, reason: 'the range choice must persist as its JSON map');
+    });
+  });
+
+  group('custom diary categories (definitions)', () {
+    testWidgets('a persisted definitions row hydrates into the provider', (
+      WidgetTester tester,
+    ) async {
+      Future<void> seed(CycleDatabase db) =>
+          SettingsStore(db.settingsDao).persistCustomCategories(const [
+            CustomCategory(name: 'Sport', items: ['Joggen', 'Kraft']),
+            CustomCategory(name: 'Medikamente', visible: false),
+          ]);
+
+      await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(CycleApp)),
+      );
+      expect(container.read(customDiaryCategoriesProvider), const [
+        CustomCategory(name: 'Sport', items: ['Joggen', 'Kraft']),
+        CustomCategory(name: 'Medikamente', visible: false),
+      ], reason: 'the stored definitions must fill the untouched provider');
+    });
+
+    testWidgets('provider changes write through to the definitions row', (
+      WidgetTester tester,
+    ) async {
+      CycleDatabase? db;
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          onCreated: (created) => db = created,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(CycleApp)),
+      );
+      expect(
+        container.read(customDiaryCategoriesProvider),
+        isEmpty,
+        reason: 'the untouched sentinel is the empty list',
+      );
+
+      container.read(customDiaryCategoriesProvider.notifier).set(const [
+        CustomCategory(name: 'Medikamente', items: ['Eisen']),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(
+        await SettingsStore(
+          db!.settingsDao,
+        ).readSetting(SettingKeys.customDiaryCategories),
+        [
+          {
+            'name': 'Medikamente',
+            'visible': true,
+            'items': ['Eisen'],
+          },
+        ],
+        reason: 'a provider change must land in app_settings as its JSON list',
+      );
     });
   });
 

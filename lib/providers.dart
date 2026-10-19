@@ -25,6 +25,7 @@ import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'db/settings_store.dart';
 import 'domain/date_only.dart';
+import 'domain/custom_categories.dart';
 import 'domain/diary_track.dart';
 import 'domain/marks.dart';
 import 'domain/measurement_method.dart';
@@ -305,6 +306,21 @@ class DiaryTrackNotifier extends _$DiaryTrackNotifier
   void set(DiaryTrack value) => state = value;
 }
 
+/// The user's custom diary category definitions ("eigene Kategorien"), in
+/// display order; empty until the first category is added. The whole list
+/// is the value — every card edit replaces it wholesale (the list is small
+/// and the caps keep it that way).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class CustomDiaryCategoriesNotifier extends _$CustomDiaryCategoriesNotifier
+    implements SettableSetting<List<CustomCategory>> {
+  @override
+  List<CustomCategory> build() => const [];
+  @override
+  void set(List<CustomCategory> value) => state = value;
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called
@@ -336,7 +352,7 @@ typedef SettingsWriteSink =
 /// The write contract every mutable settings notifier exposes — the
 /// sanctioned external write (`ref.read(xProvider.notifier).set(v)`),
 /// because riverpod annotates the Notifier `state` setter `@protected`.
-/// Implemented by all 15 Notifier classes in this file; the registrar's
+/// Implemented by all 16 Notifier classes in this file; the registrar's
 /// [PersistedSetting.bind] is generic over it.
 mixin SettableSetting<T> {
   /// The sanctioned external write for the provider this notifier backs.
@@ -465,6 +481,13 @@ final _persistedSettings = <PersistedSetting>[
     untouched: DiaryTrack.defaults,
     fromSnapshot: (snapshot) => snapshot.diaryTrack,
     persist: (store, value) => store.persistDiaryTrack(value),
+  ),
+  PersistedSetting.bind(
+    provider: customDiaryCategoriesProvider,
+    notifier: customDiaryCategoriesProvider.notifier,
+    untouched: const <CustomCategory>[],
+    fromSnapshot: (snapshot) => snapshot.customDiaryCategories,
+    persist: (store, value) => store.persistCustomCategories(value),
   ),
   PersistedSetting.bind(
     provider: onboardingCompletedProvider,
