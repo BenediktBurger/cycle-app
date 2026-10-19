@@ -11,19 +11,19 @@ requirement, docs/release.md Phase E).
 ## Provenance
 
 - Source archive:
-  https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v2.5.0/sqlite3mc-2.5.0-sqlite-3.53.4-amalgamation.zip
+  https://github.com/utelle/SQLite3MultipleCiphers/releases/download/v2.6.1/sqlite3mc-2.6.1-sqlite-3.54.0-amalgamation.zip
   (from the tooling the `sqlite3` package itself pins in
-  `tool/download_sqlite.dart` at tag `sqlite3-3.5.2`)
-- Content: SQLite3MultipleCiphers 2.5.0 built on SQLite 3.53.4.
+  `tool/download_sqlite.dart` at tag `sqlite3-3.7.1`)
+- Content: SQLite3MultipleCiphers 2.6.1 built on SQLite 3.54.0.
   Only `sqlite3mc_amalgamation.c` and `sqlite3mc_amalgamation.h` from the
   archive are vendored here (the same two files the `sqlite3` project's
   download script copies).
-- Vendored on 2026-09-22 by `dart run tool/sqlite3mc.dart update`.
+- Vendored on 2026-10-19 by `dart run tool/sqlite3mc.dart update`.
 - SHA-256:
   - `sqlite3mc_amalgamation.c`
-    d28339d7a56f3b465720aa9c729f3ca9d429705ea8fda45bb8d034536cecd579
+    9b129d1ceb2c7d5dbf374b833eb29a640ecfa8e4a5af6d48508b429019c707b0
   - `sqlite3mc_amalgamation.h`
-    959f37e52c004f179ac0e2a5ce28f7bc58271c1a7d532ce9654484641fc31855
+    99b3e6997aa5fc604d9ea2352e6ae89dfd4d0af8d5bd7cbfe7293d959779e6eb
 
 ## Licensing
 
