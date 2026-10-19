@@ -6,29 +6,53 @@ import '../../domain/temperature_range.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers.dart';
 
-/// The selectable half-degree steps of the temperature-range pickers, across
-/// the allowed 34.0..42.0 °C window. Built from integer half-steps (k / 2)
-/// so no float drift creeps into the 0.5 step grid.
-final List<double> temperatureRangeSteps = List.unmodifiable(<double>[
-  for (
-    var k = (TemperatureRange.windowLower / 0.5).round(),
-        upper = (TemperatureRange.windowUpper / 0.5).round();
-    k <= upper;
-    k++
-  )
-    k * 0.5,
-]);
+/// The snap grid the slider's `divisions` imply: every drag value and
+/// clamp result lands on a half-degree value.
+const double _step = 0.5;
+
+/// The smallest gap the card keeps between the two bounds: two grid steps,
+/// so every clamp lands back on the half-degree grid.
+const double _minimumGap = 2 * _step;
+
+/// Rounds [value] onto the half-degree grid the slider's divisions imply.
+double _snap(double value) => (value / _step).round() * _step;
+
+/// The range the card writes for a reported drag: both values snapped onto
+/// the half-degree grid (drags stay on it via divisions, but the
+/// screen-reader actions round to two decimals on the way), then the thumb
+/// that moved — detected against the current provider value — nudged back
+/// to the minimum gap when it landed on the other one (the framework
+/// never reports a crossing).
+TemperatureRange _clampedRange(RangeValues values, TemperatureRange current) {
+  final start = _snap(values.start);
+  final end = _snap(values.end);
+  final movedLower = start != current.min;
+  return TemperatureRange(
+    min: movedLower && start > end - _minimumGap ? end - _minimumGap : start,
+    max: movedLower
+        ? end
+        : end < start + _minimumGap
+        ? start + _minimumGap
+        : end,
+  );
+}
 
 // --- temperature range ---------------------------------------
-// The chart's y range: two half-degree pickers; min < max is
-// enforced BY CONSTRUCTION — each picker only offers the values
-// strictly on its side of the other bound (no error states).
+// The chart's y range: one RangeSlider across the allowed
+// 34.0..42.0 °C window; min < max is enforced BY CONSTRUCTION
+// (_clampedRange) — no error states.
 final class TemperatureRangeCard extends ConsumerWidget {
   const TemperatureRangeCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final range = ref.watch(temperatureRangeProvider);
+    final locale = Localizations.localeOf(context).toString();
+    String format(double value) =>
+        '${formatDecimal(value, locale: locale, decimalDigits: 1)} °C';
+    final lowerBound = '${l10n.settingsRangeLower}: ${format(range.min)}';
+    final upperBound = '${l10n.settingsRangeUpper}: ${format(range.max)}';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -40,79 +64,40 @@ final class TemperatureRangeCard extends ConsumerWidget {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            Builder(
-              builder: (context) {
-                final range = ref.watch(temperatureRangeProvider);
-                return Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<double>(
-                        key: const ValueKey('temperatureRangeMin'),
-                        initialValue: range.min,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: l10n.settingsRangeLower,
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: [
-                          for (final step in temperatureRangeSteps.where(
-                            (step) => step < range.max,
-                          ))
-                            DropdownMenuItem(
-                              value: step,
-                              child: Text(
-                                '${formatDecimal(step, locale: Localizations.localeOf(context).toString(), decimalDigits: 1)} °C',
-                              ),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) return;
-                          ref
-                              .read(temperatureRangeProvider.notifier)
-                              .set(
-                                TemperatureRange(min: value, max: range.max),
-                              );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<double>(
-                        key: const ValueKey('temperatureRangeMax'),
-                        initialValue: range.max,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: l10n.settingsRangeUpper,
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: [
-                          for (final step in temperatureRangeSteps.where(
-                            (step) => step > range.min,
-                          ))
-                            DropdownMenuItem(
-                              value: step,
-                              child: Text(
-                                '${formatDecimal(step, locale: Localizations.localeOf(context).toString(), decimalDigits: 1)} °C',
-                              ),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) return;
-                          ref
-                              .read(temperatureRangeProvider.notifier)
-                              .set(
-                                TemperatureRange(min: range.min, max: value),
-                              );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
+            Row(
+              children: [
+                Expanded(child: Text(lowerBound)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(upperBound)),
+              ],
+            ),
+            RangeSlider(
+              key: const ValueKey('temperatureRangeSlider'),
+              values: RangeValues(range.min, range.max),
+              min: TemperatureRange.windowLower,
+              max: TemperatureRange.windowUpper,
+              divisions:
+                  ((TemperatureRange.windowUpper -
+                              TemperatureRange.windowLower) /
+                          _step)
+                      .round(),
+              labels: RangeLabels(format(range.min), format(range.max)),
+              // The framework dispatches the callback per thumb without
+              // handle identity; the nearer bound identifies the thumb —
+              // a drag value can sit strictly between the stored ones.
+              semanticFormatterCallback: (value) =>
+                  (value - range.min).abs() <= (range.max - value).abs()
+                  ? lowerBound
+                  : upperBound,
+              onChanged: (values) => ref
+                  .read(temperatureRangeProvider.notifier)
+                  .set(
+                    _clampedRange(values, ref.read(temperatureRangeProvider)),
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.settingsTemperatureRangeDefaultHint,
+              l10n.settingsTemperatureRangeNote,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
