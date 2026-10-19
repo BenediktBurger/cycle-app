@@ -396,6 +396,51 @@
   "settingsTrackCervix": "Cervix",
   "settingsTrackSex": "Sex",
   "settingsTrackPain": "Pain",
+  "settingsCustomCategoriesTitle": "Custom categories",
+  "@settingsCustomCategoriesTitle": {
+    "description": "Title of the settings card for the user-defined diary categories (\"custom marks\"): each category is its own diary form section with its entries as ticks."
+  },
+  "settingsCustomCategoriesNote": "Custom diary sections, for example sport or medication. Renaming or deleting never rewrites days that are already saved.",
+  "@settingsCustomCategoriesNote": {
+    "description": "Hint under the card title: what the categories are for and that stored days are label-keyed — renaming or deleting a definition never rewrites already saved days."
+  },
+  "settingsCustomCategoriesNameLabel": "Name",
+  "settingsCustomCategoriesEntryLabel": "Add entry",
+  "settingsCustomCategoriesAddLabel": "New category",
+  "settingsCustomCategoriesAddTooltip": "Add category",
+  "settingsCustomCategoriesAddEntryTooltip": "Add entry",
+  "settingsCustomCategoriesRemoveEntryTooltip": "Remove entry",
+  "settingsCustomCategoriesDeleteTooltip": "Delete category",
+  "settingsCustomCategoriesMoveUpTooltip": "Move up",
+  "settingsCustomCategoriesMoveDownTooltip": "Move down",
+  "settingsCustomCategoriesVisibleLabel": "Show in the diary",
+  "settingsCustomCategoriesErrorEmpty": "Please enter a name.",
+  "settingsCustomCategoriesErrorDuplicate": "A category with this name already exists.",
+  "settingsCustomCategoriesErrorDuplicateEntry": "This entry already exists in the category.",
+  "settingsCustomCategoriesErrorTooLong": "At most {n} characters.",
+  "@settingsCustomCategoriesErrorTooLong": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsCustomCategoriesErrorCategoryLimit": "At most {n} categories.",
+  "@settingsCustomCategoriesErrorCategoryLimit": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsCustomCategoriesErrorEntryLimit": "At most {n} entries per category.",
+  "@settingsCustomCategoriesErrorEntryLimit": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "settingsObservedCyclesOutsideApp": "Cycles observed outside this app",
   "@settingsObservedCyclesOutsideApp": {
     "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."

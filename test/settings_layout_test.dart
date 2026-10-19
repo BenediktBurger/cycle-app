@@ -42,7 +42,9 @@ void main() {
         'card after them, delete data stays the last card', (
       WidgetTester tester,
     ) async {
-      useTallSurface(tester, width: 900);
+      // Tall enough that the lazy pane builds its WHOLE card list — the
+      // delete-data card must be built to be found as the last card.
+      useTallSurface(tester, width: 900, height: 3200);
       await pumpGermanSettingsPane(tester);
 
       final generalCard = find.byKey(const ValueKey('generalInfoCard'));
