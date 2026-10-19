@@ -387,7 +387,7 @@ void main() {
 
     // The bleeding row hands its cell bounds to the shared square-box
     // symbol (lib/ui/bleeding_symbol.dart); the fill layout per level is
-    // that symbol's convention, owned by test/bleeding_symbol_test.dart —
+    // that symbol's convention, owned by test/symbol_widgets_test.dart —
     // here only that every recorded level renders it at all.
     testWidgets('bleeding cells render the shared symbol: exactly one fill per '
         'menstruation level, interrupted dots for spotting, no fill for '

@@ -1,19 +1,12 @@
-// Widget tests of the shared bleeding symbol: a square box whose bleed
-// fill is a bottom-anchored fraction of the box height — levels 2–5 fill
-// (level − 1)/4 of it (1/4, 2/4, 3/4, 4/4), level 1 (spotting) renders a
-// dotted, interrupted fill within the bottom quarter band, and level 0
-// renders nothing (the surfaces keep their own none appearance: the
-// chart's empty cell, the diary's faint outlineVariant dot; see the
-// symbol's header comment).
-//
-// The cycle chart's cells hand the symbol bounded constraints — the cell
-// box serves as the fill boundary (the widget deliberately shrinks when
-// given unbounded ones) — the diary tiles wrap it in a fixed 18 px
-// square — these tests pin the geometry at a fixed square size, measured
-// with getRect, so the convention cannot drift between the surfaces.
+// Widget tests of the shared symbol renderers: the bleeding square-box fill
+// geometry and the mucus glyph long-press explanations.
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/mucus.dart' show MucusQuality, MucusSign;
+import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/bleeding_symbol.dart';
+import 'package:cycle_app/ui/mucus_symbol.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -133,6 +126,100 @@ void main() {
       sorted.last.right - sorted.first.left,
       lessThan(boxSide),
       reason: 'the dotted fill never reads as a solid quarter bar',
+    );
+  });
+
+  Widget harness(Widget child) => MaterialApp(
+    locale: const Locale('de'),
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en'), Locale('de')],
+    home: Scaffold(body: Center(child: child)),
+  );
+
+  Widget symbol(MucusSign? sign, [MucusQuality? quality]) =>
+      MucusSymbolText(sign: sign, quality: quality, color: Colors.black);
+
+  testWidgets('plain S long-presses into the S explanation', (
+    WidgetTester tester,
+  ) async {
+    final l10n = lookupAppLocalizations(const Locale('de'));
+    await tester.pumpWidget(harness(symbol(MucusSign.s)));
+
+    await tester.longPress(find.byType(MucusSymbolText));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(l10n.mucusSignTooltipS),
+      findsOneWidget,
+      reason:
+          'the plain-S glyph shows the Schleim explanation from '
+          'the cheat sheet',
+    );
+  });
+
+  testWidgets('Sᴱᵂ long-presses into the sign and quality explanation', (
+    WidgetTester tester,
+  ) async {
+    final l10n = lookupAppLocalizations(const Locale('de'));
+    await tester.pumpWidget(harness(symbol(MucusSign.s, MucusQuality.ew)));
+    final combined = find.textContaining(
+      '${l10n.mucusSignTooltipS} – ${l10n.mucusQualityTooltipEw}',
+    );
+
+    await tester.longPress(find.byType(MucusSymbolText));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(l10n.mucusSignTooltipS),
+      findsOneWidget,
+      reason: 'the long-press tooltip carries the Schleim explanation',
+    );
+    expect(
+      combined,
+      findsOneWidget,
+      reason:
+          'the S+EW glyph shows the Schleim explanation AND the '
+          'EW-quality explanation together',
+    );
+  });
+
+  testWidgets('no sign recorded renders no tooltip surface', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(harness(symbol(null)));
+
+    expect(
+      find.byType(Tooltip),
+      findsNothing,
+      reason: 'a blank day contributes no long-pressable glyph',
+    );
+  });
+
+  testWidgets('A glyph ignores a stray quality in its tooltip', (
+    WidgetTester tester,
+  ) async {
+    final l10n = lookupAppLocalizations(const Locale('de'));
+    await tester.pumpWidget(harness(symbol(MucusSign.a, MucusQuality.ew)));
+
+    await tester.longPress(find.byType(MucusSymbolText));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(l10n.mucusSignTooltipA),
+      findsOneWidget,
+      reason: 'the A glyph explains Ausfluss',
+    );
+    expect(
+      find.textContaining(l10n.mucusQualityTooltipEw),
+      findsNothing,
+      reason:
+          'qualities render only with S, so the tooltip ignores '
+          'one recorded on another sign',
     );
   });
 }
