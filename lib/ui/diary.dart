@@ -1166,15 +1166,33 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           ],
         ],
       ),
-      subtitle: day.notes != null
-          ? Text(day.notes!, maxLines: 1, overflow: TextOverflow.ellipsis)
-          : null,
+      subtitle: switch (_dayTileSubtitle(day)) {
+        null => null,
+        final preview => Text(
+          preview,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      },
       onTap: () {
         ref
             .read(selectedDateProvider.notifier)
             .set(DateOnly.normalize(day.date));
       },
     );
+  }
+
+  /// The day tile's preview line: the stored marks line (customMarksNote,
+  /// the shared render text) prepended before the free note; null when the
+  /// day has neither.
+  static String? _dayTileSubtitle(DailyEntry day) {
+    final preview = [
+      if (customMarksNote(day.customMarks) case final marks?
+          when marks.isNotEmpty)
+        marks,
+      if (day.notes case final noteText? when noteText.isNotEmpty) noteText,
+    ].join(customMarkCategoriesSeparator);
+    return preview.isEmpty ? null : preview;
   }
 
   Widget _bleedingMarker(DailyEntry day) {

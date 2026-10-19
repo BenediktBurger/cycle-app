@@ -29,7 +29,9 @@
 //                      - `pain_breast`, `pain_mittelschmerz` only when true;
 //                      - `mucus_sign`, `mucus_quality`,
 //                        `cervix_position`, `cervix_opening`,
-//                        `cervix_firmness`, `notes` only when non-null
+//                        `cervix_firmness`, `notes` only when non-null;
+//                      - `custom_marks` only when the day carries any (the
+//                        stored label-keyed marks JSON, see tables.dart)
 //                    ...}, ...],
 //     "marks":    [{"entry_date": "2026-03-12",
 //                   "mark_type": "ignoreTemperature",
@@ -62,12 +64,18 @@
 // inputs. The bleeding key carries a NUMERIC level (0=none … 5); see the
 // version note below.
 //
-// The document root is exactly schema_version / exported_at / entries /
-// marks — there are NO profile keys anywhere (the Profiles table, the
-// profile_id columns and the per-profile machinery are gone from the
-// schema; see the version note below). The `methods` list joins the root
-// additively and only when non-empty (see above), so documents without
-// snapshots keep this exact four-key shape. Old (v1–4) documents DO carry
+// The document root is schema_version / exported_at / entries / marks,
+// plus the ADDITIVE `customCategories` list — carried only when the
+// exporter has user-defined category definitions (the value is a list of
+// {name, visible, items} row maps as the settings store holds them), so
+// documents without definitions keep this exact four-key shape. Readers
+// treat the missing key as "no definitions": old documents and
+// definitions-free exports stay valid inputs, and older readers ignore
+// the unknown key entirely. There are NO profile keys anywhere (the
+// Profiles table, the profile_id columns and the per-profile machinery
+// are gone from the schema; see the version note below). The `methods`
+// list joins the root additively and only when non-empty (see above).
+// Old (v1–4) documents DO carry
 // `profile_id` on every row and a root `profiles` list: those keys are
 // ACCEPTED and IGNORED on import — rows merge by day / (day, mark_type),
 // never by profile.
@@ -147,6 +155,7 @@
 
 import 'dart:convert';
 
+import 'custom_categories.dart';
 import 'date_only.dart';
 import 'measurement_method.dart';
 import 'models.dart';
@@ -195,11 +204,16 @@ const String exportMergePolicy = 'overwrite';
 /// WRITER emits the root key only when the list is non-empty — a
 /// snapshot-free document keeps the pinned four-key shape — while every
 /// reader parses the missing key as "no snapshots".
+/// [customCategories] is the same only-when-non-empty emission (the
+/// category definitions row maps, as the settings store holds them); a
+/// definitions-free document carries no key, and the reader parses the
+/// missing key as "no definitions".
 final class ExportBlob {
   const ExportBlob({
     required this.entries,
     required this.marks,
     this.methods = const [],
+    this.customCategories = const [],
     required this.exportedAt,
   });
 
@@ -207,6 +221,8 @@ final class ExportBlob {
   final List<Map<String, Object?>> marks;
 
   final List<Map<String, Object?>> methods;
+
+  final List<Map<String, Object?>> customCategories;
 
   final DateTime exportedAt;
 }
@@ -243,6 +259,10 @@ String buildExportJson(ExportBlob blob) {
     'marks': blob.marks,
     // Snapshot-free datasets stay byte-identical to the pinned four-key shape.
     if (blob.methods.isNotEmpty) 'methods': blob.methods,
+    // Definitions-free datasets keep that shape too: the key exists only
+    // when the exporter has category definitions.
+    if (blob.customCategories.isNotEmpty)
+      'customCategories': blob.customCategories,
   });
 }
 
@@ -296,6 +316,12 @@ ExportBlob parseExportJson(String raw) {
     methods: decoded.containsKey('methods')
         ? _listOfMaps(decoded['methods'], 'methods')
         : const [],
+    // Same additive-root-key gate as methods: absent key = no definitions
+    // (old documents and definitions-free exports); a present key fails
+    // the document loudly when it is not a list of JSON objects.
+    customCategories: decoded.containsKey('customCategories')
+        ? _listOfMaps(decoded['customCategories'], 'customCategories')
+        : const [],
   );
 }
 
@@ -332,6 +358,7 @@ final class ImportSummary {
     this.methodsOverwritten = 0,
     this.methodsInvalid = 0,
     this.duplicateMethodRows = 0,
+    this.customCategories = const [],
   });
 
   /// Entries absent on this device (to insert).
@@ -373,6 +400,12 @@ final class ImportSummary {
   /// Rows whose same-day key appears twice IN the document itself; the
   /// first occurrence wins.
   final int duplicateMethodRows;
+
+  /// The document's `customCategories` re-encoded through [CustomCategory]
+  /// — the canonical list the db adapter writes to the settings row. Empty
+  /// when the document carries no key (or an empty one): no definitions
+  /// data, nothing to apply.
+  final List<CustomCategory> customCategories;
 
   /// Total rows that end up stored for the entries table.
   int get entriesWritten => entriesNew + entriesOverwritten;
@@ -430,8 +463,9 @@ MeasurementMethodSnapshot? tryMethodSnapshotFromExport(
 /// `profiles` keys of old documents are NOT read here (accepted and
 /// ignored — rows merge by day / (day, mark_type), and two rows that
 /// differ only by profile on the same day collapse onto one key: first
-/// occurrence wins, extras count as duplicates). Only counts are produced
-/// — no writes happen here, keeping this function pure and testable.
+/// occurrence wins, extras count as duplicates). Only counts plus the
+/// document's decoded definitions list are produced — no writes happen
+/// here, keeping this function pure and testable.
 ImportSummary planMerge(
   ExportBlob doc, {
   required Set<String> existingEntryKeys,
@@ -534,5 +568,8 @@ ImportSummary planMerge(
     methodsOverwritten: methodsOverwritten,
     methodsInvalid: methodsInvalid,
     duplicateMethodRows: duplicateMethodRows,
+    customCategories: [
+      for (final row in doc.customCategories) CustomCategory.fromJson(row),
+    ],
   );
 }

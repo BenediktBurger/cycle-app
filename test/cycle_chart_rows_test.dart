@@ -467,6 +467,80 @@ void main() {
     });
   });
 
+  group('custom marks in the notes band', () {
+    // Four chart days: day 0 marks only (no free note), day 1 marks plus a
+    // free note, day 2 an entry-less category (bare name), day 3 nothing.
+    final marksEntries = [
+      DailyEntry(
+        date: septSevenDay(0),
+        bbtC: 36.5,
+        customMarks: const {
+          'Sport': ['Joggen', 'Kraft'],
+        },
+      ),
+      DailyEntry(
+        date: septSevenDay(1),
+        bbtC: 36.5,
+        customMarks: const {
+          'Sport': ['Joggen'],
+          'Urlaub': <String>[],
+        },
+        notes: 'Zahnarzt telefonieren',
+      ),
+      DailyEntry(
+        date: septSevenDay(2),
+        bbtC: 36.5,
+        customMarks: const {'Medikamente': <String>[]},
+      ),
+      DailyEntry(date: septSevenDay(3), bbtC: 36.5),
+    ];
+
+    testWidgets('a marks-only day renders its marks line in the band', (
+      tester,
+    ) async {
+      await pumpChart(tester, chartHarness(entries: marksEntries));
+
+      final note = tester.widget<Text>(
+        find.byKey(const ValueKey('notesText-0')),
+      );
+      expect(
+        note.data,
+        'Sport: Joggen, Kraft',
+        reason: 'the marks line alone fills the band text',
+      );
+    });
+
+    testWidgets('a day with marks and a free note renders the marks text '
+        'before the note', (tester) async {
+      await pumpChart(tester, chartHarness(entries: marksEntries));
+
+      final note = tester.widget<Text>(
+        find.byKey(const ValueKey('notesText-1')),
+      );
+      expect(
+        note.data,
+        'Sport: Joggen · Urlaub · Zahnarzt telefonieren',
+        reason: 'the marks text leads, the folded note follows',
+      );
+    });
+
+    testWidgets('an entry-less category renders its bare name; a day without '
+        'marks and without a note renders no band text', (tester) async {
+      await pumpChart(tester, chartHarness(entries: marksEntries));
+
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('notesText-2'))).data,
+        'Medikamente',
+        reason: 'the bare category name IS the mark',
+      );
+      expect(
+        find.byKey(const ValueKey('notesText-3')),
+        findsNothing,
+        reason: 'day 3 carries nothing — no text renders',
+      );
+    });
+  });
+
   // The raw sex/mucus observations, the mucus peak and the Mittelschmerz M
   // render INSIDE the temperature plot (mapped by the pure layer in
   // lib/ui/chart_marks.dart) — in the day's column, at the row pitches

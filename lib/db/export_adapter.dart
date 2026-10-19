@@ -12,6 +12,12 @@
 //    shared helper tryMethodSnapshotFromExport rejects are skipped and
 //    counted (a foreign `method` token cannot pass the NOT NULL CHECK —
 //    no coercion exists to tolerate).
+//  - custom category definitions: a document that carries the
+//    `customCategories` key rewrites the definitions settings row inside
+//    the transaction, re-encoded through CustomCategory's canonical JSON
+//    (the exact shape persistCustomCategories writes); a document
+//    without the key — old documents and definitions-free exports both
+//    lack it — leaves stored definitions untouched.
 //  - old documents (v1–4) carry profile keys (`profile_id` on every row, a
 //    root `profiles` list): both are ACCEPTED and IGNORED — rows merge by
 //    day / (day, mark_type), never by profile. Their exclude_* keys
@@ -21,6 +27,8 @@
 //    preserving the old interrupted-day analysis semantics. The derived
 //    marks are written inside the import transaction (idempotently, like
 //    the document's own marks); they are not part of the planner's counts.
+
+import 'dart:convert';
 
 import '../domain/cervix.dart';
 import '../domain/export_import.dart';
@@ -63,6 +71,15 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 
   return ExportBlob(
     exportedAt: DateTime.now(),
+    // The custom category definitions ride as their stored row maps —
+    // lenient decode (a non-list row or a non-map member collapses away),
+    // like the settings store's reader. The literal key mirrors
+    // SettingKeys.customDiaryCategories (settings_store.dart is not
+    // importable here: the host smoke scripts run this file on the plain
+    // Dart VM).
+    customCategories: _customCategoriesFromStored(
+      await db.settingsDao.readValue('customDiaryCategories'),
+    ),
     entries: [
       for (final e in entries)
         {
@@ -94,6 +111,10 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           if (e.painBreast) 'pain_breast': true,
           if (e.painMittelschmerz) 'pain_mittelschmerz': true,
           if (e.sexTimings != 0) 'sex_timings': e.sexTimings,
+          // The stored custom-marks JSON verbatim (the mapper's write
+          // shape, lib/db/mappers.dart); the import decodes it leniently.
+          if (e.customMarks != null && e.customMarks!.isNotEmpty)
+            'custom_marks': e.customMarks,
           if (e.notes != null) 'notes': e.notes,
         },
     ],
@@ -140,7 +161,9 @@ Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
 }
 
 /// Parses, plans and writes the import into [db]; returns the executed
-/// counts for the confirmation text.
+/// counts for the confirmation text plus the canonical imported custom
+/// category definitions (empty when the document carries none) for the
+/// UI's in-session provider update.
 ///
 /// The write phase runs in ONE transaction: a failure mid-way rolls
 /// everything back. Structural validity was already checked by the plan;
@@ -245,6 +268,22 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         );
       }
 
+      // 4) Category definitions — a settings row, not a merged domain: a
+      //    document that carries the key REWRITES it with the plan's
+      //    canonical list (CustomCategory re-encode, the
+      //    persistCustomCategories shape — the same list the summary
+      //    exposes for the UI's in-session provider update). An absent or
+      //    empty key touches nothing — the writer never emits an empty
+      //    list, and an old document must not clear stored definitions.
+      //    The literal key mirrors SettingKeys.customDiaryCategories (see
+      //    exportDatabaseToBlob).
+      if (summary.customCategories.isNotEmpty) {
+        await db.settingsDao.writeValue(
+          'customDiaryCategories',
+          jsonEncode([for (final c in summary.customCategories) c.toJson()]),
+        );
+      }
+
       return summary;
     });
   } on FormatException {
@@ -263,6 +302,25 @@ bool _oldDocExcluded(Map<String, Object?> row) =>
     row['exclude_alcohol'] == true ||
     row['exclude_travel'] == true ||
     row['exclude_other'] == true;
+
+/// The definitions settings row decoded leniently — the same collapse
+/// shape the settings store's per-key reader applies: a null/missing,
+/// non-JSON or non-list row is no definitions, and non-map list members
+/// are skipped (a corrupt row never breaks an export).
+List<Map<String, Object?>> _customCategoriesFromStored(String? raw) {
+  if (raw == null) return const [];
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(raw);
+  } on FormatException {
+    return const [];
+  }
+  if (decoded is! List) return const [];
+  return [
+    for (final member in decoded)
+      if (member is Map) Map<String, Object?>.from(member),
+  ];
+}
 
 final class _Existing {
   _Existing(this.entryKeys, this.markKeys, this.methodKeys);
@@ -356,6 +414,13 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       ? rawTimings
       : 0;
 
+  // Lenient decode through the shared parser (lib/db/mappers.dart): a
+  // broken or non-string custom_marks value collapses to the empty map,
+  // never a row killer.
+  final customMarks = row['custom_marks'] is String
+      ? tryParseCustomMarks(row['custom_marks'] as String)
+      : const <String, List<String>>{};
+
   try {
     return DailyEntry(
       date: day,
@@ -378,6 +443,7 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       // read either.
       painBreast: flag('pain_breast'),
       painMittelschmerz: flag('pain_mittelschmerz'),
+      customMarks: customMarks,
       notes: row['notes'] is String ? row['notes'] as String : null,
     );
   } on AssertionError {

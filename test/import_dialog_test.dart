@@ -18,12 +18,17 @@
 import 'dart:async';
 
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/export_import.dart'
     show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/domain/models.dart' show DailyEntry;
+import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show acceptExtensions, pickFileTextOverride;
+import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
@@ -496,6 +501,111 @@ void main() {
         reason: 'a methods-only document is not an empty import',
       );
     });
+  });
+
+  group('import updates the custom categories provider in-session', () {
+    /// Pumps the REAL app shell (hydration runs there — the bare settings
+    /// harness never drives the registrar), opens the settings tab and the
+    /// JSON import dialog.
+    Future<void> pumpShellAndOpenJsonDialog(
+      WidgetTester tester, {
+      Future<void> Function(CycleDatabase db)? seed,
+    }) async {
+      await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+      await tester.pumpAndSettle();
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, settingsImportJsonButton());
+      await tester.tap(settingsImportJsonButton());
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+    }
+
+    /// The provider value through the shell's scope (the container the
+    /// diary form and the settings card read).
+    List<CustomCategory> providerCategories(WidgetTester tester) =>
+        ProviderScope.containerOf(
+          tester.element(find.byType(EinstellungenScreen)),
+        ).read(customDiaryCategoriesProvider);
+
+    /// Pastes [json] into the open dialog and applies the import.
+    Future<void> applyImport(WidgetTester tester, String json) async {
+      await tester.enterText(importTextField(), json);
+      await tester.pumpAndSettle();
+      await tester.tap(applyButton());
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a document with definitions applies them without a restart', (
+      WidgetTester tester,
+    ) async {
+      await pumpShellAndOpenJsonDialog(tester);
+      await applyImport(
+        tester,
+        buildExportJson(
+          ExportBlob(
+            exportedAt: DateTime.utc(2026, 9, 20),
+            entries: [
+              {'date': '2026-09-01', 'bbt_c': 36.5},
+            ],
+            marks: const [],
+            customCategories: const [
+              {
+                'name': 'Sport',
+                'visible': true,
+                'items': ['Joggen'],
+              },
+            ],
+          ),
+        ),
+      );
+
+      expect(
+        providerCategories(tester),
+        [
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ],
+        reason:
+            'the imported definitions are live in-session — the diary '
+            'form and the settings card see them without a restart',
+      );
+    });
+
+    testWidgets(
+      'a document without the key leaves the provider exactly as hydrated',
+      (WidgetTester tester) async {
+        await pumpShellAndOpenJsonDialog(
+          tester,
+          seed: (db) async {
+            await SettingsStore(db.settingsDao).persistCustomCategories([
+              const CustomCategory(name: 'Alt', items: ['X']),
+            ]);
+          },
+        );
+        await applyImport(
+          tester,
+          buildExportJson(
+            ExportBlob(
+              exportedAt: DateTime.utc(2026, 9, 20),
+              entries: [
+                {'date': '2026-09-01', 'bbt_c': 36.5},
+              ],
+              marks: const [],
+            ),
+          ),
+        );
+
+        expect(
+          providerCategories(tester),
+          [
+            const CustomCategory(name: 'Alt', items: ['X']),
+          ],
+          reason:
+              'a definitions-free document must not touch the '
+              'in-memory definitions (and not wipe them through a '
+              'write-through of an empty list)',
+        );
+      },
+    );
   });
 
   group('accept-string translation for the native picker', () {

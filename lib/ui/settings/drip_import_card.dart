@@ -84,6 +84,7 @@ final class DripImportCard extends ConsumerWidget {
       final parsed = dripCsvToExportJson(raw);
       final db = await ref.read(databaseProvider.future);
       final summary = await importJsonToDatabase(db, parsed.json);
+      applyImportedCustomCategories(ref, summary);
       if (!dialogContext.mounted) return;
       popDialogRouteWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;

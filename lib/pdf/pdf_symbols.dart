@@ -97,16 +97,21 @@ String pdfMethodFactText(MeasurementRoute route, String? thermometer) {
 String pdfMethodChangeNote(MeasurementRoute route, String? thermometer) =>
     pdfMethodFactText(route, thermometer);
 
-/// The rotated notes cell's text for one day: the stored note, the method
-/// change's synthesis, or both joined by the em-dash. The synthesis happens
-/// at RENDER time — the caller passes the day's stored notes untouched.
-/// Empty in both slots → null (the empty cell the row renders today).
-String? pdfNotesCellText(String? notes, String? methodChange) {
-  final note = notes == null ? null : joinedNoteText(notes);
-  final readable = note == null || note.isEmpty ? null : note;
-  if (readable == null) return methodChange;
-  if (methodChange == null) return readable;
-  return '$readable — $methodChange';
+/// The rotated notes cell's text for one day: the custom-marks line, the
+/// stored free note and the method change's synthesis merged in that
+/// order, joined by the em-dash. The marks argument carries the day's
+/// custom-marks line (customMarksNote, the shared render line) and the
+/// synthesis happens at RENDER time — the caller passes the day's stored
+/// notes untouched. Empty in all slots → null (the empty cell the row
+/// renders today).
+String? pdfNotesCellText(String? marks, String? notes, String? methodChange) {
+  final text = notes == null ? null : joinedNoteText(notes);
+  final parts = [
+    if (marks case final line? when line.isNotEmpty) line,
+    if (text case final note? when note.isNotEmpty) note,
+    if (methodChange case final change? when change.isNotEmpty) change,
+  ].join(' — ');
+  return parts.isEmpty ? null : parts;
 }
 
 /// One page window's WEEKEND columns: the tracked-day positions whose

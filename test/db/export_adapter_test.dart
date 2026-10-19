@@ -11,6 +11,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/domain/cervix.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/marks.dart';
@@ -20,6 +21,7 @@ import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
+import 'package:cycle_app/db/settings_store.dart';
 
 void main() {
   // Not final: setUp assigns a fresh in-memory database before every test
@@ -738,6 +740,249 @@ void main() {
           expect(plan.methodsWritten, 1);
         },
       );
+    });
+
+    group('custom category definitions in the document', () {
+      test(
+        'a definitions-free database exports NO customCategories key',
+        () async {
+          final decoded =
+              jsonDecode(await exportDatabaseToJson(db))
+                  as Map<String, Object?>;
+          expect(
+            decoded.containsKey('customCategories'),
+            isFalse,
+            reason: 'the pinned four-key document shape survives unchanged',
+          );
+        },
+      );
+
+      test('the export carries the stored definitions as stored', () async {
+        await SettingsStore(db.settingsDao).persistCustomCategories([
+          const CustomCategory(name: 'Sport', items: ['Joggen', 'Kraft']),
+          const CustomCategory(name: 'Medikamente', visible: false),
+        ]);
+
+        final blob = await exportDatabaseToBlob(db);
+        expect(blob.customCategories, [
+          {
+            'name': 'Sport',
+            'visible': true,
+            'items': ['Joggen', 'Kraft'],
+          },
+          {'name': 'Medikamente', 'visible': false, 'items': <Object?>[]},
+        ]);
+      });
+
+      test(
+        'the definitions-free export round-trips with an empty list',
+        () async {
+          final blob = await exportDatabaseToBlob(db);
+          expect(blob.customCategories, isEmpty);
+        },
+      );
+
+      test('importing a document WITH the key writes the definitions row '
+          '(canonical re-encode, unknown row keys dropped)', () async {
+        final doc = buildExportJson(
+          ExportBlob(
+            exportedAt: DateTime.utc(2026, 9, 15, 12),
+            entries: const [],
+            marks: const [],
+            customCategories: const [
+              {
+                'name': 'Sport',
+                'visible': true,
+                'items': ['Joggen'],
+                'future': 'ignored',
+              },
+              {'name': 'Medikamente', 'visible': false},
+            ],
+          ),
+        );
+
+        final summary = await importJsonToDatabase(db, doc);
+
+        // Read back through the typed settings store — the row must be
+        // exactly what the settings-store writers produce (canonical
+        // shape, in document order).
+        final settings = await SettingsStore(db.settingsDao).load();
+        expect(settings.customDiaryCategories, [
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+          const CustomCategory(name: 'Medikamente', visible: false),
+        ]);
+        expect(
+          summary.customCategories,
+          settings.customDiaryCategories,
+          reason:
+              'the summary exposes the canonical definitions '
+              'the row was written from',
+        );
+        final raw = await db.settingsDao.readValue(
+          SettingKeys.customDiaryCategories,
+        );
+        expect(
+          raw,
+          jsonEncode([
+            {
+              'name': 'Sport',
+              'visible': true,
+              'items': ['Joggen'],
+            },
+            {'name': 'Medikamente', 'visible': false, 'items': <Object?>[]},
+          ]),
+          reason: 'the row is written through the canonical shape',
+        );
+      });
+
+      test('importing an old-style document WITHOUT the key leaves stored '
+          'definitions untouched', () async {
+        await SettingsStore(db.settingsDao).persistCustomCategories([
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ]);
+
+        final summary = await importJsonToDatabase(
+          db,
+          buildExportJson(simpleDoc()),
+        );
+        expect(summary.entriesNew, 2);
+        expect(
+          summary.customCategories,
+          isEmpty,
+          reason: 'an absent key carries no definitions data',
+        );
+
+        final settings = await SettingsStore(db.settingsDao).load();
+        expect(settings.customDiaryCategories, [
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ], reason: 'absent key = no definitions data — nothing changes');
+      });
+
+      test('importing a document with an explicitly EMPTY customCategories '
+          'key also leaves stored definitions untouched', () async {
+        await SettingsStore(db.settingsDao).persistCustomCategories([
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ]);
+
+        // Raw JSON on purpose: the typed blob omits an empty list entirely
+        // (buildExportJson emits the key only when non-empty) — the explicit
+        // empty key is the hand-edited document shape this gate pins.
+        final doc = jsonEncode(<String, Object?>{
+          'schema_version': exportSchemaVersion,
+          'exported_at': '2026-09-15T12:00:00Z',
+          'entries': <Object?>[],
+          'marks': <Object?>[],
+          'customCategories': <Object?>[],
+        });
+
+        final summary = await importJsonToDatabase(db, doc);
+
+        final settings = await SettingsStore(db.settingsDao).load();
+        expect(settings.customDiaryCategories, [
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ], reason: 'an empty list is no definitions data — nothing changes');
+        expect(
+          summary.customCategories,
+          isEmpty,
+          reason: 'an empty list carries no definitions data',
+        );
+      });
+
+      test(
+        'a corrupt customCategories value fails the import loudly',
+        () async {
+          // Raw JSON on purpose: the corrupt mixed list cannot be expressed
+          // through the typed blob (row maps only) — exactly the hand-edited
+          // document shape the gate exists for.
+          final doc = jsonEncode(<String, Object?>{
+            'schema_version': exportSchemaVersion,
+            'exported_at': '2026-09-15T12:00:00Z',
+            'entries': [
+              {'date': '2026-04-02', 'bleeding': 3},
+            ],
+            'marks': <Object?>[],
+            'customCategories': [
+              {'name': 'Sport'},
+              42,
+            ],
+          });
+
+          await expectLater(
+            importJsonToDatabase(db, doc),
+            throwsA(isA<FormatException>()),
+            reason: 'a non-object member is a document error',
+          );
+          expect(
+            await db.entriesDao.allEntries(),
+            isEmpty,
+            reason: 'the failed import wrote NOTHING (transaction rollback)',
+          );
+        },
+      );
+    });
+
+    group('custom marks in the document', () {
+      test(
+        'a day with custom marks survives the export → import round trip',
+        () async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: DateTime(2026, 4, 2),
+              bleeding: Bleeding.medium,
+              customMarks: const {
+                'Sport': ['Joggen'],
+              },
+            ),
+          );
+
+          final json = await exportDatabaseToJson(db);
+          expect(json, contains('"custom_marks"'));
+
+          final target = CycleDatabase(NativeDatabase.memory());
+          addTearDown(target.close);
+          final summary = await importJsonToDatabase(target, json);
+          expect(summary.entriesNew, 1);
+          final row = await target.entriesDao.entryFor(DateTime(2026, 4, 2));
+          expect(dailyEntryFromDrift(row!).customMarks, {
+            'Sport': ['Joggen'],
+          }, reason: 'the marks ride through the document, not just the day');
+        },
+      );
+
+      test('a day without custom marks exports no custom_marks key', () async {
+        await db.entriesDao.upsertDaily(
+          DailyEntry(date: DateTime(2026, 4, 3), bleeding: Bleeding.medium),
+        );
+
+        final json = await exportDatabaseToJson(db);
+        expect(
+          json,
+          isNot(contains('"custom_marks"')),
+          reason: 'the sparse shape omits the key of a marks-free day',
+        );
+      });
+
+      test('a junk custom_marks value imports leniently, never killing '
+          'the row', () async {
+        final doc = buildExportJson(
+          ExportBlob(
+            exportedAt: DateTime.utc(2026, 4, 1),
+            entries: const [
+              {'date': '2026-04-02', 'bleeding': 3, 'custom_marks': 'not json'},
+            ],
+            marks: const [],
+          ),
+        );
+
+        final summary = await importJsonToDatabase(db, doc);
+        expect(summary.entriesNew, 1);
+        final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
+        expect(
+          dailyEntryFromDrift(row!).customMarks,
+          isEmpty,
+          reason: 'a broken value decodes to the empty map like the mapper',
+        );
+      });
     });
 
     test('unexpected errors surface as ImportFailedException', () async {

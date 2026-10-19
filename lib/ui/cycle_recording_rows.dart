@@ -299,8 +299,10 @@ final class _SignalRow extends StatelessWidget {
   /// then the note zone; one reserved top block per cervix day), the
   /// breast-pain B letter row directly above the note zone (at the very
   /// band top on cervix-free days; not rendered or reserved on pain-free
-  /// days), then the note zone. The note line reads top→bottom. Raw
-  /// observation display only, never a fertility conclusion (ADR-0001);
+  /// days), then the note zone. The note line reads top→bottom and carries
+  /// the day's custom-marks line merged before the folded free note — by
+  /// itself enough to make the zone non-empty. Raw observation display
+  /// only, never a fertility conclusion (ADR-0001);
   static Widget _notesBandContent(
     BuildContext context,
     DailyEntry? day,
@@ -308,13 +310,16 @@ final class _SignalRow extends StatelessWidget {
   ) {
     final scheme = Theme.of(context).colorScheme;
     final zones = notesBandLayout(day);
-    final joined = day == null || day.notes == null
+    final marksNote = day == null ? null : customMarksNote(day.customMarks);
+    final storedNotes = day?.notes;
+    final joinedNote = storedNotes == null
         ? null
-        : _joinedNoteText(day.notes!);
-    final note = switch (joined) {
-      final text? when text.isNotEmpty => text,
-      _ => null,
-    };
+        : _joinedNoteText(storedNotes);
+    final text = [
+      if (marksNote case final marks? when marks.isNotEmpty) marks,
+      if (joinedNote case final note? when note.isNotEmpty) note,
+    ].join(customMarkCategoriesSeparator);
+    final note = text.isEmpty ? null : text;
     return Stack(
       children: [
         if (zones.hasCervix)

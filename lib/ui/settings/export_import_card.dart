@@ -120,6 +120,7 @@ final class ExportImportCard extends ConsumerWidget {
     try {
       final db = await ref.read(databaseProvider.future);
       final summary = await importJsonToDatabase(db, raw);
+      applyImportedCustomCategories(ref, summary);
       if (!dialogContext.mounted) return;
       popDialogRouteWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;

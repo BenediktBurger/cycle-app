@@ -27,6 +27,7 @@ import 'db/settings_store.dart';
 import 'domain/date_only.dart';
 import 'domain/custom_categories.dart';
 import 'domain/diary_track.dart';
+import 'domain/export_import.dart';
 import 'domain/marks.dart';
 import 'domain/measurement_method.dart';
 import 'domain/models.dart';
@@ -515,6 +516,18 @@ void hydratePersistedSettings(WidgetRef ref, PersistedSettings snapshot) {
 void registerSettingsWriteThrough(WidgetRef ref, SettingsWriteSink sink) {
   for (final setting in _persistedSettings) {
     setting._listenWriteThrough(ref, sink);
+  }
+}
+
+/// Applies a successful import's custom category definitions to the
+/// provider in-session. The summary's list is empty when the document
+/// carried no key — exactly the case where the provider (and the stored
+/// row) must stay untouched.
+void applyImportedCustomCategories(WidgetRef ref, ImportSummary summary) {
+  if (summary.customCategories.isNotEmpty) {
+    ref
+        .read(customDiaryCategoriesProvider.notifier)
+        .set(summary.customCategories);
   }
 }
 

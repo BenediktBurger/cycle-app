@@ -32,6 +32,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../domain/cervix.dart';
+import '../domain/custom_categories.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
