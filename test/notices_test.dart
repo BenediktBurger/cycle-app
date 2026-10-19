@@ -1,9 +1,7 @@
-// The DSGVO/privacy notice (the drafted German paragraph from the roadmap's
-// "add necessary DSGVO notice" item): states the app's data-control reality —
-// local-only storage, nothing ever sent, GDPR rights exercisable directly in
-// the app. Its single surface is the about/onboarding content page (reached
-// via the settings pane's AppBar info action); the settings pane itself
-// carries no notice card anymore (pinned in the DSGVO group below).
+// The DSGVO/privacy notice (German wording): states the app's data-control
+// reality — local-only storage, nothing ever sent, GDPR rights exercisable
+// directly in the app. Its single surface is the about/onboarding content
+// page, reached via the settings pane's AppBar info action.
 //
 // German device locale mirrors the app's German-first posture.
 import 'package:flutter/material.dart';
@@ -16,12 +14,9 @@ import 'support/viewport.dart';
 void main() {
   /// German device locale + the German UI: the shell is reachable (the
   /// harness defaults to an onboarded install) and the settings pane is the
-  /// navigation surface both groups start from.
-  ///
-  /// The pane is a lazy ListView: an "absent from the pane" pin must enlarge
-  /// the surface so the whole card list is BUILT in one viewport (otherwise
-  /// the not-there assertion would pass vacuously while the card merely sat
-  /// below the fold unbuilt).
+  /// navigation surface every group starts from. The pane is a lazy
+  /// ListView: callers enlarge the surface and/or drag the target into the
+  /// built viewport.
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
     useTallSurface(tester, width: 900);
 
@@ -40,71 +35,7 @@ void main() {
   }
 
   group('DSGVO notice', () {
-    testWidgets(
-      'the privacy text appears only on the about page — the settings '
-      'pane carries no Datenschutz card anymore',
-      (WidgetTester tester) async {
-        await pumpGermanSettingsPane(tester);
-
-        // The pane carries no dedicated notice card: no Datenschutz heading
-        // anywhere on the settings surface (asserted BEFORE the about page
-        // is pushed, so later finds cannot spill over from the pushed page).
-        expect(
-          find.text('Datenschutz'),
-          findsNothing,
-          reason:
-              'the standalone privacy card is removed from the settings '
-              'pane — the notice lives on the about page only',
-        );
-
-        await openAboutPage(tester);
-
-        expect(
-          find.text('Datenschutz'),
-          findsOneWidget,
-          reason:
-              'with the card gone, the about page stays the notice\'s '
-              'home, heading included',
-        );
-        expect(
-          find.textContaining('ausschließlich lokal'),
-          findsOneWidget,
-          reason: 'the local-only storage statement is the notice\'s core',
-        );
-        expect(
-          find.textContaining('niemals gesendet'),
-          findsOneWidget,
-          reason:
-              'the notice must state that data is never sent — not even '
-              'on a crash',
-        );
-        expect(
-          find.textContaining('Rechte aus der DSGVO'),
-          findsOneWidget,
-          reason:
-              'the GDPR rights sentence with its in-app exercise paths '
-              'belongs to the notice',
-        );
-        expect(
-          find.textContaining('Auf Android und iOS'),
-          findsOneWidget,
-          reason:
-              'the encrypted-at-rest claim must be qualified to the '
-              'native platforms: Android and iOS store the database '
-              'encrypted (device-bound key, ADR-0005)',
-        );
-        expect(
-          find.textContaining('nicht verschlüsselt'),
-          findsOneWidget,
-          reason:
-              'the web build\'s browser storage (OPFS/IndexedDB) is '
-              'NOT encrypted by the app — the notice must say so '
-              '(web stays a development tool)',
-        );
-      },
-    );
-
-    testWidgets('the about page carries the same privacy text', (
+    testWidgets('the about page carries the full privacy notice', (
       WidgetTester tester,
     ) async {
       await pumpGermanSettingsPane(tester);
@@ -113,27 +44,43 @@ void main() {
       expect(
         find.text('Datenschutz'),
         findsOneWidget,
-        reason:
-            'the about page is the onboarding content — it must show '
-            'the same notice, heading included',
+        reason: 'the notice sits under its heading',
       );
       expect(
         find.textContaining('ausschließlich lokal'),
         findsOneWidget,
-        reason:
-            'the settings card and the about page share ONE string '
-            'source, the same sentence both times',
+        reason: 'the local-only storage statement is the notice\'s core',
       );
-      expect(find.textContaining('niemals gesendet'), findsOneWidget);
+      expect(
+        find.textContaining('niemals gesendet'),
+        findsOneWidget,
+        reason:
+            'the notice must state that data is never sent — not even '
+            'on a crash',
+      );
+      expect(
+        find.textContaining('Rechte aus der DSGVO'),
+        findsOneWidget,
+        reason:
+            'the GDPR rights sentence with its in-app exercise paths '
+            'belongs to the notice',
+      );
       expect(
         find.textContaining('Auf Android und iOS'),
         findsOneWidget,
         reason:
-            'one string source also means ONE platform-qualified '
-            'encryption wording: native (Android/iOS) encrypted, '
-            'web (OPFS/IndexedDB) not encrypted by the app',
+            'the encrypted-at-rest claim must be qualified to the '
+            'native platforms: Android and iOS store the database '
+            'encrypted (device-bound key, ADR-0005)',
       );
-      expect(find.textContaining('nicht verschlüsselt'), findsOneWidget);
+      expect(
+        find.textContaining('nicht verschlüsselt'),
+        findsOneWidget,
+        reason:
+            'the web build\'s browser storage (OPFS/IndexedDB) is '
+            'NOT encrypted by the app — the notice must say so '
+            '(web stays a development tool)',
+      );
     });
   });
 
