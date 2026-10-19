@@ -1,6 +1,7 @@
 # NER Cycle App (Arbeitstitel)
 
 [![GitHub Release](https://img.shields.io/github/v/release/BenediktBurger/cycle-app)](https://github.com/BenediktBurger/cycle-app/releases)
+[![F-Droid Version](https://img.shields.io/f-droid/v/io.github.benediktburger.cycleapp)](https://f-droid.org/de/packages/io.github.benediktburger.cycleapp)
 [![CI](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml/badge.svg)](https://github.com/BenediktBurger/cycle-app/actions/workflows/ci.yml)
 
 <p align="center">
@@ -43,9 +44,16 @@ Install the app on an **Android** device — no Flutter SDK, no development
 setup needed. (An iOS build does not exist yet.) The app is fully offline:
 no network access, no analytics; all data stays on your device.
 
-### Where to get it
+You can get it via one of the following methods:
 
-Download an APK from the
+- The easiest route is [F-Droid](https://f-droid.org/de/packages/io.github.benediktburger.cycleapp):
+  install the app from the F-Droid client,
+  and future updates arrive through the client as well.
+- Download it here from GitHub and install it manually, see below.
+
+### Manual Installation
+
+Alternatively, download an APK from the
 [GitHub releases page](https://github.com/BenediktBurger/cycle-app/releases).
 Each release carries three release-signed APKs — one per device
 architecture (ABI), named `cycle-app-<version>-<abi>.apk` where `<version>`
@@ -64,19 +72,15 @@ All three APKs are signed with the same release key. Every release note
 lists each APK's SHA-256 checksum plus the signing certificate's SHA-256
 fingerprint, so you can verify the download if you want to.
 
-### Installing
-
-1. Download the APK matching your device (see above) from the latest
-   release.
+1. Download the APK matching your device (see above) from the latest release.
 2. Open the downloaded file on the device.
 3. Android will warn about installing apps from an external source
    (sideloading / "unknown sources") — accept it to continue.
 4. Expect an additional "unknown developer" / "unsafe app" style
-   Play-Protect remark: the app is signed with the project's own key and is
-   not distributed through a store. This is expected, not a sign that
-   something is wrong with the file.
+   Play-Protect remark: the app is signed with the project's own key.
+   This is expected, not a sign that something is wrong with the file.
 
-### Updating
+### Manual Updating
 
 Download the most recent APK for your device's architecture (the same one
 you installed before) from the releases page and install it over the
@@ -189,7 +193,13 @@ weiterhin **regelmäßig und vor jedem Update** über den Export in den
 Einstellungen; der Export ist auf allen Plattformen der einzige Backup-Weg
 (Einzelheiten: [Backup, migration & recovery](#backup-migration--recovery)).
 
-**Installation (Android):** Eine iOS-Version gibt es noch nicht.
+**Installation (Android):** Eine iOS-Version gibt es noch nicht. Am
+einfachsten installieren Sie die App über
+[F-Droid](https://f-droid.org/de/packages/io.github.benediktburger.cycleapp) —
+Updates kommen dann ebenfalls über den F-Droid-Client.
+Alternativ installieren Sie die App manuell.
+
+### Manuelle Installation
 
 1. Laden Sie die zu Ihrem Gerät passende APK von der
    [GitHub-Releases-Seite](https://github.com/BenediktBurger/cycle-app/releases)
@@ -205,13 +215,12 @@ Einstellungen; der Export ist auf allen Plattformen der einzige Backup-Weg
    „unbekannte Quellen“).
 3. Ein zusätzlicher Play-Protect-Hinweis („unbekannter Entwickler“) ist zu
    erwarten: Die App ist mit dem eigenen Schlüssel des Projekts signiert
-   und wird über keinen Store verteilt — das ist normal und kein Zeichen
-   für ein Problem.
+   — das ist normal und kein Zeichen für ein Problem.
 
 Beispieldaten zum Ausprobieren finden Sie unter
 [`examples/`](examples/README.md) (auf Englisch).
 
-### Aktualisierung
+### Manuelle Aktualisierung
 
 Laden Sie die neueste APK für dieselbe Architektur herunter und
 installieren Sie sie über die bestehende Version. Da der
