@@ -55,9 +55,10 @@
 //
 // Day-index space: day index i is the CALENDAR day firstDay + i — the same
 // space [buildEvaluationOverlay] and [ignoredDayIndexes] emit indexes into
-// (and the cycle chart's _ChartDays derives globally). A gapless tracked
-// range makes the calendar-day index identical to the position in the
-// tracked-day list, which is the PDF layout's window space.
+// (and the cycle chart's _ChartDays derives globally). The PDF page
+// windows slice the same calendar space (cycleCalendarDays), so overlay
+// index and window position coincide there; the tracked-day list coincides
+// with it only for a gapless tracked range.
 
 import 'cycle_grouping.dart';
 import 'date_only.dart';

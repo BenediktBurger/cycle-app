@@ -31,9 +31,11 @@
 //   chart draws only user marks, the PDF is for teacher/doctor and adds
 //   the line.
 // - INDEX SPACES: the overlay's day indexes are calendar offsets from the
-//   cycle start; lib/pdf/pdf_curve.dart maps them onto the page window's
-//   span-list positions (marks on untracked gap days drop out) and the
-//   scaffold draws window-relative positions only.
+//   cycle start; the page windows slice the same calendar space
+//   (cycleCalendarDays), so overlay index and window column coincide —
+//   lib/pdf/pdf_curve.dart routes the artifacts through the offset map
+//   (the identity on a calendar-consecutive window) and the scaffold
+//   draws window-relative positions only.
 // - VERTICAL NOTES: every tracked day column carries its note text rotated
 //   90° into the column's footer area (multi-line notes folded to one
 //   line, note longer than the area clips — accepted limit, see
@@ -196,10 +198,10 @@ Future<List<int>> generatePdfBytes({
     theme: pw.ThemeData.withFont(base: ttf, bold: ttf),
   );
 
-  final spans = [
-    for (final evaluation in model.cycles) cycleSpanDays(evaluation.cycle),
+  final calendarDays = [
+    for (final evaluation in model.cycles) cycleCalendarDays(evaluation.cycle),
   ];
-  final dayCounts = [for (final span in spans) span.length];
+  final dayCounts = [for (final days in calendarDays) days.length];
   final plan = planCyclePages(dayCounts);
   final windowsPerCycle = <int, int>{};
   for (final window in plan) {
@@ -210,9 +212,9 @@ Future<List<int>> generatePdfBytes({
 
   for (final window in plan) {
     final evaluation = model.cycles[window.cycleIndex];
-    final span = spans[window.cycleIndex];
+    final days = calendarDays[window.cycleIndex];
     final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
-    final windowDays = span
+    final windowDays = days
         .sublist(window.firstDayIndex, window.firstDayIndex + window.dayCount)
         .toList(growable: false);
     // The page's snapshot-day method notes, keyed by the snapshot day's
@@ -254,7 +256,7 @@ Future<List<int>> generatePdfBytes({
                 model: model,
                 anonymized: options.anonymized,
                 cycleIndex: window.cycleIndex,
-                cycleWindow: (first: span.first.date, last: span.last.date),
+                cycleWindow: (first: days.first.date, last: days.last.date),
               ),
             ),
             pw.SizedBox(height: 4),
@@ -423,9 +425,9 @@ pw.Widget _factColumns(List<({String label, String value})> facts) {
 }
 
 /// One page window's paper-form scaffold. The raster is ALWAYS the full
-/// 40 columns (rail + columns), labels only in the window's tracked
-/// columns — the day-number labels count CALENDAR offsets from the cycle's
-/// start day, the other rows read the window's tracked days.
+/// 40 columns (rail + columns), labels only in the window's columns —
+/// the day-number labels count CALENDAR offsets from the cycle's start
+/// day, the other rows read the window's days.
 pw.Widget _paperFormGrid({
   required DateTime cycleStart,
   required List<DailyEntry> windowDays,

@@ -8,10 +8,9 @@
 //
 // Coordinate spaces, kept apart by the helper: the model overlay's indexes
 // are CALENDAR offsets from the cycle's start day (see
-// lib/domain/pdf_export_model.dart's header note), while page windows
-// slice TRACKED day positions. The helper maps overlay indexes through the
-// tracked-day positions; a mark on an untracked gap day drops out instead
-// of rendering on a neighboring day. The resulting draw items use COLUMN
+// lib/domain/pdf_export_model.dart's header note), and the page windows
+// slice the same calendar space (cycleCalendarDays) — overlay index and
+// window column coincide. The resulting draw items use COLUMN
 // coordinates: window day i's column spans [i, i+1] — dots, row cells and
 // the computed-SUZ line center at i + 0.5, a user SUZ bar's column start
 // at i (morning) or the middle at i + 0.5 (evening).
@@ -336,12 +335,13 @@ void main() {
   });
 
   group('index space (calendar offsets vs. tracked positions)', () {
-    test('a mark on an untracked gap day drops out instead of rendering on '
-        'a neighboring day; marks on the last tracked day survive the '
-        'gap-shifted calendar span', () {
-      // The same cycle, but WITHOUT day 1's entry: cycle.days then skips
-      // Mar 2, the tracked positions shift behind the gap, and the cycle's
-      // CALENDAR span is one day longer than its tracked count.
+    test('a mark on an untracked gap day renders in its own calendar '
+        'column; the page window counts every calendar day of the span', () {
+      // The same cycle, but WITHOUT Mar 2's entry: the calendar day list
+      // keeps Mar 2 (data-less), so the peak mark placed there renders on
+      // its own column and every later mark rides its calendar offset —
+      // the tracked positions behind the gap shift by one, the calendar
+      // positions do not.
       final entries = [
         for (final e in cycleEntries())
           if (!DateOnly.sameDay(e.date, day(2))) e,
@@ -351,7 +351,7 @@ void main() {
         CycleMark(date: day(2), type: CycleMarkTypes.mucusPeakDay),
         ...cycleMarks(),
       ];
-      // The window size is the span-day count, so pin the clock: the
+      // The window size is the calendar-day count, so pin the clock: the
       // still-running cycle's span otherwise reaches the wall clock.
       final model = buildPdfExportModel(
         entries: entries,
@@ -363,18 +363,16 @@ void main() {
         overlay: model.overlays[0],
         range: _range,
         windowFirstIndex: 0,
-        windowDayCount: cycleSpanDays(model.cycles[0].cycle).length,
+        windowDayCount: cycleCalendarDays(model.cycles[0].cycle).length,
         computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(
         drawing.peakIndexes,
-        equals({8}),
+        equals({1, 9}),
         reason:
-            'the gap-day mark (Mar 2) drops; the day 10 peak keeps its '
-            'tracked position 8 (one day shorter behind the removed entry) '
-            '— with the gap, calendar offset and tracked position no '
-            'longer coincide, and the drawn columns follow the tracked '
-            'positions',
+            'the gap-day peak (Mar 2) rides its own calendar column 1; '
+            'the day 10 peak rides calendar offset 9 — window position '
+            'and overlay index coincide on the calendar window',
       );
     });
 
@@ -382,9 +380,10 @@ void main() {
         'the chart\'s run-break rule): measured days around the gap are '
         'NOT connected by a piece, consecutive tracked days still are', () {
       // The gap fixture again (Mar 2 untracked): Mar 1 (measured 36.1,
-      // window column 0) and Mar 3 (measured 36.1, column 1) both draw
-      // dots — but their CALENDAR offsets differ by two (the untracked
-      // day between them), so no line piece may connect them.
+      // column 0) and Mar 3 (measured 36.1, column 2) both draw dots on
+      // their own calendar columns — but their CALENDAR offsets differ by
+      // two (the untracked day between them), so no line piece may
+      // connect them.
       final entries = [
         for (final e in cycleEntries())
           if (!DateOnly.sameDay(e.date, day(2))) e,
@@ -393,7 +392,7 @@ void main() {
         entries: entries,
         marks: cycleMarks(),
         // Same reason as the gap test above: pin the clock for a
-        // deterministic span-day window count.
+        // deterministic calendar-day window count.
         today: day(13),
       );
       final drawing = pdfCurveDrawing(
@@ -401,30 +400,29 @@ void main() {
         overlay: model.overlays[0],
         range: _range,
         windowFirstIndex: 0,
-        windowDayCount: cycleSpanDays(model.cycles[0].cycle).length,
+        windowDayCount: cycleCalendarDays(model.cycles[0].cycle).length,
         computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(drawing.dots.any((d) => d.index == 0), isTrue);
-      expect(drawing.dots.any((d) => d.index == 1), isTrue);
+      expect(drawing.dots.any((d) => d.index == 2), isTrue);
       expect(
         drawing.pieces.where((p) => p.startX == 0.0 || p.endX == 0.0),
         isEmpty,
         reason:
             'the Mar 1 dot starts no line: its direct CALENDAR successor '
-            '(Mar 3) sits two days ahead, not an adjacent tracked column '
-            'away from a connected run',
+            '(Mar 3) sits two columns ahead, not adjacent to a connected '
+            'run',
       );
       expect(
-        drawing.pieces.any((p) => p.startX == 1.0 && p.endX == 2.0),
+        drawing.pieces.any((p) => p.startX == 2.0 && p.endX == 3.0),
         isTrue,
         reason: 'the consecutive tracked days Mar 3 -> Mar 4 still connect',
       );
     });
 
     test('a peak on a DATA-LESS SPAN-EXTENSION day draws: the page window\'s '
-        'columns are the cycle\'s span (cycleSpanDays: the tracked days plus '
-        'the trailing data-less span days), so the mark maps to its tracked '
-        'position', () {
+        'columns are the cycle\'s calendar days (cycleCalendarDays), so the '
+        'mark maps to its calendar position', () {
       // Tracked Mar 1–13; `today` pins the still-running cycle's span to
       // Mar 17, so Mar 14–17 enter the span list as data-less span days.
       final model = buildPdfExportModel(
@@ -436,7 +434,7 @@ void main() {
         today: day(17),
       );
       final cycle = model.cycles[0];
-      expect(cycleSpanDays(cycle.cycle).length, 17);
+      expect(cycleCalendarDays(cycle.cycle).length, 17);
       final drawing = pdfCurveDrawing(
         cycle: cycle,
         overlay: model.overlays[0],
@@ -446,7 +444,7 @@ void main() {
         computedSuz: (suzBegins: null, suzRule: null),
       );
       // Mar 15 = calendar offset 14 from the cycle start, and the
-      // placeholder days occupy their own tracked positions in order.
+      // placeholder days occupy their own calendar positions in order.
       expect(drawing.peakIndexes, {9, 14});
     });
   });

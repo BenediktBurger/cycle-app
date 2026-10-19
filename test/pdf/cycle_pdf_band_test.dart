@@ -81,9 +81,9 @@ Future<List<int>> generateBandFixture({
   compress: false,
 );
 // The measurement-method GAP fixture: tracked Mar 1–3 and Mar 7–9 (the
-// interior days Mar 4–6 carry no page column) — a change dated Mar 5 must
-// render on the FIRST tracked column at or after it (Mar 7, the window's
-// fourth column: the page window position, not the calendar offset 6).
+// interior days Mar 4–6 carry no data) — a change dated Mar 5 renders on
+// the FIRST TRACKED day at or after it (Mar 7), which owns calendar
+// column 6 of the calendar-consecutive window.
 List<DailyEntry> gapMethodEntries() => [
   for (var i = 1; i <= 3; i++) DailyEntry(date: d(3, i), bbtC: 36.4),
   for (var i = 7; i <= 9; i++) DailyEntry(date: d(3, i), bbtC: 36.2),
@@ -429,21 +429,24 @@ void main() {
     });
 
     test('a change on an untracked mid-span gap day renders on the FIRST '
-        'tracked column at or after it (the window-day column, not the '
-        'calendar offset)', () async {
+        'tracked day at or after it (its own calendar column)', () async {
       final bytes = await generateGapMethodFixture();
       final (runs, _) = extractPageContent(bytes);
-      // Mar 7 is the span list's 4th day => column 3 of the single page.
-      // The Mar 5 snapshot's synthesis alone fills that noteless cell.
+      // Mar 7 is the window's 7th calendar day => column 6 of the single
+      // page. The Mar 5 snapshot's synthesis alone fills that noteless
+      // cell; the gap day Mar 5 owns a column but carries no note.
       expect(
-        compact(cellText(runs, 3)),
+        compact(cellText(runs, 6)),
         'andere',
-        reason: 'Mar 5 sits inside the Mar 4–6 gap: no column of its own',
+        reason:
+            'the note joins the first TRACKED day at/after the snapshot '
+            'date (Mar 7) — the derivation keys tracked span days, never '
+            'the data-less gap day itself',
       );
       expect(
-        cellText(runs, 2),
+        cellText(runs, 5),
         isEmpty,
-        reason: "no synthesis slides onto the snapshot day's NEIGHBOR before",
+        reason: "no synthesis lands on the snapshot day's NEIGHBOR",
       );
       // Page-plan exactness: the synthesis rides the EXISTING band row.
       expect(countPageMarkers(bytes), 1);

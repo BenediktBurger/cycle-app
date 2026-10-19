@@ -15,10 +15,11 @@
 // whole data set, today). A mark with no tracked day on/after it still
 // opens a data-less cycle AT the mark day: empty [Cycle.days], full span.
 // [cycleSpanDays] joins tracked days and span for the consumers that walk
-// the calendar. Untracked days BETWEEN a cycle's own tracked days stay
-// out of both lists (the gap-day drop-out convention). The "today" of the
-// last-cycle rule is injectable (tests pin a date; production uses the
-// wall clock / nowProvider at the call sites).
+// the calendar. Untracked days BETWEEN a cycle's own tracked days stay out
+// of both lists (the gap-day drop-out convention); [cycleCalendarDays]
+// backfills them — the paper sheet's every-calendar-day list. The "today"
+// of the last-cycle rule is injectable (tests pin a date; production uses
+// the wall clock / nowProvider at the call sites).
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -833,6 +834,60 @@ void main() {
         cycleSpanDays(inside.single).first.date,
         DateOnly.normalize(DateTime(2025, 3, 1)),
       );
+    });
+  });
+
+  group('cycleCalendarDays — EVERY calendar day of the span (the paper '
+      'sheet\'s day list)', () {
+    test('interior gaps and the mark→first-tracked-day gap are backfilled '
+        'with data-less entries; the tracked days pass through in order', () {
+      final entries = [
+        d(2026, 3, 1),
+        d(2026, 3, 4, bleeding: Bleeding.medium),
+        d(2026, 3, 5),
+      ];
+      final marks = [start(2026, 3, 3)];
+      final cycles = groupIntoCycles(
+        entries,
+        marks,
+        today: DateTime(2026, 3, 9),
+      );
+
+      final calendar = cycleCalendarDays(cycles[1]);
+      // Start Mar 3 (the mark's own gap day) through the span end Mar 9:
+      // the mark day backfilled, the tracked Mar 4–5 spliced in, the
+      // trailing span days behind them.
+      expect(calendar.map((e) => e.date.day), [3, 4, 5, 6, 7, 8, 9]);
+      expect([calendar.first, ...calendar.skip(3)], everyElement(hasNoData));
+      expect(calendar[1].bleeding, Bleeding.medium);
+      expect(identical(calendar[1], cycles[1].days[0]), isTrue);
+      expect(identical(calendar[2], cycles[1].days[1]), isTrue);
+    });
+
+    test('a gap-free cycle yields the same days as cycleSpanDays, tracked '
+        'entries the very same objects', () {
+      final cycles = groupIntoCycles(
+        [d(2026, 3, 1), d(2026, 3, 2), d(2026, 3, 3)],
+        [start(2026, 3, 1)],
+        today: DateTime(2026, 3, 5),
+      );
+      final calendar = cycleCalendarDays(cycles.single);
+      final span = cycleSpanDays(cycles.single);
+      expect(calendar.map((e) => e.date.day), span.map((e) => e.date.day));
+      // The tracked entries are the very same objects both lists carry
+      // (the trailing filler days are fresh instances in each).
+      for (var i = 0; i < 3; i++) {
+        expect(identical(calendar[i], span[i]), isTrue);
+      }
+    });
+
+    test('a data-less cycle enumerates its whole span, all data-less', () {
+      final cycles = groupIntoCycles(const <DailyEntry>[], [
+        start(2026, 3, 1),
+      ], today: DateTime(2026, 3, 4));
+      final calendar = cycleCalendarDays(cycles.single);
+      expect(calendar.map((e) => e.date.day), [1, 2, 3, 4]);
+      expect(calendar, everyElement(hasNoData));
     });
   });
 

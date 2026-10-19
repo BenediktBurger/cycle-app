@@ -32,14 +32,15 @@
 //   - the LAST cycle (the still-running one): max(last tracked day of the
 //     whole data set, today) — never earlier than its own start.
 //
-// Untracked days BETWEEN a cycle's own tracked days are in neither list:
-// they stay silent gaps, keeping the gap-day conventions intact (marks
-// on untracked days drop out of the curves; lib/domain/evaluation.dart
-// reaches gap days through calendar-day walking). [cycleSpanDays] joins
-// the two: [Cycle.days] plus data-less entries for every calendar day
-// after the last tracked one out to [Cycle.spanEnd] — the list the UI
-// day lists and the PDF pages walk; a data-less cycle yields its whole
-// span there.
+// Untracked days BETWEEN a cycle's own tracked days are in neither
+// [Cycle.days] nor the span backfill: they stay silent gaps, keeping the
+// gap-day conventions intact (marks on untracked days drop out of the
+// curves; lib/domain/evaluation.dart reaches gap days through
+// calendar-day walking). [cycleSpanDays] joins the two: [Cycle.days] plus
+// data-less entries for every calendar day after the last tracked one out
+// to [Cycle.spanEnd] — the list the UI day lists walk; a data-less cycle
+// yields its whole span there. The PDF sheet walks every calendar day of
+// the span instead ([cycleCalendarDays], gaps backfilled).
 //
 // The "today" of the last-cycle rule is injectable via the `today`
 // parameter — tests pin a date; production calls pass the wall clock
@@ -101,9 +102,9 @@ final class Cycle {
 
 /// The cycle's calendar span as entries: [Cycle.days] plus data-less
 /// entries for every calendar day after the last tracked day out to
-/// [Cycle.spanEnd] — the list the UI day lists and the PDF pages walk.
-/// Untracked days BETWEEN tracked days are NOT backfilled (gap-day
-/// convention unchanged). A data-less cycle yields its whole span
+/// [Cycle.spanEnd] — the list the UI day lists walk. Untracked days
+/// BETWEEN tracked days are NOT backfilled (gap-day convention
+/// unchanged). A data-less cycle yields its whole span
 /// (`startDate .. spanEnd`).
 List<DailyEntry> cycleSpanDays(Cycle cycle) {
   final tracked = cycle.days;
@@ -117,6 +118,26 @@ List<DailyEntry> cycleSpanDays(Cycle cycle) {
     day = DateOnly.addDays(day, 1);
   }
   return span;
+}
+
+/// The cycle's span as EVERY calendar day `startDate .. spanEnd`, in
+/// order: the tracked entries spliced in at their dates, data-less
+/// entries for the untracked days between them. Where [cycleSpanDays]
+/// keeps the gap-day convention for the UI day lists, this is the paper
+/// sheet's list — the export labels every calendar day of the span.
+List<DailyEntry> cycleCalendarDays(Cycle cycle) {
+  final start = DateOnly.normalize(cycle.startDate);
+  final end = DateOnly.normalize(cycle.spanEnd);
+  final tracked = {
+    for (final day in cycle.days) DateOnly.normalize(day.date): day,
+  };
+  final calendar = <DailyEntry>[];
+  var day = start;
+  while (!day.isAfter(end)) {
+    calendar.add(tracked[day] ?? DailyEntry(date: day));
+    day = DateOnly.addDays(day, 1);
+  }
+  return calendar;
 }
 
 /// Dates of the mark-driven cycle starts — the anchors for cycle-length

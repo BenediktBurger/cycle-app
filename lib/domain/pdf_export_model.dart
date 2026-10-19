@@ -14,17 +14,13 @@
 //
 // Day-index convention inside [PdfCycleOverlay]: index i is the calendar
 // day `cycle.startDate + i` — the space the shared overlay builder maps the
-// shared artifacts onto (see lib/domain/evaluation_overlay.dart). While a
-// cycle is tracked daily this equals the position in its span list
-// (cycleSpanDays, lib/domain/cycle_grouping.dart — the PDF page windows'
-// space); with untracked gap days the PDF's draw layers map the two spaces
-// explicitly — the page-window draw list maps every overlay index through
-// the span days' calendar offsets (lib/pdf/pdf_curve.dart) and any mark on
-// an untracked gap day drops out instead of sliding onto a neighboring
-// column. For that mapping to see the cycle's WHOLE calendar span (the
-// last tracked day sits at a larger offset than the tracked count once a
-// gap exists), the overlay window is built over the span day count below,
-// not over the tracked-day count.
+// shared artifacts onto (see lib/domain/evaluation_overlay.dart). The PDF
+// page windows slice the same calendar space (cycleCalendarDays,
+// lib/domain/cycle_grouping.dart), so overlay index and window position
+// coincide; the draw layers still route every artifact through the
+// calendar offsets (lib/pdf/pdf_curve.dart). For the window to cover the
+// cycle's WHOLE calendar span, the overlay window is built over the span
+// day count below, not over the tracked-day count.
 //
 // Numbering rule (decided, shared with the cycle page): ONLY the cycles a
 // user-placed cycleStart mark opened (`Cycle.startsAtMark`)
@@ -105,10 +101,11 @@ final class PdfCycleOverlay {
   /// The days a stored measurement-method snapshot takes effect, keyed by
   /// CALENDAR OFFSET from the cycle start (the overlay's index convention):
   /// the day that first shows the snapshot's state — the snapshot's own
-  /// day, or, when that day is an untracked mid-span gap day (no page
-  /// column, see the file-header note), the first span day AT OR AFTER it.
-  /// The value is the effective snapshot on that day (the map collapses
-  /// the same-state span a multi-day gap would otherwise produce).
+  /// tracked day, or, when that day is an untracked mid-span gap day, the
+  /// first TRACKED day at or after it (the note joins a recorded day's
+  /// column; see [cycleSpanDays]). The value is the effective snapshot on
+  /// that day (the map collapses the same-state span a multi-day gap
+  /// would otherwise produce).
   final Map<int, MeasurementMethodSnapshot> methodChanges;
 }
 
@@ -352,9 +349,8 @@ PdfExportModel buildPdfExportModel({
   // day, dayCount = its full CALENDAR span — tracked days plus any
   // untracked gap days between them; isolated per cycle — a page never
   // carries two cycles), fed the WHOLE evaluation list so a mark's
-  // attributed cycle window matches the chart's. The PDF's page-window
-  // draw-list helper maps this calendar-offset space onto tracked
-  // positions (see lib/pdf/pdf_curve.dart).
+  // attributed cycle window matches the chart's. The PDF's page windows
+  // slice the same calendar space (cycleCalendarDays).
   final overlays = [
     for (final i in exportedIndexes)
       PdfCycleOverlay.from(
@@ -453,14 +449,13 @@ PdfExportModel buildPdfExportModel({
 }
 
 /// The cycle's full CALENDAR span as the overlay window's day count:
-/// from the cycle's start day through its span end ([cycleSpanDays] —
-/// tracked days plus trailing data-less span days), inclusive — larger
+/// from the cycle's start day through its span end, inclusive — larger
 /// than the tracked-day count exactly when untracked gap days sit between
-/// the tracked days (they are not in the day list), so marks beyond a gap
-/// (e.g. on the last tracked day) still map to the correct calendar
-/// offset (the draw layers map offsets onto span positions; see
-/// lib/pdf/pdf_curve.dart). Anchored on [Cycle.endDate] rather than the
-/// day list, so a data-less cycle's span is counted too.
+/// the tracked days, so marks beyond a gap (e.g. on the last tracked day)
+/// still carry the correct calendar offset (the draw layers map offsets
+/// onto day-list positions; see lib/pdf/pdf_curve.dart). Anchored on
+/// [Cycle.endDate] rather than the day list, so a data-less cycle's span
+/// is counted too.
 int _calendarSpanDays(Cycle cycle) =>
     DateOnly.daysBetween(
       DateOnly.normalize(cycle.endDate),
