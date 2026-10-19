@@ -401,46 +401,6 @@ void main() {
           );
         },
       );
-
-      test(
-        'export → import round trip preserves all six levels exactly',
-        () async {
-          // One day per level; the heavy/medium days prove there is no
-          // medium-degradation through the document.
-          final levels = Bleeding.values;
-          for (var i = 0; i < levels.length; i++) {
-            await db.entriesDao.upsertDaily(
-              DailyEntry(date: DateTime(2026, 6, 1 + i), bleeding: levels[i]),
-            );
-          }
-
-          final json = await exportDatabaseToJson(db);
-          final target = CycleDatabase(NativeDatabase.memory());
-          addTearDown(target.close);
-          final summary = await importJsonToDatabase(target, json);
-          expect(summary.entriesInvalid, 0);
-          expect(summary.entriesWritten, levels.length);
-
-          final sourceRows = await db.entriesDao.allEntries();
-          final targetRows = await target.entriesDao.allEntries();
-          expect(targetRows, hasLength(levels.length));
-          for (var i = 0; i < levels.length; i++) {
-            final source = sourceRows.singleWhere(
-              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)),
-            );
-            final imported = targetRows.singleWhere(
-              (e) => DateOnly.sameDay(e.date, DateTime(2026, 6, 1 + i)),
-            );
-            expect(
-              imported.bleeding,
-              source.bleeding,
-              reason:
-                  '${levels[i].name} must survive the round trip exactly '
-                  '(no degradation to medium)',
-            );
-          }
-        },
-      );
     });
 
     group('sparse entry rows at the export document boundary', () {

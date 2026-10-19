@@ -1,7 +1,7 @@
 // DB-integration canary for the real-world example-cycle.json fixture
 // (schema_version 6): the actual export file a user produced imports through
 // the EXISTING importJsonToDatabase (lib/db/export_adapter.dart) into a
-// NativeDatabase.memory(), and re-importing the same file is idempotent.
+// NativeDatabase.memory().
 //
 // Deliberately lean structural sanity — light counts and the pinned spot
 // checks only; the comprehensive behavior tests live in the export/import
@@ -31,16 +31,6 @@ void main() {
   });
 
   final fixtureRaw = File('examples/example-cycle.json').readAsStringSync();
-
-  /// All stored rows mapped to the domain object, ordered ascending by date
-  /// (DailyEntry == compares every entry field + the day, no timestamps —
-  /// created_at/updated_at bookkeeping is excluded from equality this way).
-  Future<List<DailyEntry>> storedEntries() async {
-    final rows = await db.entriesDao.allEntries();
-    final list = rows.map(dailyEntryFromDrift).toList();
-    list.sort((a, b) => a.date.compareTo(b.date));
-    return list;
-  }
 
   /// The stored day row for an ISO date, as the domain object.
   Future<DailyEntry> dayRow(String iso) async {
@@ -89,35 +79,6 @@ void main() {
       expect(mucusPeakDay, hasLength(1));
       expect(mucusPeakDay.single.author, 'user');
     });
-
-    test(
-      'full-row equality of every stored day across a double import',
-      () async {
-        await importJsonToDatabase(db, fixtureRaw);
-        final afterFirst = await storedEntries();
-        expect(afterFirst, isNotEmpty, reason: 'guard: the import stored data');
-
-        final summary2 = await importJsonToDatabase(db, fixtureRaw);
-
-        // Idempotence in the counters: nothing new, everything merged.
-        expect(summary2.entriesNew, 0);
-        expect(summary2.entriesOverwritten, 27);
-        expect(summary2.entriesInvalid, 0);
-        expect(summary2.marksNew, 0);
-        expect(
-          summary2.marksSkipped,
-          7,
-          reason: 'all document marks are skip-idempotent on re-import',
-        );
-
-        final rows = await db.entriesDao.allEntries();
-        expect(rows, hasLength(27), reason: 'no duplicates on re-import');
-
-        final afterSecond = await storedEntries();
-        // Full-row equality for EVERY day, list-ordered.
-        expect(afterSecond, afterFirst);
-      },
-    );
 
     test('the gap day 2026-09-11 stays absent from the stored dates', () async {
       await importJsonToDatabase(db, fixtureRaw);

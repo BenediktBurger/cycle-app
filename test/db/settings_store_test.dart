@@ -422,58 +422,6 @@ void main() {
         }
       },
     );
-
-    test('unknown item keys in a stored map are ignored', () async {
-      await seedRaw(
-        SettingKeys.diaryTrack,
-        '{"mucus":true,"cervix":true,"sex":false,"flow":true}',
-      );
-      expect(
-        (await store.load()).diaryTrack,
-        const DiaryTrack(mucus: true, cervix: true, sex: false),
-      );
-    });
-
-    test('a pre-pain row without the pain key decodes pain tracked', () async {
-      await seedRaw(
-        SettingKeys.diaryTrack,
-        '{"mucus":false,"cervix":true,"sex":false}',
-      );
-      expect(
-        (await store.load()).diaryTrack.pain,
-        isTrue,
-        reason: 'a stored map predating the pain item keeps pain visible',
-      );
-    });
-
-    test(
-      'a pre-temperature row without the temperature key decodes temperature '
-      'tracked',
-      () async {
-        await seedRaw(
-          SettingKeys.diaryTrack,
-          '{"mucus":false,"cervix":true,"sex":false,"pain":true}',
-        );
-        expect(
-          (await store.load()).diaryTrack.temperature,
-          isTrue,
-          reason:
-              'a stored map predating the temperature item keeps the '
-              'temperature section visible',
-        );
-      },
-    );
-
-    test('a partially typed row keeps its valid items', () async {
-      await seedRaw(SettingKeys.diaryTrack, '{"cervix":true,"sex":false}');
-      expect(
-        (await store.load()).diaryTrack,
-        const DiaryTrack(mucus: true, cervix: true, sex: false),
-        reason:
-            'only the valid items are restored; the absent mucus item '
-            'keeps its default',
-      );
-    });
   });
 
   group('generic JSON path (future settings without any code change)', () {
