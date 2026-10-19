@@ -783,6 +783,39 @@ void main() {
     });
   });
 
+  group('notes cell text (marks line, free note, method synthesis — one merged '
+      'cell text)', () {
+    test('each slot alone renders its own line, all empty renders null', () {
+      expect(pdfNotesCellText(null, null, null), isNull);
+      expect(
+        pdfNotesCellText('Sport: Joggen, Kraft', null, null),
+        'Sport: Joggen, Kraft',
+      );
+      expect(pdfNotesCellText(null, 'Kopfschmerz', null), 'Kopfschmerz');
+      expect(pdfNotesCellText(null, null, 'rektal'), 'rektal');
+    });
+
+    test('the slots merge in the order marks — free note — method', () {
+      expect(
+        pdfNotesCellText('Sport: Joggen', 'Zweite Notiz', 'rektal'),
+        'Sport: Joggen — Zweite Notiz — rektal',
+      );
+    });
+
+    test('the free note folds multi-line text; a whitespace-only note '
+        'renders nothing', () {
+      expect(
+        pdfNotesCellText(null, 'schlaflos\nab 3:00', null),
+        'schlaflos ab 3:00',
+      );
+      expect(
+        pdfNotesCellText('Sport: Joggen', '   \n', 'rektal'),
+        'Sport: Joggen — rektal',
+        reason: 'a whitespace-only note drops out of the merged cell text',
+      );
+    });
+  });
+
   group('weekend positions (the weekend band columns of one page window)', () {
     test('judged by the CALENDAR DATE, never by the column index — a window '
         'starting mid-week puts the band on Sa/So wherever they fall', () {

@@ -1326,6 +1326,87 @@ abstract class _$DiaryTrackNotifier extends $Notifier<DiaryTrack> {
   }
 }
 
+/// The user's custom diary category definitions ("eigene Kategorien"), in
+/// display order; empty until the first category is added. The whole list
+/// is the value — every card edit replaces it wholesale (the list is small
+/// and the caps keep it that way).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+@ProviderFor(CustomDiaryCategoriesNotifier)
+final customDiaryCategoriesProvider = CustomDiaryCategoriesNotifierProvider._();
+
+/// The user's custom diary category definitions ("eigene Kategorien"), in
+/// display order; empty until the first category is added. The whole list
+/// is the value — every card edit replaces it wholesale (the list is small
+/// and the caps keep it that way).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+final class CustomDiaryCategoriesNotifierProvider
+    extends
+        $NotifierProvider<CustomDiaryCategoriesNotifier, List<CustomCategory>> {
+  /// The user's custom diary category definitions ("eigene Kategorien"), in
+  /// display order; empty until the first category is added. The whole list
+  /// is the value — every card edit replaces it wholesale (the list is small
+  /// and the caps keep it that way).
+  ///
+  /// Persisted exactly as [localeProvider] (registrar-table entry below).
+  CustomDiaryCategoriesNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'customDiaryCategoriesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$customDiaryCategoriesNotifierHash();
+
+  @$internal
+  @override
+  CustomDiaryCategoriesNotifier create() => CustomDiaryCategoriesNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<CustomCategory> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<CustomCategory>>(value),
+    );
+  }
+}
+
+String _$customDiaryCategoriesNotifierHash() =>
+    r'bbab20777b880390434421eaea0ae19dfd9bf415';
+
+/// The user's custom diary category definitions ("eigene Kategorien"), in
+/// display order; empty until the first category is added. The whole list
+/// is the value — every card edit replaces it wholesale (the list is small
+/// and the caps keep it that way).
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+abstract class _$CustomDiaryCategoriesNotifier
+    extends $Notifier<List<CustomCategory>> {
+  List<CustomCategory> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<List<CustomCategory>, List<CustomCategory>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<List<CustomCategory>, List<CustomCategory>>,
+              List<CustomCategory>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called

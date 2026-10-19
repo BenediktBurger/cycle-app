@@ -8,6 +8,7 @@
 // these fixtures instead: a subclass of the production notifier whose
 // `build()` returns the seeded value.
 // The fixture factories' `Override` return type ships from the misc entry.
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/providers.dart';
@@ -179,4 +180,16 @@ class _FixedDiaryTrack extends DiaryTrackNotifier {
 
   @override
   DiaryTrack build() => seed;
+}
+
+Override customDiaryCategoriesPin(List<CustomCategory> value) =>
+    customDiaryCategoriesProvider.overrideWith(() => _FixedCategories(value));
+
+class _FixedCategories extends CustomDiaryCategoriesNotifier {
+  _FixedCategories(this.seed);
+
+  final List<CustomCategory> seed;
+
+  @override
+  List<CustomCategory> build() => seed;
 }

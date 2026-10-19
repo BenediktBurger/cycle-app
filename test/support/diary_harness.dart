@@ -12,6 +12,7 @@
 //      wide test surface (the form's save button sits below the default
 //      800x600 viewport) and the bleeding-chip save + mark readback helpers.
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -73,6 +74,7 @@ class DiaryHarness {
     Future<void> Function(CycleDatabase db)? seed,
     DateTime? selectedDay,
     DiaryTrack? diaryTrack,
+    List<CustomCategory>? customCategories,
     CycleDatabase Function()? builder,
     DateTime? now,
     Locale locale = const Locale('de'),
@@ -85,6 +87,7 @@ class DiaryHarness {
           now: () => now ?? this.now,
           selectedDay: selectedDay ?? this.selectedDay,
           diaryTrack: diaryTrack,
+          customCategories: customCategories,
           locale: locale,
         )
       : diaryScreenScope(
@@ -94,6 +97,7 @@ class DiaryHarness {
           now: () => now ?? this.now,
           selectedDay: selectedDay ?? this.selectedDay,
           diaryTrack: diaryTrack,
+          customCategories: customCategories,
           locale: locale,
         );
 

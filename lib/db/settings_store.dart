@@ -16,6 +16,7 @@ import 'dart:ui' show Locale;
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../domain/custom_categories.dart';
 import '../domain/date_only.dart';
 import '../domain/diary_track.dart';
 import '../domain/temperature_range.dart';
@@ -88,6 +89,15 @@ abstract final class SettingKeys {
   /// (DiaryTrack.toJson). A value that is not a JSON map keeps the default;
   /// the map form is forgiving per item and ignores unknown future item keys.
   static const diaryTrack = 'diaryTrack';
+
+  /// The user-defined diary categories ("eigene Kategorien"), as a JSON
+  /// list of {name, visible, items} maps (CustomCategory.toJson) in the
+  /// user's display order. The decoder is lenient item-wise and per field:
+  /// a row that is not a JSON list (or has no map members) keeps the
+  /// default empty list, junk list members are skipped, mistyped fields
+  /// fall back per field — the stored days reference these labels
+  /// verbatim, so corrupt definitions must never break a read.
+  static const customDiaryCategories = 'customDiaryCategories';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -106,6 +116,7 @@ final class PersistedSettings {
     this.pdfExportName,
     this.pdfExportBirthDate,
     this.diaryTrack = DiaryTrack.defaults,
+    this.customDiaryCategories = const [],
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -154,6 +165,11 @@ final class PersistedSettings {
   /// the Tagebuch entry form's section visibility.
   final DiaryTrack diaryTrack;
 
+  /// The user-defined diary categories ("eigene Kategorien") in display
+  /// order, or the empty list when none are defined. Drives the diary
+  /// form's custom-mark sections and the settings management card.
+  final List<CustomCategory> customDiaryCategories;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
@@ -167,7 +183,8 @@ final class PersistedSettings {
       other.onboardingCompleted == onboardingCompleted &&
       other.pdfExportName == pdfExportName &&
       other.pdfExportBirthDate == pdfExportBirthDate &&
-      other.diaryTrack == diaryTrack;
+      other.diaryTrack == diaryTrack &&
+      _categoriesEqual(other.customDiaryCategories, customDiaryCategories);
 
   @override
   int get hashCode => Object.hash(
@@ -181,7 +198,18 @@ final class PersistedSettings {
     pdfExportName,
     pdfExportBirthDate,
     diaryTrack,
+    Object.hashAll(customDiaryCategories),
   );
+}
+
+/// Value comparison of two definitions lists without the `collection`
+/// package: same length, element-wise equal (order is part of the value).
+bool _categoriesEqual(List<CustomCategory> a, List<CustomCategory> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Stateless typed wrapper over one database's [SettingsDao]. Cheap enough
@@ -210,6 +238,7 @@ final class SettingsStore {
     String? pdfExportName;
     DateTime? pdfExportBirthDate;
     var diaryTrack = DiaryTrack.defaults;
+    var customDiaryCategories = const <CustomCategory>[];
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -244,6 +273,8 @@ final class SettingsStore {
             if (decoded is Map<String, Object?>) {
               diaryTrack = DiaryTrack.fromJson(decoded);
             }
+          case SettingKeys.customDiaryCategories:
+            customDiaryCategories = _customCategoriesFromStored(decoded);
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -262,6 +293,7 @@ final class SettingsStore {
       pdfExportName: pdfExportName,
       pdfExportBirthDate: pdfExportBirthDate,
       diaryTrack: diaryTrack,
+      customDiaryCategories: customDiaryCategories,
     );
   }
 
@@ -369,6 +401,16 @@ final class SettingsStore {
   /// items).
   Future<void> persistDiaryTrack(DiaryTrack track) =>
       writeSetting(SettingKeys.diaryTrack, track.toJson());
+
+  /// Persists the custom category definitions as their JSON list (one row
+  /// for the whole ordered family). An empty list deletes the row — "no
+  /// categories" and "cleared" read the same later (the
+  /// persistPdfExportName pattern).
+  Future<void> persistCustomCategories(List<CustomCategory> categories) =>
+      writeSetting(
+        SettingKeys.customDiaryCategories,
+        categories.isEmpty ? null : categories.map((c) => c.toJson()).toList(),
+      );
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code
@@ -416,6 +458,18 @@ String? _pdfExportNameFromStored(Object? decoded) {
 
 DateTime? _pdfExportBirthDateFromStored(Object? decoded) =>
     decoded is String ? tryParseIsoDate(decoded) : null;
+
+/// Custom-categories decode: a JSON list whose map members decode through
+/// the lenient [CustomCategory.fromJson], in stored order. Junk members
+/// (non-map scalars) are skipped; anything that is not a list — a string,
+/// a number, a broken row — keeps the default empty list, never an error.
+List<CustomCategory> _customCategoriesFromStored(Object? decoded) {
+  if (decoded is! List) return const [];
+  return [
+    for (final member in decoded)
+      if (member is Map<String, Object?>) CustomCategory.fromJson(member),
+  ];
+}
 
 /// The ISO date string ('yyyy-MM-dd') of a calendar day — the EXACT shape
 /// the birth-date field exchanges and the store's persist helper writes.

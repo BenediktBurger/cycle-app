@@ -56,6 +56,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../domain/band_layout.dart';
 import '../domain/cervix.dart';
+import '../domain/custom_categories.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/models.dart';
@@ -1276,11 +1277,15 @@ pw.Widget _notesBandRow(
 /// One day's band cell: the zone stack above the note (each zone only on
 /// its observation, exactly the screen band's offsets), then the note
 /// zone. [methodNote] is a snapshot day's synthesized text, joined into
-/// the stored note at render time (pdfNotesCellText — the stored notes
-/// never move).
+/// the stored note and the day's custom-marks line at render time
+/// (pdfNotesCellText — the stored notes never move).
 pw.Widget _bandCell(DailyEntry day, String? methodNote) {
   final zones = notesBandLayout(day);
-  final note = pdfNotesCellText(day.notes, methodNote);
+  final note = pdfNotesCellText(
+    customMarksNote(day.customMarks),
+    day.notes,
+    methodNote,
+  );
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [

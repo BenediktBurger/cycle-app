@@ -2,6 +2,8 @@
 // This is the ONLY place where drift types meet lib/domain types; the domain
 // layer itself never imports drift.
 
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../domain/cervix.dart';
@@ -39,6 +41,7 @@ DailyEntry dailyEntryFromDrift(CycleEntry e) {
     // Stored as the mask itself (0..7, engine CHECK); no per-bit conversion
     // happens on either side — the SexTiming.bit values ARE the storage.
     sexTimings: e.sexTimings,
+    customMarks: tryParseCustomMarks(e.customMarks),
     notes: e.notes,
   );
 }
@@ -74,8 +77,40 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
     // the SQL CHECK mirrors); the SexTiming.bit values ARE the storage, no
     // per-bit conversion happens here either.
     sexTimings: Value(d.sexTimings),
+    customMarks: d.customMarks.isEmpty
+        ? const Value(null)
+        : Value(jsonEncode(d.customMarks)),
     notes: Value(d.notes),
   );
+}
+
+/// Decodes the stored `custom_marks` JSON (`{"Kategorie": ["Eintrag", …]}`,
+/// see lib/db/tables.dart) into the domain map.
+///
+/// Lenient like the shared `tryParse*` field helpers: null/empty input and
+/// any malformed shape — not JSON, not an object, a non-list value, a list
+/// with a non-string member — decode to the empty map, so corrupt or
+/// hand-edited column data can never throw at a read boundary.
+Map<String, List<String>> tryParseCustomMarks(String? raw) {
+  if (raw == null || raw.isEmpty) return const {};
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(raw);
+  } on FormatException {
+    return const {};
+  }
+  if (decoded is! Map) return const {};
+  final marks = <String, List<String>>{};
+  for (final entry in decoded.entries) {
+    final items = entry.value;
+    if (entry.key is! String ||
+        items is! List ||
+        items.any((item) => item is! String)) {
+      return const {};
+    }
+    marks[entry.key as String] = List<String>.from(items);
+  }
+  return marks;
 }
 
 /// UserMarks row -> domain model. The mark vocabulary is open TEXT in

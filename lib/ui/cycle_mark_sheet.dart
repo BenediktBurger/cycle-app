@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../domain/cycle_grouping.dart';
+import '../domain/custom_categories.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
 import '../domain/evaluation.dart';
@@ -242,16 +243,22 @@ final class CycleDayPanel extends ConsumerWidget {
     });
   }
 
-  /// The tapped day's note text, or null when the day carries no entry or
-  /// the note is whitespace-only — the panel shows nothing in that case.
-  /// The chart band folds newlines for its rotated teaser; the panel keeps
-  /// the raw String.
+  /// The tapped day's full-text note block: the custom-marks line above
+  /// the raw free-note string (the chart band's newline folding stays a
+  /// band concern alone), or null when the day carries neither — the panel
+  /// shows nothing in that case.
   String? _dayNote(List<DailyEntry> entries) {
     for (final entry in entries) {
       if (DateOnly.sameDay(entry.date, day)) {
-        final notes = entry.notes;
-        if (notes != null && notes.trim().isNotEmpty) return notes;
-        return null;
+        final note = entry.notes;
+        final combined = [
+          if (customMarksNote(entry.customMarks) case final marks?
+              when marks.isNotEmpty)
+            marks,
+          if (note case final noteText? when noteText.trim().isNotEmpty)
+            noteText,
+        ].join('\n');
+        return combined.isEmpty ? null : combined;
       }
     }
     return null;

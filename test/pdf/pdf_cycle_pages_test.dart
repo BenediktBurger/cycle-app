@@ -69,6 +69,34 @@ PdfExportModel fixtureModel() => buildPdfExportModel(
 String valueOf(List<({String label, String value})> facts, String label) =>
     facts.firstWhere((f) => f.label == label).value;
 
+/// The merged band's first data column's left edge (rail, then days).
+const _bandFirstColumnX0 = pdfPageMargin + pdfRailWidth;
+
+/// The tiny ink runs whose line sits in [column]'s x window at the band's
+/// own height, joined in reading order (a rotated vertical line descends
+/// the page, so the earlier fragments have the larger y). The threshold
+/// reaches a hairline past the band's top edge (the first rotated glyph's
+/// baseline does too); the rows ABOVE the band (day numbers, values,
+/// times) sit clearly higher on the page and never fall in. Word runs the
+/// TJ operator split lose their separating spaces — comparisons strip
+/// them ([compact]).
+String bandCellText(List<PdfTextRun> runs, int column) {
+  final bandTopY =
+      runs.firstWhere((r) => r.text == pdfRailCaptionNotesBand).y + 7;
+  final left = _bandFirstColumnX0 + column * pdfColumnWidth;
+  final fragments =
+      runs
+          .where((r) => (r.fontSize - pdfTinyFontSize).abs() < 0.05)
+          .where((r) => r.y < bandTopY)
+          .where((r) => r.x > left && r.x < left + pdfColumnWidth)
+          .toList()
+        ..sort((a, b) => b.y.compareTo(a.y));
+  return fragments.map((r) => r.text).join();
+}
+
+/// [s] with the TJ split's lost spaces removed.
+String compact(String s) => s.replaceAll(' ', '');
+
 /// All fill-color operations (`r g b rg`) of one page content stream, as
 /// channel tuples in emission order. Uncompressed generation emits the
 /// colors verbatim; the pdf package's number formatting is absorbed by
@@ -990,33 +1018,6 @@ void main() {
   });
 
   group('measurement method: band note (render-time synthesis)', () {
-    const x0 = pdfPageMargin + pdfRailWidth;
-
-    /// The tiny ink runs whose line sits in [column]'s x window at the
-    /// band's own height, joined in reading order (a rotated vertical line
-    /// descends the page, so the earlier fragments have the larger y).
-    /// The threshold reaches a hairline past the band's top edge (the
-    /// first rotated glyph's baseline does too); the rows ABOVE the band
-    /// (day numbers, values, times) sit clearly higher on the page and
-    /// never fall in. Word runs the TJ operator split lose their
-    /// separating spaces — comparisons strip them ([compact]).
-    String cellText(List<PdfTextRun> runs, int column) {
-      final bandTopY =
-          runs.firstWhere((r) => r.text == pdfRailCaptionNotesBand).y + 7;
-      final left = x0 + column * pdfColumnWidth;
-      final fragments =
-          runs
-              .where((r) => (r.fontSize - pdfTinyFontSize).abs() < 0.05)
-              .where((r) => r.y < bandTopY)
-              .where((r) => r.x > left && r.x < left + pdfColumnWidth)
-              .toList()
-            ..sort((a, b) => b.y.compareTo(a.y));
-      return fragments.map((r) => r.text).join();
-    }
-
-    /// [s] with the TJ split's lost spaces removed.
-    String compact(String s) => s.replaceAll(' ', '');
-
     test('a change day WITH user notes renders note and synthesis as one '
         'cell text, joined by the em-dash separator', () async {
       final bytes = await generateBandFixture(
@@ -1034,7 +1035,7 @@ void main() {
       );
       final (runs, _) = extractPageContent(bytes);
       expect(
-        compact(cellText(runs, 2)),
+        compact(bandCellText(runs, 2)),
         'BZweiteNotiz—rektal',
         reason:
             "day 2 (Mar 3) carries the note AND the snapshot day's synthesis "
@@ -1059,7 +1060,7 @@ void main() {
       );
       final (runs, _) = extractPageContent(bytes);
       expect(
-        compact(cellText(runs, 2)),
+        compact(bandCellText(runs, 2)),
         'BZweiteNotiz—rektal,ThermaPen',
         reason: 'the band note carries the snapshot\'s name like the fact line',
       );
@@ -1082,14 +1083,14 @@ void main() {
       );
       final (runs, _) = extractPageContent(bytes);
       expect(
-        cellText(runs, 0),
+        bandCellText(runs, 0),
         isNot(contains('rektal')),
         reason:
             "day 0 (Mar 1): the governing snapshot predates the cycle start "
             "so it does not echo — its note stays alone",
       );
       expect(
-        cellText(runs, 3),
+        bandCellText(runs, 3),
         isEmpty,
         reason: "day 3 (Mar 4) carries neither a note nor a synthesis",
       );
@@ -1128,7 +1129,7 @@ void main() {
       // page. The Mar 5 snapshot's synthesis alone fills that noteless
       // cell; the gap day Mar 5 owns a column but carries no note.
       expect(
-        compact(cellText(runs, 6)),
+        compact(bandCellText(runs, 6)),
         'andere',
         reason:
             'the note joins the first TRACKED day at/after the snapshot '
@@ -1136,7 +1137,7 @@ void main() {
             'the data-less gap day itself',
       );
       expect(
-        cellText(runs, 5),
+        bandCellText(runs, 5),
         isEmpty,
         reason: "no synthesis lands on the snapshot day's NEIGHBOR",
       );
@@ -1927,5 +1928,114 @@ void main() {
     // The continuation page repeats the identical scaffold ("Blatt k/n").
     expect(runs.map((r) => r.text), contains('Blatt'));
     expect(runs.map((r) => r.text), contains('2/2'));
+  });
+
+  group('custom marks in the band (marks — free note — method order)', () {
+    // A marks-only band fixture: day 0 carries a full marks map (no free
+    // note), day 1 marks plus a free note, day 2 an entry-less category
+    // (its bare name renders), day 3 nothing — on a continuous window
+    // (column == calendar offset from the Mar 1 cycle start), one page.
+    List<DailyEntry> marksBandEntries() => [
+      DailyEntry(
+        date: d(3, 1),
+        bbtC: 36.5,
+        customMarks: const {
+          'Sport': ['Joggen', 'Kraft'],
+        },
+      ),
+      DailyEntry(
+        date: d(3, 2),
+        bbtC: 36.5,
+        customMarks: const {
+          'Sport': ['Joggen'],
+        },
+        notes: 'Zweite Notiz',
+      ),
+      DailyEntry(
+        date: d(3, 3),
+        bbtC: 36.5,
+        customMarks: const {'Medikamente': <String>[]},
+      ),
+      DailyEntry(date: d(3, 4), bbtC: 36.5),
+      for (var i = 4; i < 14; i++) DailyEntry(date: d(3, 1 + i), bbtC: 36.5),
+    ];
+
+    PdfExportModel marksBandModel({
+      List<MeasurementMethodSnapshot> measurementSnapshots = const [],
+    }) => buildPdfExportModel(
+      entries: marksBandEntries(),
+      marks: [CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart)],
+      measurementSnapshots: measurementSnapshots,
+      today: d(3, 14),
+    );
+
+    Future<List<int>> generateMarksBandFixture({
+      List<MeasurementMethodSnapshot> measurementSnapshots = const [],
+    }) => generatePdfBytes(
+      model: marksBandModel(measurementSnapshots: measurementSnapshots),
+      fontBytes: fixtureFontBytes(),
+      options: PdfExportOptions(anonymized: false),
+      compress: false,
+    );
+
+    test('a marks-only day (no free note) renders its marks line as the '
+        'band text', () async {
+      final bytes = await generateMarksBandFixture();
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        compact(bandCellText(runs, 0)),
+        'Sport:Joggen,Kraft',
+        reason: "the marks line fills the noteless day's band cell",
+      );
+    });
+
+    test('a day with marks and a free note renders the marks line BEFORE '
+        'the note', () async {
+      final bytes = await generateMarksBandFixture();
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        compact(bandCellText(runs, 1)),
+        'Sport:Joggen—ZweiteNotiz',
+        reason: 'the marks line leads, the stored note follows the em-dash',
+      );
+    });
+
+    test('an entry-less category renders its bare name', () async {
+      final bytes = await generateMarksBandFixture();
+      final (runs, _) = extractPageContent(bytes);
+      expect(
+        compact(bandCellText(runs, 2)),
+        'Medikamente',
+        reason: 'the bare category name IS the mark',
+      );
+    });
+
+    test(
+      'a method-snapshot synthesis still renders LAST on a marks day',
+      () async {
+        final bytes = await generateMarksBandFixture(
+          measurementSnapshots: [
+            MeasurementMethodSnapshot(
+              date: DateTime.utc(2026, 2, 20),
+              route: MeasurementRoute.oral,
+            ),
+            MeasurementMethodSnapshot(
+              date: d(3, 2),
+              route: MeasurementRoute.rectal,
+            ),
+            MeasurementMethodSnapshot(
+              date: d(3, 3),
+              route: MeasurementRoute.other,
+            ),
+          ],
+        );
+        final (runs, _) = extractPageContent(bytes);
+        expect(
+          compact(bandCellText(runs, 2)),
+          'Medikamente—andere',
+          reason: "the marks day's synthesis trails the marks line",
+        );
+      },
+    );
   });
 }

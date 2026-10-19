@@ -1483,4 +1483,107 @@ void main() {
       );
     });
   });
+
+  group('customCategories root key (optional, list-of-maps gated)', () {
+    const definitions = [
+      {
+        'name': 'Sport',
+        'visible': true,
+        'items': ['Joggen', 'Kraft'],
+      },
+      {'name': 'Medikamente', 'visible': false, 'items': <Object?>[]},
+    ];
+
+    ExportBlob blobWithDefinitions() => ExportBlob(
+      entries: const [],
+      marks: const [],
+      customCategories: definitions,
+      exportedAt: DateTime.utc(2026, 9, 15, 12),
+    );
+
+    test('buildExportJson emits the definitions verbatim when non-empty', () {
+      final json = buildExportJson(blobWithDefinitions());
+
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      expect(decoded['customCategories'], definitions);
+    });
+
+    test('a definitions-free blob keeps the pinned four-key root shape', () {
+      // Byte compatibility: the key exists only when definitions exist —
+      // the root pin at the top of this file stays untouched by the
+      // feature.
+      final json = buildExportJson(
+        ExportBlob(
+          entries: const [],
+          marks: const [],
+          exportedAt: DateTime.utc(2026, 9, 15, 12),
+        ),
+      );
+
+      final decoded = jsonDecode(json) as Map<String, Object?>;
+      expect(decoded.containsKey('customCategories'), isFalse);
+    });
+
+    test('buildExportJson ↔ parseExportJson round-trips the definitions', () {
+      final doc = parseExportJson(buildExportJson(blobWithDefinitions()));
+      expect(doc.customCategories, definitions);
+    });
+
+    test('a document without the key parses with no definitions', () {
+      // Old documents (pre-feature, or from a definitions-less user) omit
+      // the key. Raw JSON on purpose — pins the actual old file content.
+      const oldJson =
+          '{"schema_version": 6, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"entries": [{"date": "2026-03-01", "bleeding": 3}], '
+          '"marks": []}';
+      final doc = parseExportJson(oldJson);
+      expect(doc.customCategories, isEmpty);
+    });
+
+    test('a non-list customCategories value is a document error', () {
+      // Like entries/marks/methods: a present-but-broken value fails
+      // loudly instead of being ignored.
+      for (final bad in const [
+        {'name': 'Sport'},
+        3,
+        'no',
+        true,
+        null,
+      ]) {
+        expect(
+          () => parseExportJson(
+            jsonEncode(<String, Object?>{
+              'schema_version': exportSchemaVersion,
+              'exported_at': '2026-09-15T12:00:00Z',
+              'entries': <Object?>[],
+              'marks': <Object?>[],
+              'customCategories': bad,
+            }),
+          ),
+          throwsA(isA<FormatException>()),
+          reason: 'a non-list customCategories value ($bad) must fail loudly',
+        );
+      }
+    });
+
+    test('a list member that is not a JSON object is a document error', () {
+      expect(
+        () => parseExportJson(
+          jsonEncode(<String, Object?>{
+            'schema_version': exportSchemaVersion,
+            'exported_at': '2026-09-15T12:00:00Z',
+            'entries': <Object?>[],
+            'marks': <Object?>[],
+            'customCategories': [
+              {'name': 'Sport'},
+              42,
+            ],
+          }),
+        ),
+        throwsA(isA<FormatException>()),
+        reason: 'the list gate admits JSON objects only',
+      );
+    });
+  });
 }

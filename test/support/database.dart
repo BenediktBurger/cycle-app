@@ -8,6 +8,7 @@
 // real default, which is exactly what the "system follows the device" tests
 // rely on (see locale_test.dart / theme_mode_setting_test.dart).
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
@@ -160,6 +161,7 @@ ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
   DiaryTrack? diaryTrack,
+  List<CustomCategory>? customCategories,
   bool? onboardingCompleted,
   bool packageInfoFailure = false,
   Future<void> Function(CycleDatabase db)? seed,
@@ -176,6 +178,7 @@ ProviderScope appScope({
       if (locale != null) localePin(locale),
       if (themeMode != null) themeModePin(themeMode),
       if (diaryTrack != null) diaryTrackPin(diaryTrack),
+      if (customCategories != null) customDiaryCategoriesPin(customCategories),
       onboardingPin(onboardingCompleted ?? true),
       if (now != null) nowProvider.overrideWith((ref) => now),
       if (selectedDay != null) selectedDatePin(selectedDay),
@@ -208,7 +211,8 @@ Widget settingsHarness({
 /// The Tagebuch screen over the in-memory database (sans the shell).
 /// [seed]/[onCreated]/[builder] reach the database override
 /// ([inMemoryDatabase]); [now] and [selectedDay] pin the clock and the form's
-/// day, [diaryTrack] the What-to-track defaults.
+/// day, [diaryTrack] the What-to-track defaults, [customCategories] the
+/// user-defined category pins.
 ProviderScope diaryScreenScope({
   Locale locale = const Locale('de'),
   Future<void> Function(CycleDatabase db)? seed,
@@ -217,6 +221,7 @@ ProviderScope diaryScreenScope({
   DateTime Function()? now,
   DateTime? selectedDay,
   DiaryTrack? diaryTrack,
+  List<CustomCategory>? customCategories,
 }) => ProviderScope(
   overrides: [
     inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
@@ -224,6 +229,7 @@ ProviderScope diaryScreenScope({
     if (now != null) nowProvider.overrideWith((ref) => now),
     if (selectedDay != null) selectedDatePin(selectedDay),
     if (diaryTrack != null) diaryTrackPin(diaryTrack),
+    if (customCategories != null) customDiaryCategoriesPin(customCategories),
   ],
   child: _harnessApp(
     locale: locale,

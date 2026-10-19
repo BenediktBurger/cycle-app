@@ -339,6 +339,51 @@
   "settingsTrackCervix": "Muttermund",
   "settingsTrackSex": "Geschlechtsverkehr",
   "settingsTrackPain": "Schmerzen",
+  "settingsCustomCategoriesTitle": "Eigene Kategorien",
+  "@settingsCustomCategoriesTitle": {
+    "description": "Titel der Einstellungen-Karte für die nutzerdefinierten Tagebuch-Kategorien („eigene Marks“): jede Kategorie ist ein eigener Abschnitt im Tagebuch-Eingabeformular mit ihren Einträgen als Ticks."
+  },
+  "settingsCustomCategoriesNote": "Eigene Abschnitte fürs Tagebuch, zum Beispiel Sport oder Medikamente. Umbenennen oder Löschen ändert nichts an bereits gespeicherten Tagen.",
+  "@settingsCustomCategoriesNote": {
+    "description": "Hinweis unter dem Titel der Karte: wofür die Kategorien da sind und dass die gespeicherten Tage labelbezogen sind — ein Umbenennen oder Löschen schreibt keine bereits gespeicherten Tage um."
+  },
+  "settingsCustomCategoriesNameLabel": "Name",
+  "settingsCustomCategoriesEntryLabel": "Eintrag hinzufügen",
+  "settingsCustomCategoriesAddLabel": "Neue Kategorie",
+  "settingsCustomCategoriesAddTooltip": "Kategorie hinzufügen",
+  "settingsCustomCategoriesAddEntryTooltip": "Eintrag hinzufügen",
+  "settingsCustomCategoriesRemoveEntryTooltip": "Eintrag entfernen",
+  "settingsCustomCategoriesDeleteTooltip": "Kategorie löschen",
+  "settingsCustomCategoriesMoveUpTooltip": "Nach oben verschieben",
+  "settingsCustomCategoriesMoveDownTooltip": "Nach unten verschieben",
+  "settingsCustomCategoriesVisibleLabel": "Im Tagebuch anzeigen",
+  "settingsCustomCategoriesErrorEmpty": "Bitte einen Namen eingeben.",
+  "settingsCustomCategoriesErrorDuplicate": "Eine Kategorie mit diesem Namen gibt es schon.",
+  "settingsCustomCategoriesErrorDuplicateEntry": "Diesen Eintrag gibt es in dieser Kategorie schon.",
+  "settingsCustomCategoriesErrorTooLong": "Maximal {n} Zeichen.",
+  "@settingsCustomCategoriesErrorTooLong": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsCustomCategoriesErrorCategoryLimit": "Maximal {n} Kategorien.",
+  "@settingsCustomCategoriesErrorCategoryLimit": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsCustomCategoriesErrorEntryLimit": "Maximal {n} Einträge pro Kategorie.",
+  "@settingsCustomCategoriesErrorEntryLimit": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "settingsObservedCyclesOutsideApp": "Beobachtete Zyklen außerhalb dieser App",
   "@settingsObservedCyclesOutsideApp": {
     "description": "Settings card title for the count of cycles the user observed before using this app (e.g. on paper). It shifts the cycle ordinals on the cycle page."

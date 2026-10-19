@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 
@@ -422,6 +423,99 @@ void main() {
         }
       },
     );
+  });
+
+  group('custom diary categories (definitions family)', () {
+    test('an empty table loads to no categories', () async {
+      final snapshot = await store.load();
+      expect(snapshot.customDiaryCategories, isEmpty);
+    });
+
+    test(
+      'the definitions round-trip as the JSON list under their key',
+      () async {
+        const definitions = [
+          CustomCategory(name: 'Sport', items: ['Joggen', 'Kraft']),
+          CustomCategory(name: 'Medikamente', visible: false),
+        ];
+        await store.persistCustomCategories(definitions);
+        expect(
+          await db.settingsDao.readValue(SettingKeys.customDiaryCategories),
+          '[{"name":"Sport","visible":true,"items":["Joggen","Kraft"]},'
+          '{"name":"Medikamente","visible":false,"items":[]}]',
+          reason: 'the value column stores the JSON list, exactly',
+        );
+        final snapshot = await store.load();
+        expect(snapshot.customDiaryCategories, definitions);
+        expect(await db.select(db.appSettings).get(), hasLength(1));
+      },
+    );
+
+    test(
+      'persisting an empty list deletes the row (absent == cleared)',
+      () async {
+        await store.persistCustomCategories(const [
+          CustomCategory(name: 'Sport'),
+        ]);
+        await store.persistCustomCategories(const []);
+        expect(
+          await store.readSetting(SettingKeys.customDiaryCategories),
+          isNull,
+          reason: 'an empty definitions list must not linger as a row',
+        );
+        expect(await db.select(db.appSettings).get(), isEmpty);
+      },
+    );
+
+    test(
+      'a corrupt row keeps the default while other keys stay unaffected',
+      () async {
+        await store.persistDiaryTrack(const DiaryTrack(mucus: false));
+        for (final raw in [
+          '"opaque string"', // JSON string, not a list
+          'garbage{', // not JSON at all
+          '5', // JSON number, not a list
+          '[true, 42, "Sport"]', // a list without any map member
+        ]) {
+          await seedRaw(SettingKeys.customDiaryCategories, raw);
+          final snapshot = await store.load();
+          expect(
+            snapshot.customDiaryCategories,
+            isEmpty,
+            reason: 'corrupt stored value "$raw" must not surface an error',
+          );
+          expect(
+            snapshot.diaryTrack,
+            const DiaryTrack(mucus: false),
+            reason: 'a corrupt row degrades only its own key',
+          );
+        }
+      },
+    );
+
+    test('junk list members are skipped; valid members still decode', () async {
+      await seedRaw(
+        SettingKeys.customDiaryCategories,
+        '[{"name":"Sport","items":["Joggen"]}, "junk", 42]',
+      );
+      expect((await store.load()).customDiaryCategories, const [
+        CustomCategory(name: 'Sport', items: ['Joggen']),
+      ]);
+    });
+
+    test('mistyped fields inside a stored map fall back per field', () async {
+      await seedRaw(
+        SettingKeys.customDiaryCategories,
+        '[{"name":"Sport","visible":"yes","items":"Joggen"}]',
+      );
+      expect(
+        (await store.load()).customDiaryCategories,
+        const [CustomCategory(name: 'Sport')],
+        reason:
+            'the per-field leniency of CustomCategory.fromJson applies '
+            'to stored rows too',
+      );
+    });
   });
 
   group('generic JSON path (future settings without any code change)', () {

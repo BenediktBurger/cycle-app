@@ -197,6 +197,17 @@ class $CycleEntriesTable extends CycleEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _customMarksMeta = const VerificationMeta(
+    'customMarks',
+  );
+  @override
+  late final GeneratedColumn<String> customMarks = GeneratedColumn<String>(
+    'custom_marks',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -238,6 +249,7 @@ class $CycleEntriesTable extends CycleEntries
     painMittelschmerz,
     sexTimings,
     notes,
+    customMarks,
     createdAt,
     updatedAt,
   ];
@@ -349,6 +361,15 @@ class $CycleEntriesTable extends CycleEntries
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('custom_marks')) {
+      context.handle(
+        _customMarksMeta,
+        customMarks.isAcceptableOrUnknown(
+          data['custom_marks']!,
+          _customMarksMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -433,6 +454,10 @@ class $CycleEntriesTable extends CycleEntries
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
+      ),
+      customMarks: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_marks'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -558,6 +583,10 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   /// would silently drop both, leaving the column nullable).
   final int sexTimings;
   final String? notes;
+
+  /// The day's user-defined category picks, stored as one JSON object
+  /// `{"Kategorie": ["Eintrag", …]}` (label-keyed, no IDs); NULL when the day records none.
+  final String? customMarks;
   final DateTime createdAt;
   final DateTime updatedAt;
   const CycleEntry({
@@ -576,6 +605,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     required this.painMittelschmerz,
     required this.sexTimings,
     this.notes,
+    this.customMarks,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -621,6 +651,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    if (!nullToAbsent || customMarks != null) {
+      map['custom_marks'] = Variable<String>(customMarks);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -657,6 +690,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      customMarks: customMarks == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customMarks),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -683,6 +719,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       painMittelschmerz: serializer.fromJson<bool>(json['painMittelschmerz']),
       sexTimings: serializer.fromJson<int>(json['sexTimings']),
       notes: serializer.fromJson<String?>(json['notes']),
+      customMarks: serializer.fromJson<String?>(json['customMarks']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -706,6 +743,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
       'painMittelschmerz': serializer.toJson<bool>(painMittelschmerz),
       'sexTimings': serializer.toJson<int>(sexTimings),
       'notes': serializer.toJson<String?>(notes),
+      'customMarks': serializer.toJson<String?>(customMarks),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -727,6 +765,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     bool? painMittelschmerz,
     int? sexTimings,
     Value<String?> notes = const Value.absent(),
+    Value<String?> customMarks = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => CycleEntry(
@@ -753,6 +792,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
     sexTimings: sexTimings ?? this.sexTimings,
     notes: notes.present ? notes.value : this.notes,
+    customMarks: customMarks.present ? customMarks.value : this.customMarks,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -791,6 +831,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ? data.sexTimings.value
           : this.sexTimings,
       notes: data.notes.present ? data.notes.value : this.notes,
+      customMarks: data.customMarks.present
+          ? data.customMarks.value
+          : this.customMarks,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -814,6 +857,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('sexTimings: $sexTimings, ')
           ..write('notes: $notes, ')
+          ..write('customMarks: $customMarks, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -837,6 +881,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
     painMittelschmerz,
     sexTimings,
     notes,
+    customMarks,
     createdAt,
     updatedAt,
   );
@@ -859,6 +904,7 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
           other.painMittelschmerz == this.painMittelschmerz &&
           other.sexTimings == this.sexTimings &&
           other.notes == this.notes &&
+          other.customMarks == this.customMarks &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -879,6 +925,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
   final Value<bool> painMittelschmerz;
   final Value<int> sexTimings;
   final Value<String?> notes;
+  final Value<String?> customMarks;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const CycleEntriesCompanion({
@@ -897,6 +944,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.painMittelschmerz = const Value.absent(),
     this.sexTimings = const Value.absent(),
     this.notes = const Value.absent(),
+    this.customMarks = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -916,6 +964,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     this.painMittelschmerz = const Value.absent(),
     this.sexTimings = const Value.absent(),
     this.notes = const Value.absent(),
+    this.customMarks = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : date = Value(date);
@@ -935,6 +984,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Expression<bool>? painMittelschmerz,
     Expression<int>? sexTimings,
     Expression<String>? notes,
+    Expression<String>? customMarks,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -954,6 +1004,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       if (painMittelschmerz != null) 'pain_mittelschmerz': painMittelschmerz,
       if (sexTimings != null) 'sex_timings': sexTimings,
       if (notes != null) 'notes': notes,
+      if (customMarks != null) 'custom_marks': customMarks,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -975,6 +1026,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     Value<bool>? painMittelschmerz,
     Value<int>? sexTimings,
     Value<String?>? notes,
+    Value<String?>? customMarks,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -994,6 +1046,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       sexTimings: sexTimings ?? this.sexTimings,
       notes: notes ?? this.notes,
+      customMarks: customMarks ?? this.customMarks,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1051,6 +1104,9 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (customMarks.present) {
+      map['custom_marks'] = Variable<String>(customMarks.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1078,6 +1134,7 @@ class CycleEntriesCompanion extends UpdateCompanion<CycleEntry> {
           ..write('painMittelschmerz: $painMittelschmerz, ')
           ..write('sexTimings: $sexTimings, ')
           ..write('notes: $notes, ')
+          ..write('customMarks: $customMarks, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2078,6 +2135,7 @@ typedef $$CycleEntriesTableCreateCompanionBuilder =
       Value<bool> painMittelschmerz,
       Value<int> sexTimings,
       Value<String?> notes,
+      Value<String?> customMarks,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2098,6 +2156,7 @@ typedef $$CycleEntriesTableUpdateCompanionBuilder =
       Value<bool> painMittelschmerz,
       Value<int> sexTimings,
       Value<String?> notes,
+      Value<String?> customMarks,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2185,6 +2244,11 @@ class $$CycleEntriesTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customMarks => $composableBuilder(
+    column: $table.customMarks,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2283,6 +2347,11 @@ class $$CycleEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customMarks => $composableBuilder(
+    column: $table.customMarks,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2366,6 +2435,11 @@ class $$CycleEntriesTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<String> get customMarks => $composableBuilder(
+    column: $table.customMarks,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2419,6 +2493,7 @@ class $$CycleEntriesTableTableManager
                 Value<bool> painMittelschmerz = const Value.absent(),
                 Value<int> sexTimings = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> customMarks = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => CycleEntriesCompanion(
@@ -2437,6 +2512,7 @@ class $$CycleEntriesTableTableManager
                 painMittelschmerz: painMittelschmerz,
                 sexTimings: sexTimings,
                 notes: notes,
+                customMarks: customMarks,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2457,6 +2533,7 @@ class $$CycleEntriesTableTableManager
                 Value<bool> painMittelschmerz = const Value.absent(),
                 Value<int> sexTimings = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> customMarks = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => CycleEntriesCompanion.insert(
@@ -2475,6 +2552,7 @@ class $$CycleEntriesTableTableManager
                 painMittelschmerz: painMittelschmerz,
                 sexTimings: sexTimings,
                 notes: notes,
+                customMarks: customMarks,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

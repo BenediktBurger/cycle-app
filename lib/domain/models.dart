@@ -194,6 +194,7 @@ final class DailyEntry {
     this.painBreast = false,
     this.painMittelschmerz = false,
     this.sexTimings = 0,
+    this.customMarks = const {},
     this.notes,
   }) : // The measurement time is metadata OF the temperature measurement:
        // without a temperature there is no measurement to time, so the time
@@ -289,6 +290,10 @@ final class DailyEntry {
   /// together with a concrete time slot.
   final int sexTimings;
 
+  /// The day's user-defined category picks ("eigene Kategorien"): label-keyed;
+  /// survives category renames/deletions in settings — see lib/db/tables.dart.
+  final Map<String, List<String>> customMarks;
+
   final String? notes;
 
   /// True when the day carries at least one raw disturbance flag, i.e. the
@@ -313,6 +318,7 @@ final class DailyEntry {
     bool? painBreast,
     bool? painMittelschmerz,
     int? sexTimings,
+    Map<String, List<String>>? customMarks,
     Object? notes = _sentinel,
   }) {
     return DailyEntry(
@@ -341,6 +347,7 @@ final class DailyEntry {
       painBreast: painBreast ?? this.painBreast,
       painMittelschmerz: painMittelschmerz ?? this.painMittelschmerz,
       sexTimings: sexTimings ?? this.sexTimings,
+      customMarks: customMarks ?? this.customMarks,
       notes: notes == _sentinel ? this.notes : notes as String?,
     );
   }
@@ -364,26 +371,52 @@ final class DailyEntry {
         painBreast == other.painBreast &&
         painMittelschmerz == other.painMittelschmerz &&
         sexTimings == other.sexTimings &&
+        _customMarksEqual(customMarks, other.customMarks) &&
         notes == other.notes;
   }
 
+  /// Value comparison of two customMarks maps without the `collection`
+  /// package: same keys (any order) with element-wise equal lists (order
+  /// matters — the UI's reorder persists through equality).
+  static bool _customMarksEqual(
+    Map<String, List<String>> a,
+    Map<String, List<String>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final items = b[entry.key];
+      if (items == null || items.length != entry.value.length) return false;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] != entry.value[i]) return false;
+      }
+    }
+    return true;
+  }
+
   @override
-  int get hashCode => Object.hash(
-    DateOnly.normalize(date),
-    bbtC,
-    measuredAtMinutes,
-    bleeding,
-    tempDisturbances,
-    mucusSign,
-    mucusQuality,
-    cervixPosition,
-    cervixOpening,
-    cervixFirmness,
-    painBreast,
-    painMittelschmerz,
-    sexTimings,
-    notes,
-  );
+  int get hashCode {
+    final marksHash = Object.hashAllUnordered([
+      for (final entry in customMarks.entries)
+        Object.hash(entry.key, Object.hashAll(entry.value)),
+    ]);
+    return Object.hash(
+      DateOnly.normalize(date),
+      bbtC,
+      measuredAtMinutes,
+      bleeding,
+      tempDisturbances,
+      mucusSign,
+      mucusQuality,
+      cervixPosition,
+      cervixOpening,
+      cervixFirmness,
+      painBreast,
+      painMittelschmerz,
+      sexTimings,
+      marksHash,
+      notes,
+    );
+  }
 
   @override
   String toString() =>
@@ -393,5 +426,6 @@ final class DailyEntry {
       'mucusSign:$mucusSign, '
       'mucusQuality:$mucusQuality, '
       'cervixPosition:$cervixPosition, cervixOpening:$cervixOpening, '
-      'cervixFirmness:$cervixFirmness, sexTimings:$sexTimings)';
+      'cervixFirmness:$cervixFirmness, sexTimings:$sexTimings, '
+      'customMarks:$customMarks)';
 }

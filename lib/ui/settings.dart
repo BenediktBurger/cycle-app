@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
 import 'about.dart';
+import 'settings/custom_categories_card.dart';
 import 'settings/delete_data_card.dart';
 import 'settings/drip_import_card.dart';
 import 'settings/export_import_card.dart';
@@ -57,6 +58,8 @@ class EinstellungenScreen extends ConsumerWidget {
           const TemperatureRangeCard(),
           const SizedBox(height: 8),
           const WhatToTrackCard(),
+          const SizedBox(height: 8),
+          const CustomCategoriesCard(),
           const SizedBox(height: 8),
           const ExportImportCard(),
           const SizedBox(height: 8),

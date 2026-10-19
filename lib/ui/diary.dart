@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 
 import '../db/mappers.dart';
 import '../domain/cervix.dart';
+import '../domain/custom_categories.dart';
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/decimal_display.dart';
@@ -65,6 +66,11 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
   bool _painMittelschmerz = false;
   int _sexTimings = 0;
   CervixFirmness? _cervixFirmness;
+
+  /// The loaded day's custom marks ("eigene Kategorien" picks), keyed by
+  /// category label: seeded verbatim from the stored entry in [_applyEntry],
+  /// toggled by the form's chips; [_save] derives the stored map from it.
+  Map<String, List<String>> _customMarks = const {};
 
   @override
   void initState() {
@@ -154,6 +160,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
     _painBreast = entry?.painBreast ?? false;
     _painMittelschmerz = entry?.painMittelschmerz ?? false;
     _sexTimings = entry?.sexTimings ?? 0;
+    _customMarks = entry?.customMarks ?? const {};
     // The stored value passes through untouched: an off-grid reading
     // displays at its nearest wheel step but is only ever replaced by an
     // actual wheel commit.
@@ -206,6 +213,86 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
 
   static int _timeToMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
+  void _toggleCustomEntry(String category, String entry, bool selected) {
+    setState(() {
+      final items = [...?_customMarks[category]];
+      if (selected) {
+        items.add(entry);
+      } else {
+        items.remove(entry);
+      }
+      _customMarks = {..._customMarks, category: items};
+    });
+  }
+
+  /// The chip row of one category's section: the single toggle chip for an
+  /// entry-less category, otherwise one multi-select chip per entry.
+  List<Widget> _customMarkChips(CustomCategory category) => [
+    if (category.items.isEmpty)
+      FilterChip(
+        key: ValueKey('customMarkChip-${category.name}'),
+        label: Text(category.name),
+        selected: _customMarks.containsKey(category.name),
+        onSelected: (selected) =>
+            _toggleCustomCategory(category.name, selected),
+      )
+    else
+      for (final item in category.items)
+        FilterChip(
+          key: ValueKey('customMarkChip-${category.name}-$item'),
+          label: Text(item),
+          selected: _customMarks[category.name]?.contains(item) ?? false,
+          onSelected: (selected) =>
+              _toggleCustomEntry(category.name, item, selected),
+        ),
+  ];
+
+  void _toggleCustomCategory(String category, bool selected) {
+    setState(() {
+      // An if/else, not a ternary: a cascade in the else branch would bind
+      // to the whole conditional expression and strip the just-set key.
+      if (selected) {
+        _customMarks = {..._customMarks, category: const []};
+      } else {
+        _customMarks = Map.of(_customMarks)..remove(category);
+      }
+    });
+  }
+
+  /// The map to store for the loaded day, derived from the working map
+  /// [_customMarks]: a known VISIBLE category is fully controlled by its
+  /// rendered chips (an entry no longer in the definition cannot be ticked
+  /// and drops out); an entry-less category stands as the bare key with an
+  /// empty list while its toggle chip is ON. An INVISIBLE known category and
+  /// one outside the current definitions keep their stored items verbatim —
+  /// their picks are not rendered, so rewriting them would destroy history.
+  Map<String, List<String>> _mergedCustomMarks(
+    List<CustomCategory> categories,
+  ) {
+    final merged = <String, List<String>>{};
+    for (final category in categories) {
+      final stored = _customMarks[category.name];
+      if (stored == null) continue;
+      if (!category.visible) {
+        merged[category.name] = stored;
+      } else if (category.items.isEmpty) {
+        merged[category.name] = const [];
+      } else {
+        final ticked = [
+          for (final item in category.items)
+            if (stored.contains(item)) item,
+        ];
+        if (ticked.isNotEmpty) merged[category.name] = ticked;
+      }
+    }
+    for (final entry in _customMarks.entries) {
+      if (!categories.any((category) => category.name == entry.key)) {
+        merged[entry.key] = entry.value;
+      }
+    }
+    return merged;
+  }
+
   Future<void> _save(AppLocalizations l10n) async {
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) return;
@@ -234,6 +321,7 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
       // The mask is 0..7 by construction (each chip toggles exactly one
       // bit); the DailyEntry constructor assert is the single guard.
       sexTimings: _sexTimings,
+      customMarks: _mergedCustomMarks(ref.read(customDiaryCategoriesProvider)),
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
@@ -854,6 +942,19 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
                 ),
               ],
               const SizedBox(height: 12),
+              // --- eigene Kategorien -----------------------------------
+              // One section per VISIBLE category, in definitions order.
+              for (final category in ref.watch(customDiaryCategoriesProvider))
+                if (category.visible) ...[
+                  SectionHeader(title: category.name),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _customMarkChips(category),
+                  ),
+                  const SizedBox(height: 12),
+                ],
               // --- notes ------------------------------------------------
               TextFormField(
                 controller: _notesController,
@@ -1065,15 +1166,33 @@ final class _TagebuchScreenState extends ConsumerState<TagebuchScreen> {
           ],
         ],
       ),
-      subtitle: day.notes != null
-          ? Text(day.notes!, maxLines: 1, overflow: TextOverflow.ellipsis)
-          : null,
+      subtitle: switch (_dayTileSubtitle(day)) {
+        null => null,
+        final preview => Text(
+          preview,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      },
       onTap: () {
         ref
             .read(selectedDateProvider.notifier)
             .set(DateOnly.normalize(day.date));
       },
     );
+  }
+
+  /// The day tile's preview line: the stored marks line (customMarksNote,
+  /// the shared render text) prepended before the free note; null when the
+  /// day has neither.
+  static String? _dayTileSubtitle(DailyEntry day) {
+    final preview = [
+      if (customMarksNote(day.customMarks) case final marks?
+          when marks.isNotEmpty)
+        marks,
+      if (day.notes case final noteText? when noteText.isNotEmpty) noteText,
+    ].join(customMarkCategoriesSeparator);
+    return preview.isEmpty ? null : preview;
   }
 
   Widget _bleedingMarker(DailyEntry day) {
