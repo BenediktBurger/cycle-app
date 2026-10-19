@@ -20,18 +20,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/finders.dart';
+import 'support/range_slider.dart';
 import 'support/viewport.dart';
 
-/// The currently picked value of one of the range pickers (the form field
-/// wraps a DropdownButton that carries the value).
-double? _pickerValue(WidgetTester tester, ValueKey<String> key) => tester
-    .widget<DropdownButton<double>>(
-      find.descendant(
-        of: find.byKey(key),
-        matching: find.byType(DropdownButton<double>),
-      ),
-    )
-    .value;
+/// The current slider values of the temperature-range card.
+RangeValues _sliderValues(WidgetTester tester) => tester
+    .widget<RangeSlider>(find.byKey(const ValueKey('temperatureRangeSlider')))
+    .values;
 
 /// One validated text field's write-through fixtures: the keyed field and
 /// error line, the storage key a valid entry writes to, and the
@@ -411,14 +406,9 @@ void main() {
         reason: 'the stored theme choice must appear in the switcher',
       );
       expect(
-        _pickerValue(tester, const ValueKey('temperatureRangeMin')),
-        35.0,
-        reason: 'the stored range must show in the lower picker',
-      );
-      expect(
-        _pickerValue(tester, const ValueKey('temperatureRangeMax')),
-        39.0,
-        reason: 'the stored range must show in the upper picker',
+        _sliderValues(tester),
+        const RangeValues(35.0, 39.0),
+        reason: 'the stored range must show in the slider',
       );
     });
 
@@ -472,18 +462,11 @@ void main() {
       await tester.tap(settingsThemeSegment('dark'));
       await tester.pumpAndSettle();
 
-      // Range to 35–39 °C: lower picker first, then the upper one (the
-      // DropdownButtonFormField value proves the write-through read the
-      // same way the provider write does in
-      // temperature_range_setting_test.dart).
-      await tester.tap(find.byKey(const ValueKey('temperatureRangeMin')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('35.0 °C').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('temperatureRangeMax')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('39.0 °C').last);
-      await tester.pumpAndSettle();
+      // Range to 35–39 °C: lower thumb left, upper thumb right (the
+      // slider values prove the write-through read the same way the
+      // provider write does in temperature_range_setting_test.dart).
+      await dragRangeThumbToValue(tester, lower: true, value: 35.0);
+      await dragRangeThumbToValue(tester, lower: false, value: 39.0);
 
       // The moment the rows get written is not the UI's business: read
       // back through the typed store on the very handle the app opened.

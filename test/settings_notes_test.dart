@@ -1,7 +1,7 @@
 // Widget test of the settings pane's note texts: the three "saved in the
 // app's local storage" notes under the language, theme-mode and
 // temperature-range cards are gone (users expect settings to persist), and
-// the temperature-range card keeps only the useful default hint.
+// the temperature-range card keeps only the useful cycle-tab note.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,7 +22,7 @@ Future<void> _openSettings(WidgetTester tester) async {
 void main() {
   testWidgets(
     'the settings pane carries no "stored locally" note anymore, only '
-    'the default hint on the temperature-range card',
+    'the cycle-tab note on the temperature-range card',
     (tester) async {
       // The temperature card sits below the pane's top cards (lazy
       // ListView — enlarge the surface so the whole card list is built).
@@ -47,13 +47,15 @@ void main() {
         reason: 'no card repeats the persistence sentence anymore',
       );
 
-      // The temperature-range card keeps the useful default measurement as
-      // its only note.
+      // The temperature-range card keeps the useful note as its only one.
       expect(
-        find.text('Default: 36–38 °C.'),
+        find.text(
+          'Visible range of the temperature chart on the cycle tab. '
+          'Default: 36–38 °C.',
+        ),
         findsOneWidget,
         reason:
-            'the default hint replaces the removed persistence note '
+            'the cycle-tab note is the only note left '
             'on the temperature-range card',
       );
     },

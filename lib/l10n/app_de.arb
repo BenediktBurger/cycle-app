@@ -333,7 +333,7 @@
   "settingsTemperatureRange": "Temperaturbereich",
   "settingsRangeLower": "Untergrenze",
   "settingsRangeUpper": "Obergrenze",
-  "settingsTemperatureRangeDefaultHint": "Standard: 36–38 °C.",
+  "settingsTemperatureRangeNote": "Sichtbarer Bereich des Temperaturdiagramms im Zyklus-Tab. Standard: 36–38 °C.",
   "settingsTrackTitle": "Was aufzeichnen",
   "settingsTrackMucus": "Zervixschleim",
   "settingsTrackCervix": "Muttermund",

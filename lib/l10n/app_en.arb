@@ -390,7 +390,7 @@
   "settingsTemperatureRange": "Temperature range",
   "settingsRangeLower": "Lower limit",
   "settingsRangeUpper": "Upper limit",
-  "settingsTemperatureRangeDefaultHint": "Default: 36–38 °C.",
+  "settingsTemperatureRangeNote": "Visible range of the temperature chart on the cycle tab. Default: 36–38 °C.",
   "settingsTrackTitle": "What to track",
   "settingsTrackMucus": "Mucus",
   "settingsTrackCervix": "Cervix",
