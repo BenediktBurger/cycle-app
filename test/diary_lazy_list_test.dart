@@ -26,19 +26,18 @@ final _farMark = DateTime(2000, 1, 1);
 
 final _marks = [CycleMark(date: _farMark, type: CycleMarkTypes.cycleStart)];
 
-// ~2 years of plain tracked days, ending at the pinned "now" (one
-// temperature per day, nothing else — the tile content must never be the
-// subject here).
+// 120 recent plain tracked days, ending at the pinned "now" (one temperature
+// per day, nothing else — the tile content must never be the subject here).
 final _entries = <DailyEntry>[
   for (
-    var day = DateOnly.addDays(_now, -729);
+    var day = DateOnly.addDays(_now, -119);
     !day.isAfter(_now);
     day = DateOnly.addDays(day, 1)
   )
     DailyEntry(date: day, bbtC: 36.5),
 ];
 
-Future<void> _seedTwoYearsAndFarMark(CycleDatabase db) async {
+Future<void> _seedRecentDaysAndFarMark(CycleDatabase db) async {
   await db.transaction(() async {
     for (final entry in _entries) {
       await db.entriesDao.upsertDaily(entry);
@@ -66,22 +65,25 @@ void main() {
   testWidgets('an expanded cycle builds its day tiles lazily, far below the '
       'true day count', (tester) async {
     _harness.tallSurface(tester);
-    await tester.pumpWidget(_harness.scope(seed: _seedTwoYearsAndFarMark));
+    await tester.pumpWidget(_harness.scope(seed: _seedRecentDaysAndFarMark));
     await tester.pumpAndSettle();
 
-    // The fixture's total day count, computed with the same pinned clock
-    // the screen groups with: the cycles' calendar spans (real data is
-    // never trimmed) — here one mark-opened cycle spanning all of them.
+    // Far-mark fixture sanity: the header's calendar span is years long,
+    // independent of how many days are actually tracked.
     final cycles = groupIntoCycles(_entries, _marks, today: _now);
+    final cycle = cycles.single;
     final totalDays = cycles.fold<int>(
       0,
-      (n, c) => n + cycleSpanDays(c).length,
+      (n, c) => n + DateOnly.daysBetween(c.endDate, c.startDate) + 1,
     );
     expect(
       totalDays,
       greaterThanOrEqualTo(700),
-      reason: 'fixture sanity: ~2 years of tracked days in the list',
+      reason: 'fixture sanity: the far-past mark spans years of calendar days',
     );
+    // The extent of the list an expanded cycle renders — not the calendar
+    // span above, which the header reports but the day list does not contain.
+    final listDays = cycleSpanDays(cycle).length;
 
     await tester.tap(find.byType(ExpansionTile).first);
     await tester.pumpAndSettle();
@@ -94,17 +96,17 @@ void main() {
     );
     expect(
       built,
-      lessThan(totalDays ~/ 4),
+      lessThan(listDays ~/ 4),
       reason:
           'an expanded cycle builds only the tiles it lays out '
-          '($built built vs. $totalDays days in the cycles)',
+          '($built built vs. $listDays days in the rendered list)',
     );
   });
 
   testWidgets('the newest cycle opens the list: the header counts the true '
       'span, its newest day tiles build right below it', (tester) async {
     _harness.tallSurface(tester);
-    await tester.pumpWidget(_harness.scope(seed: _seedTwoYearsAndFarMark));
+    await tester.pumpWidget(_harness.scope(seed: _seedRecentDaysAndFarMark));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(ExpansionTile).first);
@@ -141,7 +143,7 @@ void main() {
     _harness.tallSurface(tester);
     await tester.pumpWidget(
       _harness.scope(
-        seed: _seedTwoYearsAndFarMark,
+        seed: _seedRecentDaysAndFarMark,
         // A different selected day keeps "tap today's tile" observable: the
         // provider must actually change to the tapped day.
         selectedDay: DateOnly.addDays(_now, -3),

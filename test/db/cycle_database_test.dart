@@ -380,20 +380,25 @@ void main() {
       final rows = await db.entriesDao.allEntries();
       expect(rows, hasLength(1));
       expect(rows.single.bleeding, Bleeding.medium);
+      expect(rows.single.createdAt, rows.single.updatedAt);
     });
 
     test('re-upsert keeps exactly one row, same id, replaces fields, keeps '
         'created_at and bumps updated_at', () async {
-      final first = await db.entriesDao.upsertByDate(
-        dailyEntryToCompanion(
-          DailyEntry(
-            date: DateTime(2026, 3, 1),
-            bleeding: Bleeding.medium,
-            bbtC: 36.1,
-          ),
-        ),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      final past = DateTime.utc(2020, 1, 1);
+      final seededId = await db
+          .into(db.cycleEntries)
+          .insert(
+            CycleEntriesCompanion.insert(
+              date: DateTime(2026, 3, 1),
+              bleeding: const Value(Bleeding.medium),
+              bbtC: const Value(36.1),
+              createdAt: Value(past),
+              updatedAt: Value(past),
+            ),
+          );
+
+      final seeded = (await db.entriesDao.entryFor(DateTime(2026, 3, 1)))!;
 
       final second = await db.entriesDao.upsertByDate(
         dailyEntryToCompanion(
@@ -407,16 +412,18 @@ void main() {
       );
 
       final rows = await db.entriesDao.allEntries();
-      expect(rows, hasLength(1)); // still exactly one row for the day
+      expect(rows, hasLength(1));
 
-      expect(second.id, first.id); // stable identity
-      expect(second.bbtC, 36.8); // replaced
-      expect(second.bleeding, Bleeding.none); // replaced
-      expect(second.notes, 'changed'); // replaced
-      // created_at is kept (drift stores DateTimes with second precision,
-      // so direct equality with "now" cannot be asserted reliably):
-      expect(!second.createdAt.isBefore(first.createdAt), isTrue);
-      expect(!second.updatedAt.isBefore(second.createdAt), isTrue);
+      expect(second.id, seededId);
+      expect(second.bbtC, 36.8);
+      expect(second.bleeding, Bleeding.none);
+      expect(second.notes, 'changed');
+      expect(second.createdAt, seeded.createdAt);
+      expect(
+        second.updatedAt.isAfter(seeded.updatedAt),
+        isTrue,
+        reason: 'the re-save bumps updated_at',
+      );
     });
 
     test('a duplicate same-day insert that bypasses the upsert hits '

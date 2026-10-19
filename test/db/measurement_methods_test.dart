@@ -5,6 +5,7 @@
 import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/mappers.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -105,12 +106,22 @@ void main() {
 
     test('re-upsert keeps exactly one row, same id, replaces fields, keeps '
         'created_at and bumps updated_at', () async {
-      final first = await db.measurementMethodsDao.upsertByDate(
-        date: DateTime(2026, 3, 1),
-        route: MeasurementRoute.vaginal,
-        thermometer: 'ThermaPen',
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      final past = DateTime.utc(2020, 1, 1);
+      final seededId = await db
+          .into(db.measurementMethods)
+          .insert(
+            MeasurementMethodsCompanion.insert(
+              date: DateTime(2026, 3, 1),
+              method: 'vaginal',
+              thermometer: const Value('ThermaPen'),
+              createdAt: Value(past),
+              updatedAt: Value(past),
+            ),
+          );
+
+      final seeded = (await db.measurementMethodsDao.snapshotFor(
+        DateTime(2026, 3, 1),
+      ))!;
 
       final second = await db.measurementMethodsDao.upsertByDate(
         date: DateTime(2026, 3, 1),
@@ -118,16 +129,14 @@ void main() {
       );
 
       final rows = await db.measurementMethodsDao.allSnapshots();
-      expect(rows, hasLength(1)); // still exactly one row for the day
-      expect(second.id, first.id); // stable identity
-      expect(second.method, 'other'); // replaced
+      expect(rows, hasLength(1));
+      expect(second.id, seededId);
+      expect(second.method, 'other');
       // A full replacement write: the previously stored name is cleared.
       expect(second.thermometer, isNull);
-      // created_at is kept (drift stores DateTimes with second precision,
-      // so direct equality with "now" cannot be asserted reliably):
-      expect(!second.createdAt.isBefore(first.createdAt), isTrue);
+      expect(second.createdAt, seeded.createdAt);
       expect(
-        second.updatedAt.isAfter(first.updatedAt),
+        second.updatedAt.isAfter(seeded.updatedAt),
         isTrue,
         reason: 'the re-save bumps updated_at',
       );
