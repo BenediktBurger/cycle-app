@@ -13,7 +13,7 @@ import 'models.dart';
 ///
 /// TODO(user-review): the height is an owner-eyeball rendering detail, not
 /// a settled rule.
-const double notesBandHeight = 64;
+const double notesBandHeight = 128;
 
 /// The band's cervix glyph zone, anchored at the band TOP: the same
 /// reserved block height on every cervix day, so the position evolution

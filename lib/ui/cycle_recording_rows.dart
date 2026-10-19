@@ -296,20 +296,17 @@ final class _SignalRow extends StatelessWidget {
 
   /// The day cell's merged notes band: the cervix stacked zones on top
   /// (only for days with any cervix observation — glyph zone, letter row,
-  /// then the note zone; one reserved top block per cervix day, so the
-  /// slot ink never depends on the note or the firmness letter), the
+  /// then the note zone; one reserved top block per cervix day), the
   /// breast-pain B letter row directly above the note zone (at the very
   /// band top on cervix-free days; not rendered or reserved on pain-free
   /// days), then the note zone. The note line reads top→bottom. Raw
   /// observation display only, never a fertility conclusion (ADR-0001);
-  /// neutral on-surface ink with the in-plot glyphs' halo pass.
   static Widget _notesBandContent(
     BuildContext context,
     DailyEntry? day,
     int index,
   ) {
     final scheme = Theme.of(context).colorScheme;
-    final surface = scheme.surface;
     final zones = notesBandLayout(day);
     final joined = day == null || day.notes == null
         ? null
@@ -335,12 +332,10 @@ final class _SignalRow extends StatelessWidget {
             top: cervixGlyphZoneHeight,
             height: cervixLetterRowHeight,
             child: Center(
-              child: _InPlotGlyphRows._haloedText(
-                inkKey: 'cervixFirmnessGlyph-$index',
-                haloKey: 'cervixFirmnessHalo-$index',
-                text: cervixFirmnessSymbol(firmness),
+              child: Text(
+                cervixFirmnessSymbol(firmness),
+                key: ValueKey('cervixFirmnessGlyph-$index'),
                 style: TextStyle(fontSize: 9, color: scheme.onSurface),
-                haloColor: surface,
               ),
             ),
           ),
@@ -351,12 +346,10 @@ final class _SignalRow extends StatelessWidget {
             top: zones.painRowTop,
             height: painRowHeight,
             child: Center(
-              child: _InPlotGlyphRows._haloedText(
-                inkKey: 'painBreastGlyph-$index',
-                haloKey: 'painBreastHalo-$index',
-                text: 'B',
+              child: Text(
+                'B',
+                key: ValueKey('painBreastGlyph-$index'),
                 style: TextStyle(fontSize: 9, color: scheme.onSurface),
-                haloColor: surface,
               ),
             ),
           ),
@@ -367,17 +360,19 @@ final class _SignalRow extends StatelessWidget {
             top: zones.noteTop,
             bottom: 0,
             child: Align(
-              alignment: Alignment.topLeft,
+              alignment: Alignment.topRight,
               child: RotatedBox(
                 quarterTurns: 1,
-                child: _InPlotGlyphRows._haloedText(
-                  inkKey: 'notesText-$index',
-                  haloKey: 'notesHaloText-$index',
-                  text: text,
-                  style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
-                  haloColor: surface,
-                  maxLines: 1,
+                child: Text(
+                  text,
+                  key: ValueKey('notesText-$index'),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: scheme.onSurfaceVariant,
+                    height: 0.95,
+                  ),
                 ),
               ),
             ),

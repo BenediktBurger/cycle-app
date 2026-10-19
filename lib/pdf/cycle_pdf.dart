@@ -1373,7 +1373,7 @@ pw.Widget _rotatedTopText(String text) => pw.LayoutBuilder(
       return pw.SizedBox();
     }
     return pw.Align(
-      alignment: pw.Alignment.topLeft,
+      alignment: pw.Alignment.topRight,
       child: pw.Transform.rotateBox(
         angle: pdfRotatedTextAngle,
         // Unconstrained: after the rotation the strip fills the cell's
@@ -1381,7 +1381,7 @@ pw.Widget _rotatedTopText(String text) => pw.LayoutBuilder(
         unconstrained: true,
         child: pw.SizedBox(
           width: length,
-          child: pw.Text(text, style: _tiny, maxLines: 1),
+          child: pw.Text(text, style: _tiny, maxLines: 2),
         ),
       ),
     );
