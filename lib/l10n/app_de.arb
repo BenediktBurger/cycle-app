@@ -704,5 +704,9 @@
   "diaryTemperatureClear": "Temperatur entfernen",
   "@diaryTemperatureClear": {
     "description": "Tooltip/Semantics-Label des Löschknopfs am Temperatur-Rad des Tagebuchs (das Gegenstück zum Löschknopf der Messzeit-Zeile): entfernt die Temperatur des Tages; die Messzeit fällt beim Speichern mit weg."
+  },
+  "diaryTemperatureWheelLabel": "Temperatur",
+  "@diaryTemperatureWheelLabel": {
+    "description": "Accessibility-Label des Temperatur-Rads im Tagebuch: kündigt dem Screenreader den Picker samt ausgewähltem Wert (lokalisiertes Zahlformat mit °C) und den Aktionen Erhöhen/Verringern (je ein 0,05-K-Schritt) an."
   }
 }

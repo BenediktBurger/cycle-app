@@ -72,8 +72,10 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
   /// instead of restarting from a mid-flight position.
   int? _wheelTargetItem;
 
-  /// Sub-notch wheel delta (dp) accumulated until it totals one item extent,
-  /// so trackpad-style small scroll events still step in whole grid items.
+  /// Signed sub-notch wheel delta (dp) accumulated until it totals one item
+  /// extent, so trackpad-style small scroll events still step in whole grid
+  /// items; the sign carries the step direction, so opposing deltas cancel
+  /// and a direction flip starts a fresh accumulation.
   double _wheelResidue = 0;
 
   int get _targetItem => _targetItemOf(widget);
@@ -103,6 +105,13 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
     }
     // The parent changed the state (clear, suggestion swap, off-grid day
     // navigation): realign the wheel without firing [onChanged].
+    _realignTo(target);
+  }
+
+  /// Jumps to [target] with the commit-suppressing flag up and any pending
+  /// notch state dropped, so the notifications the jump dispatches and the
+  /// animation it cancels cannot fire [onChanged].
+  void _realignTo(int target) {
     _wheelTargetItem = null;
     _wheelResidue = 0;
     _adjustingToState = true;
@@ -114,6 +123,16 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// The × tap. A notch animation may still be heading to a pending target;
+  /// jumping back to the parent-known target item cancels it — otherwise its
+  /// eventual settle would commit the value being removed, and the parent
+  /// rebuild's realign can early-return when the suggestion equals the
+  /// cleared value (then the target item is the correct resting position).
+  void _onClear() {
+    _realignTo(_targetItem);
+    widget.onClear?.call();
   }
 
   bool _onScroll(ScrollNotification notification) {
@@ -150,39 +169,47 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
     if (dy == 0.0) {
       return;
     }
-    int steps;
+    final int steps;
     if (dy.abs() >= _itemExtent) {
       // Oversized deltas (accelerated wheels, OS-coalesced notches) step
-      // one item, so fast scrolling never skips intermediate grid values.
-      steps = 1;
+      // one item, so fast scrolling never skips intermediate grid values;
+      // pending sub-notch residue would only leak into the next direction.
+      steps = dy.sign.toInt();
+      _wheelResidue = 0;
     } else {
-      _wheelResidue += dy.abs();
+      if (_wheelResidue.sign != dy.sign) {
+        _wheelResidue = 0;
+      }
+      _wheelResidue += dy;
       steps = _wheelResidue ~/ _itemExtent;
       _wheelResidue -= steps * _itemExtent;
     }
-    if (steps > 0) {
-      // Wheel-down (positive delta) selects the next lower value, mirroring
-      // the wheel's inverted drag direction.
-      final int direction = dy > 0.0 ? 1 : -1;
-      final int from = _wheelTargetItem ?? _controller.selectedItem;
-      final int target = (from + direction * steps).clamp(
-        0,
-        TemperatureSteps.count - 1,
-      );
-      if (target != from) {
-        // Coalesce: re-aiming an absolute animateToItem target mid-burst
-        // makes N notches settle exactly N items away with one commit.
-        _wheelTargetItem = target;
-        unawaited(
-          _controller.animateToItem(
-            target,
-            duration: _notchAnimationDuration,
-            curve: Curves.easeOut,
-          ),
-        );
-      }
+    if (steps != 0) {
+      _animateToNeighbour(steps);
     }
     scrollEvent.respond(allowPlatformDefault: false);
+  }
+
+  /// Moves the wheel [steps] grid items (positive = toward lower values,
+  /// mirroring the wheel's inverted drag direction) with the notch animation
+  /// whose settle commits through [_onScroll]. The notch overlay and the
+  /// semantics increase/decrease actions share this path.
+  void _animateToNeighbour(int steps) {
+    final int from = _wheelTargetItem ?? _controller.selectedItem;
+    final int target = (from + steps).clamp(0, TemperatureSteps.count - 1);
+    if (target == from) {
+      return;
+    }
+    // Coalesce: re-aiming an absolute animateToItem target mid-burst
+    // makes N notches settle exactly N items away with one commit.
+    _wheelTargetItem = target;
+    unawaited(
+      _controller.animateToItem(
+        target,
+        duration: _notchAnimationDuration,
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   @override
@@ -208,26 +235,58 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
           children: [
             NotificationListener<ScrollNotification>(
               onNotification: _onScroll,
-              child: ListWheelScrollView(
-                key: const ValueKey('diaryTemperatureWheel'),
-                controller: _controller,
-                itemExtent: _itemExtent,
-                diameterRatio: 1.5,
-                physics: const FixedExtentScrollPhysics(),
-                children: [
-                  for (
-                    var display = 0;
-                    display < TemperatureSteps.count;
-                    display++
-                  )
-                    _item(
-                      display,
-                      locale,
-                      solid: solid,
-                      labelColor: labelColor,
-                      centerColor: centerColor,
+              child: AnimatedBuilder(
+                animation: _controller,
+                // The value tracks the live selection, so a screen reader
+                // reads the settled value without waiting for a rebuild.
+                child: ListWheelScrollView(
+                  key: const ValueKey('diaryTemperatureWheel'),
+                  controller: _controller,
+                  itemExtent: _itemExtent,
+                  diameterRatio: 1.5,
+                  physics: const FixedExtentScrollPhysics(),
+                  children: [
+                    for (
+                      var display = 0;
+                      display < TemperatureSteps.count;
+                      display++
+                    )
+                      _item(
+                        display,
+                        locale,
+                        solid: solid,
+                        labelColor: labelColor,
+                        centerColor: centerColor,
+                      ),
+                  ],
+                ),
+                builder: (context, wheel) {
+                  // The builder also runs on the first build, before the
+                  // scroll view attaches — the initial item is the target.
+                  final int selected = _controller.hasClients
+                      ? _controller.selectedItem
+                      : _targetItem;
+                  // The value neighbours must accompany the increase/decrease
+                  // actions; at a window end the neighbour is the value itself.
+                  String labelAt(int delta) => _label(
+                    _valueAtDisplay(
+                      (selected + delta).clamp(0, TemperatureSteps.count - 1),
                     ),
-                ],
+                    locale,
+                  );
+                  return Semantics(
+                    key: const ValueKey('diaryTemperatureWheelSemantics'),
+                    container: true,
+                    excludeSemantics: true,
+                    label: l10n.diaryTemperatureWheelLabel,
+                    value: '${labelAt(0)} °C',
+                    increasedValue: '${labelAt(-1)} °C',
+                    decreasedValue: '${labelAt(1)} °C',
+                    onIncrease: () => _animateToNeighbour(-1),
+                    onDecrease: () => _animateToNeighbour(1),
+                    child: wheel,
+                  );
+                },
               ),
             ),
             Positioned(
@@ -264,7 +323,7 @@ class _TemperatureWheelFieldState extends State<TemperatureWheelField> {
                     key: const ValueKey('diaryTemperatureClearButton'),
                     icon: const Icon(Icons.close),
                     tooltip: l10n.diaryTemperatureClear,
-                    onPressed: widget.onClear,
+                    onPressed: widget.onClear == null ? null : _onClear,
                   ),
                 ),
               ),

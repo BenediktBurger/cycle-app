@@ -4,6 +4,7 @@ import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/ui/temperature_wheel_field.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _wheel = ValueKey('diaryTemperatureWheel');
@@ -862,6 +863,163 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a clear × tapped while a notch animation is in flight does not commit after the animation settles',
+    (tester) async {
+      final recorder = _Recorder();
+      await tester.pumpWidget(
+        _CommittingHost(suggestion: 36.55, recorder: recorder),
+      );
+
+      // Tap-commit the suggestion: the value equals the suggestion, so the
+      // post-clear target equals the pre-clear one and the parent rebuild's
+      // realign early-returns — the in-flight animation would be the only
+      // thing left to resurrect the value the × just removed.
+      await tester.tap(find.byKey(_wheel));
+      await tester.pumpAndSettle();
+      expect(recorder.committed, [36.55]);
+
+      await _notch(tester, 100);
+      // Let the notch animation progress before the × lands, so the clear
+      // must cancel a genuinely mid-flight animation.
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tap(find.byKey(_clearButton));
+      await tester.pumpAndSettle();
+
+      expect(recorder.clears, 1);
+      expect(
+        recorder.committed,
+        [36.55],
+        reason:
+            'the in-flight notch animation must not commit a value after the clear',
+      );
+      expect(find.byKey(_clearButton), findsNothing);
+      expect(
+        _centeredLabel(tester).data,
+        '36.55',
+        reason: 'the wheel rests gray on the suggestion after the clear',
+      );
+    },
+  );
+
+  testWidgets(
+    'a clear × while a notch animation is in flight realigns safely when the targets differ',
+    (tester) async {
+      final recorder = _Recorder();
+      await tester.pumpWidget(
+        _CommittingHost(suggestion: 36.55, recorder: recorder),
+      );
+
+      await _notch(tester, 100);
+      await tester.pumpAndSettle();
+      expect(recorder.committed, [36.50]);
+
+      await _notch(tester, 100);
+      await tester.tap(find.byKey(_clearButton));
+      await tester.pumpAndSettle();
+
+      expect(recorder.clears, 1);
+      expect(recorder.committed, [
+        36.50,
+      ], reason: 'the realign cancels the animation; no commit may follow');
+      expect(_centeredLabel(tester).data, '36.55');
+    },
+  );
+
+  testWidgets(
+    'opposing sub-notch deltas cancel instead of stepping in the last direction',
+    (tester) async {
+      final recorder = _Recorder();
+      await tester.pumpWidget(_host(value: 36.70, recorder: recorder));
+
+      await _notch(tester, 18);
+      await _notch(tester, -18);
+      await tester.pumpAndSettle();
+
+      expect(
+        recorder.committed,
+        isEmpty,
+        reason: '+18 and −18 are a net zero — no step may result',
+      );
+      expect(_centeredLabel(tester).data, '36.70');
+    },
+  );
+
+  testWidgets('a direction flip discards the accumulated sub-notch residue', (
+    tester,
+  ) async {
+    final recorder = _Recorder();
+    await tester.pumpWidget(_host(value: 36.70, recorder: recorder));
+
+    await _notch(tester, 18);
+    await _notch(tester, -18);
+    await _notch(tester, 18);
+    await tester.pumpAndSettle();
+
+    expect(
+      recorder.committed,
+      isEmpty,
+      reason:
+          'every direction change starts a fresh accumulation — no side '
+          'may inherit the other direction’s residue',
+    );
+    expect(_centeredLabel(tester).data, '36.70');
+  });
+
+  testWidgets('an oversized notch clears the pending sub-notch residue', (
+    tester,
+  ) async {
+    final recorder = _Recorder();
+    await tester.pumpWidget(_host(value: 36.70, recorder: recorder));
+
+    await _notch(tester, 18);
+    await _notch(tester, 500);
+    await _notch(tester, 18);
+    await tester.pumpAndSettle();
+
+    expect(
+      recorder.committed,
+      [36.65],
+      reason:
+          'the oversized notch steps once and must not leave residue for '
+          'the following sub-notch to complete',
+    );
+    expect(_centeredLabel(tester).data, '36.65');
+  });
+
+  testWidgets(
+    'the wheel exposes a semantics node with a temperature label, the selected value, and increase/decrease actions',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final recorder = _Recorder();
+      await tester.pumpWidget(_host(value: 36.70, recorder: recorder));
+
+      final node = tester.getSemantics(
+        find.byKey(const ValueKey('diaryTemperatureWheelSemantics')),
+      );
+      final data = node.getSemanticsData();
+      expect(data.label, 'Temperature');
+      expect(data.value, '36.70 °C');
+      expect(data.hasAction(SemanticsAction.increase), isTrue);
+      expect(data.hasAction(SemanticsAction.decrease), isTrue);
+
+      final nodeFinder = find.semantics.byLabel('Temperature');
+      tester.semantics.performAction(nodeFinder, SemanticsAction.increase);
+      await tester.pumpAndSettle();
+      expect(recorder.committed, [
+        36.75,
+      ], reason: 'increase moves the wheel one step to the higher value');
+
+      tester.semantics.performAction(nodeFinder, SemanticsAction.decrease);
+      await tester.pumpAndSettle();
+      expect(recorder.committed, [
+        36.75,
+        36.70,
+      ], reason: 'decrease moves the wheel one step back down');
+      handle.dispose();
+    },
+  );
+
   testWidgets('window-end notches are no-ops without commits', (tester) async {
     final recorder = _Recorder();
     await tester.pumpWidget(_host(value: 42.00, recorder: recorder));
@@ -906,7 +1064,10 @@ class _CommittingHostState extends State<_CommittingHost> {
           _value = v;
           widget.recorder.committed.add(v);
         }),
-        onClear: () => widget.recorder.clears++,
+        onClear: () => setState(() {
+          _value = null;
+          widget.recorder.clears++;
+        }),
       ),
     ),
   );

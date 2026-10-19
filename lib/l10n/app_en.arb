@@ -798,5 +798,9 @@
   "diaryTemperatureClear": "Remove temperature",
   "@diaryTemperatureClear": {
     "description": "Tooltip/semantics label of the diary temperature wheel's clear button (the counterpart to the measured-time row's clear affordance): removes the day's temperature; the measured time goes with it on save."
+  },
+  "diaryTemperatureWheelLabel": "Temperature",
+  "@diaryTemperatureWheelLabel": {
+    "description": "Accessibility label of the diary temperature wheel: announces the picker to screen readers together with its selected value (locale-formatted number with °C) and the increase/decrease actions that step one 0.05 K grid item."
   }
 }
