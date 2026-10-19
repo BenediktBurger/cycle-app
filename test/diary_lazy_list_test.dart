@@ -65,7 +65,7 @@ String _tileDate(DateTime day) =>
 void main() {
   testWidgets('an expanded cycle builds its day tiles lazily, far below the '
       'true day count', (tester) async {
-    _harness.tallSurface(tester, height: 3600);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(_harness.scope(seed: _seedTwoYearsAndFarMark));
     await tester.pumpAndSettle();
 
@@ -103,7 +103,7 @@ void main() {
 
   testWidgets('the newest cycle opens the list: the header counts the true '
       'span, its newest day tiles build right below it', (tester) async {
-    _harness.tallSurface(tester, height: 3600);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(_harness.scope(seed: _seedTwoYearsAndFarMark));
     await tester.pumpAndSettle();
 
@@ -138,7 +138,7 @@ void main() {
   });
 
   testWidgets('tapping a built day tile selects that day', (tester) async {
-    _harness.tallSurface(tester, height: 3600);
+    _harness.tallSurface(tester);
     await tester.pumpWidget(
       _harness.scope(
         seed: _seedTwoYearsAndFarMark,
