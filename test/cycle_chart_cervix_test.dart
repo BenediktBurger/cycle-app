@@ -426,7 +426,7 @@ void main() {
       'Impfung nachgekauft (Rückfrage bei Dr. Wild) Arztbesuche nachtragen',
       reason: 'the notes teaser folds newlines to a space like the PDF',
     );
-    expect(note.maxLines, 1, reason: 'the teaser is a single line');
+    expect(note.maxLines, 2, reason: 'the teaser has two lines');
     expect(
       note.overflow,
       TextOverflow.ellipsis,
@@ -451,17 +451,17 @@ void main() {
       reason: 'the note text anchors at the note zone top, below the pain row',
     );
     expect(
-      noteRect.left,
-      closeTo(cell8.left, 1),
+      noteRect.right,
+      closeTo(cell8.right, 1),
       reason:
           'the pain letter lives in its own row — the note text keeps the '
-          'column edge, no left clearance',
+          'column edge, no right clearance',
     );
 
     final cell9 = tester.getRect(chartCell(9, 'notesBand'));
     expect(
-      tester.getRect(find.byKey(const ValueKey('notesText-9'))).left,
-      closeTo(cell9.left, 1),
+      tester.getRect(find.byKey(const ValueKey('notesText-9'))).right,
+      closeTo(cell9.right, 1),
       reason: "a pain-free day's note text sits at the column edge",
     );
 
