@@ -63,7 +63,7 @@ String _tileDate(DateTime day) =>
 
 void main() {
   testWidgets('an expanded cycle builds its day tiles lazily, far below the '
-      'true day count', (tester) async {
+      'day count of the rendered list', (tester) async {
     _harness.tallSurface(tester);
     await tester.pumpWidget(_harness.scope(seed: _seedRecentDaysAndFarMark));
     await tester.pumpAndSettle();

@@ -1,10 +1,12 @@
 // Shared widget-test harness: the in-memory drift database override and the
-// app scope builder used by every test that pumps the real app (CycleApp)
-// against a fresh database — no files, no platform channels, no FFI paths.
+// scopes built on it — the screen-level harnesses (`diaryScreenScope`,
+// `settingsHarness`) for tests that inspect one screen, and `appScope` for
+// the thin full-shell tier (navigation, lifecycle, write-through, snackbars)
+// — no files, no platform channels, no FFI paths.
 //
-// All pins are optional; leaving one out keeps the provider at its real
-// default, which is exactly what the "system follows the device" tests rely
-// on (see locale_test.dart / theme_mode_setting_test.dart).
+// `appScope`'s pins are optional; leaving one out keeps the provider at its
+// real default, which is exactly what the "system follows the device" tests
+// rely on (see locale_test.dart / theme_mode_setting_test.dart).
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -71,15 +73,21 @@ Override inMemoryDatabase({
 }
 
 /// The package-info channel the about/onboarding pages read their version
-/// through. The harness decides per scope call how it answers — mock
-/// handlers registered at the messenger override one another, so both
-/// postures (seeded values / deliberate failure) stay test order-independent.
+/// through. The success posture seeds `PackageInfo`'s static cache and
+/// registers no handler; `fromPlatform` returns that cache before consulting
+/// the channel. A failure posture only installs a throwing handler, so it
+/// takes effect only while no success has seeded the cache — keep a file's
+/// failure cases before its success cases.
 const MethodChannel packageInfoChannel = MethodChannel(
   'dev.fluttercommunity.plus/package_info',
 );
 
-/// The app's MaterialApp configuration without the database gate and shell
-/// around it — the surface a screen-level harness pumps.
+/// MaterialApp wiring shared by the screen-level harnesses: the app's seed
+/// color and app-bar/tooltip themes, and the production `supportedLocales`
+/// order (English first, so an unmatched locale falls back to English).
+/// `darkTheme`/`themeMode` and `onGenerateTitle` are deliberately absent —
+/// the screen tests fix their locale and never exercise brightness or the
+/// window title.
 Widget _harnessApp({required Locale locale, required Widget home}) =>
     MaterialApp(
       theme: ThemeData(
@@ -89,7 +97,7 @@ Widget _harnessApp({required Locale locale, required Widget home}) =>
       ),
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: const [Locale('en'), Locale('de')],
       home: home,
     );
 
@@ -141,14 +149,13 @@ void _answerPackageInfo({required bool failure}) {
 /// that pump CycleApp directly (without [appScope]) override the provider
 /// themselves.
 ///
-/// The harness also answers the package-info channel on every scope call:
-/// the default seeds the mock values of a real 0.1.0+1 device install
-/// (version without the build suffix, buildNumber without the `+`) so the
-/// version line renders; [packageInfoFailure] answers instead with an
-/// error — the closest model of a broken/unanswerable device install — and
-/// the version line hides (its designed failure path). Each scope call
-/// (re-)sets the channel handler, so whichever posture a test needs wins
-/// over what earlier tests in the file seeded.
+/// The harness also sets the package-info posture on every scope call: the
+/// default seeds the mock values of a real 0.1.0+1 device install (version
+/// without the build suffix, buildNumber without the `+`) so the version
+/// line renders; [packageInfoFailure] installs a throwing channel handler
+/// instead — the closest model of a broken/unanswerable device install — and
+/// the version line hides (its designed failure path). [packageInfoChannel]
+/// documents why that failure posture depends on call order.
 ProviderScope appScope({
   Locale? locale,
   ThemeMode? themeMode,
@@ -179,9 +186,12 @@ ProviderScope appScope({
   );
 }
 
-/// The settings screen over the in-memory database (sans the shell). [seed]
-/// provides the device-side data the surface under test previews against;
-/// [builder] swaps in a fault-injectable database (support/faulty_db.dart).
+/// The settings screen over the in-memory database (sans the shell).
+/// [locale] pins the settings/about language; [packageInfoFailure] makes the
+/// about page's version lookup fail and hides its version line (see
+/// [packageInfoChannel] for its call-order caveat); [seed] provides the
+/// device-side data the surface under test previews against; [builder] swaps
+/// in a fault-injectable database (support/faulty_db.dart).
 Widget settingsHarness({
   Locale locale = const Locale('de'),
   bool packageInfoFailure = false,

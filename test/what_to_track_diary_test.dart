@@ -5,8 +5,8 @@
 // stored day's values for a hidden section load and save back unchanged
 // (no silent data wipe).
 //
-// The tests pump the real app through the diary harness (German locale,
-// pinned clock); a non-default tracked-item configuration is forced
+// The tests pump the Tagebuch screen through the diary harness (German
+// locale, pinned clock); a non-default tracked-item configuration is forced
 // through the diaryTrack pin (a "live choice" outside the settings card).
 import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/domain/cervix.dart';

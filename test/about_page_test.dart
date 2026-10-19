@@ -52,11 +52,11 @@ void main() {
   testWidgets('the version line hides when the package-info lookup fails', (
     WidgetTester tester,
   ) async {
-    // The harness answers the package-info channel with an ERROR like on a
-    // broken/unanswerable device install (the channel handler is re-set per
-    // scope call, so this failure posture is order-independent); the
-    // first-start page (onboardingCompleted: false) is the surface that
-    // also renders the version line.
+    // The harness installs a throwing package-info handler, like on a
+    // broken/unanswerable device install; these failure cases run before the
+    // file's success cases, because a seeded success cache would answer
+    // instead (see the packageInfoChannel doc). The first-start page
+    // (onboardingCompleted: false) also renders the version line.
     useDeviceLocales(tester, const [Locale('de')]);
     await tester.pumpWidget(
       appScope(onboardingCompleted: false, packageInfoFailure: true),
@@ -151,9 +151,8 @@ void main() {
       find.text('${l10n.appTitle} · ${l10n.aboutVersion('0.1.0')}'),
       findsOneWidget,
       reason:
-          'the about page shows the app version from the installed '
-          'binary (the PackageInfo mock the harness seeds) — the '
-          'constant mirror and its sync test are gone',
+          'the about page shows the version the installed binary '
+          'reports (the harness-mocked PackageInfo)',
     );
 
     // The method warning carries the INER website as visible text.
@@ -473,9 +472,9 @@ void main() {
     WidgetTester tester,
   ) async {
     final l10n = lookupAppLocalizations(const Locale('de'));
-    // Register the same collector production registers in main(): this suite
-    // pumps the CycleApp widget directly (main() never runs), so the
-    // license page's registry collection has the bundled entries.
+    // Register the same collector production registers in main(): the
+    // settings harness never runs main(), so the license page's registry
+    // collection has the bundled entries.
     LicenseRegistry.addLicense(extraLicenses);
     await openGermanAboutPage(tester);
 

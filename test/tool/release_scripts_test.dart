@@ -95,7 +95,7 @@ String summaryBlock(String content) =>
     '<!-- /release-summary -->';
 
 void main() {
-  group('argument parsing', () {
+  group('download/sign argument parsing', () {
     test('accepts a well-formed tag plus --run-id', () {
       final options = sign.parseArguments(['v0.2.1', '--run-id', '12345']);
       expect(options.tag, 'v0.2.1');
@@ -2135,7 +2135,7 @@ launchable-activity: name='io.github.benediktburger.cycleapp.MainActivity'  labe
     });
   });
 
-  group('argument parsing', () {
+  group('publish argument parsing', () {
     test('accepts a well-formed tag plus --dry-run', () {
       final options = publish.parseArguments(['v1.2.3', '--dry-run']);
       expect(options.tag, 'v1.2.3');

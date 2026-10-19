@@ -276,8 +276,8 @@ failures):
 Pick the cheapest layer that can prove the behavior:
 
 - **domain / db / pdf / tool unit tests** — pure logic, storage contracts,
-  and export shapes. They start in milliseconds, so they are the first
-  choice; run them in a tight loop while iterating.
+  and export shapes. They are the cheapest layer per behavior, so they are
+  the first choice; run them in a tight loop while iterating.
 - **Widget tests** — wiring and interaction: a screen with its providers,
   then pump, tap, assert. Shared pump shapes live in `test/support/`; reuse
   [`chart_pump.dart`](test/support/chart_pump.dart) for the chart and
