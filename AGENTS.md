@@ -28,6 +28,15 @@ decisions in [`docs/adr/`](docs/adr/README.md).
   justification is not repeated at every occurrence, only where it isn't
   inferable from the code.
 
+## Tests
+
+Test the replacement behavior, not the removal. An absence assertion is
+temporary scaffolding during a removal — delete it in the same change once
+the replacement is covered. Keep an absence assertion only when absence is
+itself the contract (privacy, permission, or no-network guarantee). Layer
+choice and harness precedents: [CONTRIBUTING.md](CONTRIBUTING.md),
+"Test layers".
+
 ## Improvement notes: three destinations, never lost
 
 Issues, dislikes, and improvement ideas go where they can actually take
@@ -99,11 +108,11 @@ failures only surface in a summary at the end. Instead:
   (`--plain-name '<substring>'` or `--name '<regexp>'` to narrow further).
 - **Full gate** before "done" (matches CI): run `flutter analyze`, then
   `dart format --output=none --set-exit-if-changed .`, then
-  `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
-  suite still runs. All three are judged by exit code only (the format
-  check exits non-zero when any file would be reformatted). Before
-  declaring done, also do the **comment self-review**: list every comment
-  added in the change and name the misunderstanding it prevents (see
+  `flutter test --no-pub -j "$(nproc)" -r expanded` — drop `--fail-fast`
+  here so the whole suite still runs. All three are judged by exit code only
+  (the format check exits non-zero when any file would be reformatted).
+  Before declaring done, also do the **comment self-review**: list every
+  comment added in the change and name the misunderstanding it prevents (see
   Coding Style); delete the rest.
 - **Judge by the exit code, not the text.** `flutter test` exits non-zero on
   failure; a green-looking log tail can still hide a failure (and packages

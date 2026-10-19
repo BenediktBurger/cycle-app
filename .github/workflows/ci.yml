@@ -133,8 +133,10 @@ jobs:
       # SQLite engine bundled by the sqlite3 package's build hook (the
       # `sqlite3mc` user-define in pubspec.yaml — see CONTRIBUTING.md,
       # "Linux note (database tests)").
+
+      # package:test defaults to nproc / 2 workers (2 on the 4-core runner).
       - name: Test
-        run: flutter test
+        run: flutter test --no-pub -j "$(nproc)"
 
       - name: Build web
         run: flutter build web
