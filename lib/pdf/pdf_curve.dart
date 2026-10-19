@@ -17,16 +17,16 @@
 //   overlay's own dayCount already covers the cycle's full calendar span,
 //   so a mark on the last tracked day of a cycle with untracked gap days
 //   still reaches this mapping.
-// - Page windows slice positions in the cycle's span list
-//   (cycleSpanDays: the tracked days plus the trailing data-less span
-//   days; untracked gap days BETWEEN tracked days stay out of the list).
+// - Page windows slice positions in the cycle's CALENDAR day list
+//   (cycleCalendarDays: every calendar day start..spanEnd, the tracked
+//   entries spliced in, untracked days data-less).
 //
 // This helper maps an overlay index through the day list's calendar
-// offsets: an index only renders when its calendar offset names a day of
-// the list — a mark on an untracked gap day (still not listed) drops out
-// instead of sliding onto a neighboring column. While a cycle is tracked
-// daily (the common case) both spaces coincide and the mapping is the
-// identity.
+// offsets: an index renders when its calendar offset names a day of the
+// list and the day lies in this window. On a calendar-consecutive window
+// the offset IS the list position, so the mapping degenerates to the
+// identity — the general form stays (harmless, still correct for any
+// day list), the tests pin it.
 //
 // OUTPUT COORDINATES (column space, window-relative): window day i's
 // column spans [i, i+1] — measured dots, the computed-SUZ line and row
@@ -216,7 +216,7 @@ final class PdfCurveDrawing {
 ///
 /// [cycle] and [overlay] must reference the SAME cycle (as the export
 /// model guarantees: `overlays[i]` draws over `cycles[i]`). The window is
-/// the span-list slice `[windowFirstIndex, windowFirstIndex +
+/// the calendar-day-list slice `[windowFirstIndex, windowFirstIndex +
 /// windowDayCount)` of the cycle. [computedSuz] carries the evaluation's
 /// already-computed `suzBegins`/`suzRule` — the PDF draws them, it does
 /// not re-derive the rules.
@@ -228,16 +228,16 @@ PdfCurveDrawing pdfCurveDrawing({
   required int windowDayCount,
   required ({DateTime? suzBegins, SuzRule? suzRule}) computedSuz,
 }) {
-  final days = cycleSpanDays(cycle.cycle);
+  final days = cycleCalendarDays(cycle.cycle);
   final cycleStart = DateOnly.normalize(cycle.cycle.startDate);
   final windowEnd = windowFirstIndex + windowDayCount;
 
-  // calendar offset from the cycle's start day -> span-list position
+  // calendar offset from the cycle's start day -> day-list position
   final spanPositions = <int, int>{
     for (var i = 0; i < days.length; i++)
       DateOnly.daysBetween(days[i].date, cycleStart): i,
   };
-  // calendar offset -> the span day's RAW measured temperature
+  // calendar offset -> the day's RAW measured temperature
   final spanValues = <int, double>{
     for (final MapEntry(key: offset, value: position) in spanPositions.entries)
       offset: ?days[position].bbtC,
@@ -245,8 +245,7 @@ PdfCurveDrawing pdfCurveDrawing({
 
   /// An overlay day index (calendar-offset space) mapped onto its
   /// window-relative column index — null when the offset names no day of
-  /// the span list (untracked interior gap) or the day lies outside this
-  /// window.
+  /// the day list or the day lies outside this window.
   int? windowPositionOf(int calendarIndex) {
     final pos = spanPositions[calendarIndex];
     if (pos == null) return null;
@@ -267,12 +266,12 @@ PdfCurveDrawing pdfCurveDrawing({
   // window's days, keyed by CALENDAR OFFSET from the cycle's start (the
   // chart's x space, see _ChartDays): the run-break rule (a day without a
   // temperature breaks the line) then acts on the day keys' adjacency —
-  // and the untracked gap days are absent from the key set by
-  // construction, so an interior gap splits the line exactly as the chart
-  // renders it across its recorded range. The keys map back to
-  // window-relative columns afterwards (see below); the
-  // ignoredDayIndexes stay offset-keyed like the overlay indexes (they
-  // key the lighter rendering, never the connectivity).
+  // an untracked gap day sits in the key set but carries no temperature,
+  // so an interior gap splits the line exactly as the chart renders it
+  // across its recorded range. The keys map back to window-relative
+  // columns afterwards (see below); the ignoredDayIndexes stay
+  // offset-keyed like the overlay indexes (they key the lighter
+  // rendering, never the connectivity).
   final windowRuns = curveRuns(
     {
       for (final MapEntry(key: offset, value: position)

@@ -13,10 +13,9 @@
 
 /// One page window for ONE cycle: the cycle's days
 /// `[firstDayIndex, firstDayIndex + dayCount)` — indices into the cycle's
-/// span list (cycleSpanDays, lib/domain/cycle_grouping.dart: the tracked
-/// days plus the trailing data-less span days; untracked gap days BETWEEN
-/// tracked days stay out of the list). Ordered: cycle order first, then
-/// page order inside the cycle.
+/// calendar-day list (cycleCalendarDays, lib/domain/cycle_grouping.dart:
+/// every calendar day of the span, the untracked days among them).
+/// Ordered: cycle order first, then page order inside the cycle.
 final class CyclePagePlan {
   const CyclePagePlan({
     required this.cycleIndex,
@@ -47,8 +46,8 @@ final class CyclePagePlan {
 const int defaultMaxDaysPerPage = 40;
 
 /// Plans the pages of the exported cycles: [cycleDayCounts] carries each
-/// exported cycle's span-day count (cycleSpanDays — tracked days plus
-/// trailing data-less span days, so every cycle counts at least one) in
+/// exported cycle's calendar-day count (cycleCalendarDays — every
+/// calendar day of the span, so every cycle counts at least one) in
 /// observation order; the result lists one entry per page, in print
 /// order.
 ///
