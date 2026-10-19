@@ -1,9 +1,10 @@
 // Shared diary harnesses: the two copy-paste shapes of the Tagebuch
 // widget tests.
 //
-//  (a) the selector tests (bleeding/cervix/pain/firmness): the real app over
-//      an in-memory database with the locale pinned, plus the saved-day
-//      readback through the same database provider the form writes with;
+//  (a) the selector tests (bleeding/cervix/pain/firmness): the Tagebuch
+//      screen over an in-memory database with the locale pinned, plus the
+//      saved-day readback through the same database provider the form
+//      writes with;
 //  (b) the pinned-clock tests (measured time, day navigation, cycle-start
 //      switch, disturbance auto-mark): an in-memory (optionally seeded)
 //      database, the clock pinned through nowProvider, the form's day pinned
@@ -24,12 +25,12 @@ import 'database.dart';
 import 'finders.dart';
 import 'viewport.dart';
 
-/// Entry-form selector scope: the real app over an in-memory database,
-/// language pinned to [locale] (German in every caller so the German token
-/// assertions hold). An entry-form section pinned off in the What-to-track
-/// defaults (cervix) can be re-shown for the tests that exercise it.
+/// Entry-form selector scope: the Tagebuch screen over an in-memory
+/// database, language pinned to [locale]. An entry-form section pinned off
+/// in the What-to-track defaults (cervix) can be re-shown for the tests that
+/// exercise it.
 ProviderScope diarySelectorScope(Locale locale, {DiaryTrack? diaryTrack}) =>
-    appScope(locale: locale, diaryTrack: diaryTrack);
+    diaryScreenScope(locale: locale, diaryTrack: diaryTrack);
 
 /// Reads the saved day back through the database provider — the same
 /// instance the entry form writes through, not a second connection.
@@ -59,29 +60,42 @@ class DiaryHarness {
   DiaryHarness({required this.now, DateTime? selectedDay})
     : selectedDay = selectedDay ?? DateOnly.normalize(now);
 
-  /// The app scope with the pinned overrides; [seed] runs inside the
+  /// The screen scope with the pinned overrides; [seed] runs inside the
   /// database future (the form, reading through databaseProvider.future,
   /// sees the seeded day); a per-call [selectedDay] overrides the harness
   /// default, a per-call [now] overrides the harness clock (for files whose
   /// sections pin different dates on one harness).
   /// [builder] passes a subclassed database through (fault injection —
   /// the same seam delete-data tests use); the default stays the plain
-  /// in-memory instance.
+  /// in-memory instance. [fullApp] pumps the whole shell for tests that
+  /// exercise lifecycle or navigation wiring.
   ProviderScope scope({
     Future<void> Function(CycleDatabase db)? seed,
     DateTime? selectedDay,
     DiaryTrack? diaryTrack,
     CycleDatabase Function()? builder,
     DateTime? now,
-  }) => appScope(
-    seed: seed,
-    builder: builder,
-    onCreated: (db) => this.db = db,
-    now: () => now ?? this.now,
-    selectedDay: selectedDay ?? this.selectedDay,
-    diaryTrack: diaryTrack,
-    locale: const Locale('de'),
-  );
+    Locale locale = const Locale('de'),
+    bool fullApp = false,
+  }) => fullApp
+      ? appScope(
+          seed: seed,
+          builder: builder,
+          onCreated: (db) => this.db = db,
+          now: () => now ?? this.now,
+          selectedDay: selectedDay ?? this.selectedDay,
+          diaryTrack: diaryTrack,
+          locale: locale,
+        )
+      : diaryScreenScope(
+          seed: seed,
+          builder: builder,
+          onCreated: (db) => this.db = db,
+          now: () => now ?? this.now,
+          selectedDay: selectedDay ?? this.selectedDay,
+          diaryTrack: diaryTrack,
+          locale: locale,
+        );
 
   /// Enlarges the test surface: the form is tall, and the day tiles plus the
   /// save button sit BELOW the default 800x600 test viewport — with the

@@ -19,7 +19,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:cycle_app/db/cycle_database.dart';
 import 'support/diary_harness.dart';
-import 'support/database.dart';
 import 'support/error_collector.dart';
 import 'support/finders.dart';
 import 'support/formatting.dart';
@@ -702,7 +701,7 @@ void main() {
     // One en assertion guards the template/fallback ordering of the
     // todayDate key.
     await tester.pumpWidget(
-      appScope(locale: const Locale('en'), now: () => _now, selectedDay: _now),
+      _harness.scope(locale: const Locale('en'), selectedDay: _now),
     );
     await tester.pumpAndSettle();
 

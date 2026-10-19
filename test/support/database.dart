@@ -11,13 +11,13 @@ import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show MethodChannel, MissingPluginException;
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Override (the inMemoryDatabase return type) ships from the misc entry in
 // Riverpod 3.x — the main import doesn't export it.
@@ -78,6 +78,45 @@ const MethodChannel packageInfoChannel = MethodChannel(
   'dev.fluttercommunity.plus/package_info',
 );
 
+/// The app's MaterialApp configuration without the database gate and shell
+/// around it — the surface a screen-level harness pumps.
+Widget _harnessApp({required Locale locale, required Widget home}) =>
+    MaterialApp(
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
+        appBarTheme: const AppBarTheme(toolbarHeight: 48),
+        tooltipTheme: const TooltipThemeData(preferBelow: false),
+      ),
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: home,
+    );
+
+/// Answers the package-info channel for one scope: seeded device values, or
+/// (with [failure]) an error that models an unanswerable install.
+void _answerPackageInfo({required bool failure}) {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  if (failure) {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(packageInfoChannel, (call) async {
+          throw MissingPluginException(
+            'no package metadata on this (test) device',
+          );
+        });
+  } else {
+    PackageInfo.setMockInitialValues(
+      appName: '',
+      packageName: '',
+      version: '0.1.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+  }
+}
+
+/// The thin full-shell integration tier: navigation, lifecycle, write-through and snackbar tests only.
+///
 /// App scope for the widget smoke tests: wraps the real app in a
 /// ProviderScope over a fresh in-memory database. Every pin is optional and
 /// null means "leave the provider at its real default":
@@ -123,23 +162,7 @@ ProviderScope appScope({
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
 }) {
-  if (packageInfoFailure) {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(packageInfoChannel, (call) async {
-          throw MissingPluginException(
-            'no package metadata on this (test) device',
-          );
-        });
-  } else {
-    PackageInfo.setMockInitialValues(
-      appName: '',
-      packageName: '',
-      version: '0.1.0',
-      buildNumber: '1',
-      buildSignature: '',
-    );
-  }
+  _answerPackageInfo(failure: packageInfoFailure);
   return ProviderScope(
     overrides: [
       inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
@@ -156,28 +179,45 @@ ProviderScope appScope({
   );
 }
 
-/// The settings screen with the exact MaterialApp configuration of the app
-/// shell (sans the shell itself) over the in-memory database. [seed]
+/// The settings screen over the in-memory database (sans the shell). [seed]
 /// provides the device-side data the surface under test previews against;
 /// [builder] swaps in a fault-injectable database (support/faulty_db.dart).
 Widget settingsHarness({
+  Locale locale = const Locale('de'),
+  bool packageInfoFailure = false,
   Future<void> Function(CycleDatabase db)? seed,
   CycleDatabase Function()? builder,
+}) {
+  _answerPackageInfo(failure: packageInfoFailure);
+  return ProviderScope(
+    overrides: [inMemoryDatabase(seed: seed, builder: builder)],
+    child: _harnessApp(locale: locale, home: const EinstellungenScreen()),
+  );
+}
+
+/// The Tagebuch screen over the in-memory database (sans the shell).
+/// [seed]/[onCreated]/[builder] reach the database override
+/// ([inMemoryDatabase]); [now] and [selectedDay] pin the clock and the form's
+/// day, [diaryTrack] the What-to-track defaults.
+ProviderScope diaryScreenScope({
+  Locale locale = const Locale('de'),
+  Future<void> Function(CycleDatabase db)? seed,
+  void Function(CycleDatabase db)? onCreated,
+  CycleDatabase Function()? builder,
+  DateTime Function()? now,
+  DateTime? selectedDay,
+  DiaryTrack? diaryTrack,
 }) => ProviderScope(
-  overrides: [inMemoryDatabase(seed: seed, builder: builder)],
-  child: MaterialApp(
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6750A4)),
-    ),
-    locale: const Locale('de'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    supportedLocales: const [Locale('en'), Locale('de')],
-    home: const EinstellungenScreen(),
+  overrides: [
+    inMemoryDatabase(seed: seed, onCreated: onCreated, builder: builder),
+    localePin(locale),
+    if (now != null) nowProvider.overrideWith((ref) => now),
+    if (selectedDay != null) selectedDatePin(selectedDay),
+    if (diaryTrack != null) diaryTrackPin(diaryTrack),
+  ],
+  child: _harnessApp(
+    locale: locale,
+    home: const Scaffold(body: TagebuchScreen()),
   ),
 );
 

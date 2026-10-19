@@ -4,7 +4,7 @@
 // card, not under a "PDF-Export" title), the temperature-range note, and
 // the anonymization note's home (inside the export card, at its switch).
 //
-// German device locale + full-app pump mirror the other settings tests;
+// German locale + direct settings-screen pump;
 // the pane is a lazy ListView, so the tests enlarge the surface
 // (useTallSurface, like settings_persistence_test.dart) and assert
 // the built children directly — never on compact-view assumptions.
@@ -16,14 +16,8 @@ import 'support/finders.dart';
 import 'support/viewport.dart';
 
 void main() {
-  /// German device locale + the German UI: the shell is reachable (the
-  /// harness defaults to an onboarded install) and the settings pane is the
-  /// navigation surface both groups start from.
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
-    await tester.pumpWidget(appScope(locale: const Locale('de')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(navLabel('Einstellungen'));
+    await tester.pumpWidget(settingsHarness());
     await tester.pumpAndSettle();
   }
 

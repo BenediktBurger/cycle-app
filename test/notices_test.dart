@@ -8,22 +8,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
-import 'support/finders.dart';
 import 'support/viewport.dart';
 
 void main() {
-  /// German device locale + the German UI: the shell is reachable (the
-  /// harness defaults to an onboarded install) and the settings pane is the
-  /// navigation surface every group starts from. The pane is a lazy
+  /// German locale + direct settings-screen pump. The pane is a lazy
   /// ListView: callers enlarge the surface and/or drag the target into the
   /// built viewport.
   Future<void> pumpGermanSettingsPane(WidgetTester tester) async {
     useTallSurface(tester, width: 900);
 
-    await tester.pumpWidget(appScope(locale: const Locale('de')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(navLabel('Einstellungen'));
+    await tester.pumpWidget(settingsHarness());
     await tester.pumpAndSettle();
   }
 
