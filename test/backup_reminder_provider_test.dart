@@ -57,6 +57,8 @@ ProviderContainer _container({
   DateTime? lastExportAt,
   BackupReminderInterval? interval,
   DateTime? snoozedUntil,
+  DateTime Function()? now,
+  Duration? refreshInterval,
   Future<WebStorageStatus?> Function()? report,
 }) {
   final container = ProviderContainer(
@@ -65,10 +67,11 @@ ProviderContainer _container({
       webStorageReportProvider.overrideWith(
         (ref) => report?.call() ?? Future<WebStorageStatus?>.value(null),
       ),
-      nowProvider.overrideWith(
-        (ref) =>
-            () => fixedNow,
-      ),
+      nowProvider.overrideWith((ref) => now ?? (() => fixedNow)),
+      if (refreshInterval != null)
+        backupReminderRefreshIntervalProvider.overrideWith(
+          (ref) => refreshInterval,
+        ),
       if (lastExportAt != null) lastExportAtPin(lastExportAt),
       if (interval != null) backupReminderIntervalPin(interval),
       if (snoozedUntil != null) backupReminderSnoozedUntilPin(snoozedUntil),
@@ -270,6 +273,31 @@ void main() {
         reason: 'a refresh must not hide the banner behind a loading state',
       );
       await container.read(earliestTrackedDataAtProvider.future);
+    });
+
+    test('re-evaluates on the refresh tick while the app stays open', () async {
+      var now = fixedNow;
+      final container = _container(
+        interval: BackupReminderInterval.monthly,
+        lastExportAt: fixedNow,
+        refreshInterval: const Duration(milliseconds: 5),
+        now: () => now,
+        seed: (db) => _insertEntry(db, createdAt: DateTime.utc(2026, 9, 1)),
+      );
+      expect(await _isDue(container), isFalse);
+
+      final due = Completer<void>();
+      final subscription = container.listen(backupReminderDueProvider, (
+        _,
+        next,
+      ) {
+        if (next && !due.isCompleted) due.complete();
+      });
+      addTearDown(subscription.close);
+
+      now = DateTime.utc(2026, 11, 21);
+      await due.future.timeout(const Duration(seconds: 5));
+      expect(container.read(backupReminderDueProvider), isTrue);
     });
   });
 }

@@ -11,3 +11,8 @@ WebShareOutcome webShareOutcome({required bool resolved, String? errorName}) {
       ? WebShareOutcome.cancelled
       : WebShareOutcome.unsupported;
 }
+
+/// The JSON share's bool contract: true only for a completed hand-off. A
+/// dismissed sheet and an unavailable share API both report failure.
+bool webShareCompleted(WebShareOutcome outcome) =>
+    outcome == WebShareOutcome.success;

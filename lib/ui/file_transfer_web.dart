@@ -50,15 +50,11 @@ Future<bool> _triggerDownload(String filename, html.Blob blob) async {
 }
 
 /// Hands the JSON export to the browser share sheet where it accepts a file.
-/// A completed share is true, a dismissed sheet false, and a browser that
-/// rejects file sharing falls back to the anchor download above.
+/// True only for a completed share; a dismissed sheet or an unavailable
+/// share API is false. The browser download stays the separate save action.
 Future<bool> shareFile(String filename, String content) async {
-  if (!canShareJsonFile) return saveFile(filename, content);
-  return switch (await shareJsonFiles(filename, content)) {
-    WebShareOutcome.success => true,
-    WebShareOutcome.cancelled => false,
-    WebShareOutcome.unsupported => await saveFile(filename, content),
-  };
+  if (!canShareJsonFile) return false;
+  return webShareCompleted(await shareJsonFiles(filename, content));
 }
 
 /// Binary share variant for the PDF export document: dead on web, where the

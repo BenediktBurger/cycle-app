@@ -2,8 +2,8 @@
 //
 // The import side offers a file picker everywhere it can:
 //   - web: a file <input type=file> for imports plus, for exports, the browser
-//     share sheet where it accepts a file and the anchored browser download
-//     otherwise;
+//     share sheet where it accepts a file (the anchored browser download is
+//     the separate save action);
 //   - native io targets (Linux/mac/Windows desktops and Android/iOS via
 //     SAF): `FilePicker.pickFile` from `file_picker`;
 //   - anything else (no dart:html and no dart:io): the stub, paste-only,

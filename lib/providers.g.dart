@@ -678,23 +678,77 @@ final class EarliestTrackedDataAtProvider
 String _$earliestTrackedDataAtHash() =>
     r'a5ca29f8aaca94c23731144d507940d60565674d';
 
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+
+@ProviderFor(backupReminderRefreshInterval)
+final backupReminderRefreshIntervalProvider =
+    BackupReminderRefreshIntervalProvider._();
+
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+
+final class BackupReminderRefreshIntervalProvider
+    extends $FunctionalProvider<Duration, Duration, Duration>
+    with $Provider<Duration> {
+  /// How often [backupReminderDue] re-evaluates while the app stays open, so a
+  /// long session crosses the due boundary without a restart. A provider so
+  /// tests can shrink the tick instead of waiting a minute.
+  BackupReminderRefreshIntervalProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backupReminderRefreshIntervalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$backupReminderRefreshIntervalHash();
+
+  @$internal
+  @override
+  $ProviderElement<Duration> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Duration create(Ref ref) {
+    return backupReminderRefreshInterval(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Duration value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Duration>(value),
+    );
+  }
+}
+
+String _$backupReminderRefreshIntervalHash() =>
+    r'23e37f23d01aa174907545a00295217d8f1c8b9d';
+
 /// Whether the backup banner should show: the pure predicate decides on data
 /// and interval, while an unresolved or in-memory storage report suppresses
-/// it.
+/// it. The periodic refresh keeps an open app current as time passes.
 
 @ProviderFor(backupReminderDue)
 final backupReminderDueProvider = BackupReminderDueProvider._();
 
 /// Whether the backup banner should show: the pure predicate decides on data
 /// and interval, while an unresolved or in-memory storage report suppresses
-/// it.
+/// it. The periodic refresh keeps an open app current as time passes.
 
 final class BackupReminderDueProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
   /// Whether the backup banner should show: the pure predicate decides on data
   /// and interval, while an unresolved or in-memory storage report suppresses
-  /// it.
+  /// it. The periodic refresh keeps an open app current as time passes.
   BackupReminderDueProvider._()
     : super(
         from: null,
@@ -728,7 +782,7 @@ final class BackupReminderDueProvider
   }
 }
 
-String _$backupReminderDueHash() => r'4febe30be123af3e17d2d1f77582b06c3c7d53d6';
+String _$backupReminderDueHash() => r'cebedfbb30cbd4c4b6f02a034189e9cf1690e578';
 
 /// The one derived grouping+evaluation pass behind the Tagebuch, Zyklus and
 /// Statistik screens: each faces its data through the SAME

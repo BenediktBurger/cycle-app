@@ -34,5 +34,11 @@ void main() {
     test('an error without a name is unsupported', () {
       expect(webShareOutcome(resolved: false), WebShareOutcome.unsupported);
     });
+
+    test('only a completed share is true for the export marking', () {
+      expect(webShareCompleted(WebShareOutcome.success), isTrue);
+      expect(webShareCompleted(WebShareOutcome.cancelled), isFalse);
+      expect(webShareCompleted(WebShareOutcome.unsupported), isFalse);
+    });
   });
 }

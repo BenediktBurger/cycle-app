@@ -13,6 +13,8 @@
 // change back to that table. The settings themselves are @riverpod
 // Notifier providers in this file; their only sanctioned external write
 // is the notifier's `set` member.
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -203,9 +205,15 @@ Future<DateTime?> earliestTrackedDataAt(Ref ref) async {
 DateTime _earliest(List<DateTime> instants) =>
     instants.reduce((a, b) => a.isBefore(b) ? a : b).toUtc();
 
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+@Riverpod(keepAlive: true)
+Duration backupReminderRefreshInterval(Ref ref) => const Duration(minutes: 1);
+
 /// Whether the backup banner should show: the pure predicate decides on data
 /// and interval, while an unresolved or in-memory storage report suppresses
-/// it.
+/// it. The periodic refresh keeps an open app current as time passes.
 @Riverpod(keepAlive: true)
 bool backupReminderDue(Ref ref) {
   final report = ref.watch(webStorageReportProvider);
@@ -214,6 +222,9 @@ bool backupReminderDue(Ref ref) {
   final lastExportAt = ref.watch(lastExportAtProvider);
   final snoozedUntil = ref.watch(backupReminderSnoozedUntilProvider);
   final now = ref.watch(nowProvider)();
+  final refreshInterval = ref.watch(backupReminderRefreshIntervalProvider);
+  final timer = Timer.periodic(refreshInterval, (_) => ref.invalidateSelf());
+  ref.onDispose(timer.cancel);
   if (!report.hasValue || !anchor.hasValue) return false;
   if (report.value?.isInMemory ?? false) return false;
   return isBackupReminderDue(
