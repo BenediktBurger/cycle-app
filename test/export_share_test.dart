@@ -8,7 +8,10 @@
 //
 // Harness notes: the tests pin the German locale and use the in-memory
 // drift database override (test/support/database.dart) with a seeded
-// entry so the export is non-empty — nothing platform-channel based.
+// entry so the export is non-empty — nothing platform-channel based. The
+// last-export group drives the real shell through `appScope` (write-through
+// included) so a mark is asserted in the provider AND the settings row;
+// the rest use `settingsHarness` for the screen-level flow.
 // The share and save paths go through the test-only seams in
 // file_transfer_io.dart (shareFileOverride / saveFileOverride, the same
 // pattern as the picker's pickFileTextOverride): the real plugins are
@@ -20,18 +23,23 @@
 import 'dart:io';
 
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/export_import.dart'
     show ExportBlob, buildExportJson, formatIsoDay;
 import 'package:cycle_app/domain/measurement_method.dart' show MeasurementRoute;
+import 'package:cycle_app/main.dart' show CycleApp;
+import 'package:cycle_app/providers.dart' show lastExportAtProvider;
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show saveFileOverride, shareFile, shareFileBytes, shareFileOverride;
 import 'package:cycle_app/ui/settings.dart' show exportFileName;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/database.dart';
 import 'support/faulty_db.dart';
+import 'support/finders.dart';
 import 'support/fixtures.dart';
 
 /// The l10n strings the tests drive through (German is authoritative):
@@ -73,6 +81,51 @@ Future<void> pumpToExportPreview(WidgetTester tester) async {
   );
 }
 
+/// The instant the marking assertions pin through `appScope`'s clock.
+final fixedExportInstant = DateTime.utc(2026, 10, 20, 9, 30);
+
+/// The REAL app shell over the in-memory database, navigated to Settings ›
+/// Export › preview; returns the opened database handle for row assertions.
+Future<CycleDatabase> pumpAppToExportPreview(WidgetTester tester) async {
+  CycleDatabase? db;
+  await tester.pumpWidget(
+    appScope(
+      locale: const Locale('de'),
+      now: () => fixedExportInstant,
+      seed: _defaultSeed,
+      onCreated: (created) => db = created,
+    ),
+  );
+  await tester.pumpAndSettle();
+  await openSettingsTab(tester);
+  await scrollSettingsCardIntoView(tester, settingsExportButton());
+  await tester.tap(settingsExportButton());
+  await tester.pumpAndSettle();
+  expect(find.text(previewTitleLabel), findsOneWidget);
+  return db!;
+}
+
+/// Asserts the in-memory instant and its persisted row agree on [expected].
+Future<void> expectLastExportAt(
+  WidgetTester tester,
+  CycleDatabase db,
+  DateTime? expected,
+) async {
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(CycleApp)),
+  );
+  expect(
+    container.read(lastExportAtProvider),
+    expected,
+    reason: 'the last-export provider tracks only successful JSON hand-offs',
+  );
+  expect(
+    await SettingsStore(db.settingsDao).readSetting(SettingKeys.lastExportAt),
+    expected?.toUtc().toIso8601String(),
+    reason: 'the last-export row tracks only successful JSON hand-offs',
+  );
+}
+
 /// The path_provider channel whose getTemporaryDirectory answer decides
 /// where [shareFile]/[shareFileBytes] stage their files; and the
 /// share_plus channel the staged hand-off goes through.
@@ -80,6 +133,131 @@ const _pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
 const _sharePlusChannel = MethodChannel('dev.fluttercommunity.plus/share');
 
 void main() {
+  group('last export marking', () {
+    testWidgets('a successful save lands the pinned instant in the provider '
+        'and the settings row', (WidgetTester tester) async {
+      saveFileOverride = (filename, content) async => true;
+      addTearDown(() => saveFileOverride = null);
+
+      final db = await pumpAppToExportPreview(tester);
+      await tester.tap(find.text(saveFileButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text(savedSnackbarLabel), findsOneWidget);
+      await expectLastExportAt(tester, db, fixedExportInstant);
+    });
+
+    testWidgets('a successful share lands the pinned instant in the provider '
+        'and the settings row', (WidgetTester tester) async {
+      shareFileOverride = (filename, content) async => true;
+      addTearDown(() => shareFileOverride = null);
+
+      final db = await pumpAppToExportPreview(tester);
+      await tester.tap(find.text(shareButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text(sharedSnackbarLabel), findsOneWidget);
+      await expectLastExportAt(tester, db, fixedExportInstant);
+    });
+
+    testWidgets('a dismissed share marks nothing', (WidgetTester tester) async {
+      shareFileOverride = (filename, content) async => false;
+      addTearDown(() => shareFileOverride = null);
+
+      final db = await pumpAppToExportPreview(tester);
+      await tester.tap(find.text(shareButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text(shareFailedSnackbarLabel), findsOneWidget);
+      await expectLastExportAt(tester, db, null);
+    });
+
+    testWidgets('a cancelled save dialog marks nothing', (
+      WidgetTester tester,
+    ) async {
+      saveFileOverride = (filename, content) async => false;
+      addTearDown(() => saveFileOverride = null);
+
+      final db = await pumpAppToExportPreview(tester);
+      await tester.tap(find.text(saveFileButtonLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text(saveFailedSnackbarLabel), findsOneWidget);
+      await expectLastExportAt(tester, db, null);
+    });
+
+    testWidgets('the copy action marks nothing', (WidgetTester tester) async {
+      final clipboardCalls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') clipboardCalls.add(call);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      final db = await pumpAppToExportPreview(tester);
+      await tester.tap(find.text('Kopieren'));
+      await tester.pumpAndSettle();
+
+      expect(clipboardCalls, hasLength(1));
+      await expectLastExportAt(tester, db, null);
+    });
+
+    testWidgets('a successful import marks nothing', (
+      WidgetTester tester,
+    ) async {
+      CycleDatabase? db;
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          now: () => fixedExportInstant,
+          seed: _defaultSeed,
+          onCreated: (created) => db = created,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, settingsImportJsonButton());
+      await tester.tap(settingsImportJsonButton());
+      await tester.pumpAndSettle();
+
+      final imported = buildExportJson(
+        ExportBlob(
+          exportedAt: DateTime.utc(2026, 10, 1),
+          entries: [
+            {'date': '2026-10-01', 'bbt_c': 36.5},
+          ],
+          marks: const [],
+        ),
+      );
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
+        imported,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(AlertDialog),
+        findsNothing,
+        reason: 'a successful import closes the dialog',
+      );
+      await expectLastExportAt(tester, db!, null);
+    });
+  });
+
   group('export open: failure surfacing', () {
     testWidgets('a failing export build reports the failure snackbar and '
         'keeps the settings screen (no preview page, no unhandled error)', (
@@ -398,6 +576,7 @@ void main() {
     void registerShareHandler({
       bool throwPlatformException = false,
       void Function(String stagedPath)? onHandoff,
+      String result = 'test-action',
     }) {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(_sharePlusChannel, (call) async {
@@ -408,7 +587,7 @@ void main() {
             if (throwPlatformException) {
               throw PlatformException(code: 'test', message: 'share failed');
             }
-            return 'test-action';
+            return result;
           });
     }
 
@@ -442,7 +621,11 @@ void main() {
           '{"schema_version":1}',
         );
 
-        expect(shared, isTrue, reason: 'a resolved sheet is a hand-off');
+        expect(
+          shared,
+          isTrue,
+          reason: 'a success result from share_plus is a completed hand-off',
+        );
         expect(
           stagedPath,
           '${stagingDir.path}${Platform.pathSeparator}cycle_export_test.json',
@@ -451,6 +634,26 @@ void main() {
         expectStagedFileGone('cycle_export_test.json');
       },
     );
+
+    test('shareFile reports a dismissed sheet as false (nothing was handed '
+        'over) and still deletes the staged file', () async {
+      // share_plus maps the empty channel result to
+      // ShareResultStatus.dismissed.
+      registerShareHandler(result: '');
+      final shared = await shareFile(
+        'cycle_export_dismissed.json',
+        '{"schema_version":1}',
+      );
+
+      expect(
+        shared,
+        isFalse,
+        reason:
+            'a dismissed share sheet hands nothing over and must not '
+            'advance the last export instant',
+      );
+      expectStagedFileGone('cycle_export_dismissed.json');
+    });
 
     test(
       'shareFile also deletes the staged file when the share fails',
@@ -493,6 +696,26 @@ void main() {
       );
       expectStagedFileGone('cycle_pdf_test.pdf');
     });
+
+    test(
+      'shareFileBytes keeps the resolved-sheet contract on a dismissed sheet '
+      '(the PDF route marks nothing)',
+      () async {
+        registerShareHandler(result: '');
+        final bytes = <int>[0x25, 0x50, 0x44, 0x46]; // "%PDF"
+
+        final shared = await shareFileBytes('cycle_pdf_dismissed.pdf', bytes);
+
+        expect(
+          shared,
+          isTrue,
+          reason:
+              'the PDF hand-off reports a resolved sheet; unlike the JSON '
+              'route it has no last-export instant to protect',
+        );
+        expectStagedFileGone('cycle_pdf_dismissed.pdf');
+      },
+    );
 
     tearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

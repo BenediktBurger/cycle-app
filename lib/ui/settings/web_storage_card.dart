@@ -63,7 +63,7 @@ final class WebStorageCard extends StatelessWidget {
               l10n.webStorageLastExport(
                 lastExportAt == null
                     ? l10n.webStorageNever
-                    : formatIsoDate(lastExportAt!),
+                    : formatIsoDate(lastExportAt!.toLocal()),
               ),
             ),
             const SizedBox(height: 8),

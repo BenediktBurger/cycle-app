@@ -25,6 +25,7 @@ import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'db/settings_store.dart';
+import 'domain/backup_reminder.dart';
 import 'domain/date_only.dart';
 import 'domain/custom_categories.dart';
 import 'domain/diary_track.dart';
@@ -171,6 +172,56 @@ Stream<List<MeasurementMethodSnapshot>> measurementMethods(Ref ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.measurementMethodsDao.watchAll().map(
     (rows) => rows.map(measurementSnapshotFromDrift).toList(),
+  );
+}
+
+/// The earliest moment the app tracked data: the minimum `createdAt` over
+/// entries and measurement-method snapshots. A marks-only database anchors at
+/// its earliest mark day because marks carry no timestamp.
+///
+/// The stream providers are watched only as invalidation triggers; the
+/// streamed domain models carry no timestamps, so the anchor is read from the
+/// tables.
+@Riverpod(keepAlive: true)
+Future<DateTime?> earliestTrackedDataAt(Ref ref) async {
+  ref.watch(dailyEntriesProvider);
+  ref.watch(marksProvider);
+  ref.watch(measurementMethodsProvider);
+  final db = await ref.watch(databaseProvider.future);
+  final entries = await db.entriesDao.allEntries();
+  final methods = await db.measurementMethodsDao.allSnapshots();
+  final timestamps = <DateTime>[
+    for (final entry in entries) entry.createdAt,
+    for (final method in methods) method.createdAt,
+  ];
+  if (timestamps.isNotEmpty) return _earliest(timestamps);
+  final marks = await db.marksDao.allMarks();
+  if (marks.isEmpty) return null;
+  return _earliest([for (final mark in marks) mark.entryDate]);
+}
+
+DateTime _earliest(List<DateTime> instants) =>
+    instants.reduce((a, b) => a.isBefore(b) ? a : b).toUtc();
+
+/// Whether the backup banner should show: the pure predicate decides on data
+/// and interval, while an unresolved or in-memory storage report suppresses
+/// it.
+@Riverpod(keepAlive: true)
+bool backupReminderDue(Ref ref) {
+  final report = ref.watch(webStorageReportProvider);
+  final anchor = ref.watch(earliestTrackedDataAtProvider);
+  final interval = ref.watch(backupReminderIntervalProvider);
+  final lastExportAt = ref.watch(lastExportAtProvider);
+  final snoozedUntil = ref.watch(backupReminderSnoozedUntilProvider);
+  final now = ref.watch(nowProvider)();
+  if (report.isLoading || anchor.isLoading) return false;
+  if (report.value?.isInMemory ?? false) return false;
+  return isBackupReminderDue(
+    interval: interval,
+    lastExportAt: lastExportAt,
+    earliestTrackedDataAt: anchor.value,
+    snoozedUntil: snoozedUntil,
+    now: now,
   );
 }
 
@@ -398,6 +449,49 @@ class CustomDiaryCategoriesNotifier extends _$CustomDiaryCategoriesNotifier
   void set(List<CustomCategory> value) => state = value;
 }
 
+/// When the last successful JSON export was saved or shared, UTC; null means
+/// "never exported". Only a save or share that actually succeeded advances
+/// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class LastExportAtNotifier extends _$LastExportAtNotifier
+    implements SettableSetting<DateTime?> {
+  @override
+  DateTime? build() => null;
+  @override
+  void set(DateTime? value) => state = value;
+}
+
+/// The backup-reminder preset chosen in Settings; quarterly until the user
+/// picks another one. `off` is a deliberate choice and persists like any
+/// other preset.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class BackupReminderIntervalNotifier extends _$BackupReminderIntervalNotifier
+    implements SettableSetting<BackupReminderInterval> {
+  @override
+  BackupReminderInterval build() => BackupReminderInterval.quarterly;
+  @override
+  void set(BackupReminderInterval value) => state = value;
+}
+
+/// Until when the backup-reminder banner is snoozed, UTC; null means not
+/// snoozed. An expired snooze simply stops hiding the banner — it never
+/// restarts the reminder interval.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class BackupReminderSnoozedUntilNotifier
+    extends _$BackupReminderSnoozedUntilNotifier
+    implements SettableSetting<DateTime?> {
+  @override
+  DateTime? build() => null;
+  @override
+  void set(DateTime? value) => state = value;
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called
@@ -422,9 +516,9 @@ typedef SettingsWriteSink =
 
 /// One table entry of the hydration registrar: a persisted setting bound
 /// to its in-memory [ProviderBase], its untouched sentinel and the typed
-/// store write. The generic [PersistedSetting.bind] keeps the nine
-/// heterogeneous value types out of the drivers — both iterate the plain
-/// entries below without knowing `T`.
+/// store write. The generic [PersistedSetting.bind] keeps the heterogeneous
+/// value types out of the drivers — both iterate the plain entries below
+/// without knowing `T`.
 ///
 /// The write contract every mutable settings notifier exposes — the
 /// sanctioned external write (`ref.read(xProvider.notifier).set(v)`),
@@ -572,6 +666,27 @@ final _persistedSettings = <PersistedSetting>[
     untouched: false,
     fromSnapshot: (snapshot) => snapshot.onboardingCompleted,
     persist: (store, value) => store.persistOnboardingCompleted(value),
+  ),
+  PersistedSetting.bind(
+    provider: lastExportAtProvider,
+    notifier: lastExportAtProvider.notifier,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.lastExportAt,
+    persist: (store, value) => store.persistLastExportAt(value),
+  ),
+  PersistedSetting.bind(
+    provider: backupReminderIntervalProvider,
+    notifier: backupReminderIntervalProvider.notifier,
+    untouched: BackupReminderInterval.quarterly,
+    fromSnapshot: (snapshot) => snapshot.backupReminderInterval,
+    persist: (store, value) => store.persistBackupReminderInterval(value),
+  ),
+  PersistedSetting.bind(
+    provider: backupReminderSnoozedUntilProvider,
+    notifier: backupReminderSnoozedUntilProvider.notifier,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.backupReminderSnoozedUntil,
+    persist: (store, value) => store.persistBackupReminderSnoozedUntil(value),
   ),
 ];
 

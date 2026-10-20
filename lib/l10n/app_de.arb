@@ -617,6 +617,39 @@
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
   "settingsImport": "Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
+  "settingsBackupReminder": "Sicherungserinnerung",
+  "@settingsBackupReminder": {
+    "description": "Beschriftung des Erinnerungsintervall-Dropdowns der Export-Karte."
+  },
+  "settingsLastExport": "Letzter Export: {date}",
+  "@settingsLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Export-Karte mit dem letzten erfolgreichen JSON-Export als lokalem Kalendertag (ISO-Datum) oder 'nie'."
+  },
+  "settingsNever": "nie",
+  "@settingsNever": {
+    "description": "Wert der Zeile 'Letzter Export' der Export-Karte, solange noch kein Export erfasst wurde."
+  },
+  "settingsBackupReminderOff": "Aus",
+  "@settingsBackupReminderOff": {
+    "description": "Erinnerungs-Voreinstellung: keine Sicherungserinnerungen."
+  },
+  "settingsBackupReminderMonthly": "Monatlich",
+  "@settingsBackupReminderMonthly": {
+    "description": "Erinnerungs-Voreinstellung: monatlich erinnern."
+  },
+  "settingsBackupReminderQuarterly": "Vierteljährlich",
+  "@settingsBackupReminderQuarterly": {
+    "description": "Erinnerungs-Voreinstellung: alle drei Monate erinnern (die Voreinstellung)."
+  },
+  "settingsBackupReminderHalfYearly": "Halbjährlich",
+  "@settingsBackupReminderHalfYearly": {
+    "description": "Erinnerungs-Voreinstellung: alle sechs Monate erinnern."
+  },
   "webStorageCard": "Browser-Speicher",
   "@webStorageCard": {
     "description": "Titel der Einstellungen-Karte, die den Browser-Speicher der Web-App beschreibt (nur auf Web sichtbar)."
@@ -868,5 +901,17 @@
   "diaryTemperatureWheelLabel": "Temperatur",
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility-Label des Temperatur-Rads im Tagebuch: kündigt dem Screenreader den Picker samt ausgewähltem Wert (lokalisiertes Zahlformat mit °C) und den Aktionen Erhöhen/Verringern (je ein 0,05-K-Schritt) an."
+  },
+  "backupReminderMessage": "Zeit für eine Sicherung: Exportiere deine Daten als JSON-Datei, damit sie bei einem Gerätewechsel oder Datenverlust nicht verloren gehen.",
+  "@backupReminderMessage": {
+    "description": "Text des Erinnerungsbanners über der App, wenn seit dem letzten erfolgreichen JSON-Export das gewählte Intervall verstrichen ist."
+  },
+  "backupReminderExportNow": "Jetzt exportieren",
+  "@backupReminderExportNow": {
+    "description": "Aktion des Erinnerungsbanners: öffnet den gemeinsamen JSON-Export (Vorschau mit Speichern/Teilen)."
+  },
+  "backupReminderLater": "Später",
+  "@backupReminderLater": {
+    "description": "Aktion des Erinnerungsbanners: blendet die Erinnerung für sieben Tage aus, ohne das Exportintervall neu zu starten."
   }
 }

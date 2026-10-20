@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../db/export_adapter.dart';
-import '../../domain/export_import.dart';
+import '../../db/settings_store.dart' show formatIsoDate;
+import '../../domain/backup_reminder.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers.dart';
-import '../file_transfer.dart';
+import '../json_export.dart';
 import 'import_dialog.dart';
-
-/// Export file name used by the save/download path.
-const String exportFileName = 'cycle_app_export.json';
 
 // --- JSON export / import ------------------------------------
 final class ExportImportCard extends ConsumerWidget {
@@ -19,6 +16,8 @@ final class ExportImportCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final lastExportAt = ref.watch(lastExportAtProvider);
+    final interval = ref.watch(backupReminderIntervalProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -35,9 +34,41 @@ final class ExportImportCard extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
+            Text(
+              l10n.settingsLastExport(
+                lastExportAt == null
+                    ? l10n.settingsNever
+                    : formatIsoDate(lastExportAt.toLocal()),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: Text(l10n.settingsBackupReminder)),
+                DropdownButton<BackupReminderInterval>(
+                  key: const ValueKey('backupReminderIntervalDropdown'),
+                  value: interval,
+                  onChanged: (value) {
+                    if (value != null) {
+                      ref
+                          .read(backupReminderIntervalProvider.notifier)
+                          .set(value);
+                    }
+                  },
+                  items: [
+                    for (final preset in BackupReminderInterval.values)
+                      DropdownMenuItem(
+                        value: preset,
+                        child: Text(_intervalLabel(l10n, preset)),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             FilledButton.tonalIcon(
               key: const ValueKey('settingsExportButton'),
-              onPressed: () => _openExport(context, ref),
+              onPressed: () => openJsonExport(context, ref),
               icon: const Icon(Icons.download_outlined),
               label: Text(l10n.settingsExport),
             ),
@@ -62,34 +93,6 @@ final class ExportImportCard extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _openExport(BuildContext context, WidgetRef ref) async {
-    final l10n = AppLocalizations.of(context);
-    try {
-      final db = await ref.read(databaseProvider.future);
-      final json = await exportDatabaseToJson(db);
-      // An empty export is not useful as a file — communicate instead.
-      final doc = parseExportJson(json);
-      if (doc.entries.isEmpty && doc.marks.isEmpty && doc.methods.isEmpty) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.exportNothing)));
-        return;
-      }
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (context) => _ExportPreviewPage(json: json),
-        ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.exportFailed)));
-    }
   }
 
   /// Opens the self-contained JSON import dialog (see [ImportDialog]).
@@ -161,95 +164,11 @@ final class ExportImportCard extends ConsumerWidget {
   }
 }
 
-/// Full-screen JSON preview: the export text with a copy button for every
-/// platform, the system share sheet where [canShareFile] provides one,
-/// and a file save/download where the platform supports it.
-final class _ExportPreviewPage extends StatelessWidget {
-  const _ExportPreviewPage({required this.json});
-
-  final String json;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.exportTitle)),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: json));
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(l10n.exportCopied)));
-                  },
-                  icon: const Icon(Icons.copy_outlined),
-                  label: Text(l10n.exportCopy),
-                ),
-                if (canShareFile)
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final ok = await shareFile(exportFileName, json);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            ok ? l10n.exportShared : l10n.exportShareFailed,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.share_outlined),
-                    label: Text(l10n.exportShare),
-                  ),
-                if (canSaveFile)
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final ok = await saveFile(exportFileName, json);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            ok ? l10n.exportSaved : l10n.exportSaveFailed,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.save_outlined),
-                    label: Text(l10n.exportSaveFile),
-                  )
-                else if (!canShareFile)
-                  Text(
-                    l10n.exportNativeHint,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: SelectableText(
-                json,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+String _intervalLabel(AppLocalizations l10n, BackupReminderInterval interval) =>
+    switch (interval) {
+      BackupReminderInterval.off => l10n.settingsBackupReminderOff,
+      BackupReminderInterval.monthly => l10n.settingsBackupReminderMonthly,
+      BackupReminderInterval.quarterly => l10n.settingsBackupReminderQuarterly,
+      BackupReminderInterval.halfYearly =>
+        l10n.settingsBackupReminderHalfYearly,
+    };

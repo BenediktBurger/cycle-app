@@ -28,6 +28,9 @@ const bool canSaveFile = true;
 // its own FileProvider, so no permission or manifest change is needed.
 const bool canShareFile = true;
 
+// The same share sheet carries the JSON export on every native target.
+const bool canShareJsonFile = true;
+
 const bool canPickFile = true;
 
 /// Test-only seam for the widget tests, which must not touch platform
@@ -89,12 +92,16 @@ Future<bool> saveFile(String filename, String content) async {
 /// staged file again: the sheet is closed by the time `share` resolves,
 /// and the plaintext export / PDF must not linger in the platform temp
 /// directory — no matter how the sharing went (user dismissal included).
+/// Returns true only when share_plus reports a completed share action.
 /// Deletion failures are ignored: a stuck temp file is cosmetically
 /// regrettable, but turning the cleanup into an error would surface in
 /// the UI for the wrong event.
-Future<void> _shareAndUnstage(File file) async {
+Future<bool> _shareAndUnstage(File file) async {
   try {
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    final result = await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)]),
+    );
+    return result.status == ShareResultStatus.success;
   } finally {
     try {
       await file.delete();
@@ -107,12 +114,13 @@ Future<void> _shareAndUnstage(File file) async {
 /// Stages [content] under [filename] in the platform's temporary directory
 /// and opens the system share sheet with that file (the user then picks
 /// the target: Files/Drive/mail on Android, whatever the desktop offers).
-/// True when the hand-off to the share sheet happened; false on any
-/// staging or platform error (the caller reports only via snackbar, so
-/// failures surface as "not shared", never as a crash). The share sheet
-/// being dismissed by the user is still a hand-off, not a failure. The
-/// staged file is deleted again once the share resolves — see
-/// [_shareAndUnstage].
+/// True only when the share sheet reports a completed share action; a
+/// dismissed sheet or an unavailable platform result is false, because the
+/// JSON export's last-export instant must not advance on a hand-off that
+/// never happened. False on any staging or platform error too (the caller
+/// reports only via snackbar, so failures surface as "not shared", never
+/// as a crash). The staged file is deleted again once the share resolves —
+/// see [_shareAndUnstage].
 Future<bool> shareFile(String filename, String content) async {
   final override = shareFileOverride;
   if (override != null) return override(filename, content);
@@ -121,8 +129,7 @@ Future<bool> shareFile(String filename, String content) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$filename');
     await file.writeAsString(content);
-    await _shareAndUnstage(file);
-    return true;
+    return await _shareAndUnstage(file);
   } catch (_) {
     // The plugin's channel, the platform temp directory or the staging
     // write can each fail per platform; the snackbar contract means the
@@ -133,10 +140,10 @@ Future<bool> shareFile(String filename, String content) async {
 
 /// The binary twin of [shareFile] for the PDF document: stages [bytes]
 /// under [filename] in the platform's temporary directory and opens the
-/// system share sheet with that file. The bool contract matches
-/// [shareFile]'s — a dismissed share sheet is a hand-off (true), false on
-/// any staging or platform error. The staged file is deleted again once
-/// the share resolves — see [_shareAndUnstage].
+/// system share sheet with that file. A resolved sheet is true even when
+/// dismissed: the PDF route marks nothing and its snackbar wording is out of
+/// scope. False on any staging or platform error. The staged file is deleted
+/// again once the share resolves — see [_shareAndUnstage].
 Future<bool> shareFileBytes(String filename, List<int> bytes) async {
   final override = shareFileBytesOverride;
   if (override != null) return override(filename, bytes);

@@ -680,6 +680,39 @@
   "settingsExportNote": "All entries and marks as one JSON document. Export regularly — this is the only backup: moving to another device and recovery work only through it, the database file itself cannot be copied because of its device-bound key.",
   "settingsImport": "Import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
+  "settingsBackupReminder": "Backup reminder",
+  "@settingsBackupReminder": {
+    "description": "Label of the export card's reminder-interval dropdown."
+  },
+  "settingsLastExport": "Last export: {date}",
+  "@settingsLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Export card row with the last successful JSON export as the local calendar day (ISO date) or 'never'."
+  },
+  "settingsNever": "never",
+  "@settingsNever": {
+    "description": "Value of the export card's 'Last export' row until an export is recorded."
+  },
+  "settingsBackupReminderOff": "Off",
+  "@settingsBackupReminderOff": {
+    "description": "Reminder preset: no backup reminders."
+  },
+  "settingsBackupReminderMonthly": "Monthly",
+  "@settingsBackupReminderMonthly": {
+    "description": "Reminder preset: remind every month."
+  },
+  "settingsBackupReminderQuarterly": "Quarterly",
+  "@settingsBackupReminderQuarterly": {
+    "description": "Reminder preset: remind every three months (the default)."
+  },
+  "settingsBackupReminderHalfYearly": "Half-yearly",
+  "@settingsBackupReminderHalfYearly": {
+    "description": "Reminder preset: remind every six months."
+  },
   "webStorageCard": "Browser storage",
   "@webStorageCard": {
     "description": "Title of the Settings card describing the web app's browser storage (web only)."
@@ -962,5 +995,17 @@
   "diaryTemperatureWheelLabel": "Temperature",
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility label of the diary temperature wheel: announces the picker to screen readers together with its selected value (locale-formatted number with °C) and the increase/decrease actions that step one 0.05 K grid item."
+  },
+  "backupReminderMessage": "Time to back up: export your data as a JSON file so nothing is lost when you change devices or data is lost.",
+  "@backupReminderMessage": {
+    "description": "Text of the reminder banner above the app once the chosen interval has elapsed since the last successful JSON export."
+  },
+  "backupReminderExportNow": "Export now",
+  "@backupReminderExportNow": {
+    "description": "Reminder banner action: opens the shared JSON export (preview with save/share)."
+  },
+  "backupReminderLater": "Later",
+  "@backupReminderLater": {
+    "description": "Reminder banner action: hides the reminder for seven days without restarting the export interval."
   }
 }

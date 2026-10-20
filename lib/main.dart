@@ -19,6 +19,7 @@ import 'l10n/app_localizations.dart';
 import 'licenses.dart';
 import 'providers.dart';
 import 'ui/about.dart';
+import 'ui/backup_reminder.dart';
 import 'ui/cycle.dart';
 import 'ui/diary.dart';
 import 'ui/settings.dart';
@@ -460,12 +461,13 @@ class _HomeShell extends ConsumerWidget {
               )
             : indexedStack;
         return Scaffold(
-          // Warnings sit above the mounted screens and never block entry; a
-          // null storage report collapses to nothing, leaving the body size
-          // unchanged.
+          // Warnings and the backup reminder sit above the mounted screens
+          // and never block entry; a null storage report and a non-due
+          // reminder collapse to nothing, leaving the body size unchanged.
           body: Column(
             children: [
               const WebStorageWarningsHost(),
+              const BackupReminderBannerHost(),
               Expanded(child: body),
             ],
           ),

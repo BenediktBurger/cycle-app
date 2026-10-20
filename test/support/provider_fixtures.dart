@@ -8,6 +8,7 @@
 // these fixtures instead: a subclass of the production notifier whose
 // `build()` returns the seeded value.
 // The fixture factories' `Override` return type ships from the misc entry.
+import 'package:cycle_app/domain/backup_reminder.dart';
 import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -192,4 +193,44 @@ class _FixedCategories extends CustomDiaryCategoriesNotifier {
 
   @override
   List<CustomCategory> build() => seed;
+}
+
+Override lastExportAtPin(DateTime? value) =>
+    lastExportAtProvider.overrideWith(() => _FixedLastExportAt(value));
+
+class _FixedLastExportAt extends LastExportAtNotifier {
+  _FixedLastExportAt(this.seed);
+
+  final DateTime? seed;
+
+  @override
+  DateTime? build() => seed;
+}
+
+Override backupReminderIntervalPin(BackupReminderInterval value) =>
+    backupReminderIntervalProvider.overrideWith(
+      () => _FixedBackupReminderInterval(value),
+    );
+
+class _FixedBackupReminderInterval extends BackupReminderIntervalNotifier {
+  _FixedBackupReminderInterval(this.seed);
+
+  final BackupReminderInterval seed;
+
+  @override
+  BackupReminderInterval build() => seed;
+}
+
+Override backupReminderSnoozedUntilPin(DateTime? value) =>
+    backupReminderSnoozedUntilProvider.overrideWith(
+      () => _FixedBackupReminderSnooze(value),
+    );
+
+class _FixedBackupReminderSnooze extends BackupReminderSnoozedUntilNotifier {
+  _FixedBackupReminderSnooze(this.seed);
+
+  final DateTime? seed;
+
+  @override
+  DateTime? build() => seed;
 }

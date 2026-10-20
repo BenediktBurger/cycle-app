@@ -12,12 +12,15 @@
 // (All/None/confirm) on top.
 import 'dart:async';
 
+import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/db/settings_store.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
+import 'package:cycle_app/main.dart' show CycleApp;
 import 'package:cycle_app/pdf/cycle_pdf.dart'
     show PdfExportOptions, pdfExportFileName;
 import 'package:cycle_app/providers.dart';
@@ -28,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/database.dart';
 import 'support/finders.dart';
 import 'support/provider_fixtures.dart';
 
@@ -995,4 +999,75 @@ void main() {
     );
     expect(runs, 0, reason: 'no document for empty data');
   });
+
+  testWidgets(
+    'a PDF save and share leave the last export instant in the provider and '
+    'the settings row untouched',
+    (WidgetTester tester) async {
+      final priorExport = DateTime.utc(2026, 1, 15, 8, 30);
+      CycleDatabase? db;
+      await enlargeViewport(tester);
+      saveFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => saveFileBytesOverride = null);
+      shareFileBytesOverride = (filename, bytes) async => true;
+      addTearDown(() => shareFileBytesOverride = null);
+
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          now: () => DateTime.utc(2026, 4, 1, 10),
+          seed: (seeded) async {
+            await SettingsStore(
+              seeded.settingsDao,
+            ).persistLastExportAt(priorExport);
+            for (final entry in cardEntries()) {
+              await seeded.entriesDao.upsertDaily(entry);
+            }
+            for (final mark in cardMarks()) {
+              await seeded.marksDao.addMark(mark.date, mark.type);
+            }
+          },
+          onCreated: (created) => db = created,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, pdfExportButton());
+
+      Future<void> expectUntouched() async {
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(CycleApp)),
+        );
+        expect(
+          container.read(lastExportAtProvider),
+          priorExport,
+          reason:
+              'a PDF hand-off is not the JSON backup and must not advance '
+              'the last export instant',
+        );
+        expect(
+          await SettingsStore(
+            db!.settingsDao,
+          ).readSetting(SettingKeys.lastExportAt),
+          priorExport.toUtc().toIso8601String(),
+          reason: 'the persisted last-export row stays at the prior instant',
+        );
+      }
+
+      await tester.tap(pdfExportButton());
+      await tester.pumpAndSettle();
+      expect(find.text('Datei gespeichert.'), findsOneWidget);
+      await expectUntouched();
+
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).first)
+          .clearSnackBars();
+      await tester.pumpAndSettle();
+
+      await tester.tap(pdfExportShareButton());
+      await tester.pumpAndSettle();
+      expect(find.text('Datei geteilt.'), findsOneWidget);
+      await expectUntouched();
+    },
+  );
 }

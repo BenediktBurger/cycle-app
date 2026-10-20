@@ -137,8 +137,29 @@ void main() {
       await pumpCard(tester, status());
       expect(find.text('Letzter Export: nie'), findsOneWidget);
 
-      await pumpCard(tester, status(), lastExportAt: DateTime.utc(2026, 4, 26));
-      expect(find.text('Letzter Export: 2026-04-26'), findsOneWidget);
+      // Local-time boundaries: the card shows the user's local calendar
+      // day, so both instants stay on 26 April.
+      for (final localInstant in [
+        DateTime(2026, 4, 26, 0, 30),
+        DateTime(2026, 4, 26, 23, 30),
+      ]) {
+        await pumpCard(tester, status(), lastExportAt: localInstant);
+        expect(find.text('Letzter Export: 2026-04-26'), findsOneWidget);
+      }
+
+      // The seam receives UTC instants from the provider; the card converts
+      // to local time before formatting.
+      final storedInstant = DateTime.utc(2026, 4, 26, 23, 30);
+      final local = storedInstant.toLocal();
+      await pumpCard(tester, status(), lastExportAt: storedInstant);
+      expect(
+        find.text(
+          'Letzter Export: ${local.year.toString().padLeft(4, '0')}-'
+          '${local.month.toString().padLeft(2, '0')}-'
+          '${local.day.toString().padLeft(2, '0')}',
+        ),
+        findsOneWidget,
+      );
     });
   });
 
