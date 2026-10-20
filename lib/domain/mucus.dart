@@ -1,5 +1,5 @@
 // The "Zeichen der Fruchtbarkeit" vocabulary from the INER cheat sheet
-// (docs/cheatsheet.md): fertility signs t / Ø (nichts) / f / S / A
+// (docs/NER/cheatsheet.md): fertility signs t / Ø (nichts) / f / S / A
 // (Ausfluss), with quality qualifiers that are ONLY valid together with the
 // sign S (the discharge sign A has no quality of its own).
 //

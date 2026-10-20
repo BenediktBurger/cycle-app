@@ -1,4 +1,4 @@
-// NER evaluation arithmetic (docs/cheatsheet.md §Auswertung): derive the
+// NER evaluation arithmetic (docs/NER/cheatsheet.md §Auswertung): derive the
 // evaluation artifacts from tracked entries plus user-placed marks.
 //
 // HARD RULE (ADR-0001, Mode M): the user places marks, the app computes,
