@@ -511,7 +511,7 @@
   "@aboutWebOnboardingTitle": {
     "description": "Title of the compact web-only card on the first-start page: explains the durable web path before the user enters data. The installed web app is the durable web mode."
   },
-  "aboutWebOnboardingInstall": "Step 1: install the web app on your Home Screen — iOS/Safari: Share › Add to Home Screen; Android/Chrome: install the app. Only the installed web app is the durable web mode.",
+  "aboutWebOnboardingInstall": "Install the web app on your Home Screen — iOS/Safari: Share › Add to Home Screen; Android/Chrome: install the app. Only the installed web app is the durable web mode.",
   "@aboutWebOnboardingInstall": {
     "description": "First fact line of the web onboarding section: install to the Home Screen before entering data — iOS/Safari via Share › Add to Home Screen, Android/Chrome via install. Only the installed web app is the durable web mode."
   },

@@ -80,9 +80,10 @@ encryption, sync, raw database-file copy, and background notifications.
 
 - **The installed PWA is the durable web mode.** A normal Safari tab is not
   guaranteed to retain data: WebKit evicts script-writable storage after
-  seven days of Safari use without interacting with the site. Onboarding, the
-  Settings storage card, and the README state this before real data is
-  entered.
+  seven days of Safari use without interacting with the site. Onboarding and
+  the README state the durability rule before real data is entered; the
+  shell's iOS install hint repeats it, and the Settings storage card reports
+  the live install and persistence state.
 - **Android and iOS remain the primary targets.** They are the reference
   feature set; web parity covers the contract above, not every native
   capability. Native at-rest encryption stays native-only and always-on
