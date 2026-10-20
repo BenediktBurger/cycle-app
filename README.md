@@ -11,11 +11,12 @@
 
 ## What it is
 
-A local-first, open-source mobile app (Android + iOS, PWA bonus) for
-tracking menstrual-cycle symptoms and manually evaluating them per **NER
-rules (Rötzer), in the INER spirit**: the app computes and visualizes, the
-user stays the decision-maker. The full posture is described in
-[docs/product/vision.md](docs/product/vision.md) and
+A local-first, open-source cycle app for **Android and iOS** (primary
+targets) and the browser ([web app](#web-app), supported secondary
+target), to track menstrual-cycle symptoms and evaluate them manually per
+**NER rules (Rötzer), in the INER spirit**: the app computes and
+visualizes, the user stays the decision-maker. The full posture is
+described in [docs/product/vision.md](docs/product/vision.md) and
 [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md).
 
 > **This app is in beta: the core is stable, the details still change.**
@@ -84,22 +85,49 @@ updates the app in place instead of treating it as a new install, and your
 data stays. Export your data first anyway (Export in the settings screen —
 see [Backup, migration & recovery](#backup-migration--recovery)).
 
-## Web demo
+## Web app
 
-There is also a public web demo at
-[BenediktBurger.github.io/cycle-app](https://BenediktBurger.github.io/cycle-app/):
-the app running in your browser, nothing to install. The demo is built from
-the current development state, so it shows the upcoming release rather than
-the latest published one. Entries made there stay in that browser — the
-browser storage is not encrypted. The
-[demo page](https://BenediktBurger.github.io/cycle-app/) states the
-details.
+The **web app** is a **supported secondary target**: data entry,
+statistics, the cycle view, PDF, and JSON export/import work there, and it
+installs as a PWA. **Android and iOS remain the primary targets**; the web
+app is a second way to use the same app, not a replacement for the native
+apps.
+
+The public deployment is at
+[BenediktBurger.github.io/cycle-app](https://BenediktBurger.github.io/cycle-app/).
+`/app/` mirrors the latest published release; `/branches/main/` is the
+current development build, next to branch previews under
+`/branches/<branch>/`.
+
+Only the **installed** web app is the durable web mode. A normal Safari tab
+is not guaranteed to keep its data: WebKit deletes script-writable storage
+after seven days of Safari use without interacting with the site. Install
+the app before entering real data — on iOS Safari via *Share › Add to Home
+Screen*, on Android/Chrome via the browser's install action — and treat the
+tab as a quick look, not as storage.
+
+The JSON export in Settings is the **only backup** — on the web app as on
+every other platform, with a default backup reminder of **quarterly**. There
+is **no sync**: each browser and device keeps its own copy, and nothing
+moves between deployments. The app does **not encrypt** browser storage:
+anything that can read the browser profile can read the entries, and
+exported JSON is plaintext.
+
+All deployments share the `BenediktBurger.github.io` origin. Their storage
+slots are separate, so the released app, the development build, and branch
+previews never see each other's database — but same-origin scripts are
+inside the trust boundary: a script served by another Pages project or a
+branch preview under that origin could read this browser profile's storage.
+The site stays static and free of third-party scripts for that reason. No
+custom domain is planned.
+
+The landing page there states the details.
 
 ## Example data
 
 Sample files in [`examples/`](examples/README.md) — in the app's JSON
 export format and some in the drip CSV format — can be loaded into the app
-or the web demo for a first look. Both import paths merge by date with an
+or the web app for a first look. Both import paths merge by date with an
 overwrite policy, so don't import into a profile with real data without
 exporting first.
 
@@ -126,10 +154,9 @@ nowhere else**:
   is encrypted with a device-bound key (see
   [ADR-0005](docs/adr/0005-storage-and-encryption.md)), so a copied file is
   unopenable data on anything else — not a backup.
-- On the **web build** the browser storage (OPFS/IndexedDB) is not encrypted
-  by the app (web stays an unencrypted development tool) — the public
-  [web demo](https://BenediktBurger.github.io/cycle-app/) states what that
-  means for demo users.
+- On the **web app** the browser storage (OPFS/IndexedDB) is not encrypted
+  by the app, and exported JSON is plaintext on every platform — durability
+  and same-origin caveats are in [Web app](#web-app).
 
 Export/import is the only backup path on **all** platforms — web
 included.
@@ -211,9 +238,9 @@ scaffolding, and the analyze/test/build commands — notably
 
 ### Tech stack
 
-- **Flutter** stable (web as iteration target, per
-  [ADR-0003](docs/adr/0003-target-platforms-web-iteration.md); product
-  targets Android + iOS)
+- **Flutter** stable (web as iteration target and supported secondary
+  target, per [ADR-0003](docs/adr/0003-target-platforms-web-iteration.md);
+  product targets Android + iOS)
 - **flutter_riverpod** for state management
   ([ADR-0004](docs/adr/0004-riverpod-flchart-flutter.md))
 - **drift / SQLite** for local-first storage

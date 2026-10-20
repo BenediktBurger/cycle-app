@@ -1,5 +1,5 @@
 // Canary over the shipped examples/ samples: the files a user loads into the
-// app or the web demo must parse with the CURRENT readers and sit at the
+// app or the web app must parse with the CURRENT readers and sit at the
 // current schema version, so a brokenly edited or outdated sample fails the
 // suite instead of surprising an importer. Detailed import behavior is
 // covered in the export/import and drip suites — only sample health here.

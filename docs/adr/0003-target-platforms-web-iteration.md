@@ -63,3 +63,33 @@ The web build now runs as a public demo at
 "PWA is a welcome bonus" of the decision above: web remains the **iteration
 target**, Android + iOS remain the **product targets** — the demo does not
 change that.
+
+## Amendment 2026-10-20: web is a supported secondary target
+
+**Status: Accepted (amends the platform-target decision above; the iteration
+and test role, the no-native-only-plugins rule, and the cheap CI web build are
+unchanged).** The original text above is kept for the record; where it
+conflicts with this amendment, the amendment governs.
+
+The web build has left the "welcome bonus" status: it is a **supported
+secondary target**, served publicly (ADR-0012) and installable as a PWA.
+
+Supported: data entry, statistics, the cycle view, PDF, JSON export/import,
+and the installed PWA. Not guaranteed: Safari-tab durability, at-rest
+encryption, sync, raw database-file copy, and background notifications.
+
+- **The installed PWA is the durable web mode.** A normal Safari tab is not
+  guaranteed to retain data: WebKit evicts script-writable storage after
+  seven days of Safari use without interacting with the site. Onboarding, the
+  Settings storage card, and the README state this before real data is
+  entered.
+- **Android and iOS remain the primary targets.** They are the reference
+  feature set; web parity covers the contract above, not every native
+  capability. Native at-rest encryption stays native-only and always-on
+  ([ADR-0005](0005-storage-and-encryption.md)); web storage stays
+  unencrypted.
+- **Web remains the iteration and test target.** `flutter run -d chrome` and
+  CI's `flutter build web` stay the cheap inner loop and first compile check,
+  and the no-native-only-plugins rule still constrains package selection.
+- This amendment promotes an existing target's status; it adds no third
+  product platform and no new platform decision.

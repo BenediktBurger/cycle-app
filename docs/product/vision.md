@@ -2,9 +2,10 @@
 
 ## Product goal
 
-A **local-first, open-source mobile app (iOS + Android; PWA bonus)** for
-tracking menstrual-cycle symptoms and **manually evaluating them per NER rules
-(Rötzer), in the INER spirit**: the user evaluates and stays the authority; the
+A **local-first, open-source mobile app (iOS + Android; the installed web
+app as a supported secondary target)** for tracking menstrual-cycle symptoms
+and **manually evaluating them per NER rules (Rötzer), in the INER spirit**:
+the user evaluates and stays the authority; the
 app is a **tool** (visualization, arithmetic, statistics), not the
 decision-maker.
 

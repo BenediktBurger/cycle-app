@@ -16,6 +16,7 @@ import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/main.dart';
 import 'package:cycle_app/platform/web_storage_status.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/about.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
@@ -228,6 +229,27 @@ Widget settingsHarness({
         backupReminderIntervalPin(backupReminderInterval),
     ],
     child: _harnessApp(locale: locale, home: const EinstellungenScreen()),
+  );
+}
+
+/// The about/onboarding content page over the in-memory database (sans the
+/// shell). [onboarding] selects the first-start variant; [webOverride] pins
+/// the web branch (the production gate falls back to the compile-time
+/// `kIsWeb`); [packageInfoFailure] hides the version line (see
+/// [packageInfoChannel] for its call-order caveat).
+Widget aboutHarness({
+  Locale locale = const Locale('de'),
+  bool onboarding = true,
+  bool? webOverride,
+  bool packageInfoFailure = false,
+}) {
+  _answerPackageInfo(failure: packageInfoFailure);
+  return ProviderScope(
+    overrides: [inMemoryDatabase(), onboardingPin(!onboarding)],
+    child: _harnessApp(
+      locale: locale,
+      home: AboutPage(onboarding: onboarding, webOverride: webOverride),
+    ),
   );
 }
 

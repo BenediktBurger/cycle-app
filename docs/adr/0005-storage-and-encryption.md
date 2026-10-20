@@ -177,3 +177,37 @@ stays documented here (and in the app's README/dev docs). The
 user-facing lock story ("PIN lock only on web", the native
 password/biometric lock) remains open and gets no placeholder surface in
 the meantime.
+
+## Amendment 2026-10-20: unencrypted web storage accepted for a supported target
+
+**Status: Accepted (amends the web-encryption decision and the "web is the
+iteration target" rationale above; the native always-on encryption of the
+2026-09-21 amendment is unchanged).** The original text above is kept for
+the record; where it conflicts with this amendment, the amendment governs.
+
+Web storage stays **unencrypted** now that web is a supported target rather
+than only an iteration target. The browser provides OPFS/IndexedDB as it
+does for every site; the app adds no at-rest encryption on top.
+
+Supported: data entry, statistics, the cycle view, PDF, JSON export/import,
+and the installed PWA. Not guaranteed: Safari-tab durability, at-rest
+encryption, sync, raw database-file copy, and background notifications.
+
+- **No passphrase, no PIN, no unlocked-device warning.** The original
+  "PIN lock only on web" mitigation is not a protection and was already
+  removed (2026-10-12); this amendment rules out replacing it with another
+  credential prompt. A tab left unlocked on a shared device therefore has no
+  in-app guard beyond the operating system's screen lock.
+- **Native encryption is unchanged:** Android/iOS databases stay
+  always-on-encrypted with the device-bound key from the 2026-09-21
+  amendment, with no settings toggle.
+- **Exported JSON is plaintext on every platform**, web included — the
+  export is a portable file, not an encrypted container, and it is the only
+  backup path.
+- **The risk is surfaced, not hidden:** onboarding states it on a web first
+  start, the Settings web storage card reports the backend and the
+  persistence state with a diagnostics copy, and the README documents the
+  same limitation.
+- **No migration and no schema change** accompany this amendment: no new
+  drift columns, no schema-version bump, and existing browser databases are
+  read as they are.

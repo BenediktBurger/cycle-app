@@ -423,13 +423,37 @@
     "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. INER's website (iner.org) is named as plain, copyable text — the link handling is a later concern."
   },
   "aboutPosture": "Die App unterstützt — sie entscheidet nie: Sie rechnet und zeigt an, gibt aber keine Fruchtbarkeitsaussage; die Auswertung liegt bei dir.",
+  "aboutWebOnboardingTitle": "Web-App: Vor dem ersten Eintrag",
+  "@aboutWebOnboardingTitle": {
+    "description": "Title of the compact web-only card on the first-start page: explains the durable web path before the user enters data. The installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingInstall": "Schritt 1: Installiere die Web-App auf dem Home-Bildschirm — iOS/Safari: Teilen › „Zum Home-Bildschirm“; Android/Chrome: App installieren. Nur die installierte Web-App ist der dauerhafte Web-Modus.",
+  "@aboutWebOnboardingInstall": {
+    "description": "First fact line of the web onboarding section: install to the Home Screen before entering data — iOS/Safari via Share › Add to Home Screen, Android/Chrome via install. Only the installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingSafari": "Ein normaler Safari-Tab ist nicht dauerhaft: Safari kann den Speicher eines nicht installierten Tabs nach sieben Tagen ohne Interaktion löschen.",
+  "@aboutWebOnboardingSafari": {
+    "description": "Second fact line: a normal Safari tab is not durable; Safari may delete a non-installed tab's storage after seven days without interaction."
+  },
+  "aboutWebOnboardingExport": "Der JSON-Export ist die einzige Sicherung; die Erinnerung steht standardmäßig auf vierteljährlich.",
+  "@aboutWebOnboardingExport": {
+    "description": "Third fact line: the JSON export is the only backup and the backup reminder defaults to quarterly."
+  },
+  "aboutWebOnboardingNoSync": "Es gibt keine Synchronisierung zwischen Geräten oder Browsern.",
+  "@aboutWebOnboardingNoSync": {
+    "description": "Fourth fact line: there is no sync between devices or browsers."
+  },
+  "aboutWebOnboardingUnencrypted": "Der Browser-Speicher wird von der App nicht verschlüsselt.",
+  "@aboutWebOnboardingUnencrypted": {
+    "description": "Fifth fact line: browser storage is not encrypted by the app. States the absence of at-rest encryption without promising encryption."
+  },
   "aboutPrivacyHeading": "Datenschutz",
   "@aboutPrivacyHeading": {
     "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
   },
-  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät. Auf Android und iOS ist die Datenbank verschlüsselt gespeichert; der Schlüssel dazu liegt im geschützten Speicher des Systems. Der Browser-Speicher der Web-Version (OPFS/IndexedDB) wird von der App nicht verschlüsselt — die Web-Version dient nur der Entwicklung. Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
+  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät. Auf Android und iOS ist die Datenbank verschlüsselt gespeichert; der Schlüssel dazu liegt im geschützten Speicher des Systems. Die Web-App ist ein unterstütztes Ziel; ihr Browser-Speicher (OPFS/IndexedDB) ist nicht verschlüsselt. Exportiere deshalb regelmäßig — der Export ist die einzige Sicherung. Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
   "@aboutPrivacyBody": {
-    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. The encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web build's browser storage (OPFS/IndexedDB) is NOT encrypted by the app (web stays an unencrypted development tool). GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. The encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web app's browser storage (OPFS/IndexedDB) is not encrypted by the app. The web app is a supported target; because its storage stays unencrypted, the notice asks for regular exports as the only backup. GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Weiter",
   "aboutLicenseHeading": "Lizenz",
