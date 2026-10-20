@@ -680,6 +680,121 @@
   "settingsExportNote": "All entries and marks as one JSON document. Export regularly — this is the only backup: moving to another device and recovery work only through it, the database file itself cannot be copied because of its device-bound key.",
   "settingsImport": "Import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
+  "webStorageCard": "Browser storage",
+  "@webStorageCard": {
+    "description": "Title of the Settings card describing the web app's browser storage (web only)."
+  },
+  "webStorageInstalled": "Installed as an app: {value}",
+  "@webStorageInstalled": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Yes/no row of the browser-storage card: whether the page runs as an installed PWA."
+  },
+  "webStoragePersistent": "Persistent storage: {value}",
+  "@webStoragePersistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Yes/no/unknown row of the browser-storage card: whether the browser confirmed persistent storage; 'unknown' means the API is unavailable."
+  },
+  "webStorageBackend": "Storage backend: {value}",
+  "@webStorageBackend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Row of the browser-storage card naming drift's chosen backend (OPFS, IndexedDB, in-memory)."
+  },
+  "webStorageUsage": "Estimated storage: {used} of {quota}",
+  "@webStorageUsage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    },
+    "description": "Storage estimate of the browser-storage card when the quota is available. The placeholders are already formatted sizes (e.g. '1.5 MB')."
+  },
+  "webStorageUsageNoQuota": "Estimated storage: {used}",
+  "@webStorageUsageNoQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    },
+    "description": "Storage estimate of the browser-storage card without an available quota; the placeholder is a formatted size or 'unknown'."
+  },
+  "webStorageLastExport": "Last export: {date}",
+  "@webStorageLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Row of the browser-storage card with the last successful JSON export (ISO date) or 'never'."
+  },
+  "webStorageNever": "never",
+  "@webStorageNever": {
+    "description": "Value of the 'Last export' row until an export is recorded."
+  },
+  "webStorageYes": "yes",
+  "webStorageNo": "no",
+  "webStorageUnknown": "unknown",
+  "webStorageBackendOpfs": "OPFS",
+  "@webStorageBackendOpfs": {
+    "description": "Backend label: Origin Private File System, the most durable browser storage."
+  },
+  "webStorageBackendSharedIndexedDb": "Shared IndexedDB",
+  "webStorageBackendUnsafeIndexedDb": "IndexedDB without multi-tab protection",
+  "webStorageBackendInMemory": "In-memory only",
+  "webStorageBackendUnknown": "Unknown",
+  "webStorageMakePersistent": "Make storage persistent",
+  "@webStorageMakePersistent": {
+    "description": "Browser-storage card action: requests persistent browser storage. Enabled only when the API answered and storage is not already persistent."
+  },
+  "webStorageCopyDiagnostics": "Copy diagnostics",
+  "@webStorageCopyDiagnostics": {
+    "description": "Browser-storage card action: copies the diagnostics lines (user agent, backend, estimate) to the clipboard; no network access."
+  },
+  "webStoragePersistGranted": "Persistent storage is now active.",
+  "webStoragePersistDenied": "The browser did not grant persistent storage.",
+  "webStorageDiagnosticsCopied": "Diagnostics copied to clipboard.",
+  "webStorageInMemoryDialogTitle": "Data is not stored persistently",
+  "@webStorageInMemoryDialogTitle": {
+    "description": "Title of the one-time dialog shown when the web database runs in memory only (test mode): warns about data loss without blocking the app."
+  },
+  "webStorageInMemoryDialogBody": "The browser does not provide persistent storage, so the database runs in memory only (test mode). Everything is lost when you close or reload the page. Export regularly if you want to keep your data.",
+  "@webStorageInMemoryDialogBody": {
+    "description": "Body of the one-time test-mode dialog: why the data lives in memory only, that closing or reloading loses it, and that exporting is the way to keep data."
+  },
+  "webStorageInMemoryDismiss": "Got it",
+  "@webStorageInMemoryDismiss": {
+    "description": "Button of the one-time test-mode dialog: closes the dialog; the persistent test-mode banner stays visible."
+  },
+  "webStorageInMemoryBanner": "Test mode: the database lives in memory only. Closing or reloading the page loses all entries.",
+  "@webStorageInMemoryBanner": {
+    "description": "Persistent banner above the app while the web database runs in memory; stays visible after the one-time dialog is dismissed."
+  },
+  "webStorageMultiTabBanner": "This browser cannot safely separate multiple tabs of the same app. Open the app in one tab only, or data may be lost.",
+  "@webStorageMultiTabBanner": {
+    "description": "Banner when drift falls back to unsafe IndexedDB without multi-tab protection: warns against opening the app in several tabs at once."
+  },
+  "webStorageInstallHint": "Install the app in Safari via “Add to Home Screen”. In a normal Safari tab the browser may delete its data after seven days without use.",
+  "@webStorageInstallHint": {
+    "description": "Dismissible hint on iOS/Safari when the app is neither installed nor persistently stored: installing via the Home Screen protects against Safari's seven-day deletion."
+  },
+  "webStorageInstallHintDismiss": "Dismiss hint",
+  "@webStorageInstallHintDismiss": {
+    "description": "Tooltip/semantics label of the close button on the iOS install hint; dismissal lasts for the running session only, not permanently."
+  },
   "exportTitle": "JSON preview",
   "exportCopy": "Copy",
   "exportCopied": "JSON copied to clipboard.",

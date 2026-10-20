@@ -617,6 +617,121 @@
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
   "settingsImport": "Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
+  "webStorageCard": "Browser-Speicher",
+  "@webStorageCard": {
+    "description": "Titel der Einstellungen-Karte, die den Browser-Speicher der Web-App beschreibt (nur auf Web sichtbar)."
+  },
+  "webStorageInstalled": "Als App installiert: {value}",
+  "@webStorageInstalled": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Ja/Nein-Zeile der Browser-Speicher-Karte: ob die Seite als installierte PWA läuft."
+  },
+  "webStoragePersistent": "Dauerhafter Speicher: {value}",
+  "@webStoragePersistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Ja/Nein/unbekannt-Zeile der Browser-Speicher-Karte: ob der Browser den Speicher als dauerhaft bestätigt hat; 'unbekannt' heißt, die API ist nicht verfügbar."
+  },
+  "webStorageBackend": "Speicher-Backend: {value}",
+  "@webStorageBackend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Browser-Speicher-Karte mit dem von drift gewählten Speicher-Backend (OPFS, IndexedDB, Arbeitsspeicher)."
+  },
+  "webStorageUsage": "Geschätzter Speicher: {used} von {quota}",
+  "@webStorageUsage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    },
+    "description": "Speicher-Schätzung der Browser-Speicher-Karte, wenn die Quota verfügbar ist. Die Platzhalter sind bereits formatierte Größen (z. B. '1.5 MB')."
+  },
+  "webStorageUsageNoQuota": "Geschätzter Speicher: {used}",
+  "@webStorageUsageNoQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    },
+    "description": "Speicher-Schätzung der Browser-Speicher-Karte ohne verfügbare Quota; der Platzhalter ist eine formatierte Größe oder 'unbekannt'."
+  },
+  "webStorageLastExport": "Letzter Export: {date}",
+  "@webStorageLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Browser-Speicher-Karte mit dem letzten erfolgreichen JSON-Export (ISO-Datum) oder 'nie'."
+  },
+  "webStorageNever": "nie",
+  "@webStorageNever": {
+    "description": "Wert der Zeile 'Letzter Export', solange noch kein Export erfasst wurde."
+  },
+  "webStorageYes": "ja",
+  "webStorageNo": "nein",
+  "webStorageUnknown": "unbekannt",
+  "webStorageBackendOpfs": "OPFS",
+  "@webStorageBackendOpfs": {
+    "description": "Speicher-Backend-Label: Origin Private File System (die dauerhafteste Browser-Speicherart)."
+  },
+  "webStorageBackendSharedIndexedDb": "Geteilte IndexedDB",
+  "webStorageBackendUnsafeIndexedDb": "IndexedDB ohne Mehr-Tab-Schutz",
+  "webStorageBackendInMemory": "Nur im Arbeitsspeicher",
+  "webStorageBackendUnknown": "Unbekannt",
+  "webStorageMakePersistent": "Speicher dauerhaft machen",
+  "@webStorageMakePersistent": {
+    "description": "Aktion der Browser-Speicher-Karte: fordert persistenten Browser-Speicher an. Nur aktiv, wenn die API antwortet und der Speicher noch nicht dauerhaft ist."
+  },
+  "webStorageCopyDiagnostics": "Diagnose kopieren",
+  "@webStorageCopyDiagnostics": {
+    "description": "Aktion der Browser-Speicher-Karte: kopiert die Diagnosezeilen (User-Agent, Backend, Schätzung) in die Zwischenablage; kein Netzwerkzugriff."
+  },
+  "webStoragePersistGranted": "Dauerhafter Speicher ist jetzt aktiv.",
+  "webStoragePersistDenied": "Der Browser hat dauerhaften Speicher nicht gewährt.",
+  "webStorageDiagnosticsCopied": "Diagnose in die Zwischenablage kopiert.",
+  "webStorageInMemoryDialogTitle": "Daten werden nicht dauerhaft gespeichert",
+  "@webStorageInMemoryDialogTitle": {
+    "description": "Titel des einmaligen Dialogs, wenn die Web-Datenbank nur im Arbeitsspeicher läuft (Testmodus): warnt vor Datenverlust, blockiert die App aber nicht."
+  },
+  "webStorageInMemoryDialogBody": "Der Browser stellt keinen dauerhaften Speicher bereit, deshalb läuft die Datenbank nur im Arbeitsspeicher (Testmodus). Alle Einträge gehen verloren, sobald du die Seite schließt oder neu lädst. Exportiere regelmäßig, wenn du Daten behalten willst.",
+  "@webStorageInMemoryDialogBody": {
+    "description": "Text des einmaligen Testmodus-Dialogs: warum die Daten nur im Arbeitsspeicher liegen, dass Schließen oder Neuladen sie verliert und dass der Export der Weg ist, Daten zu behalten."
+  },
+  "webStorageInMemoryDismiss": "Verstanden",
+  "@webStorageInMemoryDismiss": {
+    "description": "Schaltfläche des einmaligen Testmodus-Dialogs: schließt den Dialog; der dauerhafte Testmodus-Banner bleibt sichtbar."
+  },
+  "webStorageInMemoryBanner": "Testmodus: Die Datenbank liegt nur im Arbeitsspeicher. Beim Schließen oder Neuladen der Seite gehen alle Einträge verloren.",
+  "@webStorageInMemoryBanner": {
+    "description": "Dauerhafter Banner über der App, solange die Web-Datenbank im Arbeitsspeicher läuft; bleibt nach dem Schließen des einmaligen Dialogs sichtbar."
+  },
+  "webStorageMultiTabBanner": "Dieser Browser kann mehrere Tabs derselben App nicht sicher trennen. Öffne die App nur in einem Tab, sonst können Daten verloren gehen.",
+  "@webStorageMultiTabBanner": {
+    "description": "Banner, wenn drift auf unsicheres IndexedDB ohne Mehr-Tab-Schutz ausweicht: warnt davor, die App in mehreren Tabs gleichzeitig zu öffnen."
+  },
+  "webStorageInstallHint": "Installiere die App in Safari über „Zum Home-Bildschirm“. In einem normalen Safari-Tab kann der Browser die Daten nach sieben Tagen ohne Nutzung löschen.",
+  "@webStorageInstallHint": {
+    "description": "Schließbarer Hinweis auf iOS/Safari, wenn die App weder installiert noch dauerhaft gespeichert ist: Installation über den Home-Bildschirm schützt vor der Safari-Löschung nach sieben Tagen."
+  },
+  "webStorageInstallHintDismiss": "Hinweis ausblenden",
+  "@webStorageInstallHintDismiss": {
+    "description": "Tooltip/Semantik-Label des Schließen-Knopfs am iOS-Installationshinweis; das Ausblenden gilt nur für die laufende Sitzung, nicht dauerhaft."
+  },
   "exportTitle": "JSON-Vorschau",
   "exportCopy": "Kopieren",
   "exportCopied": "JSON in die Zwischenablage kopiert.",

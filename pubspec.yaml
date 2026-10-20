@@ -141,6 +141,10 @@ dependencies:
   # migration tests (they bootstrap older-version database files via the raw
   # binding before drift's upgrade runs on them).
   sqlite3: ^3.5.0
+  # Browser APIs for the web-only storage probe (lib/platform/browser_storage_web.dart,
+  # reached through a conditional export so native and VM builds never see
+  # package:web). Pinned to the lock's 1.x line.
+  web: ^1.1.1
   # System share sheet for the JSON export (an alternative hand-off to a
   # mail app / cloud drive next to the save-as dialog in file_picker above
   # — the copy button alone stays the always-available fallback).

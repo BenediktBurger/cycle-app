@@ -13,6 +13,7 @@
 // change back to that table. The settings themselves are @riverpod
 // Notifier providers in this file; their only sanctioned external write
 // is the notifier's `set` member.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ProviderBase/Refreshable (the registrar bind's parameter types) ship from
@@ -35,6 +36,8 @@ import 'domain/pdf_export_model.dart';
 import 'domain/statistics.dart';
 import 'domain/temperature_range.dart';
 import 'pdf/cycle_pdf.dart';
+import 'platform/browser_storage.dart';
+import 'platform/web_storage_status.dart';
 
 part 'providers.g.dart';
 
@@ -48,9 +51,82 @@ part 'providers.g.dart';
 /// impossible — lib/db/db_key.dart); the splash gate surfaces the error.
 @Riverpod(keepAlive: true)
 Future<CycleDatabase> database(Ref ref) async {
-  final db = await openCycleDatabase();
+  final db = await openCycleDatabase(
+    onWebStorageResult: (backend) =>
+        ref.read(webStorageBackendProvider.notifier).set(backend),
+  );
   ref.onDispose(db.close);
   return db;
+}
+
+/// The storage implementation drift chose when opening the web database.
+/// Null until the opener reports it, and permanently null on native. Kept in
+/// memory only: it describes this process's backend, not a user setting.
+@Riverpod(keepAlive: true)
+class WebStorageBackendNotifier extends _$WebStorageBackendNotifier
+    implements SettableSetting<WebStorageBackend?> {
+  @override
+  WebStorageBackend? build() => null;
+  @override
+  void set(WebStorageBackend? value) => state = value;
+}
+
+/// The browser's answer to an explicit persistence request, in memory only and
+/// null until the user asks; [webStorageReportProvider] merges it so the status
+/// reflects the answer even where `persisted()` is unavailable.
+@Riverpod(keepAlive: true)
+class WebStoragePersistenceNotifier extends _$WebStoragePersistenceNotifier
+    implements SettableSetting<bool?> {
+  @override
+  bool? build() => null;
+  @override
+  void set(bool? value) => state = value;
+}
+
+/// The merged browser storage status, null off the web and until the opening
+/// database has recorded its backend.
+@Riverpod(keepAlive: true)
+Future<WebStorageStatus?> webStorageReport(Ref ref) async {
+  await ref.watch(databaseProvider.future);
+  if (!kIsWeb) return null;
+  final backend = ref.read(webStorageBackendProvider);
+  if (backend == null) return null;
+  final status = composeWebStorageStatus(backend, await probeBrowserStorage());
+  final persisted = ref.read(webStoragePersistenceProvider);
+  return persisted == null ? status : status.withPersistentResult(persisted);
+}
+
+/// Requests persistent browser storage for an explicit user action, returning
+/// whether the browser granted it and refreshing [webStorageReportProvider].
+Future<bool> persistWebStorage(WidgetRef ref) async {
+  if (!kIsWeb) return false;
+  final granted = await requestPersistentStorage();
+  ref.read(webStoragePersistenceProvider.notifier).set(granted);
+  ref.invalidate(webStorageReportProvider);
+  return granted;
+}
+
+/// Whether this app run has already shown the in-memory test-mode dialog;
+/// in-memory only, because persisting it would silence the next run's
+/// storage failure.
+@Riverpod(keepAlive: true)
+class InMemoryWarningShownNotifier extends _$InMemoryWarningShownNotifier
+    implements SettableSetting<bool> {
+  @override
+  bool build() => false;
+  @override
+  void set(bool value) => state = value;
+}
+
+/// Whether the iOS install hint was dismissed in this app run; in-memory
+/// only, because the dismissal is a session choice, not a setting.
+@Riverpod(keepAlive: true)
+class InstallHintDismissedNotifier extends _$InstallHintDismissedNotifier
+    implements SettableSetting<bool> {
+  @override
+  bool build() => false;
+  @override
+  void set(bool value) => state = value;
 }
 
 /// The current wall-clock time, injectable: the Tagebuch entry form stamps
@@ -353,7 +429,7 @@ typedef SettingsWriteSink =
 /// The write contract every mutable settings notifier exposes — the
 /// sanctioned external write (`ref.read(xProvider.notifier).set(v)`),
 /// because riverpod annotates the Notifier `state` setter `@protected`.
-/// Implemented by all 16 Notifier classes in this file; the registrar's
+/// Implemented by every Notifier class in this file; the registrar's
 /// [PersistedSetting.bind] is generic over it.
 mixin SettableSetting<T> {
   /// The sanctioned external write for the provider this notifier backs.
