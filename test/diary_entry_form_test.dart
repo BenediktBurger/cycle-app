@@ -706,7 +706,7 @@ void main() {
   // ═══════════ mucus picker chip tooltips ═══════════
   // Both picker rows explain themselves: long-pressing (hover on desktop)
   // a sign or quality chip shows the German wording from the INER cheat
-  // sheet (docs/cheatsheet.md). The German wording is pinned exactly, per
+  // sheet (docs/NER/cheatsheet.md). The German wording is pinned exactly, per
   // the locale-de harness.
 
   group('mucus picker chip tooltips', () {

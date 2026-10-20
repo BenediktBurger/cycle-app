@@ -1,5 +1,5 @@
 // Domain tests: evaluation arithmetic over (entries, marks) — the
-// compute-only NER rules of docs/cheatsheet.md §Auswertung. Pure Dart —
+// compute-only NER rules of docs/NER/cheatsheet.md §Auswertung. Pure Dart —
 // imports only lib/domain, runs on the host VM.
 //
 // Numbering (settled, owner-confirmed 2026-09-17): the six-low window is
