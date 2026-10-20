@@ -18,9 +18,13 @@ user stays the decision-maker. The full posture is described in
 [docs/product/vision.md](docs/product/vision.md) and
 [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md).
 
-> **This app is in beta.** A beta can still lose data, so export your data
-> **regularly and before every update** — via Export in the settings
-> screen. See [Backup, migration & recovery](#backup-migration--recovery).
+> **This app is in beta: the core is stable, the details still change.**
+> Storage and evaluation logic are settled and no larger database changes
+> are planned. Screens, controls, and features are still being revised and the
+> final name, icon, and colour scheme are not decided yet. Data loss cannot
+> be ruled out entirely, so export your data **regularly and before every
+> update** — via Export in the settings screen. See
+> [Backup, migration & recovery](#backup-migration--recovery).
 
 ## Screenshots
 
@@ -148,11 +152,15 @@ Daten, und die App rechnet und zeigt an — sie schlägt nichts vor und
 entscheidet nichts. Methodenkenntnisse (aus einem Lehrbuch oder einer
 Schulung) sind Voraussetzung für eine zuverlässige Beurteilung.
 
-**Beta-Hinweis:** Die App befindet sich in der Beta-Phase — Datenverlust
-ist nicht ausgeschlossen. Exportieren Sie Ihre Daten deshalb **regelmäßig
-und vor jedem Update** über den Export in den Einstellungen; der Export ist
-auf allen Plattformen der einzige Backup-Weg (Einzelheiten:
-[Backup, migration & recovery](#backup-migration--recovery)).
+**Beta-Hinweis:** Der Kern der App ist stabil — Datenspeicherung,
+Datenmodell und Auswertungslogik sind gesetzt, größere Datenbankänderungen
+sind nicht zu erwarten. Oberfläche und Bedienung werden aber weiter
+überarbeitet, Funktionen kommen hinzu, und Name, Symbol sowie Farbschema
+stehen noch nicht fest („NER Cycle App“ ist ein Arbeitstitel). Ganz
+ausgeschlossen ist Datenverlust nicht — exportieren Sie Ihre Daten deshalb
+weiterhin **regelmäßig und vor jedem Update** über den Export in den
+Einstellungen; der Export ist auf allen Plattformen der einzige Backup-Weg
+(Einzelheiten: [Backup, migration & recovery](#backup-migration--recovery)).
 
 **Installation (Android):** Eine iOS-Version gibt es noch nicht.
 

@@ -9,9 +9,11 @@ Phasenlängen). Sie rechnet und zeigt an; sie schlägt nichts vor und
 entscheidet nichts. Für eine zuverlässige Beurteilung der Fruchtbarkeit
 brauchen Sie Methodenkenntnisse — aus einem Lehrbuch oder einer Schulung.
 
-Die App befindet sich in der Beta-Phase — exportieren Sie Ihre Daten
-regelmäßig und vor jedem Update über den Export in den
-Einstellungen.
+Die App befindet sich in der Beta-Phase: Speicherung und Auswertung sind
+stabil, Oberfläche, Bedienung und Funktionen werden aber weiter
+überarbeitet, und Name, Symbol sowie Farbschema stehen noch nicht fest.
+Datenverlust ist nicht vollständig ausgeschlossen — exportieren Sie Ihre
+Daten regelmäßig und vor jedem Update über den Export in den Einstellungen.
 
 Funktionen:
 
