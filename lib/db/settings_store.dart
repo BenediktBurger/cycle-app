@@ -16,6 +16,7 @@ import 'dart:ui' show Locale;
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../domain/backup_reminder.dart';
 import '../domain/custom_categories.dart';
 import '../domain/date_only.dart';
 import '../domain/diary_track.dart';
@@ -98,6 +99,21 @@ abstract final class SettingKeys {
   /// fall back per field — the stored days reference these labels
   /// verbatim, so corrupt definitions must never break a read.
   static const customDiaryCategories = 'customDiaryCategories';
+
+  /// When the last successful JSON export was saved or shared, as a plain
+  /// ISO-8601 timestamp string in UTC. Nothing stored (or a corrupt row)
+  /// means "never exported".
+  static const lastExportAt = 'backupReminder.lastExportAt';
+
+  /// The backup-reminder preset as its enum-name token ('off', 'monthly',
+  /// 'quarterly', 'halfYearly'). An absent or corrupt row means
+  /// [BackupReminderInterval.quarterly].
+  static const backupReminderInterval = 'backupReminder.interval';
+
+  /// Until when the user snoozed the backup reminder, as a plain ISO-8601
+  /// timestamp string in UTC. Nothing stored (or a corrupt row) means "not
+  /// snoozed".
+  static const backupReminderSnoozedUntil = 'backupReminder.snoozedUntil';
 }
 
 /// One joined snapshot of all persisted general settings, as
@@ -117,6 +133,9 @@ final class PersistedSettings {
     this.pdfExportBirthDate,
     this.diaryTrack = DiaryTrack.defaults,
     this.customDiaryCategories = const [],
+    this.lastExportAt,
+    this.backupReminderInterval = BackupReminderInterval.quarterly,
+    this.backupReminderSnoozedUntil,
   });
 
   /// The all-defaults snapshot (what an empty table loads to).
@@ -170,6 +189,18 @@ final class PersistedSettings {
   /// form's custom-mark sections and the settings management card.
   final List<CustomCategory> customDiaryCategories;
 
+  /// When the last successful JSON export was saved or shared, UTC, or null
+  /// when never exported.
+  final DateTime? lastExportAt;
+
+  /// The backup-reminder preset; quarterly when no explicit choice is
+  /// stored.
+  final BackupReminderInterval backupReminderInterval;
+
+  /// Until when the user snoozed the backup reminder, UTC, or null when not
+  /// snoozed.
+  final DateTime? backupReminderSnoozedUntil;
+
   @override
   bool operator ==(Object other) =>
       other is PersistedSettings &&
@@ -184,7 +215,10 @@ final class PersistedSettings {
       other.pdfExportName == pdfExportName &&
       other.pdfExportBirthDate == pdfExportBirthDate &&
       other.diaryTrack == diaryTrack &&
-      _categoriesEqual(other.customDiaryCategories, customDiaryCategories);
+      _categoriesEqual(other.customDiaryCategories, customDiaryCategories) &&
+      other.lastExportAt == lastExportAt &&
+      other.backupReminderInterval == backupReminderInterval &&
+      other.backupReminderSnoozedUntil == backupReminderSnoozedUntil;
 
   @override
   int get hashCode => Object.hash(
@@ -199,6 +233,9 @@ final class PersistedSettings {
     pdfExportBirthDate,
     diaryTrack,
     Object.hashAll(customDiaryCategories),
+    lastExportAt,
+    backupReminderInterval,
+    backupReminderSnoozedUntil,
   );
 }
 
@@ -239,6 +276,9 @@ final class SettingsStore {
     DateTime? pdfExportBirthDate;
     var diaryTrack = DiaryTrack.defaults;
     var customDiaryCategories = const <CustomCategory>[];
+    DateTime? lastExportAt;
+    var backupReminderInterval = BackupReminderInterval.quarterly;
+    DateTime? backupReminderSnoozedUntil;
 
     for (final row in rows) {
       // Per row: a single corrupt value must degrade only its own key.
@@ -275,6 +315,12 @@ final class SettingsStore {
             }
           case SettingKeys.customDiaryCategories:
             customDiaryCategories = _customCategoriesFromStored(decoded);
+          case SettingKeys.lastExportAt:
+            lastExportAt = _utcInstantFromStored(decoded);
+          case SettingKeys.backupReminderInterval:
+            backupReminderInterval = _backupReminderIntervalFromStored(decoded);
+          case SettingKeys.backupReminderSnoozedUntil:
+            backupReminderSnoozedUntil = _utcInstantFromStored(decoded);
         }
       } catch (_) {
         // Not JSON / unrepresentable for this key: its default stands.
@@ -294,6 +340,9 @@ final class SettingsStore {
       pdfExportBirthDate: pdfExportBirthDate,
       diaryTrack: diaryTrack,
       customDiaryCategories: customDiaryCategories,
+      lastExportAt: lastExportAt,
+      backupReminderInterval: backupReminderInterval,
+      backupReminderSnoozedUntil: backupReminderSnoozedUntil,
     );
   }
 
@@ -411,6 +460,26 @@ final class SettingsStore {
         SettingKeys.customDiaryCategories,
         categories.isEmpty ? null : categories.map((c) => c.toJson()).toList(),
       );
+
+  /// Persists the last successful JSON export's instant as its UTC ISO
+  /// string; null deletes the row ("never exported").
+  Future<void> persistLastExportAt(DateTime? instant) => writeSetting(
+    SettingKeys.lastExportAt,
+    instant?.toUtc().toIso8601String(),
+  );
+
+  /// Persists the backup-reminder preset under its enum-name token. `off` is
+  /// written like every other preset — an explicit choice, not an absent
+  /// row.
+  Future<void> persistBackupReminderInterval(BackupReminderInterval interval) =>
+      writeSetting(SettingKeys.backupReminderInterval, interval.name);
+
+  /// Persists the snooze end as its UTC ISO string; null deletes the row.
+  Future<void> persistBackupReminderSnoozedUntil(DateTime? instant) =>
+      writeSetting(
+        SettingKeys.backupReminderSnoozedUntil,
+        instant?.toUtc().toIso8601String(),
+      );
 }
 
 /// Locale decode: any non-empty language code is accepted verbatim (a code
@@ -469,6 +538,28 @@ List<CustomCategory> _customCategoriesFromStored(Object? decoded) {
     for (final member in decoded)
       if (member is Map<String, Object?>) CustomCategory.fromJson(member),
   ];
+}
+
+/// Timestamp decode for the export instant and the snooze end: ISO-8601
+/// strings with a real calendar day only, normalized to UTC because the
+/// reminder compares instants, not wall-clock forms. The date prefix goes
+/// through [tryParseIsoDate] so Dart's lenient parser cannot roll an
+/// impossible day over; everything else — numbers, booleans, unparsable or
+/// corrupt rows — decodes to null, "not set".
+DateTime? _utcInstantFromStored(Object? decoded) {
+  if (decoded is! String || decoded.length < 10) return null;
+  if (tryParseIsoDate(decoded.substring(0, 10)) == null) return null;
+  return DateTime.tryParse(decoded)?.toUtc();
+}
+
+/// Interval decode: the four enum-name tokens only. Unknown tokens and
+/// non-strings decode to the quarterly default, never an error.
+BackupReminderInterval _backupReminderIntervalFromStored(Object? decoded) {
+  if (decoded is String) {
+    return BackupReminderInterval.values.asNameMap()[decoded] ??
+        BackupReminderInterval.quarterly;
+  }
+  return BackupReminderInterval.quarterly;
 }
 
 /// The ISO date string ('yyyy-MM-dd') of a calendar day — the EXACT shape

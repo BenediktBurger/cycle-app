@@ -8,12 +8,15 @@
 // real default, which is exactly what the "system follows the device" tests
 // rely on (see locale_test.dart / theme_mode_setting_test.dart).
 import 'package:cycle_app/db/cycle_database.dart';
+import 'package:cycle_app/domain/backup_reminder.dart';
 import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/l10n/app_localizations.dart';
 import 'package:cycle_app/main.dart';
+import 'package:cycle_app/platform/web_storage_status.dart';
 import 'package:cycle_app/providers.dart';
+import 'package:cycle_app/ui/about.dart';
 import 'package:cycle_app/ui/diary.dart';
 import 'package:cycle_app/ui/settings.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
@@ -137,7 +140,11 @@ void _answerPackageInfo({required bool failure}) {
 ///  - [selectedDay]: today (the provider's real default),
 ///  - [entriesStream]: the provider's real database-backed stream (the
 ///    override replaces it wholesale — broadcast streams let the diary and
-///    the cycle chart listen at the same time).
+///    the cycle chart listen at the same time),
+///  - [storageReport]: null leaves the real report (native: null); a status
+///    pins the browser storage report (the in-memory suppression case),
+///  - [lastExportAt] / [backupReminderInterval]: the backup-reminder state
+///    (null leaves the provider default — never exported / quarterly).
 ///
 /// [seed] and [onCreated] reach the database override ([inMemoryDatabase]).
 ///
@@ -170,6 +177,9 @@ ProviderScope appScope({
   DateTime Function()? now,
   DateTime? selectedDay,
   Stream<List<DailyEntry>>? entriesStream,
+  WebStorageStatus? storageReport,
+  DateTime? lastExportAt,
+  BackupReminderInterval? backupReminderInterval,
 }) {
   _answerPackageInfo(failure: packageInfoFailure);
   return ProviderScope(
@@ -184,6 +194,11 @@ ProviderScope appScope({
       if (selectedDay != null) selectedDatePin(selectedDay),
       if (entriesStream != null)
         dailyEntriesProvider.overrideWith((ref) => entriesStream),
+      if (storageReport != null)
+        webStorageReportProvider.overrideWith((ref) async => storageReport),
+      if (lastExportAt != null) lastExportAtPin(lastExportAt),
+      if (backupReminderInterval != null)
+        backupReminderIntervalPin(backupReminderInterval),
     ],
     child: const CycleApp(),
   );
@@ -194,17 +209,47 @@ ProviderScope appScope({
 /// about page's version lookup fail and hides its version line (see
 /// [packageInfoChannel] for its call-order caveat); [seed] provides the
 /// device-side data the surface under test previews against; [builder] swaps
-/// in a fault-injectable database (support/faulty_db.dart).
+/// in a fault-injectable database (support/faulty_db.dart);
+/// [lastExportAt] / [backupReminderInterval] pin the export card's reminder
+/// state (null leaves the provider default — never exported / quarterly).
 Widget settingsHarness({
   Locale locale = const Locale('de'),
   bool packageInfoFailure = false,
   Future<void> Function(CycleDatabase db)? seed,
   CycleDatabase Function()? builder,
+  DateTime? lastExportAt,
+  BackupReminderInterval? backupReminderInterval,
 }) {
   _answerPackageInfo(failure: packageInfoFailure);
   return ProviderScope(
-    overrides: [inMemoryDatabase(seed: seed, builder: builder)],
+    overrides: [
+      inMemoryDatabase(seed: seed, builder: builder),
+      if (lastExportAt != null) lastExportAtPin(lastExportAt),
+      if (backupReminderInterval != null)
+        backupReminderIntervalPin(backupReminderInterval),
+    ],
     child: _harnessApp(locale: locale, home: const EinstellungenScreen()),
+  );
+}
+
+/// The about/onboarding content page over the in-memory database (sans the
+/// shell). [onboarding] selects the first-start variant; [webOverride] pins
+/// the web branch (the production gate falls back to the compile-time
+/// `kIsWeb`); [packageInfoFailure] hides the version line (see
+/// [packageInfoChannel] for its call-order caveat).
+Widget aboutHarness({
+  Locale locale = const Locale('de'),
+  bool onboarding = true,
+  bool? webOverride,
+  bool packageInfoFailure = false,
+}) {
+  _answerPackageInfo(failure: packageInfoFailure);
+  return ProviderScope(
+    overrides: [inMemoryDatabase(), onboardingPin(!onboarding)],
+    child: _harnessApp(
+      locale: locale,
+      home: AboutPage(onboarding: onboarding, webOverride: webOverride),
+    ),
   );
 }
 

@@ -2,9 +2,10 @@
 
 ## Product goal
 
-A **local-first, open-source mobile app (iOS + Android; PWA bonus)** for
-tracking menstrual-cycle symptoms and **manually evaluating them per NER rules
-(Rötzer), in the INER spirit**: the user evaluates and stays the authority; the
+A **local-first, open-source mobile app (iOS + Android; the installed web
+app as a supported secondary target)** for tracking menstrual-cycle symptoms
+and **manually evaluating them per NER rules (Rötzer), in the INER spirit**:
+the user evaluates and stays the authority; the
 app is a **tool** (visualization, arithmetic, statistics), not the
 decision-maker.
 
@@ -33,8 +34,9 @@ override) **and A** (automatic) are explicitly deferred.
 4. **PDF export** of cycles as Auswertungsbogen — deferred past M1.
 5. **Partner evaluates on same phone** (profiles in the v0 schema, UI later);
    file-based sharing a nice-to-have.
-6. **Password/biometric lock** (PIN stub in settings; ADR notes web
-   limitations, `flutter_secure_storage` on native later).
+6. **Password/biometric lock** (planned native-only future work; no web
+   lock, since browser storage stays unencrypted — ADR-0005;
+   `flutter_secure_storage` on native later).
 7. **Local-first, no cloud, no analytics**; Export/import in Settings
    from M1.
 8. **Open source** under Apache-2.0 (chosen 2026-09; final confirmation
@@ -46,9 +48,10 @@ override) **and A** (automatic) are explicitly deferred.
 
 - **Local-first**: all data stays on the device — no cloud, no analytics, no
   network permissions (req. 7).
-- **Security/privacy**: password/biometric lock; native storage is already
-  always-on encrypted (SQLite3MultipleCiphers, ADR-005); PIN lock only on
-  web (req. 6).
+- **Security/privacy**: a password/biometric lock is planned for native only,
+  where storage is already always-on encrypted (SQLite3MultipleCiphers,
+  ADR-0005); web storage is unencrypted by the app (ADR-0005); no lock is
+  implemented yet (req. 6).
 - **Licensing & size**: open source under Apache-2.0 (chosen 2026-09; final
   confirmation before first publishing still open), app size well below 50 MB
   (req. 8).

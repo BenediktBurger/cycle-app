@@ -12,6 +12,7 @@
 // test/db/settings_store_test.dart.
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/backup_reminder.dart';
 import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:cycle_app/main.dart';
@@ -556,6 +557,47 @@ void main() {
     });
   });
 
+  group('backup reminder notifiers', () {
+    test('defaults follow the store defaults and set writes the state', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(lastExportAtProvider), isNull);
+      expect(
+        container.read(backupReminderIntervalProvider),
+        BackupReminderInterval.quarterly,
+        reason: 'quarterly is the default without an explicit row',
+      );
+      expect(container.read(backupReminderSnoozedUntilProvider), isNull);
+
+      final exportedAt = DateTime.utc(2026, 1, 15, 10, 30);
+      final snoozedUntil = DateTime.utc(2026, 2, 1);
+      container.read(lastExportAtProvider.notifier).set(exportedAt);
+      container
+          .read(backupReminderIntervalProvider.notifier)
+          .set(BackupReminderInterval.monthly);
+      container
+          .read(backupReminderSnoozedUntilProvider.notifier)
+          .set(snoozedUntil);
+
+      expect(container.read(lastExportAtProvider), exportedAt);
+      expect(
+        container.read(backupReminderIntervalProvider),
+        BackupReminderInterval.monthly,
+      );
+      expect(container.read(backupReminderSnoozedUntilProvider), snoozedUntil);
+
+      container
+          .read(backupReminderIntervalProvider.notifier)
+          .set(BackupReminderInterval.off);
+      expect(
+        container.read(backupReminderIntervalProvider),
+        BackupReminderInterval.off,
+        reason: 'off is an explicit choice, not the absence of a choice',
+      );
+    });
+  });
+
   group('PDF export identifying values (name & birth date)', () {
     testWidgets('a persisted name and birth date hydrate into the '
         'PDF-export card on start', (WidgetTester tester) async {
@@ -603,5 +645,102 @@ void main() {
         (tester) => _validatedWriteThroughCycle(tester, field),
       );
     }
+  });
+
+  group('backup reminder (interval & last export)', () {
+    Finder reminderDropdown() =>
+        find.byKey(const ValueKey('backupReminderIntervalDropdown'));
+
+    DropdownButton<BackupReminderInterval> dropdown(WidgetTester tester) =>
+        tester.widget<DropdownButton<BackupReminderInterval>>(
+          reminderDropdown(),
+        );
+
+    testWidgets('a persisted interval and export instant appear in the export '
+        'card on start', (WidgetTester tester) async {
+      useTallSurface(tester, width: 900);
+
+      Future<void> seed(CycleDatabase db) async {
+        final store = SettingsStore(db.settingsDao);
+        await store.persistBackupReminderInterval(
+          BackupReminderInterval.monthly,
+        );
+        await store.persistLastExportAt(DateTime(2026, 5, 4, 12));
+      }
+
+      await tester.pumpWidget(appScope(locale: const Locale('de'), seed: seed));
+      await tester.pumpAndSettle();
+
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, reminderDropdown());
+
+      expect(
+        dropdown(tester).value,
+        BackupReminderInterval.monthly,
+        reason: 'the stored preset must appear in the dropdown after start',
+      );
+      expect(
+        find.text('Letzter Export: 2026-05-04'),
+        findsOneWidget,
+        reason: 'the stored export instant must appear as its local day',
+      );
+    });
+
+    testWidgets('changing the dropdown writes the interval row', (
+      WidgetTester tester,
+    ) async {
+      useTallSurface(tester, width: 900);
+
+      CycleDatabase? db;
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          onCreated: (created) => db = created,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, reminderDropdown());
+
+      await tester.tap(reminderDropdown());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Halbjährlich'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await SettingsStore(
+          db!.settingsDao,
+        ).readSetting(SettingKeys.backupReminderInterval),
+        'halfYearly',
+        reason: 'a preset choice must land in app_settings as its token',
+      );
+    });
+
+    testWidgets('a live interval choice is not clobbered by hydration', (
+      WidgetTester tester,
+    ) async {
+      useTallSurface(tester, width: 900);
+
+      Future<void> seed(CycleDatabase db) => SettingsStore(
+        db.settingsDao,
+      ).persistBackupReminderInterval(BackupReminderInterval.halfYearly);
+
+      // The pin stands for a live choice made before the stored snapshot
+      // arrived; the hydrated half-yearly row must not overwrite it.
+      await tester.pumpWidget(
+        appScope(
+          locale: const Locale('de'),
+          backupReminderInterval: BackupReminderInterval.monthly,
+          seed: seed,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openSettingsTab(tester);
+      await scrollSettingsCardIntoView(tester, reminderDropdown());
+
+      expect(dropdown(tester).value, BackupReminderInterval.monthly);
+    });
   });
 }

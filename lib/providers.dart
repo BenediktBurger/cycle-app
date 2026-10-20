@@ -13,6 +13,9 @@
 // change back to that table. The settings themselves are @riverpod
 // Notifier providers in this file; their only sanctioned external write
 // is the notifier's `set` member.
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ProviderBase/Refreshable (the registrar bind's parameter types) ship from
@@ -24,6 +27,7 @@ import 'db/cycle_database.dart';
 import 'db/database_opener.dart';
 import 'db/mappers.dart';
 import 'db/settings_store.dart';
+import 'domain/backup_reminder.dart';
 import 'domain/date_only.dart';
 import 'domain/custom_categories.dart';
 import 'domain/diary_track.dart';
@@ -35,6 +39,8 @@ import 'domain/pdf_export_model.dart';
 import 'domain/statistics.dart';
 import 'domain/temperature_range.dart';
 import 'pdf/cycle_pdf.dart';
+import 'platform/browser_storage.dart';
+import 'platform/web_storage_status.dart';
 
 part 'providers.g.dart';
 
@@ -48,9 +54,82 @@ part 'providers.g.dart';
 /// impossible — lib/db/db_key.dart); the splash gate surfaces the error.
 @Riverpod(keepAlive: true)
 Future<CycleDatabase> database(Ref ref) async {
-  final db = await openCycleDatabase();
+  final db = await openCycleDatabase(
+    onWebStorageResult: (backend) =>
+        ref.read(webStorageBackendProvider.notifier).set(backend),
+  );
   ref.onDispose(db.close);
   return db;
+}
+
+/// The storage implementation drift chose when opening the web database.
+/// Null until the opener reports it, and permanently null on native. Kept in
+/// memory only: it describes this process's backend, not a user setting.
+@Riverpod(keepAlive: true)
+class WebStorageBackendNotifier extends _$WebStorageBackendNotifier
+    implements SettableSetting<WebStorageBackend?> {
+  @override
+  WebStorageBackend? build() => null;
+  @override
+  void set(WebStorageBackend? value) => state = value;
+}
+
+/// The browser's answer to an explicit persistence request, in memory only and
+/// null until the user asks; [webStorageReportProvider] merges it so the status
+/// reflects the answer even where `persisted()` is unavailable.
+@Riverpod(keepAlive: true)
+class WebStoragePersistenceNotifier extends _$WebStoragePersistenceNotifier
+    implements SettableSetting<bool?> {
+  @override
+  bool? build() => null;
+  @override
+  void set(bool? value) => state = value;
+}
+
+/// The merged browser storage status, null off the web and until the opening
+/// database has recorded its backend.
+@Riverpod(keepAlive: true)
+Future<WebStorageStatus?> webStorageReport(Ref ref) async {
+  await ref.watch(databaseProvider.future);
+  if (!kIsWeb) return null;
+  final backend = ref.read(webStorageBackendProvider);
+  if (backend == null) return null;
+  final status = composeWebStorageStatus(backend, await probeBrowserStorage());
+  final persisted = ref.read(webStoragePersistenceProvider);
+  return persisted == null ? status : status.withPersistentResult(persisted);
+}
+
+/// Requests persistent browser storage for an explicit user action, returning
+/// whether the browser granted it and refreshing [webStorageReportProvider].
+Future<bool> persistWebStorage(WidgetRef ref) async {
+  if (!kIsWeb) return false;
+  final granted = await requestPersistentStorage();
+  ref.read(webStoragePersistenceProvider.notifier).set(granted);
+  ref.invalidate(webStorageReportProvider);
+  return granted;
+}
+
+/// Whether this app run has already shown the in-memory test-mode dialog;
+/// in-memory only, because persisting it would silence the next run's
+/// storage failure.
+@Riverpod(keepAlive: true)
+class InMemoryWarningShownNotifier extends _$InMemoryWarningShownNotifier
+    implements SettableSetting<bool> {
+  @override
+  bool build() => false;
+  @override
+  void set(bool value) => state = value;
+}
+
+/// Whether the iOS install hint was dismissed in this app run; in-memory
+/// only, because the dismissal is a session choice, not a setting.
+@Riverpod(keepAlive: true)
+class InstallHintDismissedNotifier extends _$InstallHintDismissedNotifier
+    implements SettableSetting<bool> {
+  @override
+  bool build() => false;
+  @override
+  void set(bool value) => state = value;
 }
 
 /// The current wall-clock time, injectable: the Tagebuch entry form stamps
@@ -95,6 +174,65 @@ Stream<List<MeasurementMethodSnapshot>> measurementMethods(Ref ref) async* {
   final db = await ref.watch(databaseProvider.future);
   yield* db.measurementMethodsDao.watchAll().map(
     (rows) => rows.map(measurementSnapshotFromDrift).toList(),
+  );
+}
+
+/// The earliest moment the app tracked data: the minimum `createdAt` over
+/// entries and measurement-method snapshots. A marks-only database anchors at
+/// its earliest mark day because marks carry no timestamp.
+///
+/// The stream providers are watched only as invalidation triggers; the
+/// streamed domain models carry no timestamps, so the anchor is read from the
+/// tables.
+@Riverpod(keepAlive: true)
+Future<DateTime?> earliestTrackedDataAt(Ref ref) async {
+  ref.watch(dailyEntriesProvider);
+  ref.watch(marksProvider);
+  ref.watch(measurementMethodsProvider);
+  final db = await ref.watch(databaseProvider.future);
+  final entries = await db.entriesDao.allEntries();
+  final methods = await db.measurementMethodsDao.allSnapshots();
+  final timestamps = <DateTime>[
+    for (final entry in entries) entry.createdAt,
+    for (final method in methods) method.createdAt,
+  ];
+  if (timestamps.isNotEmpty) return _earliest(timestamps);
+  final marks = await db.marksDao.allMarks();
+  if (marks.isEmpty) return null;
+  return _earliest([for (final mark in marks) mark.entryDate]);
+}
+
+DateTime _earliest(List<DateTime> instants) =>
+    instants.reduce((a, b) => a.isBefore(b) ? a : b).toUtc();
+
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+@Riverpod(keepAlive: true)
+Duration backupReminderRefreshInterval(Ref ref) => const Duration(minutes: 1);
+
+/// Whether the backup banner should show: the pure predicate decides on data
+/// and interval, while an unresolved or in-memory storage report suppresses
+/// it. The periodic refresh keeps an open app current as time passes.
+@Riverpod(keepAlive: true)
+bool backupReminderDue(Ref ref) {
+  final report = ref.watch(webStorageReportProvider);
+  final anchor = ref.watch(earliestTrackedDataAtProvider);
+  final interval = ref.watch(backupReminderIntervalProvider);
+  final lastExportAt = ref.watch(lastExportAtProvider);
+  final snoozedUntil = ref.watch(backupReminderSnoozedUntilProvider);
+  final now = ref.watch(nowProvider)();
+  final refreshInterval = ref.watch(backupReminderRefreshIntervalProvider);
+  final timer = Timer.periodic(refreshInterval, (_) => ref.invalidateSelf());
+  ref.onDispose(timer.cancel);
+  if (!report.hasValue || !anchor.hasValue) return false;
+  if (report.value?.isInMemory ?? false) return false;
+  return isBackupReminderDue(
+    interval: interval,
+    lastExportAt: lastExportAt,
+    earliestTrackedDataAt: anchor.value,
+    snoozedUntil: snoozedUntil,
+    now: now,
   );
 }
 
@@ -322,6 +460,49 @@ class CustomDiaryCategoriesNotifier extends _$CustomDiaryCategoriesNotifier
   void set(List<CustomCategory> value) => state = value;
 }
 
+/// When the last successful JSON export was saved or shared, UTC; null means
+/// "never exported". Only a save or share that actually succeeded advances
+/// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class LastExportAtNotifier extends _$LastExportAtNotifier
+    implements SettableSetting<DateTime?> {
+  @override
+  DateTime? build() => null;
+  @override
+  void set(DateTime? value) => state = value;
+}
+
+/// The backup-reminder preset chosen in Settings; quarterly until the user
+/// picks another one. `off` is a deliberate choice and persists like any
+/// other preset.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class BackupReminderIntervalNotifier extends _$BackupReminderIntervalNotifier
+    implements SettableSetting<BackupReminderInterval> {
+  @override
+  BackupReminderInterval build() => BackupReminderInterval.quarterly;
+  @override
+  void set(BackupReminderInterval value) => state = value;
+}
+
+/// Until when the backup-reminder banner is snoozed, UTC; null means not
+/// snoozed. An expired snooze simply stops hiding the banner — it never
+/// restarts the reminder interval.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+@Riverpod(keepAlive: true)
+class BackupReminderSnoozedUntilNotifier
+    extends _$BackupReminderSnoozedUntilNotifier
+    implements SettableSetting<DateTime?> {
+  @override
+  DateTime? build() => null;
+  @override
+  void set(DateTime? value) => state = value;
+}
+
 /// The persisted general settings as one snapshot, freshly loaded from the
 /// app_settings table the moment the database opens ([databaseProvider]).
 /// The hydration registrar's driver ([hydratePersistedSettings], called
@@ -346,14 +527,14 @@ typedef SettingsWriteSink =
 
 /// One table entry of the hydration registrar: a persisted setting bound
 /// to its in-memory [ProviderBase], its untouched sentinel and the typed
-/// store write. The generic [PersistedSetting.bind] keeps the nine
-/// heterogeneous value types out of the drivers — both iterate the plain
-/// entries below without knowing `T`.
+/// store write. The generic [PersistedSetting.bind] keeps the heterogeneous
+/// value types out of the drivers — both iterate the plain entries below
+/// without knowing `T`.
 ///
 /// The write contract every mutable settings notifier exposes — the
 /// sanctioned external write (`ref.read(xProvider.notifier).set(v)`),
 /// because riverpod annotates the Notifier `state` setter `@protected`.
-/// Implemented by all 16 Notifier classes in this file; the registrar's
+/// Implemented by every Notifier class in this file; the registrar's
 /// [PersistedSetting.bind] is generic over it.
 mixin SettableSetting<T> {
   /// The sanctioned external write for the provider this notifier backs.
@@ -496,6 +677,27 @@ final _persistedSettings = <PersistedSetting>[
     untouched: false,
     fromSnapshot: (snapshot) => snapshot.onboardingCompleted,
     persist: (store, value) => store.persistOnboardingCompleted(value),
+  ),
+  PersistedSetting.bind(
+    provider: lastExportAtProvider,
+    notifier: lastExportAtProvider.notifier,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.lastExportAt,
+    persist: (store, value) => store.persistLastExportAt(value),
+  ),
+  PersistedSetting.bind(
+    provider: backupReminderIntervalProvider,
+    notifier: backupReminderIntervalProvider.notifier,
+    untouched: BackupReminderInterval.quarterly,
+    fromSnapshot: (snapshot) => snapshot.backupReminderInterval,
+    persist: (store, value) => store.persistBackupReminderInterval(value),
+  ),
+  PersistedSetting.bind(
+    provider: backupReminderSnoozedUntilProvider,
+    notifier: backupReminderSnoozedUntilProvider.notifier,
+    untouched: null,
+    fromSnapshot: (snapshot) => snapshot.backupReminderSnoozedUntil,
+    persist: (store, value) => store.persistBackupReminderSnoozedUntil(value),
   ),
 ];
 

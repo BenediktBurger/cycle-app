@@ -68,12 +68,25 @@ void main() {
             'encrypted (device-bound key, ADR-0005)',
       );
       expect(
+        find.textContaining('unterstütztes Ziel'),
+        findsOneWidget,
+        reason:
+            'the notice names the web app as a supported target, '
+            'matching the shipped status',
+      );
+      expect(
         find.textContaining('nicht verschlüsselt'),
         findsOneWidget,
         reason:
-            'the web build\'s browser storage (OPFS/IndexedDB) is '
-            'NOT encrypted by the app — the notice must say so '
-            '(web stays a development tool)',
+            'the web app\'s browser storage (OPFS/IndexedDB) is '
+            'NOT encrypted by the app — the notice must say so',
+      );
+      expect(
+        find.textContaining('Exportiere deshalb regelmäßig'),
+        findsOneWidget,
+        reason:
+            'browser storage is unencrypted, so the notice asks for '
+            'regular exports; export/import remains the only backup',
       );
     });
   });

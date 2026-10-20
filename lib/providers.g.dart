@@ -71,7 +71,321 @@ final class DatabaseProvider
   }
 }
 
-String _$databaseHash() => r'060c027a48143127107e170943d3f59e079e8853';
+String _$databaseHash() => r'46df7e08ad82e867daf057545fe3f5e33c3c2487';
+
+/// The storage implementation drift chose when opening the web database.
+/// Null until the opener reports it, and permanently null on native. Kept in
+/// memory only: it describes this process's backend, not a user setting.
+
+@ProviderFor(WebStorageBackendNotifier)
+final webStorageBackendProvider = WebStorageBackendNotifierProvider._();
+
+/// The storage implementation drift chose when opening the web database.
+/// Null until the opener reports it, and permanently null on native. Kept in
+/// memory only: it describes this process's backend, not a user setting.
+final class WebStorageBackendNotifierProvider
+    extends $NotifierProvider<WebStorageBackendNotifier, WebStorageBackend?> {
+  /// The storage implementation drift chose when opening the web database.
+  /// Null until the opener reports it, and permanently null on native. Kept in
+  /// memory only: it describes this process's backend, not a user setting.
+  WebStorageBackendNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'webStorageBackendProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$webStorageBackendNotifierHash();
+
+  @$internal
+  @override
+  WebStorageBackendNotifier create() => WebStorageBackendNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WebStorageBackend? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WebStorageBackend?>(value),
+    );
+  }
+}
+
+String _$webStorageBackendNotifierHash() =>
+    r'bfd8ed4041f42f78c51013b5d0585d587ab40a8b';
+
+/// The storage implementation drift chose when opening the web database.
+/// Null until the opener reports it, and permanently null on native. Kept in
+/// memory only: it describes this process's backend, not a user setting.
+
+abstract class _$WebStorageBackendNotifier
+    extends $Notifier<WebStorageBackend?> {
+  WebStorageBackend? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<WebStorageBackend?, WebStorageBackend?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<WebStorageBackend?, WebStorageBackend?>,
+              WebStorageBackend?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The browser's answer to an explicit persistence request, in memory only and
+/// null until the user asks; [webStorageReportProvider] merges it so the status
+/// reflects the answer even where `persisted()` is unavailable.
+
+@ProviderFor(WebStoragePersistenceNotifier)
+final webStoragePersistenceProvider = WebStoragePersistenceNotifierProvider._();
+
+/// The browser's answer to an explicit persistence request, in memory only and
+/// null until the user asks; [webStorageReportProvider] merges it so the status
+/// reflects the answer even where `persisted()` is unavailable.
+final class WebStoragePersistenceNotifierProvider
+    extends $NotifierProvider<WebStoragePersistenceNotifier, bool?> {
+  /// The browser's answer to an explicit persistence request, in memory only and
+  /// null until the user asks; [webStorageReportProvider] merges it so the status
+  /// reflects the answer even where `persisted()` is unavailable.
+  WebStoragePersistenceNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'webStoragePersistenceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$webStoragePersistenceNotifierHash();
+
+  @$internal
+  @override
+  WebStoragePersistenceNotifier create() => WebStoragePersistenceNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool?>(value),
+    );
+  }
+}
+
+String _$webStoragePersistenceNotifierHash() =>
+    r'4030e21c0ba80113cc5b5178785f9ed5ff08430e';
+
+/// The browser's answer to an explicit persistence request, in memory only and
+/// null until the user asks; [webStorageReportProvider] merges it so the status
+/// reflects the answer even where `persisted()` is unavailable.
+
+abstract class _$WebStoragePersistenceNotifier extends $Notifier<bool?> {
+  bool? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool?, bool?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool?, bool?>,
+              bool?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The merged browser storage status, null off the web and until the opening
+/// database has recorded its backend.
+
+@ProviderFor(webStorageReport)
+final webStorageReportProvider = WebStorageReportProvider._();
+
+/// The merged browser storage status, null off the web and until the opening
+/// database has recorded its backend.
+
+final class WebStorageReportProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<WebStorageStatus?>,
+          WebStorageStatus?,
+          FutureOr<WebStorageStatus?>
+        >
+    with
+        $FutureModifier<WebStorageStatus?>,
+        $FutureProvider<WebStorageStatus?> {
+  /// The merged browser storage status, null off the web and until the opening
+  /// database has recorded its backend.
+  WebStorageReportProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'webStorageReportProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$webStorageReportHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<WebStorageStatus?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<WebStorageStatus?> create(Ref ref) {
+    return webStorageReport(ref);
+  }
+}
+
+String _$webStorageReportHash() => r'6588dc2ce6741ad93c6ff4463a9a666457df9295';
+
+/// Whether this app run has already shown the in-memory test-mode dialog;
+/// in-memory only, because persisting it would silence the next run's
+/// storage failure.
+
+@ProviderFor(InMemoryWarningShownNotifier)
+final inMemoryWarningShownProvider = InMemoryWarningShownNotifierProvider._();
+
+/// Whether this app run has already shown the in-memory test-mode dialog;
+/// in-memory only, because persisting it would silence the next run's
+/// storage failure.
+final class InMemoryWarningShownNotifierProvider
+    extends $NotifierProvider<InMemoryWarningShownNotifier, bool> {
+  /// Whether this app run has already shown the in-memory test-mode dialog;
+  /// in-memory only, because persisting it would silence the next run's
+  /// storage failure.
+  InMemoryWarningShownNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inMemoryWarningShownProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inMemoryWarningShownNotifierHash();
+
+  @$internal
+  @override
+  InMemoryWarningShownNotifier create() => InMemoryWarningShownNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$inMemoryWarningShownNotifierHash() =>
+    r'cf9bcc132351aa4753c8b8a4ca9fa93dfc2e4dc1';
+
+/// Whether this app run has already shown the in-memory test-mode dialog;
+/// in-memory only, because persisting it would silence the next run's
+/// storage failure.
+
+abstract class _$InMemoryWarningShownNotifier extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// Whether the iOS install hint was dismissed in this app run; in-memory
+/// only, because the dismissal is a session choice, not a setting.
+
+@ProviderFor(InstallHintDismissedNotifier)
+final installHintDismissedProvider = InstallHintDismissedNotifierProvider._();
+
+/// Whether the iOS install hint was dismissed in this app run; in-memory
+/// only, because the dismissal is a session choice, not a setting.
+final class InstallHintDismissedNotifierProvider
+    extends $NotifierProvider<InstallHintDismissedNotifier, bool> {
+  /// Whether the iOS install hint was dismissed in this app run; in-memory
+  /// only, because the dismissal is a session choice, not a setting.
+  InstallHintDismissedNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'installHintDismissedProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$installHintDismissedNotifierHash();
+
+  @$internal
+  @override
+  InstallHintDismissedNotifier create() => InstallHintDismissedNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$installHintDismissedNotifierHash() =>
+    r'ab00b4eeecfda8399e5cd717fd53f7d4d170b44c';
+
+/// Whether the iOS install hint was dismissed in this app run; in-memory
+/// only, because the dismissal is a session choice, not a setting.
+
+abstract class _$InstallHintDismissedNotifier extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
 
 /// The current wall-clock time, injectable: the Tagebuch entry form stamps
 /// the time-of-measurement with this value when a valid temperature is
@@ -301,6 +615,174 @@ final class MeasurementMethodsProvider
 
 String _$measurementMethodsHash() =>
     r'da72cf769b6b6fffd0ba8079c6129da9db5cadce';
+
+/// The earliest moment the app tracked data: the minimum `createdAt` over
+/// entries and measurement-method snapshots. A marks-only database anchors at
+/// its earliest mark day because marks carry no timestamp.
+///
+/// The stream providers are watched only as invalidation triggers; the
+/// streamed domain models carry no timestamps, so the anchor is read from the
+/// tables.
+
+@ProviderFor(earliestTrackedDataAt)
+final earliestTrackedDataAtProvider = EarliestTrackedDataAtProvider._();
+
+/// The earliest moment the app tracked data: the minimum `createdAt` over
+/// entries and measurement-method snapshots. A marks-only database anchors at
+/// its earliest mark day because marks carry no timestamp.
+///
+/// The stream providers are watched only as invalidation triggers; the
+/// streamed domain models carry no timestamps, so the anchor is read from the
+/// tables.
+
+final class EarliestTrackedDataAtProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<DateTime?>,
+          DateTime?,
+          FutureOr<DateTime?>
+        >
+    with $FutureModifier<DateTime?>, $FutureProvider<DateTime?> {
+  /// The earliest moment the app tracked data: the minimum `createdAt` over
+  /// entries and measurement-method snapshots. A marks-only database anchors at
+  /// its earliest mark day because marks carry no timestamp.
+  ///
+  /// The stream providers are watched only as invalidation triggers; the
+  /// streamed domain models carry no timestamps, so the anchor is read from the
+  /// tables.
+  EarliestTrackedDataAtProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'earliestTrackedDataAtProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$earliestTrackedDataAtHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<DateTime?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<DateTime?> create(Ref ref) {
+    return earliestTrackedDataAt(ref);
+  }
+}
+
+String _$earliestTrackedDataAtHash() =>
+    r'a5ca29f8aaca94c23731144d507940d60565674d';
+
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+
+@ProviderFor(backupReminderRefreshInterval)
+final backupReminderRefreshIntervalProvider =
+    BackupReminderRefreshIntervalProvider._();
+
+/// How often [backupReminderDue] re-evaluates while the app stays open, so a
+/// long session crosses the due boundary without a restart. A provider so
+/// tests can shrink the tick instead of waiting a minute.
+
+final class BackupReminderRefreshIntervalProvider
+    extends $FunctionalProvider<Duration, Duration, Duration>
+    with $Provider<Duration> {
+  /// How often [backupReminderDue] re-evaluates while the app stays open, so a
+  /// long session crosses the due boundary without a restart. A provider so
+  /// tests can shrink the tick instead of waiting a minute.
+  BackupReminderRefreshIntervalProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backupReminderRefreshIntervalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$backupReminderRefreshIntervalHash();
+
+  @$internal
+  @override
+  $ProviderElement<Duration> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Duration create(Ref ref) {
+    return backupReminderRefreshInterval(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Duration value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Duration>(value),
+    );
+  }
+}
+
+String _$backupReminderRefreshIntervalHash() =>
+    r'23e37f23d01aa174907545a00295217d8f1c8b9d';
+
+/// Whether the backup banner should show: the pure predicate decides on data
+/// and interval, while an unresolved or in-memory storage report suppresses
+/// it. The periodic refresh keeps an open app current as time passes.
+
+@ProviderFor(backupReminderDue)
+final backupReminderDueProvider = BackupReminderDueProvider._();
+
+/// Whether the backup banner should show: the pure predicate decides on data
+/// and interval, while an unresolved or in-memory storage report suppresses
+/// it. The periodic refresh keeps an open app current as time passes.
+
+final class BackupReminderDueProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether the backup banner should show: the pure predicate decides on data
+  /// and interval, while an unresolved or in-memory storage report suppresses
+  /// it. The periodic refresh keeps an open app current as time passes.
+  BackupReminderDueProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backupReminderDueProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$backupReminderDueHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return backupReminderDue(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$backupReminderDueHash() => r'cebedfbb30cbd4c4b6f02a034189e9cf1690e578';
 
 /// The one derived grouping+evaluation pass behind the Tagebuch, Zyklus and
 /// Statistik screens: each faces its data through the SAME
@@ -1400,6 +1882,242 @@ abstract class _$CustomDiaryCategoriesNotifier
             as $ClassProviderElement<
               AnyNotifier<List<CustomCategory>, List<CustomCategory>>,
               List<CustomCategory>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// When the last successful JSON export was saved or shared, UTC; null means
+/// "never exported". Only a save or share that actually succeeded advances
+/// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+@ProviderFor(LastExportAtNotifier)
+final lastExportAtProvider = LastExportAtNotifierProvider._();
+
+/// When the last successful JSON export was saved or shared, UTC; null means
+/// "never exported". Only a save or share that actually succeeded advances
+/// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+final class LastExportAtNotifierProvider
+    extends $NotifierProvider<LastExportAtNotifier, DateTime?> {
+  /// When the last successful JSON export was saved or shared, UTC; null means
+  /// "never exported". Only a save or share that actually succeeded advances
+  /// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+  ///
+  /// Persisted exactly as [localeProvider] (registrar-table entry below).
+  LastExportAtNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'lastExportAtProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$lastExportAtNotifierHash();
+
+  @$internal
+  @override
+  LastExportAtNotifier create() => LastExportAtNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime?>(value),
+    );
+  }
+}
+
+String _$lastExportAtNotifierHash() =>
+    r'7beb34b68f126510a3cf53f1d118cccfeb3fedfa';
+
+/// When the last successful JSON export was saved or shared, UTC; null means
+/// "never exported". Only a save or share that actually succeeded advances
+/// it — a cancelled sheet, the copy action and PDF exports leave it alone.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+abstract class _$LastExportAtNotifier extends $Notifier<DateTime?> {
+  DateTime? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<DateTime?, DateTime?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<DateTime?, DateTime?>,
+              DateTime?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The backup-reminder preset chosen in Settings; quarterly until the user
+/// picks another one. `off` is a deliberate choice and persists like any
+/// other preset.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+@ProviderFor(BackupReminderIntervalNotifier)
+final backupReminderIntervalProvider =
+    BackupReminderIntervalNotifierProvider._();
+
+/// The backup-reminder preset chosen in Settings; quarterly until the user
+/// picks another one. `off` is a deliberate choice and persists like any
+/// other preset.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+final class BackupReminderIntervalNotifierProvider
+    extends
+        $NotifierProvider<
+          BackupReminderIntervalNotifier,
+          BackupReminderInterval
+        > {
+  /// The backup-reminder preset chosen in Settings; quarterly until the user
+  /// picks another one. `off` is a deliberate choice and persists like any
+  /// other preset.
+  ///
+  /// Persisted exactly as [localeProvider] (registrar-table entry below).
+  BackupReminderIntervalNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backupReminderIntervalProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$backupReminderIntervalNotifierHash();
+
+  @$internal
+  @override
+  BackupReminderIntervalNotifier create() => BackupReminderIntervalNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(BackupReminderInterval value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<BackupReminderInterval>(value),
+    );
+  }
+}
+
+String _$backupReminderIntervalNotifierHash() =>
+    r'6f44faa44ef1e78843efa469b4a6d2fac3bf5168';
+
+/// The backup-reminder preset chosen in Settings; quarterly until the user
+/// picks another one. `off` is a deliberate choice and persists like any
+/// other preset.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+abstract class _$BackupReminderIntervalNotifier
+    extends $Notifier<BackupReminderInterval> {
+  BackupReminderInterval build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref =
+        this.ref as $Ref<BackupReminderInterval, BackupReminderInterval>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<BackupReminderInterval, BackupReminderInterval>,
+              BackupReminderInterval,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// Until when the backup-reminder banner is snoozed, UTC; null means not
+/// snoozed. An expired snooze simply stops hiding the banner — it never
+/// restarts the reminder interval.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+@ProviderFor(BackupReminderSnoozedUntilNotifier)
+final backupReminderSnoozedUntilProvider =
+    BackupReminderSnoozedUntilNotifierProvider._();
+
+/// Until when the backup-reminder banner is snoozed, UTC; null means not
+/// snoozed. An expired snooze simply stops hiding the banner — it never
+/// restarts the reminder interval.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+final class BackupReminderSnoozedUntilNotifierProvider
+    extends $NotifierProvider<BackupReminderSnoozedUntilNotifier, DateTime?> {
+  /// Until when the backup-reminder banner is snoozed, UTC; null means not
+  /// snoozed. An expired snooze simply stops hiding the banner — it never
+  /// restarts the reminder interval.
+  ///
+  /// Persisted exactly as [localeProvider] (registrar-table entry below).
+  BackupReminderSnoozedUntilNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backupReminderSnoozedUntilProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$backupReminderSnoozedUntilNotifierHash();
+
+  @$internal
+  @override
+  BackupReminderSnoozedUntilNotifier create() =>
+      BackupReminderSnoozedUntilNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime?>(value),
+    );
+  }
+}
+
+String _$backupReminderSnoozedUntilNotifierHash() =>
+    r'289357ec4f6cc15279328760b09162debad195a3';
+
+/// Until when the backup-reminder banner is snoozed, UTC; null means not
+/// snoozed. An expired snooze simply stops hiding the banner — it never
+/// restarts the reminder interval.
+///
+/// Persisted exactly as [localeProvider] (registrar-table entry below).
+
+abstract class _$BackupReminderSnoozedUntilNotifier
+    extends $Notifier<DateTime?> {
+  DateTime? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<DateTime?, DateTime?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<DateTime?, DateTime?>,
+              DateTime?,
               Object?,
               Object?
             >;

@@ -182,3 +182,40 @@ opens. This removes the reason to walk
 stakeholders through private windows; private windows remain an
 available scratch option, and data entered there vanishes with the
 window.
+
+## Amendment 2026-10-20: supported deployment, shared origin accepted, iPhone check pending
+
+**Status: Accepted (amends the "demo does not change the platform decision"
+clause and the demo framing above; the released/development/branch tiers and
+the storage-slot-per-deployment rule are unchanged).** The original text
+above is kept for the record; where it conflicts with this amendment, the
+amendment governs.
+
+The Pages site now serves a **supported web deployment**, not only a demo:
+web is a supported secondary target
+([ADR-0003](0003-target-platforms-web-iteration.md)), and the deployment is
+how that target is used. The three tiers stay as described above — released
+`/app/`, current development `/branches/main/`, and on-demand
+`/branches/<slug>/` previews.
+
+Supported: data entry, statistics, the cycle view, PDF, JSON export/import,
+and the installed PWA. Not guaranteed: Safari-tab durability, at-rest
+encryption, sync, raw database-file copy, and background notifications.
+
+- **Shared origin accepted.** The deployment keeps using the shared
+  `BenediktBurger.github.io` origin, which also hosts other Pages projects
+  and the branch previews. All of them are same-origin, so same-origin
+  scripts sit inside the trust boundary: a script served by another Pages
+  project or by a branch preview could read this browser profile's storage.
+  Per-deployment storage slots isolate the databases (the rule above), not
+  origin trust.
+- **The static, third-party-script-free mitigation stands.** The site
+  remains static and carries no third-party scripts, which bounds the
+  origin's script surface. No custom domain is planned.
+- **On-device iPhone verification is pending.** No iPhone was available; the
+  deployment has been exercised on desktop browsers only, and nothing here
+  claims a mobile result. The verification path is the in-app diagnostics
+  card: its copy action produces `buildDiagnosticsText` from the web storage
+  card — user agent, installed state, persistence, drift's storage backend,
+  missing features, and the storage estimate — so a report from a real
+  iPhone can be checked against this ADR.

@@ -8,6 +8,7 @@
 // Flutter's showAboutDialog is deliberately NOT used: it hard-wires the
 // license-chapter surface and can host neither the German-first warning
 // content nor the first-start "continue" affordance.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -67,11 +68,15 @@ Future<void> _showLicenseDetails(
 }
 
 class AboutPage extends ConsumerWidget {
-  const AboutPage({super.key, this.onboarding = false});
+  const AboutPage({super.key, this.onboarding = false, this.webOverride});
 
   /// Full-page variant on the first start: AppBar without a back affordance
   /// (the only way forward is "Continue") plus the continue button itself.
   final bool onboarding;
+
+  /// Test seam for the compile-time `kIsWeb` gate; never user-facing or
+  /// persisted.
+  final bool? webOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -161,6 +166,10 @@ class AboutPage extends ConsumerWidget {
           // warning it tempers.
           Text(l10n.aboutPosture, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 24),
+          if (onboarding && (webOverride ?? kIsWeb)) ...[
+            const _WebOnboardingSection(),
+            const SizedBox(height: 24),
+          ],
           // The license/copyright section: Apache-2.0 with its copyright
           // holder. The FULL license texts are bundled (Apache-2.0 plus the
           // Noto Sans font license) and shown through the tappable
@@ -257,6 +266,43 @@ class AboutPage extends ConsumerWidget {
             style: theme.textTheme.bodySmall,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WebOnboardingSection extends StatelessWidget {
+  const _WebOnboardingSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('webOnboardingSection'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.aboutWebOnboardingTitle,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            for (final fact in <String>[
+              l10n.aboutWebOnboardingInstall,
+              l10n.aboutWebOnboardingSafari,
+              l10n.aboutWebOnboardingExport,
+              l10n.aboutWebOnboardingNoSync,
+              l10n.aboutWebOnboardingUnencrypted,
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(fact, style: theme.textTheme.bodyMedium),
+              ),
+          ],
+        ),
       ),
     );
   }

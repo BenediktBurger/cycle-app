@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/db/cycle_database.dart';
 import 'package:cycle_app/db/settings_store.dart';
+import 'package:cycle_app/domain/backup_reminder.dart';
 import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/diary_track.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -516,6 +517,192 @@ void main() {
             'to stored rows too',
       );
     });
+  });
+
+  group('backup reminder and export tracking', () {
+    test('an empty table loads the documented defaults', () async {
+      final snapshot = await store.load();
+      expect(snapshot.lastExportAt, isNull);
+      expect(
+        snapshot.backupReminderInterval,
+        BackupReminderInterval.quarterly,
+        reason: 'quarterly is the default without an explicit row',
+      );
+      expect(snapshot.backupReminderSnoozedUntil, isNull);
+    });
+
+    test('every interval token round-trips', () async {
+      for (final interval in BackupReminderInterval.values) {
+        await store.persistBackupReminderInterval(interval);
+        expect(
+          await store.readSetting(SettingKeys.backupReminderInterval),
+          interval.name,
+          reason: '${interval.name} is stored as its enum-name token',
+        );
+        expect((await store.load()).backupReminderInterval, interval);
+      }
+    });
+
+    test('unknown, non-string and corrupt interval rows decode to '
+        'quarterly', () async {
+      for (final raw in [
+        '"weekly"', // a token that is not one of the four presets
+        '"Off"', // wrong case is not a token
+        '3', // JSON number, not a string token
+        'true', // JSON bool
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.backupReminderInterval, raw);
+        expect(
+          (await store.load()).backupReminderInterval,
+          BackupReminderInterval.quarterly,
+          reason: 'corrupt stored value "$raw" must keep the default',
+        );
+      }
+    });
+
+    test('timestamps round-trip as ISO strings normalized to UTC', () async {
+      final exportedAt = DateTime.utc(2026, 1, 15, 10, 30);
+      await store.persistLastExportAt(exportedAt);
+      expect(
+        await store.readSetting(SettingKeys.lastExportAt),
+        exportedAt.toIso8601String(),
+        reason: 'the value column stores the plain ISO timestamp string',
+      );
+      final loadedExport = (await store.load()).lastExportAt;
+      expect(loadedExport, exportedAt);
+      expect(loadedExport!.isUtc, isTrue);
+
+      final snoozedUntil = DateTime.utc(2026, 2, 1);
+      await store.persistBackupReminderSnoozedUntil(snoozedUntil);
+      expect(
+        await store.readSetting(SettingKeys.backupReminderSnoozedUntil),
+        snoozedUntil.toIso8601String(),
+      );
+      final loadedSnooze = (await store.load()).backupReminderSnoozedUntil;
+      expect(loadedSnooze, snoozedUntil);
+      expect(loadedSnooze!.isUtc, isTrue);
+    });
+
+    test(
+      'a stored timestamp with an offset loads as the same UTC instant',
+      () async {
+        await seedRaw(SettingKeys.lastExportAt, '"2026-01-15T10:30:00+02:00"');
+        final loaded = (await store.load()).lastExportAt;
+        expect(loaded, DateTime.utc(2026, 1, 15, 8, 30));
+        expect(loaded!.isUtc, isTrue);
+      },
+    );
+
+    test('non-string and unparsable timestamp rows decode to null', () async {
+      for (final raw in [
+        '123', // JSON number
+        'true', // JSON bool
+        '"not-a-date"', // JSON string, not an instant
+        '"2026-13-45T00:00:00Z"', // ISO-shaped but not a real instant
+        'null', // JSON null
+        'garbage{', // not JSON at all
+      ]) {
+        await seedRaw(SettingKeys.lastExportAt, raw);
+        await seedRaw(SettingKeys.backupReminderSnoozedUntil, raw);
+        final snapshot = await store.load();
+        expect(
+          snapshot.lastExportAt,
+          isNull,
+          reason: 'corrupt stored value "$raw" must not surface an error',
+        );
+        expect(
+          snapshot.backupReminderSnoozedUntil,
+          isNull,
+          reason: 'corrupt stored value "$raw" must not surface an error',
+        );
+      }
+    });
+
+    test(
+      'one corrupt reminder row leaves the other settings untouched',
+      () async {
+        final exportedAt = DateTime.utc(2026, 1, 15, 10, 30);
+        final snoozedUntil = DateTime.utc(2026, 2, 1);
+        await store.persistLastExportAt(exportedAt);
+        await store.persistBackupReminderSnoozedUntil(snoozedUntil);
+        await seedRaw(SettingKeys.backupReminderInterval, '"weekly"');
+
+        final snapshot = await store.load();
+        expect(
+          snapshot.backupReminderInterval,
+          BackupReminderInterval.quarterly,
+        );
+        expect(
+          snapshot.lastExportAt,
+          exportedAt,
+          reason: 'a corrupt row degrades only its own key',
+        );
+        expect(snapshot.backupReminderSnoozedUntil, snoozedUntil);
+      },
+    );
+
+    test('snapshots differing only in a reminder field are unequal', () async {
+      const defaults = PersistedSettings.defaults();
+      final otherExport = PersistedSettings(
+        lastExportAt: DateTime.utc(2026, 1, 15),
+      );
+      final otherInterval = PersistedSettings(
+        backupReminderInterval: BackupReminderInterval.off,
+      );
+      final otherSnooze = PersistedSettings(
+        backupReminderSnoozedUntil: DateTime.utc(2026, 2, 1),
+      );
+
+      expect(otherExport == defaults, isFalse);
+      expect(otherInterval == defaults, isFalse);
+      expect(otherSnooze == defaults, isFalse);
+      expect(
+        otherExport ==
+            PersistedSettings(lastExportAt: DateTime.utc(2026, 1, 15)),
+        isTrue,
+      );
+      expect(
+        otherExport.hashCode,
+        PersistedSettings(lastExportAt: DateTime.utc(2026, 1, 15)).hashCode,
+      );
+    });
+
+    test(
+      'a null write deletes its row and an explicit off row persists',
+      () async {
+        await store.persistLastExportAt(DateTime.utc(2026, 1, 15));
+        await store.persistLastExportAt(null);
+        expect(
+          await store.readSetting(SettingKeys.lastExportAt),
+          isNull,
+          reason: 'a cleared export instant must not linger as a row',
+        );
+
+        await store.persistBackupReminderSnoozedUntil(DateTime.utc(2026, 2, 1));
+        await store.persistBackupReminderSnoozedUntil(null);
+        expect(
+          await store.readSetting(SettingKeys.backupReminderSnoozedUntil),
+          isNull,
+        );
+
+        await store.persistBackupReminderInterval(BackupReminderInterval.off);
+        expect(
+          await store.readSetting(SettingKeys.backupReminderInterval),
+          'off',
+          reason: 'an explicit off choice is a real row, not an absent one',
+        );
+        expect(
+          (await store.load()).backupReminderInterval,
+          BackupReminderInterval.off,
+        );
+        expect(
+          await db.select(db.appSettings).get(),
+          hasLength(1),
+          reason: 'only the explicit off row remains',
+        );
+      },
+    );
   });
 
   group('generic JSON path (future settings without any code change)', () {

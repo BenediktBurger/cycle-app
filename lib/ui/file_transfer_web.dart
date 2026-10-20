@@ -1,24 +1,27 @@
-// Web implementation: browser file download for exports and a file input
-// for importing a previously saved export.
+// Web implementation: browser downloads for exports, the share sheet for JSON
+// exports, and a file input for importing a previously saved export.
 //
 // ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 //
-// Justification for dart:html (the two superseded-analysis infos above are
-// intentionally ignored HERE, nothing else): this file exists exactly once,
-// inside a conditional export that only web (dart2js) targets compile; pub
-// gains NO extra dependency in exchange (package:web would be one more dep
-// purely for cosmetic import-shape parity with drift internals). Migrating
-// to package:web + dart:js_interop is future work when dart2wasm promotion
-// matters for these helpers — the stub covers that case already.
+// dart:html stays confined to this download/picker file; the share glue next
+// to it (web_share_web.dart) uses package:web + dart:js_interop, and migrating
+// these DOM calls is separate work.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 
+import 'web_share.dart';
+import 'web_share_outcome.dart';
+
 const bool canSaveFile = true;
-// No system share sheet on web — the browser download above carries the
-// export file, so the share button stays hidden here.
+// The PDF hand-off stays the browser download on web; only the JSON export
+// uses the share sheet (see [canShareJsonFile]).
 const bool canShareFile = false;
 const bool canPickFile = true;
+
+/// JSON exports go through the browser share sheet where it accepts a file;
+/// the runtime probe keeps the share button hidden where it does not.
+bool get canShareJsonFile => canShareJsonFiles;
 
 /// Triggers a browser download of [content] as [filename] (anchor + Blob).
 /// Returns true when the click was sent — browsers may still ask the user
@@ -46,14 +49,17 @@ Future<bool> _triggerDownload(String filename, html.Blob blob) async {
   return true;
 }
 
-// Never called in production ([canShareFile] is false keeps the button
-// hidden); it exists only so every implementation of the conditional
-// export compiles with the same surface.
-Future<bool> shareFile(String filename, String content) async => false;
+/// Hands the JSON export to the browser share sheet where it accepts a file.
+/// True only for a completed share; a dismissed sheet or an unavailable
+/// share API is false. The browser download stays the separate save action.
+Future<bool> shareFile(String filename, String content) async {
+  if (!canShareJsonFile) return false;
+  return webShareCompleted(await shareJsonFiles(filename, content));
+}
 
-/// Binary share variant for the PDF export document: dead on web like
-/// [shareFile] above (the browser download is the hand-off there); kept
-/// only for the conditional export's equal surface.
+/// Binary share variant for the PDF export document: dead on web, where the
+/// browser download is the PDF hand-off; kept only for the conditional
+/// export's equal surface.
 Future<bool> shareFileBytes(String filename, List<int> bytes) async => false;
 
 /// Opens a file picker filtered by [accept] (an HTML accept list such as

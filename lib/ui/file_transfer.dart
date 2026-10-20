@@ -1,8 +1,9 @@
 // Platform-adaptive helpers for exporting/importing the JSON document.
 //
 // The import side offers a file picker everywhere it can:
-//   - web: a file <input type=file> (plus the anchored browser download for
-//     exports);
+//   - web: a file <input type=file> for imports plus, for exports, the browser
+//     share sheet where it accepts a file (the anchored browser download is
+//     the separate save action);
 //   - native io targets (Linux/mac/Windows desktops and Android/iOS via
 //     SAF): `FilePicker.pickFile` from `file_picker`;
 //   - anything else (no dart:html and no dart:io): the stub, paste-only,
@@ -10,7 +11,7 @@
 // The export save side: a real save-as dialog on every native io target
 // (`FilePicker.saveFile`, SAF-backed on Android) and the browser download
 // on web; the system share sheet (`share_plus`) stays alongside the save
-// route on the io targets.
+// route on the io targets where share_plus can share files.
 //
 // Dispatch via conditional exports — only the file matching the current
 // compiler target code is actually compiled/imported.

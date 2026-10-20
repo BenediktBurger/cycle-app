@@ -423,13 +423,37 @@
     "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. INER's website (iner.org) is named as plain, copyable text — the link handling is a later concern."
   },
   "aboutPosture": "Die App unterstützt — sie entscheidet nie: Sie rechnet und zeigt an, gibt aber keine Fruchtbarkeitsaussage; die Auswertung liegt bei dir.",
+  "aboutWebOnboardingTitle": "Web-App: Vor dem ersten Eintrag",
+  "@aboutWebOnboardingTitle": {
+    "description": "Title of the compact web-only card on the first-start page: explains the durable web path before the user enters data. The installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingInstall": "Installiere die Web-App auf dem Home-Bildschirm — iOS/Safari: Teilen › „Zum Home-Bildschirm“; Android/Chrome: App installieren. Nur die installierte Web-App ist der dauerhafte Web-Modus.",
+  "@aboutWebOnboardingInstall": {
+    "description": "First fact line of the web onboarding section: install to the Home Screen before entering data — iOS/Safari via Share › Add to Home Screen, Android/Chrome via install. Only the installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingSafari": "Ein normaler Safari-Tab ist nicht dauerhaft: Safari kann den Speicher eines nicht installierten Tabs nach sieben Tagen ohne Interaktion löschen.",
+  "@aboutWebOnboardingSafari": {
+    "description": "Second fact line: a normal Safari tab is not durable; Safari may delete a non-installed tab's storage after seven days without interaction."
+  },
+  "aboutWebOnboardingExport": "Der JSON-Export ist die einzige Sicherung; die Erinnerung steht standardmäßig auf vierteljährlich.",
+  "@aboutWebOnboardingExport": {
+    "description": "Third fact line: the JSON export is the only backup and the backup reminder defaults to quarterly."
+  },
+  "aboutWebOnboardingNoSync": "Es gibt keine Synchronisierung zwischen Geräten oder Browsern.",
+  "@aboutWebOnboardingNoSync": {
+    "description": "Fourth fact line: there is no sync between devices or browsers."
+  },
+  "aboutWebOnboardingUnencrypted": "Der Browser-Speicher wird von der App nicht verschlüsselt.",
+  "@aboutWebOnboardingUnencrypted": {
+    "description": "Fifth fact line: browser storage is not encrypted by the app. States the absence of at-rest encryption without promising encryption."
+  },
   "aboutPrivacyHeading": "Datenschutz",
   "@aboutPrivacyHeading": {
     "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
   },
-  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät. Auf Android und iOS ist die Datenbank verschlüsselt gespeichert; der Schlüssel dazu liegt im geschützten Speicher des Systems. Der Browser-Speicher der Web-Version (OPFS/IndexedDB) wird von der App nicht verschlüsselt — die Web-Version dient nur der Entwicklung. Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
+  "aboutPrivacyBody": "Diese App speichert alle Daten ausschließlich lokal auf deinem Gerät. Auf Android und iOS ist die Datenbank verschlüsselt gespeichert; der Schlüssel dazu liegt im geschützten Speicher des Systems. Die Web-App ist ein unterstütztes Ziel; ihr Browser-Speicher (OPFS/IndexedDB) ist nicht verschlüsselt. Exportiere deshalb regelmäßig — der Export ist die einzige Sicherung. Es gibt keine Server, keine Cloud, keine Analyse-Dienste. Deine Daten werden niemals gesendet — auch nicht bei einem Absturz oder Fehler. Daten verlassen das Gerät nur, wenn du selbst eine Export-/Sicherungsdatei erzeugst und teilst. Es findet keine Übermittlung personenbezogener Daten an Dritte statt. Die Rechte aus der DSGVO (z. B. Auskunft, Löschung) kannst du unmittelbar über die App ausüben: Einsicht über „Einstellungen › Export“, Löschung über „Daten löschen“, Wiederherstellung über „Import“.",
   "@aboutPrivacyBody": {
-    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. The encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web build's browser storage (OPFS/IndexedDB) is NOT encrypted by the app (web stays an unencrypted development tool). GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+    "description": "GDPR/privacy notice, drafted for simplicity (not lawyer-reviewed): no servers, no transmission — data-control reality of the app, crash-safe since nothing is sent even on a crash. The encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web app's browser storage (OPFS/IndexedDB) is not encrypted by the app. The web app is a supported target; because its storage stays unencrypted, the notice asks for regular exports as the only backup. GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Weiter",
   "aboutLicenseHeading": "Lizenz",
@@ -617,6 +641,154 @@
   "settingsExportNote": "Alle Einträge und Markierungen als JSON-Dokument. Regelmäßig exportieren — das ist die einzige Sicherung: Umzug auf ein anderes Gerät und Wiederherstellung laufen nur hierüber, die Datenbankdatei selbst kann wegen ihres gerätegebundenen Schlüssels nicht kopiert werden.",
   "settingsImport": "Import",
   "settingsImportNote": "Versetzt junge Daten mit älteren: gleicher Tag wird überschrieben, Rest bleibt. Markierungen werden ergänzt.",
+  "settingsBackupReminder": "Sicherungserinnerung",
+  "@settingsBackupReminder": {
+    "description": "Beschriftung des Erinnerungsintervall-Dropdowns der Export-Karte."
+  },
+  "settingsLastExport": "Letzter Export: {date}",
+  "@settingsLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Export-Karte mit dem letzten erfolgreichen JSON-Export als lokalem Kalendertag (ISO-Datum) oder 'nie'."
+  },
+  "settingsNever": "nie",
+  "@settingsNever": {
+    "description": "Wert der Zeile 'Letzter Export' der Export-Karte, solange noch kein Export erfasst wurde."
+  },
+  "settingsBackupReminderOff": "Aus",
+  "@settingsBackupReminderOff": {
+    "description": "Erinnerungs-Voreinstellung: keine Sicherungserinnerungen."
+  },
+  "settingsBackupReminderMonthly": "Monatlich",
+  "@settingsBackupReminderMonthly": {
+    "description": "Erinnerungs-Voreinstellung: monatlich erinnern."
+  },
+  "settingsBackupReminderQuarterly": "Vierteljährlich",
+  "@settingsBackupReminderQuarterly": {
+    "description": "Erinnerungs-Voreinstellung: alle drei Monate erinnern (die Voreinstellung)."
+  },
+  "settingsBackupReminderHalfYearly": "Halbjährlich",
+  "@settingsBackupReminderHalfYearly": {
+    "description": "Erinnerungs-Voreinstellung: alle sechs Monate erinnern."
+  },
+  "webStorageCard": "Browser-Speicher",
+  "@webStorageCard": {
+    "description": "Titel der Einstellungen-Karte, die den Browser-Speicher der Web-App beschreibt (nur auf Web sichtbar)."
+  },
+  "webStorageInstalled": "Als App installiert: {value}",
+  "@webStorageInstalled": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Ja/Nein-Zeile der Browser-Speicher-Karte: ob die Seite als installierte PWA läuft."
+  },
+  "webStoragePersistent": "Dauerhafter Speicher: {value}",
+  "@webStoragePersistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Ja/Nein/unbekannt-Zeile der Browser-Speicher-Karte: ob der Browser den Speicher als dauerhaft bestätigt hat; 'unbekannt' heißt, die API ist nicht verfügbar."
+  },
+  "webStorageBackend": "Speicher-Backend: {value}",
+  "@webStorageBackend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Browser-Speicher-Karte mit dem von drift gewählten Speicher-Backend (OPFS, IndexedDB, Arbeitsspeicher)."
+  },
+  "webStorageUsage": "Geschätzter Speicher: {used} von {quota}",
+  "@webStorageUsage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    },
+    "description": "Speicher-Schätzung der Browser-Speicher-Karte, wenn die Quota verfügbar ist. Die Platzhalter sind bereits lokalisiert formatierte Größen (z. B. '1,5 MB' auf Deutsch, '1.5 MB' auf Englisch)."
+  },
+  "webStorageUsageNoQuota": "Geschätzter Speicher: {used}",
+  "@webStorageUsageNoQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    },
+    "description": "Speicher-Schätzung der Browser-Speicher-Karte ohne verfügbare Quota; der Platzhalter ist eine formatierte Größe oder 'unbekannt'."
+  },
+  "webStorageLastExport": "Letzter Export: {date}",
+  "@webStorageLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Zeile der Browser-Speicher-Karte mit dem letzten erfolgreichen JSON-Export (ISO-Datum) oder 'nie'."
+  },
+  "webStorageNever": "nie",
+  "@webStorageNever": {
+    "description": "Wert der Zeile 'Letzter Export', solange noch kein Export erfasst wurde."
+  },
+  "webStorageYes": "ja",
+  "webStorageNo": "nein",
+  "webStorageUnknown": "unbekannt",
+  "webStorageBackendOpfs": "OPFS",
+  "@webStorageBackendOpfs": {
+    "description": "Speicher-Backend-Label: Origin Private File System (die dauerhafteste Browser-Speicherart)."
+  },
+  "webStorageBackendSharedIndexedDb": "Geteilte IndexedDB",
+  "webStorageBackendUnsafeIndexedDb": "IndexedDB ohne Mehr-Tab-Schutz",
+  "webStorageBackendInMemory": "Nur im Arbeitsspeicher",
+  "webStorageBackendUnknown": "Unbekannt",
+  "webStorageMakePersistent": "Speicher dauerhaft machen",
+  "@webStorageMakePersistent": {
+    "description": "Aktion der Browser-Speicher-Karte: fordert persistenten Browser-Speicher an. Nur aktiv, wenn die API antwortet und der Speicher noch nicht dauerhaft ist."
+  },
+  "webStorageCopyDiagnostics": "Diagnose kopieren",
+  "@webStorageCopyDiagnostics": {
+    "description": "Aktion der Browser-Speicher-Karte: kopiert die Diagnosezeilen (User-Agent, Backend, Schätzung) in die Zwischenablage; kein Netzwerkzugriff."
+  },
+  "webStoragePersistGranted": "Dauerhafter Speicher ist jetzt aktiv.",
+  "webStoragePersistDenied": "Der Browser hat dauerhaften Speicher nicht gewährt.",
+  "webStorageDiagnosticsCopied": "Diagnose in die Zwischenablage kopiert.",
+  "webStorageInMemoryDialogTitle": "Daten werden nicht dauerhaft gespeichert",
+  "@webStorageInMemoryDialogTitle": {
+    "description": "Titel des einmaligen Dialogs, wenn die Web-Datenbank nur im Arbeitsspeicher läuft (Testmodus): warnt vor Datenverlust, blockiert die App aber nicht."
+  },
+  "webStorageInMemoryDialogBody": "Der Browser stellt keinen dauerhaften Speicher bereit, deshalb läuft die Datenbank nur im Arbeitsspeicher (Testmodus). Alle Einträge gehen verloren, sobald du die Seite schließt oder neu lädst. Exportiere regelmäßig, wenn du Daten behalten willst.",
+  "@webStorageInMemoryDialogBody": {
+    "description": "Text des einmaligen Testmodus-Dialogs: warum die Daten nur im Arbeitsspeicher liegen, dass Schließen oder Neuladen sie verliert und dass der Export der Weg ist, Daten zu behalten."
+  },
+  "webStorageInMemoryDismiss": "Verstanden",
+  "@webStorageInMemoryDismiss": {
+    "description": "Schaltfläche des einmaligen Testmodus-Dialogs: schließt den Dialog; der dauerhafte Testmodus-Banner bleibt sichtbar."
+  },
+  "webStorageInMemoryBanner": "Testmodus: Die Datenbank liegt nur im Arbeitsspeicher. Beim Schließen oder Neuladen der Seite gehen alle Einträge verloren.",
+  "@webStorageInMemoryBanner": {
+    "description": "Dauerhafter Banner über der App, solange die Web-Datenbank im Arbeitsspeicher läuft; bleibt nach dem Schließen des einmaligen Dialogs sichtbar."
+  },
+  "webStorageMultiTabBanner": "Dieser Browser kann mehrere Tabs derselben App nicht sicher trennen. Öffne die App nur in einem Tab, sonst können Daten verloren gehen.",
+  "@webStorageMultiTabBanner": {
+    "description": "Banner, wenn drift auf unsicheres IndexedDB ohne Mehr-Tab-Schutz ausweicht: warnt davor, die App in mehreren Tabs gleichzeitig zu öffnen."
+  },
+  "webStorageInstallHint": "Installiere die App in Safari über „Zum Home-Bildschirm“. In einem normalen Safari-Tab kann der Browser die Daten nach sieben Tagen ohne Nutzung löschen.",
+  "@webStorageInstallHint": {
+    "description": "Schließbarer Hinweis auf iOS/Safari, wenn die App weder installiert noch dauerhaft gespeichert ist: Installation über den Home-Bildschirm schützt vor der Safari-Löschung nach sieben Tagen."
+  },
+  "webStorageInstallHintDismiss": "Hinweis ausblenden",
+  "@webStorageInstallHintDismiss": {
+    "description": "Tooltip/Semantik-Label des Schließen-Knopfs am iOS-Installationshinweis; das Ausblenden gilt nur für die laufende Sitzung, nicht dauerhaft."
+  },
   "exportTitle": "JSON-Vorschau",
   "exportCopy": "Kopieren",
   "exportCopied": "JSON in die Zwischenablage kopiert.",
@@ -753,5 +925,17 @@
   "diaryTemperatureWheelLabel": "Temperatur",
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility-Label des Temperatur-Rads im Tagebuch: kündigt dem Screenreader den Picker samt ausgewähltem Wert (lokalisiertes Zahlformat mit °C) und den Aktionen Erhöhen/Verringern (je ein 0,05-K-Schritt) an."
+  },
+  "backupReminderMessage": "Zeit für eine Sicherung: Exportiere deine Daten als JSON-Datei, damit sie bei einem Gerätewechsel oder Datenverlust erhalten bleiben.",
+  "@backupReminderMessage": {
+    "description": "Text des Erinnerungsbanners über der App, wenn seit dem letzten erfolgreichen JSON-Export das gewählte Intervall verstrichen ist."
+  },
+  "backupReminderExportNow": "Jetzt exportieren",
+  "@backupReminderExportNow": {
+    "description": "Aktion des Erinnerungsbanners: öffnet den gemeinsamen JSON-Export (Vorschau mit Speichern/Teilen)."
+  },
+  "backupReminderLater": "Später",
+  "@backupReminderLater": {
+    "description": "Aktion des Erinnerungsbanners: blendet die Erinnerung für sieben Tage aus, ohne das Exportintervall neu zu starten."
   }
 }

@@ -1,6 +1,7 @@
-// Platform-specific database opening — the ONLY place importing
-// drift_flutter. Kept separate from lib/db/cycle_database.dart so the core
-// schema/DAO library stays compilable for pure-Dart host scripts and tests.
+// Platform-specific database opening — the production entry point that arms
+// drift_flutter's web storage callback. Kept separate from
+// lib/db/cycle_database.dart so the core schema/DAO library stays compilable
+// for pure-Dart host scripts and tests.
 //
 // Executor decision table (ADR-0003/ADR-0005), resolved via drift_flutter's
 // `driftDatabase()` which performs the conditional per-platform dispatch in
@@ -33,7 +34,7 @@
 // from the tag-matching drift release (currently drift 2.35.x; the pubspec
 // pins the same minor line). When bumping drift, re-download BOTH files from
 // `https://github.com/simolus3/drift/releases/tag/drift-<version>` into
-// `web/` and reference them from the [DriftWebOptions] below.
+// `web/` and reference them from `webDriftOptions` below.
 // See CONTRIBUTING.md §"web assets".
 //
 // Intentionally NOT used here: a CDN fallback URI. If the assets are missing
@@ -50,9 +51,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart'
     show getApplicationDocumentsDirectory;
 
+import '../platform/web_storage_status.dart';
 import 'cipher_setup.dart';
 import 'cycle_database.dart';
 import 'db_key.dart';
+import 'web_drift_options.dart';
 import 'web_storage_name.dart';
 
 /// Storage file/stream name of this app's drift database. On native this
@@ -70,22 +73,33 @@ const String databaseName = 'cycle_storage';
 /// therefore never call this function; call sites use the Riverpod
 /// [databaseProvider] instead of this factory directly.
 ///
+/// [onWebStorageResult] receives drift's chosen web storage before the
+/// returned future completes; native ignores it entirely.
+///
 /// Fails (never falls back) when the encryption key cannot be loaded from
 /// the platform's secure storage or created there on first use — see
 /// lib/db/db_key.dart.
-Future<CycleDatabase> openCycleDatabase() async {
-  // Web: the exact pre-encryption wiring, untouched. No key store access —
-  // web storage stays unencrypted.
+Future<CycleDatabase> openCycleDatabase({
+  void Function(WebStorageBackend backend)? onWebStorageResult,
+}) async {
+  // Web: drift's WASM database, unencrypted, with no key store access. The
+  // opener awaits the first connection below so drift's storage choice is
+  // recorded before this future completes.
   if (kIsWeb) {
-    return CycleDatabase(
+    final db = CycleDatabase(
       driftDatabase(
         name: webDatabaseName(Uri.base),
-        web: DriftWebOptions(
+        web: webDriftOptions(
           sqlite3Wasm: Uri.parse('sqlite3.wasm'),
           driftWorker: Uri.parse('drift_worker.js'),
+          onResult: onWebStorageResult,
         ),
       ),
     );
+    // Opening is what fires `onResult`; awaiting it keeps the recorded
+    // backend from lagging the caller's database future.
+    if (onWebStorageResult != null) await db.executor.ensureOpen(db);
+    return db;
   }
 
   // Native: encrypted by default. The key is resolved up front (before the

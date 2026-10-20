@@ -3,6 +3,7 @@
 // export screen remains the always-available path on such targets.
 const bool canSaveFile = false;
 const bool canShareFile = false;
+const bool canShareJsonFile = false;
 const bool canPickFile = false;
 
 Future<bool> saveFile(String filename, String content) async => false;

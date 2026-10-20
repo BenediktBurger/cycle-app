@@ -507,13 +507,37 @@
     "description": "First-start warning: reliable tracking requires the faithful observation and interpretation of the body signs; the Rötzer guide / INER courses teach the skills, INER answers questions. INER's website (iner.org) is named as plain, copyable text — the link handling is a later concern."
   },
   "aboutPosture": "The app supports — it never decides: it computes and displays, but gives no fertility verdict; the evaluation stays with you.",
+  "aboutWebOnboardingTitle": "Web app: before your first entry",
+  "@aboutWebOnboardingTitle": {
+    "description": "Title of the compact web-only card on the first-start page: explains the durable web path before the user enters data. The installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingInstall": "Install the web app on your Home Screen — iOS/Safari: Share › Add to Home Screen; Android/Chrome: install the app. Only the installed web app is the durable web mode.",
+  "@aboutWebOnboardingInstall": {
+    "description": "First fact line of the web onboarding section: install to the Home Screen before entering data — iOS/Safari via Share › Add to Home Screen, Android/Chrome via install. Only the installed web app is the durable web mode."
+  },
+  "aboutWebOnboardingSafari": "A normal Safari tab is not durable: Safari may delete a non-installed tab's storage after seven days without interaction.",
+  "@aboutWebOnboardingSafari": {
+    "description": "Second fact line: a normal Safari tab is not durable; Safari may delete a non-installed tab's storage after seven days without interaction."
+  },
+  "aboutWebOnboardingExport": "The JSON export is the only backup; the reminder defaults to quarterly.",
+  "@aboutWebOnboardingExport": {
+    "description": "Third fact line: the JSON export is the only backup and the backup reminder defaults to quarterly."
+  },
+  "aboutWebOnboardingNoSync": "There is no sync between devices or browsers.",
+  "@aboutWebOnboardingNoSync": {
+    "description": "Fourth fact line: there is no sync between devices or browsers."
+  },
+  "aboutWebOnboardingUnencrypted": "Browser storage is not encrypted by the app.",
+  "@aboutWebOnboardingUnencrypted": {
+    "description": "Fifth fact line: browser storage is not encrypted by the app. States the absence of at-rest encryption without promising encryption."
+  },
   "aboutPrivacyHeading": "Privacy",
   "@aboutPrivacyHeading": {
     "description": "Heading of the GDPR notice on the about/onboarding page and the title of the settings pane's privacy card — one string on both surfaces."
   },
-  "aboutPrivacyBody": "This app stores all data exclusively locally on your device. On Android and iOS the database is stored encrypted; its key lives in the system's protected storage. The browser storage of the web build (OPFS/IndexedDB) is not encrypted by the app — the web build serves development only. There are no servers, no cloud, no analytics services. Your data is never sent — not even on a crash or an error. Data leaves the device only when you yourself create and share an export/backup file. No personal data is transmitted to third parties. You can exercise your GDPR rights (e.g. access, deletion) directly within the app: view via Settings › Export, deletion via Delete data, restore via Import.",
+  "aboutPrivacyBody": "This app stores all data exclusively locally on your device. On Android and iOS the database is stored encrypted; its key lives in the system's protected storage. The web app is a supported target; its browser storage (OPFS/IndexedDB) is not encrypted by the app. Export regularly — the export is the only backup. There are no servers, no cloud, no analytics services. Your data is never sent — not even on a crash or an error. Data leaves the device only when you yourself create and share an export/backup file. No personal data is transmitted to third parties. You can exercise your GDPR rights (e.g. access, deletion) directly within the app: view via Settings › Export, deletion via Delete data, restore via Import.",
   "@aboutPrivacyBody": {
-    "description": "GDPR/privacy notice, English mirror of the German original — no servers, no transmission, crash-safe; the encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web build's browser storage (OPFS/IndexedDB) is NOT encrypted by the app (web stays an unencrypted development tool). GDPR rights referenced to the in-app actions (export view/delete-data/import)."
+    "description": "GDPR/privacy notice, English mirror of the German original — no servers, no transmission, crash-safe; the encryption claim is platform-qualified: Android/iOS databases are encrypted at rest (key in the system's protected storage, ADR-0005), while the web app's browser storage (OPFS/IndexedDB) is not encrypted by the app. The web app is a supported target; because its storage stays unencrypted, the notice asks for regular exports as the only backup. GDPR rights referenced to the in-app actions (export view/delete-data/import)."
   },
   "aboutContinue": "Continue",
   "aboutLicenseHeading": "License",
@@ -680,6 +704,154 @@
   "settingsExportNote": "All entries and marks as one JSON document. Export regularly — this is the only backup: moving to another device and recovery work only through it, the database file itself cannot be copied because of its device-bound key.",
   "settingsImport": "Import",
   "settingsImportNote": "Merges incoming data with existing ones: an existing day is overwritten, the rest stays. Marks are added idempotently.",
+  "settingsBackupReminder": "Backup reminder",
+  "@settingsBackupReminder": {
+    "description": "Label of the export card's reminder-interval dropdown."
+  },
+  "settingsLastExport": "Last export: {date}",
+  "@settingsLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Export card row with the last successful JSON export as the local calendar day (ISO date) or 'never'."
+  },
+  "settingsNever": "never",
+  "@settingsNever": {
+    "description": "Value of the export card's 'Last export' row until an export is recorded."
+  },
+  "settingsBackupReminderOff": "Off",
+  "@settingsBackupReminderOff": {
+    "description": "Reminder preset: no backup reminders."
+  },
+  "settingsBackupReminderMonthly": "Monthly",
+  "@settingsBackupReminderMonthly": {
+    "description": "Reminder preset: remind every month."
+  },
+  "settingsBackupReminderQuarterly": "Quarterly",
+  "@settingsBackupReminderQuarterly": {
+    "description": "Reminder preset: remind every three months (the default)."
+  },
+  "settingsBackupReminderHalfYearly": "Half-yearly",
+  "@settingsBackupReminderHalfYearly": {
+    "description": "Reminder preset: remind every six months."
+  },
+  "webStorageCard": "Browser storage",
+  "@webStorageCard": {
+    "description": "Title of the Settings card describing the web app's browser storage (web only)."
+  },
+  "webStorageInstalled": "Installed as an app: {value}",
+  "@webStorageInstalled": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Yes/no row of the browser-storage card: whether the page runs as an installed PWA."
+  },
+  "webStoragePersistent": "Persistent storage: {value}",
+  "@webStoragePersistent": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Yes/no/unknown row of the browser-storage card: whether the browser confirmed persistent storage; 'unknown' means the API is unavailable."
+  },
+  "webStorageBackend": "Storage backend: {value}",
+  "@webStorageBackend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Row of the browser-storage card naming drift's chosen backend (OPFS, IndexedDB, in-memory)."
+  },
+  "webStorageUsage": "Estimated storage: {used} of {quota}",
+  "@webStorageUsage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    },
+    "description": "Storage estimate of the browser-storage card when the quota is available. The placeholders are already locale-formatted sizes (e.g. '1.5 MB' in English, '1,5 MB' in German)."
+  },
+  "webStorageUsageNoQuota": "Estimated storage: {used}",
+  "@webStorageUsageNoQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    },
+    "description": "Storage estimate of the browser-storage card without an available quota; the placeholder is a formatted size or 'unknown'."
+  },
+  "webStorageLastExport": "Last export: {date}",
+  "@webStorageLastExport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    },
+    "description": "Row of the browser-storage card with the last successful JSON export (ISO date) or 'never'."
+  },
+  "webStorageNever": "never",
+  "@webStorageNever": {
+    "description": "Value of the 'Last export' row until an export is recorded."
+  },
+  "webStorageYes": "yes",
+  "webStorageNo": "no",
+  "webStorageUnknown": "unknown",
+  "webStorageBackendOpfs": "OPFS",
+  "@webStorageBackendOpfs": {
+    "description": "Backend label: Origin Private File System, the most durable browser storage."
+  },
+  "webStorageBackendSharedIndexedDb": "Shared IndexedDB",
+  "webStorageBackendUnsafeIndexedDb": "IndexedDB without multi-tab protection",
+  "webStorageBackendInMemory": "In-memory only",
+  "webStorageBackendUnknown": "Unknown",
+  "webStorageMakePersistent": "Make storage persistent",
+  "@webStorageMakePersistent": {
+    "description": "Browser-storage card action: requests persistent browser storage. Enabled only when the API answered and storage is not already persistent."
+  },
+  "webStorageCopyDiagnostics": "Copy diagnostics",
+  "@webStorageCopyDiagnostics": {
+    "description": "Browser-storage card action: copies the diagnostics lines (user agent, backend, estimate) to the clipboard; no network access."
+  },
+  "webStoragePersistGranted": "Persistent storage is now active.",
+  "webStoragePersistDenied": "The browser did not grant persistent storage.",
+  "webStorageDiagnosticsCopied": "Diagnostics copied to clipboard.",
+  "webStorageInMemoryDialogTitle": "Data is not stored persistently",
+  "@webStorageInMemoryDialogTitle": {
+    "description": "Title of the one-time dialog shown when the web database runs in memory only (test mode): warns about data loss without blocking the app."
+  },
+  "webStorageInMemoryDialogBody": "The browser does not provide persistent storage, so the database runs in memory only (test mode). Everything is lost when you close or reload the page. Export regularly if you want to keep your data.",
+  "@webStorageInMemoryDialogBody": {
+    "description": "Body of the one-time test-mode dialog: why the data lives in memory only, that closing or reloading loses it, and that exporting is the way to keep data."
+  },
+  "webStorageInMemoryDismiss": "Got it",
+  "@webStorageInMemoryDismiss": {
+    "description": "Button of the one-time test-mode dialog: closes the dialog; the persistent test-mode banner stays visible."
+  },
+  "webStorageInMemoryBanner": "Test mode: the database lives in memory only. Closing or reloading the page loses all entries.",
+  "@webStorageInMemoryBanner": {
+    "description": "Persistent banner above the app while the web database runs in memory; stays visible after the one-time dialog is dismissed."
+  },
+  "webStorageMultiTabBanner": "This browser cannot safely separate multiple tabs of the same app. Open the app in one tab only, or data may be lost.",
+  "@webStorageMultiTabBanner": {
+    "description": "Banner when drift falls back to unsafe IndexedDB without multi-tab protection: warns against opening the app in several tabs at once."
+  },
+  "webStorageInstallHint": "Install the app in Safari via “Add to Home Screen”. In a normal Safari tab the browser may delete its data after seven days without use.",
+  "@webStorageInstallHint": {
+    "description": "Dismissible hint on iOS/Safari when the app is neither installed nor persistently stored: installing via the Home Screen protects against Safari's seven-day deletion."
+  },
+  "webStorageInstallHintDismiss": "Dismiss hint",
+  "@webStorageInstallHintDismiss": {
+    "description": "Tooltip/semantics label of the close button on the iOS install hint; dismissal lasts for the running session only, not permanently."
+  },
   "exportTitle": "JSON preview",
   "exportCopy": "Copy",
   "exportCopied": "JSON copied to clipboard.",
@@ -847,5 +1019,17 @@
   "diaryTemperatureWheelLabel": "Temperature",
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility label of the diary temperature wheel: announces the picker to screen readers together with its selected value (locale-formatted number with °C) and the increase/decrease actions that step one 0.05 K grid item."
+  },
+  "backupReminderMessage": "Time to back up: export your data as a JSON file so it survives a device change or data loss.",
+  "@backupReminderMessage": {
+    "description": "Text of the reminder banner above the app once the chosen interval has elapsed since the last successful JSON export."
+  },
+  "backupReminderExportNow": "Export now",
+  "@backupReminderExportNow": {
+    "description": "Reminder banner action: opens the shared JSON export (preview with save/share)."
+  },
+  "backupReminderLater": "Later",
+  "@backupReminderLater": {
+    "description": "Reminder banner action: hides the reminder for seven days without restarting the export interval."
   }
 }

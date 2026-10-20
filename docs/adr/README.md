@@ -29,7 +29,7 @@ question remains visible wherever the ADR marks unresolved assumptions.
 |-----|-------|--------|
 | [0001](0001-iner-mode-m-hypothesis.md) | INER-compatible "Mode M" product shape | Accepted |
 | [0002](0002-package-name-cycle-app-placeholder.md) | Package name `cycle_app` is a placeholder | Accepted |
-| [0003](0003-target-platforms-web-iteration.md) | Web/Chrome as iteration target; Android + iOS as product targets | Accepted |
+| [0003](0003-target-platforms-web-iteration.md) | Web app as a supported secondary target (installed PWA, amended 2026-10-20) alongside Android + iOS; web also stays the iteration/test target | Accepted |
 | [0004](0004-riverpod-flchart-flutter.md) | Riverpod for state management; fl_chart for the temperature curve | Accepted |
 | [0005](0005-storage-and-encryption.md) | Storage drift/SQLite; native at-rest encryption always-on (SQLite3MultipleCiphers, amended 2026-09-21), web unencrypted | Accepted |
 | [0006](0006-ci.md) | Automated verification — local testing AND GitHub Actions CI (analyze + test + build web) | Accepted |
@@ -38,4 +38,4 @@ question remains visible wherever the ADR marks unresolved assumptions.
 | [0009](0009-release-pipeline-and-signing.md) | Release pipeline — Android-first publishing, signing custody, store accounts | Accepted |
 | [0010](0010-settings-key-value-table.md) | General settings persist in a drift key-value table (`app_settings`) | Accepted |
 | [0011](0011-license-bundling.md) | License texts bundled as assets behind the in-app license page (package licenses auto-collected) | Accepted |
-| [0012](0012-public-web-demo-github-pages.md) | Public web demo on GitHub Pages — docs landing at Pages root, app under /app/ | Accepted |
+| [0012](0012-public-web-demo-github-pages.md) | Public web deployment on GitHub Pages — supported secondary target (amended 2026-10-20), docs landing at Pages root, app under /app/, shared origin accepted, iPhone check pending | Accepted |

@@ -1,10 +1,12 @@
 // Einstellungen screen: language and theme-mode switchers, the
 // temperature range, paper history, the JSON export/import, PDF export and
 // the drip CSV import.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
+import '../providers.dart';
 import 'about.dart';
 import 'settings/custom_categories_card.dart';
 import 'settings/delete_data_card.dart';
@@ -16,9 +18,10 @@ import 'settings/paper_history_card.dart';
 import 'settings/pdf_export_card.dart';
 import 'settings/temperature_range_card.dart';
 import 'settings/theme_card.dart';
+import 'settings/web_storage_card.dart';
 import 'settings/what_to_track_card.dart';
 
-export 'settings/export_import_card.dart' show exportFileName;
+export 'json_export.dart' show exportFileName;
 
 class EinstellungenScreen extends ConsumerWidget {
   const EinstellungenScreen({super.key});
@@ -61,6 +64,10 @@ class EinstellungenScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           const CustomCategoriesCard(),
           const SizedBox(height: 8),
+          if (kIsWeb) ...[
+            WebStorageCardHost(lastExportAt: ref.watch(lastExportAtProvider)),
+            const SizedBox(height: 8),
+          ],
           const ExportImportCard(),
           const SizedBox(height: 8),
           const PdfExportCard(),

@@ -19,10 +19,12 @@ import 'l10n/app_localizations.dart';
 import 'licenses.dart';
 import 'providers.dart';
 import 'ui/about.dart';
+import 'ui/backup_reminder.dart';
 import 'ui/cycle.dart';
 import 'ui/diary.dart';
 import 'ui/settings.dart';
 import 'ui/statistics.dart';
+import 'ui/web_storage_warnings.dart';
 
 /// Seed for both brightness' color schemes: Flutter's Material 3 default
 /// seed, i.e. the scheme the app materialized before dark mode was made
@@ -417,48 +419,58 @@ class _HomeShell extends ConsumerWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _railBreakpointWidth;
         final indexedStack = IndexedStack(index: index, children: _screens);
+        final body = wide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // The rail reuses the bottom bar's icons and the same
+                  // `nav…` l10n labels — one navigation vocabulary, two
+                  // surfaces. Labeled on every destination, so the tests
+                  // (and the tab tap targets) stay independent of the
+                  // selection state.
+                  NavigationRail(
+                    selectedIndex: index,
+                    onDestinationSelected: (int newIndex) =>
+                        ref.read(tabIndexProvider.notifier).set(newIndex),
+                    labelType: NavigationRailLabelType.all,
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.event_outlined),
+                        selectedIcon: const Icon(Icons.event),
+                        label: Text(l10n.navDiary),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.loop_outlined),
+                        selectedIcon: const Icon(Icons.loop),
+                        label: Text(l10n.navCycle),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.bar_chart_outlined),
+                        selectedIcon: const Icon(Icons.bar_chart),
+                        label: Text(l10n.navStatistics),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.settings_outlined),
+                        selectedIcon: const Icon(Icons.settings),
+                        label: Text(l10n.navSettings),
+                      ),
+                    ],
+                  ),
+                  Expanded(child: indexedStack),
+                ],
+              )
+            : indexedStack;
         return Scaffold(
-          body: wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // The rail reuses the bottom bar's icons and the same
-                    // `nav…` l10n labels — one navigation vocabulary, two
-                    // surfaces. Labeled on every destination, so the tests
-                    // (and the tab tap targets) stay independent of the
-                    // selection state.
-                    NavigationRail(
-                      selectedIndex: index,
-                      onDestinationSelected: (int newIndex) =>
-                          ref.read(tabIndexProvider.notifier).set(newIndex),
-                      labelType: NavigationRailLabelType.all,
-                      destinations: [
-                        NavigationRailDestination(
-                          icon: const Icon(Icons.event_outlined),
-                          selectedIcon: const Icon(Icons.event),
-                          label: Text(l10n.navDiary),
-                        ),
-                        NavigationRailDestination(
-                          icon: const Icon(Icons.loop_outlined),
-                          selectedIcon: const Icon(Icons.loop),
-                          label: Text(l10n.navCycle),
-                        ),
-                        NavigationRailDestination(
-                          icon: const Icon(Icons.bar_chart_outlined),
-                          selectedIcon: const Icon(Icons.bar_chart),
-                          label: Text(l10n.navStatistics),
-                        ),
-                        NavigationRailDestination(
-                          icon: const Icon(Icons.settings_outlined),
-                          selectedIcon: const Icon(Icons.settings),
-                          label: Text(l10n.navSettings),
-                        ),
-                      ],
-                    ),
-                    Expanded(child: indexedStack),
-                  ],
-                )
-              : indexedStack,
+          // Warnings and the backup reminder sit above the mounted screens
+          // and never block entry; a null storage report and a non-due
+          // reminder collapse to nothing, leaving the body size unchanged.
+          body: Column(
+            children: [
+              const WebStorageWarningsHost(),
+              const BackupReminderBannerHost(),
+              Expanded(child: body),
+            ],
+          ),
           // All tabs stay mounted in an IndexedStack: switching away and
           // back preserves each screen's widget state (e.g. the cycle
           // chart's scroll window survives the Tagebuch→Zyklus roundtrip),
