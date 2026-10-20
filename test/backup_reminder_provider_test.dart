@@ -233,5 +233,43 @@ void main() {
       );
       expect(await _isDue(container, awaitReport: false), isFalse);
     });
+
+    test('a refreshing storage report keeps the previous answer', () async {
+      var loads = 0;
+      final refresh = Completer<WebStorageStatus?>();
+      final container = _container(
+        lastExportAt: DateTime.utc(2026, 6, 1),
+        report: () => ++loads == 1
+            ? Future<WebStorageStatus?>.value(null)
+            : refresh.future,
+        seed: (db) => _insertEntry(db, createdAt: DateTime.utc(2026, 9, 1)),
+      );
+      expect(await _isDue(container), isTrue);
+
+      container.invalidate(webStorageReportProvider);
+      expect(
+        container.read(backupReminderDueProvider),
+        isTrue,
+        reason: 'a refresh must not hide the banner behind a loading state',
+      );
+      refresh.complete(null);
+      await container.read(webStorageReportProvider.future);
+    });
+
+    test('a refreshing anchor keeps the previous answer', () async {
+      final container = _container(
+        lastExportAt: DateTime.utc(2026, 6, 1),
+        seed: (db) => _insertEntry(db, createdAt: DateTime.utc(2026, 9, 1)),
+      );
+      expect(await _isDue(container), isTrue);
+
+      container.invalidate(earliestTrackedDataAtProvider);
+      expect(
+        container.read(backupReminderDueProvider),
+        isTrue,
+        reason: 'a refresh must not hide the banner behind a loading state',
+      );
+      await container.read(earliestTrackedDataAtProvider.future);
+    });
   });
 }

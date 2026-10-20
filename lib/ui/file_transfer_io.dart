@@ -22,14 +22,19 @@ import 'package:share_plus/share_plus.dart';
 // switch and no extra probing.
 const bool canSaveFile = true;
 
-// The share sheet is cross-platform via share_plus (Android/iOS and the
-// desktops), so every native target the io file compiles for can offer
-// it — no per-Platform switch here. share_plus stages the file through
-// its own FileProvider, so no permission or manifest change is needed.
+// The share sheet is available via share_plus on Android, iOS and macOS,
+// and the PDF route keeps it on every native target (file sharing is
+// limited on the desktops). share_plus stages the file through its own
+// FileProvider, so no permission or manifest change is needed.
 const bool canShareFile = true;
 
-// The same share sheet carries the JSON export on every native target.
-const bool canShareJsonFile = true;
+// share_plus cannot share files on Linux and only on recent Windows builds,
+// so the JSON hand-off stays with the save-as dialog there.
+/// Test-only seam for widget tests on a host where share_plus cannot share
+/// files; always null in production code.
+bool? canShareJsonFileOverride;
+bool get canShareJsonFile =>
+    canShareJsonFileOverride ?? !(Platform.isWindows || Platform.isLinux);
 
 const bool canPickFile = true;
 

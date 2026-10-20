@@ -715,7 +715,7 @@
         "type": "String"
       }
     },
-    "description": "Speicher-Schätzung der Browser-Speicher-Karte, wenn die Quota verfügbar ist. Die Platzhalter sind bereits formatierte Größen (z. B. '1.5 MB')."
+    "description": "Speicher-Schätzung der Browser-Speicher-Karte, wenn die Quota verfügbar ist. Die Platzhalter sind bereits lokalisiert formatierte Größen (z. B. '1,5 MB' auf Deutsch, '1.5 MB' auf Englisch)."
   },
   "webStorageUsageNoQuota": "Geschätzter Speicher: {used}",
   "@webStorageUsageNoQuota": {
@@ -926,7 +926,7 @@
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility-Label des Temperatur-Rads im Tagebuch: kündigt dem Screenreader den Picker samt ausgewähltem Wert (lokalisiertes Zahlformat mit °C) und den Aktionen Erhöhen/Verringern (je ein 0,05-K-Schritt) an."
   },
-  "backupReminderMessage": "Zeit für eine Sicherung: Exportiere deine Daten als JSON-Datei, damit sie bei einem Gerätewechsel oder Datenverlust nicht verloren gehen.",
+  "backupReminderMessage": "Zeit für eine Sicherung: Exportiere deine Daten als JSON-Datei, damit sie bei einem Gerätewechsel oder Datenverlust erhalten bleiben.",
   "@backupReminderMessage": {
     "description": "Text des Erinnerungsbanners über der App, wenn seit dem letzten erfolgreichen JSON-Export das gewählte Intervall verstrichen ist."
   },

@@ -58,14 +58,11 @@ Future<bool> _handOffJson(
   String json,
   Future<bool> Function(String filename, String content) handOff,
 ) async {
+  final notifier = ref.read(lastExportAtProvider.notifier);
+  // The reminder compares instants, so capture the clock in UTC before the
+  // hand-off can outlive this widget's ref.
+  final exportedAt = ref.read(nowProvider)().toUtc();
   final completed = await handOff(exportFileName, json);
-  if (completed) markJsonExportCompleted(ref);
+  if (completed) notifier.set(exportedAt);
   return completed;
-}
-
-/// Records a successful JSON export on the reminder's clock, always in UTC
-/// because the reminder compares instants, not wall-clock forms.
-void markJsonExportCompleted(WidgetRef ref) {
-  final now = ref.read(nowProvider)().toUtc();
-  ref.read(lastExportAtProvider.notifier).set(now);
 }

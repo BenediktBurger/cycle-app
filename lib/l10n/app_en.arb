@@ -778,7 +778,7 @@
         "type": "String"
       }
     },
-    "description": "Storage estimate of the browser-storage card when the quota is available. The placeholders are already formatted sizes (e.g. '1.5 MB')."
+    "description": "Storage estimate of the browser-storage card when the quota is available. The placeholders are already locale-formatted sizes (e.g. '1.5 MB' in English, '1,5 MB' in German)."
   },
   "webStorageUsageNoQuota": "Estimated storage: {used}",
   "@webStorageUsageNoQuota": {
@@ -1020,7 +1020,7 @@
   "@diaryTemperatureWheelLabel": {
     "description": "Accessibility label of the diary temperature wheel: announces the picker to screen readers together with its selected value (locale-formatted number with °C) and the increase/decrease actions that step one 0.05 K grid item."
   },
-  "backupReminderMessage": "Time to back up: export your data as a JSON file so nothing is lost when you change devices or data is lost.",
+  "backupReminderMessage": "Time to back up: export your data as a JSON file so it survives a device change or data loss.",
   "@backupReminderMessage": {
     "description": "Text of the reminder banner above the app once the chosen interval has elapsed since the last successful JSON export."
   },

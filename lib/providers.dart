@@ -214,7 +214,7 @@ bool backupReminderDue(Ref ref) {
   final lastExportAt = ref.watch(lastExportAtProvider);
   final snoozedUntil = ref.watch(backupReminderSnoozedUntilProvider);
   final now = ref.watch(nowProvider)();
-  if (report.isLoading || anchor.isLoading) return false;
+  if (!report.hasValue || !anchor.hasValue) return false;
   if (report.value?.isInMemory ?? false) return false;
   return isBackupReminderDue(
     interval: interval,

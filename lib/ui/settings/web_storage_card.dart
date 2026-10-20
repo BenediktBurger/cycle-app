@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../db/settings_store.dart' show formatIsoDate;
 import '../../l10n/app_localizations.dart';
@@ -149,14 +150,14 @@ String _backendLabel(AppLocalizations l10n, String key) => switch (key) {
 String _usageLine(AppLocalizations l10n, WebStorageStatus status) {
   final used = status.usageBytes == null
       ? l10n.webStorageUnknown
-      : _formatBytes(status.usageBytes!);
+      : _formatBytes(status.usageBytes!, l10n.localeName);
   final quota = status.quotaBytes;
   return quota == null
       ? l10n.webStorageUsageNoQuota(used)
-      : l10n.webStorageUsage(used, _formatBytes(quota));
+      : l10n.webStorageUsage(used, _formatBytes(quota, l10n.localeName));
 }
 
-String _formatBytes(int bytes) {
+String _formatBytes(int bytes, String locale) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   var value = bytes.toDouble();
   var unit = 0;
@@ -165,6 +166,8 @@ String _formatBytes(int bytes) {
     unit++;
   }
   final digits = unit == 0 || value >= 100 ? 0 : 1;
-  final text = value.toStringAsFixed(digits).replaceFirst(RegExp(r'\.0$'), '');
-  return '$text ${units[unit]}';
+  final format = NumberFormat.decimalPattern(locale)
+    ..minimumFractionDigits = 0
+    ..maximumFractionDigits = digits;
+  return '${format.format(value)} ${units[unit]}';
 }

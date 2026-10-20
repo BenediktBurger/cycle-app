@@ -50,7 +50,7 @@ override) **and A** (automatic) are explicitly deferred.
   network permissions (req. 7).
 - **Security/privacy**: a password/biometric lock is planned for native only,
   where storage is already always-on encrypted (SQLite3MultipleCiphers,
-  ADR-005); web storage is unencrypted by the app (ADR-0005); no lock is
+  ADR-0005); web storage is unencrypted by the app (ADR-0005); no lock is
   implemented yet (req. 6).
 - **Licensing & size**: open source under Apache-2.0 (chosen 2026-09; final
   confirmation before first publishing still open), app size well below 50 MB

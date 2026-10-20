@@ -120,12 +120,12 @@ void main() {
         status(usageBytes: 1536 * 1024, quotaBytes: 10 * 1024 * 1024),
       );
       expect(
-        find.text('Geschätzter Speicher: 1.5 MB von 10 MB'),
+        find.text('Geschätzter Speicher: 1,5 MB von 10 MB'),
         findsOneWidget,
       );
 
       await pumpCard(tester, status(usageBytes: 1536 * 1024, quotaBytes: null));
-      expect(find.text('Geschätzter Speicher: 1.5 MB'), findsOneWidget);
+      expect(find.text('Geschätzter Speicher: 1,5 MB'), findsOneWidget);
 
       await pumpCard(tester, status(usageBytes: null, quotaBytes: null));
       expect(find.text('Geschätzter Speicher: unbekannt'), findsOneWidget);

@@ -30,7 +30,13 @@ import 'package:cycle_app/domain/measurement_method.dart' show MeasurementRoute;
 import 'package:cycle_app/main.dart' show CycleApp;
 import 'package:cycle_app/providers.dart' show lastExportAtProvider;
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show saveFileOverride, shareFile, shareFileBytes, shareFileOverride;
+    show
+        canShareJsonFile,
+        canShareJsonFileOverride,
+        saveFileOverride,
+        shareFile,
+        shareFileBytes,
+        shareFileOverride;
 import 'package:cycle_app/ui/settings.dart' show exportFileName;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +139,16 @@ const _pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
 const _sharePlusChannel = MethodChannel('dev.fluttercommunity.plus/share');
 
 void main() {
+  // These flows model a native target where share_plus can share files,
+  // independent of the host VM.
+  setUp(() => canShareJsonFileOverride = true);
+  tearDown(() => canShareJsonFileOverride = null);
+
+  test('JSON sharing is unavailable where share_plus cannot share files', () {
+    canShareJsonFileOverride = null;
+    expect(canShareJsonFile, !(Platform.isWindows || Platform.isLinux));
+  });
+
   group('last export marking', () {
     testWidgets('a successful save lands the pinned instant in the provider '
         'and the settings row', (WidgetTester tester) async {

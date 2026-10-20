@@ -11,7 +11,7 @@
 // The export save side: a real save-as dialog on every native io target
 // (`FilePicker.saveFile`, SAF-backed on Android) and the browser download
 // on web; the system share sheet (`share_plus`) stays alongside the save
-// route on the io targets.
+// route on the io targets where share_plus can share files.
 //
 // Dispatch via conditional exports — only the file matching the current
 // compiler target code is actually compiled/imported.
