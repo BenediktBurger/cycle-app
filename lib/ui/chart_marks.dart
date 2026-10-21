@@ -18,8 +18,8 @@
 //
 // TODO(user-review): the row pitches and the alpha below are
 // owner-eyeball rendering details, not settled rules; the top-anchored
-// rows sit between the 0.1 K grid lines at the −0.05 (sex), −0.15 (peak
-// dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M) offsets from the
+// rows sit between the 0.1 K grid lines at the −0.05 (sexual intercourse),
+// −0.15 (peak dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M) offsets from the
 // scale max, and the day numbers anchor from the BOTTOM at min + 0.05.
 import '../domain/mucus.dart';
 import '../domain/models.dart';
@@ -32,7 +32,7 @@ export '../domain/band_layout.dart';
 /// `min + [chartEdgeMarginK] … max − [chartEdgeMarginK]` to render.
 const double chartEdgeMarginK = 0.05;
 
-/// Vertical pitch of the sex X row's glyph center, in °C below the scale
+/// Vertical pitch of the sexual intercourse X row's glyph center, in °C below the scale
 /// max ([TemperatureRange.max]).
 const double sexRowCenterOffsetK = 0.05;
 

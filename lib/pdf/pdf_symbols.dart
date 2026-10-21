@@ -3,7 +3,7 @@
 // fill, the pain letter cell, the disturbance codes and the
 // measurement-time text.
 //
-// The in-plot glyphs (the sex X marks, the mucus sign letters, the
+// The in-plot glyphs (the sexual intercourse X marks, the mucus sign letters, the
 // Mittelschmerz M and the evaluation day numbers) are not mapped here:
 // they render inside the plot (see cycle_pdf.dart's in-plot glyph seam),
 // placed by the shared chart-marks mapper, whose mucus letters come
