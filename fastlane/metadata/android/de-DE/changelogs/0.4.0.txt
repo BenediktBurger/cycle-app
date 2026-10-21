@@ -1,0 +1,11 @@
+Eigene Kategorien im Tagebuch: Abschnitte wie Sport oder Medikamente mit eigenen Einträgen – auch in PDF, Export und Import.
+
+Unter „Was aufzeichnen“ blendest du Abschnitte aus: Temperatur, Schleim, Muttermund, Geschlechtsverkehr, Schmerzen.
+
+Temperatur per Scrollrad in 0,05-K-Schritten; Messmethode eintragen – sie erscheint in Kurve und PDF.
+
+PDF-Export zeigt jeden Kalendertag.
+
+Sicherungserinnerung mit Intervall und letztem Export.
+
+Web: Browser-Speicherstatus in den Einstellungen.

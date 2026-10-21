@@ -1,0 +1,11 @@
+Custom diary categories: sections such as sport or medication with your own entries — also in the PDF, export and import.
+
+Under "What to track" you hide sections you don't need: temperature, mucus, cervix, sex, pain.
+
+Temperature on a 0.05 K scroll wheel; enter your measurement method — it appears in the chart and PDF.
+
+The PDF export shows every calendar day.
+
+Backup reminder with interval and last export.
+
+Web: browser storage status in Settings.
