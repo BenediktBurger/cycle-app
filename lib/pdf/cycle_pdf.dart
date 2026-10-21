@@ -15,9 +15,9 @@
 //   cervix glyph zones, firmness letters, breast pain and rotated notes
 //   stacked like the cycle tab's band, the band absorbing the remaining
 //   page height.
-//   Columns the window does not track stay empty. The sex X marks, the
-//   mucus sign letters, the mucus peak dot, the Mittelschmerz M and the
-//   evaluation day numbers render INSIDE the plot (paper-form parity with
+//   Columns the window does not track stay empty. The sexual intercourse
+//   X marks, the mucus sign letters, the mucus peak dot, the Mittelschmerz
+//   M and the day numbers render INSIDE the plot (paper-form parity with
 //   the cycle tab — no duplicated recording rows), placed by the shared
 //   chart-marks mapper.
 // - The TEMPERATURE CURVE and the evaluation overlay geometry (rings
@@ -302,7 +302,7 @@ const double _bleedingRowHeight = 12;
 const double _tempValueRowHeight = 12;
 
 /// The curve block's painted plot region (fine scale + curve + overlay
-/// marks + the in-plot glyph rows: sex X, mucus letters, peak dot, the
+/// marks + the in-plot glyph rows: intercourse X, mucus letters, peak dot, the
 /// Mittelschmerz M and the evaluation day numbers).
 const double pdfCurvePlotHeight = 185;
 
@@ -316,7 +316,7 @@ const double _disturbanceRowHeight = 14;
 /// −π/2).
 const double pdfRotatedTextAngle = -math.pi / 2;
 
-/// The in-plot glyph rows' ink size, pt (the sex X, the mucus letters and
+/// The in-plot glyph rows' ink size, pt (the intercourse X, the mucus letters and
 /// the Mittelschmerz M).
 const double pdfLabelFontSize = 6.5;
 
@@ -447,7 +447,7 @@ pw.Widget _paperFormGrid({
         _dateRow(windowDays.length, windowDays, weekend),
         _bleedingRow(windowDays.length, windowDays, weekend),
         // The strip ends at bleeding: the Mittelschmerz M and the day
-        // numbers render inside the curve block's plot, like the sex/mucus
+        // numbers render inside the curve block's plot, like the intercourse/mucus
         // marks (paper-form parity with the cycle tab's in-plot glyph rows).
         _curveBlock(windowDays, drawing, axis, weekend),
         // The numeric values render BELOW the plot, right above the

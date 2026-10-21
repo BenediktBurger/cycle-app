@@ -94,14 +94,14 @@ int? tryParseMeasuredAtMinutes(Object? raw) {
   return (minutes >= 0 && minutes <= 1439) ? minutes : null;
 }
 
-/// One time-of-day of sex on a tracked day, as a single-bit flag. A day
+/// One time-of-day of sexual intercourse on a tracked day, as a single-bit flag. A day
 /// stores the OR of the observed times in [DailyEntry.sexTimings] — multiple
 /// bits mean multiple times on the same day.
 ///
 /// Stored as INTEGER (the bitmask itself, not a numbered scale like
 /// Bleeding.level) in the db and the export document; the db mapping MUST go
 /// through `bit`, never the Dart declaration index. Note the deliberate
-/// vocabulary decision: "sex happened, but the time is unknown" is NOT
+/// vocabulary decision: "sexual intercourse happened, but the time is unknown" is NOT
 /// representable — the observation is either tied to a recorded time or not
 /// recorded.
 enum SexTiming {
@@ -283,9 +283,9 @@ final class DailyEntry {
   final bool painBreast;
   final bool painMittelschmerz;
 
-  /// Times of day sex happened, as a bitmask of [SexTiming.bit] values
+  /// Times of day sexual intercourse happened, as a bitmask of [SexTiming.bit] values
   /// (0 = not recorded; 1 start / 2 middle / 4 end; OR-combined for
-  /// multiple times on one day). "Sex happened, time unknown" is
+  /// multiple times on one day). "Sexual intercourse happened, time unknown" is
   /// deliberately NOT representable — the observation is only recorded
   /// together with a concrete time slot.
   final int sexTimings;

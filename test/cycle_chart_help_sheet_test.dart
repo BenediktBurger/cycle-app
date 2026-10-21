@@ -28,7 +28,7 @@ const _glossaryEn = [
   'Fertility sign (mucus)',
   'Mucus peak',
   'Mittelschmerz (M)',
-  'Sex (X per time of day)',
+  'Sexual intercourse (X per time of day)',
   'BBT (temperature) in °C',
   'Ignored temperature (lighter; set in the day sheet)',
   'Circled higher measurements',

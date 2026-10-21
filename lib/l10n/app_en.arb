@@ -42,9 +42,12 @@
   "termMittelschmerz": "Mittelschmerz (M)",
   "termPain": "Pain",
   "@termPain": {
-    "description": "Section header of the pain chips (breast pain, Mittelschmerz) on the diary entry form. TODO(user-review): wording — check whether a more specific title fits."
+    "description": "Section header of the pain chips (breast pain, Mittelschmerz) on the diary entry form."
   },
-  "termSex": "Sex (X)",
+  "termSex": "Sexual intercourse (X)",
+  "@termSex": {
+    "description": "Section header of the sexual intercourse on the diary entry form."
+  },
   "todayDate": "Today, {date}",
   "@todayDate": {
     "placeholders": {
@@ -281,7 +284,7 @@
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening",
   "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning",
-  "cycleLegendSex": "Sex (X per time of day)",
+  "cycleLegendSex": "Sexual intercourse (X per time of day)",
   "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {
     "description": "Glossary entry for the disturbance row's stacked letter codes. The codes (sp/a/alk/kr) are the four temperature disturbances as entered in the diary, in the order the row stacks them; travel is not part of the vocabulary."
@@ -394,7 +397,7 @@
   "settingsTrackTitle": "What to track",
   "settingsTrackMucus": "Mucus",
   "settingsTrackCervix": "Cervix",
-  "settingsTrackSex": "Sex",
+  "settingsTrackSex": "Sexual intercourse",
   "settingsTrackPain": "Pain",
   "settingsCustomCategoriesTitle": "Custom categories",
   "@settingsCustomCategoriesTitle": {
@@ -1004,7 +1007,7 @@
   "@diaryInfoCervix": {
     "description": "Info-Text zum Muttermund-Abschnitt im Tagebuch-Eingabeformular: die Technik der Selbstuntersuchung und die drei erfassten Merkmale."
   },
-  "diaryInfoSex": "Recorded is intercourse with ejaculation into the vagina. The time of day (morning, midday, evening) is noted too because it is fertility-relevant: sperm can survive several days, so intercourse before the fertile time can lead to pregnancy. Several times of day can be selected together for the same day.",
+  "diaryInfoSex": "Recorded is sexual intercourse with ejaculation into the vagina. The time of day (morning, midday, evening) is noted too because it is fertility-relevant: sperm can survive several days, so intercourse before the fertile time can lead to pregnancy. Several times of day can be selected together for the same day.",
   "@diaryInfoSex": {
     "description": "Info-Text zum Geschlechtsverkehr-Abschnitt im Tagebuch-Eingabeformular (Titel: „Geschlechtsverkehr (X)“): im Zyklus-Kontext meint dies Geschlechtsverkehr mit Samenerguss in die Scheide, und der Zeitpunkt wird wegen seiner Fruchtbarkeitsrelevanz erfasst."
   },

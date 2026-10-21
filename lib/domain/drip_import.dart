@@ -252,9 +252,9 @@ DripCsvImport dripCsvToExportJson(String raw) {
     // drip tracks sex as activity (solo/partner) plus the contraceptive
     // methods (condom, pill, iud, patch, ring, implant, diaphragm, other —
     // and `none`; drip: components/helpers/labels.js). The stored variant
-    // is partner sex WITHOUT contraception, at the MIDDLE time of day
-    // (drip carries none) — an unfilled method column also counts as no
-    // contraception (owner decision 2026-09-17: drip is a
+    // is sexual intercourse, that is partner sex WITHOUT contraception,
+    // at the MIDDLE time of day (drip carries none) — an unfilled method
+    // column also counts as no contraception (owner decision 2026-09-17: drip is a
     // non-authoritative import source). Every other activity/method
     // combination has no stored option of its own; the whole choice is
     // rescued into the [sex] note line below (`sex.none` is a "no method"

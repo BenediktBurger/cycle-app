@@ -24,7 +24,7 @@ Funktionen:
 • Tägliche Erfassung von Basaltemperatur (mit Ausschlusskennzeichnung für
   Störungen wie Krankheit, Alkohol oder spätes Zubettgehen), Blutungen,
   Zervixschleim in der Zeichen-Schreibweise des NER (t, Ø, f, S),
-  Muttermund (wahlweise), Schmerzen, sexuelle Aktivität und Notizen.
+  Muttermund (wahlweise), Schmerzen, Geschlechtsverkehr und Notizen.
 • Auswertungswerkzeuge: erste Temperatur über der Basislinie, Zählung der
   tiefen Messungen, Schleimhöhepunkt, sicher unfruchtbare Zeit, Ausschluss
   von Störungstagen.

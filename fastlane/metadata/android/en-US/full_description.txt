@@ -24,7 +24,7 @@ Features:
 • Daily entry of basal body temperature (with exclusion flags for
   disturbances such as illness, alcohol or a late bedtime), bleeding,
   cervical mucus in the NER shorthand notation (t, Ø, f, S), optional
-  cervix, pain, sex, and notes.
+  cervix, pain, sexual intercourse, and notes.
 • Evaluation tools: first temperature above the baseline, count of low
   measurements, mucus peak day, sympto-thermal fertile window, exclusion
   of disturbed days.

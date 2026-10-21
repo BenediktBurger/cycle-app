@@ -573,9 +573,9 @@ class CycleEntry extends DataClass implements Insertable<CycleEntry> {
   final bool painBreast;
   final bool painMittelschmerz;
 
-  /// Times of day sex happened, as an INTEGER bitmask of [SexTiming.bit]:
+  /// Times of day sexual intercourse happened, as an INTEGER bitmask of [SexTiming.bit]:
   /// start(1) / middle(2) / end(4), OR-combined — multiple bits mean
-  /// multiple times on the same day; 0 = not recorded. "Sex happened, time
+  /// multiple times on the same day; 0 = not recorded. "Sexual intercourse happened, time
   /// unknown" is deliberately NOT representable (the observation is only
   /// recorded together with a concrete time slot). customConstraint replaces
   /// drift's own constraints, so NOT NULL and the column default 0 are
