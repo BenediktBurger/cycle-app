@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NER Cycle App — Web-App: Zyklusdaten bleiben in diesem Browser. / Web app: cycle entries stay in this browser.">
+  <title>NER Cycle App — Web-App</title>
+  <style>
+    body {
+      max-width: 44rem;
+      margin: 0 auto;
+      padding: 1rem 1.25rem 3rem;
+      font-family: system-ui, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #ffffff;
+    }
+    a { color: #0b57a4; }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; }
+    li { margin-bottom: 0.4rem; }
+    .hint {
+      border-left: 4px solid #c28700;
+      background: #fdf6e3;
+      padding: 0.75rem 1rem;
+    }
+    .hint h2, .hint h3 { margin-top: 0; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>NER Cycle App — Web-App</h1>
+
+    <div class="hint">
+      <h2>Bevor Sie beginnen</h2>
+      <ul>
+        <li><strong>Installieren Sie die App zuerst auf dem
+        Home-Bildschirm</strong>, bevor Sie Daten erfassen: unter iOS in
+        Safari über „Teilen“ › „Zum Home-Bildschirm“, unter Android in Chrome
+        über „App installieren“.</li>
+        <li><strong>Ein normaler Safari-Tab kann Daten verlieren:</strong>
+        Safari löscht den Speicher einer nicht installierten Seite nach
+        sieben Tagen ohne Interaktion.</li>
+        <li><strong>Exportieren Sie regelmäßig:</strong> Der JSON-Export ist
+        die einzige Sicherung; die Erinnerung an den Export steht
+        standardmäßig auf „Vierteljährlich“.</li>
+        <li><strong>Es gibt keine Synchronisierung</strong> — weder zwischen
+        Browsern und Geräten noch zwischen den Bereitstellungen.</li>
+        <li><strong>Der Browserspeicher ist von der App nicht
+        verschlüsselt.</strong></li>
+      </ul>
+    </div>
+
+    <p class="hint"><strong>Die App ist in der Beta-Phase: Der Kern steht,
+    Oberfläche und Funktionen werden aber noch weiterentwickelt.</strong>
+    Name, Symbol und Farbschema stehen ebenfalls noch nicht fest („NER Cycle
+    App“ ist ein Arbeitstitel). Datenverlust ist nicht vollständig
+    ausgeschlossen. Für ernsthafte Nutzung: Android-App aus dem
+    <a href="https://github.com/BenediktBurger/cycle-app/releases">Release-Bereich</a>
+    (eine iOS-Version gibt es noch nicht) oder die Web-App auf dem
+    Home-Bildschirm (siehe oben) installieren und regelmäßig
+    exportieren. Zwei Demos liegen bereit: die „App-Demo“ zeigt die zuletzt
+    veröffentlichte Version, die „Entwicklungs-Demo“ den aktuellen Stand der
+    Entwicklung.</p>
+
+    <p>Die Web-App ist ein unterstütztes zweites Ziel neben Android und iOS:
+    Zyklusdaten von Hand erfassen, Statistik, Zyklusansicht, PDF sowie
+    JSON-Export und -Import. Die App rechnet und zeigt die Kurve an, sie
+    entscheidet nichts; dauerhaft ist nur die installierte Web-App, nicht ein
+    normaler Browser-Tab. Details im
+    <a href="https://github.com/BenediktBurger/cycle-app">GitHub-Repository</a>.
+    Methodenkenntnis (Lehrbuch oder Schulung) bleibt Voraussetzung für eine
+    zuverlässige Deutung.</p>
+
+    <h2>Wo Ihre Daten bleiben</h2>
+    <p>Alle Einträge, die Sie hier erfassen, <strong>bleiben in diesem
+    Browser</strong> (im Browserspeicher OPFS/IndexedDB, getrennt nach
+    aufgerufener Seite und Version):</p>
+    <ul>
+      <li>Nichts wird hochgeladen — kein Cloud-Dienst, keine Analyse, keine
+      Nutzungsstatistik.</li>
+      <li>Umgekehrt gibt es <strong>keine Synchronisierung</strong>: Weder
+      zwischen Browsern und Geräten (jeder Browser und jedes Gerät hält
+      seine eigene Kopie) noch zwischen den Bereitstellungen — was die
+      App-Demo speichert, sieht die Entwicklungs-Demo nicht, und umgekehrt.</li>
+      <li>Gelöscht werden die Daten durch die Browser-Option „Websitedaten
+      löschen“, im privaten Modus verschwinden Einträge mit dem Fenster —
+      und ein Wechsel des Browsers oder Geräts ist ein Neuanfang.</li>
+    </ul>
+
+    <h2>Daten sichern</h2>
+    <p>Über <strong>Einstellungen › Export</strong> speichern Sie Ihre
+    Einträge als Datei — regelmäßig exportieren ist die einzige Sicherung.
+    Die Erinnerung daran steht standardmäßig auf „Vierteljährlich“; über den
+    Import spielen Sie eine Sicherung später wieder ein.</p>
+
+    <h2>Verbleibende Risiken</h2>
+    <p>Der Browserspeicher ist von der App her <strong>nicht
+    verschlüsselt</strong>: Wer (physisch oder per Schadsoftware) Ihr
+    Browserprofil ausliest, kann die Einträge sehen. Unabhängig davon gilt:
+    Nur Daten eintragen, deren Verlust oder Offenlegung Sie verschmerzen
+    können — Einzelheiten im
+    <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#web-app">README
+    (englisch)</a>.</p>
+
+    <p><a href="./app/"><strong>Zur App-Demo</strong></a> (veröffentlichte
+    Version) ·
+    <a href="./branches/main/"><strong>Zur Entwicklungs-Demo</strong></a>
+    (aktueller Stand)</p>
+
+    <h2 lang="en">English</h2>
+
+    <div class="hint">
+      <h3 lang="en">Before you start</h3>
+      <ul>
+        <li><strong>Install the app to your Home Screen first</strong>,
+        before you enter any data: on iOS Safari via “Share” › “Add to Home
+        Screen”, on Android in Chrome via “Install app”.</li>
+        <li><strong>A normal Safari tab can lose its data:</strong> Safari
+        deletes the storage of a non-installed page after seven days without
+        interaction.</li>
+        <li><strong>Export regularly:</strong> the JSON export is the only
+        backup, and the reminder to export defaults to “quarterly”.</li>
+        <li><strong>There is no sync</strong> — neither between browsers and
+        devices nor between the deployments.</li>
+        <li><strong>Browser storage is not encrypted by the app.</strong></li>
+      </ul>
+    </div>
+
+    <p><strong>This app is in beta: the core is stable, but the UI and
+    features are still being developed.</strong> The name, icon, and colour
+    scheme are not final either (“NER Cycle App” is a working title). Data
+    loss is not ruled out entirely. For serious use, install the Android app
+    from the
+    <a href="https://github.com/BenediktBurger/cycle-app/releases">releases
+    page</a> (an iOS build does not exist yet) or the web app on your Home Screen
+    (see above), and export regularly. Two
+    deployments are available: the “app demo” shows the latest published version,
+    and the “development demo” shows the current state of development.</p>
+
+    <p>The web app is a supported secondary target alongside Android and
+    iOS: you enter cycle data by hand and get statistics, the cycle view,
+    PDF, and JSON export/import. The app computes and plots the curve, it
+    never decides anything; the durable form is the installed web app, not a
+    normal browser tab. Details in the
+    <a href="https://github.com/BenediktBurger/cycle-app">GitHub repository</a>.
+    Knowing the method (book or course) is a prerequisite for reliable
+    interpretation.</p>
+
+    <h3 lang="en">Where your data stays</h3>
+    <p>Every entry you make here <strong>stays in this browser</strong>
+    (browser-local storage, OPFS/IndexedDB, kept separate per page and
+    version):</p>
+    <ul>
+      <li>Nothing is uploaded — no cloud service, no analytics, no usage
+      statistics.</li>
+      <li>Conversely, there is <strong>no sync</strong>: neither between
+      browsers and devices (every browser and every device holds its own copy)
+      nor between the deployments — what the app demo stores is invisible to
+      the development demo, and vice versa.</li>
+      <li>The browser's “clear site data” wipes the entries, private windows
+      discard them on close, and switching browser or device is a fresh
+      start.</li>
+    </ul>
+
+    <h3 lang="en">Getting data out</h3>
+    <p><strong>Einstellungen (settings) › Export</strong> saves your
+    entries to a file; the Import brings them back later. The reminder to
+    export defaults to quarterly.</p>
+
+    <h3 lang="en">Residual risks</h3>
+    <p>Browser storage is <strong>not encrypted</strong> by the app:
+    anything that reads your browser profile can read the entries.
+    Independently of that: only enter data whose loss or exposure you can
+    live with — details in the
+    <a href="https://github.com/BenediktBurger/cycle-app/blob/main/README.md#web-app">README</a>.</p>
+
+    <p><a href="./app/"><strong>Open the app demo</strong></a> (published
+    version) ·
+    <a href="./branches/main/"><strong>Open the development demo</strong></a>
+    (current state)</p>
+  </main>
+</body>
+</html>
