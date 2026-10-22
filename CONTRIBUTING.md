@@ -22,7 +22,7 @@ details live in [AGENTS.md](AGENTS.md). In brief:
   scope.
 - **No work-package IDs** in code, docs, or tool/file names.
 - **Run the full test gate** before you consider work done:
-  `flutter analyze` and `flutter test --no-pub -j "$(nproc)" -r expanded`
+  `flutter analyze` and `flutter test --no-pub -r expanded`
   (why that reporter: [AGENTS.md](AGENTS.md); commands: section 4 below).
 
 Setup path and daily commands below; open work is tracked in
@@ -231,24 +231,23 @@ whenever wireless debugging is toggled or the phone reboots, so re-run
 
 ## 4. Analyze, test, build
 
-The local gate mirrors [.github/workflows/ci.yml](.github/workflows/ci.yml)
-(see [ADR-0006](docs/adr/0006-ci.md) for the decision):
+The local gate runs the same checks as
+[.github/workflows/ci.yml](.github/workflows/ci.yml) — the two-layer local + CI
+gate decided in [ADR-0006](docs/adr/0006-ci.md).
 
 ```sh
 flutter pub get    # prerequisite of test runs (also runs gen-l10n)
 flutter analyze
 dart format --output=none --set-exit-if-changed .   # check-only
-flutter test --no-pub -j "$(nproc)" -r expanded
+flutter test --no-pub -r expanded
 flutter build web
 ```
 
+Local runs keep package:test's default worker count so the machine stays
+usable, while CI passes `-j "$(nproc)"` deliberately to use all cores.
 All four checks must pass before you push. To fix formatting instead of
 merely checking it, run a plain `dart format .` (only the check variant is
 part of the gate).
-
-`package:test` defaults to `nproc / 2` concurrent workers (2 on a 4-core
-machine), so pass `-j` explicitly to use every core — CI does the same. On
-macOS, `nproc` is absent; use `-j "$(sysctl -n hw.ncpu)"`.
 
 `flutter build apk --debug` is available locally as well once the local
 Android toolchain is green (§3 above, "Android toolchain") — the web build

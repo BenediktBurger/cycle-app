@@ -887,6 +887,57 @@
       }
     }
   },
+  "importCustomCategoryVisibilityShown": "{count, plural, =1{1 category will be visible again: {names}} other{{count} categories will be visible again: {names}}}",
+  "@importCustomCategoryVisibilityShown": {
+    "description": "Import preview: category definitions the pasted document makes visible again (stored hidden, document shown). The names arrive pre-joined with customMarkItemsSeparator, in stored order and untruncated (the dialog scrolls).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "importCustomCategoryVisibilityHidden": "{count, plural, =1{1 category will be hidden: {names}} other{{count} categories will be hidden: {names}}}",
+  "@importCustomCategoryVisibilityHidden": {
+    "description": "Import preview: category definitions the pasted document hides (stored shown, document hidden). The names arrive pre-joined with customMarkItemsSeparator, in stored order and untruncated (the dialog scrolls).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "importCustomCategoryBlankNameSkipped": "{rows, plural, =1{1 row without a name was skipped.} other{{rows} rows without a name were skipped.}}",
+  "@importCustomCategoryBlankNameSkipped": {
+    "description": "Import preview: document category rows dropped because the name is empty or whitespace-only.",
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      }
+    }
+  },
+  "importCustomCategoryDuplicateNameSkipped": "{rows, plural, =1{1 duplicate category name was skipped.} other{{rows} duplicate category names were skipped.}}",
+  "@importCustomCategoryDuplicateNameSkipped": {
+    "description": "Import preview: document category rows dropped because an earlier row already carried the name (the first occurrence wins).",
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      }
+    }
+  },
+  "importCategoriesMerged": "Import: {added, plural, =0{custom categories merged.} =1{1 custom category added.} other{{added} custom categories added.}}",
+  "@importCategoriesMerged": {
+    "description": "Success message when the import changed only category definitions (no day, mark or method rows). The =0 form covers a merge that adds no category, e.g. a visibility or label change.",
+    "placeholders": {
+      "added": {
+        "type": "int"
+      }
+    }
+  },
   "dripImportTitle": "Import drip data",
   "dripImportNote": "Reads a CSV export of the \"drip\" app: an existing day is overwritten, the rest stays. An excluded temperature derives an \"exclude from analysis\" mark; mood and desire flags are dropped (their notes are kept).",
   "dripImportHint": "Paste a drip CSV export here …",

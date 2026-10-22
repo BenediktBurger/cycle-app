@@ -215,7 +215,10 @@ final class PersistedSettings {
       other.pdfExportName == pdfExportName &&
       other.pdfExportBirthDate == pdfExportBirthDate &&
       other.diaryTrack == diaryTrack &&
-      _categoriesEqual(other.customDiaryCategories, customDiaryCategories) &&
+      sameCustomCategories(
+        other.customDiaryCategories,
+        customDiaryCategories,
+      ) &&
       other.lastExportAt == lastExportAt &&
       other.backupReminderInterval == backupReminderInterval &&
       other.backupReminderSnoozedUntil == backupReminderSnoozedUntil;
@@ -237,16 +240,6 @@ final class PersistedSettings {
     backupReminderInterval,
     backupReminderSnoozedUntil,
   );
-}
-
-/// Value comparison of two definitions lists without the `collection`
-/// package: same length, element-wise equal (order is part of the value).
-bool _categoriesEqual(List<CustomCategory> a, List<CustomCategory> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
 }
 
 /// Stateless typed wrapper over one database's [SettingsDao]. Cheap enough
@@ -314,7 +307,10 @@ final class SettingsStore {
               diaryTrack = DiaryTrack.fromJson(decoded);
             }
           case SettingKeys.customDiaryCategories:
-            customDiaryCategories = _customCategoriesFromStored(decoded);
+            customDiaryCategories = [
+              for (final row in customCategoryRowsFromStored(decoded))
+                CustomCategory.fromJson(row),
+            ];
           case SettingKeys.lastExportAt:
             lastExportAt = _utcInstantFromStored(decoded);
           case SettingKeys.backupReminderInterval:
@@ -527,18 +523,6 @@ String? _pdfExportNameFromStored(Object? decoded) {
 
 DateTime? _pdfExportBirthDateFromStored(Object? decoded) =>
     decoded is String ? tryParseIsoDate(decoded) : null;
-
-/// Custom-categories decode: a JSON list whose map members decode through
-/// the lenient [CustomCategory.fromJson], in stored order. Junk members
-/// (non-map scalars) are skipped; anything that is not a list — a string,
-/// a number, a broken row — keeps the default empty list, never an error.
-List<CustomCategory> _customCategoriesFromStored(Object? decoded) {
-  if (decoded is! List) return const [];
-  return [
-    for (final member in decoded)
-      if (member is Map<String, Object?>) CustomCategory.fromJson(member),
-  ];
-}
 
 /// Timestamp decode for the export instant and the snooze end: ISO-8601
 /// strings with a real calendar day only, normalized to UTC because the

@@ -12,12 +12,13 @@
 //    shared helper tryMethodSnapshotFromExport rejects are skipped and
 //    counted (a foreign `method` token cannot pass the NOT NULL CHECK —
 //    no coercion exists to tolerate).
-//  - custom category definitions: a document that carries the
-//    `customCategories` key rewrites the definitions settings row inside
-//    the transaction, re-encoded through CustomCategory's canonical JSON
-//    (the exact shape persistCustomCategories writes); a document
-//    without the key — old documents and definitions-free exports both
-//    lack it — leaves stored definitions untouched.
+//  - custom category definitions: name-keyed merge into the definitions row
+//    the device holds — a colliding name keeps its stored position and
+//    unions its labels, the document's visibility wins, unknown names
+//    append. The row is rewritten inside the transaction (canonical
+//    CustomCategory JSON, the shape persistCustomCategories writes) only
+//    when the merged list differs from the stored one; an unchanged merge —
+//    and a document without the key — leaves the row untouched.
 //  - old documents (v1–4) carry profile keys (`profile_id` on every row, a
 //    root `profiles` list): both are ACCEPTED and IGNORED — rows merge by
 //    day / (day, mark_type), never by profile. Their exclude_* keys
@@ -31,6 +32,7 @@
 import 'dart:convert';
 
 import '../domain/cervix.dart';
+import '../domain/custom_categories.dart';
 import '../domain/export_import.dart';
 import '../domain/marks.dart';
 import '../domain/models.dart';
@@ -71,13 +73,10 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 
   return ExportBlob(
     exportedAt: DateTime.now(),
-    // The custom category definitions ride as their stored row maps —
-    // lenient decode (a non-list row or a non-map member collapses away),
-    // like the settings store's reader. The literal key mirrors
-    // SettingKeys.customDiaryCategories (settings_store.dart is not
-    // importable here: the host smoke scripts run this file on the plain
-    // Dart VM).
-    customCategories: _customCategoriesFromStored(
+    // The literal key mirrors SettingKeys.customDiaryCategories
+    // (settings_store.dart is not importable here: the host smoke scripts
+    // run this file on the plain Dart VM).
+    customCategories: _storedCategoryRows(
       await db.settingsDao.readValue('customDiaryCategories'),
     ),
     entries: [
@@ -111,10 +110,14 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           if (e.painBreast) 'pain_breast': true,
           if (e.painMittelschmerz) 'pain_mittelschmerz': true,
           if (e.sexTimings != 0) 'sex_timings': e.sexTimings,
-          // The stored custom-marks JSON verbatim (the mapper's write
-          // shape, lib/db/mappers.dart); the import decodes it leniently.
-          if (e.customMarks != null && e.customMarks!.isNotEmpty)
-            'custom_marks': e.customMarks,
+          // The stored column string decoded through the shared parser
+          // (lib/db/mappers.dart): the document carries the day's marks
+          // as a label-keyed JSON object, not the raw column text. A
+          // marks-free day — and a corrupt column collapsing to the
+          // empty map — emits no key.
+          if (tryParseCustomMarks(e.customMarks) case final marks
+              when marks.isNotEmpty)
+            'custom_marks': marks,
           if (e.notes != null) 'notes': e.notes,
         },
     ],
@@ -148,7 +151,9 @@ Future<String> exportDatabaseToJson(CycleDatabase db) =>
 /// Validates the document with [parseExportJson] and COUNTS the import plan
 /// against the current database state (no writes) — the count behind the
 /// import dialogs' overwrite preview (the dialogs recompute it on every
-/// text edit, before the user applies).
+/// text edit, before the user applies). The stored category definitions are
+/// part of that state, so the preview shows the same merged list the apply
+/// writes.
 Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
   final doc = parseExportJson(raw);
   final existing = await _existingKeys(db);
@@ -157,13 +162,13 @@ Future<ImportSummary> planDatabaseImport(CycleDatabase db, String raw) async {
     existingEntryKeys: existing.entryKeys,
     existingMarkKeys: existing.markKeys,
     existingMethodKeys: existing.methodKeys,
+    existingCustomCategories: existing.customCategories,
   );
 }
 
 /// Parses, plans and writes the import into [db]; returns the executed
-/// counts for the confirmation text plus the canonical imported custom
-/// category definitions (empty when the document carries none) for the
-/// UI's in-session provider update.
+/// counts for the confirmation text plus the merged custom category
+/// definitions for the UI's in-session provider update.
 ///
 /// The write phase runs in ONE transaction: a failure mid-way rolls
 /// everything back. Structural validity was already checked by the plan;
@@ -184,6 +189,7 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         existingEntryKeys: existing.entryKeys,
         existingMarkKeys: existing.markKeys,
         existingMethodKeys: existing.methodKeys,
+        existingCustomCategories: existing.customCategories,
       );
 
       // 1) Entries in document order. Duplicate same-day keys inside the
@@ -268,16 +274,10 @@ Future<ImportSummary> importJsonToDatabase(CycleDatabase db, String raw) async {
         );
       }
 
-      // 4) Category definitions — a settings row, not a merged domain: a
-      //    document that carries the key REWRITES it with the plan's
-      //    canonical list (CustomCategory re-encode, the
-      //    persistCustomCategories shape — the same list the summary
-      //    exposes for the UI's in-session provider update). An absent or
-      //    empty key touches nothing — the writer never emits an empty
-      //    list, and an old document must not clear stored definitions.
-      //    The literal key mirrors SettingKeys.customDiaryCategories (see
-      //    exportDatabaseToBlob).
-      if (summary.customCategories.isNotEmpty) {
+      // 4) Category definitions — the plan's merged list, written only on a
+      //    change (see the import semantics above). The literal key mirrors
+      //    SettingKeys.customDiaryCategories (see exportDatabaseToBlob).
+      if (summary.customCategoriesChanged) {
         await db.settingsDao.writeValue(
           'customDiaryCategories',
           jsonEncode([for (final c in summary.customCategories) c.toJson()]),
@@ -303,37 +303,39 @@ bool _oldDocExcluded(Map<String, Object?> row) =>
     row['exclude_travel'] == true ||
     row['exclude_other'] == true;
 
-/// The definitions settings row decoded leniently — the same collapse
-/// shape the settings store's per-key reader applies: a null/missing,
-/// non-JSON or non-list row is no definitions, and non-map list members
-/// are skipped (a corrupt row never breaks an export).
-List<Map<String, Object?>> _customCategoriesFromStored(String? raw) {
+/// The definitions settings row decoded leniently through
+/// [customCategoryRowsFromStored]; a null or non-JSON row is no definitions
+/// (a corrupt row never breaks an export or an import).
+List<Map<String, Object?>> _storedCategoryRows(String? raw) {
   if (raw == null) return const [];
-  final Object? decoded;
   try {
-    decoded = jsonDecode(raw);
+    return customCategoryRowsFromStored(jsonDecode(raw));
   } on FormatException {
     return const [];
   }
-  if (decoded is! List) return const [];
-  return [
-    for (final member in decoded)
-      if (member is Map) Map<String, Object?>.from(member),
-  ];
 }
 
 final class _Existing {
-  _Existing(this.entryKeys, this.markKeys, this.methodKeys);
+  _Existing(
+    this.entryKeys,
+    this.markKeys,
+    this.methodKeys,
+    this.customCategories,
+  );
 
   final Set<String> entryKeys;
   final Set<String> markKeys;
   final Set<String> methodKeys;
+  final List<CustomCategory> customCategories;
 }
 
 Future<_Existing> _existingKeys(CycleDatabase db) async {
   final entries = await db.entriesDao.allEntries();
   final marks = await db.marksDao.allMarks();
   final methods = await db.measurementMethodsDao.allSnapshots();
+  final definitions = _storedCategoryRows(
+    await db.settingsDao.readValue('customDiaryCategories'),
+  );
 
   return _Existing(
     {for (final e in entries) importEntryKey(formatIsoDay(e.date))},
@@ -342,6 +344,7 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
         importMarkKey(formatIsoDay(m.entryDate), m.markType),
     },
     {for (final m in methods) importMethodKey(formatIsoDay(m.date))},
+    [for (final row in definitions) CustomCategory.fromJson(row)],
   );
 }
 
@@ -354,7 +357,9 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 /// with its quality nulled (both via the shared mucus parse helpers + the
 /// pair sanitize rule, lib/domain/mucus.dart), an out-of-vocabulary
 /// cervix token collapses to null (lib/domain/cervix.dart helpers), and an
-/// out-of-range sex_timings or temp_disturbances mask collapses to 0.
+/// out-of-range sex_timings or temp_disturbances mask collapses to 0. A
+/// `custom_marks` value that is neither the label-keyed object nor a JSON
+/// string of one collapses to the empty map (lib/db/mappers.dart).
 ///
 /// Old-document translation (v1–4 documents): `exclude_illness` maps onto
 /// the kr bit (8), `exclude_alcohol` onto the alk bit (4) — OR-combined
@@ -414,12 +419,10 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       ? rawTimings
       : 0;
 
-  // Lenient decode through the shared parser (lib/db/mappers.dart): a
-  // broken or non-string custom_marks value collapses to the empty map,
-  // never a row killer.
-  final customMarks = row['custom_marks'] is String
-      ? tryParseCustomMarks(row['custom_marks'] as String)
-      : const <String, List<String>>{};
+  final rawMarks = row['custom_marks'];
+  final customMarks = rawMarks is String
+      ? tryParseCustomMarks(rawMarks)
+      : customMarksFromDecoded(rawMarks);
 
   try {
     return DailyEntry(

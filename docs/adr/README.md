@@ -39,3 +39,4 @@ question remains visible wherever the ADR marks unresolved assumptions.
 | [0010](0010-settings-key-value-table.md) | General settings persist in a drift key-value table (`app_settings`) | Accepted |
 | [0011](0011-license-bundling.md) | License texts bundled as assets behind the in-app license page (package licenses auto-collected) | Accepted |
 | [0012](0012-public-web-demo-github-pages.md) | Public web deployment on GitHub Pages — supported secondary target (amended 2026-10-20), docs landing at Pages root, app under /app/, shared origin accepted, iPhone check pending | Accepted |
+| [0013](0013-custom-category-import-merge.md) | Imported custom category definitions merge into the stored ones (name-keyed, in place, label union, imported visibility wins) | Accepted |

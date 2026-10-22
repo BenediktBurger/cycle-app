@@ -34,6 +34,15 @@ String? customMarksNote(Map<String, List<String>>? customMarks) {
   ].join(customMarkCategoriesSeparator);
 }
 
+/// The map members of a JSON-decoded settings value, in stored order.
+List<Map<String, Object?>> customCategoryRowsFromStored(Object? decoded) {
+  if (decoded is! List) return const [];
+  return [
+    for (final member in decoded)
+      if (member is Map<String, Object?>) member,
+  ];
+}
+
 final class CustomCategory {
   const CustomCategory({
     required this.name,
@@ -92,4 +101,12 @@ final class CustomCategory {
     }
     return true;
   }
+}
+
+bool sameCustomCategories(List<CustomCategory> a, List<CustomCategory> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

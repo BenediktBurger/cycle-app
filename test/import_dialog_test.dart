@@ -115,6 +115,17 @@ Finder applyButton() => find.descendant(
 Finder overwritePreview() =>
     find.byKey(const ValueKey('importOverwritePreview'));
 
+/// An export document carrying only category definitions — the
+/// definitions-only import shape.
+String categoriesDoc(List<Map<String, Object?>> rows) => buildExportJson(
+  ExportBlob(
+    exportedAt: DateTime.utc(2026, 9, 20),
+    entries: const [],
+    marks: const [],
+    customCategories: rows,
+  ),
+);
+
 void main() {
   group('import dialogs', () {
     testWidgets(
@@ -471,6 +482,247 @@ void main() {
     );
   });
 
+  group('import custom category preview', () {
+    Finder shownPreview() => find.byKey(
+      const ValueKey('importCustomCategoryVisibilityShownPreview'),
+    );
+    Finder hiddenPreview() => find.byKey(
+      const ValueKey('importCustomCategoryVisibilityHiddenPreview'),
+    );
+    Finder rowsPreview() =>
+        find.byKey(const ValueKey('importCustomCategoryRowsPreview'));
+
+    void expectNoVisibilityPreviews() {
+      expect(shownPreview(), findsNothing);
+      expect(hiddenPreview(), findsNothing);
+    }
+
+    testWidgets('a category the document hides previews in the error style', (
+      WidgetTester tester,
+    ) async {
+      await pumpAndOpenJsonDialog(
+        tester,
+        seed: (db) async {
+          await SettingsStore(db.settingsDao).persistCustomCategories([
+            const CustomCategory(name: 'Sport', items: ['Joggen']),
+          ]);
+        },
+      );
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Sport',
+            'visible': false,
+            'items': ['Joggen'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(hiddenPreview(), findsOneWidget);
+      final warning = tester.widget<Text>(hiddenPreview());
+      expect(warning.data, '1 Kategorie wird ausgeblendet: Sport');
+      expect(
+        warning.style?.color,
+        Theme.of(tester.element(hiddenPreview())).colorScheme.error,
+        reason: 'a hidden category loses its chips from the diary form',
+      );
+      expect(shownPreview(), findsNothing);
+      expect(rowsPreview(), findsNothing);
+    });
+
+    testWidgets(
+      'a mixed-direction document previews one line per direction, each in '
+      'stored order',
+      (WidgetTester tester) async {
+        await pumpAndOpenJsonDialog(
+          tester,
+          seed: (db) async {
+            await SettingsStore(db.settingsDao).persistCustomCategories([
+              const CustomCategory(name: 'Sport', items: ['Joggen']),
+              const CustomCategory(name: 'Medikamente', visible: false),
+              const CustomCategory(name: 'Reisen', visible: false),
+            ]);
+          },
+        );
+        await tester.enterText(
+          importTextField(),
+          categoriesDoc(const [
+            {'name': 'Reisen', 'visible': true},
+            {'name': 'Medikamente', 'visible': true},
+            {
+              'name': 'Sport',
+              'visible': false,
+              'items': ['Joggen'],
+            },
+          ]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.widget<Text>(shownPreview()).data,
+          '2 Kategorien werden wieder sichtbar: Medikamente, Reisen',
+          reason: 'the join follows the stored order, not the document order',
+        );
+        expect(
+          tester.widget<Text>(hiddenPreview()).data,
+          '1 Kategorie wird ausgeblendet: Sport',
+        );
+      },
+    );
+
+    testWidgets('identical definitions preview no warning', (
+      WidgetTester tester,
+    ) async {
+      await pumpAndOpenJsonDialog(
+        tester,
+        seed: (db) async {
+          await SettingsStore(db.settingsDao).persistCustomCategories([
+            const CustomCategory(name: 'Sport', items: ['Joggen']),
+          ]);
+        },
+      );
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Sport',
+            'visible': true,
+            'items': ['Joggen'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expectNoVisibilityPreviews();
+      expect(rowsPreview(), findsNothing);
+    });
+
+    testWidgets('skipped blank-name and duplicate-name rows preview both '
+        'counts', (WidgetTester tester) async {
+      await pumpAndOpenJsonDialog(tester);
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': '   ',
+            'items': ['x'],
+          },
+          {
+            'name': 'Neu',
+            'items': ['X'],
+          },
+          {
+            'name': 'Neu',
+            'items': ['Y'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(rowsPreview(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 Zeile ohne Namen wurde übersprungen.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 doppelter Kategoriename wurde übersprungen.'),
+        ),
+        findsOneWidget,
+      );
+      expectNoVisibilityPreviews();
+    });
+
+    testWidgets('a blank-name row alone previews only the blank-name line', (
+      WidgetTester tester,
+    ) async {
+      await pumpAndOpenJsonDialog(tester);
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {'name': '   '},
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(rowsPreview(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 Zeile ohne Namen wurde übersprungen.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 doppelter Kategoriename wurde übersprungen.'),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('an in-document duplicate alone previews only the duplicate '
+        'line', (WidgetTester tester) async {
+      await pumpAndOpenJsonDialog(tester);
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Neu',
+            'items': ['X'],
+          },
+          {
+            'name': 'Neu',
+            'items': ['Y'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(rowsPreview(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 doppelter Kategoriename wurde übersprungen.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rowsPreview(),
+          matching: find.text('1 Zeile ohne Namen wurde übersprungen.'),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('a clean document previews no notice', (
+      WidgetTester tester,
+    ) async {
+      await pumpAndOpenJsonDialog(tester);
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Neu',
+            'items': ['X'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expectNoVisibilityPreviews();
+      expect(rowsPreview(), findsNothing);
+    });
+  });
+
   group('import summary counts the method snapshots', () {
     testWidgets('a methods-only document is not reported as empty — the '
         'method figures ride the applied summary', (WidgetTester tester) async {
@@ -500,6 +752,70 @@ void main() {
         findsNothing,
         reason: 'a methods-only document is not an empty import',
       );
+    });
+  });
+
+  group('import summary of category-only changes', () {
+    testWidgets('a categories-only change reports the merged categories '
+        'instead of "nothing to change"', (WidgetTester tester) async {
+      await pumpAndOpenJsonDialog(tester);
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Neu',
+            'items': ['X'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(applyButton());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Import: 1 eigene Kategorie ergänzt.'),
+        findsOneWidget,
+        reason: 'a definitions-only change is not an empty import',
+      );
+      expect(find.textContaining('nichts zu ändern'), findsNothing);
+    });
+
+    testWidgets('a merge that adds no category reports the merged wording', (
+      WidgetTester tester,
+    ) async {
+      await pumpAndOpenJsonDialog(
+        tester,
+        seed: (db) async {
+          await SettingsStore(db.settingsDao).persistCustomCategories([
+            const CustomCategory(name: 'Sport', items: ['X']),
+          ]);
+        },
+      );
+      await tester.enterText(
+        importTextField(),
+        categoriesDoc(const [
+          {
+            'name': 'Sport',
+            'visible': true,
+            'items': ['X', 'Y'],
+          },
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(applyButton());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Import: eigene Kategorien zusammengeführt.'),
+        findsOneWidget,
+        reason: 'a label-only merge adds no category',
+      );
+      expect(
+        find.text('Import: 1 eigene Kategorie ergänzt.'),
+        findsNothing,
+        reason: 'the =0 form must not claim an added category',
+      );
+      expect(find.textContaining('nichts zu ändern'), findsNothing);
     });
   });
 
@@ -568,6 +884,44 @@ void main() {
             'the imported definitions are live in-session — the diary '
             'form and the settings card see them without a restart',
       );
+    });
+
+    testWidgets('a colliding definition merges into the provider in place', (
+      WidgetTester tester,
+    ) async {
+      await pumpShellAndOpenJsonDialog(
+        tester,
+        seed: (db) async {
+          await SettingsStore(db.settingsDao).persistCustomCategories([
+            const CustomCategory(name: 'Alt', items: ['X']),
+          ]);
+        },
+      );
+      await applyImport(
+        tester,
+        buildExportJson(
+          ExportBlob(
+            exportedAt: DateTime.utc(2026, 9, 20),
+            entries: [
+              {'date': '2026-09-01', 'bbt_c': 36.5},
+            ],
+            marks: const [],
+            customCategories: const [
+              {
+                'name': 'Alt',
+                'visible': true,
+                'items': ['X', 'Y'],
+              },
+              {'name': 'Neu', 'visible': true, 'items': <String>[]},
+            ],
+          ),
+        ),
+      );
+
+      expect(providerCategories(tester), [
+        const CustomCategory(name: 'Alt', items: ['X', 'Y']),
+        const CustomCategory(name: 'Neu'),
+      ]);
     });
 
     testWidgets(
