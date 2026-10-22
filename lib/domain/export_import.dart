@@ -370,7 +370,8 @@ final class ImportSummary {
     this.customCategories = const [],
     this.customCategoriesChanged = false,
     this.customCategoriesAdded = 0,
-    this.customCategoryVisibilityChanges = const [],
+    this.customCategoryVisibilityShown = const [],
+    this.customCategoryVisibilityHidden = const [],
     this.customCategoriesInvalid = 0,
     this.duplicateCustomCategoryRows = 0,
   });
@@ -428,9 +429,12 @@ final class ImportSummary {
   /// Categories the document adds to the stored list.
   final int customCategoriesAdded;
 
-  /// Visibility flips of the merge (see
-  /// [CustomCategoryMerge.visibilityChanges]).
-  final List<String> customCategoryVisibilityChanges;
+  /// Categories the merge makes visible again (hidden -> shown), in stored
+  /// order.
+  final List<String> customCategoryVisibilityShown;
+
+  /// Categories the merge hides (shown -> hidden), in stored order.
+  final List<String> customCategoryVisibilityHidden;
 
   /// Document rows the merge rejects for a blank name (see
   /// [CustomCategoryMerge.invalidRows]).
@@ -494,7 +498,8 @@ final class CustomCategoryMerge {
   const CustomCategoryMerge({
     required this.categories,
     required this.added,
-    required this.visibilityChanges,
+    required this.visibilityShown,
+    required this.visibilityHidden,
     required this.invalidRows,
     required this.duplicateRows,
     required this.changed,
@@ -506,9 +511,13 @@ final class CustomCategoryMerge {
   /// Document categories whose name is new on this device.
   final int added;
 
-  /// Names whose stored visibility the document flips, in stored order (the
-  /// order the settings card shows).
-  final List<String> visibilityChanges;
+  /// Names the document makes visible again (stored hidden, document shown),
+  /// in stored order (the order the settings card shows).
+  final List<String> visibilityShown;
+
+  /// Names the document hides (stored shown, document hidden), in stored
+  /// order (the order the settings card shows).
+  final List<String> visibilityHidden;
 
   /// Document rows dropped because the name is empty or whitespace-only.
   final int invalidRows;
@@ -543,7 +552,8 @@ CustomCategoryMerge mergeCustomCategoryDefinitions(
   var added = 0;
   var invalidRows = 0;
   var duplicateRows = 0;
-  final flippedIndexes = <int>{};
+  final shownIndexes = <int>{};
+  final hiddenIndexes = <int>{};
   final seenDocumentNames = <String>{};
 
   for (final row in documentRows) {
@@ -567,7 +577,11 @@ CustomCategoryMerge mergeCustomCategoryDefinitions(
 
     final current = merged[index];
     if (current.visible != definition.visible) {
-      flippedIndexes.add(index);
+      if (definition.visible) {
+        shownIndexes.add(index);
+      } else {
+        hiddenIndexes.add(index);
+      }
     }
     final present = <String>{...current.items};
     final items = List<String>.of(current.items);
@@ -581,12 +595,15 @@ CustomCategoryMerge mergeCustomCategoryDefinitions(
     );
   }
 
+  List<String> namesInStoredOrder(Set<int> indexes) => [
+    for (final index in indexes.toList()..sort()) merged[index].name,
+  ];
+
   return CustomCategoryMerge(
     categories: merged,
     added: added,
-    visibilityChanges: [
-      for (final index in flippedIndexes.toList()..sort()) merged[index].name,
-    ],
+    visibilityShown: namesInStoredOrder(shownIndexes),
+    visibilityHidden: namesInStoredOrder(hiddenIndexes),
     invalidRows: invalidRows,
     duplicateRows: duplicateRows,
     changed: !_sameCategories(merged, stored),
@@ -724,7 +741,8 @@ ImportSummary planMerge(
     customCategories: categories.categories,
     customCategoriesChanged: categories.changed,
     customCategoriesAdded: categories.added,
-    customCategoryVisibilityChanges: categories.visibilityChanges,
+    customCategoryVisibilityShown: categories.visibilityShown,
+    customCategoryVisibilityHidden: categories.visibilityHidden,
     customCategoriesInvalid: categories.invalidRows,
     duplicateCustomCategoryRows: categories.duplicateRows,
   );

@@ -821,9 +821,21 @@
       }
     }
   },
-  "importCustomCategoryVisibilityWarning": "{count, plural, =1{1 Kategorie ändert die Sichtbarkeit: {names}} other{{count} Kategorien ändern die Sichtbarkeit: {names}}}",
-  "@importCustomCategoryVisibilityWarning": {
-    "description": "Import-Vorschau: Kategorie-Definitionen, deren gespeicherte Sichtbarkeit das eingefügte Dokument umschaltet. Die Namen kommen mit customMarkItemsSeparator verbunden an, in gespeicherter Reihenfolge und ungekürzt (der Dialog scrollt).",
+  "importCustomCategoryVisibilityShown": "{count, plural, =1{1 Kategorie wird wieder sichtbar: {names}} other{{count} Kategorien werden wieder sichtbar: {names}}}",
+  "@importCustomCategoryVisibilityShown": {
+    "description": "Import-Vorschau: Kategorie-Definitionen, die das eingefügte Dokument wieder sichtbar macht (gespeichert ausgeblendet, im Dokument sichtbar). Die Namen kommen mit customMarkItemsSeparator verbunden an, in gespeicherter Reihenfolge und ungekürzt (der Dialog scrollt).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "importCustomCategoryVisibilityHidden": "{count, plural, =1{1 Kategorie wird ausgeblendet: {names}} other{{count} Kategorien werden ausgeblendet: {names}}}",
+  "@importCustomCategoryVisibilityHidden": {
+    "description": "Import-Vorschau: Kategorie-Definitionen, die das eingefügte Dokument ausblendet (gespeichert sichtbar, im Dokument ausgeblendet). Die Namen kommen mit customMarkItemsSeparator verbunden an, in gespeicherter Reihenfolge und ungekürzt (der Dialog scrollt).",
     "placeholders": {
       "count": {
         "type": "int"

@@ -887,9 +887,21 @@
       }
     }
   },
-  "importCustomCategoryVisibilityWarning": "{count, plural, =1{1 category changes visibility: {names}} other{{count} categories change visibility: {names}}}",
-  "@importCustomCategoryVisibilityWarning": {
-    "description": "Import preview: category definitions whose stored visibility the pasted document flips. The names arrive pre-joined with customMarkItemsSeparator, in stored order and untruncated (the dialog scrolls).",
+  "importCustomCategoryVisibilityShown": "{count, plural, =1{1 category will be visible again: {names}} other{{count} categories will be visible again: {names}}}",
+  "@importCustomCategoryVisibilityShown": {
+    "description": "Import preview: category definitions the pasted document makes visible again (stored hidden, document shown). The names arrive pre-joined with customMarkItemsSeparator, in stored order and untruncated (the dialog scrolls).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "importCustomCategoryVisibilityHidden": "{count, plural, =1{1 category will be hidden: {names}} other{{count} categories will be hidden: {names}}}",
+  "@importCustomCategoryVisibilityHidden": {
+    "description": "Import preview: category definitions the pasted document hides (stored shown, document hidden). The names arrive pre-joined with customMarkItemsSeparator, in stored order and untruncated (the dialog scrolls).",
     "placeholders": {
       "count": {
         "type": "int"

@@ -153,11 +153,16 @@ final class _ImportDialogState extends State<ImportDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final plan = _plan;
-    final visibilityChanges =
-        plan?.customCategoryVisibilityChanges ?? const <String>[];
+    final visibilityShown =
+        plan?.customCategoryVisibilityShown ?? const <String>[];
+    final visibilityHidden =
+        plan?.customCategoryVisibilityHidden ?? const <String>[];
     final skippedRows = plan?.customCategoriesInvalid ?? 0;
     final duplicateRows = plan?.duplicateCustomCategoryRows ?? 0;
     final overwrittenDays = plan?.entriesOverwritten ?? 0;
+    final errorStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error);
     final applyEnabled =
         _controller.text.trim().isNotEmpty && !_running && !_planPending;
     return AlertDialog(
@@ -193,20 +198,29 @@ final class _ImportDialogState extends State<ImportDialog> {
               Text(
                 l10n.importOverwriteWarning(overwrittenDays),
                 key: const ValueKey('importOverwritePreview'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+                style: errorStyle,
               ),
-            if (visibilityChanges.isNotEmpty)
+            if (visibilityHidden.isNotEmpty)
               Text(
-                l10n.importCustomCategoryVisibilityWarning(
-                  visibilityChanges.length,
-                  visibilityChanges.join(customMarkItemsSeparator),
+                l10n.importCustomCategoryVisibilityHidden(
+                  visibilityHidden.length,
+                  visibilityHidden.join(customMarkItemsSeparator),
                 ),
-                key: const ValueKey('importCustomCategoryVisibilityPreview'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
+                key: const ValueKey(
+                  'importCustomCategoryVisibilityHiddenPreview',
                 ),
+                style: errorStyle,
+              ),
+            if (visibilityShown.isNotEmpty)
+              Text(
+                l10n.importCustomCategoryVisibilityShown(
+                  visibilityShown.length,
+                  visibilityShown.join(customMarkItemsSeparator),
+                ),
+                key: const ValueKey(
+                  'importCustomCategoryVisibilityShownPreview',
+                ),
+                style: errorStyle,
               ),
             if (skippedRows > 0 || duplicateRows > 0)
               Column(

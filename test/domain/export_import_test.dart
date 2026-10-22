@@ -1635,6 +1635,11 @@ void main() {
       for (final definition in summary.customCategories) definition.name,
     ];
 
+    void expectNoVisibilityFlips(ImportSummary summary) {
+      expect(summary.customCategoryVisibilityShown, isEmpty);
+      expect(summary.customCategoryVisibilityHidden, isEmpty);
+    }
+
     test('imported-only categories append after the stored ones in document '
         'order', () {
       final stored = [
@@ -1654,11 +1659,7 @@ void main() {
       expect(namesOf(summary), ['Sport', 'Medikamente', 'Reisen', 'Ärzte']);
       expect(summary.customCategoriesAdded, 2);
       expect(summary.customCategoriesChanged, isTrue);
-      expect(
-        summary.customCategoryVisibilityChanges,
-        isEmpty,
-        reason: 'a new category has no stored visibility to change',
-      );
+      expectNoVisibilityFlips(summary);
     });
 
     test(
@@ -1685,7 +1686,8 @@ void main() {
       },
     );
 
-    test('the document visibility wins and the name is reported', () {
+    test('the document visibility wins and a shown-to-hidden flip is '
+        'reported as hidden', () {
       final stored = [
         category('Sport', items: ['Joggen']),
       ];
@@ -1699,11 +1701,12 @@ void main() {
       ]);
 
       expect(summary.customCategories.single.visible, isFalse);
-      expect(summary.customCategoryVisibilityChanges, ['Sport']);
+      expect(summary.customCategoryVisibilityHidden, ['Sport']);
+      expect(summary.customCategoryVisibilityShown, isEmpty);
       expect(summary.customCategoriesChanged, isTrue);
     });
 
-    test('visibility changes are listed in stored order', () {
+    test('shown flips are listed in stored order', () {
       final stored = [
         category('Sport'),
         category('Medikamente', visible: false),
@@ -1715,10 +1718,35 @@ void main() {
         {'name': 'Medikamente', 'visible': true},
       ]);
 
-      expect(summary.customCategoryVisibilityChanges, [
-        'Medikamente',
-        'Reisen',
+      expect(summary.customCategoryVisibilityShown, ['Medikamente', 'Reisen']);
+      expect(summary.customCategoryVisibilityHidden, isEmpty);
+    });
+
+    test('a document flipping categories both ways reports shown and hidden '
+        'separately, each in stored order', () {
+      final stored = [
+        category('Sport'),
+        category('Medikamente', visible: false),
+        category('Reisen'),
+        category('Ärzte', visible: false),
+      ];
+
+      final summary = plan(stored, const [
+        {'name': 'Ärzte', 'visible': true},
+        {'name': 'Reisen', 'visible': false},
+        {'name': 'Sport', 'visible': false},
+        {'name': 'Medikamente', 'visible': true},
       ]);
+
+      expect(summary.customCategoryVisibilityShown, [
+        'Medikamente',
+        'Ärzte',
+      ], reason: 'shown names follow the stored index, not the document order');
+      expect(
+        summary.customCategoryVisibilityHidden,
+        ['Sport', 'Reisen'],
+        reason: 'hidden names follow the stored index, not the document order',
+      );
     });
 
     test('an identical definition list is a no-op', () {
@@ -1739,7 +1767,7 @@ void main() {
       expect(summary.customCategories, stored);
       expect(summary.customCategoriesChanged, isFalse);
       expect(summary.customCategoriesAdded, 0);
-      expect(summary.customCategoryVisibilityChanges, isEmpty);
+      expectNoVisibilityFlips(summary);
     });
 
     test('an absent or explicitly empty document list keeps the stored '
@@ -1826,7 +1854,7 @@ void main() {
 
       expect(namesOf(summary), ['Sport', 'sport', ' Sport']);
       expect(summary.customCategoriesAdded, 2);
-      expect(summary.customCategoryVisibilityChanges, isEmpty);
+      expectNoVisibilityFlips(summary);
     });
 
     test('the added count ignores label-only merges', () {

@@ -946,33 +946,32 @@ void main() {
         }, reason: 'a tick keeps the label it was stored with');
       });
 
-      test(
-        'the document visibility wins and the summary lists the name',
-        () async {
-          await SettingsStore(db.settingsDao).persistCustomCategories([
-            const CustomCategory(name: 'Sport', items: ['Joggen']),
-          ]);
+      test('the document visibility wins and the summary reports the hidden '
+          'name', () async {
+        await SettingsStore(db.settingsDao).persistCustomCategories([
+          const CustomCategory(name: 'Sport', items: ['Joggen']),
+        ]);
 
-          final summary = await importJsonToDatabase(
-            db,
-            buildExportJson(
-              ExportBlob(
-                exportedAt: DateTime.utc(2026, 9, 15, 12),
-                entries: const [],
-                marks: const [],
-                customCategories: const [
-                  {'name': 'Sport', 'visible': false, 'items': <String>[]},
-                ],
-              ),
+        final summary = await importJsonToDatabase(
+          db,
+          buildExportJson(
+            ExportBlob(
+              exportedAt: DateTime.utc(2026, 9, 15, 12),
+              entries: const [],
+              marks: const [],
+              customCategories: const [
+                {'name': 'Sport', 'visible': false, 'items': <String>[]},
+              ],
             ),
-          );
+          ),
+        );
 
-          final settings = await SettingsStore(db.settingsDao).load();
-          expect(settings.customDiaryCategories.single.visible, isFalse);
-          expect(summary.customCategoryVisibilityChanges, ['Sport']);
-          expect(summary.customCategoriesChanged, isTrue);
-        },
-      );
+        final settings = await SettingsStore(db.settingsDao).load();
+        expect(settings.customDiaryCategories.single.visible, isFalse);
+        expect(summary.customCategoryVisibilityHidden, ['Sport']);
+        expect(summary.customCategoryVisibilityShown, isEmpty);
+        expect(summary.customCategoriesChanged, isTrue);
+      });
 
       test('identical definitions write no settings row', () async {
         // A non-canonical extra key: any rewrite would canonicalize it away,
@@ -1052,7 +1051,8 @@ void main() {
 
         expect(second.customCategoriesChanged, isFalse);
         expect(second.customCategoriesAdded, 0);
-        expect(second.customCategoryVisibilityChanges, isEmpty);
+        expect(second.customCategoryVisibilityShown, isEmpty);
+        expect(second.customCategoryVisibilityHidden, isEmpty);
         expect(
           await db.settingsDao.readValue(SettingKeys.customDiaryCategories),
           afterFirst,
@@ -1183,12 +1183,17 @@ void main() {
         expect(plan.customCategories, applied.customCategories);
         expect(plan.customCategoriesAdded, applied.customCategoriesAdded);
         expect(
-          plan.customCategoryVisibilityChanges,
-          applied.customCategoryVisibilityChanges,
+          plan.customCategoryVisibilityShown,
+          applied.customCategoryVisibilityShown,
+        );
+        expect(
+          plan.customCategoryVisibilityHidden,
+          applied.customCategoryVisibilityHidden,
         );
         expect(plan.customCategoriesChanged, applied.customCategoriesChanged);
         expect(plan.customCategoriesChanged, isTrue);
-        expect(applied.customCategoryVisibilityChanges, ['Sport']);
+        expect(applied.customCategoryVisibilityHidden, ['Sport']);
+        expect(applied.customCategoryVisibilityShown, isEmpty);
       });
 
       test('importing an old-style document WITHOUT the key keeps the stored '

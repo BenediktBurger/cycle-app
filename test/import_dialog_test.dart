@@ -483,13 +483,23 @@ void main() {
   });
 
   group('import custom category preview', () {
-    Finder visibilityPreview() =>
-        find.byKey(const ValueKey('importCustomCategoryVisibilityPreview'));
+    Finder shownPreview() => find.byKey(
+      const ValueKey('importCustomCategoryVisibilityShownPreview'),
+    );
+    Finder hiddenPreview() => find.byKey(
+      const ValueKey('importCustomCategoryVisibilityHiddenPreview'),
+    );
     Finder rowsPreview() =>
         find.byKey(const ValueKey('importCustomCategoryRowsPreview'));
 
-    testWidgets('a visibility flip previews the affected name in the error '
-        'style', (WidgetTester tester) async {
+    void expectNoVisibilityPreviews() {
+      expect(shownPreview(), findsNothing);
+      expect(hiddenPreview(), findsNothing);
+    }
+
+    testWidgets('a category the document hides previews in the error style', (
+      WidgetTester tester,
+    ) async {
       await pumpAndOpenJsonDialog(
         tester,
         seed: (db) async {
@@ -510,47 +520,57 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(visibilityPreview(), findsOneWidget);
-      final warning = tester.widget<Text>(visibilityPreview());
-      expect(warning.data, '1 Kategorie ändert die Sichtbarkeit: Sport');
+      expect(hiddenPreview(), findsOneWidget);
+      final warning = tester.widget<Text>(hiddenPreview());
+      expect(warning.data, '1 Kategorie wird ausgeblendet: Sport');
       expect(
         warning.style?.color,
-        Theme.of(tester.element(visibilityPreview())).colorScheme.error,
-        reason: 'the visibility flip is the destructive part of the merge',
+        Theme.of(tester.element(hiddenPreview())).colorScheme.error,
+        reason: 'a hidden category loses its chips from the diary form',
       );
+      expect(shownPreview(), findsNothing);
       expect(rowsPreview(), findsNothing);
     });
 
-    testWidgets('several visibility flips preview in stored order, joined '
-        'with the shared separator', (WidgetTester tester) async {
-      await pumpAndOpenJsonDialog(
-        tester,
-        seed: (db) async {
-          await SettingsStore(db.settingsDao).persistCustomCategories([
-            const CustomCategory(name: 'Sport', items: ['Joggen']),
-            const CustomCategory(name: 'Medikamente'),
-          ]);
-        },
-      );
-      await tester.enterText(
-        importTextField(),
-        categoriesDoc(const [
-          {'name': 'Medikamente', 'visible': false},
-          {
-            'name': 'Sport',
-            'visible': false,
-            'items': ['Joggen'],
+    testWidgets(
+      'a mixed-direction document previews one line per direction, each in '
+      'stored order',
+      (WidgetTester tester) async {
+        await pumpAndOpenJsonDialog(
+          tester,
+          seed: (db) async {
+            await SettingsStore(db.settingsDao).persistCustomCategories([
+              const CustomCategory(name: 'Sport', items: ['Joggen']),
+              const CustomCategory(name: 'Medikamente', visible: false),
+              const CustomCategory(name: 'Reisen', visible: false),
+            ]);
           },
-        ]),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.enterText(
+          importTextField(),
+          categoriesDoc(const [
+            {'name': 'Reisen', 'visible': true},
+            {'name': 'Medikamente', 'visible': true},
+            {
+              'name': 'Sport',
+              'visible': false,
+              'items': ['Joggen'],
+            },
+          ]),
+        );
+        await tester.pumpAndSettle();
 
-      expect(
-        tester.widget<Text>(visibilityPreview()).data,
-        '2 Kategorien ändern die Sichtbarkeit: Sport, Medikamente',
-        reason: 'the join follows the stored order, not the document order',
-      );
-    });
+        expect(
+          tester.widget<Text>(shownPreview()).data,
+          '2 Kategorien werden wieder sichtbar: Medikamente, Reisen',
+          reason: 'the join follows the stored order, not the document order',
+        );
+        expect(
+          tester.widget<Text>(hiddenPreview()).data,
+          '1 Kategorie wird ausgeblendet: Sport',
+        );
+      },
+    );
 
     testWidgets('identical definitions preview no warning', (
       WidgetTester tester,
@@ -575,7 +595,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(visibilityPreview(), findsNothing);
+      expectNoVisibilityPreviews();
       expect(rowsPreview(), findsNothing);
     });
 
@@ -616,7 +636,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(visibilityPreview(), findsNothing);
+      expectNoVisibilityPreviews();
     });
 
     testWidgets('a blank-name row alone previews only the blank-name line', (
@@ -698,7 +718,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(visibilityPreview(), findsNothing);
+      expectNoVisibilityPreviews();
       expect(rowsPreview(), findsNothing);
     });
   });

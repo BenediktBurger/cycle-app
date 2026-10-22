@@ -47,11 +47,11 @@ Constraints:
   document keeps its first occurrence and is counted. Stored definitions are
   taken as they are, so a no-change import of the stored list cannot become a
   change.
-- **The imported visibility wins, and the flip is warned about before
-  applying.** The import dialog lists the affected names (stored order, joined
-  with `, `, untruncated) in the error style: visibility is the one
-  destructive part of the merge, because a hidden category's chips disappear
-  from the diary form.
+- **The imported visibility wins, and each flip direction is warned about
+  separately before applying.** The import dialog gives each direction its own
+  line (stored order, joined with `, `, untruncated) in the error style: a
+  category the document hides loses its chips in the diary form, while one it
+  makes visible again re-adds them.
 - **UI write caps are not enforced at import.** A merge may exceed 10
   categories, 15 labels or 40 characters and is stored untruncated; the caps
   remain edit-time guards.
@@ -89,3 +89,10 @@ Constraints:
   `mergeCustomCategoryDefinitions`); the database adapter only reads the
   stored row into the plan and writes the merged list back when it changed.
   Preview and apply therefore cannot drift apart.
+- **No hard ceiling bounds the merged list.** A hand-edited or foreign
+  document can grow the `customDiaryCategories` row arbitrarily, and the
+  settings card (`lib/ui/settings/custom_categories_card.dart`) builds one row
+  per category while the diary form (`lib/ui/diary.dart`) builds one section
+  per visible category, both non-lazily, so the cost is paid on every render.
+  Setting a ceiling is an open item
+  ([`docs/roadmap.md`](../roadmap.md)).
