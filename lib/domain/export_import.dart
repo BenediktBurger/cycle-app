@@ -30,8 +30,9 @@
 //                      - `mucus_sign`, `mucus_quality`,
 //                        `cervix_position`, `cervix_opening`,
 //                        `cervix_firmness`, `notes` only when non-null;
-//                      - `custom_marks` only when the day carries any (the
-//                        stored label-keyed marks JSON, see tables.dart)
+//                      - `custom_marks` only when the day carries any
+//                        (a label-keyed JSON object — see the
+//                        additive-fields note below);
 //                    ...}, ...],
 //     "marks":    [{"entry_date": "2026-03-12",
 //                   "mark_type": "ignoreTemperature",
@@ -139,7 +140,10 @@
 // An unknown/out-of-vocabulary token collapses to null on import without
 // dropping the row (never a row killer, same principle as mucus); an
 // out-of-range `sex_timings` mask or `temp_disturbances` mask likewise
-// collapses to 0.
+// collapses to 0. `custom_marks` rides as the label-keyed object
+// `{"Kategorie": ["Eintrag", …]}`; the reader also accepts the stored-column
+// JSON string of that object (the shape main-branch exports carry), and any
+// malformed value collapses to the empty map on import, never a row killer.
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in

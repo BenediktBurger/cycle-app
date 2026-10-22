@@ -84,21 +84,15 @@ CycleEntriesCompanion dailyEntryToCompanion(DailyEntry d) {
   );
 }
 
-/// Decodes the stored `custom_marks` JSON (`{"Kategorie": ["Eintrag", …]}`,
-/// see lib/db/tables.dart) into the domain map.
+/// Validates an already-decoded `custom_marks` value
+/// (`{"Kategorie": ["Eintrag", …]}`, see lib/db/tables.dart): a Map with
+/// String keys whose values are Lists of Strings.
 ///
-/// Lenient like the shared `tryParse*` field helpers: null/empty input and
-/// any malformed shape — not JSON, not an object, a non-list value, a list
-/// with a non-string member — decode to the empty map, so corrupt or
-/// hand-edited column data can never throw at a read boundary.
-Map<String, List<String>> tryParseCustomMarks(String? raw) {
-  if (raw == null || raw.isEmpty) return const {};
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(raw);
-  } on FormatException {
-    return const {};
-  }
+/// Lenient like the shared `tryParse*` field helpers: any malformed
+/// shape — not an object, a non-list value, a list with a non-string
+/// member — collapses to the empty map, so corrupt data can never throw
+/// at a read boundary.
+Map<String, List<String>> customMarksFromDecoded(Object? decoded) {
   if (decoded is! Map) return const {};
   final marks = <String, List<String>>{};
   for (final entry in decoded.entries) {
@@ -111,6 +105,18 @@ Map<String, List<String>> tryParseCustomMarks(String? raw) {
     marks[entry.key as String] = List<String>.from(items);
   }
   return marks;
+}
+
+/// Decodes the stored `custom_marks` JSON column into the domain map.
+/// Null/empty and undecodable input collapse through
+/// [customMarksFromDecoded] to the empty map.
+Map<String, List<String>> tryParseCustomMarks(String? raw) {
+  if (raw == null || raw.isEmpty) return const {};
+  try {
+    return customMarksFromDecoded(jsonDecode(raw));
+  } on FormatException {
+    return const {};
+  }
 }
 
 /// UserMarks row -> domain model. The mark vocabulary is open TEXT in

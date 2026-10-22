@@ -111,10 +111,14 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
           if (e.painBreast) 'pain_breast': true,
           if (e.painMittelschmerz) 'pain_mittelschmerz': true,
           if (e.sexTimings != 0) 'sex_timings': e.sexTimings,
-          // The stored custom-marks JSON verbatim (the mapper's write
-          // shape, lib/db/mappers.dart); the import decodes it leniently.
-          if (e.customMarks != null && e.customMarks!.isNotEmpty)
-            'custom_marks': e.customMarks,
+          // The stored column string decoded through the shared parser
+          // (lib/db/mappers.dart): the document carries the day's marks
+          // as a label-keyed JSON object, not the raw column text. A
+          // marks-free day — and a corrupt column collapsing to the
+          // empty map — emits no key.
+          if (tryParseCustomMarks(e.customMarks) case final marks
+              when marks.isNotEmpty)
+            'custom_marks': marks,
           if (e.notes != null) 'notes': e.notes,
         },
     ],
@@ -354,7 +358,9 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
 /// with its quality nulled (both via the shared mucus parse helpers + the
 /// pair sanitize rule, lib/domain/mucus.dart), an out-of-vocabulary
 /// cervix token collapses to null (lib/domain/cervix.dart helpers), and an
-/// out-of-range sex_timings or temp_disturbances mask collapses to 0.
+/// out-of-range sex_timings or temp_disturbances mask collapses to 0. A
+/// `custom_marks` value that is neither the label-keyed object nor a JSON
+/// string of one collapses to the empty map (lib/db/mappers.dart).
 ///
 /// Old-document translation (v1–4 documents): `exclude_illness` maps onto
 /// the kr bit (8), `exclude_alcohol` onto the alk bit (4) — OR-combined
@@ -414,12 +420,13 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       ? rawTimings
       : 0;
 
-  // Lenient decode through the shared parser (lib/db/mappers.dart): a
-  // broken or non-string custom_marks value collapses to the empty map,
-  // never a row killer.
-  final customMarks = row['custom_marks'] is String
-      ? tryParseCustomMarks(row['custom_marks'] as String)
-      : const <String, List<String>>{};
+  // Either accepted document shape, through the shared parsers
+  // (lib/db/mappers.dart): the label-keyed object, or its stored-column JSON
+  // string form.
+  final rawMarks = row['custom_marks'];
+  final customMarks = rawMarks is String
+      ? tryParseCustomMarks(rawMarks)
+      : customMarksFromDecoded(rawMarks);
 
   try {
     return DailyEntry(

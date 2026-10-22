@@ -23,6 +23,12 @@ import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/db/mappers.dart';
 import 'package:cycle_app/db/settings_store.dart';
 
+/// The single entries row of an exported document, decoded — the
+/// custom-marks tests assert the DOCUMENT shape, not pretty-printed text.
+Map<String, Object?> exportedSingleEntryRow(String json) =>
+    ((jsonDecode(json) as Map<String, Object?>)['entries']! as List).single
+        as Map<String, Object?>;
+
 void main() {
   // Not final: setUp assigns a fresh in-memory database before every test
   // (closed again by the per-test tearDown registered inside setUp).
@@ -922,6 +928,22 @@ void main() {
     });
 
     group('custom marks in the document', () {
+      String stringFormMarksDocument() => buildExportJson(
+        ExportBlob(
+          exportedAt: DateTime.utc(2026, 4, 1),
+          entries: [
+            {
+              'date': '2026-04-02',
+              'bleeding': 3,
+              'custom_marks': jsonEncode({
+                'Sport': ['Joggen'],
+              }),
+            },
+          ],
+          marks: const [],
+        ),
+      );
+
       test(
         'a day with custom marks survives the export → import round trip',
         () async {
@@ -936,16 +958,155 @@ void main() {
           );
 
           final json = await exportDatabaseToJson(db);
-          expect(json, contains('"custom_marks"'));
+          final row = exportedSingleEntryRow(json);
+          expect(
+            row['custom_marks'],
+            {
+              'Sport': ['Joggen'],
+            },
+            reason:
+                'the document carries the marks as a nested JSON object, '
+                'not the stored column string',
+          );
 
           final target = CycleDatabase(NativeDatabase.memory());
           addTearDown(target.close);
           final summary = await importJsonToDatabase(target, json);
           expect(summary.entriesNew, 1);
-          final row = await target.entriesDao.entryFor(DateTime(2026, 4, 2));
-          expect(dailyEntryFromDrift(row!).customMarks, {
+          final imported = await target.entriesDao.entryFor(
+            DateTime(2026, 4, 2),
+          );
+          expect(dailyEntryFromDrift(imported!).customMarks, {
             'Sport': ['Joggen'],
           }, reason: 'the marks ride through the document, not just the day');
+        },
+      );
+
+      test(
+        "a document's custom_marks object imports as the day's marks",
+        () async {
+          final doc = buildExportJson(
+            ExportBlob(
+              exportedAt: DateTime.utc(2026, 4, 1),
+              entries: const [
+                {
+                  'date': '2026-04-02',
+                  'bleeding': 3,
+                  'custom_marks': {
+                    'Sport': ['Joggen'],
+                  },
+                },
+              ],
+              marks: const [],
+            ),
+          );
+
+          final summary = await importJsonToDatabase(db, doc);
+          expect(summary.entriesNew, 1);
+          final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
+          expect(
+            dailyEntryFromDrift(row!).customMarks,
+            {
+              'Sport': ['Joggen'],
+            },
+            reason: 'the object form is the document shape the reader accepts',
+          );
+        },
+      );
+
+      test(
+        "a document's custom_marks JSON string imports as the day's marks",
+        () async {
+          final summary = await importJsonToDatabase(
+            db,
+            stringFormMarksDocument(),
+          );
+
+          expect(summary.entriesNew, 1);
+          final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
+          expect(
+            dailyEntryFromDrift(row!).customMarks,
+            {
+              'Sport': ['Joggen'],
+            },
+            reason:
+                'a stored-column JSON string carries the same label-keyed '
+                'marks as the object form',
+          );
+        },
+      );
+
+      test('a string-form custom_marks imports and re-exports as the '
+          'object form', () async {
+        await importJsonToDatabase(db, stringFormMarksDocument());
+
+        final row = exportedSingleEntryRow(await exportDatabaseToJson(db));
+        expect(
+          row['custom_marks'],
+          {
+            'Sport': ['Joggen'],
+          },
+          reason:
+              'the string form is an input shape only, never an output shape',
+        );
+      });
+
+      test(
+        'a string-form document keeps the ticks of the day it overwrites',
+        () async {
+          await db.entriesDao.upsertDaily(
+            DailyEntry(
+              date: DateTime(2026, 4, 2),
+              bleeding: Bleeding.medium,
+              customMarks: const {
+                'Sport': ['Joggen'],
+              },
+            ),
+          );
+
+          final summary = await importJsonToDatabase(
+            db,
+            stringFormMarksDocument(),
+          );
+          expect(
+            summary.entriesOverwritten,
+            1,
+            reason: 'the import replaces the stored day',
+          );
+          final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
+          expect(dailyEntryFromDrift(row!).customMarks, {
+            'Sport': ['Joggen'],
+          }, reason: 'a full-replace overwrite must not wipe read ticks');
+        },
+      );
+
+      test(
+        'a corrupt stored custom_marks column exports no custom_marks key',
+        () async {
+          await db
+              .into(db.cycleEntries)
+              .insert(
+                CycleEntriesCompanion.insert(
+                  date: DateTime(2026, 4, 2),
+                  bleeding: const Value(Bleeding.medium),
+                  customMarks: const Value('not json'),
+                ),
+              );
+
+          final json = await exportDatabaseToJson(db);
+          final row = exportedSingleEntryRow(json);
+          expect(
+            row['date'],
+            '2026-04-02',
+            reason: 'the corrupt column never costs the day its export',
+          );
+          expect(
+            row.containsKey('custom_marks'),
+            isFalse,
+            reason:
+                'the corrupt column decodes to no marks a document may '
+                'carry, so no key rides',
+          );
         },
       );
 
@@ -964,24 +1125,58 @@ void main() {
 
       test('a junk custom_marks value imports leniently, never killing '
           'the row', () async {
+        // The accepted shapes are the label-keyed object and its
+        // stored-column JSON string; anything else — undecodable text, a
+        // JSON string of a non-object, a non-object value, malformed
+        // members — is junk.
         final doc = buildExportJson(
           ExportBlob(
             exportedAt: DateTime.utc(2026, 4, 1),
             entries: const [
               {'date': '2026-04-02', 'bleeding': 3, 'custom_marks': 'not json'},
+              {
+                'date': '2026-04-03',
+                'bleeding': 3,
+                'custom_marks': ['Joggen'],
+              },
+              {
+                'date': '2026-04-04',
+                'bleeding': 3,
+                'custom_marks': {'Sport': 42},
+              },
+              {
+                'date': '2026-04-05',
+                'bleeding': 3,
+                'custom_marks': {
+                  'Sport': ['Joggen', 7],
+                },
+              },
+              {
+                'date': '2026-04-06',
+                'bleeding': 3,
+                'custom_marks': '["Joggen"]',
+              },
             ],
             marks: const [],
           ),
         );
 
         final summary = await importJsonToDatabase(db, doc);
-        expect(summary.entriesNew, 1);
-        final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
-        expect(
-          dailyEntryFromDrift(row!).customMarks,
-          isEmpty,
-          reason: 'a broken value decodes to the empty map like the mapper',
-        );
+        expect(summary.entriesNew, 5);
+        for (final day in [
+          DateTime(2026, 4, 2),
+          DateTime(2026, 4, 3),
+          DateTime(2026, 4, 4),
+          DateTime(2026, 4, 5),
+          DateTime(2026, 4, 6),
+        ]) {
+          final row = await db.entriesDao.entryFor(day);
+          expect(
+            dailyEntryFromDrift(row!).customMarks,
+            isEmpty,
+            reason: 'a junk value decodes to the empty map like the mapper',
+          );
+        }
       });
     });
 
