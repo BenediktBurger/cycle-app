@@ -142,9 +142,9 @@
 // dropping the row (never a row killer, same principle as mucus); an
 // out-of-range `sex_timings` mask or `temp_disturbances` mask likewise
 // collapses to 0. `custom_marks` rides as the label-keyed object
-// `{"Kategorie": ["Eintrag", …]}`; the reader also accepts the stored-column
-// JSON string of that object (the shape main-branch exports carry), and any
-// malformed value collapses to the empty map on import, never a row killer.
+// `{"Kategorie": ["Eintrag", …]}`; the reader also accepts the raw
+// stored-column JSON text of that object, and any malformed value collapses
+// to the empty map on import, never a row killer.
 //
 // The document builds from GENERIC row maps so this layer stays decoupled
 // from drift data classes; the drift <-> map conversion lives in

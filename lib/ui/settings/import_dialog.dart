@@ -152,6 +152,7 @@ final class _ImportDialogState extends State<ImportDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final plan = _plan;
     final visibilityShown =
         plan?.customCategoryVisibilityShown ?? const <String>[];
@@ -160,9 +161,9 @@ final class _ImportDialogState extends State<ImportDialog> {
     final skippedRows = plan?.customCategoriesInvalid ?? 0;
     final duplicateRows = plan?.duplicateCustomCategoryRows ?? 0;
     final overwrittenDays = plan?.entriesOverwritten ?? 0;
-    final errorStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error);
+    final errorStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.error,
+    );
     final applyEnabled =
         _controller.text.trim().isNotEmpty && !_running && !_planPending;
     return AlertDialog(
@@ -231,14 +232,14 @@ final class _ImportDialogState extends State<ImportDialog> {
                   if (skippedRows > 0)
                     Text(
                       l10n.importCustomCategoryBlankNameSkipped(skippedRows),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall,
                     ),
                   if (duplicateRows > 0)
                     Text(
                       l10n.importCustomCategoryDuplicateNameSkipped(
                         duplicateRows,
                       ),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall,
                     ),
                 ],
               ),

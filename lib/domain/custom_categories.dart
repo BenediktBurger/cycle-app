@@ -34,11 +34,7 @@ String? customMarksNote(Map<String, List<String>>? customMarks) {
   ].join(customMarkCategoriesSeparator);
 }
 
-/// The definition row maps of a JSON-decoded settings value, in stored
-/// order: a JSON list whose map members decode through the lenient
-/// [CustomCategory.fromJson]. Junk members (non-map scalars, nested lists)
-/// are skipped; anything that is not a list — including a missing row — is
-/// no definitions.
+/// The map members of a JSON-decoded settings value, in stored order.
 List<Map<String, Object?>> customCategoryRowsFromStored(Object? decoded) {
   if (decoded is! List) return const [];
   return [

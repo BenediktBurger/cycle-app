@@ -73,11 +73,9 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 
   return ExportBlob(
     exportedAt: DateTime.now(),
-    // The custom category definitions ride as their stored row maps
-    // through customCategoryRowsFromStored. The literal key mirrors
-    // SettingKeys.customDiaryCategories (settings_store.dart is not
-    // importable here: the host smoke scripts run this file on the plain
-    // Dart VM).
+    // The literal key mirrors SettingKeys.customDiaryCategories
+    // (settings_store.dart is not importable here: the host smoke scripts
+    // run this file on the plain Dart VM).
     customCategories: _storedCategoryRows(
       await db.settingsDao.readValue('customDiaryCategories'),
     ),
@@ -421,9 +419,6 @@ DailyEntry? tryDailyEntryFromExport(Map<String, Object?> row) {
       ? rawTimings
       : 0;
 
-  // Either accepted document shape, through the shared parsers
-  // (lib/db/mappers.dart): the label-keyed object, or its stored-column JSON
-  // string form.
   final rawMarks = row['custom_marks'];
   final customMarks = rawMarks is String
       ? tryParseCustomMarks(rawMarks)

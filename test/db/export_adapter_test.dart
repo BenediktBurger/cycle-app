@@ -1426,7 +1426,7 @@ void main() {
           final row = await db.entriesDao.entryFor(DateTime(2026, 4, 2));
           expect(dailyEntryFromDrift(row!).customMarks, {
             'Sport': ['Joggen'],
-          }, reason: 'a full-replace overwrite must not wipe read ticks');
+          }, reason: 'a full-replace overwrite must not wipe stored ticks');
         },
       );
 
