@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/custom_categories.dart';
 import '../../domain/export_import.dart';
 import '../../l10n/app_localizations.dart';
 import '../file_transfer.dart';
@@ -150,6 +151,13 @@ final class _ImportDialogState extends State<ImportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final plan = _plan;
+    final visibilityChanges =
+        plan?.customCategoryVisibilityChanges ?? const <String>[];
+    final skippedRows = plan?.customCategoriesInvalid ?? 0;
+    final duplicateRows = plan?.duplicateCustomCategoryRows ?? 0;
+    final overwrittenDays = plan?.entriesOverwritten ?? 0;
     final applyEnabled =
         _controller.text.trim().isNotEmpty && !_running && !_planPending;
     return AlertDialog(
@@ -164,7 +172,7 @@ final class _ImportDialogState extends State<ImportDialog> {
               OutlinedButton.icon(
                 onPressed: _running ? null : _pickFile,
                 icon: const Icon(Icons.file_open_outlined),
-                label: Text(AppLocalizations.of(context).importPickFile),
+                label: Text(l10n.importPickFile),
               ),
               const SizedBox(height: 8),
             ],
@@ -181,15 +189,44 @@ final class _ImportDialogState extends State<ImportDialog> {
                 decoration: InputDecoration(hintText: widget.hint),
               ),
             ),
-            if ((_plan?.entriesOverwritten ?? 0) > 0)
+            if (overwrittenDays > 0)
               Text(
-                AppLocalizations.of(
-                  context,
-                ).importOverwriteWarning(_plan!.entriesOverwritten),
+                l10n.importOverwriteWarning(overwrittenDays),
                 key: const ValueKey('importOverwritePreview'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.error,
                 ),
+              ),
+            if (visibilityChanges.isNotEmpty)
+              Text(
+                l10n.importCustomCategoryVisibilityWarning(
+                  visibilityChanges.length,
+                  visibilityChanges.join(customMarkItemsSeparator),
+                ),
+                key: const ValueKey('importCustomCategoryVisibilityPreview'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            if (skippedRows > 0 || duplicateRows > 0)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                key: const ValueKey('importCustomCategoryRowsPreview'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (skippedRows > 0)
+                    Text(
+                      l10n.importCustomCategoryBlankNameSkipped(skippedRows),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (duplicateRows > 0)
+                    Text(
+                      l10n.importCustomCategoryDuplicateNameSkipped(
+                        duplicateRows,
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
               ),
           ],
         ),

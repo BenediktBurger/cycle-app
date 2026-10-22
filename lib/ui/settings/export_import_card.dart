@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../db/export_adapter.dart';
 import '../../db/settings_store.dart' show formatIsoDate;
 import '../../domain/backup_reminder.dart';
+import '../../domain/export_import.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers.dart';
 import '../json_export.dart';
@@ -127,26 +128,9 @@ final class ExportImportCard extends ConsumerWidget {
       if (!dialogContext.mounted) return;
       popDialogRouteWhileCurrent(dialogContext);
       if (!screenContext.mounted) return;
-      ScaffoldMessenger.of(screenContext).showSnackBar(
-        SnackBar(
-          content: Text(
-            summary.entriesWritten == 0 &&
-                    summary.marksNew == 0 &&
-                    summary.methodsWritten == 0
-                ? l10n.importEmpty
-                : l10n.importSummary(
-                    summary.entriesNew,
-                    summary.entriesOverwritten,
-                    summary.duplicateEntryRows,
-                    summary.entriesInvalid,
-                    summary.marksNew,
-                    summary.marksSkipped,
-                    summary.methodsNew,
-                    summary.methodsOverwritten,
-                  ),
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        screenContext,
+      ).showSnackBar(SnackBar(content: Text(_summaryMessage(l10n, summary))));
     } on FormatException {
       // The DOCUMENT is invalid — nothing was written; the dialog stays
       // open for correcting the text.
@@ -172,3 +156,24 @@ String _intervalLabel(AppLocalizations l10n, BackupReminderInterval interval) =>
       BackupReminderInterval.halfYearly =>
         l10n.settingsBackupReminderHalfYearly,
     };
+
+String _summaryMessage(AppLocalizations l10n, ImportSummary summary) {
+  if (summary.entriesWritten > 0 ||
+      summary.marksNew > 0 ||
+      summary.methodsWritten > 0) {
+    return l10n.importSummary(
+      summary.entriesNew,
+      summary.entriesOverwritten,
+      summary.duplicateEntryRows,
+      summary.entriesInvalid,
+      summary.marksNew,
+      summary.marksSkipped,
+      summary.methodsNew,
+      summary.methodsOverwritten,
+    );
+  }
+  if (summary.customCategoriesChanged) {
+    return l10n.importCategoriesMerged(summary.customCategoriesAdded);
+  }
+  return l10n.importEmpty;
+}

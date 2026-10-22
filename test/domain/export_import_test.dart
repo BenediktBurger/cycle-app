@@ -15,6 +15,7 @@ import 'dart:io';
 
 import 'package:cycle_app/db/export_adapter.dart';
 import 'package:cycle_app/domain/cervix.dart';
+import 'package:cycle_app/domain/custom_categories.dart';
 import 'package:cycle_app/domain/export_import.dart';
 import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -143,6 +144,7 @@ void main() {
         existingEntryKeys: {'2026-03-05'},
         existingMarkKeys: {'2026-03-03|baseline'},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
 
       expect(summary.duplicateEntryRows, 0, reason: 'no date repeated in doc');
@@ -172,6 +174,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
 
       // The plan counts EXACTLY what the writer will write: the two
@@ -198,6 +201,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(summary.duplicateEntryRows, 1);
       // The first occurrence wins; the later one is the counted duplicate.
@@ -229,6 +233,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
 
       expect(summary.entriesNew, 1, reason: 'the second row is a duplicate');
@@ -342,6 +347,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesNew, 2);
@@ -435,6 +441,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -530,6 +537,7 @@ void main() {
           existingEntryKeys: {},
           existingMarkKeys: {},
           existingMethodKeys: {},
+          existingCustomCategories: const [],
         );
         expect(
           summary.entriesInvalid,
@@ -670,6 +678,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -788,6 +797,7 @@ void main() {
           existingEntryKeys: {},
           existingMarkKeys: {},
           existingMethodKeys: {},
+          existingCustomCategories: const [],
         );
         expect(
           summary.entriesInvalid,
@@ -859,6 +869,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -892,6 +903,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(summary.entriesInvalid, 0);
       expect(summary.entriesWritten, 1);
@@ -944,6 +956,7 @@ void main() {
           existingEntryKeys: {},
           existingMarkKeys: {},
           existingMethodKeys: {},
+          existingCustomCategories: const [],
         );
         expect(
           summary.entriesInvalid,
@@ -1016,6 +1029,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(first.marksNew, 2);
       expect(first.marksSkipped, 0);
@@ -1035,6 +1049,7 @@ void main() {
         existingEntryKeys: const {'2026-01-01', '2026-02-01'},
         existingMarkKeys: existingMarkKeys,
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(second.marksNew, 0);
       expect(second.marksSkipped, 2);
@@ -1129,6 +1144,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -1220,6 +1236,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -1251,6 +1268,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(
         summary.entriesInvalid,
@@ -1373,6 +1391,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(summary.methodsNew, 0);
     });
@@ -1429,6 +1448,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {'2026-03-05'},
+        existingCustomCategories: const [],
       );
 
       expect(summary.methodsNew, 1, reason: '2026-03-01 only');
@@ -1462,6 +1482,7 @@ void main() {
         existingEntryKeys: {},
         existingMarkKeys: {},
         existingMethodKeys: {},
+        existingCustomCategories: const [],
       );
       expect(summary.methodsInvalid, 0);
       expect(summary.methodsNew, 1);
@@ -1584,6 +1605,318 @@ void main() {
         throwsA(isA<FormatException>()),
         reason: 'the list gate admits JSON objects only',
       );
+    });
+  });
+
+  group('custom category definitions merge into the stored ones', () {
+    CustomCategory category(
+      String name, {
+      bool visible = true,
+      List<String> items = const [],
+    }) => CustomCategory(name: name, visible: visible, items: items);
+
+    ImportSummary plan(
+      List<CustomCategory> stored,
+      List<Map<String, Object?>> rows,
+    ) => planMerge(
+      ExportBlob(
+        entries: const [],
+        marks: const [],
+        customCategories: rows,
+        exportedAt: DateTime.utc(2026, 9, 15, 12),
+      ),
+      existingEntryKeys: const {},
+      existingMarkKeys: const {},
+      existingMethodKeys: const {},
+      existingCustomCategories: stored,
+    );
+
+    List<String> namesOf(ImportSummary summary) => [
+      for (final definition in summary.customCategories) definition.name,
+    ];
+
+    test('imported-only categories append after the stored ones in document '
+        'order', () {
+      final stored = [
+        category('Sport', items: ['Joggen']),
+        category('Medikamente', visible: false),
+      ];
+
+      final summary = plan(stored, const [
+        {
+          'name': 'Reisen',
+          'visible': true,
+          'items': ['Flug'],
+        },
+        {'name': 'Ärzte', 'visible': false},
+      ]);
+
+      expect(namesOf(summary), ['Sport', 'Medikamente', 'Reisen', 'Ärzte']);
+      expect(summary.customCategoriesAdded, 2);
+      expect(summary.customCategoriesChanged, isTrue);
+      expect(
+        summary.customCategoryVisibilityChanges,
+        isEmpty,
+        reason: 'a new category has no stored visibility to change',
+      );
+    });
+
+    test(
+      'a colliding name is merged in place, keeping its stored position',
+      () {
+        final stored = [
+          category('Alltag', items: ['x']),
+          category('Sport', items: ['Joggen']),
+          category('Medikamente'),
+        ];
+
+        final summary = plan(stored, const [
+          {
+            'name': 'Sport',
+            'visible': true,
+            'items': ['Kraft', 'Joggen', 'Kraft'],
+          },
+        ]);
+
+        expect(namesOf(summary), ['Alltag', 'Sport', 'Medikamente']);
+        expect(summary.customCategories[1].items, ['Joggen', 'Kraft']);
+        expect(summary.customCategoriesAdded, 0);
+        expect(summary.customCategoriesChanged, isTrue);
+      },
+    );
+
+    test('the document visibility wins and the name is reported', () {
+      final stored = [
+        category('Sport', items: ['Joggen']),
+      ];
+
+      final summary = plan(stored, const [
+        {
+          'name': 'Sport',
+          'visible': false,
+          'items': ['Joggen'],
+        },
+      ]);
+
+      expect(summary.customCategories.single.visible, isFalse);
+      expect(summary.customCategoryVisibilityChanges, ['Sport']);
+      expect(summary.customCategoriesChanged, isTrue);
+    });
+
+    test('visibility changes are listed in stored order', () {
+      final stored = [
+        category('Sport'),
+        category('Medikamente', visible: false),
+        category('Reisen', visible: false),
+      ];
+
+      final summary = plan(stored, const [
+        {'name': 'Reisen', 'visible': true},
+        {'name': 'Medikamente', 'visible': true},
+      ]);
+
+      expect(summary.customCategoryVisibilityChanges, [
+        'Medikamente',
+        'Reisen',
+      ]);
+    });
+
+    test('an identical definition list is a no-op', () {
+      final stored = [
+        category('Sport', visible: false, items: ['Joggen']),
+        category('Medikamente'),
+      ];
+
+      final summary = plan(stored, const [
+        {
+          'name': 'Sport',
+          'visible': false,
+          'items': ['Joggen'],
+        },
+        {'name': 'Medikamente', 'visible': true},
+      ]);
+
+      expect(summary.customCategories, stored);
+      expect(summary.customCategoriesChanged, isFalse);
+      expect(summary.customCategoriesAdded, 0);
+      expect(summary.customCategoryVisibilityChanges, isEmpty);
+    });
+
+    test('an absent or explicitly empty document list keeps the stored '
+        'definitions', () {
+      final stored = [
+        category('Sport', items: ['Joggen']),
+      ];
+
+      final absent = plan(stored, const []);
+      expect(absent.customCategories, stored);
+      expect(absent.customCategoriesChanged, isFalse);
+
+      final explicitEmpty = planMerge(
+        parseExportJson(
+          '{"schema_version": $exportSchemaVersion, '
+          '"exported_at": "2026-09-15T12:00:00Z", '
+          '"entries": [], "marks": [], "customCategories": []}',
+        ),
+        existingEntryKeys: const {},
+        existingMarkKeys: const {},
+        existingMethodKeys: const {},
+        existingCustomCategories: stored,
+      );
+      expect(explicitEmpty.customCategories, stored);
+      expect(explicitEmpty.customCategoriesChanged, isFalse);
+    });
+
+    test('blank-name document rows are skipped and counted', () {
+      final stored = [
+        category('Sport', items: ['Joggen']),
+      ];
+
+      final summary = plan(stored, const [
+        {
+          'name': '',
+          'visible': true,
+          'items': ['x'],
+        },
+        {'name': '   ', 'visible': false},
+        {'visible': true},
+      ]);
+
+      expect(summary.customCategoriesInvalid, 3);
+      expect(summary.customCategories, stored);
+      expect(summary.customCategoriesChanged, isFalse);
+      expect(summary.customCategoriesAdded, 0);
+    });
+
+    test('the first of two document rows with the same name wins', () {
+      final summary = plan(const [], const [
+        {
+          'name': 'Neu',
+          'visible': true,
+          'items': ['X'],
+        },
+        {
+          'name': 'Neu',
+          'visible': false,
+          'items': ['Y'],
+        },
+      ]);
+
+      expect(summary.duplicateCustomCategoryRows, 1);
+      expect(namesOf(summary), ['Neu']);
+      expect(summary.customCategories.single.items, ['X']);
+      expect(summary.customCategories.single.visible, isTrue);
+    });
+
+    test('names differing only by case or surrounding whitespace are distinct '
+        'categories', () {
+      final summary = plan(
+        [category('Sport')],
+        const [
+          {
+            'name': 'sport',
+            'items': ['a'],
+          },
+          {
+            'name': ' Sport',
+            'items': ['b'],
+          },
+        ],
+      );
+
+      expect(namesOf(summary), ['Sport', 'sport', ' Sport']);
+      expect(summary.customCategoriesAdded, 2);
+      expect(summary.customCategoryVisibilityChanges, isEmpty);
+    });
+
+    test('the added count ignores label-only merges', () {
+      final summary = plan(
+        [
+          category('Sport', items: ['Joggen']),
+        ],
+        const [
+          {
+            'name': 'Sport',
+            'visible': true,
+            'items': ['Kraft'],
+          },
+          {
+            'name': 'Neu',
+            'visible': true,
+            'items': ['Y'],
+          },
+        ],
+      );
+
+      expect(summary.customCategoriesAdded, 1);
+      expect(summary.customCategories, hasLength(2));
+      expect(summary.customCategories.first.items, ['Joggen', 'Kraft']);
+    });
+
+    test('a merge beyond the UI caps is accepted untruncated', () {
+      final longLabel = List.filled(customLabelMaxLength + 1, 'x').join();
+      final stored = [
+        for (var i = 0; i < maxCustomCategories; i++)
+          category('Kat$i', items: ['gespeichert']),
+      ];
+
+      final summary = plan(stored, [
+        {
+          'name': 'KatNeu1',
+          'items': ['neu'],
+        },
+        {
+          'name': 'KatNeu2',
+          'items': ['neu'],
+        },
+        {
+          'name': 'Kat0',
+          'items': [
+            for (var i = 0; i < maxCustomCategoryEntries; i++) 'Label$i',
+            longLabel,
+          ],
+        },
+      ]);
+
+      expect(summary.customCategories, hasLength(maxCustomCategories + 2));
+      final kat0 = summary.customCategories.first;
+      expect(kat0.items, hasLength(1 + maxCustomCategoryEntries + 1));
+      expect(kat0.items.last, longLabel);
+    });
+
+    test('stored labels stay verbatim, duplicates included', () {
+      final summary = plan(
+        [
+          category('Sport', items: ['Joggen', 'Joggen']),
+        ],
+        const [
+          {
+            'name': 'Sport',
+            'items': ['Joggen', 'Kraft'],
+          },
+        ],
+      );
+
+      expect(summary.customCategories.single.items, [
+        'Joggen',
+        'Joggen',
+        'Kraft',
+      ]);
+    });
+
+    test('a stored definition is trusted verbatim', () {
+      // The row gate covers document rows only: dropping a stored row here
+      // would turn a no-change import into a change.
+      final stored = [
+        category(''),
+        category('Sport', items: ['A', 'A']),
+      ];
+
+      final summary = plan(stored, const []);
+
+      expect(summary.customCategories, stored);
+      expect(summary.customCategoriesChanged, isFalse);
+      expect(summary.customCategoriesInvalid, 0);
     });
   });
 }

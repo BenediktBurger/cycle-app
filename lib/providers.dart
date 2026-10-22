@@ -721,12 +721,11 @@ void registerSettingsWriteThrough(WidgetRef ref, SettingsWriteSink sink) {
   }
 }
 
-/// Applies a successful import's custom category definitions to the
-/// provider in-session. The summary's list is empty when the document
-/// carried no key — exactly the case where the provider (and the stored
-/// row) must stay untouched.
+/// Applies a successful import's merged custom category definitions to the
+/// provider in-session. Only a changed list is applied — an identical merge
+/// must not rebuild the provider's listeners.
 void applyImportedCustomCategories(WidgetRef ref, ImportSummary summary) {
-  if (summary.customCategories.isNotEmpty) {
+  if (summary.customCategoriesChanged) {
     ref
         .read(customDiaryCategoriesProvider.notifier)
         .set(summary.customCategories);

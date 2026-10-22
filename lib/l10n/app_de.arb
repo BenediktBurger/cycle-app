@@ -821,6 +821,45 @@
       }
     }
   },
+  "importCustomCategoryVisibilityWarning": "{count, plural, =1{1 Kategorie ändert die Sichtbarkeit: {names}} other{{count} Kategorien ändern die Sichtbarkeit: {names}}}",
+  "@importCustomCategoryVisibilityWarning": {
+    "description": "Import-Vorschau: Kategorie-Definitionen, deren gespeicherte Sichtbarkeit das eingefügte Dokument umschaltet. Die Namen kommen mit customMarkItemsSeparator verbunden an, in gespeicherter Reihenfolge und ungekürzt (der Dialog scrollt).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "importCustomCategoryBlankNameSkipped": "{rows, plural, =1{1 Zeile ohne Namen wurde übersprungen.} other{{rows} Zeilen ohne Namen wurden übersprungen.}}",
+  "@importCustomCategoryBlankNameSkipped": {
+    "description": "Import-Vorschau: Zeilen des Dokuments, die verworfen werden, weil der Name leer oder nur Leerraum ist.",
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      }
+    }
+  },
+  "importCustomCategoryDuplicateNameSkipped": "{rows, plural, =1{1 doppelter Kategoriename wurde übersprungen.} other{{rows} doppelte Kategorienamen wurden übersprungen.}}",
+  "@importCustomCategoryDuplicateNameSkipped": {
+    "description": "Import-Vorschau: Zeilen des Dokuments, die verworfen werden, weil eine frühere Zeile den Namen bereits trägt (der erste Treffer gewinnt).",
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      }
+    }
+  },
+  "importCategoriesMerged": "Import: {added, plural, =0{eigene Kategorien zusammengeführt.} =1{1 eigene Kategorie ergänzt.} other{{added} eigene Kategorien ergänzt.}}",
+  "@importCategoriesMerged": {
+    "description": "Erfolgsmeldung, wenn der Import nur Kategorie-Definitionen geändert hat (keine Tage, Markierungen oder Methoden). Die =0-Form deckt einen Merge ohne neue Kategorie ab, etwa eine Sichtbarkeits- oder Label-Änderung.",
+    "placeholders": {
+      "added": {
+        "type": "int"
+      }
+    }
+  },
   "dripImportTitle": "Drip-Daten importieren",
   "dripImportNote": "Liest einen CSV-Export der App „drip“ ein: derselbe Tag wird überschrieben, Rest bleibt. Eine ausgeschlossene Temperatur erzeugt eine „vom Auswerten ausschließen“-Markierung; Stimmung- und Lust-Kennzeichen fallen weg (ihre Notizen bleiben erhalten).",
   "dripImportHint": "Drip-CSV-Export hier einfügen …",

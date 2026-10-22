@@ -72,14 +72,15 @@
 // documents without definitions keep this exact four-key shape. Readers
 // treat the missing key as "no definitions": old documents and
 // definitions-free exports stay valid inputs, and older readers ignore
-// the unknown key entirely. There are NO profile keys anywhere (the
-// Profiles table, the profile_id columns and the per-profile machinery
-// are gone from the schema; see the version note below). The `methods`
-// list joins the root additively and only when non-empty (see above).
-// Old (v1–4) documents DO carry
-// `profile_id` on every row and a root `profiles` list: those keys are
-// ACCEPTED and IGNORED on import — rows merge by day / (day, mark_type),
-// never by profile.
+// the unknown key entirely. The list MERGES into the device's stored
+// definitions on import (see the merge policy below). There are NO profile
+// keys anywhere (the Profiles table, the profile_id columns and the
+// per-profile machinery are gone from the schema; see the version note
+// below). The `methods` list joins the root additively and only when
+// non-empty (see above). Old (v1–4) documents DO carry `profile_id` on
+// every row and a root `profiles` list: those keys are ACCEPTED and
+// IGNORED on import — rows merge by day / (day, mark_type), never by
+// profile.
 //
 // Per-version entry fields: v1 omitted `measured_at_minutes` and carried
 // bleeding as one of the legacy string tokens none/period/spotting; v2
@@ -154,8 +155,10 @@
 // (existing marks are skipped, never duplicated); method snapshots merge
 // exactly like entries — overwritten day-keyed via the DAO upsert, first
 // occurrence wins inside one document, invalid rows counted (see
-// planMerge). The planner only COUNTS what will happen — the actual
-// writes are performed by the db adapter against the same plan.
+// planMerge). Category definitions merge into the stored list by exact
+// name — see mergeCustomCategoryDefinitions for the collision, label-union
+// and visibility rules. The planner only COUNTS what will happen — the
+// actual writes are performed by the db adapter against the same plan.
 
 import 'dart:convert';
 
@@ -211,7 +214,9 @@ const String exportMergePolicy = 'overwrite';
 /// [customCategories] is the same only-when-non-empty emission (the
 /// category definitions row maps, as the settings store holds them); a
 /// definitions-free document carries no key, and the reader parses the
-/// missing key as "no definitions".
+/// missing key as "no definitions". Import MERGES these rows into the
+/// device's stored definitions (see [planMerge]) — they never replace the
+/// stored list.
 final class ExportBlob {
   const ExportBlob({
     required this.entries,
@@ -363,6 +368,11 @@ final class ImportSummary {
     this.methodsInvalid = 0,
     this.duplicateMethodRows = 0,
     this.customCategories = const [],
+    this.customCategoriesChanged = false,
+    this.customCategoriesAdded = 0,
+    this.customCategoryVisibilityChanges = const [],
+    this.customCategoriesInvalid = 0,
+    this.duplicateCustomCategoryRows = 0,
   });
 
   /// Entries absent on this device (to insert).
@@ -405,11 +415,30 @@ final class ImportSummary {
   /// first occurrence wins.
   final int duplicateMethodRows;
 
-  /// The document's `customCategories` re-encoded through [CustomCategory]
-  /// — the canonical list the db adapter writes to the settings row. Empty
-  /// when the document carries no key (or an empty one): no definitions
-  /// data, nothing to apply.
+  /// The definitions the device holds after merging the document's
+  /// `customCategories` rows into the stored ones (see
+  /// [mergeCustomCategoryDefinitions]); the stored list when the document
+  /// carries none.
   final List<CustomCategory> customCategories;
+
+  /// Whether [customCategories] differs from the stored list — the gate for
+  /// the settings write and the provider update.
+  final bool customCategoriesChanged;
+
+  /// Categories the document adds to the stored list.
+  final int customCategoriesAdded;
+
+  /// Visibility flips of the merge (see
+  /// [CustomCategoryMerge.visibilityChanges]).
+  final List<String> customCategoryVisibilityChanges;
+
+  /// Document rows the merge rejects for a blank name (see
+  /// [CustomCategoryMerge.invalidRows]).
+  final int customCategoriesInvalid;
+
+  /// Document rows the merge rejects as duplicate names (see
+  /// [CustomCategoryMerge.duplicateRows]).
+  final int duplicateCustomCategoryRows;
 
   /// Total rows that end up stored for the entries table.
   int get entriesWritten => entriesNew + entriesOverwritten;
@@ -459,22 +488,137 @@ MeasurementMethodSnapshot? tryMethodSnapshotFromExport(
   );
 }
 
+/// Result of merging the document's category rows into the stored
+/// definitions; see [mergeCustomCategoryDefinitions].
+final class CustomCategoryMerge {
+  const CustomCategoryMerge({
+    required this.categories,
+    required this.added,
+    required this.visibilityChanges,
+    required this.invalidRows,
+    required this.duplicateRows,
+    required this.changed,
+  });
+
+  /// The definitions the device holds after the merge.
+  final List<CustomCategory> categories;
+
+  /// Document categories whose name is new on this device.
+  final int added;
+
+  /// Names whose stored visibility the document flips, in stored order (the
+  /// order the settings card shows).
+  final List<String> visibilityChanges;
+
+  /// Document rows dropped because the name is empty or whitespace-only.
+  final int invalidRows;
+
+  /// Document rows dropped because an earlier row already carried the name.
+  final int duplicateRows;
+
+  /// Whether [categories] differs from the stored list.
+  final bool changed;
+}
+
+/// Merges the document's `customCategories` rows into [stored].
+///
+/// Names are the identity, compared exactly (no trim, no case folding). A
+/// colliding name keeps its stored position, unions the labels (stored
+/// labels first, then imported-only ones) and takes the document's
+/// visibility; an unknown name appends in document order. [stored] is
+/// trusted verbatim — the blank-name and duplicate-row gates apply to
+/// document rows only, so a no-change import of the stored list stays a
+/// no-op. The UI write caps are not enforced here: a merge that exceeds
+/// them is still accepted.
+CustomCategoryMerge mergeCustomCategoryDefinitions(
+  List<CustomCategory> stored,
+  List<Map<String, Object?>> documentRows,
+) {
+  final merged = List<CustomCategory>.of(stored);
+  final indexByName = <String, int>{};
+  for (var i = 0; i < merged.length; i++) {
+    indexByName.putIfAbsent(merged[i].name, () => i);
+  }
+
+  var added = 0;
+  var invalidRows = 0;
+  var duplicateRows = 0;
+  final flippedIndexes = <int>{};
+  final seenDocumentNames = <String>{};
+
+  for (final row in documentRows) {
+    final definition = CustomCategory.fromJson(row);
+    if (definition.name.trim().isEmpty) {
+      invalidRows++;
+      continue;
+    }
+    if (!seenDocumentNames.add(definition.name)) {
+      duplicateRows++;
+      continue;
+    }
+
+    final index = indexByName[definition.name];
+    if (index == null) {
+      indexByName[definition.name] = merged.length;
+      merged.add(definition);
+      added++;
+      continue;
+    }
+
+    final current = merged[index];
+    if (current.visible != definition.visible) {
+      flippedIndexes.add(index);
+    }
+    final present = <String>{...current.items};
+    final items = List<String>.of(current.items);
+    for (final item in definition.items) {
+      if (present.add(item)) items.add(item);
+    }
+    merged[index] = CustomCategory(
+      name: current.name,
+      visible: definition.visible,
+      items: items,
+    );
+  }
+
+  return CustomCategoryMerge(
+    categories: merged,
+    added: added,
+    visibilityChanges: [
+      for (final index in flippedIndexes.toList()..sort()) merged[index].name,
+    ],
+    invalidRows: invalidRows,
+    duplicateRows: duplicateRows,
+    changed: !_sameCategories(merged, stored),
+  );
+}
+
+bool _sameCategories(List<CustomCategory> a, List<CustomCategory> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 /// Plans the import of [doc] into an existing dataset.
 ///
 /// [existingEntryKeys] / [existingMarkKeys] / [existingMethodKeys] contain
 /// the keys of all rows already on the device (built with
-/// [importEntryKey]/[importMarkKey]/[importMethodKey]). The `profile_id` /
-/// `profiles` keys of old documents are NOT read here (accepted and
-/// ignored — rows merge by day / (day, mark_type), and two rows that
-/// differ only by profile on the same day collapse onto one key: first
-/// occurrence wins, extras count as duplicates). Only counts plus the
-/// document's decoded definitions list are produced — no writes happen
-/// here, keeping this function pure and testable.
+/// [importEntryKey]/[importMarkKey]/[importMethodKey]);
+/// [existingCustomCategories] is the definitions list the settings row
+/// holds. The `profile_id` / `profiles` keys of old documents are NOT read
+/// here (accepted and ignored — rows merge by day / (day, mark_type), and
+/// two rows that differ only by profile on the same day collapse onto one
+/// key: first occurrence wins, extras count as duplicates). Only counts
+/// plus the merged definitions list are produced — no writes happen here,
+/// keeping this function pure and testable.
 ImportSummary planMerge(
   ExportBlob doc, {
   required Set<String> existingEntryKeys,
   required Set<String> existingMarkKeys,
   required Set<String> existingMethodKeys,
+  required List<CustomCategory> existingCustomCategories,
 }) {
   var entriesNew = 0;
   var entriesOverwritten = 0;
@@ -560,6 +704,11 @@ ImportSummary planMerge(
     }
   }
 
+  final categories = mergeCustomCategoryDefinitions(
+    existingCustomCategories,
+    doc.customCategories,
+  );
+
   return ImportSummary(
     entriesNew: entriesNew,
     entriesOverwritten: entriesOverwritten,
@@ -572,8 +721,11 @@ ImportSummary planMerge(
     methodsOverwritten: methodsOverwritten,
     methodsInvalid: methodsInvalid,
     duplicateMethodRows: duplicateMethodRows,
-    customCategories: [
-      for (final row in doc.customCategories) CustomCategory.fromJson(row),
-    ],
+    customCategories: categories.categories,
+    customCategoriesChanged: categories.changed,
+    customCategoriesAdded: categories.added,
+    customCategoryVisibilityChanges: categories.visibilityChanges,
+    customCategoriesInvalid: categories.invalidRows,
+    duplicateCustomCategoryRows: categories.duplicateRows,
   );
 }
