@@ -606,16 +606,8 @@ CustomCategoryMerge mergeCustomCategoryDefinitions(
     visibilityHidden: namesInStoredOrder(hiddenIndexes),
     invalidRows: invalidRows,
     duplicateRows: duplicateRows,
-    changed: !_sameCategories(merged, stored),
+    changed: !sameCustomCategories(merged, stored),
   );
-}
-
-bool _sameCategories(List<CustomCategory> a, List<CustomCategory> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
 }
 
 /// Plans the import of [doc] into an existing dataset.

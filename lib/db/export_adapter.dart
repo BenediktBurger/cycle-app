@@ -73,13 +73,12 @@ Future<ExportBlob> exportDatabaseToBlob(CycleDatabase db) async {
 
   return ExportBlob(
     exportedAt: DateTime.now(),
-    // The custom category definitions ride as their stored row maps —
-    // lenient decode (a non-list row or a non-map member collapses away),
-    // like the settings store's reader. The literal key mirrors
+    // The custom category definitions ride as their stored row maps
+    // through customCategoryRowsFromStored. The literal key mirrors
     // SettingKeys.customDiaryCategories (settings_store.dart is not
     // importable here: the host smoke scripts run this file on the plain
     // Dart VM).
-    customCategories: _customCategoriesFromStored(
+    customCategories: _storedCategoryRows(
       await db.settingsDao.readValue('customDiaryCategories'),
     ),
     entries: [
@@ -306,23 +305,16 @@ bool _oldDocExcluded(Map<String, Object?> row) =>
     row['exclude_travel'] == true ||
     row['exclude_other'] == true;
 
-/// The definitions settings row decoded leniently — the same collapse
-/// shape the settings store's per-key reader applies: a null/missing,
-/// non-JSON or non-list row is no definitions, and non-map list members
-/// are skipped (a corrupt row never breaks an export or an import).
-List<Map<String, Object?>> _customCategoriesFromStored(String? raw) {
+/// The definitions settings row decoded leniently through
+/// [customCategoryRowsFromStored]; a null or non-JSON row is no definitions
+/// (a corrupt row never breaks an export or an import).
+List<Map<String, Object?>> _storedCategoryRows(String? raw) {
   if (raw == null) return const [];
-  final Object? decoded;
   try {
-    decoded = jsonDecode(raw);
+    return customCategoryRowsFromStored(jsonDecode(raw));
   } on FormatException {
     return const [];
   }
-  if (decoded is! List) return const [];
-  return [
-    for (final member in decoded)
-      if (member is Map) Map<String, Object?>.from(member),
-  ];
 }
 
 final class _Existing {
@@ -343,7 +335,7 @@ Future<_Existing> _existingKeys(CycleDatabase db) async {
   final entries = await db.entriesDao.allEntries();
   final marks = await db.marksDao.allMarks();
   final methods = await db.measurementMethodsDao.allSnapshots();
-  final definitions = _customCategoriesFromStored(
+  final definitions = _storedCategoryRows(
     await db.settingsDao.readValue('customDiaryCategories'),
   );
 
