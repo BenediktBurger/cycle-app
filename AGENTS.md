@@ -106,12 +106,10 @@ failures only surface in a summary at the end. Instead:
 - **Iteration** (fixing one thing, fast loop):
   `flutter test test/domain/<file>_test.dart --fail-fast --no-pub -r expanded`
   (`--plain-name '<substring>'` or `--name '<regexp>'` to narrow further).
-- **Full gate** before "done" (matches CI): run `flutter analyze`, then
+- **Full gate** before "done": run `flutter analyze`, then
   `dart format --output=none --set-exit-if-changed .`, then
-  `flutter test --no-pub -j "$(nproc)" -r expanded` — drop `--fail-fast`
-  here so the whole suite still runs. On macOS, `nproc` is absent; use
-  `-j "$(sysctl -n hw.ncpu)"` (see CONTRIBUTING.md §4). All three are judged
-  by exit code only
+  `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
+  suite still runs. All three are judged by exit code only
   (the format check exits non-zero when any file would be reformatted).
   Before declaring done, also do the **comment self-review**: list every
   comment added in the change and name the misunderstanding it prevents (see
