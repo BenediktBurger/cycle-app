@@ -351,8 +351,7 @@ final class _CycleChartState extends State<_CycleChart> {
     final yMax = widget.range.max;
 
     // The plot height adapts to the y-span; the constants below are tuned
-    // values. TODO(user-review): growth rate and cap are display
-    // heuristics, not rules from the cheat sheet.
+    // values.
     const chartBaseHeight = 260.0;
     const chartHeightCap = 400.0;
     const comfortableYSpan = 3.0;
@@ -369,10 +368,15 @@ final class _CycleChartState extends State<_CycleChart> {
       locale: Localizations.localeOf(context).toString(),
     );
 
+    // Only a range under ~0.15 K clamps, far below the settings' 1 K minimum.
+    final ordinalBadgeTop =
+        (scale.pixelFor(scale.max - peakDotCenterOffsetK) -
+                _cycleBadgeHeight / 2)
+            .clamp(0.0, scale.plotHeight - _cycleBadgeHeight);
+
     // SUZ glyph anchoring in °C value units (independent of the plot's
     // pixel height), constants shared with the PDF export via
-    // suz_glyph.dart. TODO(user-review): both values are owner-eyeball
-    // rendering details.
+    // suz_glyph.dart.
     final temperatureColor = Theme.of(context).colorScheme.primary;
     final interruptedColor = temperatureColor.withValues(
       alpha: ignoredTemperatureAlpha,
@@ -739,6 +743,7 @@ final class _CycleChartState extends State<_CycleChart> {
                                   cellWidth: colW,
                                   windowStart: winStart,
                                   windowEnd: winEnd,
+                                  rowTop: ordinalBadgeTop,
                                 ),
                                 _InPlotGlyphRows(
                                   days: _days,
@@ -809,9 +814,8 @@ String _shortMonthLabel(DateTime date, String locale) =>
 /// The day/cycle header line above the chart: day of month on top (the
 /// first-of-month column shows the localized short month instead — a
 /// CALENDAR-based, not cycle-based rule), day of cycle underneath. The
-/// "Zyklus N" ordinal renders inside the plot as a badge
-/// (_CycleOrdinalBadges). TODO(user-review): the column prototypes
-/// ("14.", "#5", in the rail's header slot) are ad-hoc samples.
+/// "Zyklus N" ordinal renders inside the plot on the mucus-peak row
+/// (_CycleOrdinalBadges).
 final class _DayHeaderRow extends StatelessWidget {
   const _DayHeaderRow({
     required this.days,
@@ -931,18 +935,12 @@ Widget _railScaleLabel(_TemperatureScale scale, double value) {
 }
 
 /// The in-plot "Zyklus N" chips: at every mark-opened cycle boundary a
-/// small chip renders pinned to the top of the boundary day's column, below
-/// the opaque tap overlay so day mapping is untouched. The boundary
-/// separator at domain x = i − 0.5 sits at pixel i · cellWidth — the chip's
-/// left edge pins there with an inset. The chip is free to shrink to its
-/// label; its cycle's column span is only the FittedBox's max width.
-///
-/// TODO(user-review): the chip's look is an owner-eyeball rendering detail.
-/// TODO(user-review): known overlap — a user-placed SUZ bar on the cycle's
-/// first day hangs from the plot top and sits under the chip (opaque
-/// background covers it).
+/// small chip renders in the boundary day's column, centered on the
+/// mucus-peak glyph row. The boundary separator at domain x = i − 0.5 sits
+/// at pixel i · cellWidth — the chip's left edge pins there with an inset.
+/// The chip is free to shrink to its label; its cycle's column span is only
+/// the FittedBox's max width.
 const double _cycleBadgeColumnInset = 2;
-const double _cycleBadgeTopInset = 3;
 const double _cycleBadgeHeight = 14;
 
 final class _CycleOrdinalBadges extends StatelessWidget {
@@ -951,12 +949,14 @@ final class _CycleOrdinalBadges extends StatelessWidget {
     required this.cellWidth,
     required this.windowStart,
     required this.windowEnd,
+    required this.rowTop,
   });
 
   final _ChartDays days;
   final double cellWidth;
   final int windowStart;
   final int windowEnd;
+  final double rowTop;
 
   @override
   Widget build(BuildContext context) {
@@ -976,7 +976,7 @@ final class _CycleOrdinalBadges extends StatelessWidget {
       chips.add(
         Positioned(
           left: i * cellWidth + _cycleBadgeColumnInset,
-          top: _cycleBadgeTopInset,
+          top: rowTop,
           height: _cycleBadgeHeight,
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -1377,8 +1377,7 @@ final class _TemperatureScale {
 /// OUTSIDE the horizontal scroll. It carries the header prototypes, the
 /// temperature scale and the rows' name glyphs in vertical slots mirroring
 /// the scroll content's segment heights (shared constants; alignment is
-/// pinned by the rail's widget test). TODO(user-review): the rail's
-/// right-edge hairline is an owner-eyeball rendering detail.
+/// pinned by the rail's widget test).
 final class _LeftRail extends StatelessWidget {
   const _LeftRail({required this.scale});
 

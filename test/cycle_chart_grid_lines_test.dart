@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
+import 'package:cycle_app/domain/temperature_range.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -355,8 +356,7 @@ void main() {
 
       // The extra-line list carries no edge line: the boundary at the
       // recorded range's left edge is painted by the cells' borders, not
-      // by a chart line that would clamp at the plot edge (and the chip
-      // hangs from that border).
+      // by a chart line that would clamp at the plot edge.
       expect(
         chartData(tester).extraLinesData.verticalLines.map((l) => l.x),
         isNot(contains(-0.5)),
@@ -638,6 +638,91 @@ void main() {
         visual.left,
         greaterThanOrEqualTo(chip.left),
         reason: 'the scaled-down label starts inside the chip',
+      );
+    });
+
+    testWidgets('the in-plot ordinal badge rides the mucus-peak row: it clears '
+        'the sex X row and centers on the peak dot', (tester) async {
+      // The boundary day 5 carries a morning sex X in the chip's own column
+      // — the row directly above the peak. Day 2 carries the mucus-peak
+      // mark, whose dot renders from the mark alone.
+      final entries = [
+        for (final entry in _twoCycleEntries)
+          entry.date == septSevenDay(5)
+              ? entry.copyWith(sexTimings: SexTiming.morning.bit)
+              : entry,
+      ];
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: entries,
+          marks: [
+            ..._twoCycleMarks,
+            CycleMark(date: septSevenDay(2), type: CycleMarkTypes.mucusPeakDay),
+          ],
+        ),
+      );
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final chip = tester.getRect(
+        find.byKey(const ValueKey('cycleOrdinalChip-5')),
+      );
+      final peakDot = tester.getRect(inPlotPeakDot(2));
+      final sexX = tester.getRect(
+        find.byKey(const ValueKey('inPlotSex-5-morning')),
+      );
+
+      expect(
+        chip.center.dy,
+        closeTo(peakDot.center.dy, 0.5),
+        reason: 'the chip centers on the mucus-peak dot\'s row',
+      );
+      expect(
+        chip.center.dy,
+        greaterThan(sexX.bottom),
+        reason:
+            'the chip\'s center sits on the row below the sex X glyph, '
+            'clear of the X box',
+      );
+      expect(
+        chip.top,
+        greaterThanOrEqualTo(plot.top),
+        reason: 'the chip stays inside the plot at its top edge',
+      );
+      expect(
+        chip.bottom,
+        lessThanOrEqualTo(plot.bottom),
+        reason: 'the chip stays inside the plot at its bottom edge',
+      );
+    });
+
+    testWidgets('a degenerate persisted range keeps the ordinal badge inside '
+        'the plot', (tester) async {
+      // A 0.1 K span — only reachable through an imported or hand-built
+      // range; the settings card's minimum gap is 1.0 K. The peak row then
+      // lies below the plot's bottom edge.
+      await pumpChart(
+        tester,
+        chartHarness(
+          entries: _twoCycleEntries,
+          marks: _twoCycleMarks,
+          temperatureRange: const TemperatureRange(min: 37.8, max: 37.9),
+        ),
+      );
+
+      final plot = tester.getRect(find.byType(LineChart));
+      final chip = tester.getRect(
+        find.byKey(const ValueKey('cycleOrdinalChip-5')),
+      );
+      expect(
+        chip.top,
+        greaterThanOrEqualTo(plot.top),
+        reason: 'the degenerate range cannot push the chip above the plot',
+      );
+      expect(
+        chip.bottom,
+        lessThanOrEqualTo(plot.bottom),
+        reason: 'the degenerate range cannot clip the chip below the plot',
       );
     });
   });
