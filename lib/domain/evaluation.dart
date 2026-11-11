@@ -172,8 +172,9 @@ final class CycleEvaluation {
   /// above; true otherwise.
   final bool? riseMarkConsistent;
 
-  /// True when R2 stopped the automatic evaluation mid-sequence (more than
-  /// one intervening gap day — no re-search, the user re-marks the rise).
+  /// True when R2 stopped the automatic evaluation mid-sequence: a second
+  /// excluded day ended the run at the next above-baseline day (no
+  /// re-search, the user re-marks the rise).
   /// False when the sequence ran out of data, completed at the SUZ trigger,
   /// or never started.
   final bool evaluationStopped;
@@ -375,10 +376,11 @@ CycleEvaluation _evaluateCycle(
   final firstHigherDay = lowWindow.firstHigherDay;
 
   // Walk CALENDAR days from the marked rise so untracked days count as the
-  // gaps they are. Unmeasured, mark-excluded and at/below-baseline days are
-  // gaps just the same (R2); one gap day between candidates is tolerated,
-  // two stop the automatic evaluation. The gap counting spans the whole
-  // sequence, including the arrow→circle transition.
+  // gaps they are. Unmeasured, mark-excluded and at/below-baseline days form
+  // one gap class (R2). The run tolerates ONE such day in total: a second
+  // one ends the search at the next above-baseline day, so the budget spans
+  // arrows and circles and is not refreshed by a candidate. Gap days before
+  // the first candidate consume nothing — the sequence has not started.
   final higherMeasurements = <HigherMeasurement>[];
   var evaluationStopped = false;
   DateTime? suzBegins;
@@ -401,7 +403,7 @@ CycleEvaluation _evaluateCycle(
     final lastDay = DateOnly.normalize(cycle.endDate);
 
     var sequenceStarted = false;
-    var gapRun = 0;
+    var gapDays = 0;
     var arrowCount = 0;
     var circleCount = 0;
 
@@ -418,18 +420,16 @@ CycleEvaluation _evaluateCycle(
           entry.bbtC! <= baseline.value) {
         // A gap day before the first candidate does not count — nothing to
         // be connected to yet.
-        if (sequenceStarted) gapRun++;
+        if (sequenceStarted) gapDays++;
         continue;
       }
 
-      if (sequenceStarted && gapRun > 1) {
-        // R2: more than one intervening gap day — the evaluation stops.
+      if (sequenceStarted && gapDays > 1) {
         evaluationStopped = true;
         break;
       }
 
       sequenceStarted = true;
-      gapRun = 0;
 
       final value = entry.bbtC!;
       // R4: arrow when the peak is unset or the day is at/before it;

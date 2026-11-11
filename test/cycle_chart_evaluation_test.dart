@@ -521,6 +521,41 @@ void main() {
     });
   });
 
+  group('R2 — the ring set and the baseline end follow the run\'s gap '
+      'budget', () {
+    testWidgets(
+      'a second gap day stops the run: the next above-baseline day stays a '
+      'plain dot and the segment ends at the last circle',
+      (tester) async {
+        // 9/15 drops to 36.3 (below the baseline 36.4) — the 1st gap day;
+        // 9/16 (37.0) is circle 2; 9/17 (36.3) is the 2nd gap day; 9/18
+        // (37.0) would be circle 3 — the run stops short of it.
+        final entries = [
+          for (final e in _evaluationEntries)
+            _sameDay(e, _tue15) ? DailyEntry(date: e.date, bbtC: 36.3) : e,
+          DailyEntry(date: _thu17, bbtC: 36.3),
+          DailyEntry(date: _fri18, bbtC: 37.0),
+        ];
+        await pumpChart(tester, chartHarness(entries: entries, marks: _marks));
+
+        expect(candidateKinds(tester).rings, {8, 10});
+        expect(
+          dotPainter(tester, 12),
+          isNot(isA<RingDotPainter>()),
+          reason: 'the day after the second gap day is no candidate',
+        );
+        expect(dotPainter(tester, 12), isNot(isA<ArrowUpDotPainter>()));
+
+        final last = _baselineBars(tester).single.spots.last;
+        expect(
+          last.x,
+          closeTo(10.5, 1e-9),
+          reason: 'the segment ends at the last circle idx 10 + half a day',
+        );
+      },
+    );
+  });
+
   group('no marks', () {
     testWidgets('nothing evaluation-related is drawn when no marks exist', (
       tester,

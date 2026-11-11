@@ -100,13 +100,17 @@ Rules as implemented (owner-reviewed):
 - R1 Candidacy: every measured day STRICTLY ABOVE the baseline is a
   candidate, regardless of the margin. The 0.2 K margin survives only
   inside SUZ rule D.
-- R2 Connectedness: between consecutive candidates at most ONE intervening
-  day may be missing (no measured temperature), excluded, or at/below the
-  baseline. With more than one such day the automatic evaluation STOPS
-  (`evaluationStopped`): no SUZ, nothing further is marked, no automatic
-  re-search — the user re-marks the rise at the next higher measurement.
-  The gap counting applies across the WHOLE candidate sequence, including
-  the arrow→circle transition — mixed sequences are one sequence.
+- R2 Connectedness: the candidate run tolerates at most ONE gap day IN
+  TOTAL, not one per adjacent pair. A gap day is a day with no measured
+  temperature, an excluded (mark-ignored) day, or a day at/below the
+  baseline — all one class. A SECOND such day anywhere in the run stops the
+  automatic evaluation at the next above-baseline day (`evaluationStopped`):
+  no SUZ, nothing further is marked, no automatic re-search — the user
+  re-marks the rise at the next higher measurement. The one budget spans the
+  WHOLE candidate sequence, including the arrow→circle transition — mixed
+  sequences are one sequence — and is not refreshed by a candidate. A
+  trailing gap run with no following candidate does not set
+  `evaluationStopped` (data may still be entered).
 - R3 Candidate region: candidates exist only from the marked rise day
   onward. The rise anchor is the MOST RECENT `firstHigherMeasurement` mark
   of the cycle (owner-confirmed: re-marking supersedes — after a broken

@@ -99,6 +99,17 @@ final _baseLowRun = <DailyEntry>[
   d(2026, 3, 9, t: 36.2), // peak day (most scenarios set it here)
 ];
 
+/// The report scenario's tail on top of [_baseLowRun]: two candidates split
+/// by gap days, then one above-baseline day after the second gap — the day
+/// the run no longer reaches.
+final _gapInterruptedRun = <DailyEntry>[
+  d(2026, 3, 10, t: 36.8), // marked rise → first candidate
+  d(2026, 3, 11, t: 36.3), // 1st gap day
+  d(2026, 3, 12, t: 36.9), // second candidate
+  d(2026, 3, 13, t: 36.3), // 2nd gap day — the run's budget is spent
+  d(2026, 3, 14, t: 37.0), // would-be third candidate — NOT marked
+];
+
 /// The fewer-than-six-lows scenario: only THREE measured days sit inside
 /// the six-calendar-day window rise−1 … rise−6 = Mar 9 … Mar 4 (Mar 8, 6,
 /// 4 are untracked). Mar 3 is measured too, but OLDER than rise−6 — the
@@ -251,7 +262,8 @@ void main() {
     });
   });
 
-  group('rule R2 — connectedness: one gap tolerated, two stop the run', () {
+  group('rule R2 — connectedness: one gap tolerated per run, a second stops '
+      'it', () {
     test('ONE missing day between candidates keeps the sequence going', () {
       final entries = [
         ..._baseLowRun,
@@ -406,6 +418,136 @@ void main() {
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
+      expect(e.evaluationStopped, isFalse);
+    });
+
+    test('two non-consecutive gap days stop the run before the 3rd circle', () {
+      final entries = [..._baseLowRun, ..._gapInterruptedRun];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [(10, MarkKind.circle, 1), (12, MarkKind.circle, 2)],
+      );
+      expect(e.suzBegins, isNull);
+      expect(e.suzRule, isNull);
+      expect(e.evaluationStopped, isTrue);
+      expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 12)));
+      expect(
+        firstCircledCandidateDay(e),
+        DateOnly.normalize(DateTime(2026, 3, 10)),
+      );
+    });
+
+    test('two non-consecutive gap days stop the 4th-measurement path', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.5), // marked rise → circle 1
+        d(2026, 3, 11, t: 36.5), // circle 2
+        d(2026, 3, 12, t: 36.3), // 1st gap day
+        d(2026, 3, 13, t: 36.5), // circle 3 — below the rule-D margin
+        d(2026, 3, 14, t: 36.3), // 2nd gap day — the run's budget is spent
+        d(2026, 3, 15, t: 36.5), // would-be circle 4 — NOT marked
+      ];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+        (10, 1),
+        (11, 2),
+        (13, 3),
+      ]);
+      expect(e.suzBegins, isNull);
+      expect(e.suzRule, isNull);
+      expect(e.evaluationStopped, isTrue);
+    });
+
+    test('one non-consecutive gap still lets rule E fire', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.5), // marked rise → circle 1
+        d(2026, 3, 11, t: 36.3), // the one tolerated gap day
+        d(2026, 3, 12, t: 36.5), // circle 2
+        d(2026, 3, 13, t: 36.5), // circle 3 — below the rule-D margin
+        d(2026, 3, 14, t: 36.5), // circle 4 → SUZ (rule E)
+      ];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+        (10, 1),
+        (12, 2),
+        (13, 3),
+        (14, 4),
+      ]);
+      expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 14)));
+      expect(e.suzRule, SuzRule.e);
+      expect(e.evaluationStopped, isFalse);
+    });
+
+    test('the gap budget covers arrows too: one cumulative counter, not one '
+        'per candidate', () {
+      final entries = [..._baseLowRun, ..._gapInterruptedRun];
+      // The peak sits after the run, so every candidate here is an arrow.
+      final marks = [peak(2026, 3, 15), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [(10, MarkKind.arrow, 1), (12, MarkKind.arrow, 2)],
+      );
+      expect(e.suzBegins, isNull);
+      expect(e.evaluationStopped, isTrue);
+    });
+
+    test('the gap budget spans the arrow→circle transition', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.8),
+        d(2026, 3, 11, t: 36.3), // the one tolerated gap day
+        d(2026, 3, 12, t: 36.9), // arrow 2 — the peak day
+        d(2026, 3, 13, t: 36.9),
+        d(2026, 3, 14, t: 36.3), // 2nd gap day — the budget is spent
+        d(2026, 3, 15, t: 37.0), // would-be circle 2 — NOT marked
+      ];
+      final marks = [peak(2026, 3, 12), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(
+        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        [
+          (10, MarkKind.arrow, 1),
+          (12, MarkKind.arrow, 2),
+          (13, MarkKind.circle, 1),
+        ],
+      );
+      expect(e.suzBegins, isNull);
+      expect(e.evaluationStopped, isTrue);
+    });
+
+    test('gap days before the first candidate do not consume the budget', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.4), // marked rise, but AT the baseline
+        d(2026, 3, 11, t: 36.3), // still before the first candidate
+        d(2026, 3, 12, t: 36.9), // circle 1 — the sequence starts here
+        d(2026, 3, 13, t: 36.3), // the one tolerated gap day
+        d(2026, 3, 14, t: 37.0), // circle 2
+      ];
+      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+        (12, 1),
+        (14, 2),
+      ]);
       expect(e.evaluationStopped, isFalse);
     });
   });
@@ -1111,6 +1253,31 @@ void main() {
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
+      expect(e.evaluationStopped, isTrue);
+    });
+
+    test('an ignoreTemperature day in the SECOND gap position counts the '
+        'same as an unmeasured one', () {
+      final entries = [
+        ..._baseLowRun,
+        d(2026, 3, 10, t: 36.8), // candidate 1
+        d(2026, 3, 11, t: 36.3), // below the baseline — gap 1
+        d(2026, 3, 12, t: 36.9), // candidate 2
+        d(2026, 3, 13, t: 37.2), // marked excluded — gap 2, not a candidate
+        d(2026, 3, 14, t: 37.0), // would-be candidate — NOT marked
+      ];
+      final marks = [
+        peak(2026, 3, 9),
+        rise(2026, 3, 10),
+        excludedDay(2026, 3, 13),
+      ];
+
+      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+
+      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+        (10, 1),
+        (12, 2),
+      ]);
       expect(e.evaluationStopped, isTrue);
     });
   });

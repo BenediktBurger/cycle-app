@@ -156,6 +156,56 @@ void main() {
     });
   });
 
+  group('rule R2 — the circled set and the baseline span stop at the last '
+      'connected candidate', () {
+    final entries = <DailyEntry>[
+      d(2026, 3, 2, bleeding: Bleeding.medium), // cycle onset, unmeasured
+      d(2026, 3, 3, t: 36.2),
+      d(2026, 3, 4, t: 36.1), // low #6
+      d(2026, 3, 5, t: 36.3), // #5
+      d(2026, 3, 6, t: 36.4), // #4 — highest of the six lows → baseline
+      d(2026, 3, 7, t: 36.2), // #3
+      d(2026, 3, 8, t: 36.3), // #2
+      d(2026, 3, 9, t: 36.2), // #1, peak day
+      d(2026, 3, 10, t: 36.8), // marked rise → circle 1
+      d(2026, 3, 11, t: 36.3), // 1st gap day
+      d(2026, 3, 12, t: 36.9), // circle 2
+      d(2026, 3, 13, t: 36.3), // 2nd gap day — the run's budget is spent
+      d(2026, 3, 14, t: 37.0), // would-be circle 3 — NOT marked
+    ];
+    final marks = <CycleMark>[
+      mark(2026, 3, 9, CycleMarkTypes.mucusPeakDay),
+      mark(2026, 3, 10, CycleMarkTypes.firstHigherMeasurement),
+    ];
+
+    EvaluationOverlay overlay() => buildEvaluationOverlay(
+      evaluations: evaluateCycles(entries, marks),
+      marks: marks,
+      firstDay: DateOnly.normalize(DateTime(2026, 3, 2)),
+      dayCount: 13,
+    );
+
+    test('only the connected candidates get circled — the day after the '
+        'second gap stays a plain dot', () {
+      final result = overlay();
+      // Mar 10 → index 8, Mar 12 → index 10; Mar 14 would be index 12.
+      expect(result.circledIndexes, {8, 10});
+      expect(result.arrowIndexes, isEmpty);
+    });
+
+    test('the baseline segment ends at the last connected candidate', () {
+      final segment = overlay().baselineSegments.single;
+      expect(segment.startIndex, 2, reason: 'low #6 on Mar 4');
+      expect(segment.endIndex, 10, reason: 'last connected candidate Mar 12');
+      expect(segment.value, 36.4);
+    });
+
+    test('the six-low numbering is untouched by the break', () {
+      // Mar 4..Mar 9 → indexes 2..7, numbers 6..1.
+      expect(overlay().numbersByIndex, {2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1});
+    });
+  });
+
   group('ignoredDayIndexes', () {
     final ignoreMarks = <CycleMark>[
       mark(2026, 3, 5, CycleMarkTypes.ignoreTemperature), // cycle 1, index 3
