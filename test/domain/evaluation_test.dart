@@ -1675,6 +1675,31 @@ void main() {
       expect(e.riseMarkConsistent, isFalse);
     });
 
+    test('false when the marked day is not tracked at all', () {
+      final entries = [...baseEntries.take(7)];
+      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.baseline!.value, 36.4);
+      expect(e.riseMarkConsistent, isFalse);
+    });
+
+    test('false when the marked day sits at the baseline and the sequence '
+        'starts the next day', () {
+      final entries = [
+        ...baseEntries.take(7),
+        d(2026, 3, 11, t: 36.4),
+        d(2026, 3, 12, t: 36.9),
+      ];
+      final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
+
+      expect(e.riseMarkConsistent, isFalse);
+      expect(
+        e.higherMeasurements.single.date,
+        DateOnly.normalize(DateTime(2026, 3, 12)),
+      );
+    });
+
     test('false when the marked day is excluded (ignoreTemperature mark, '
         'no raw flags needed)', () {
       final entries = [
