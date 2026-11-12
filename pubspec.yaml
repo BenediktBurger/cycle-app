@@ -82,13 +82,15 @@ hooks:
 # pdf: the pure-Dart PDF writer for the PDF export feature — generates an
 #   ISO-32000 document in-process, fully offline, no platform channels. The
 #   `printing` plugin (share/print, platform channels) stays deliberately
-#   absent for now; the PDF is only saved to a file via the file_transfer
-#   seam.
-# share_plus: ^13.3.0. The system share sheet for the JSON export — an
-#   alternative hand-off (mail app, cloud drive, …) alongside the
-#   save-as dialog from file_picker, kept because not every target app
-#   offers a file save. Only lib/ui/file_transfer_io.dart references it; web
-#   keeps the browser download, the stub target the copy button.
+#   absent for now; the document leaves through the file_transfer seam
+#   (save-as dialog or browser download, plus the system share sheet where
+#   the platform can share files).
+# share_plus: ^13.3.0. The system share sheet for the JSON and PDF exports —
+#   an alternative hand-off (mail app, cloud drive, …) alongside the save-as
+#   dialog from file_picker, kept because not every target app offers a file
+#   save. Only lib/ui/file_transfer_io.dart references it; web shares through
+#   `navigator.share` (lib/ui/web_share_web.dart), the stub target keeps the
+#   copy button.
 #
 # Native at-rest encryption is always-on: SQLite3MultipleCiphers is supplied
 # as the sqlite3 engine via the build-hook user-define above and keyed in
@@ -145,11 +147,11 @@ dependencies:
   # reached through a conditional export so native and VM builds never see
   # package:web). Constraint ^1.1.1, resolved to the 1.x version in the lock.
   web: ^1.1.1
-  # System share sheet for the JSON export (an alternative hand-off to a
-  # mail app / cloud drive next to the save-as dialog in file_picker above
-  # — the copy button alone stays the always-available fallback).
-  # Referenced only from lib/ui/file_transfer_io.dart; the web target keeps
-  # its browser download.
+  # System share sheet for the JSON and PDF exports (an alternative hand-off
+  # to a mail app / cloud drive next to the save-as dialog in file_picker
+  # above — the copy button alone stays the always-available fallback).
+  # Referenced only from lib/ui/file_transfer_io.dart; the web target shares
+  # through navigator.share (lib/ui/web_share_web.dart).
   share_plus: ^13.3.0
 
 dev_dependencies:

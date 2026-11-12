@@ -249,7 +249,8 @@ Finder pdfExportButton() => find.byKey(const ValueKey('pdfExportButton'));
 
 /// The PDF export card's share button (the second hand-off next to the
 /// save button: same generated document, system share sheet instead of the
-/// save-as dialog).
+/// save-as dialog). It renders only where the platform can share files
+/// (`canShareFile`).
 Finder pdfExportShareButton() =>
     find.byKey(const ValueKey('pdfExportShareButton'));
 

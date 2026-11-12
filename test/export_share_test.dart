@@ -31,6 +31,8 @@ import 'package:cycle_app/main.dart' show CycleApp;
 import 'package:cycle_app/providers.dart' show lastExportAtProvider;
 import 'package:cycle_app/ui/file_transfer_io.dart'
     show
+        canShareFile,
+        canShareFileOverride,
         canShareJsonFile,
         canShareJsonFileOverride,
         saveFileOverride,
@@ -141,12 +143,23 @@ const _sharePlusChannel = MethodChannel('dev.fluttercommunity.plus/share');
 void main() {
   // These flows model a native target where share_plus can share files,
   // independent of the host VM.
-  setUp(() => canShareJsonFileOverride = true);
-  tearDown(() => canShareJsonFileOverride = null);
+  setUp(() {
+    canShareJsonFileOverride = true;
+    canShareFileOverride = true;
+  });
+  tearDown(() {
+    canShareJsonFileOverride = null;
+    canShareFileOverride = null;
+  });
 
   test('JSON sharing is unavailable where share_plus cannot share files', () {
     canShareJsonFileOverride = null;
     expect(canShareJsonFile, !(Platform.isWindows || Platform.isLinux));
+  });
+
+  test('PDF sharing is unavailable where share_plus cannot share files', () {
+    canShareFileOverride = null;
+    expect(canShareFile, !Platform.isLinux);
   });
 
   group('last export marking', () {
