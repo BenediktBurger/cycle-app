@@ -387,12 +387,19 @@ Any branch can be published as a web preview next to the released demo:
   clarification).
 - **Package name** `cycle_app` is a placeholder ([ADR-0002](docs/adr/0002-package-name-cycle-app-placeholder.md));
   do not rely on it in code
+- **NER vocabulary**: cite book rules by their German names from
+  [`docs/NER/rules.md`](docs/NER/rules.md) and app behavior by the English
+  conventions from
+  [`docs/NER/app-conventions.md`](docs/NER/app-conventions.md). Do not
+  introduce ad-hoc rule labels (plan-derived numbers or single letters for
+  individual rules) in comments, tests, docs or UI strings.
 - **Unresolved working assumptions** are marked in code and docs — in
   particular the open questions (`TODO(user-review)`) in
   [ADR-0008](docs/adr/0008-cycle-start-as-mark.md), the statistics
-  bucket edges (`lib/domain/statistics.dart`), and per-rule interpretation
-  questions under `lib/domain/evaluation.dart` (the overall "Mode M"
-  product shape itself is settled —
+  bucket edges (`lib/domain/statistics.dart`), and the NER interpretation
+  questions in
+  [`docs/NER/app-conventions.md`](docs/NER/app-conventions.md) (the
+  overall "Mode M" product shape itself is settled —
   [ADR-0001](docs/adr/0001-iner-mode-m-hypothesis.md), Accepted). Treat
   marked comments like `// TODO(user-review)` as questions to bring to
   INER experts, not as settled behavior.
