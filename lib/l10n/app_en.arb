@@ -431,7 +431,7 @@
   "@statisticsHelpBleedingDuration": {
     "description": "Body under the `statisticsMetricBleedingDuration` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherDay": "The cycle day of this cycle's first circled higher measurement.",
+  "statisticsHelpFirstHigherDay": "The cycle day of this cycle's first circled higher measurement; when no measurement is circled, the marked first higher measurement counts instead.",
   "@statisticsHelpFirstHigherDay": {
     "description": "Body under the `statisticsMetricFirstHigherDay` entry; the title comes from that key."
   },
@@ -439,7 +439,7 @@
   "@statisticsHelpFirstHigherUntilEnd": {
     "description": "Body under the `statisticsMetricFirstHigherUntilEnd` entry; the title comes from that key."
   },
-  "statisticsHelpDistribution": "How often each cycle length occurs. The bar length is relative to the most frequent value.",
+  "statisticsHelpDistribution": "Each bar counts the cycles with a length in its displayed range. The bar length is relative to the most frequent range.",
   "@statisticsHelpDistribution": {
     "description": "Body under the `statisticsDistribution` entry; the title comes from that key."
   },

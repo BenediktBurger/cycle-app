@@ -371,7 +371,7 @@
   "@statisticsHelpBleedingDuration": {
     "description": "Body under the `statisticsMetricBleedingDuration` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherDay": "Der Zyklustag der ersten umrandeten höheren Messung dieses Zyklus.",
+  "statisticsHelpFirstHigherDay": "Der Zyklustag der ersten umrandeten höheren Messung dieses Zyklus; ist keine Messung umrandet, zählt stattdessen die markierte erste höhere Messung.",
   "@statisticsHelpFirstHigherDay": {
     "description": "Body under the `statisticsMetricFirstHigherDay` entry; the title comes from that key."
   },
@@ -379,7 +379,7 @@
   "@statisticsHelpFirstHigherUntilEnd": {
     "description": "Body under the `statisticsMetricFirstHigherUntilEnd` entry; the title comes from that key."
   },
-  "statisticsHelpDistribution": "Wie oft jede Zykluslänge vorkommt. Die Balkenlänge ist relativ zum häufigsten Wert.",
+  "statisticsHelpDistribution": "Jeder Balken zählt die Zyklen mit einer Länge in seinem angezeigten Bereich. Die Balkenlänge ist relativ zum häufigsten Bereich.",
   "@statisticsHelpDistribution": {
     "description": "Body under the `statisticsDistribution` entry; the title comes from that key."
   },
