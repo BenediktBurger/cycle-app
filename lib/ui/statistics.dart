@@ -16,6 +16,7 @@ import '../domain/decimal_display.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'statistics_help_sheet.dart';
 import 'stream_error.dart';
 
 /// The shared missing-value marker of this screen — a neutral glyph, not
@@ -31,7 +32,17 @@ class StatistikScreen extends ConsumerWidget {
     final entriesAsync = ref.watch(dailyEntriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navStatistics)),
+      appBar: AppBar(
+        title: Text(l10n.navStatistics),
+        actions: [
+          IconButton(
+            key: const ValueKey('statisticsHelpAction'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: l10n.statisticsHelpShow,
+            onPressed: () => showStatisticsHelpSheet(context),
+          ),
+        ],
+      ),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => StreamLoadError(

@@ -327,6 +327,86 @@
     },
     "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT the same sense as the card's figure (the earliest umrandete Messung across in-app cycles). Capitalization matches statisticsCycleDay."
   },
+  "statisticsHelpShow": "Statistik-Hilfe anzeigen",
+  "@statisticsHelpShow": {
+    "description": "Tooltip and semantics label of the statistics screen's AppBar info_outline action; opens the statistics help sheet."
+  },
+  "statisticsHelpTitle": "Statistik-Hilfe",
+  "@statisticsHelpTitle": {
+    "description": "Title of the statistics help sheet opened from the AppBar info_outline action."
+  },
+  "statisticsHelpIntro": "Alle Zahlen sind aus erfassten Einträgen und Markierungen berechnet. „—“ bedeutet: kein Wert.",
+  "@statisticsHelpIntro": {
+    "description": "Intro paragraph of the statistics help sheet: the numbers are computed from recorded data and the dash marks a missing value, without evaluation."
+  },
+  "statisticsHelpSectionCycles": "Zyklen",
+  "@statisticsHelpSectionCycles": {
+    "description": "Section header in the statistics help sheet for the cycle-count and summary entries."
+  },
+  "statisticsHelpSectionCards": "Karten",
+  "@statisticsHelpSectionCards": {
+    "description": "Section header in the statistics help sheet for the per-metric card entries."
+  },
+  "statisticsHelpSectionFigures": "Rechenwerte in jeder Karte",
+  "@statisticsHelpSectionFigures": {
+    "description": "Section header in the statistics help sheet for the minimum, maximum, average and standard-deviation rows shared by every metric card; the cycle-table entry follows them."
+  },
+  "statisticsHelpObservedCycles": "Zählt die in dieser App durch Markierungen begonnenen Zyklen und addiert die in den Einstellungen erfassten Zyklen außerhalb der App.",
+  "@statisticsHelpObservedCycles": {
+    "description": "Body under the `statisticsObservedCyclesTitle` entry; the title comes from that key."
+  },
+  "statisticsHelpShortest": "Die kürzeste in dieser App gemessene Zykluslänge. Die Zeile „außerhalb“ nennt getrennt den kürzesten Wert aus der vor der App geführten Aufzeichnung.",
+  "@statisticsHelpShortest": {
+    "description": "Body under the `statisticsShortest` entry; the title comes from that key."
+  },
+  "statisticsHelpEarliestFirstHigher": "Der kleinste Zyklustag, an dem in einem Zyklus die erste umrandete höhere Messung liegt. Der Zyklusbeginn ist Zyklustag 1. Die Zeile „außerhalb“ nennt getrennt den Wert aus der vor der App geführten Aufzeichnung.",
+  "@statisticsHelpEarliestFirstHigher": {
+    "description": "Body under the `statisticsEarliestFirstHigher` entry; the title comes from that key."
+  },
+  "statisticsHelpCycleLength": "Vom markierten Zyklusbeginn bis zum Tag vor dem nächsten markierten Zyklusbeginn. Die Länge wird nicht aus der Blutung abgeleitet.",
+  "@statisticsHelpCycleLength": {
+    "description": "Body under the `statisticsMetricCycleLength` entry; the title comes from that key."
+  },
+  "statisticsHelpBleedingDuration": "Vom ersten bis zum letzten Blutungstag innerhalb des Zyklus; beide Tage zählen mit.",
+  "@statisticsHelpBleedingDuration": {
+    "description": "Body under the `statisticsMetricBleedingDuration` entry; the title comes from that key."
+  },
+  "statisticsHelpFirstHigherDay": "Der Zyklustag der ersten umrandeten höheren Messung dieses Zyklus.",
+  "@statisticsHelpFirstHigherDay": {
+    "description": "Body under the `statisticsMetricFirstHigherDay` entry; the title comes from that key."
+  },
+  "statisticsHelpFirstHigherUntilEnd": "Von der ersten höheren Messung bis zum Zyklusende; der erste Tag zählt mit.",
+  "@statisticsHelpFirstHigherUntilEnd": {
+    "description": "Body under the `statisticsMetricFirstHigherUntilEnd` entry; the title comes from that key."
+  },
+  "statisticsHelpDistribution": "Wie oft jede Zykluslänge vorkommt. Die Balkenlänge ist relativ zum häufigsten Wert.",
+  "@statisticsHelpDistribution": {
+    "description": "Body under the `statisticsDistribution` entry; the title comes from that key."
+  },
+  "statisticsHelpMinimum": "Der kleinste in dieser Karte beobachtete Wert.",
+  "@statisticsHelpMinimum": {
+    "description": "Body under the `statisticsMinimum` entry; the title comes from that key."
+  },
+  "statisticsHelpMaximum": "Der größte in dieser Karte beobachtete Wert.",
+  "@statisticsHelpMaximum": {
+    "description": "Body under the `statisticsMaximum` entry; the title comes from that key."
+  },
+  "statisticsHelpAverage": "Die Summe der beobachteten Werte geteilt durch ihre Anzahl.",
+  "@statisticsHelpAverage": {
+    "description": "Body under the `statisticsAverage` entry; the title comes from that key."
+  },
+  "statisticsHelpStandardDeviation": "Ein Maß für die Streuung um den Durchschnitt: kleine Werte bedeuten gleichmäßige Werte, 0 bedeutet, dass alle Werte gleich sind. Bezug ist der Durchschnitt dieser Daten selbst — ausdrücklich keine äußere Norm oder ein externer Standard. Berechnet über alle erfassten Werte der Karte.",
+  "@statisticsHelpStandardDeviation": {
+    "description": "Body under the `statisticsStandardDeviation` entry; the title comes from that key. States the data set's own average as the reference, never an external norm."
+  },
+  "statisticsHelpMetricCount": "Die Zeile „aus N Zyklen“ nennt, wie viele Zyklen Werte zu dieser Karte beigetragen haben.",
+  "@statisticsHelpMetricCount": {
+    "description": "Body-only paragraph in the statistics help sheet explaining the `statisticsMetricFromCycles` caption; that key carries a plural placeholder and serves as no entry title."
+  },
+  "statisticsHelpCycleTable": "Je Zyklus eine Zeile mit Beginn, Blutungstagen, erster höherer Messung und Länge — so lassen sich die Zahlen der Karten nachvollziehen.",
+  "@statisticsHelpCycleTable": {
+    "description": "Body under the `statisticsCycleTable` entry; the title comes from that key."
+  },
   "settingsLanguage": "Sprache",
   "languageGerman": "Deutsch",
   "languageEnglish": "English",

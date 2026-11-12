@@ -66,10 +66,30 @@ Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
 Finder metricCard(String id) => find.byKey(ValueKey('statisticsCard-$id'));
 Finder earliestFirstHigherCard() =>
     find.byKey(const ValueKey('statisticsCard-earliestFirstHigher'));
+Finder helpSheet() => find.byKey(const ValueKey('statisticsHelpSheet'));
 
-// Every test that uses these lookups also runs the harness under the
-// default en locale.
+/// Every title/body pair the sheet renders, in sheet order.
+List<(String, String)> helpEntries(AppLocalizations l10n) => [
+  (l10n.statisticsObservedCyclesTitle, l10n.statisticsHelpObservedCycles),
+  (l10n.statisticsShortest, l10n.statisticsHelpShortest),
+  (l10n.statisticsEarliestFirstHigher, l10n.statisticsHelpEarliestFirstHigher),
+  (l10n.statisticsMetricCycleLength, l10n.statisticsHelpCycleLength),
+  (l10n.statisticsDistribution, l10n.statisticsHelpDistribution),
+  (l10n.statisticsMetricBleedingDuration, l10n.statisticsHelpBleedingDuration),
+  (l10n.statisticsMetricFirstHigherDay, l10n.statisticsHelpFirstHigherDay),
+  (
+    l10n.statisticsMetricFirstHigherUntilEnd,
+    l10n.statisticsHelpFirstHigherUntilEnd,
+  ),
+  (l10n.statisticsMinimum, l10n.statisticsHelpMinimum),
+  (l10n.statisticsMaximum, l10n.statisticsHelpMaximum),
+  (l10n.statisticsAverage, l10n.statisticsHelpAverage),
+  (l10n.statisticsStandardDeviation, l10n.statisticsHelpStandardDeviation),
+  (l10n.statisticsCycleTable, l10n.statisticsHelpCycleTable),
+];
+
 final enL10n = lookupAppLocalizations(const Locale('en'));
+final deL10n = lookupAppLocalizations(const Locale('de'));
 
 Widget harness({
   List<DailyEntry> entries = const [],
@@ -1312,6 +1332,210 @@ void main() {
       // The German wording is authoritative (language policy).
       expect(find.text('Laden fehlgeschlagen'), findsOneWidget);
       expect(find.text('Erneut versuchen'), findsOneWidget);
+    });
+  });
+
+  group('help sheet', () {
+    testWidgets('the Statistik AppBar carries an info_outline action with a '
+        'localized tooltip', (tester) async {
+      await pumpStats(tester);
+
+      final action = tester.widget<IconButton>(
+        find.byKey(const ValueKey('statisticsHelpAction')),
+      );
+      expect(
+        action.icon,
+        isA<Icon>().having((i) => i.icon, 'icon', Icons.info_outline),
+        reason: 'the affordance is the info_outline icon',
+      );
+      expect(
+        action.tooltip,
+        enL10n.statisticsHelpShow,
+        reason: 'the action carries the localized tooltip',
+      );
+    });
+
+    testWidgets('the screen stays numbers-only until the action opens the '
+        'sheet', (tester) async {
+      await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
+
+      expect(
+        find.text(enL10n.statisticsHelpStandardDeviation),
+        findsNothing,
+        reason: 'the explanation bodies live only in the help sheet',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('statisticsHelpAction')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(helpSheet(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.text(enL10n.statisticsHelpTitle),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.text(enL10n.statisticsHelpIntro),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('every entry, body and section header renders inside the '
+        'sheet (en)', (tester) async {
+      await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
+      await tester.tap(find.byKey(const ValueKey('statisticsHelpAction')));
+      await tester.pumpAndSettle();
+
+      for (final header in [
+        enL10n.statisticsHelpSectionCycles,
+        enL10n.statisticsHelpSectionCards,
+        enL10n.statisticsHelpSectionFigures,
+      ]) {
+        expect(
+          find.descendant(of: helpSheet(), matching: find.text(header)),
+          findsOneWidget,
+          reason: 'the sheet carries the "$header" section header',
+        );
+      }
+
+      final entries = helpEntries(enL10n);
+      for (final (title, body) in entries) {
+        expect(
+          find.descendant(of: helpSheet(), matching: find.text(title)),
+          findsOneWidget,
+          reason: 'the sheet carries the "$title" entry title',
+        );
+        expect(
+          find.descendant(of: helpSheet(), matching: find.text(body)),
+          findsOneWidget,
+          reason: 'the sheet carries the explanation under "$title"',
+        );
+      }
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.text(enL10n.statisticsHelpMetricCount),
+        ),
+        findsOneWidget,
+        reason:
+            'the count caption explanation renders as a body-only paragraph',
+      );
+    });
+
+    testWidgets('the sheet mirrors the statistics screen\'s top-down order', (
+      tester,
+    ) async {
+      await pumpStats(tester, entries: screenEntries(), marks: screenMarks());
+      await tester.tap(find.byKey(const ValueKey('statisticsHelpAction')));
+      await tester.pumpAndSettle();
+
+      final expected = [
+        enL10n.statisticsHelpTitle,
+        enL10n.statisticsHelpIntro,
+        enL10n.statisticsHelpSectionCycles,
+        enL10n.statisticsObservedCyclesTitle,
+        enL10n.statisticsHelpObservedCycles,
+        enL10n.statisticsShortest,
+        enL10n.statisticsHelpShortest,
+        enL10n.statisticsEarliestFirstHigher,
+        enL10n.statisticsHelpEarliestFirstHigher,
+        enL10n.statisticsHelpSectionCards,
+        enL10n.statisticsMetricCycleLength,
+        enL10n.statisticsHelpCycleLength,
+        enL10n.statisticsDistribution,
+        enL10n.statisticsHelpDistribution,
+        enL10n.statisticsMetricBleedingDuration,
+        enL10n.statisticsHelpBleedingDuration,
+        enL10n.statisticsMetricFirstHigherDay,
+        enL10n.statisticsHelpFirstHigherDay,
+        enL10n.statisticsMetricFirstHigherUntilEnd,
+        enL10n.statisticsHelpFirstHigherUntilEnd,
+        enL10n.statisticsHelpSectionFigures,
+        enL10n.statisticsMinimum,
+        enL10n.statisticsHelpMinimum,
+        enL10n.statisticsMaximum,
+        enL10n.statisticsHelpMaximum,
+        enL10n.statisticsAverage,
+        enL10n.statisticsHelpAverage,
+        enL10n.statisticsStandardDeviation,
+        enL10n.statisticsHelpStandardDeviation,
+        enL10n.statisticsHelpMetricCount,
+        enL10n.statisticsCycleTable,
+        enL10n.statisticsHelpCycleTable,
+      ];
+      final texts = tester
+          .widgetList<Text>(
+            find.descendant(of: helpSheet(), matching: find.byType(Text)),
+          )
+          .map((text) => text.data)
+          .toList();
+      expect(
+        texts,
+        expected,
+        reason: 'the sheet mirrors the statistics screen top-down',
+      );
+    });
+
+    testWidgets('the de surface renders the action tooltip, title and every '
+        'help entry', (tester) async {
+      await pumpStats(
+        tester,
+        entries: screenEntries(),
+        marks: screenMarks(),
+        locale: const Locale('de'),
+      );
+
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byKey(const ValueKey('statisticsHelpAction')),
+            )
+            .tooltip,
+        deL10n.statisticsHelpShow,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('statisticsHelpAction')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.text(deL10n.statisticsHelpTitle),
+        ),
+        findsOneWidget,
+      );
+      for (final (title, body) in helpEntries(deL10n)) {
+        expect(
+          find.descendant(of: helpSheet(), matching: find.text(title)),
+          findsOneWidget,
+          reason: 'the de sheet carries the "$title" entry title',
+        );
+        expect(
+          find.descendant(of: helpSheet(), matching: find.text(body)),
+          findsOneWidget,
+          reason: 'the de sheet carries the explanation under "$title"',
+        );
+      }
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.textContaining('Durchschnitt'),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(
+          of: helpSheet(),
+          matching: find.textContaining('keine äußere Norm'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }
