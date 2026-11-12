@@ -172,8 +172,9 @@ final class CycleEvaluation {
   /// above; true otherwise.
   final bool? riseMarkConsistent;
 
-  /// True when R2 stopped the automatic evaluation mid-sequence (more than
-  /// one intervening gap day — no re-search, the user re-marks the rise).
+  /// True when R2 stopped the automatic evaluation mid-sequence: a second
+  /// excluded day ended the run at the next above-baseline day (no
+  /// re-search, the user re-marks the rise).
   /// False when the sequence ran out of data, completed at the SUZ trigger,
   /// or never started.
   final bool evaluationStopped;
@@ -229,7 +230,7 @@ List<CycleEvaluation> evaluateCycles(
 
   final evaluations = <CycleEvaluation>[];
   for (var i = 0; i < cycles.length; i++) {
-    final nextWindowStart = i + 1 < cycles.length
+    final nextLowWindowStart = i + 1 < cycles.length
         ? windows[i + 1].startDay
         : null;
     evaluations.add(
@@ -239,7 +240,7 @@ List<CycleEvaluation> evaluateCycles(
         excludedDays,
         windows[i],
         _nextStart(cycles, i),
-        nextWindowStart,
+        nextLowWindowStart,
       ),
     );
   }
@@ -355,13 +356,51 @@ _LowWindow _lowWindowFor(
   );
 }
 
+/// The day's measured temperature when it is usable and strictly above
+/// [baselineValue]; null for untracked, unmeasured, excluded and
+/// at/below-baseline days — the R2 gap class.
+double? _candidateValue(
+  Map<DateTime, DailyEntry> byDay,
+  DateTime day,
+  Set<DateTime> excludedDays,
+  double baselineValue,
+) {
+  final entry = byDay[day];
+  if (entry == null || entry.bbtC == null || excludedDays.contains(day)) {
+    return null;
+  }
+  final value = entry.bbtC!;
+  return value > baselineValue ? value : null;
+}
+
+SuzRule? _suzRuleFor({
+  required int ordinal,
+  required double value,
+  required double baselineValue,
+}) {
+  if (ordinal == 3) {
+    if (value >= baselineValue + _suzRuleDAboveBaselineK - _epsilon) {
+      // Rule D fired — SUZ begins this evening.
+      return SuzRule.d;
+    }
+    // Below the margin: rule E may still fire at the 4th circle.
+    return null;
+  }
+  if (ordinal == 4) {
+    // Rule E: the 3rd circle was below the margin, so the 4th circle —
+    // any margin — fires, SUZ this morning.
+    return SuzRule.e;
+  }
+  return null;
+}
+
 CycleEvaluation _evaluateCycle(
   Cycle cycle,
   List<CycleMark> marks,
   Set<DateTime> excludedDays,
   _LowWindow lowWindow,
   DateTime? nextCycleStart,
-  DateTime? nextWindowStart,
+  DateTime? nextLowWindowStart,
 ) {
   final peakDay = _latestMarkOf(
     cycle,
@@ -375,10 +414,11 @@ CycleEvaluation _evaluateCycle(
   final firstHigherDay = lowWindow.firstHigherDay;
 
   // Walk CALENDAR days from the marked rise so untracked days count as the
-  // gaps they are. Unmeasured, mark-excluded and at/below-baseline days are
-  // gaps just the same (R2); one gap day between candidates is tolerated,
-  // two stop the automatic evaluation. The gap counting spans the whole
-  // sequence, including the arrow→circle transition.
+  // gaps they are. Unmeasured, mark-excluded and at/below-baseline days form
+  // one gap class (R2). The run tolerates ONE such day in total: a second
+  // one ends the search at the next above-baseline day, so the budget spans
+  // arrows and circles and is not refreshed by a candidate. Gap days before
+  // the first candidate consume nothing — the sequence has not started.
   final higherMeasurements = <HigherMeasurement>[];
   var evaluationStopped = false;
   DateTime? suzBegins;
@@ -387,21 +427,15 @@ CycleEvaluation _evaluateCycle(
 
   final byDay = {for (final e in cycle.days) DateOnly.normalize(e.date): e};
   bool? riseMarkConsistent;
-  if (firstHigherDay != null && baseline != null) {
-    final markedEntry = byDay[firstHigherDay];
-    riseMarkConsistent =
-        markedEntry == null ||
-            markedEntry.bbtC == null ||
-            excludedDays.contains(firstHigherDay)
-        ? false
-        : markedEntry.bbtC! > baseline.value;
-  }
 
   if (baseline != null && firstHigherDay != null) {
+    riseMarkConsistent =
+        _candidateValue(byDay, firstHigherDay, excludedDays, baseline.value) !=
+        null;
     final lastDay = DateOnly.normalize(cycle.endDate);
 
     var sequenceStarted = false;
-    var gapRun = 0;
+    var gapDays = 0;
     var arrowCount = 0;
     var circleCount = 0;
 
@@ -410,28 +444,22 @@ CycleEvaluation _evaluateCycle(
       !day.isAfter(lastDay);
       day = DateOnly.addDays(day, 1)
     ) {
-      final entry = byDay[day];
+      final value = _candidateValue(byDay, day, excludedDays, baseline.value);
 
-      if (entry == null ||
-          entry.bbtC == null ||
-          excludedDays.contains(day) ||
-          entry.bbtC! <= baseline.value) {
+      if (value == null) {
         // A gap day before the first candidate does not count — nothing to
         // be connected to yet.
-        if (sequenceStarted) gapRun++;
+        if (sequenceStarted) gapDays++;
         continue;
       }
 
-      if (sequenceStarted && gapRun > 1) {
-        // R2: more than one intervening gap day — the evaluation stops.
+      if (sequenceStarted && gapDays > 1) {
         evaluationStopped = true;
         break;
       }
 
       sequenceStarted = true;
-      gapRun = 0;
 
-      final value = entry.bbtC!;
       // R4: arrow when the peak is unset or the day is at/before it;
       // circle strictly after it.
       final markKind =
@@ -458,35 +486,31 @@ CycleEvaluation _evaluateCycle(
       );
 
       // R5: the SUZ fires on CIRCLED candidates only (the circle ordinal).
-      if (markKind == MarkKind.circle && ordinal != null) {
-        if (ordinal == 3) {
-          if (value >= baseline.value + _suzRuleDAboveBaselineK - _epsilon) {
-            // Rule D fired — SUZ begins this evening.
-            suzBegins = day;
-            suzRule = SuzRule.d;
-            break;
-          }
-          // Below the margin: rule E may still fire at the 4th circle.
-        } else if (ordinal == 4) {
-          // Rule E: the 3rd circle was below the margin, so the 4th circle
-          // — any margin — fires, SUZ this morning.
-          suzBegins = day;
-          suzRule = SuzRule.e;
-          break;
-        }
+      final rule = markKind == MarkKind.circle && ordinal != null
+          ? _suzRuleFor(
+              ordinal: ordinal,
+              value: value,
+              baselineValue: baseline.value,
+            )
+          : null;
+      if (rule != null) {
+        suzBegins = day;
+        suzRule = rule;
+        break;
       }
     }
 
     // R10: baseline segment — earliest numbered low day to last marked
-    // candidate, clamped to the next cycle start / six-low window.
+    // candidate, clamped to the next cycle start / the next cycle's six-low
+    // window start.
     final spanStart = lowWindow.startDay;
     if (spanStart != null && higherMeasurements.isNotEmpty) {
       var spanEnd = higherMeasurements.last.date;
       if (nextCycleStart != null && nextCycleStart.isBefore(spanEnd)) {
         spanEnd = nextCycleStart;
       }
-      if (nextWindowStart != null && nextWindowStart.isBefore(spanEnd)) {
-        spanEnd = nextWindowStart;
+      if (nextLowWindowStart != null && nextLowWindowStart.isBefore(spanEnd)) {
+        spanEnd = nextLowWindowStart;
       }
       baselineSpan = BaselineSpan(startDay: spanStart, endDay: spanEnd);
     }
