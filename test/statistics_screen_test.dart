@@ -53,8 +53,8 @@ List<CycleMark> screenMarks() => [
 /// day (Mar 29, cycle day 1) with the peak on the SAME day: the "over all
 /// cycles" variant drops to minimum cycle day 1. Cycle 2 produces no
 /// measured circle of its own — a rise inside a cycle's first six days
-/// has its six-low window truncated at the cycle's own tracked days (R9),
-/// so no baseline and no candidate exist there — and the real (umrandete
+/// has its six-low window truncated at the cycle's own tracked days, so
+/// no baseline and no candidate exist there — and the real (umrandete
 /// Messung) variant keeps cycle 1's first circle, cycle day 14.
 List<CycleMark> divergentMarks() => [
   ...screenMarks(),
@@ -543,7 +543,7 @@ void main() {
     );
     expect(summaryEarliest, findsOneWidget);
     // Cycle 1's first circle is the true (umrandete) figure — cycle day
-    // 14 — and cycle 2 adds no better one (R9): its day-1 rise stays a
+    // 14 — and cycle 2 adds no better one: its day-1 rise stays a
     // marked-rise variant figure only.
     final figures = tester
         .widgetList<Text>(
@@ -1040,9 +1040,9 @@ void main() {
   testWidgets('a divergent record with a paper earliest keeps the one true '
       'figure on the summary card plus the outside line', (tester) async {
     // The divergent in-app record (marked rise = 1, true figure = 14 —
-    // cycle 2 carries no measurable circle, R9) with paper 5 pinned: the
-    // card keeps its single true figure, the paper figure shows on the
-    // one outside line.
+    // cycle 2 carries no measurable circle) with paper 5 pinned: the card
+    // keeps its single true figure, the paper figure shows on the one
+    // outside line.
     await pumpStats(
       tester,
       entries: screenEntries(),

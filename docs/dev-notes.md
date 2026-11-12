@@ -109,9 +109,7 @@ Layout/design decisions:
   POSITION, and the accent grayscales to a mid-gray clearly lighter than
   ink), the bleeding levels (solid fill FRACTION and the dotted spotting
   mechanic, not the red), the dimmed ignoreTemperature pieces (ExtGState
-  alpha → lighter gray + thinner stroke), the computed „sicher unfruchtbare
-  Zeit“ line (thin ink line, unlabeled, distinct in shape from the
-  user-placed bar+arrow glyph), the dashed window
+  alpha → lighter gray + thinner stroke), the dashed window
   bounds, the always-dark scale labels and value row, and the weekend
   bands (all-equal near-white gray — never a pale color — far enough from
   ink/accent/grid grays that nothing above or beside it loses legibility).

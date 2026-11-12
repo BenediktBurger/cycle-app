@@ -2,15 +2,15 @@
 // moved into a bottom sheet opened from the AppBar's info_outline action —
 // every symbol the legend carried (bleeding, mucus, mucus peak,
 // Mittelschmerz, sex, temperature, ignored temperature, circled higher,
-// arrow higher, baseline, SUZ, measurement time, disturbance, cervix
-// position, cervix firmness, breast pain, note) plus the entry notes for
-// the ignored-temperature entry (the lighter temperature rendering of the
-// ignoreTemperature-marked days — see the entry note), the disturbance
-// letters, the note indicator and the evaluation-arithmetic note. The
-// entries render in the cycle tab's top-down appearance order so glossary
-// and screen always agree. The glyph samples reuse the same shapes the
-// chart and its rows render, so the glossary always shows what the screen
-// draws. Pure display — no persistence (ADR-0001).
+// arrow higher, baseline, „Sicher unfruchtbare Zeit“, measurement time,
+// disturbance, cervix position, cervix firmness, breast pain, note) plus the
+// entry notes for the ignored-temperature entry (the lighter temperature
+// rendering of the ignoreTemperature-marked days — see the entry note), the
+// disturbance letters, the note indicator and the evaluation-arithmetic
+// note. The entries render in the cycle tab's top-down appearance order so
+// glossary and screen always agree. The glyph samples reuse the same shapes
+// the chart and its rows render, so the glossary always shows what the
+// screen draws. Pure display — no persistence (ADR-0001).
 
 import 'dart:math' as math;
 
@@ -65,8 +65,9 @@ final class _CycleHelpSheet extends StatelessWidget {
             // mucus-peak dot above the mucus letters, the M below them),
             // then the temperature-curve group as the plot draws
             // it (curve, ignored-temperature rendering, circled higher,
-            // premature rise, dashed baseline, SUZ), then the below-chart
-            // strip (_belowChartKinds) — glossary and tab cannot drift.
+            // premature rise, dashed baseline, „Sicher unfruchtbare Zeit“),
+            // then the below-chart strip (_belowChartKinds) — glossary and
+            // tab cannot drift.
             _HelpEntry(
               color: scheme.error,
               label: l10n.termBleeding,
@@ -84,7 +85,8 @@ final class _CycleHelpSheet extends StatelessWidget {
             _HelpEntry(
               color: scheme.tertiary,
               label: l10n.termMucusPeak,
-              // R6: the peak renders as a SOLID dot in its own in-plot row
+              // „Höhepunkt“ / app convention "peak marker": the peak
+              // renders as a SOLID dot in its own in-plot row
               // above the mucus letters.
               shape: _HelpEntryShape.dot,
             ),
@@ -309,8 +311,9 @@ final class _HelpEntry extends StatelessWidget {
         size: _baselineGlyphSize,
         painter: _DashedBaselinePainter(color: color),
       ),
-      // The SUZ glyph: the chart's vertical bar plus the right-pointing
-      // arrow from it (same shapes as the chart's painter).
+      // The „Sicher unfruchtbare Zeit“ glyph: the chart's vertical bar plus
+      // the right-pointing arrow from it (same shapes as the chart's
+      // painter).
       // TODO(user-review): the legend wording was re-checked against the
       // new top-anchored glyph (the bar now hangs down from the
       // temperature chart's top border, the arrow sits just below it) and

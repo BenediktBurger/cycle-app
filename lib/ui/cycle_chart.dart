@@ -374,16 +374,17 @@ final class _CycleChartState extends State<_CycleChart> {
                 _cycleBadgeHeight / 2)
             .clamp(0.0, scale.plotHeight - _cycleBadgeHeight);
 
-    // SUZ glyph anchoring in °C value units (independent of the plot's
-    // pixel height), constants shared with the PDF export via
-    // suz_glyph.dart.
+    // „Sicher unfruchtbare Zeit“ glyph anchoring in °C value units
+    // (independent of the plot's pixel height), constants shared with the
+    // PDF export via suz_glyph.dart.
     final temperatureColor = Theme.of(context).colorScheme.primary;
     final interruptedColor = temperatureColor.withValues(
       alpha: ignoredTemperatureAlpha,
     );
     // The evaluation-artifact accent: scheme secondary, the one color the
     // regular temperature/bleeding/mucus rendering does not use — it feeds
-    // the dashed R10 baseline segment bars AND the user-placed SUZ bars.
+    // the dashed baseline segment bars (app convention "baseline line
+    // extent") AND the user-placed „Sicher unfruchtbare Zeit“ bars.
     final evaluationColor = Theme.of(context).colorScheme.secondary;
 
     return LayoutBuilder(
@@ -428,7 +429,8 @@ final class _CycleChartState extends State<_CycleChart> {
           context,
         ).colorScheme.onSurface.withValues(alpha: 0.07);
         // The half-column-shifted domain: the ±0.5 offsets below and in the
-        // baseline/SUZ drawing mean exactly "column bounds".
+        // baseline/„Sicher unfruchtbare Zeit“ drawing mean exactly "column
+        // bounds".
         final lastX = (dayCount - 0.5).toDouble();
         final weekendBands = <VerticalRangeAnnotation>[];
         for (var i = winStart; i <= winEnd; i++) {
@@ -558,10 +560,11 @@ final class _CycleChartState extends State<_CycleChart> {
                                                   ),
                                             ),
                                           ),
-                                      // The baseline segments (R10), drawn
-                                      // LAST so they paint above curve and
-                                      // dots; clamped to the plot bounds
-                                      // like the weekend bands.
+                                      // The baseline segments (app
+                                      // convention "baseline line extent"),
+                                      // drawn LAST so they paint above
+                                      // curve and dots; clamped to the
+                                      // plot bounds like the weekend bands.
                                       for (final segment
                                           in overlay.baselineSegments)
                                         LineChartBarData(
@@ -587,10 +590,11 @@ final class _CycleChartState extends State<_CycleChart> {
                                           dashArray: const [6, 4],
                                           dotData: const FlDotData(show: false),
                                         ),
-                                      // The user-placed SUZ marks: a vertical
-                                      // bar hanging down from the chart's top
-                                      // border plus a right-pointing arrow —
-                                      // only user-placed marks render, the
+                                      // The user-placed „Sicher unfruchtbare
+                                      // Zeit“ marks: a vertical bar hanging
+                                      // down from the chart's top border plus
+                                      // a right-pointing arrow — only
+                                      // user-placed marks render, the
                                       // computed suzBegins never draws here.
                                       for (final suz in overlay.suzMarks) ...[
                                         LineChartBarData(

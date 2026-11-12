@@ -1,13 +1,14 @@
-// NER evaluation arithmetic (docs/NER/cheatsheet.md §Auswertung): derive the
-// evaluation artifacts from tracked entries plus user-placed marks.
+// NER evaluation arithmetic: derive the evaluation artifacts from tracked
+// entries plus user-placed marks. The book rule vocabulary is
+// docs/NER/rules.md; the app conventions and owner-settled interpretations
+// are docs/NER/app-conventions.md.
 //
 // HARD RULE (ADR-0001, Mode M): the user places marks, the app computes,
 // never interprets. Everything is COMPUTED ONLY at render time — nothing is
 // persisted (no drift types, no Flutter imports). User-placed inputs: the
 // mucus peak and the first higher measurement; the 1–6 numbering, the
 // baseline, the circled/arrowed candidates, the baseline segment and the
-// SUZ start are derived. The full R1–R10 rule list and the owner-settled
-// interpretations live in docs/dev-notes.md ("NER evaluation rules").
+// „Sicher unfruchtbare Zeit“ start are derived.
 //
 // The temperature-IGNORE marks (CycleMarkTypes.ignoreTemperature — the mark
 // token, not the raw disturbance mask) are the only analysis input: a marked
@@ -20,14 +21,20 @@ import 'date_only.dart';
 import 'marks.dart';
 import 'models.dart';
 
-/// Circle when strictly after the mucus peak day, arrow otherwise (R4).
+/// „Höhere Messung“ vs „Pfeilmessung“: circle strictly after the mucus peak
+/// day, arrow at or before it (or with the peak unset) — app convention
+/// "candidate walk".
 enum MarkKind { circle, arrow }
 
-/// Which SUZ rule determined the SUZ start — the D→evening / E→morning
-/// mapping IS the time-of-day semantics (the domain reports only the day,
-/// see [CycleEvaluation.suzBegins]): [d] is the 3rd circled candidate
-/// ≥ 0.2 K above the baseline, [e] the 4th circled candidate at any margin.
-enum SuzRule { d, e }
+/// Which book case determined the „Sicher unfruchtbare Zeit“ start.
+/// [evening]: „Sicher unfruchtbare Zeit am Abend“ — the 3rd circled candidate
+/// lies at least 0.2 K above the Basislinie; the quoted book text starts it
+/// that evening.
+/// [morning]: the „Erster Sonderfall“ — the book awaits a 4th higher
+/// measurement. The higher measurements are waking temperatures, so the 4th
+/// is read in the morning and the „Sicher unfruchtbare Zeit“ begins that
+/// morning (derived, see docs/NER/rules.md).
+enum SuzRule { evening, morning }
 
 /// One of the (up to) six numbered low measurements before the first higher
 /// measurement.
@@ -55,10 +62,11 @@ final class BaselinePoint {
   final double value;
 }
 
-/// The x-extent of the drawn baseline segment (R10), null when the cycle
-/// has no marked candidate (no segment is drawn). The baseline's y-value is
-/// [CycleEvaluation.baseline].value; the chart painter adds the half-day
-/// padding past [endDay]'s column when drawing.
+/// The x-extent of the drawn baseline segment (app convention "baseline
+/// line extent"), null when the cycle has no marked candidate (no segment
+/// is drawn). The baseline's y-value is [CycleEvaluation.baseline].value;
+/// the chart painter adds the half-day padding past [endDay]'s column when
+/// drawing.
 final class BaselineSpan {
   const BaselineSpan({required this.startDay, required this.endDay});
 
@@ -70,11 +78,16 @@ final class BaselineSpan {
   final DateTime endDay;
 }
 
-/// One marked candidate of the connected candidate sequence (R1–R4): a
-/// measured day strictly above the baseline, from the marked rise day
-/// onward, complete at the SUZ trigger.
-final class HigherMeasurement {
-  const HigherMeasurement({
+/// One marked candidate of the connected candidate sequence („Höhere
+/// Messung“ / „Pfeilmessung“; app convention "candidate walk"): a measured
+/// day strictly above the baseline, from the marked rise day onward,
+/// complete at the „Sicher unfruchtbare Zeit“ trigger.
+///
+/// Named app-neutrally because the book's „höhere Messung“ is the circled
+/// measurement and its arrows are „Pfeilmessungen“, while this sequence
+/// carries both kinds until the per-candidate [markKind] decides.
+final class CandidateMeasurement {
+  const CandidateMeasurement({
     required this.date,
     required this.value,
     required this.markKind,
@@ -85,25 +98,27 @@ final class HigherMeasurement {
   final DateTime date;
   final double value;
 
-  /// Circle or arrow, decided PER CANDIDATE (R4): arrow when the mucus peak
-  /// is unset or the day is at or before the peak day, circle strictly
+  /// Circle or arrow, decided PER CANDIDATE („Höhere Messung“ vs
+  /// „Pfeilmessung“, app convention "candidate walk"): arrow when the mucus
+  /// peak is unset or the day is at or before the peak day, circle strictly
   /// after the peak day.
   final MarkKind markKind;
 
   /// The 1-based position WITHIN this candidate's own mark kind (circles
-  /// 1–4 drive the SUZ rules D/E; null beyond the kind's four-cap — the
-  /// candidate stays part of the sequence but unnumbered, R4).
+  /// 1–4 drive „Sicher unfruchtbare Zeit am Abend“ / „Erster Sonderfall“;
+  /// null beyond the kind's four-cap — the candidate stays part of the
+  /// sequence but unnumbered, app convention "per-kind cap").
   final int? ordinal;
 
-  /// value minus the baseline value, always > 0 (R7 difference display
-  /// input; the UI formats it).
+  /// value minus the baseline value, always > 0 (app convention "baseline
+  /// difference"; the UI formats it).
   final double differenceK;
 }
 
-/// The earliest circle candidate's day (rule R4 — the circles the chart and
-/// PDF rings draw), null when the sequence has no circle.
+/// The earliest circle candidate's day („Höhere Messung“ — the circles the
+/// chart and PDF rings draw), null when the sequence has no circle.
 DateTime? firstCircledCandidateDay(CycleEvaluation evaluation) {
-  for (final candidate in evaluation.higherMeasurements) {
+  for (final candidate in evaluation.candidateMeasurements) {
     if (candidate.markKind == MarkKind.circle) return candidate.date;
   }
   return null;
@@ -119,7 +134,7 @@ final class CycleEvaluation {
     required this.firstHigherDay,
     required this.numberedLows,
     required this.baseline,
-    required this.higherMeasurements,
+    required this.candidateMeasurements,
     required this.baselineSpan,
     required this.suzBegins,
     required this.suzRule,
@@ -145,22 +160,26 @@ final class CycleEvaluation {
   final BaselinePoint? baseline;
 
   /// The marked candidate sequence, chronological: the measured days
-  /// strictly above the baseline from the marked rise day onward (R1/R3),
-  /// each carrying its per-candidate [HigherMeasurement.markKind] and
-  /// within-kind [HigherMeasurement.ordinal]. Empty when the rise is
-  /// unmarked, the baseline is unknown, or the sequence has not started.
-  final List<HigherMeasurement> higherMeasurements;
+  /// strictly above the baseline from the marked rise day onward
+  /// („Temperaturanstieg“ / „Höhere Messung“; app conventions "candidate
+  /// walk" and "latest-mark anchor"), each carrying its per-candidate
+  /// [CandidateMeasurement.markKind] and within-kind
+  /// [CandidateMeasurement.ordinal]. Empty when the rise is unmarked, the
+  /// baseline is unknown, or the sequence has not started.
+  final List<CandidateMeasurement> candidateMeasurements;
 
-  /// The baseline segment extent (R10), or null when the cycle has no
-  /// marked candidate (no segment is drawn).
+  /// The baseline segment extent (app convention "baseline line extent"),
+  /// or null when the cycle has no marked candidate (no segment is drawn).
   final BaselineSpan? baselineSpan;
 
-  /// The day the sicher unfruchtbare Zeit begins — the SUZ-EVENING under
-  /// rule D, the SUZ-MORNING under rule E (the rule-to-time mapping lives
-  /// on [SuzRule]) — or null when no rule has triggered.
+  /// The day the „Sicher unfruchtbare Zeit“ begins — the day of the circled
+  /// candidate that triggered it — or null while no case has triggered. The
+  /// domain reports the trigger day; [SuzRule.morning]'s start is that
+  /// morning, [SuzRule.evening]'s that evening.
   final DateTime? suzBegins;
 
-  /// [SuzRule.d] or [SuzRule.e], null while the SUZ is not determined.
+  /// [SuzRule.evening] or [SuzRule.morning], null while the
+  /// „Sicher unfruchtbare Zeit“ is not determined.
   final SuzRule? suzRule;
 
   /// Whether the marked first-higher day carries a measured,
@@ -172,25 +191,25 @@ final class CycleEvaluation {
   /// above; true otherwise.
   final bool? riseMarkConsistent;
 
-  /// True when R2 stopped the automatic evaluation mid-sequence: a second
-  /// excluded day ended the run at the next above-baseline day (no
-  /// re-search, the user re-marks the rise).
-  /// False when the sequence ran out of data, completed at the SUZ trigger,
-  /// or never started.
+  /// True when app convention "gap tolerance" stopped the automatic
+  /// evaluation mid-sequence: a second excluded day ended the run at the
+  /// next above-baseline day (no re-search, the user re-marks the rise).
+  /// False when the sequence ran out of data, completed at the „Sicher
+  /// unfruchtbare Zeit“ trigger, or never started.
   final bool evaluationStopped;
 }
 
-/// Rule D margin: the 3rd circled candidate must lie at least this far above
-/// the baseline.
-const double _suzRuleDAboveBaselineK = 0.2;
+/// „Sicher unfruchtbare Zeit am Abend“: the 3rd circled measurement must
+/// lie at least this far (0.2 K) above the Basislinie.
+const double _suzEveningMarginK = 0.2;
 
-/// Per-kind ordinal cap (R4): beyond four arrows / four circles, candidates
-/// stay in the sequence unnumbered.
+/// Per-kind ordinal cap (app convention "per-kind cap"): beyond four arrows
+/// / four circles, candidates stay in the sequence unnumbered.
 const int _marksPerKindCap = 4;
 
-/// Comparison tolerance for the rule-D boundary: `baseline + 0.2` is not
-/// exactly representable as a double, so an exact +0.2 measurement would be
-/// wrongly rejected without it.
+/// Comparison tolerance for the „Sicher unfruchtbare Zeit am Abend“
+/// boundary: `baseline + 0.2` is not exactly representable as a double, so
+/// an exact +0.2 measurement would be wrongly rejected without it.
 const double _epsilon = 1e-9;
 
 /// Computes the evaluation artifacts for every cycle group.
@@ -278,7 +297,8 @@ DateTime? _latestMarkOf(
 }
 
 /// The six-low window of one cycle: the numbered lows, the baseline through
-/// their highest, and the window's earliest day (the R10 segment start).
+/// their highest, and the window's earliest day (the baseline-segment
+/// start).
 final class _LowWindow {
   const _LowWindow({
     required this.firstHigherDay,
@@ -297,8 +317,8 @@ final class _LowWindow {
   final BaselinePoint? baseline;
 
   /// The earliest numbered low day (low #6 when the window is fully
-  /// measured, the oldest available low otherwise) — the R10
-  /// baseline-segment START. Null when no usable low measurement exists.
+  /// measured, the oldest available low otherwise) — the baseline
+  /// segment's START. Null when no usable low measurement exists.
   DateTime? get startDay {
     DateTime? earliest;
     for (final low in numberedLows) {
@@ -358,7 +378,8 @@ _LowWindow _lowWindowFor(
 
 /// The day's measured temperature when it is usable and strictly above
 /// [baselineValue]; null for untracked, unmeasured, excluded and
-/// at/below-baseline days — the R2 gap class.
+/// at/below-baseline days — the gap class of app convention "gap
+/// tolerance".
 double? _candidateValue(
   Map<DateTime, DailyEntry> byDay,
   DateTime day,
@@ -379,17 +400,20 @@ SuzRule? _suzRuleFor({
   required double baselineValue,
 }) {
   if (ordinal == 3) {
-    if (value >= baselineValue + _suzRuleDAboveBaselineK - _epsilon) {
-      // Rule D fired — SUZ begins this evening.
-      return SuzRule.d;
+    if (value >= baselineValue + _suzEveningMarginK - _epsilon) {
+      // „Sicher unfruchtbare Zeit am Abend“: it begins this evening.
+      return SuzRule.evening;
     }
-    // Below the margin: rule E may still fire at the 4th circle.
+    // Below the margin: the „Erster Sonderfall“ may still fire at the 4th
+    // circle.
     return null;
   }
   if (ordinal == 4) {
-    // Rule E: the 3rd circle was below the margin, so the 4th circle —
-    // any margin — fires, SUZ this morning.
-    return SuzRule.e;
+    // „Erster Sonderfall“ (vierte höhere Messung): the 3rd circle was below
+    // the margin, so the 4th circle — any margin above the Basislinie —
+    // fires. The 4th is a waking temperature, so the start is its morning
+    // (derived, see SuzRule).
+    return SuzRule.morning;
   }
   return null;
 }
@@ -415,11 +439,12 @@ CycleEvaluation _evaluateCycle(
 
   // Walk CALENDAR days from the marked rise so untracked days count as the
   // gaps they are. Unmeasured, mark-excluded and at/below-baseline days form
-  // one gap class (R2). The run tolerates ONE such day in total: a second
-  // one ends the search at the next above-baseline day, so the budget spans
-  // arrows and circles and is not refreshed by a candidate. Gap days before
-  // the first candidate consume nothing — the sequence has not started.
-  final higherMeasurements = <HigherMeasurement>[];
+  // one gap class (app convention "gap tolerance"). The run tolerates ONE
+  // such day in total: a second one ends the search at the next
+  // above-baseline day, so the budget spans arrows and circles and is not
+  // refreshed by a candidate. Gap days before the first candidate consume
+  // nothing — the sequence has not started.
+  final candidateMeasurements = <CandidateMeasurement>[];
   var evaluationStopped = false;
   DateTime? suzBegins;
   SuzRule? suzRule;
@@ -460,8 +485,9 @@ CycleEvaluation _evaluateCycle(
 
       sequenceStarted = true;
 
-      // R4: arrow when the peak is unset or the day is at/before it;
-      // circle strictly after it.
+      // App convention "candidate walk" („Höhere Messung“ vs
+      // „Pfeilmessung“): arrow when the peak is unset or the day is
+      // at/before it; circle strictly after it.
       final markKind =
           peakDay == null || DateOnly.daysBetween(peakDay, day) >= 0
           ? MarkKind.arrow
@@ -475,8 +501,8 @@ CycleEvaluation _evaluateCycle(
           ordinal = circleCount < _marksPerKindCap ? ++circleCount : null;
       }
 
-      higherMeasurements.add(
-        HigherMeasurement(
+      candidateMeasurements.add(
+        CandidateMeasurement(
           date: day,
           value: value,
           markKind: markKind,
@@ -485,7 +511,8 @@ CycleEvaluation _evaluateCycle(
         ),
       );
 
-      // R5: the SUZ fires on CIRCLED candidates only (the circle ordinal).
+      // „Sicher unfruchtbare Zeit am Abend“ / „Erster Sonderfall“: the
+      // trigger fires on CIRCLED candidates only (the circle ordinal).
       final rule = markKind == MarkKind.circle && ordinal != null
           ? _suzRuleFor(
               ordinal: ordinal,
@@ -500,12 +527,12 @@ CycleEvaluation _evaluateCycle(
       }
     }
 
-    // R10: baseline segment — earliest numbered low day to last marked
-    // candidate, clamped to the next cycle start / the next cycle's six-low
-    // window start.
+    // App convention "baseline line extent": baseline segment — earliest
+    // numbered low day to last marked candidate, clamped to the next cycle
+    // start / the next cycle's six-low window start.
     final spanStart = lowWindow.startDay;
-    if (spanStart != null && higherMeasurements.isNotEmpty) {
-      var spanEnd = higherMeasurements.last.date;
+    if (spanStart != null && candidateMeasurements.isNotEmpty) {
+      var spanEnd = candidateMeasurements.last.date;
       if (nextCycleStart != null && nextCycleStart.isBefore(spanEnd)) {
         spanEnd = nextCycleStart;
       }
@@ -522,7 +549,7 @@ CycleEvaluation _evaluateCycle(
     firstHigherDay: firstHigherDay,
     numberedLows: numberedLows,
     baseline: baseline,
-    higherMeasurements: List.unmodifiable(higherMeasurements),
+    candidateMeasurements: List.unmodifiable(candidateMeasurements),
     baselineSpan: baselineSpan,
     suzBegins: suzBegins,
     suzRule: suzRule,

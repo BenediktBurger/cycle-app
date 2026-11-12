@@ -34,7 +34,7 @@ const _glossaryEn = [
   'Circled higher measurements',
   'Premature temperature rise',
   'Baseline',
-  'Sicher unfruchtbare Zeit (SUZ)',
+  'Definitely infertile time (SUZ)',
   'Measurement time',
   'Disturbed measurement (sp late to bed, a frequent night awakening, '
       'alk alcohol, kr illness)',
@@ -225,7 +225,8 @@ void main() {
                 'the signal rows above the curve (bleeding, mucus, mucus '
                 'peak, Mittelschmerz, sex), then the temperature-curve '
                 'group (temperature, ignored temperature, circled higher, '
-                'premature rise, baseline, SUZ), then the below-chart strip '
+                'premature rise, baseline, „Sicher unfruchtbare Zeit“), then '
+                'the below-chart strip '
                 '(measurement time, disturbance, cervix position, cervix '
                 'firmness, breast pain, note)',
           ),

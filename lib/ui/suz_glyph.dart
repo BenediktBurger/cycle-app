@@ -1,7 +1,8 @@
-// The user-placed SUZ glyph's shared anchoring constants — pure Dart, NO
-// Flutter imports (the cycle chart and the PDF export both anchor the
-// glyph in °C scale units, and the PDF generation layer must stay free of
-// material imports for the host smoke scripts, tool/pdf_smoke.dart).
+// The user-placed „Sicher unfruchtbare Zeit“ glyph's shared anchoring
+// constants — pure Dart, NO Flutter imports (the cycle chart and the PDF
+// export both anchor the glyph in °C scale units, and the PDF generation
+// layer must stay free of material imports for the host smoke scripts,
+// tool/pdf_smoke.dart).
 //
 // The bar hangs DOWN from the temperature plot's top border by
 // [suzBarHangSpanDegrees] of the scale — exactly spanning the sex X row

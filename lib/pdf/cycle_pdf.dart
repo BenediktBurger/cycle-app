@@ -22,14 +22,11 @@
 //   chart-marks mapper.
 // - The TEMPERATURE CURVE and the evaluation overlay geometry (rings
 //   around circled candidates, arrow-up glyphs hanging clear below their
-//   dots, the solid peak dot, the user-placed SUZ bar+arrow glyphs) are
-//   painted here from draw lists composed ONCE by lib/pdf/pdf_curve.dart
-//   — this file never re-derives a rule; the overlay's 1–6 low numbers
-//   ride the same draw list onto the in-plot glyph seam. The computed
-//   suzBegins renders as the suggestion line: a thin solid vertical line
-//   plus the rule letter D/E, visually distinct from the user marks; the
-//   chart draws only user marks, the PDF is for teacher/doctor and adds
-//   the line.
+//   dots, the solid peak dot, the user-placed „Sicher unfruchtbare Zeit“
+//   bar+arrow glyphs) are painted here from draw lists composed ONCE by
+//   lib/pdf/pdf_curve.dart — this file never re-derives a rule; the
+//   overlay's 1–6 low numbers ride the same draw list onto the in-plot
+//   glyph seam.
 // - INDEX SPACES: the overlay's day indexes are calendar offsets from the
 //   cycle start; the page windows slice the same calendar space
 //   (cycleCalendarDays), so overlay index and window column coincide —
@@ -236,10 +233,6 @@ Future<List<int>> generatePdfBytes({
       range: model.temperatureRange,
       windowFirstIndex: window.firstDayIndex,
       windowDayCount: window.dayCount,
-      computedSuz: (
-        suzBegins: evaluation.suzBegins,
-        suzRule: evaluation.suzRule,
-      ),
     );
     doc.addPage(
       pw.Page(
@@ -260,7 +253,7 @@ Future<List<int>> generatePdfBytes({
                 cycleWindow: (first: days.first.date, last: days.last.date),
               ),
             ),
-            pw.SizedBox(height: 4),
+            pw.SizedBox(height: _headerGap),
             _paperFormGrid(
               // The page window's day-number labels key on the cycle's
               // normalized start day (calendar offsets — never the page
@@ -296,10 +289,24 @@ const double pdfPageMargin = 28;
 
 /// The header block's fixed height, pt.
 const double pdfHeaderHeight = 58;
+const double _headerGap = 4;
 const double _dayNumberRowHeight = 10;
 const double _dateRowHeight = 14;
 const double _bleedingRowHeight = 12;
 const double _tempValueRowHeight = 12;
+
+/// The curve block's top edge's y in the content stream's y-up page frame,
+/// whose origin is the page's bottom: the page height minus the page margin,
+/// the header, the header gap and the three row heights stacked above the
+/// curve block.
+final double pdfPlotTop =
+    PdfPageFormat.a4.landscape.height -
+    pdfPageMargin -
+    pdfHeaderHeight -
+    _headerGap -
+    _dayNumberRowHeight -
+    _dateRowHeight -
+    _bleedingRowHeight;
 
 /// The curve block's painted plot region (fine scale + curve + overlay
 /// marks + the in-plot glyph rows: intercourse X, mucus letters, peak dot, the
@@ -775,22 +782,7 @@ pw.Widget _curveBlock(
               axis,
               weekend,
             ),
-            child: pw.Stack(
-              children: [
-                _inPlotChartMarks(windowDays, drawing, axis),
-                // The computed SUZ's rule letter rides its line's
-                // column (a positioned widget above the geometry).
-                if (drawing.suzLine case final line?)
-                  pw.Positioned(
-                    left: (line.x * pdfColumnWidth - 4).clamp(
-                      0.0,
-                      defaultMaxDaysPerPage * pdfColumnWidth - 8,
-                    ),
-                    top: 0,
-                    child: pw.Text(line.ruleLetter ?? 'S', style: _tinyAccent),
-                  ),
-              ],
-            ),
+            child: _inPlotChartMarks(windowDays, drawing, axis),
           ),
         ),
       ],
@@ -1002,8 +994,9 @@ final pw.TextStyle _mucusQualityStyle = const pw.TextStyle(
 /// All painted geometry of the plot region: the 0.1 °C graduation (light),
 /// the dashed window bounds, the column hairlines, the curve (dots +
 /// range-clipped pieces, dimmed over ignoreTemperature-marked days), the
-/// dashed R10 baseline pieces, the candidate marks (rings on circled
-/// dots, arrow-up glyphs below arrowed ones) and the SUZ glyphs.
+/// dashed baseline segment pieces, the candidate marks (rings on circled
+/// dots, arrow-up glyphs below arrowed ones) and the „Sicher unfruchtbare
+/// Zeit“ glyphs.
 void _paintCurveBlock(
   PdfGraphics canvas,
   double plotWidth,
@@ -1075,7 +1068,7 @@ void _paintCurveBlock(
     }
   }
 
-  // The R10 baseline pieces (dashed, accent color).
+  // The baseline segment pieces (dashed, accent color).
   canvas.setStrokeColor(_markAccent);
   canvas.setLineWidth(0.6);
   for (final baseline in drawing.baseline) {
@@ -1127,9 +1120,9 @@ void _paintCurveBlock(
     canvas.fillPath();
   }
 
-  // The user-placed SUZ marks drawn as the CYCLE CHART's glyph (same
-  // shape, orientation and anchoring — constants shared via
-  // suz_glyph.dart): a vertical bar hanging down from the plot's top
+  // The user-placed „Sicher unfruchtbare Zeit“ marks drawn as the CYCLE
+  // CHART's glyph (same shape, orientation and anchoring — constants shared
+  // via suz_glyph.dart): a vertical bar hanging down from the plot's top
   // border plus the right-pointing arrow below it (arrow geometry mirrors
   // paintSuzArrowGlyph). Morning bars anchor at the column START, evening
   // bars at the column middle.
@@ -1158,22 +1151,6 @@ void _paintCurveBlock(
       ..closePath()
       ..fillPath();
   }
-
-  // The computed SUZ: a thin solid vertical line through the whole plot —
-  // deliberately distinct from the user marks' bar+arrow glyph; the rule
-  // letter is a positioned widget (kept out of the canvas-font path).
-  if (drawing.suzLine case final line?) {
-    canvas
-      ..setStrokeColor(_ink)
-      ..setLineWidth(0.6)
-      ..drawLine(
-        line.x * pdfColumnWidth,
-        0,
-        line.x * pdfColumnWidth,
-        plotHeight,
-      )
-      ..strokePath();
-  }
 }
 
 double _columnCenterX(int windowColumn) =>
@@ -1181,10 +1158,10 @@ double _columnCenterX(int windowColumn) =>
 
 /// Fills a circle centered at (x, y) with the given radius.
 ///
-/// SEMANTICS PIN: PdfGraphics.drawEllipse(x, y, r1, r2) draws an ellipse
-/// CENTERED on (x, y) with r1/r2 as HALF-axes — corner+size arithmetic
-/// drifts every circle off-center and double its size (pinned byte-level
-/// in test/pdf/pdf_circle_geometry_test.dart).
+/// SEMANTICS PIN: PdfGraphics.drawEllipse(x, y, radiusX, radiusY) draws an
+/// ellipse CENTERED on (x, y) with the two radii as HALF-axes —
+/// corner+size arithmetic drifts every circle off-center and double its
+/// size (pinned byte-level in test/pdf/pdf_circle_geometry_test.dart).
 void pdfFillCircle(PdfGraphics canvas, double x, double y, double radius) {
   canvas
     ..drawEllipse(x, y, radius, radius)

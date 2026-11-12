@@ -15,10 +15,11 @@
 // candidate from the marked rise onward is an ARROW while the mucus peak is
 // unset or the day is at or before the peak day, and a CIRCLE after the peak
 // day. Ordinals count WITHIN each kind (arrows 1–4, circles 1–4); the circle
-// ordinal drives the SUZ rules D/E — rule D begins the SUZ the EVENING of
-// the 3rd circle (≥ +0.2 K above the baseline), rule E the MORNING of the
-// 4th circle (any margin) — the arrow ordinal expresses the arrow cap.
-// Candidates beyond their kind's cap stay in the sequence unnumbered.
+// ordinal drives „Sicher unfruchtbare Zeit“ — „Sicher unfruchtbare Zeit am
+// Abend“ starts at the 3rd circle (≥ +0.2 K above the Basislinie), the
+// „Erster Sonderfall“ (vierte höhere Messung) at the 4th circle (any
+// margin); the arrow ordinal expresses the arrow cap. Candidates beyond
+// their kind's cap stay in the sequence unnumbered.
 //
 // Anchors (owner-confirmed): the MOST RECENT mark of each type inside a
 // cycle drives the evaluation — the latest mucus-peak mark ("Höhepunkt =
@@ -138,8 +139,18 @@ void main() {
       d(2026, 3, 10, t: 36.1), // mucus peak day
       d(2026, 3, 11, t: 36.8), // first higher (marked) → circled
       d(2026, 3, 12, t: 36.9), // 2nd circled
-      d(2026, 3, 13, t: 37.0), // 3rd circled, ≥ +0.2 K → SUZ (rule D)
-      d(2026, 3, 14, t: 36.95), // higher, but the SUZ already began
+      d(
+        2026,
+        3,
+        13,
+        t: 37.0,
+      ), // 3rd circled, ≥ +0.2 K → „Sicher unfruchtbare Zeit am Abend“
+      d(
+        2026,
+        3,
+        14,
+        t: 36.95,
+      ), // higher, but the „Sicher unfruchtbare Zeit“ already began
     ];
     final marks = [peak(2026, 3, 10), rise(2026, 3, 11)];
 
@@ -184,11 +195,11 @@ void main() {
     test('baseline segment: starts at low #6, ends at the last candidate', () {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      // R10: the segment starts at the earliest numbered low day (low #6 —
-      // Mar 5, the highest of the six) and ends at the last marked
-      // candidate day (Mar 13, the rule-D trigger day). The Mar 14
-      // measurement is beyond the completed sequence and does not extend
-      // the segment.
+      // App convention "baseline line extent": the segment starts at the
+      // earliest numbered low day (low #6 — Mar 5, the highest of the six)
+      // and ends at the last marked candidate day (Mar 13, the „Sicher
+      // unfruchtbare Zeit am Abend“ trigger day). The Mar 14 measurement is
+      // beyond the completed sequence and does not extend the segment.
       expect(
         e.baselineSpan!.startDay,
         DateOnly.normalize(DateTime(2026, 3, 5)),
@@ -196,37 +207,41 @@ void main() {
       expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 13)));
     });
 
-    test('circles the marked candidates; the SUZ day ends the sequence', () {
+    test('circles the marked candidates; the „Sicher unfruchtbare Zeit“ day '
+        'ends the sequence', () {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      // Rule D fires at the 3rd CIRCLE (37.0 ≥ 36.4 + 0.2), so the
-      // sequence is complete after three circles; the Mar 14 measurement
-      // (36.95, still above the baseline) is NOT marked — the evaluation
-      // is finished, not stopped.
+      // „Sicher unfruchtbare Zeit am Abend“ fires at the 3rd CIRCLE
+      // (37.0 ≥ 36.4 + 0.2), so the sequence is complete after three
+      // circles; the Mar 14 measurement (36.95, still above the baseline)
+      // is NOT marked — the evaluation is finished, not stopped.
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (11, MarkKind.circle, 1),
           (12, MarkKind.circle, 2),
           (13, MarkKind.circle, 3),
         ],
       );
-      // Difference-to-baseline per candidate (rendering input, rule R7).
-      expect(e.higherMeasurements[0].differenceK, closeTo(0.4, 1e-9));
-      expect(e.higherMeasurements[1].differenceK, closeTo(0.5, 1e-9));
-      expect(e.higherMeasurements[2].differenceK, closeTo(0.6, 1e-9));
+      // Difference-to-baseline per candidate (rendering input, app
+      // convention "baseline difference").
+      expect(e.candidateMeasurements[0].differenceK, closeTo(0.4, 1e-9));
+      expect(e.candidateMeasurements[1].differenceK, closeTo(0.5, 1e-9));
+      expect(e.candidateMeasurements[2].differenceK, closeTo(0.6, 1e-9));
     });
 
-    test('SUZ begins the evening of the 3rd circle via rule D', () {
+    test('„Sicher unfruchtbare Zeit“ begins the evening of the 3rd circle '
+        '(„Sicher unfruchtbare Zeit am Abend“)', () {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
-      expect(e.suzRule, SuzRule.d);
+      expect(e.suzRule, SuzRule.evening);
       expect(e.evaluationStopped, isFalse);
     });
   });
 
-  group('rule R1 — candidacy is strictly above the baseline, any margin', () {
+  group('„Höhere Messung“ — candidacy is strictly above the baseline, any '
+      'margin', () {
     test('a day exactly AT the baseline is not a candidate', () {
       final entries = [
         ..._baseLowRun,
@@ -237,8 +252,9 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.baseline!.value, 36.4);
-      expect(e.higherMeasurements, isEmpty);
-      // R10: no marked candidate → no baseline segment.
+      expect(e.candidateMeasurements, isEmpty);
+      // App convention "baseline line extent": no marked candidate → no
+      // baseline segment.
       expect(e.baselineSpan, isNull);
       expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
@@ -254,30 +270,35 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
-      expect(e.higherMeasurements.single.differenceK, closeTo(0.01, 1e-9));
+      expect(e.candidateMeasurements.single.differenceK, closeTo(0.01, 1e-9));
       expect(e.suzBegins, isNull);
     });
   });
 
-  group('rule R2 — connectedness: one gap tolerated per run, a second stops '
-      'it', () {
+  group('app convention "gap tolerance" — connectedness: one gap tolerated '
+      'per run, a second stops it', () {
     test('ONE missing day between candidates keeps the sequence going', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         // Mar 11: untracked — the single tolerated gap day
         d(2026, 3, 12, t: 36.9), // candidate 2
-        d(2026, 3, 13, t: 37.0), // candidate 3, ≥ +0.2 K → SUZ (rule D)
+        d(
+          2026,
+          3,
+          13,
+          t: 37.0,
+        ), // candidate 3, ≥ +0.2 K → „Sicher unfruchtbare Zeit am Abend“
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (12, MarkKind.circle, 2),
@@ -285,7 +306,7 @@ void main() {
         ],
       );
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
-      expect(e.suzRule, SuzRule.d);
+      expect(e.suzRule, SuzRule.evening);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -295,13 +316,18 @@ void main() {
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
         d(2026, 3, 11, t: 36.3), // BELOW the baseline — the tolerated gap
         d(2026, 3, 12, t: 36.9), // candidate 2
-        d(2026, 3, 13, t: 37.0), // candidate 3 → SUZ (rule D)
+        d(
+          2026,
+          3,
+          13,
+          t: 37.0,
+        ), // candidate 3 → „Sicher unfruchtbare Zeit am Abend“
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+      expect(e.candidateMeasurements.map((h) => (h.date.day, h.ordinal)), [
         (10, 1),
         (12, 2),
         (13, 3),
@@ -311,7 +337,8 @@ void main() {
     });
 
     test('ONE missing day between the last ARROW and the first CIRCLE keeps '
-        'the sequence going (R2 spans the kind transition)', () {
+        'the sequence going (app convention "gap tolerance" spans the kind '
+        'transition)', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
@@ -326,7 +353,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -352,15 +379,16 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.arrow, 1), (11, MarkKind.arrow, 2)],
       );
       expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isTrue);
     });
 
-    test('TWO missing days between candidates STOP the evaluation: no SUZ, '
-        'no automatic re-search (later higher days stay unmarked)', () {
+    test('TWO missing days between candidates STOP the evaluation: no '
+        '„Sicher unfruchtbare Zeit“, no automatic re-search (later higher '
+        'days stay unmarked)', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
@@ -373,7 +401,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -394,7 +422,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -414,7 +442,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -428,7 +456,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1), (12, MarkKind.circle, 2)],
       );
       expect(e.suzBegins, isNull);
@@ -447,7 +475,12 @@ void main() {
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.5), // circle 2
         d(2026, 3, 12, t: 36.3), // 1st gap day
-        d(2026, 3, 13, t: 36.5), // circle 3 — below the rule-D margin
+        d(
+          2026,
+          3,
+          13,
+          t: 36.5,
+        ), // circle 3 — below the „Sicher unfruchtbare Zeit am Abend“ margin
         d(2026, 3, 14, t: 36.3), // 2nd gap day — the run's budget is spent
         d(2026, 3, 15, t: 36.5), // would-be circle 4 — NOT marked
       ];
@@ -455,7 +488,7 @@ void main() {
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+      expect(e.candidateMeasurements.map((h) => (h.date.day, h.ordinal)), [
         (10, 1),
         (11, 2),
         (13, 3),
@@ -465,27 +498,38 @@ void main() {
       expect(e.evaluationStopped, isTrue);
     });
 
-    test('one non-consecutive gap still lets rule E fire', () {
+    test('one non-consecutive gap still lets the „Erster Sonderfall“ '
+        '(vierte höhere Messung) fire', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
         d(2026, 3, 11, t: 36.3), // the one tolerated gap day
         d(2026, 3, 12, t: 36.5), // circle 2
-        d(2026, 3, 13, t: 36.5), // circle 3 — below the rule-D margin
-        d(2026, 3, 14, t: 36.5), // circle 4 → SUZ (rule E)
+        d(
+          2026,
+          3,
+          13,
+          t: 36.5,
+        ), // circle 3 — below the „Sicher unfruchtbare Zeit am Abend“ margin
+        d(
+          2026,
+          3,
+          14,
+          t: 36.5,
+        ), // circle 4 → „Erster Sonderfall“ (vierte höhere Messung)
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+      expect(e.candidateMeasurements.map((h) => (h.date.day, h.ordinal)), [
         (10, 1),
         (12, 2),
         (13, 3),
         (14, 4),
       ]);
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 14)));
-      expect(e.suzRule, SuzRule.e);
+      expect(e.suzRule, SuzRule.morning);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -498,7 +542,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.arrow, 1), (12, MarkKind.arrow, 2)],
       );
       expect(e.suzBegins, isNull);
@@ -520,7 +564,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (12, MarkKind.arrow, 2),
@@ -544,7 +588,7 @@ void main() {
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+      expect(e.candidateMeasurements.map((h) => (h.date.day, h.ordinal)), [
         (12, 1),
         (14, 2),
       ]);
@@ -552,7 +596,8 @@ void main() {
     });
   });
 
-  group('rule R3 — candidates exist only from the marked rise onward', () {
+  group('„Temperaturanstieg“ / app convention "latest-mark anchor" — '
+      'candidates exist only from the marked rise onward', () {
     test('a pre-rise above-baseline day (Zacke) is no candidate and does '
         'not disturb the sequence', () {
       final entries = [
@@ -590,7 +635,7 @@ void main() {
       expect(e.baseline!.value, 36.4);
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 15)));
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(20, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -610,7 +655,7 @@ void main() {
 
       expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(11, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -618,7 +663,8 @@ void main() {
     });
   });
 
-  group('rule R4 — arrow vs circle, PER CANDIDATE', () {
+  group('„Höhere Messung“ vs „Pfeilmessung“ — arrow vs circle, PER '
+      'CANDIDATE', () {
     // Shared fixture: baseline 36.4 (Mar 6), rise on Mar 10.
     final entries = [
       ..._baseLowRun,
@@ -633,7 +679,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (11, MarkKind.circle, 2),
@@ -642,14 +688,15 @@ void main() {
       );
     });
 
-    test('peak NOT set → every candidate is an ARROW (and no SUZ)', () {
+    test('peak NOT set → every candidate is an ARROW (and no „Sicher '
+        'unfruchtbare Zeit“)', () {
       final marks = [rise(2026, 3, 10)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.mucusPeakDay, isNull);
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -657,7 +704,8 @@ void main() {
         ],
       );
       // Even though the 3rd candidate is ≥ +0.2 K above the baseline, the
-      // SUZ cannot be declared: rules D and E count CIRCLED measurements
+      // „Sicher unfruchtbare Zeit“ cannot be declared: „Sicher unfruchtbare
+      // Zeit am Abend“ / „Erster Sonderfall“ count CIRCLED measurements
       // only, and without circles there is nothing to count (the settled
       // rule in lib/domain/evaluation.dart cites the cheat sheet's
       // "umrandete" wording).
@@ -673,7 +721,7 @@ void main() {
         d(2026, 3, 13, t: 37.0), // candidate 4 — first after the peak
       ];
       // The peak sits on candidate 2 (Mar 11, 36.9 > 36.4): the peak day's
-      // own above-baseline temperature is an ARROW (R4).
+      // own above-baseline temperature is an ARROW („Pfeilmessung“).
       final marks = [peak(2026, 3, 11), rise(2026, 3, 10)];
 
       final e = evalFor(mixed, marks, DateTime(2026, 3, 2));
@@ -681,7 +729,7 @@ void main() {
       // Ordinals are per kind: the arrows count among themselves, the
       // circles RESTART at 1 after the peak.
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2), // the peak-day candidate is an arrow
@@ -690,19 +738,20 @@ void main() {
         ],
       );
       // Chronologically arrows precede circles — no interleaving.
-      final firstCircle = e.higherMeasurements.indexWhere(
+      final firstCircle = e.candidateMeasurements.indexWhere(
         (h) => h.markKind == MarkKind.circle,
       );
       expect(
-        e.higherMeasurements.indexWhere(
+        e.candidateMeasurements.indexWhere(
           (h) => h.markKind == MarkKind.arrow,
           firstCircle,
         ),
         -1,
         reason: 'chronologically arrows precede circles — no interleaving',
       );
-      // Only two circles so far: neither rule D (needs a 3rd circle) nor
-      // rule E (needs a 4th) has triggered.
+      // Only two circles so far: neither „Sicher unfruchtbare Zeit am
+      // Abend“ (needs a 3rd circle) nor „Erster Sonderfall“ (needs a 4th) has
+      // triggered.
       expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
@@ -715,7 +764,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.circle, 1),
@@ -737,7 +786,7 @@ void main() {
       final e = evalFor(mixed, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -750,7 +799,7 @@ void main() {
     });
 
     test('caps: four arrows with ordinals, then the circles continue to '
-        'four (rule E fires at the 4th circle)', () {
+        'four, where the „Erster Sonderfall“ fires at the 4th circle', () {
       final long = [
         ...entries,
         d(2026, 3, 13, t: 36.5), // arrow 4
@@ -758,7 +807,12 @@ void main() {
         d(2026, 3, 15, t: 36.5), // circle 1
         d(2026, 3, 16, t: 36.5), // circle 2
         d(2026, 3, 17, t: 36.5), // circle 3 — below the +0.2 margin
-        d(2026, 3, 18, t: 36.5), // circle 4 — rule E fires here
+        d(
+          2026,
+          3,
+          18,
+          t: 36.5,
+        ), // circle 4 — „Erster Sonderfall“ (vierte höhere Messung) fires here
       ];
       // The peak sits on the 5th candidate (Mar 14, 36.5 > 36.4): that
       // candidate is still an ARROW (at or before the peak day), but the
@@ -769,7 +823,7 @@ void main() {
       final e = evalFor(long, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -779,16 +833,17 @@ void main() {
           (15, MarkKind.circle, 1),
           (16, MarkKind.circle, 2),
           (17, MarkKind.circle, 3),
-          (18, MarkKind.circle, 4), // rule E fires here (any margin)
+          (18, MarkKind.circle, 4), // „Erster Sonderfall“: any margin
         ],
       );
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 18)));
-      expect(e.suzRule, SuzRule.e);
+      expect(e.suzRule, SuzRule.morning);
       expect(e.evaluationStopped, isFalse);
     });
 
     test('an arrows-only sequence keeps listing connected candidates beyond '
-        'the arrow cap, unnumbered (no SUZ is possible anyway)', () {
+        'the arrow cap, unnumbered (no „Sicher unfruchtbare Zeit“ is possible '
+        'anyway)', () {
       final long = [
         ...entries,
         d(2026, 3, 13, t: 36.5), // arrow 4
@@ -799,7 +854,7 @@ void main() {
       final e = evalFor(long, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -823,8 +878,8 @@ void main() {
     // and simply stop anchoring.
 
     test('two peaks: candidates up to and including the LAST peak are '
-        'arrows, circles start at 1 after it; rule D fires on the 3rd '
-        'circle under the late peak', () {
+        'arrows, circles start at 1 after it; „Sicher unfruchtbare Zeit am '
+        'Abend“ fires on the 3rd circle under the late peak', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise (between the peaks) → arrow 1
@@ -837,7 +892,9 @@ void main() {
           t: 37.0,
         ), // circle 1 — first candidate after the LAST peak
         d(2026, 3, 14, t: 37.0), // circle 2
-        d(2026, 3, 15, t: 36.7), // circle 3, ≥ +0.2 K → rule D fires HERE
+        // Circle 3 and ≥ 0.2 K above the baseline: „Sicher unfruchtbare
+        // Zeit am Abend“ fires here.
+        d(2026, 3, 15, t: 36.7),
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10), peak(2026, 3, 12)];
 
@@ -846,11 +903,12 @@ void main() {
       // The MOST RECENT peak (Mar 12) anchors the per-candidate decision —
       // "Höhepunkt = letzter Tag mit der besten Qualität": multiple peaks
       // arise from delayed ovulation (a peak subsides and a later one
-      // appears), so the latest peak is the ovulation that counts for R4.
+      // appears), so the latest peak is the ovulation that counts for the
+      // per-candidate decision.
       expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 12)));
       expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -860,11 +918,12 @@ void main() {
           (15, MarkKind.circle, 3),
         ],
       );
-      // Rules D/E count circles only; under the late peak the 3rd circle
-      // (36.7 ≥ 36.4 + 0.2) triggers rule D on Mar 15 — NOT on Mar 12
-      // (which would be the 3rd circle under an early-peak anchor).
+      // „Sicher unfruchtbare Zeit am Abend“ / „Erster Sonderfall“ count circles
+      // only; under the late peak the 3rd circle (36.7 ≥ 36.4 + 0.2)
+      // triggers „Sicher unfruchtbare Zeit am Abend“ on Mar 15 — not on
+      // Mar 12, which would be the 3rd circle under an early-peak anchor.
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 15)));
-      expect(e.suzRule, SuzRule.d);
+      expect(e.suzRule, SuzRule.evening);
       expect(e.evaluationStopped, isFalse);
     });
 
@@ -885,7 +944,7 @@ void main() {
 
       final before = evalFor(entries, marks, DateTime(2026, 3, 2));
       expect(
-        before.higherMeasurements.map(
+        before.candidateMeasurements.map(
           (h) => (h.date.day, h.markKind, h.ordinal),
         ),
         [
@@ -900,7 +959,7 @@ void main() {
         peak(2026, 3, 12),
       ], DateTime(2026, 3, 2));
       expect(
-        after.higherMeasurements.map(
+        after.candidateMeasurements.map(
           (h) => (h.date.day, h.markKind, h.ordinal),
         ),
         [
@@ -912,7 +971,8 @@ void main() {
     });
 
     test('a peak marked AFTER all candidates: every candidate stays an '
-        'arrow → no SUZ (rules D/E count circles only)', () {
+        'arrow → no „Sicher unfruchtbare Zeit“ (the book rules count circles '
+        'only)', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.8), // marked rise → arrow 1
@@ -921,14 +981,16 @@ void main() {
       ];
       // Peak 2 is marked on Mar 14 — AFTER every candidate (Mar 10–12).
       // Under the most-recent-peak anchor every candidate day is ≤ the
-      // peak → arrows; arrows never trigger rules D/E → no SUZ.
+      // peak → arrows; arrows never trigger the „Sicher unfruchtbare
+      // Zeit am Abend“ / „Erster Sonderfall“ rules → no „Sicher unfruchtbare
+      // Zeit“.
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10), peak(2026, 3, 14)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 14)));
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.arrow, 1),
           (11, MarkKind.arrow, 2),
@@ -939,8 +1001,9 @@ void main() {
         e.suzBegins,
         isNull,
         reason:
-            'an all-arrow sequence yields no circles, so rules D and '
-            'E cannot fire — even though the 3rd candidate is ≥ +0.2 K',
+            'an all-arrow sequence yields no circles, so „Sicher '
+            'unfruchtbare Zeit am Abend“ / „Erster Sonderfall“ cannot fire — '
+            'even though the 3rd candidate is ≥ +0.2 K',
       );
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
@@ -979,10 +1042,11 @@ void main() {
       expect(e.baseline!.value, 36.8);
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 10)));
       // The earlier rise day renders NO candidate: the walk starts at the
-      // later mark (R3), so Mar 10 lies before the walk region (it is also
-      // AT the new baseline — doubly excluded).
+      // later mark (app convention "latest-mark anchor"), so Mar 10 lies
+      // before the walk region (it is also AT the new baseline — doubly
+      // excluded).
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(13, MarkKind.circle, 1), (14, MarkKind.circle, 2)],
       );
       expect(e.suzBegins, isNull);
@@ -994,15 +1058,22 @@ void main() {
     });
   });
 
-  group('rule R5 — SUZ rules D and E count circles only', () {
-    test('rule D regression: the 3rd CIRCLE exactly +0.2 K above the '
-        'baseline triggers the SUZ (floating-point tolerance)', () {
+  group('„Sicher unfruchtbare Zeit am Abend“ / „Erster Sonderfall“ — count '
+      'circles only', () {
+    test('„Sicher unfruchtbare Zeit am Abend“ regression: the 3rd CIRCLE '
+        'exactly +0.2 K above the baseline triggers the „Sicher '
+        'unfruchtbare Zeit“ (floating-point tolerance)', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.3), // peak day — low #1 (Mar 11 is low #2)
         d(2026, 3, 12, t: 36.5), // marked rise → circle 1 (+0.1)
         d(2026, 3, 13, t: 36.5), // circle 2 (+0.1)
-        d(2026, 3, 14, t: 36.6), // circle 3, exactly +0.2 K → rule D
+        d(
+          2026,
+          3,
+          14,
+          t: 36.6,
+        ), // circle 3, exactly +0.2 K → „Sicher unfruchtbare Zeit am Abend“
       ];
       final marks = [peak(2026, 3, 10), rise(2026, 3, 12)];
 
@@ -1013,47 +1084,57 @@ void main() {
       // still recognize 36.6 as exactly +0.2 K (epsilon in
       // lib/domain/evaluation.dart).
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 14)));
-      expect(e.suzRule, SuzRule.d);
+      expect(e.suzRule, SuzRule.evening);
       expect(e.evaluationStopped, isFalse);
     });
 
-    test('rule E: 3rd circle below the margin, 4th circle at ANY margin → '
-        'SUZ begins the MORNING of the 4th circle', () {
-      final entries = [
-        ..._baseLowRun,
-        d(2026, 3, 10, t: 36.5), // marked rise → circle 1 (+0.1)
-        d(2026, 3, 11, t: 36.5), // circle 2 (+0.1)
-        d(2026, 3, 12, t: 36.5), // circle 3 (+0.1 — below the +0.2 margin)
-        d(2026, 3, 13, t: 36.41), // circle 4, only +0.01 K → rule E
-      ];
-      final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
+    test(
+      '„Erster Sonderfall“ (vierte höhere Messung): 3rd circle below the '
+      'margin, 4th circle at ANY margin → the trigger day is the 4th circle',
+      () {
+        final entries = [
+          ..._baseLowRun,
+          d(2026, 3, 10, t: 36.5), // marked rise → circle 1 (+0.1)
+          d(2026, 3, 11, t: 36.5), // circle 2 (+0.1)
+          d(2026, 3, 12, t: 36.5), // circle 3 (+0.1 — below the +0.2 margin)
+          d(
+            2026,
+            3,
+            13,
+            t: 36.41,
+          ), // circle 4, only +0.01 K → „Erster Sonderfall“
+        ];
+        final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
 
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+        final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
-        [
-          (10, MarkKind.circle, 1),
-          (11, MarkKind.circle, 2),
-          (12, MarkKind.circle, 3),
-          (13, MarkKind.circle, 4),
-        ],
-      );
-      expect(
-        e.suzBegins,
-        DateOnly.normalize(DateTime(2026, 3, 13)),
-        reason:
-            'rule E: the SUZ begins the MORNING of the 4th circled '
-            'measurement day — the D→evening / E→morning mapping IS the '
-            'time-of-day semantics: the domain reports the day plus the '
-            'rule, the sheet renders the matching phrasing',
-      );
-      expect(e.suzRule, SuzRule.e);
-      expect(e.evaluationStopped, isFalse);
-    });
+        expect(
+          e.candidateMeasurements.map(
+            (h) => (h.date.day, h.markKind, h.ordinal),
+          ),
+          [
+            (10, MarkKind.circle, 1),
+            (11, MarkKind.circle, 2),
+            (12, MarkKind.circle, 3),
+            (13, MarkKind.circle, 4),
+          ],
+        );
+        expect(
+          e.suzBegins,
+          DateOnly.normalize(DateTime(2026, 3, 13)),
+          reason:
+              '„Erster Sonderfall“ triggers on the 4th circled measurement '
+              'day; its start is that morning (derived from the waking-'
+              'temperature measurement, see docs/NER/rules.md)',
+        );
+        expect(e.suzRule, SuzRule.morning);
+        expect(e.evaluationStopped, isFalse);
+      },
+    );
 
     test('exactly 3 circles, the 3rd below the +0.2 margin, data ends → '
-        'NO SUZ, NOT stopped (rule E needs the 4th circle)', () {
+        'NO „Sicher unfruchtbare Zeit“, NOT stopped („Erster Sonderfall“ '
+        'needs the 4th circle)', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1 (+0.1)
@@ -1065,7 +1146,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (11, MarkKind.circle, 2),
@@ -1081,44 +1162,58 @@ void main() {
       );
     });
 
-    test('D/E count circles only: arrows before the peak do not advance the '
-        'trigger — the SUZ fires on the 3rd CIRCLE, not the 3rd candidate', () {
-      final entries = [
-        ..._baseLowRun,
-        d(2026, 3, 10, t: 36.5), // marked rise → arrow 1 (+0.1)
-        d(2026, 3, 11, t: 36.5), // peak day → arrow 2 (+0.1)
-        d(2026, 3, 12, t: 36.6), // circle 1 (+0.2 — 3rd CANDIDATE, but only
-        // the 1st circle: NO trigger here)
-        d(2026, 3, 13, t: 36.6), // circle 2 (+0.2)
-        d(2026, 3, 14, t: 36.7), // circle 3 (+0.3 ≥ +0.2) → rule D HERE
-      ];
-      final marks = [peak(2026, 3, 11), rise(2026, 3, 10)];
+    test(
+      '„Sicher unfruchtbare Zeit am Abend“ / „Erster Sonderfall“ count circles '
+      'only: arrows before the peak do not advance the '
+      'trigger — the „Sicher unfruchtbare Zeit“ fires on the 3rd CIRCLE, '
+      'not the 3rd candidate',
+      () {
+        final entries = [
+          ..._baseLowRun,
+          d(2026, 3, 10, t: 36.5), // marked rise → arrow 1 (+0.1)
+          d(2026, 3, 11, t: 36.5), // peak day → arrow 2 (+0.1)
+          d(2026, 3, 12, t: 36.6), // circle 1 (+0.2 — 3rd CANDIDATE, but only
+          // the 1st circle: NO trigger here)
+          d(2026, 3, 13, t: 36.6), // circle 2 (+0.2)
+          d(
+            2026,
+            3,
+            14,
+            t: 36.7,
+          ), // circle 3 (+0.3 ≥ +0.2) → „Sicher unfruchtbare Zeit am Abend“ HERE
+        ];
+        final marks = [peak(2026, 3, 11), rise(2026, 3, 10)];
 
-      final e = evalFor(entries, marks, DateTime(2026, 3, 2));
+        final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
-        [
-          (10, MarkKind.arrow, 1),
-          (11, MarkKind.arrow, 2),
-          (12, MarkKind.circle, 1),
-          (13, MarkKind.circle, 2),
-          (14, MarkKind.circle, 3),
-        ],
-      );
-      expect(
-        e.suzBegins,
-        DateOnly.normalize(DateTime(2026, 3, 14)),
-        reason:
-            'the 3rd circle (Mar 14) triggers rule D — not the 3rd '
-            'candidate (Mar 12), which was only the 1st circle',
-      );
-      expect(e.suzRule, SuzRule.d);
-      expect(e.evaluationStopped, isFalse);
-    });
+        expect(
+          e.candidateMeasurements.map(
+            (h) => (h.date.day, h.markKind, h.ordinal),
+          ),
+          [
+            (10, MarkKind.arrow, 1),
+            (11, MarkKind.arrow, 2),
+            (12, MarkKind.circle, 1),
+            (13, MarkKind.circle, 2),
+            (14, MarkKind.circle, 3),
+          ],
+        );
+        expect(
+          e.suzBegins,
+          DateOnly.normalize(DateTime(2026, 3, 14)),
+          reason:
+              'the 3rd circle (Mar 14) triggers „Sicher unfruchtbare Zeit am '
+              'Abend“ — not the 3rd '
+              'candidate (Mar 12), which was only the 1st circle',
+        );
+        expect(e.suzRule, SuzRule.evening);
+        expect(e.evaluationStopped, isFalse);
+      },
+    );
 
     test('a break between the 3rd (below the margin) and the 4th circle '
-        'prevents rule E: no SUZ, evaluation stopped', () {
+        'prevents „Erster Sonderfall“ (vierte höhere Messung): no „Sicher '
+        'unfruchtbare Zeit“, evaluation stopped', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
@@ -1132,7 +1227,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (11, MarkKind.circle, 2),
@@ -1144,7 +1239,8 @@ void main() {
       expect(e.evaluationStopped, isTrue);
     });
 
-    test('only two circles and the data ends: no SUZ, not stopped', () {
+    test('only two circles and the data ends: no „Sicher unfruchtbare Zeit“, '
+        'not stopped', () {
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.5), // marked rise → circle 1
@@ -1154,15 +1250,15 @@ void main() {
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements, hasLength(2));
+      expect(e.candidateMeasurements, hasLength(2));
       expect(e.suzBegins, isNull);
       expect(e.suzRule, isNull);
       expect(e.evaluationStopped, isFalse);
     });
   });
 
-  group('rule R8 — excluded days in the candidate sequence (excluded like '
-      'missing)', () {
+  group('app convention "temperature-ignore exclusion" — excluded days in '
+      'the candidate sequence (excluded like missing)', () {
     test('an ignoreTemperature MARK without any raw flags excludes: ONE '
         'marked day between candidates consumes the tolerated gap; its '
         'above-baseline value is never a candidate', () {
@@ -1173,7 +1269,12 @@ void main() {
         // not a candidate, despite being far above the baseline (the entry
         // carries no raw exclusion flags at all)
         d(2026, 3, 12, t: 36.9), // candidate 2
-        d(2026, 3, 13, t: 37.0), // candidate 3 → SUZ (rule D)
+        d(
+          2026,
+          3,
+          13,
+          t: 37.0,
+        ), // candidate 3 → „Sicher unfruchtbare Zeit am Abend“
       ];
       final marks = [
         peak(2026, 3, 9),
@@ -1184,7 +1285,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (12, MarkKind.circle, 2),
@@ -1210,14 +1311,19 @@ void main() {
           tempDisturbances:
               TempDisturbance.alk.bit | TempDisturbance.kr.bit, // flags only
         ), // candidate 2 — the flags alone do NOT exclude it
-        d(2026, 3, 12, t: 36.9), // candidate 3 → SUZ (rule D)
+        d(
+          2026,
+          3,
+          12,
+          t: 36.9,
+        ), // candidate 3 → „Sicher unfruchtbare Zeit am Abend“
       ];
       final marks = [peak(2026, 3, 9), rise(2026, 3, 10)];
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (10, MarkKind.circle, 1),
           (11, MarkKind.circle, 2),
@@ -1249,7 +1355,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.circle, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -1274,7 +1380,7 @@ void main() {
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.higherMeasurements.map((h) => (h.date.day, h.ordinal)), [
+      expect(e.candidateMeasurements.map((h) => (h.date.day, h.ordinal)), [
         (10, 1),
         (12, 2),
       ]);
@@ -1282,7 +1388,7 @@ void main() {
     });
   });
 
-  group('baseline span (R10)', () {
+  group('baseline span (app convention "baseline line extent")', () {
     test(
       'fewer than six lows: the segment starts at the oldest numbered low',
       () {
@@ -1329,7 +1435,7 @@ void main() {
 
       // Only two circles (the later days are at/below the baseline); the
       // segment ends at the LAST MARKED CANDIDATE, not at the cycle end.
-      expect(e.higherMeasurements, hasLength(2));
+      expect(e.candidateMeasurements, hasLength(2));
       expect(e.baselineSpan!.endDay, DateOnly.normalize(DateTime(2026, 3, 11)));
     });
 
@@ -1390,7 +1496,7 @@ void main() {
 
     test('no marked candidates → no segment (null span)', () {
       // The rise mark sits exactly at the baseline: no candidate ever
-      // appears, so R10 draws no baseline segment.
+      // appears, so no baseline segment is drawn.
       final entries = [
         ..._baseLowRun,
         d(2026, 3, 10, t: 36.4), // marked rise, but AT the baseline
@@ -1400,7 +1506,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.baseline, isNotNull);
-      expect(e.higherMeasurements, isEmpty);
+      expect(e.candidateMeasurements, isEmpty);
       expect(e.baselineSpan, isNull);
     });
   });
@@ -1601,7 +1707,8 @@ void main() {
 
       // Fewer than six measured days inside the window: the numbers 3, 4,
       // 5 belong to the calendar positions — no stretch-back to Mar 3,
-      // and the marked candidacy still stands alone (one circle, no SUZ).
+      // and the marked candidacy still stands alone (one circle, no
+      // „Sicher unfruchtbare Zeit“).
       final five = evalFor(
         _fewerThanSixLows,
         _fewerThanSixMarks,
@@ -1615,7 +1722,9 @@ void main() {
       expect(five.baseline!.value, 36.4);
       expect(five.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 6)));
       expect(
-        five.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        five.candidateMeasurements.map(
+          (h) => (h.date.day, h.markKind, h.ordinal),
+        ),
         [(10, MarkKind.circle, 1)],
       );
       expect(five.suzBegins, isNull);
@@ -1695,7 +1804,7 @@ void main() {
 
       expect(e.riseMarkConsistent, isFalse);
       expect(
-        e.higherMeasurements.single.date,
+        e.candidateMeasurements.single.date,
         DateOnly.normalize(DateTime(2026, 3, 12)),
       );
     });
@@ -1742,7 +1851,7 @@ void main() {
   });
   group('edge matrix', () {
     test('missing peak: numbering + baseline still work; the candidates '
-        'become arrows and no SUZ can be declared', () {
+        'become arrows and no „Sicher unfruchtbare Zeit“ can be declared', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1772,7 +1881,7 @@ void main() {
       expect(e.baseline!.value, 36.4);
       expect(e.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 4)));
       expect(
-        e.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(10, MarkKind.arrow, 1)],
       );
       expect(e.suzBegins, isNull);
@@ -1800,7 +1909,7 @@ void main() {
       expect(e.firstHigherDay, isNull);
       expect(e.numberedLows, isEmpty);
       expect(e.baseline, isNull);
-      expect(e.higherMeasurements, isEmpty);
+      expect(e.candidateMeasurements, isEmpty);
       expect(e.baselineSpan, isNull);
       expect(e.suzBegins, isNull);
       expect(e.evaluationStopped, isFalse);
@@ -1853,7 +1962,7 @@ void main() {
       expect(a.baseline!.value, 36.4);
       expect(a.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 5)));
       expect(
-        a.higherMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
+        a.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
           (11, MarkKind.circle, 1),
           (12, MarkKind.circle, 2),
@@ -1861,7 +1970,7 @@ void main() {
         ],
       );
       expect(a.suzBegins, DateOnly.normalize(DateTime(2026, 3, 13)));
-      expect(a.suzRule, SuzRule.d);
+      expect(a.suzRule, SuzRule.evening);
       expect(a.evaluationStopped, isFalse);
 
       final b = evalFor(entries, marks, DateTime(2026, 4, 6));
@@ -1870,7 +1979,7 @@ void main() {
       expect(b.baseline!.value, 36.4);
       expect(b.baseline!.date, DateOnly.normalize(DateTime(2026, 4, 9)));
       expect(b.suzBegins, DateOnly.normalize(DateTime(2026, 4, 16)));
-      expect(b.suzRule, SuzRule.d);
+      expect(b.suzRule, SuzRule.evening);
       expect(b.evaluationStopped, isFalse);
     });
 
@@ -2039,11 +2148,11 @@ void main() {
         ),
         (
           [
-            for (final h in gapMarked.higherMeasurements)
+            for (final h in gapMarked.candidateMeasurements)
               (h.date, h.value, h.markKind, h.ordinal, h.differenceK),
           ],
           [
-            for (final h in trackedMarked.higherMeasurements)
+            for (final h in trackedMarked.candidateMeasurements)
               (h.date, h.value, h.markKind, h.ordinal, h.differenceK),
           ],
         ),
@@ -2070,8 +2179,9 @@ void main() {
         'stop the evaluation and derive nothing of their own', () {
       // Baseline window Mar 3–8 (highest = Mar 6, 36.4), peak Mar 9,
       // rise marked Mar 10: every candidate Mar 10–12 is strictly after
-      // the peak (circles); rule D fires on the 3rd circle (Mar 12) —
-      // and every calendar day BEYOND Mar 13 is untracked: the grouping's
+      // the peak (circles); „Sicher unfruchtbare Zeit am Abend“ fires on
+      // the 3rd circle (Mar 12). Every calendar day BEYOND Mar 13 is
+      // untracked: the grouping's
       // span list covers it as data-less span-extension days (cycle
       // through Mar 25). Neither the walk's lengthened bound nor those
       // days create candidates, numbers or a stop — the sequence ran out
@@ -2100,7 +2210,7 @@ void main() {
       );
 
       expect(e.cycle.endDate, DateOnly.normalize(DateTime(2026, 3, 25)));
-      expect(e.higherMeasurements.map((h) => h.date.day), [10, 11, 12]);
+      expect(e.candidateMeasurements.map((h) => h.date.day), [10, 11, 12]);
       expect(e.evaluationStopped, isFalse);
       expect(e.suzBegins, DateOnly.normalize(DateTime(2026, 3, 12)));
       expect(e.numberedLows.map((l) => l.date.day), [9, 8, 7, 6, 5, 4]);
@@ -2110,10 +2220,12 @@ void main() {
     });
   });
 
-  group('firstCircledCandidateDay — the earliest circle candidate (R4)', () {
-    // The same R4 fixture shape as above: baseline 36.4 (Mar 6), rise on
-    // Mar 10. The function only SELECTS a day off the evaluation — the
-    // per-candidate arrow/circle rules themselves are pinned in rule R4.
+  group('firstCircledCandidateDay — the earliest circle candidate '
+      '(„Höhere Messung“)', () {
+    // The same „Höhere Messung“ fixture shape as above: baseline 36.4
+    // (Mar 6), rise on Mar 10. The function only SELECTS a day off the
+    // evaluation — the per-candidate arrow/circle rules themselves are
+    // pinned in the „Höhere Messung“ vs „Pfeilmessung“ group.
     final r4Entries = [
       ..._baseLowRun,
       d(2026, 3, 10, t: 36.8), // marked rise → candidate 1
@@ -2153,7 +2265,7 @@ void main() {
       final e = evalFor(r4Entries, [rise(2026, 3, 10)], DateTime(2026, 3, 2));
 
       expect(
-        e.higherMeasurements.map((h) => h.markKind),
+        e.candidateMeasurements.map((h) => h.markKind),
         everyElement(MarkKind.arrow),
       );
       expect(firstCircledCandidateDay(e), isNull);
@@ -2183,7 +2295,7 @@ void main() {
         DateTime(2026, 3, 2),
       );
 
-      expect(e.higherMeasurements, isEmpty);
+      expect(e.candidateMeasurements, isEmpty);
       expect(firstCircledCandidateDay(e), isNull);
     });
   });

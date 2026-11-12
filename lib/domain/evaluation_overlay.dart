@@ -2,26 +2,27 @@
 // per-day artifacts the cycle chart AND the PDF export draw from — the
 // candidate circles/arrows and the 1–6 numbering and the baseline segment
 // from evaluateCycles (lib/domain/evaluation.dart), the solid peak dots and
-// the SUZ bars straight from the MARKS STREAM, and the ignored-day indexes
-// of the temperature-ignore marks. Nothing is persisted: a render-time
-// mapping of already-computed artifacts onto a day-index space, with no
-// interpretation of its own.
+// the „Sicher unfruchtbare Zeit“ bars straight from the MARKS STREAM, and
+// the ignored-day indexes of the temperature-ignore marks. Nothing is
+// persisted: a render-time mapping of already-computed artifacts onto a
+// day-index space, with no interpretation of its own.
 //
-// The USER places the mucus peak, the first higher measurement and the SUZ
-// start (sicher unfruchtbare Zeit, from a morning or from an evening).
-// Derived at render time: the rings around the circled higher measurements
-// (candidates strictly AFTER the mucus peak day), the arrow-up glyph for
-// the arrow-marked candidates (candidate day at or before the peak day, or
-// the peak unset — R4, decided PER CANDIDATE by the domain), the 1–6
-// numbering under the six low days, the baseline SEGMENT (R10: from the
-// left edge of low #6's day column to half a day past the last marked
+// The USER places the mucus peak, the first higher measurement and the
+// start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
+// evening). Derived at render time: the rings around the circled higher
+// measurements (candidates strictly AFTER the mucus peak day), the arrow-up
+// glyph for the arrow-marked candidates (candidate day at or before the
+// peak day, or the peak unset — „Höhere Messung“ vs „Pfeilmessung“,
+// decided PER CANDIDATE by the domain), the 1–6 numbering under the six low
+// days, the baseline SEGMENT (app convention "baseline line extent": from
+// the left edge of low #6's day column to half a day past the last marked
 // candidate's column, from the domain's baselineSpan; a cycle with no
 // marked candidate draws no segment) and the solid peak dot in its own
-// in-plot row above the mucus letters row (R6 — the peak never touches
-// the temperature curve; EVERY placed
-// peak renders, driven from the marks stream so peaks render even when
-// no evaluation exists). The SUZ renders
-// ONLY user-placed marks (a vertical bar hanging down from the temperature
+// in-plot row above the mucus letters row („Höhepunkt“, app convention
+// "peak marker" — the peak never touches the temperature curve; EVERY
+// placed peak renders, driven from the marks stream so peaks render even
+// when no evaluation exists). The „Sicher unfruchtbare Zeit“ renders ONLY
+// user-placed marks (a vertical bar hanging down from the temperature
 // chart's top border plus a right-pointing arrow just below it); the
 // computed suzBegins drives the sheet's suggestion instead — clean
 // compute-only/manual separation.
@@ -33,21 +34,22 @@
 //   The peak dot renders on every in-range day straight from the marks
 //   stream, entry or not — it centers in its day column, so the missing
 //   cell content of an entry-less day is no obstacle.
-//   TODO(user-review): Days after the SUZ trigger or after a
-//   connectedness break render as ordinary temperature dots (the domain
-//   lists exactly the marked candidates; there is no automatic
-//   continuation — the user re-marks the rise, R2). Candidates beyond
-//   their kind's four-cap STAY in the sequence (R4) and render as the
+//   TODO(user-review): Days after the „Sicher unfruchtbare Zeit“ trigger
+//   or after a connectedness break render as ordinary temperature dots
+//   (the domain lists exactly the marked candidates; there is no automatic
+//   continuation — the user re-marks the rise, app convention "gap
+//   tolerance"). Candidates beyond their kind's four-cap STAY in the
+//   sequence (app convention "per-kind cap") and render as the
 //   ordinary circle/arrow mark, just without a number — the curve never
 //   paints candidate ordinals; the day panel's circle-numbering line is
 //   the only ordinal surface (circles-only, see cycle_mark_sheet.dart).
-//   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
-//   from the temperature chart's top border by a fixed °C drop and the
-//   arrow anchors just below that border — is an owner-eyeball placement,
-//   not a settled rule (the constants live beside the chart's SUZ bar
-//   code in cycle.dart; the old baseline anchor is retired). A
-//   temperature dot near the scale top can visually meet the top arrow —
-//   accepted, no avoidance logic.
+//   TODO(user-review): The „Sicher unfruchtbare Zeit“ glyph's top
+//   anchoring — the bar hangs down from the temperature chart's top border
+//   by a fixed °C drop and the arrow anchors just below that border — is
+//   an owner-eyeball placement, not a settled rule (the constants live
+//   beside the chart's „Sicher unfruchtbare Zeit“ bar code in cycle.dart;
+//   the old baseline anchor is retired). A temperature dot near the scale
+//   top can visually meet the top arrow — accepted, no avoidance logic.
 //   (The glyph's SIZE is chosen: shaft 8 px, head 7 x 11 px — see the
 //   paintSuzArrowGlyph painter in lib/ui/cycle_marks.dart; the original
 //   5 px shaft / 4 px head / Size(9, 8) footprint rendered too small next
@@ -66,10 +68,11 @@ import 'evaluation.dart';
 import 'marks.dart';
 
 /// One drawn baseline segment, mapped onto the day-index space of the
-/// overlay that carries it (R10). The drawing layer puts it from the LEFT
-/// EDGE of [startIndex]'s day column to HALF A DAY past [endIndex]'s
-/// column, clamped to the recorded range; the extent itself comes straight
-/// from the domain's [BaselineSpan] (no-candidate cycles carry no segment).
+/// overlay that carries it (app convention "baseline line extent"). The
+/// drawing layer puts it from the LEFT EDGE of [startIndex]'s day column to
+/// HALF A DAY past [endIndex]'s column, clamped to the recorded range; the
+/// extent itself comes straight from the domain's [BaselineSpan]
+/// (no-candidate cycles carry no segment).
 final class BaselineSegment {
   const BaselineSegment({
     required this.startIndex,
@@ -89,14 +92,15 @@ final class BaselineSegment {
   final double value;
 }
 
-/// One user-placed SUZ mark, mapped onto the day-index space of the
-/// overlay that carries it. The drawing layers place a VERTICAL bar
-/// hanging down from the temperature chart's top border (x = column START
-/// `dayIndex − 0.5` for `suzMorning`, column MIDDLE `dayIndex` for
-/// `suzEvening`) plus a right-pointing arrow whose base starts at the bar,
-/// just below that border. Only the x anchoring and the morning/evening
-/// VARIANT live here — the vertical placement stays the chart's
-/// top-anchored constants (see the SUZ bar code in cycle.dart).
+/// One user-placed „Sicher unfruchtbare Zeit“ mark, mapped onto the
+/// day-index space of the overlay that carries it. The drawing layers place
+/// a VERTICAL bar hanging down from the temperature chart's top border
+/// (x = column START `dayIndex − 0.5` for `suzMorning`, column MIDDLE
+/// `dayIndex` for `suzEvening`) plus a right-pointing arrow whose base
+/// starts at the bar, just below that border. Only the x anchoring and the
+/// morning/evening VARIANT live here — the vertical placement stays the
+/// chart's top-anchored constants (see the „Sicher unfruchtbare Zeit“ bar
+/// code in cycle.dart).
 final class SuzOverlayMark {
   const SuzOverlayMark({required this.dayIndex, required this.morning});
 
@@ -128,10 +132,10 @@ final class EvaluationOverlay {
     this.suzMarks = const [],
   });
 
-  /// Day indexes carrying a mucus-peak mark. R6: the peak renders as a
-  /// solid dot in its own in-plot row above the mucus letters row — the
-  /// curve never rings the peak day (the curve's rings wrap only circled
-  /// candidates).
+  /// Day indexes carrying a mucus-peak mark. „Höhepunkt“ (app convention
+  /// "peak marker"): the peak renders as a solid dot in its own in-plot row
+  /// above the mucus letters row — the curve never rings the peak day (the
+  /// curve's rings wrap only circled candidates).
   /// Driven from the MARKS STREAM (every placed peak), not from the
   /// evaluation's single anchored peak, so multiple peaks (delayed
   /// ovulation) all render — even when no evaluation exists (no rise
@@ -141,12 +145,14 @@ final class EvaluationOverlay {
   final Set<int> arrowIndexes;
   final Map<int, int> numbersByIndex;
 
-  /// The baseline segments (R10), one per evaluated cycle with a marked
-  /// candidate; a cycle without candidates has none.
+  /// The baseline segments (app convention "baseline line extent"), one per
+  /// evaluated cycle with a marked candidate; a cycle without candidates
+  /// has none.
   final List<BaselineSegment> baselineSegments;
 
-  /// The user-placed SUZ marks (suzMorning/suzEvening), one overlay entry
-  /// per mark inside an evaluated cycle. ONLY user-placed SUZ marks are
+  /// The user-placed „Sicher unfruchtbare Zeit“ marks
+  /// (suzMorning/suzEvening), one overlay entry per mark inside an
+  /// evaluated cycle. ONLY user-placed „Sicher unfruchtbare Zeit“ marks are
   /// listed — the computed suzBegins drives the sheet's suggestion
   /// and never renders here.
   final List<SuzOverlayMark> suzMarks;
@@ -185,10 +191,10 @@ EvaluationOverlay buildEvaluationOverlay({
 
   for (var e = 0; e < evaluations.length; e++) {
     final evaluation = evaluations[e];
-    // The SUZ marks belong to the cycle whose attribution window contains
-    // them (isDayInCycleWindow — the shared window helper above). Their
-    // vertical placement is the chart's top anchoring, so the evaluation
-    // only decides WHICH marks render.
+    // The „Sicher unfruchtbare Zeit“ marks belong to the cycle whose
+    // attribution window contains them (isDayInCycleWindow — the shared
+    // window helper above). Their vertical placement is the chart's top
+    // anchoring, so the evaluation only decides WHICH marks render.
     for (final mark in marks) {
       final isSuz =
           mark.type == CycleMarkTypes.suzEvening ||
@@ -210,27 +216,28 @@ EvaluationOverlay buildEvaluationOverlay({
       final i = indexFor(low.date);
       if (i != null) numbers[i] = low.number;
     }
-    for (final higher in evaluation.higherMeasurements) {
-      final i = indexFor(higher.date);
+    for (final candidate in evaluation.candidateMeasurements) {
+      final i = indexFor(candidate.date);
       if (i == null) continue;
-      // The mark kind is decided PER CANDIDATE by the domain (R4: arrow
-      // at or before the peak day or with the peak unset, circle strictly
-      // after it) — the draw layers carry no decision logic of their own
-      // and map the kind onto the matching glyph. Beyond-cap candidates
-      // carry a null ordinal but stay in the sequence: they render as the
-      // same mark, just unnumbered (the curve paints no candidate
-      // ordinals).
-      switch (higher.markKind) {
+      // The mark kind is decided PER CANDIDATE by the domain („Höhere
+      // Messung“ vs „Pfeilmessung“: arrow at or before the peak day or
+      // with the peak unset, circle strictly after it) — the draw layers
+      // carry no decision logic of their own and map the kind onto the
+      // matching glyph. Beyond-cap candidates carry a null ordinal but
+      // stay in the sequence: they render as the same mark, just
+      // unnumbered (the curve paints no candidate ordinals).
+      switch (candidate.markKind) {
         case MarkKind.circle:
           circled.add(i);
         case MarkKind.arrow:
           arrows.add(i);
       }
     }
-    // R10: the baseline SEGMENT extent comes straight from the domain
-    // (start = low #6, end = the last marked candidate, defensively
-    // clamped there; null when the cycle has no marked candidate) — the
-    // overlay only maps the span's days onto the day-index space.
+    // App convention "baseline line extent": the baseline SEGMENT extent
+    // comes straight from the domain (start = low #6, end = the last marked
+    // candidate, defensively clamped there; null when the cycle has no
+    // marked candidate) — the overlay only maps the span's days onto the
+    // day-index space.
     final span = evaluation.baselineSpan;
     final baseline = evaluation.baseline;
     if (span != null && baseline != null) {

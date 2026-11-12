@@ -220,7 +220,7 @@
         "type": "String"
       }
     },
-    "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (R7); der Wert ist bereits im Gebietsschema formatiert."
+    "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (App-Konvention \"baseline difference\"); der Wert ist bereits im Gebietsschema formatiert."
   },
   "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze die erste höhere Messung bei der nächsten höheren Messung neu.",
   "cycleSheetRiseConsistencyBelow": "{value} °C am markierten Tag liegt nicht über der Basislinie {baseline} °C.",
@@ -230,6 +230,9 @@
   "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
   "cycleSheetSuzSuggestionEvening": "Vorschlag: sicher unfruchtbare Zeit beginnt heute Abend",
   "cycleSheetSuzSuggestionMorning": "Vorschlag: sicher unfruchtbare Zeit beginnt heute früh",
+  "@cycleSheetSuzSuggestionMorning": {
+    "description": "Vorschlag zum „Ersten Sonderfall“ (vierte höhere Messung) am berechneten Auslösetag. Die vierte höhere Messung ist eine Aufwachtemperatur; der daraus folgende Beginn der sicher unfruchtbaren Zeit liegt am Morgen dieses Tages, siehe docs/NER/rules.md."
+  },
   "cycleLegendSex": "Geschlechtsverkehr (X je Zeitpunkt)",
   "cycleLegendDisturbance": "Messstörung (sp Spät ins Bett, a Nachts öfter aufstehen, alk Alkohol, kr Krank)",
   "cycleLegendNote": "Notiz (Tagebuchtext, am Tag senkrecht dargestellt)",

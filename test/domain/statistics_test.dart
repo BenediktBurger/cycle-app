@@ -704,9 +704,9 @@ void main() {
       expect(earliest.any, 8);
       expect(earliest.afterMucusPeak, 8);
 
-      // R2 gap-stopped evaluation: no candidate after the peak exists —
-      // the real variant qualifies nowhere, the "any" variant keeps the
-      // marked rise day.
+      // App convention "gap tolerance" gap-stopped evaluation: no candidate
+      // after the peak exists — the real variant qualifies nowhere, the
+      // "any" variant keeps the marked rise day.
       final stopped = evaluateCycles(
         [
           for (var day = 1; day <= 4; day++) d(2026, 3, day, bbtC: 36.4),

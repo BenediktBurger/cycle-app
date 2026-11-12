@@ -505,8 +505,8 @@ String _$dailyEntriesHash() => r'2a04be3ebc3e8f0cbed01df2f828cbeb4945e58f';
 /// side of the evaluation feature (Mode M, the counterpart to
 /// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
 /// consumers recompute the derived evaluation (baseline, circled higher
-/// measurements, SUZ) from it at render time — never from a persisted copy,
-/// per ADR-0001.
+/// measurements, „Sicher unfruchtbare Zeit“) from it at render time —
+/// never from a persisted copy, per ADR-0001.
 
 @ProviderFor(marks)
 final marksProvider = MarksProvider._();
@@ -515,8 +515,8 @@ final marksProvider = MarksProvider._();
 /// side of the evaluation feature (Mode M, the counterpart to
 /// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
 /// consumers recompute the derived evaluation (baseline, circled higher
-/// measurements, SUZ) from it at render time — never from a persisted copy,
-/// per ADR-0001.
+/// measurements, „Sicher unfruchtbare Zeit“) from it at render time —
+/// never from a persisted copy, per ADR-0001.
 
 final class MarksProvider
     extends
@@ -530,8 +530,8 @@ final class MarksProvider
   /// side of the evaluation feature (Mode M, the counterpart to
   /// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
   /// consumers recompute the derived evaluation (baseline, circled higher
-  /// measurements, SUZ) from it at render time — never from a persisted copy,
-  /// per ADR-0001.
+  /// measurements, „Sicher unfruchtbare Zeit“) from it at render time —
+  /// never from a persisted copy, per ADR-0001.
   MarksProvider._()
     : super(
         from: null,

@@ -1,31 +1,31 @@
 // Chart painters for the computed evaluation marks (Mode M, ADR-0001).
 //
-// The USER places the mucus peak, the first higher measurement and the SUZ
-// start (sicher unfruchtbare Zeit, from a morning or from an evening).
-// The DERIVATION of what the chart paints lives in
+// The USER places the mucus peak, the first higher measurement and the
+// start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
+// evening). The DERIVATION of what the chart paints lives in
 // lib/domain/evaluation_overlay.dart — shared with the PDF export so both
 // draw layers can never drift — and arrives here as an [EvaluationOverlay];
 // this file contains the GLYPHS: the dot painters (rings around the
-// circled higher measurements — candidates strictly AFTER the mucus peak
-// day, R4 — and the arrow-up glyph for the arrow-marked candidates), the
-// dot-painter selection per day ([dotPainterForDay]) and the SUZ arrow
-// glyphs. The derivation semantics below stay true of what these painters
-// receive: the rings wrap circled candidates (R4, decided PER CANDIDATE by
-// the domain), the 1–6 numbers of the six low days feed the in-plot
-// bottom-anchored row via the shared per-day placement map
-// (chart_marks.dart), the baseline
-// SEGMENT (R10: from the left edge of low #6's day column to half a day
-// past the last marked candidate's column, mapped by the overlay from the
+// circled „Höhere Messung“ — candidates strictly AFTER the mucus peak
+// day, app convention "candidate walk" — and the arrow-up glyph for the
+// „Pfeilmessung“ candidates), the dot-painter selection per day
+// ([dotPainterForDay]) and the „Sicher unfruchtbare Zeit“ arrow glyphs.
+// The derivation semantics below stay true of what these painters receive:
+// the rings wrap circled candidates („Höhere Messung“ vs „Pfeilmessung“,
+// decided PER CANDIDATE by the domain), the 1–6 numbers of the six low days
+// feed the in-plot bottom-anchored row via the shared per-day placement map
+// (chart_marks.dart), the baseline SEGMENT (app convention "baseline line
+// extent": from the left edge of low #6's day column to half a day past
+// the last marked candidate's column, mapped by the overlay from the
 // domain's baselineSpan; a cycle with no marked candidate draws no
 // segment) and the solid peak dot in its own in-plot row above the
-// mucus letters row (R6 — the peak never touches the temperature curve;
-// the dot hangs on the peak mark, not on a recorded entry, so every
-// placed peak renders straight from the marks stream, entry or not).
-// The SUZ renders ONLY user-placed marks (a vertical
-// bar hanging down from the temperature chart's top border plus a
-// right-pointing arrow
-// just below it); the computed
-// suzBegins drives the sheet's suggestion instead — clean
+// mucus letters row („Höhepunkt“, app convention "peak marker" — the peak
+// never touches the temperature curve; the dot hangs on the peak mark, not
+// on a recorded entry, so every placed peak renders straight from the marks
+// stream, entry or not). The „Sicher unfruchtbare Zeit“ renders ONLY
+// user-placed marks (a vertical bar hanging down from the temperature
+// chart's top border plus a right-pointing arrow just below it); the
+// computed suzBegins drives the sheet's suggestion instead — clean
 // compute-only/manual separation. Rendered across fl_chart's dot painters +
 // line bars, with the glyph shapes painted by hand where fl_chart has no
 // facility (ADR-0004 anticipates this custom-paint fallback — used here
@@ -36,22 +36,24 @@
 // the Mode-M context; the posture is Accepted — the per-item flags below
 // are separate, still-open rendering-detail questions):
 //
-//   TODO(user-review): Days after the SUZ trigger or after a
-//   connectedness break render as ordinary temperature dots (the domain
-//   lists exactly the marked candidates; there is no automatic
-//   continuation — the user re-marks the rise, R2). Candidates beyond
-//   their kind's four-cap STAY in the sequence (R4) and render as the
+//   TODO(user-review): Days after the „Sicher unfruchtbare Zeit“ trigger
+//   or after a connectedness break render as ordinary temperature dots (the
+//   domain lists exactly the marked candidates; there is no automatic
+//   continuation — the user re-marks the rise, app convention "gap
+//   tolerance"). Candidates beyond their kind's four-cap STAY in the
+//   sequence (app convention "per-kind cap") and render as the
 //   ordinary circle/arrow mark, just without a number — the curve never
 //   paints candidate ordinals; the day panel's circle-numbering line is
 //   the only ordinal surface (circles-only, see cycle_mark_sheet.dart).
-//   TODO(user-review): The SUZ glyph's top anchoring — the bar hangs down
-//   from the temperature chart's top border by suzBarHangSpanDegrees of
-//   the scale and the arrow anchors suzArrowTopInsetDegrees just below
-//   that border — is an owner-eyeball placement, not a settled rule (the
-//   constants live beside the SUZ glyph section below, shared with the
-//   PDF export's mirroring renderer in lib/pdf/cycle_pdf.dart). A
-//   temperature dot near the scale top can visually meet the top arrow —
-//   accepted, no avoidance logic.
+//   TODO(user-review): The „Sicher unfruchtbare Zeit“ glyph's top
+//   anchoring — the bar hangs down from the temperature chart's top border
+//   by suzBarHangSpanDegrees of the scale and the arrow anchors
+//   suzArrowTopInsetDegrees just below that border — is an owner-eyeball
+//   placement, not a settled rule (the constants live beside the „Sicher
+//   unfruchtbare Zeit“ glyph section below, shared with the PDF export's
+//   mirroring renderer in lib/pdf/cycle_pdf.dart). A temperature dot near
+//   the scale top can visually meet the top arrow — accepted, no avoidance
+//   logic.
 //   (The glyph's SIZE is chosen: shaft 8 px, head 7 x 11 px — see
 //   paintSuzArrowGlyph; the
 //   original 5 px shaft / 4 px head / Size(9, 8) footprint rendered too
@@ -72,9 +74,10 @@ export 'suz_glyph.dart' show suzArrowTopInsetDegrees, suzBarHangSpanDegrees;
 // --- dot painters -----------------------------------------------------------
 
 /// Paints the temperature dot plus a RING around it, with a small gap so
-/// the value stays readable: the CIRCLED higher measurements — every
-/// candidate strictly after the mucus peak day (R4, decided per
-/// candidate by the domain; the peak day itself never gets a ring, R6).
+/// the value stays readable: the CIRCLED „Höhere Messung“ — every
+/// candidate strictly after the mucus peak day (decided per candidate by
+/// the domain; the peak day itself never gets a ring, „Höhepunkt“ / app
+/// convention "peak marker").
 /// Candidates beyond the circle kind's four-cap stay circled too, just
 /// unnumbered (the curve paints no ordinals).
 final class RingDotPainter extends FlDotCirclePainter {
@@ -111,10 +114,10 @@ final class RingDotPainter extends FlDotCirclePainter {
 
 /// Paints the temperature dot plus an ARROW-UP glyph BELOW it: a marked
 /// candidate whose day is at or before the mucus peak day, or one of a
-/// cycle with the peak unset (R4, decided per candidate by the domain) —
-/// higher, but explicitly NOT circled per the rule that only candidates
-/// after the peak get circled. Beyond the arrow kind's four-cap the
-/// candidate stays arrowed too, just unnumbered.
+/// cycle with the peak unset („Pfeilmessung“, decided per candidate by the
+/// domain) — higher, but explicitly NOT circled per the rule that only
+/// candidates after the peak get circled. Beyond the arrow kind's four-cap
+/// the candidate stays arrowed too, just unnumbered.
 ///
 /// The glyph paints below the dot on purpose: the paper sheet writes the
 /// upward arrow UNDER the column's dot. This is a position change, not an
@@ -177,7 +180,8 @@ void paintArrowUpGlyph(Canvas canvas, Offset tip, {required Color color}) {
 /// Chooses the dot painter for one chart day: plain dot, dot with a ring
 /// (circled higher measurement) or dot with an arrow-up glyph (arrowed
 /// candidate). The mucus peak never reaches the curve — it renders as a
-/// solid dot in its own in-plot row (R6). [dayIndex] and [overlay]
+/// solid dot in its own in-plot row („Höhepunkt“, app convention "peak
+/// marker"). [dayIndex] and [overlay]
 /// indexes share one space.
 FlDotPainter dotPainterForDay({
   required int dayIndex,
@@ -194,14 +198,14 @@ FlDotPainter dotPainterForDay({
   return FlDotCirclePainter(color: dotColor);
 }
 
-// --- SUZ mark glyph ----------------------------------------------------------
+// --- „Sicher unfruchtbare Zeit“ mark glyph ----------------------------------
 /// Paints a RIGHT-POINTING arrow whose base starts at [base]: an 8 px
 /// horizontal shaft followed by a triangular head (7 px long, 11 px high),
-/// used as the companion glyph of the SUZ vertical bar (the bar marks the
-/// SUZ start's column, the arrow points toward the fertile-barren boundary
-/// it opens). The size matches the paper sheet's clearly readable SUZ
-/// arrow — enlarged from the original 5 px shaft / 4 px head, which
-/// rendered too small next to the day columns.
+/// used as the companion glyph of the „Sicher unfruchtbare Zeit“ vertical
+/// bar (the bar marks the start's column, the arrow points toward the
+/// fertile-barren boundary it opens). The size matches the paper sheet's
+/// clearly readable arrow — enlarged from the original 5 px shaft / 4 px
+/// head, which rendered too small next to the day columns.
 /// TODO(user-review): the exact geometry (shaft length, head size) stays
 /// an owner-eyeball rendering detail, not a settled rule.
 void paintSuzArrowGlyph(Canvas canvas, Offset base, {required Color color}) {
@@ -215,14 +219,14 @@ void paintSuzArrowGlyph(Canvas canvas, Offset base, {required Color color}) {
   canvas.drawPath(head, paint);
 }
 
-/// The SUZ arrow glyph as a fl_chart dot painter: fl_chart's painters paint
-/// at spots, and the SUZ arrow's anchor is exactly one spot — the bar's x
-/// (column start for suzMorning, column middle for suzEvening) at the
-/// chart's top-anchored arrow y (just below the temperature chart's top
-/// border, inside the hung band — see the SUZ bar code in cycle.dart).
-/// Unlike the other dot painters this one
-/// paints NO temperature dot underneath: the SUZ mark is its own artifact,
-/// not a temperature rendering.
+/// The „Sicher unfruchtbare Zeit“ arrow glyph as a fl_chart dot painter:
+/// fl_chart's painters paint at spots, and the arrow's anchor is exactly
+/// one spot — the bar's x (column start for suzMorning, column middle for
+/// suzEvening) at the chart's top-anchored arrow y (just below the
+/// temperature chart's top border, inside the hung band — see the bar code
+/// in cycle.dart). Unlike the other dot painters this one paints NO
+/// temperature dot underneath: the mark is its own artifact, not a
+/// temperature rendering.
 final class SuzArrowDotPainter extends FlDotPainter {
   const SuzArrowDotPainter({required this.color});
 
@@ -298,14 +302,14 @@ class _ArrowUpGlyphPainter extends CustomPainter {
       color != oldDelegate.color;
 }
 
-/// The SUZ glyph as a standalone widget for the legend: the same
-/// right-pointing arrow the chart's [SuzArrowDotPainter] paints, plus the
-/// vertical bar it hangs from. Placement-INDEPENDENT by design: on the
-/// chart the bar hangs down from the temperature chart's top border and
-/// the arrow sits just below it, while the legend sample draws the bar
-/// across its sample box at full height (the legend shows the glyph's
-/// SHAPE, not the chart's vertical anchoring — the sample stays valid
-/// through the shared arrow painter).
+/// The „Sicher unfruchtbare Zeit“ glyph as a standalone widget for the
+/// legend: the same right-pointing arrow the chart's [SuzArrowDotPainter]
+/// paints, plus the vertical bar it hangs from. Placement-INDEPENDENT by
+/// design: on the chart the bar hangs down from the temperature chart's top
+/// border and the arrow sits just below it, while the legend sample draws
+/// the bar across its sample box at full height (the legend shows the
+/// glyph's SHAPE, not the chart's vertical anchoring — the sample stays
+/// valid through the shared arrow painter).
 final class SuzArrowGlyph extends StatelessWidget {
   const SuzArrowGlyph({super.key, required this.color});
 
@@ -333,7 +337,7 @@ class _SuzArrowGlyphPainter extends CustomPainter {
     final paint = Paint()..color = color;
     // The vertical bar: full sample height, at the sample's left edge —
     // a shape sample of the chart's bar, which hangs down from the chart's
-    // top border at the SUZ day's column.
+    // top border at the „Sicher unfruchtbare Zeit“ day's column.
     canvas.drawRect(Rect.fromLTWH(0.5, 0, 2, size.height), paint);
     // The arrow, base at the bar (same enlarged glyph shape as the chart's
     // painter — scaled together with it).

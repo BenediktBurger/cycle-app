@@ -4,7 +4,6 @@
 import 'package:cycle_app/domain/cycle_grouping.dart';
 import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/disturbances.dart';
-import 'package:cycle_app/domain/evaluation.dart';
 import 'package:cycle_app/domain/evaluation_overlay.dart';
 import 'package:cycle_app/domain/marks.dart';
 import 'package:cycle_app/domain/models.dart';
@@ -175,7 +174,6 @@ void main() {
       range: _range,
       windowFirstIndex: 0,
       windowDayCount: 13,
-      computedSuz: (suzBegins: null, suzRule: null),
     );
 
     test('one dot per measured IN-RANGE day, raw value kept', () {
@@ -237,12 +235,12 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: 13,
-        computedSuz: (suzBegins: day(11), suzRule: SuzRule.d),
       );
 
       test('the circled candidates carry rings on their dots', () {
         // The domain lists EVERY above-baseline measured day from the marked
-        // rise onward (R1) — the marked rise (day 10) plus the unmarked
+        // rise onward („Höhere Messung“, app convention "candidate walk") —
+        // the marked rise (day 10) plus the unmarked
         // days 11/12, all strictly after the peak ⇒ circles. Day 12's 38.4
         // is OUT of the display range: like the chart (whose dot painter
         // never runs for out-of-range spots), the PDF draws NOTHING there
@@ -298,7 +296,6 @@ void main() {
           range: _range,
           windowFirstIndex: 0,
           windowDayCount: 7,
-          computedSuz: (suzBegins: null, suzRule: null),
         );
         expect(drawing.arrows, hasLength(1));
         final arrow = drawing.arrows.single;
@@ -318,7 +315,9 @@ void main() {
         expect(
           drawing.rings,
           isEmpty,
-          reason: 'rings need the mucus-peak-backed R1 rule — none here',
+          reason:
+              'rings need the mucus-peak-backed per-candidate decision — '
+              'none here',
         );
       });
 
@@ -337,7 +336,8 @@ void main() {
         expect(drawing.peakIndexes, {9});
       });
 
-      test('the R10 baseline runs from the left edge of the first numbered low '
+      test('the baseline segment runs from the left edge of the first '
+          'numbered low '
           'to half a column past the last marked candidate', () {
         final piece = drawing.baseline.single;
         expect(piece.startX, 4.0);
@@ -346,7 +346,8 @@ void main() {
           closeTo(13.0, 1e-9),
           reason:
               'the last candidate is day 12 (the auto-candidacy above '
-              'the rise, R1) — the piece runs half a column past it',
+              'the rise, app convention "candidate walk") — the piece runs '
+              'half a column past it',
         );
         expect(
           piece.value,
@@ -355,46 +356,16 @@ void main() {
         );
       });
 
-      test(
-        'user SUZ bars: morning → column start, evening → column middle',
-        () {
-          expect(
-            drawing.suzBars.map((b) => b.x).toSet(),
-            {3.0, 5.5},
-            reason:
-                'day 3\'s morning bar rides its column left edge (x = 3), '
-                'day 5\'s evening bar its middle (x = 5.5)',
-          );
-          expect(drawing.suzBars.where((b) => b.morning).single.x, 3.0);
-        },
-      );
-
-      test('the computed SUZ renders as its own artifact: a thin line at the '
-          'suzBegins day with the rule letter', () {
-        final line = drawing.suzLine!;
+      test('user „Sicher unfruchtbare Zeit“ bars: morning → column start, '
+          'evening → column middle', () {
         expect(
-          line.x,
-          closeTo(10.5, 1e-9),
-          reason: 'the line rides the suzBegins column\'s middle',
+          drawing.suzBars.map((b) => b.x).toSet(),
+          {3.0, 5.5},
+          reason:
+              'day 3\'s morning bar rides its column left edge (x = 3), '
+              'day 5\'s evening bar its middle (x = 5.5)',
         );
-        expect(line.ruleLetter, 'D');
-      });
-
-      test('without a computed SUZ there is no line artifact', () {
-        final drawing = pdfCurveDrawing(
-          cycle: cycle,
-          overlay: overlay,
-          range: _range,
-          windowFirstIndex: 0,
-          windowDayCount: 13,
-          computedSuz: (suzBegins: null, suzRule: null),
-        );
-        expect(drawing.suzLine, isNull);
-        expect(
-          drawing.suzBars,
-          hasLength(2),
-          reason: 'the user-placed marks render regardless',
-        );
+        expect(drawing.suzBars.where((b) => b.morning).single.x, 3.0);
       });
     },
   );
@@ -409,7 +380,6 @@ void main() {
       range: _range,
       windowFirstIndex: 5,
       windowDayCount: 5,
-      computedSuz: (suzBegins: day(11), suzRule: SuzRule.e),
     );
 
     test('only the window\'s tracked days produce dots and pieces', () {
@@ -452,7 +422,6 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: cycleCalendarDays(model.cycles[0].cycle).length,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(
         drawing.peakIndexes,
@@ -489,7 +458,6 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: cycleCalendarDays(model.cycles[0].cycle).length,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(drawing.dots.any((d) => d.index == 0), isTrue);
       expect(drawing.dots.any((d) => d.index == 2), isTrue);
@@ -529,7 +497,6 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: 17,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       // Mar 15 = calendar offset 14 from the cycle start, and the
       // placeholder days occupy their own calendar positions in order.
@@ -541,7 +508,8 @@ void main() {
     // A gapless 45-tracked-day cycle (Mar 1 – Apr 14): the default 40-day
     // column budget splits it into windows [40, 5] — page 1 tracks day
     // indexes 0–39, page 2 the trailing 40–44. A peak mark, a low number
-    // and an evening SUZ mark on cycle index 42 (page 2's third column)
+    // and an evening „Sicher unfruchtbare Zeit“ mark on cycle index 42
+    // (page 2's third column)
     // and a baseline segment spanning indexes 20–44 (it OPENS on page 1
     // and RUNS THROUGH page 2) pin the window-relative mapping the page
     // builder applies to every overlay artifact: subtract firstDayIndex,
@@ -587,7 +555,6 @@ void main() {
         range: _range,
         windowFirstIndex: 40,
         windowDayCount: 5,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(drawing.peakIndexes, {
         2,
@@ -597,7 +564,9 @@ void main() {
       expect(
         drawing.suzBars.map((b) => b.x),
         [2.5],
-        reason: 'the evening SUZ mark rides its window-relative column middle',
+        reason:
+            'the evening „Sicher unfruchtbare Zeit“ mark rides its '
+            'window-relative column middle',
       );
       expect(drawing.rings, isEmpty);
       expect(drawing.arrows, isEmpty);
@@ -610,7 +579,6 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: 40,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       expect(window1.peakIndexes, isEmpty);
       expect(window1.lowNumbers, isEmpty);
@@ -624,7 +592,6 @@ void main() {
         range: _range,
         windowFirstIndex: 40,
         windowDayCount: 5,
-        computedSuz: (suzBegins: null, suzRule: null),
       );
       final piece = drawing.baseline.single;
       expect(
@@ -652,12 +619,6 @@ void main() {
         range: _range,
         windowFirstIndex: 0,
         windowDayCount: 40,
-        // suzBegins at cycle index 42 rides page 2: page 1 must clamp the
-        // line to its own right edge.
-        computedSuz: (
-          suzBegins: base.add(const Duration(days: 42)),
-          suzRule: SuzRule.d,
-        ),
       );
       expect(
         drawing.peakIndexes,
@@ -673,13 +634,6 @@ void main() {
             "the piece clips at the window edge — the segment "
             'continues onto page 2',
       );
-      final line = drawing.suzLine!;
-      expect(
-        line.x,
-        closeTo(40.0, 1e-9),
-        reason: 'the suzBegins line clamps to the same window edge',
-      );
-      expect(line.ruleLetter, 'D');
     });
   });
 

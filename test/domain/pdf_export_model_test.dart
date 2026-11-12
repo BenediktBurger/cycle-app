@@ -30,9 +30,10 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 /// carries the full observation surface the PDF's per-cycle overlay maps
 /// from: mucus (with a quality on the S day), a measurement time, a raw
 /// disturbance flag, a temperature-ignore mark, the mucus-peak and
-/// first-higher marks, and one SUZ mark of each variant (the cycle's plain
-/// record rows the export renders verbatim; cycles 2 and 3 stay almost
-/// plain so a mark-free cycle's empty overlay is asserted too).
+/// first-higher marks, and one „Sicher unfruchtbare Zeit“ mark of each
+/// variant (the cycle's plain record rows the export renders verbatim;
+/// cycles 2 and 3 stay almost plain so a mark-free cycle's empty overlay
+/// is asserted too).
 List<DailyEntry> modelEntries() => [
   DailyEntry(date: d(2, 20), bbtC: 36.5),
   DailyEntry(date: d(3, 1), bbtC: 36.4, bleeding: Bleeding.medium),
@@ -83,9 +84,9 @@ List<DailyEntry> modelEntries() => [
   DailyEntry(date: d(4, 26), bbtC: 36.4, bleeding: Bleeding.light),
 ];
 
-/// Cycle 1's analysis marks (peak Mar 12, rise Mar 14), one SUZ mark per
-/// variant inside its window and one temperature-ignore mark; cycles 2 and
-/// 3 stay mark-free.
+/// Cycle 1's analysis marks (peak Mar 12, rise Mar 14), one
+/// „Sicher unfruchtbare Zeit“ mark per variant inside its window and one
+/// temperature-ignore mark; cycles 2 and 3 stay mark-free.
 List<CycleMark> modelMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 12), type: CycleMarkTypes.mucusPeakDay),
@@ -574,9 +575,9 @@ void main() {
     /// first-higher mark on the SAME day (its marked rise is cycle day 1).
     /// Cycle 2 produces no measured circle of its own — a rise inside a
     /// cycle's first six days has its six-low window truncated at the
-    /// cycle's own tracked days (R9), so no baseline and no candidate
-    /// exist there — and its model fact can only come from cycle 1's
-    /// first circle (cycle day 14).
+    /// cycle's own tracked days, so no baseline and no candidate exist
+    /// there — and its model fact can only come from cycle 1's first
+    /// circle (cycle day 14).
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -599,8 +600,9 @@ void main() {
         model.earliestFirstHigherCycleDays[1],
         14,
         reason:
-            'cycle 2 qualifies nowhere on its own (rise on its start day '
-            'beside the peak, no measurable circle candidate, R9) and '
+            'cycle 2 qualifies nowhere on its own: its rise on its start '
+            'day sits beside the peak and its truncated six-low window '
+            'yields no measurable circle candidate, so it '
             "keeps cycle 1's first circle",
       );
     });
@@ -649,8 +651,8 @@ void main() {
   group('the paper-history constants fold into every exported page', () {
     /// Marks variant: cycle 2's rise sits on its own start day, on the
     /// SAME day as its peak (not a measured circle's day — cycle 2
-    /// produces no circle, R9) — same shape as the
-    /// earliest-first-higher group's fixture.
+    /// produces no circle because its six-low window is truncated at its
+    /// start) — same shape as the earliest-first-higher group's fixture.
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -688,8 +690,8 @@ void main() {
     test('the paper earliest first higher min-combines into every page', () {
       // divergentMarks: cycle 2's rise on its own start day, exactly on
       // the SAME day as its peak, with no measurable candidate in cycle
-      // 2 (R9 truncates its six-low window at its start). Paper 10
-      // undercuts the in-app 14 on every page; paper 16 is beaten
+      // 2 (its six-low window is truncated at its start).
+      // Paper 10 undercuts the in-app 14 on every page; paper 16 is beaten
       // everywhere by cycle 1's first circle (cycle day 14) and never
       // inflates a page.
       final paper10 = buildPdfExportModel(
@@ -802,7 +804,7 @@ void main() {
         {13, 14},
         reason:
             'the candidates Mar 14/15 — strictly after the peak → '
-            'circles (R4)',
+            'circles („Höhere Messung“, app convention "candidate walk")',
       );
       expect(first.arrowIndexes, isEmpty);
       expect(
@@ -816,7 +818,8 @@ void main() {
         first.baselineSegments.map((s) => (s.startIndex, s.endIndex, s.value)),
         [(7, 14, 36.3)],
         reason:
-            'R10: from low #6 (Mar 8) to the last marked candidate '
+            'app convention "baseline line extent": from low #6 (Mar 8) to '
+            'the last marked candidate '
             '(Mar 15), through the highest low',
       );
       final suz = first.suzMarks
@@ -943,7 +946,7 @@ void main() {
       final last = model.cycles.last;
       expect(last.firstHigherDay, DateOnly.normalize(d(5, 10)));
       expect(last.baseline, isNull);
-      expect(last.higherMeasurements, isEmpty);
+      expect(last.candidateMeasurements, isEmpty);
       expect(last.numberedLows, isEmpty);
       expect(last.evaluationStopped, isFalse);
     });

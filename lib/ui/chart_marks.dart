@@ -19,8 +19,9 @@
 // TODO(user-review): the row pitches and the alpha below are
 // owner-eyeball rendering details, not settled rules; the top-anchored
 // rows sit between the 0.1 K grid lines at the −0.05 (sexual intercourse),
-// −0.15 (peak dot / SUZ arrow), −0.25 (mucus letters) and −0.35 (M) offsets from the
-// scale max, and the day numbers anchor from the BOTTOM at min + 0.05.
+// −0.15 (peak dot / „Sicher unfruchtbare Zeit“ arrow), −0.25 (mucus
+// letters) and −0.35 (M) offsets from the scale max, and the day numbers
+// anchor from the BOTTOM at min + 0.05.
 import '../domain/mucus.dart';
 import '../domain/models.dart';
 import '../domain/temperature_range.dart';
@@ -37,10 +38,10 @@ const double chartEdgeMarginK = 0.05;
 const double sexRowCenterOffsetK = 0.05;
 
 /// Vertical pitch of the mucus peak dot's center, in °C below the scale
-/// max — shared with the SUZ arrow row (see suz_glyph.dart), so a
-/// same-column peak/arrow co-occurrence collides (accepted). The dot is
-/// ITS OWN row: it hides and shows at this offset, decoupled from the
-/// letters row below it.
+/// max — shared with the „Sicher unfruchtbare Zeit“ arrow row (see
+/// suz_glyph.dart), so a same-column peak/arrow co-occurrence collides
+/// (accepted). The dot is ITS OWN row: it hides and shows at this offset,
+/// decoupled from the letters row below it.
 const double peakDotCenterOffsetK = 0.15;
 
 /// Vertical pitch of the mucus letter row's glyph center, in °C below the

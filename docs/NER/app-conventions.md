@@ -7,8 +7,8 @@ two conflict, the book wins and the app convention is the bug.
 
 German rule names are quoted from [rules.md](rules.md). The acronym in the
 identifiers `SuzRule`, `suzBegins` and `SuzOverlayMark` means the computed
-„sicher unfruchtbare Zeit“; it survives only inside those English technical
-names.
+definitely infertile time „sicher unfruchtbare Zeit“; it survives only inside
+those English technical names.
 
 ## Source discipline
 
@@ -83,20 +83,20 @@ every rule detail of the book has been audited page by page.
 
 ## Implementation map
 
-| Convention                               | Current code                                                                       |
-|------------------------------------------|------------------------------------------------------------------------------------|
-| candidate walk                           | `_evaluateCycle` / `_candidateValue` / `candidateMeasurements`                     |
-| latest-mark anchor                       | `_latestMarkOf`                                                                    |
-| temperature-ignore exclusion             | `excludedDays` / `ignoredDayIndexes`                                               |
-| gap tolerance                            | `gapDays` / `evaluationStopped`                                                    |
-| low-window numbering                     | `NumberedLow.number` / `_LowWindow.numberedLows`                                   |
-| per-kind cap                             | `_marksPerKindCap` / `MarkKind` / `ordinal`                                        |
-| peak marker                              | `EvaluationOverlay.peakIndexes` / `peakDotCenterOffsetK`                           |
-| baseline difference                      | `CandidateMeasurement.differenceK` / `cycleSheetDifferenceInfo`                    |
-| baseline line extent                     | `BaselineSpan` / `baselineSpan` / `BaselineSegment` / `PdfBaselinePiece`           |
-| rise consistency check                   | `riseMarkConsistent`                                                               |
-| computed „sicher unfruchtbare Zeit“ line | `suzBegins` / `PdfSuzLine` / `cycleSheetSuzSuggestion*`                            |
-| statistics earliest first higher         | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay` / `_resolveFirstHigher` |
+| Convention                                  | Current code                                                                         |
+|---------------------------------------------|--------------------------------------------------------------------------------------|
+| candidate walk                              | `_evaluateCycle` / `_candidateValue` / `candidateMeasurements`                       |
+| latest-mark anchor                          | `_latestMarkOf`                                                                      |
+| temperature-ignore exclusion                | `excludedDays` / `ignoredDayIndexes`                                                 |
+| gap tolerance                               | `gapDays` / `evaluationStopped`                                                      |
+| low-window numbering                        | `NumberedLow.number` / `_LowWindow.numberedLows`                                     |
+| per-kind cap                                | `_marksPerKindCap` / `MarkKind` / `ordinal`                                          |
+| peak marker                                 | `EvaluationOverlay.peakIndexes` / `peakDotCenterOffsetK`                             |
+| baseline difference                         | `CandidateMeasurement.differenceK` / `cycleSheetDifferenceInfo`                      |
+| baseline line extent                        | `BaselineSpan` / `baselineSpan` / `BaselineSegment` / `PdfBaselinePiece`             |
+| rise consistency check                      | `riseMarkConsistent`                                                                 |
+| computed „sicher unfruchtbare Zeit“ trigger | `suzBegins` / `cycleSheetSuzSuggestion*`                                             |
+| statistics earliest first higher            | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay` / `_resolveFirstHigher`   |
 
 ## Settled interpretations
 
