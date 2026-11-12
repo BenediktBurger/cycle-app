@@ -217,11 +217,11 @@
   "cycleSheetEditDay": "Edit day",
   "cycleSheetSuzEveningLabel": "SUZ from this evening",
   "@cycleSheetSuzEveningLabel": {
-    "description": "Static label of the SUZ-evening chip (the chip state, not the label, carries set/remove). TODO(user-review): the wording replaces the old set/remove labels that said \"today\" (heute) while the panel opens for an arbitrary selected day — pending the expert review."
+    "description": "Static label of the definitely infertile time evening chip (the chip state, not the label, carries set/remove). TODO(user-review): the wording replaces the old set/remove labels that said \"today\" (heute) while the panel opens for an arbitrary selected day — pending the expert review."
   },
   "cycleSheetSuzMorningLabel": "SUZ from this morning",
   "@cycleSheetSuzMorningLabel": {
-    "description": "Static label of the SUZ-morning chip (the chip state, not the label, carries set/remove). TODO(user-review): see the evening label — the wording is pending the expert review."
+    "description": "Static label of the definitely infertile time morning chip (the chip state, not the label, carries set/remove). TODO(user-review): see the evening label — the wording is pending the expert review."
   },
   "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
   "cycleSheetBaselineInfo": "Baseline: {value}",
@@ -255,7 +255,7 @@
         "type": "String"
       }
     },
-    "description": "The difference of a circled/arrowed higher measurement to the baseline (R7); the value is pre-formatted with the locale's decimal style."
+    "description": "The difference of a circled/arrowed higher measurement to the baseline (app convention \"baseline difference\"); the value is pre-formatted with the locale's decimal style."
   },
   "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
   "cycleSheetRiseConsistencyBelow": "{value} °C on the marked day is not above the baseline {baseline} °C.",
@@ -281,9 +281,12 @@
     },
     "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
   },
-  "cycleLegendSuz": "Sicher unfruchtbare Zeit (SUZ)",
+  "cycleLegendSuz": "Definitely infertile time (SUZ)",
   "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening",
   "cycleSheetSuzSuggestionMorning": "Suggested: the infertile time begins this morning",
+  "@cycleSheetSuzSuggestionMorning": {
+    "description": "Suggestion for the „Erster Sonderfall“ (vierte höhere Messung) on the computed trigger day. The 4th higher measurement is a waking temperature, so the inferred start of the definitely infertile time is that morning; see docs/NER/rules.md."
+  },
   "cycleLegendSex": "Sexual intercourse (X per time of day)",
   "cycleLegendDisturbance": "Disturbed measurement (sp late to bed, a frequent night awakening, alk alcohol, kr illness)",
   "@cycleLegendDisturbance": {

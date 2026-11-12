@@ -88,148 +88,12 @@ error above again, the cause is the sandbox profile, not the tests; verify
 against the log and fall back to `flutter analyze` plus the host-VM smoke
 scripts (§4 of CONTRIBUTING.md) until it is lifted again.
 
-## NER evaluation rules, as implemented (lib/domain/evaluation.dart)
+## NER rules and app conventions
 
-HARD RULE (ADR-0001, Mode M): the user places marks, the app computes, never
-interprets. Everything the evaluation produces is computed only at render
-time — nothing is persisted. The overall Mode-M posture is accepted by owner
-decision; the per-rule `TODO(user-review)` flags are separate open questions.
-
-Rules as implemented (owner-reviewed):
-
-- R1 Candidacy: every measured day STRICTLY ABOVE the baseline is a
-  candidate, regardless of the margin. The 0.2 K margin survives only
-  inside SUZ rule D.
-- R2 Connectedness: the candidate run tolerates at most ONE gap day IN
-  TOTAL, not one per adjacent pair. A gap day is a day with no measured
-  temperature, an excluded (mark-ignored) day, or a day at/below the
-  baseline — all one class. A SECOND such day anywhere in the run stops the
-  automatic evaluation at the next above-baseline day (`evaluationStopped`):
-  no SUZ, nothing further is marked, no automatic re-search — the user
-  re-marks the rise at the next higher measurement. The one budget spans the
-  WHOLE candidate sequence, including the arrow→circle transition — mixed
-  sequences are one sequence — and is not refreshed by a candidate. A
-  trailing gap run with no following candidate does not set
-  `evaluationStopped` (data may still be entered).
-- R3 Candidate region: candidates exist only from the marked rise day
-  onward. The rise anchor is the MOST RECENT `firstHigherMeasurement` mark
-  of the cycle (owner-confirmed: re-marking supersedes — after a broken
-  Hochlage or a delayed second peak the user re-marks the rise; the earlier
-  mark stays stored and, lying before the walk region, renders no
-  candidate). Above-baseline values before the rise are user error or a
-  separately-handled disturbance and never become candidates.
-- R4 Arrow vs circle, PER CANDIDATE: a candidate is an ARROW when the mucus
-  peak is not set at all, or the candidate day is at or before the peak day
-  (the peak day's own above-baseline temperature is an ARROW); every
-  candidate AFTER the peak day is a CIRCLE. The peak anchor is the MOST
-  RECENT marked peak of the cycle ("Höhepunkt = letzter Tag mit der besten
-  Qualität"): multiple peaks arise from delayed ovulation — a peak subsides
-  and a later one appears — so the last marked peak is the ovulation that
-  counts. When a later peak is added, earlier candidates flip from circles
-  back to arrows automatically (compute-only re-evaluation, no mark
-  changes). Arrows and circles are never interleaved. The caps are PER
-  KIND: up to four arrows carry ordinals 1–4, then up to four circles carry
-  ordinals 1–4; candidates beyond their kind's cap stay unnumbered (ordinal
-  null), so a late peak does not swallow the circles that follow it.
-- R5 SUZ rules D and E count CIRCLED measurements only (the cheat sheet
-  speaks of the "umrandete" — circled — higher measurement; arrows never
-  start the SUZ, and circles exist only after the peak day, so an
-  arrow-only sequence never yields an SUZ). D: the 3rd CIRCLE at least
-  0.2 K above the baseline starts the SUZ the EVENING of that day ("gegen
-  Abendessen"). E: when the 3rd circle is below that margin, the 4th CIRCLE
-  — ANY margin — starts the SUZ in the MORNING of that day. Both require
-  R2 connectedness; once a rule fires the sequence is complete.
-- R7 Every marked candidate carries its difference to the baseline
-  (`differenceK`) so the UI can render it without arithmetic.
-- R9 Six-low window and numbering: the six-low window is the SIX PREVIOUS
-  CALENDAR DAYS before the user-marked first higher measurement
-  (rise−1 … rise−6), intersected with the cycle group's tracked days; the
-  baseline is the MAX of the not-marked-excluded MEASURED temperatures
-  within those days (the earliest maximum wins on ties). Any measured,
-  not-marked-excluded temperature in the window counts as a low, regardless
-  of its mucus role — the peak day itself carries a number when it falls
-  into the window. Numbering belongs to the CALENDAR POSITIONS, not a dense
-  index: the measured, not-excluded day at rise−i carries number i
-  (cheat sheet: "zurücknummerieren"); an untracked, unmeasured or
-  excluded window day gets NO number — numbers skip, e.g. "6 5 _ 3 _ 1".
-  A window reaching past the group's first tracked day (rise marked within
-  the first six days of a cycle group) truncates at the group's tracked
-  days — beyond that it must not reach into the previous cycle group; the
-  edge case is consciously not handled further (owner: "should never happen
-  physically").
-- R10 Baseline SEGMENT: the evaluation reports the x-extent the drawn
-  baseline line covers (`baselineSpan`). START: the earliest numbered low
-  day (low #6; see the TODO below for the fewer-than-six case). END: the
-  last marked candidate day (arrow or circle), clamped by the next
-  menstruation start and by the next cycle's six-low window start per
-  R10's min() definition — under the current grouping both clamps cannot
-  bind; they are kept because R10 defines them. The "+ half a day" padding
-  past the end day's column is a rendering concern of the chart. A cycle
-  with NO marked candidate draws no segment (null span).
-
-Owner-confirmed settled interpretations (2026-09-17):
-
-- An unmeasured or EXCLUDED day inside the candidate sequence counts
-  exactly like a day at/below the baseline — a gap day consuming the
-  one-gap R2 allowance. The R2 class list names one and the same gap-day
-  class.
-- The SUZ is declared only from CIRCLED measurements (summary rule 2.5:
-  arrows are "keine höhere Messung im Sinne dieser Auswertung"; rules
-  2.7/2.8 cite the "umrandete höhere Messung").
-- The user is assumed to follow the rules (Mode M), so the user-marked
-  first higher measurement is taken verbatim for the six-low window and
-  the baseline, even when the marked day itself is not above the baseline;
-  the candidate search then starts at the next strictly-above measurement
-  from the mark onward (R3).
-- Multiple peak / first-higher marks inside one cycle are EXPECTED, not a
-  user-data problem; the MOST RECENT mark of each type anchors the
-  evaluation and earlier duplicates stay stored until removed through the
-  sheet's mark toggles.
-
-Open questions (`TODO(user-review)` in the file):
-
-- R10 with fewer than six numbered lows: the segment START falls on the
-  earliest AVAILABLE low day instead of a low #6 that does not exist.
-  R10 defines only the six-low case; the fallback is this implementation's
-  choice.
-- R10 end-of-segment handling: the min() clamps are defensive — under the
-  current cycle grouping they can never bind. If a future grouping change
-  makes them bind, revisit.
-
-## Statistics' "earliest first higher" variants (lib/domain/statistics.dart)
-
-`earliestFirstHigherCycleDay` folds two variants over the mark-driven
-cycles, both reported as cycle-day numbers (the cycle's marked start day is
-day 1):
-
-- `any`: the minimum cycle-day number of the marked first-higher rise,
-  wherever it sits relative to the mucus peak. Mark-position only.
-- `afterMucusPeak` (the "umrandete Messung"): the minimum cycle-day number
-  of the cycles' FIRST CIRCLED candidate — `firstCircledCandidateDay()`
-  (evaluation.dart, rule R4). The same function behind the chart's and
-  PDF's rings and the fact rows' first-higher resolution (`marked day`
-  fallback), so rendering and statistics refer to one domain definition.
-  The PDF per-cycle header line shares the helper over its truncated
-  record prefixes.
-
-The ruling behind the real variant: the NER analysis rules are the
-official ones; the first circled line is a consequence of them, and that
-marked-and-measured day is the first higher measurement the statistics
-analyze. A mark-only reading ("the marked rise, else peak + 1, without a
-temperature") differs from it exactly where the measurement is absent:
-
-| Situation | mark-only reading | first circle (R4, implemented) |
-|---|---|---|
-| rise strictly after peak, measured above the baseline | rise day | first circle = rise day |
-| rise at/before peak, peak + 1 measured above the baseline | peak + 1 | first circle = peak + 1 |
-| rise at/before peak, peak + 1 unmeasured or ≤ baseline | peak + 1 (no temperature needed) | first circle later, or the cycle does not qualify |
-| rise after peak, marked day itself not above the baseline | the marked day | first circle later, or the cycle does not qualify |
-| sequence gap-stopped (R2) before any circle | peak + 1 qualifies | no circle — the cycle does not qualify |
-| no marked peak | real variant null | arrows only — no circle, so the cycle does not qualify |
-
-Both variants' day numbers lie inside their cycle's window by
-construction (marks attach within a cycle window; the candidate walk ends
-at the cycle's own end), so no extra window guard is needed.
+The book rule-set is summarized in [NER/rules.md](NER/rules.md). The app's
+own evaluation and rendering conventions, the implementation map, the settled
+interpretations, the open `TODO(user-review)` questions and the statistics
+ruling live in [NER/app-conventions.md](NER/app-conventions.md).
 
 ## Paper-form PDF export (lib/pdf/cycle_pdf.dart)
 
@@ -240,13 +104,12 @@ Layout/design decisions:
   information may be encoded in COLOR alone. Every colored or informative
   element carries a second, color-independent difference (shape, position,
   weight or luminance): the curve (near-black ink) vs the accent marks
-  (rings, arrows, dashed baseline, bold 1–6 numbers, peak dot, SUZ bars —
-  each differs by SHAPE or POSITION, and the accent grayscales to a
-  mid-gray clearly lighter than ink), the bleeding levels (solid fill
-  FRACTION and the dotted spotting mechanic, not the red), the dimmed
-  ignoreTemperature pieces (ExtGState alpha → lighter gray + thinner
-  stroke), the computed-SUZ line (thin ink line + rule letter, distinct in
-  shape and letter from the user SUZ bar+arrow glyph), the dashed window
+  (rings, arrows, dashed baseline, bold 1–6 numbers, peak dot,
+  user-placed „sicher unfruchtbare Zeit“ bars — each differs by SHAPE or
+  POSITION, and the accent grayscales to a mid-gray clearly lighter than
+  ink), the bleeding levels (solid fill FRACTION and the dotted spotting
+  mechanic, not the red), the dimmed ignoreTemperature pieces (ExtGState
+  alpha → lighter gray + thinner stroke), the dashed window
   bounds, the always-dark scale labels and value row, and the weekend
   bands (all-equal near-white gray — never a pale color — far enough from
   ink/accent/grid grays that nothing above or beside it loses legibility).
@@ -308,10 +171,11 @@ drip's own writer (drip: lib/import-export/export-to-csv.js):
 
 - Mode M applies (ADR-0001): the panel writes nothing derived — mark
   toggles go through the MarksDao, and everything it shows as evaluation
-  data (the 1–6 numbering, the baseline value, the R7 differences, the R2
-  stopped-evaluation notice, the SUZ suggestion) is recomputed from the
-  entries + marks streams at render time; a write re-emits through
-  marksProvider, so labels, chart overlay and info lines update live.
+  data (the 1–6 numbering, the baseline value, the baseline differences,
+  the gap-tolerance stopped-evaluation notice, the „sicher unfruchtbare
+  Zeit“ suggestion) is recomputed from the entries + marks streams at
+  render time; a write re-emits through marksProvider, so labels, chart
+  overlay and info lines update live.
 - Non-modal: the panel is owned by cycle_day_panel_provider and rendered
   as a fixed dock at the bottom of the cycle screen — a card in front of
   the chart list, margin ~12 dp above the system bottom inset, elevation
@@ -341,16 +205,13 @@ drip's own writer (drip: lib/import-export/export-to-csv.js):
   and the fill plus the announced selection already carry set/remove.
 - No note editing in the panel: notes live in the diary entry form's note
   row, so there is no comment surface to lay out in columns.
-- SUZ suggestion: on the computed `suzBegins` day the suggestion line
-  names which rule fired with the rule's time of day — rule D the EVENING
-  phrasing (the SUZ begins that evening, "gegen Abendessen"), rule E the
-  MORNING phrasing — while no user SUZ mark exists anywhere in that
-  cycle. The computed SUZ is never persisted and never renders on the
-  chart; a manual SUZ mark in turn never alters the arithmetic
+- „Sicher unfruchtbare Zeit“ suggestion: on the computed `suzBegins` day
+  the suggestion line names the firing book case — „Sicher unfruchtbare
+  Zeit am Abend“ when the quoted book text begins it that evening, or the
+  „Erster Sonderfall“ (vierte höhere Messung) with the morning wording
+  settled by the 2026-11-12 owner decision: the 4th is a waking temperature,
+  so the start is that morning (book boundary note in
+  app-conventions.md) — while no user mark exists anywhere in that cycle.
+  The computed „sicher unfruchtbare Zeit“ is never persisted and never
+  renders on the chart; a manual mark in turn never alters the arithmetic
   (compute-only separation, ADR-0001).
-- Temperature exclusion (owner decisions, 2026-09-19): the exclusion is
-  manual-only and made visible as the grid's third chip; the day's
-  disturbance flags are not shown there (the chart's disturbance row
-  spells them per day), flag editing stays diary-side, and marked days
-  render lighter on the temperature curve. The mark does not affect the
-  drip-import cycleStart replay.

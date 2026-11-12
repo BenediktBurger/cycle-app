@@ -942,7 +942,7 @@ void main() {
       // The temperature-ignore mark (the NER-aligned replacement of the
       // old exclude_* raw flags) is part of the shared vocabulary too.
       expect(CycleMarkTypes.ignoreTemperature, MarkTypes.ignoreTemperature);
-      // The SUZ start markers (sicher unfruchtbare Zeit, placed by the
+      // The „Sicher unfruchtbare Zeit“ start markers (placed by the
       // user from a morning or from an evening) joined the open TEXT
       // vocabulary — both sides must spell the tokens identically.
       expect(CycleMarkTypes.suzEvening, MarkTypes.suzEvening);

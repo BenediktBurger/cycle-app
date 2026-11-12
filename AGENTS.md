@@ -28,6 +28,14 @@ decisions in [`docs/adr/`](docs/adr/README.md).
   justification is not repeated at every occurrence, only where it isn't
   inferable from the code.
 
+## NER vocabulary
+
+Cite book rules by their German names from
+[`docs/NER/rules.md`](docs/NER/rules.md) and app behavior by the English
+conventions from
+[`docs/NER/app-conventions.md`](docs/NER/app-conventions.md). Do not
+introduce ad-hoc rule labels such as plan-derived numbers or single letters.
+
 ## Tests
 
 Test the replacement behavior, not the removal. An absence assertion is
@@ -133,6 +141,11 @@ failures only surface in a summary at the end. Instead:
 ## File roles
 
 - `docs/roadmap.md` — the to-do list: open work only, no diaries.
+- `docs/NER/rules.md` — the condensed book rule-set in German, one short
+  statement plus a source line per rule.
+- `docs/NER/app-conventions.md` — the app's evaluation and rendering
+  conventions, implementation map, settled interpretations, the statistics
+  ruling and the open NER questions.
 - `CONTRIBUTING.md` — timeless setup and conventions; nothing
   milestone-specific.
 - `docs/adr/` — one ADR per decision; unresolved working assumptions stay

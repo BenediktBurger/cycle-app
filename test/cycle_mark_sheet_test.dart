@@ -222,9 +222,8 @@ void main() {
     );
   });
 
-  testWidgets('R7: circled days show the difference to the baseline', (
-    tester,
-  ) async {
+  testWidgets('app convention "baseline difference": circled days show the '
+      'difference to the baseline', (tester) async {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
@@ -245,10 +244,11 @@ void main() {
     );
   });
 
-  testWidgets('R7: arrowed days show the difference too — without the '
+  testWidgets('app convention "baseline difference": arrowed days show the '
+      'difference too — without the '
       'circled ordinal line', (tester) async {
-    // Peak unmarked: the candidates become arrows (R4) — the difference
-    // display applies to circled AND arrowed days.
+    // Peak unmarked: the candidates become arrows („Pfeilmessung“) — the
+    // difference display applies to circled AND arrowed days.
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
@@ -260,7 +260,9 @@ void main() {
     expect(
       find.text('+0.50 K above the baseline'),
       findsOneWidget,
-      reason: 'arrowed candidates show the difference too (R7)',
+      reason:
+          'arrowed candidates show the difference too (app convention '
+          '"baseline difference")',
     );
     expect(
       find.text('Circled higher measurement 1'),
@@ -270,10 +272,13 @@ void main() {
   });
 
   testWidgets('a beyond-cap arrow keeps the difference line — it stays a '
-      'marked candidate, just unnumbered (R4)', (tester) async {
+      'marked candidate, just unnumbered (app convention "per-kind cap")', (
+    tester,
+  ) async {
     // Peak unmarked: every candidate is an arrow; the 5th (9/18) is beyond
     // its kind's four-cap, so it carries no ordinal — but it stays in the
-    // connected sequence (R4) and still shows the R7 difference line.
+    // connected sequence (app convention "per-kind cap") and still shows
+    // the "baseline difference" line.
     final entries = [
       ...scenarioEntries,
       DailyEntry(date: scenarioDay(17), bbtC: 36.5),
@@ -290,7 +295,9 @@ void main() {
     expect(
       find.text('+0.10 K above the baseline'),
       findsOneWidget,
-      reason: 'beyond-cap candidates stay marked (R4) and show R7',
+      reason:
+          'beyond-cap candidates stay marked (app convention "per-kind '
+          'cap") and show the baseline difference',
     );
     expect(
       find.text('Circled higher measurement 1'),
@@ -299,7 +306,8 @@ void main() {
     );
   });
 
-  testWidgets('R4 per-kind ordinals: the circle ordinal restarts after the '
+  testWidgets('app convention "per-kind cap" ordinals: the circle ordinal '
+      'restarts after the '
       'arrows — the sheet shows the circle number, not the overall count', (
     tester,
   ) async {
@@ -324,7 +332,9 @@ void main() {
     expect(
       find.text('Circled higher measurement 1'),
       findsOneWidget,
-      reason: 'the circle ordinal restarts within its own kind (R4)',
+      reason:
+          'the circle ordinal restarts within its own kind (app convention '
+          '"per-kind cap")',
     );
     expect(
       find.text('Circled higher measurement 3'),
@@ -363,7 +373,8 @@ void main() {
           'the chip re-renders selected from the marks stream after '
           'the write',
     );
-    // R6: the peak renders as a solid dot INSIDE the plot — not as a
+    // „Höhepunkt“ / app convention "peak marker": the peak renders as a
+    // solid dot INSIDE the plot — not as a
     // ring on the temperature curve.
     expect(
       find.byKey(const ValueKey('inPlotPeakDot-6')),
@@ -373,7 +384,7 @@ void main() {
     expect(
       dotPainterOrNull(tester, 6),
       isNot(isA<RingDotPainter>()),
-      reason: 'the peak day keeps a plain dot on the curve (R6)',
+      reason: 'the peak day keeps a plain dot on the curve („Höhepunkt“)',
     );
   });
 
@@ -583,9 +594,12 @@ void main() {
   });
 
   testWidgets('a broken sequence shows the stopped-evaluation notice '
-      '(R2: the user re-marks the rise)', (tester) async {
+      '(app convention "gap tolerance": the user re-marks the rise)', (
+    tester,
+  ) async {
     // Candidate 1 on 9/14, then TWO untracked days (9/15, 9/16), then 9/17
-    // above the baseline: the automatic evaluation stops (R2).
+    // above the baseline: the automatic evaluation stops (app convention
+    // "gap tolerance").
     final entries = <DailyEntry>[
       DailyEntry(date: scenarioDay(6), bbtC: 36.2),
       DailyEntry(date: scenarioDay(7), bbtC: 36.1),
@@ -619,7 +633,9 @@ void main() {
     expect(
       find.byKey(const ValueKey('cycleSheetEvaluationStopped')),
       findsOneWidget,
-      reason: 'the broken sequence surfaces the stopped state (R2)',
+      reason:
+          'the broken sequence surfaces the stopped state (app convention '
+          '"gap tolerance")',
     );
   });
 
@@ -809,8 +825,9 @@ void main() {
     testWidgets(
       'all six chips — the five mark chips AND the exclusion chip — share '
       'ONE equal-width grid in the reading order cycle start, mucus peak, '
-      'exclusion, first higher, SUZ evening, SUZ morning: on a narrow '
-      'surface the last row completes evenly with the SUZ variants and '
+      'exclusion, first higher, „Sicher unfruchtbare Zeit“ evening, '
+      '„Sicher unfruchtbare Zeit“ morning: on a narrow surface the last row '
+      'completes evenly with the „Sicher unfruchtbare Zeit“ variants and '
       'the exclusion sits directly before first higher',
       (tester) async {
         final (_, _) = await _pumpAt(
@@ -830,9 +847,9 @@ void main() {
         final ignore = chipRect('ignoreTemperature');
 
         // The grid rows (two columns): cycle start + mucus peak, exclusion
-        // + first higher (the exclusion sits directly BEFORE first
-        // higher, per the evaluation-based reading order), then the SUZ
-        // variants.
+        // + first higher (the exclusion sits directly BEFORE first higher,
+        // per the evaluation-based reading order), then the „Sicher
+        // unfruchtbare Zeit“ variants.
         expect(
           (cycleStart.top - peak.top).abs(),
           lessThan(4),
@@ -849,7 +866,9 @@ void main() {
         expect(
           (suzEvening.top - suzMorn.top).abs(),
           lessThan(4),
-          reason: 'the last row completes evenly with the SUZ variants',
+          reason:
+              'the last row completes evenly with the „Sicher unfruchtbare '
+              'Zeit“ variants',
         );
         expect(
           suzEvening.left,
@@ -872,14 +891,16 @@ void main() {
         expect(
           suzMorn.left,
           closeTo(peak.left, 4),
-          reason: 'the SUZ morning chip occupies the second column',
+          reason:
+              'the „Sicher unfruchtbare Zeit“ morning chip occupies the '
+              'second column',
         );
         expect(
           suzMorn.top,
           greaterThan(firstHigher.bottom),
           reason:
-              'the SUZ variants wrap BELOW the exclusion/first-higher '
-              'row',
+              'the „Sicher unfruchtbare Zeit“ variants wrap BELOW the '
+              'exclusion/first-higher row',
         );
         expect(
           excludeGroup,
@@ -892,8 +913,8 @@ void main() {
         for (final (name, rect) in [
           ('mucus peak', peak),
           ('first higher measurement', firstHigher),
-          ('SUZ evening', suzEvening),
-          ('SUZ morning', suzMorn),
+          ('„Sicher unfruchtbare Zeit“ evening', suzEvening),
+          ('„Sicher unfruchtbare Zeit“ morning', suzMorn),
           ('temperature exclusion', ignore),
         ]) {
           expect(
@@ -950,7 +971,7 @@ void main() {
           lessThan(4),
           reason:
               'the second wide row continues with first higher and the '
-              'SUZ variants',
+              '„Sicher unfruchtbare Zeit“ variants',
         );
         expect((suzEvening.top - suzMorn.top).abs(), lessThan(4));
         // The distribution stays even on wide surfaces (3+3, no lone
@@ -958,12 +979,16 @@ void main() {
         expect(
           suzEvening.left,
           closeTo(peak.left, 4),
-          reason: 'the SUZ evening chip is the second row\'s second column',
+          reason:
+              'the „Sicher unfruchtbare Zeit“ evening chip is the second '
+              'row\'s second column',
         );
         expect(
           suzMorn.left,
           closeTo(ignore.left, 4),
-          reason: 'the SUZ morning chip is the second row\'s third column',
+          reason:
+              'the „Sicher unfruchtbare Zeit“ morning chip is the second '
+              'row\'s third column',
         );
         expect(
           ignore.left,
@@ -1316,7 +1341,7 @@ void main() {
         findsOneWidget,
         reason:
             'the peak chip identifies the solid dot the chart '
-            'renders for a peak (R6)',
+            'renders for a peak („Höhepunkt“)',
       );
       expect(
         chipIcon('firstHigherMeasurement', Icons.adjust),
@@ -1348,8 +1373,9 @@ void main() {
             'crossed-out-eye glyph inside its keyed grid cell',
       );
 
-      // The two SUZ icons identify THEIR variant, not the pair — the
-      // glyphs never appear swapped onto the sibling variant chip.
+      // The two „Sicher unfruchtbare Zeit“ icons identify THEIR variant,
+      // not the pair — the glyphs never appear swapped onto the sibling
+      // variant chip.
       expect(
         chipIcon('suzMorning', Icons.nightlight_outlined),
         findsNothing,
@@ -1540,12 +1566,15 @@ void main() {
     );
   });
 
-  group('SUZ mark + suggestion (the app suggests, the user places)', () {
+  group('„Sicher unfruchtbare Zeit“ mark + suggestion (the app suggests, the '
+      'user places)', () {
     testWidgets(
-      'the computed SUZ day suggests the start with the EVENING phrasing',
+      'the computed „Sicher unfruchtbare Zeit“ day suggests the start '
+      'with the EVENING phrasing',
       (tester) async {
         // Main scenario: the 3rd circled candidate (9/16, 37.0) is >= 0.2 K
-        // above the baseline 36.4 -> rule D fires, SUZ begins 9/16 evening.
+        // above the baseline 36.4 -> „Sicher unfruchtbare Zeit am Abend“
+        // fires, the „Sicher unfruchtbare Zeit“ begins 9/16 evening.
         final (_, _) = await _pump(
           tester,
           entries: scenarioEntries,
@@ -1559,100 +1588,107 @@ void main() {
           findsOneWidget,
           reason:
               'the viewed day equals the computed suzBegins and '
-              'no user SUZ mark exists anywhere in the cycle',
+              'no user „Sicher unfruchtbare Zeit“ mark exists anywhere in '
+              'the cycle',
         );
         expect(
           find.textContaining('begins this evening'),
           findsOneWidget,
           reason:
-              'the suggestion carries the evening phrasing (begins the SUZ that evening)',
+              'the suggestion carries the evening phrasing (begins the '
+              '„Sicher unfruchtbare Zeit“ that evening)',
         );
         expect(
           find.textContaining('begins this morning'),
           findsNothing,
-          reason: 'must NOT render the morning phrasing',
+          reason:
+              'the 3rd circle reached the evening margin, so the morning '
+              'wording does not apply',
         );
       },
     );
 
-    testWidgets('the suggestion carries the MORNING phrasing on the 4th circle', (
-      tester,
-    ) async {
-      // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd circled
-      // candidate is below the rule-D margin, so the 4th (9/17) fires
-      // rule E — and rule E begins the SUZ in the MORNING (owner-corrected:
-      // the SUZ begins the morning of the 4th circled measurement, not the
-      // evening).
-      final entries = [
-        ...scenarioEntries.take(8),
-        DailyEntry(date: scenarioDay(14), bbtC: 36.5),
-        DailyEntry(date: scenarioDay(15), bbtC: 36.5),
-        DailyEntry(date: scenarioDay(16), bbtC: 36.5),
-        DailyEntry(date: scenarioDay(17), bbtC: 36.5),
-      ];
-      final (_, _) = await _pump(
-        tester,
-        entries: entries,
-        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
-      );
-
-      await tapCycleDay(tester, 11); // 9/17: the computed suzBegins
-
-      expect(
-        find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('begins this morning'),
-        findsOneWidget,
-        reason:
-            'the suggestion carries the morning phrasing (begins the SUZ that morning)',
-      );
-      expect(
-        find.textContaining('begins this evening'),
-        findsNothing,
-        reason:
-            'must NOT render the evening phrasing — the SUZ '
-            'begins in the morning of the 4th circled day',
-      );
-    });
-
     testWidgets(
-      'the suggestion is suppressed once a user SUZ mark exists in the '
-      'cycle',
+      'the suggestion uses the derived morning wording on the 4th circle',
       (tester) async {
+        // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd circled
+        // candidate is below the „Sicher unfruchtbare Zeit am Abend“
+        // margin, so the 4th (9/17) fires „Erster Sonderfall“; the
+        // suggestion names that morning (the 4th higher measurement is a
+        // waking temperature; see docs/NER/rules.md).
+        final entries = [
+          ...scenarioEntries.take(8),
+          DailyEntry(date: scenarioDay(14), bbtC: 36.5),
+          DailyEntry(date: scenarioDay(15), bbtC: 36.5),
+          DailyEntry(date: scenarioDay(16), bbtC: 36.5),
+          DailyEntry(date: scenarioDay(17), bbtC: 36.5),
+        ];
         final (_, _) = await _pump(
           tester,
-          entries: scenarioEntries,
-          seedMarks: [
-            scenarioPeakMark,
-            scenarioFirstHigherMark,
-            CycleMark(date: scenarioDay(13), type: CycleMarkTypes.suzMorning),
-          ],
+          entries: entries,
+          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
         );
 
-        await tapCycleDay(tester, 10); // 9/16: the computed suzBegins
+        await tapCycleDay(tester, 11); // 9/17: the computed suzBegins
 
         expect(
           find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
-          findsNothing,
+          findsOneWidget,
+        );
+        final suggestion = tester.widget<Text>(
+          find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
+        );
+        expect(
+          suggestion.data,
+          contains('this morning'),
           reason:
-              'a user SUZ mark anywhere in the cycle suppresses the '
-              'suggestion',
+              'the 4th higher measurement is a waking temperature, so the '
+              '„Sicher unfruchtbare Zeit“ begins that morning (derived, '
+              'see docs/NER/rules.md)',
+        );
+        expect(
+          suggestion.data,
+          isNot(contains('this evening')),
+          reason: 'the 3rd circle stayed below the evening margin',
         );
       },
     );
 
-    testWidgets('no suggestion on days that are not the computed SUZ day', (
-      tester,
-    ) async {
+    testWidgets('the suggestion is suppressed once a user „Sicher unfruchtbare '
+        'Zeit“ mark exists in the cycle', (tester) async {
+      final (_, _) = await _pump(
+        tester,
+        entries: scenarioEntries,
+        seedMarks: [
+          scenarioPeakMark,
+          scenarioFirstHigherMark,
+          CycleMark(date: scenarioDay(13), type: CycleMarkTypes.suzMorning),
+        ],
+      );
+
+      await tapCycleDay(tester, 10); // 9/16: the computed suzBegins
+
+      expect(
+        find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
+        findsNothing,
+        reason:
+            'a user „Sicher unfruchtbare Zeit“ mark anywhere in the '
+            'cycle suppresses the suggestion',
+      );
+    });
+
+    testWidgets('no suggestion on days that are not the computed „Sicher '
+        'unfruchtbare Zeit“ day', (tester) async {
       final (_, _) = await _pump(
         tester,
         entries: scenarioEntries,
         seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
       );
 
-      await tapCycleDay(tester, 8); // 9/14: the marked rise, not the SUZ day
+      await tapCycleDay(
+        tester,
+        8,
+      ); // 9/14: the marked rise, not the „Sicher unfruchtbare Zeit“ day
 
       expect(
         find.byKey(const ValueKey('cycleSheetSuzSuggestion')),
@@ -1660,8 +1696,8 @@ void main() {
       );
     });
 
-    testWidgets('SUZ chips on any day: set evening, variant-switch to morning, '
-        'remove', (tester) async {
+    testWidgets('„Sicher unfruchtbare Zeit“ chips on any day: set evening, '
+        'variant-switch to morning, remove', (tester) async {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
       await tapCycleDay(
         tester,
@@ -1673,7 +1709,9 @@ void main() {
       expect(
         await storedMarkTypes(db, scenarioDay(10)),
         contains(CycleMarkTypes.suzEvening),
-        reason: 'the SUZ mark is persisted through the MarksDao',
+        reason:
+            'the „Sicher unfruchtbare Zeit“ mark is persisted through '
+            'the MarksDao',
       );
       expect(
         tester.widget<FilterChip>(cycleSheetChip('suzEvening')).selected,
@@ -1715,36 +1753,37 @@ void main() {
       );
     });
 
-    testWidgets(
-      'a manual SUZ mark never alters the arithmetic — the evaluation '
-      'info lines stay as computed',
-      (tester) async {
-        final (_, _) = await _pump(
-          tester,
-          entries: scenarioEntries,
-          seedMarks: [
-            scenarioPeakMark,
-            scenarioFirstHigherMark,
-            CycleMark(date: scenarioDay(12), type: CycleMarkTypes.suzEvening),
-          ],
-        );
+    testWidgets('a manual „Sicher unfruchtbare Zeit“ mark never alters the '
+        'arithmetic — the evaluation info lines stay as computed', (
+      tester,
+    ) async {
+      final (_, _) = await _pump(
+        tester,
+        entries: scenarioEntries,
+        seedMarks: [
+          scenarioPeakMark,
+          scenarioFirstHigherMark,
+          CycleMark(date: scenarioDay(12), type: CycleMarkTypes.suzEvening),
+        ],
+      );
 
-        await tapCycleDay(tester, 8); // 9/14: circled candidate #1
+      await tapCycleDay(tester, 8); // 9/14: circled candidate #1
 
-        expect(
-          find.text('+0.50 K above the baseline'),
-          findsOneWidget,
-          reason:
-              'the difference to the baseline is unchanged by the SUZ '
-              'mark (compute-only separation)',
-        );
-        expect(
-          find.text('Circled higher measurement 1'),
-          findsOneWidget,
-          reason: 'the candidate sequence is unchanged by the SUZ mark',
-        );
-      },
-    );
+      expect(
+        find.text('+0.50 K above the baseline'),
+        findsOneWidget,
+        reason:
+            'the difference to the baseline is unchanged by the „Sicher '
+            'unfruchtbare Zeit“ mark (compute-only separation)',
+      );
+      expect(
+        find.text('Circled higher measurement 1'),
+        findsOneWidget,
+        reason:
+            'the candidate sequence is unchanged by the „Sicher '
+            'unfruchtbare Zeit“ mark',
+      );
+    });
   });
 
   group('rise-mark consistency warning (owner decision 2026-09-17)', () {
@@ -2005,8 +2044,8 @@ void main() {
       );
 
       testWidgets(
-        'a failing SUZ write surfaces the same failure message, stores no '
-        'mark, and stays free of unhandled errors',
+        'a failing „Sicher unfruchtbare Zeit“ write surfaces the same failure '
+        'message, stores no mark, and stays free of unhandled errors',
         (tester) async {
           final faulty = FaultyCycleDatabase();
           final (db, _) = await _pump(
@@ -2024,15 +2063,16 @@ void main() {
             tester.takeException(),
             isNull,
             reason:
-                'the SUZ write must catch its own failure — nothing may '
-                'leak into the zone as an unhandled error',
+                'the „Sicher unfruchtbare Zeit“ write must catch its own '
+                'failure — nothing may leak into the zone as an unhandled '
+                'error',
           );
           expect(
             find.text('Saving failed — the data was not changed.'),
             findsOneWidget,
             reason:
-                'a failed SUZ write is reported via the same localized '
-                'failure SnackBar (nothing was changed)',
+                'a failed „Sicher unfruchtbare Zeit“ write is reported via the '
+                'same localized failure SnackBar (nothing was changed)',
           );
           expect(
             await storedMarkTypes(db, scenarioDay(10)),

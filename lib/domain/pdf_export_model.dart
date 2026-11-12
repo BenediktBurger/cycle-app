@@ -48,9 +48,10 @@ import 'temperature_range.dart';
 /// The evaluation overlay of ONE exported cycle, localized to that
 /// cycle's day space (see the file-header note on the index convention):
 /// the same derived artifacts the cycle chart draws (built with the shared
-/// [buildEvaluationOverlay], fed the WHOLE evaluation list so the SUZ
-/// attribution windows match the chart's) plus the cycle's
-/// temperature-ignore indexes. The drawing layer draws, it never re-derives.
+/// [buildEvaluationOverlay], fed the WHOLE evaluation list so the „Sicher
+/// unfruchtbare Zeit“ attribution windows match the chart's) plus the
+/// cycle's temperature-ignore indexes. The drawing layer draws, it never
+/// re-derives.
 final class PdfCycleOverlay {
   const PdfCycleOverlay({
     this.peakIndexes = const {},
@@ -81,17 +82,20 @@ final class PdfCycleOverlay {
   /// EvaluationOverlay.peakIndexes).
   final Set<int> peakIndexes;
 
-  /// Circled / arrowed marked candidates (per-candidate rule R4).
+  /// Circled / arrowed marked candidates („Höhere Messung“ /
+  /// „Pfeilmessung“, app convention "candidate walk", decided per
+  /// candidate).
   final Set<int> circledIndexes;
   final Set<int> arrowIndexes;
 
   /// The 1–6 low numbers by day index.
   final Map<int, int> numbersByIndex;
 
-  /// The drawn baseline segments (R10).
+  /// The drawn baseline segments (app convention "baseline line extent").
   final List<BaselineSegment> baselineSegments;
 
-  /// The user-placed SUZ marks (suzMorning/suzEvening).
+  /// The user-placed „Sicher unfruchtbare Zeit“ marks
+  /// (suzMorning/suzEvening).
   final List<SuzOverlayMark> suzMarks;
 
   /// The temperature-ignore day indexes ([ignoredDayIndexes]) — the
@@ -142,10 +146,10 @@ final class PdfExportModel {
 
   /// The per-cycle evaluation overlays, PARALLEL to [cycles]
   /// (`overlays[i]` carries the display artifacts of `cycles[i]` — the
-  /// derived marks/low numbers/baseline/SUZ pieces plus the
-  /// temperature-ignore indexes, all in the owning cycle's day space, see
-  /// the file header). Built with the shared overlay derivation so the PDF
-  /// draws exactly what the chart draws.
+  /// derived marks/low numbers/baseline/„Sicher unfruchtbare Zeit“ pieces
+  /// plus the temperature-ignore indexes, all in the owning cycle's day
+  /// space, see the file header). Built with the shared overlay derivation
+  /// so the PDF draws exactly what the chart draws.
   final List<PdfCycleOverlay> overlays;
 
   /// The temperature-display range ("Temperaturbereich" settings card)

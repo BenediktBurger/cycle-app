@@ -9,8 +9,9 @@
 // evaluation overlay (Mode M, ADR-0001) draws the user's mucus-peak and
 // first-higher marks' derived artifacts for DISPLAY ONLY — never persisted;
 // it is derived in lib/domain/evaluation_overlay.dart over evaluateCycles
-// and painted by lib/ui/cycle_marks.dart (the SUZ arithmetic stays
-// domain-only; a manual SUZ mark never alters it).
+// and painted by lib/ui/cycle_marks.dart (the „Sicher unfruchtbare Zeit“
+// arithmetic stays domain-only; a manual „Sicher unfruchtbare Zeit“ mark
+// never alters it).
 //
 // Tapping a chart day or a signal-row cell shows the day options in the
 // NON-MODAL panel the screen owns (lib/ui/cycle_mark_sheet.dart,

@@ -263,6 +263,11 @@ scaffolding, and the analyze/test/build commands — notably
 - [docs/adr/README.md](docs/adr/README.md) — architecture decision records
   (ADR-0001 … ADR-0007 — 0007 is the language policy).
 - [docs/dev-notes.md](docs/dev-notes.md) — operational lessons and how-tos.
+- [docs/NER/rules.md](docs/NER/rules.md) — condensed book rule-set (German)
+  with a source line per rule.
+- [docs/NER/app-conventions.md](docs/NER/app-conventions.md) — the app's
+  evaluation and rendering conventions, implementation map and open NER
+  questions.
 - [docs/roadmap.md](docs/roadmap.md) — open work / upcoming milestones
   (to-do list; history lives in git).
 - `.github/workflows/ci.yml` — GitHub Actions CI: `flutter analyze`,
@@ -273,7 +278,8 @@ scaffolding, and the analyze/test/build commands — notably
 Working app: Tagebuch / Zyklus / Statistik / Einstellungen on a local drift
 database, with JSON export/import; the UI is German-first with an English
 switch, including the Mode-M marking UI (first higher measurement, mucus
-peak, SUZ). Open work is tracked in [docs/roadmap.md](docs/roadmap.md).
+peak, sicher unfruchtbare Zeit). Open work is tracked in
+[docs/roadmap.md](docs/roadmap.md).
 
 ## License
 

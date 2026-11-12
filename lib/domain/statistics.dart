@@ -224,12 +224,14 @@ List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
 ///   first-higher mark, wherever it sits relative to the mucus peak;
 /// - `afterMucusPeak`: the minimum over the cycle-day numbers of the
 ///   mark-driven cycles' FIRST CIRCLED candidates
-///   ([firstCircledCandidateDay] — rule R4's "umrandete Messung": a
-///   measured temperature strictly above the baseline, from the marked
-///   rise onward, strictly after the marked mucus peak day). A cycle
+///   ([firstCircledCandidateDay] — the book's „umrandete höhere Messung“,
+///   app convention "statistics earliest first higher": a measured
+///   temperature strictly above the baseline, from the marked rise
+///   onward, strictly after the marked mucus peak day). A cycle
 ///   qualifies only when its candidate sequence carries such a circle:
 ///   no marked peak (arrows only), no measurable candidate, and a
-///   gap-stopped sequence (R2) all leave the cycle out.
+///   gap-stopped sequence (app convention "gap tolerance") all leave the
+///   cycle out.
 ///
 /// Both variants' day numbers lie inside their cycle's window by
 /// construction: marks attach within [Cycle.startDate, next cycle start),
@@ -525,8 +527,8 @@ List<CycleFact> cycleFactsFromCycles(
   return facts;
 }
 
-/// The fact-row first higher: the earliest R4 circle
-/// ([firstCircledCandidateDay]), else the user-placed mark day.
+/// The fact-row first higher: the earliest circled candidate („Höhere
+/// Messung“, [firstCircledCandidateDay]), else the user-placed mark day.
 DateTime? _resolveFirstHigher(CycleEvaluation evaluation) =>
     firstCircledCandidateDay(evaluation) ?? evaluation.firstHigherDay;
 

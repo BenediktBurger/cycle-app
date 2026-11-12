@@ -211,6 +211,10 @@ PdfInkPath _pathOf(
         fill = pending.sublist(pending.length - 3);
       case 'RG':
         stroke = pending.sublist(pending.length - 3);
+      case 'h':
+        // closePath only closes the subpath; the pending points stay for
+        // the following fill/stroke operator.
+        break;
       case 'f' || 'f*':
         if (pathPoints.isNotEmpty) paths.add(_pathOf(fill, pathPoints));
         pathPoints.clear();

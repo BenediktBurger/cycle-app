@@ -1,7 +1,8 @@
 // Unit tests of the pure chart glyph layer: the per-day observation records
 // and narrow-range visibility rules from lib/ui/chart_marks.dart (the letter
 // vocabulary stays mucusDisplay's), plus the evaluation glyph geometry from
-// lib/ui/cycle_marks.dart (arrow-up tip, SUZ legend footprint).
+// lib/ui/cycle_marks.dart (arrow-up tip, „Sicher unfruchtbare Zeit“ legend
+// footprint).
 import 'package:cycle_app/domain/mucus.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -309,7 +310,7 @@ void main() {
     });
   });
 
-  group('SUZ arrow glyph size', () {
+  group('„Sicher unfruchtbare Zeit“ arrow glyph size', () {
     testWidgets('the legend sample scales with the chart glyph', (
       tester,
     ) async {

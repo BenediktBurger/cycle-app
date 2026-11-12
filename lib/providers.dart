@@ -155,8 +155,8 @@ Stream<List<DailyEntry>> dailyEntries(Ref ref) async* {
 /// side of the evaluation feature (Mode M, the counterpart to
 /// [dailyEntriesProvider]). Re-emits on every mark write (add/remove);
 /// consumers recompute the derived evaluation (baseline, circled higher
-/// measurements, SUZ) from it at render time — never from a persisted copy,
-/// per ADR-0001.
+/// measurements, „Sicher unfruchtbare Zeit“) from it at render time —
+/// never from a persisted copy, per ADR-0001.
 @riverpod
 Stream<List<CycleMark>> marks(Ref ref) async* {
   final db = await ref.watch(databaseProvider.future);

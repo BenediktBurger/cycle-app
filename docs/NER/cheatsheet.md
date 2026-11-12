@@ -1,5 +1,9 @@
 # NER Cheat Sheet
 
+> This is a quick reference. The ordered book rule-set is
+> [rules.md](rules.md); the app's own conventions are
+> [app-conventions.md](app-conventions.md). The book is the authority.
+
 ## Auswertung
 
 1. **Schleimhöhepunkt** bestimmen und markieren

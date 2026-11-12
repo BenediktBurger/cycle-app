@@ -87,11 +87,11 @@ final class CycleDayPanel extends ConsumerWidget {
     return true;
   }
 
-  /// The SUZ mark-writing action: set through [MarksDao.addMark], remove
-  /// through [MarksDao.deleteMark]. The two variants are mutually
-  /// exclusive per day, so the delete-and-add variant switch is ONE
-  /// all-or-nothing transaction — a failure leaves the previous variant
-  /// standing.
+  /// The „Sicher unfruchtbare Zeit“ mark-writing action: set through
+  /// [MarksDao.addMark], remove through [MarksDao.deleteMark]. The two
+  /// variants are mutually exclusive per day, so the delete-and-add variant
+  /// switch is ONE all-or-nothing transaction — a failure leaves the
+  /// previous variant standing.
   Future<bool> _writeSuzMark(
     BuildContext context,
     WidgetRef ref, {
@@ -156,8 +156,8 @@ final class CycleDayPanel extends ConsumerWidget {
     for (var i = 0; i < evaluations.length; i++) {
       final evaluation = evaluations[i];
       if (!isDayInCycleWindow(evaluations, i, day)) continue;
-      // Only the ANCHORING mark is checked (R3): a superseded earlier
-      // mark defines no baseline of its own.
+      // Only the ANCHORING mark is checked (app convention "latest-mark
+      // anchor"): a superseded earlier mark defines no baseline of its own.
       final anchor = evaluation.firstHigherDay;
       if (anchor == null || !DateOnly.sameDay(anchor, day)) continue;
       if (evaluation.riseMarkConsistent != false) return;
@@ -227,8 +227,8 @@ final class CycleDayPanel extends ConsumerWidget {
     onClose();
   }
 
-  /// Whether a user SUZ mark (either variant) exists inside the cycle
-  /// window of the evaluation at [index].
+  /// Whether a user „Sicher unfruchtbare Zeit“ mark (either variant) exists
+  /// inside the cycle window of the evaluation at [index].
   bool _cycleHasSuzMark(
     List<CycleEvaluation> evaluations,
     int index,
@@ -272,14 +272,15 @@ final class CycleDayPanel extends ConsumerWidget {
   /// The computed info lines for [day] (empty when no evaluation data
   /// exists for it), each the line text plus an optional test-visible key.
   /// A day can carry several facts at once: the 1-6 low number, the
-  /// baseline value, the marked candidate's baseline difference (R7) plus
-  /// a circle's ordinal (arrow ordinals are curve-rendering input only),
-  /// the SUZ suggestion, the stopped-evaluation notice (R2) and the
-  /// inconsistent rise-mark warning.
+  /// baseline value, the marked candidate's baseline difference (app
+  /// convention "baseline difference") plus a circle's ordinal (arrow
+  /// ordinals are curve-rendering input only), the „Sicher unfruchtbare
+  /// Zeit“ suggestion, the stopped-evaluation notice (app convention "gap
+  /// tolerance") and the inconsistent rise-mark warning.
   ///
-  /// TODO(user-review): the R2 notice surfaces on the whole cycle rather
-  /// than only the day after the break — the domain does not report the
-  /// break day.
+  /// TODO(user-review): the gap-tolerance notice surfaces on the whole
+  /// cycle rather than only the day after the break — the domain does not
+  /// report the break day.
   List<(String, Key?)> _infoLines(
     BuildContext context,
     AppLocalizations l10n,
@@ -304,35 +305,36 @@ final class CycleDayPanel extends ConsumerWidget {
           null,
         ));
       }
-      for (final higher in evaluation.higherMeasurements) {
-        if (!DateOnly.sameDay(higher.date, day)) continue;
-        // R7: the difference to the baseline, for circled AND arrowed
-        // candidates.
+      for (final candidate in evaluation.candidateMeasurements) {
+        if (!DateOnly.sameDay(candidate.date, day)) continue;
+        // App convention "baseline difference": the difference to the
+        // baseline, for circled AND arrowed candidates.
         // TODO(user-review): the sheet info line is the minimum placement
         // for the difference display; extra placements (chart-curve
         // labels) remain an option for the expert review.
         lines.add((
           l10n.cycleSheetDifferenceInfo(
-            _formatValue(locale, higher.differenceK),
+            _formatValue(locale, candidate.differenceK),
           ),
           null,
         ));
-        if (higher.markKind == MarkKind.circle && higher.ordinal != null) {
+        if (candidate.markKind == MarkKind.circle &&
+            candidate.ordinal != null) {
           // Unnumbered circles (beyond the per-kind cap) stay without the
           // numbering line.
-          lines.add((l10n.cycleSheetCircledInfo(higher.ordinal!), null));
+          lines.add((l10n.cycleSheetCircledInfo(candidate.ordinal!), null));
         }
       }
-      // The SUZ suggestion (locked decision: the app suggests, the user
-      // places) — shown while NO user SUZ mark exists anywhere in the
-      // cycle; the computed SUZ is never persisted.
+      // The „Sicher unfruchtbare Zeit“ suggestion (locked decision: the app
+      // suggests, the user places) — shown while NO user mark exists
+      // anywhere in the cycle; the computed value is never persisted.
       final suzDay = evaluation.suzBegins;
       if (suzDay != null &&
           DateOnly.sameDay(suzDay, day) &&
           !_cycleHasSuzMark(evaluations, e, marks)) {
         final line = switch (evaluation.suzRule!) {
-          SuzRule.d => l10n.cycleSheetSuzSuggestionEvening,
-          SuzRule.e => l10n.cycleSheetSuzSuggestionMorning,
+          SuzRule.evening => l10n.cycleSheetSuzSuggestionEvening,
+          SuzRule.morning => l10n.cycleSheetSuzSuggestionMorning,
         };
         lines.add((line, const ValueKey('cycleSheetSuzSuggestion')));
       }
@@ -507,8 +509,8 @@ final class CycleDayPanel extends ConsumerWidget {
               // for it.
               //
               // Reading order: cycle start, mucus peak, temperature
-              // exclusion, first higher measurement, SUZ evening, SUZ
-              // morning.
+              // exclusion, first higher measurement, „Sicher unfruchtbare
+              // Zeit“ evening, „Sicher unfruchtbare Zeit“ morning.
               if (marksAsync.hasError)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
@@ -605,9 +607,9 @@ final class CycleDayPanel extends ConsumerWidget {
                             ),
                             width: chipWidth,
                           ),
-                          // SUZ start from a morning or an evening, placeable
-                          // on any day; the two variants are mutually
-                          // exclusive per day.
+                          // „Sicher unfruchtbare Zeit“ start from a morning
+                          // or an evening, placeable on any day; the two
+                          // variants are mutually exclusive per day.
                           gridChip(
                             l10n.cycleSheetSuzEveningLabel,
                             hasSuzEvening,

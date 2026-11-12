@@ -24,8 +24,8 @@ import 'fixtures.dart';
 import 'provider_fixtures.dart';
 
 /// The evaluation scenario's September, as a day (the fixtures' prose names
-/// the scenario days — 9/6 baseline-window Monday .. 9/16 the SUZ day — so
-/// the assertions can read like the day prose).
+/// the scenario days — 9/6 baseline-window Monday .. 9/16 the „Sicher
+/// unfruchtbare Zeit“ day — so the assertions can read like the day prose).
 DateTime scenarioDay(int day) => DateTime.utc(2026, 9, day);
 
 /// The evaluation scenario's data: entries fresh per test use

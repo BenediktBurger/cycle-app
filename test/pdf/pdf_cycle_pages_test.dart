@@ -13,6 +13,7 @@ import 'package:cycle_app/pdf/cycle_pdf.dart';
 import 'package:cycle_app/pdf/pdf_axis.dart';
 import 'package:cycle_app/pdf/pdf_layout.dart';
 import 'package:cycle_app/ui/chart_marks.dart';
+import 'package:cycle_app/ui/suz_glyph.dart' show suzBarHangSpanDegrees;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/pdf_content.dart'
@@ -300,6 +301,38 @@ Future<List<int>> generateNumberFixture({TemperatureRange? range}) =>
       options: PdfExportOptions(anonymized: false),
       compress: false,
     );
+
+// The „Sicher unfruchtbare Zeit“ fixture: six lows at 36.2, a mucus peak,
+// then three circled candidates at 36.8 / 36.9 / 37.0 — the third at least
+// 0.2 K above the baseline starts the computed „Sicher unfruchtbare Zeit
+// am Abend“ on Mar 9; the user-placed morning mark on Mar 11 carries the
+// bar+arrow glyph. One page (Mar 1–13).
+List<DailyEntry> computedSuzEntries() => [
+  for (var i = 0; i <= 12; i++)
+    DailyEntry(
+      date: d(3, 1 + i),
+      bbtC: switch (i) {
+        <= 5 => 36.2,
+        6 => 36.8,
+        7 => 36.9,
+        8 => 37.0,
+        _ => 36.2,
+      },
+    ),
+];
+
+List<CycleMark> computedSuzMarks() => [
+  CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+  CycleMark(date: d(3, 5), type: CycleMarkTypes.mucusPeakDay),
+  CycleMark(date: d(3, 7), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 11), type: CycleMarkTypes.suzMorning),
+];
+
+PdfExportModel computedSuzModel() => buildPdfExportModel(
+  entries: computedSuzEntries(),
+  marks: computedSuzMarks(),
+  today: d(3, 13),
+);
 
 DateTime _calendarDate(int y, int m, int day) => DateTime.utc(y, m, day);
 
@@ -2037,5 +2070,91 @@ void main() {
         );
       },
     );
+  });
+
+  group('„Sicher unfruchtbare Zeit“ on the sheet', () {
+    test('the computed trigger paints no line of its own', () async {
+      final model = computedSuzModel();
+      expect(
+        model.cycles.single.suzBegins,
+        d(3, 9),
+        reason: 'the fixture must carry a computed „Sicher unfruchtbare Zeit“',
+      );
+      final bytes = await generatePdfBytes(
+        model: model,
+        fontBytes: fixtureFontBytes(),
+        options: PdfExportOptions(anonymized: false),
+        compress: false,
+      );
+      final (_, paths) = extractPageContent(bytes);
+      const x0 = pdfPageMargin + pdfRailWidth;
+      final triggerX = x0 + 8.5 * pdfColumnWidth;
+      final triggerStrokes = [
+        for (final path in paths)
+          if (!path.filled &&
+              (path.maxX - path.minX) < 0.1 &&
+              (path.maxY - path.minY) > 100 &&
+              ((path.minX + path.maxX) / 2 - triggerX).abs() < 1)
+            path,
+      ];
+      expect(
+        triggerStrokes,
+        isEmpty,
+        reason:
+            'the computed trigger day carries no full-plot-height stroke '
+            'of its own',
+      );
+    });
+
+    test('the user-placed morning mark paints its hanging bar and arrow '
+        'head at its column\'s left edge', () async {
+      final model = computedSuzModel();
+      final bytes = await generatePdfBytes(
+        model: model,
+        fontBytes: fixtureFontBytes(),
+        options: PdfExportOptions(anonymized: false),
+        compress: false,
+      );
+      final (_, paths) = extractPageContent(bytes);
+      const x0 = pdfPageMargin + pdfRailWidth;
+      final barX = x0 + 10 * pdfColumnWidth;
+      final barHeight = PdfCurveAxis(
+        range: model.temperatureRange,
+        plotHeight: pdfCurvePlotHeight,
+      ).yFor(model.temperatureRange.max - suzBarHangSpanDegrees);
+      final bars = [
+        for (final path in paths)
+          if (!path.filled &&
+              (path.maxX - path.minX) < 0.1 &&
+              ((path.minX + path.maxX) / 2 - barX).abs() < 0.5 &&
+              (path.maxY - path.minY - barHeight).abs() < 1)
+            path,
+      ];
+      expect(
+        bars,
+        hasLength(1),
+        reason:
+            'the morning mark paints one shared-span bar at its column\'s '
+            'left edge',
+      );
+      expect(
+        bars.single.maxY,
+        closeTo(pdfPlotTop, 0.5),
+        reason: 'the bar hangs from the plot\'s top border',
+      );
+      final arrowHeads = [
+        for (final path in paths)
+          if (path.filled &&
+              (path.maxX - path.minX - 7).abs() < 0.2 &&
+              (path.maxY - path.minY - 11).abs() < 0.2 &&
+              (path.minX - (barX + 8)).abs() < 0.5)
+            path,
+      ];
+      expect(
+        arrowHeads,
+        hasLength(1),
+        reason: 'the morning mark\'s right-pointing arrow head sits at its bar',
+      );
+    });
   });
 }

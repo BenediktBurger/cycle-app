@@ -14,12 +14,13 @@ import 'support/fixtures.dart';
 // Widget tests of the computed evaluation marks on the cycle chart (Mode M,
 // ADR-0001): the user places the mucus-peak and first-higher marks; the UI
 // derives and renders the candidate circles/arrows (kind decided PER
-// CANDIDATE: arrows at or before the peak day, circles strictly after — R4),
-// the solid peak dot in its own in-plot row, the 1–6 low numbering inside
-// the plot's bottom edge and the baseline SEGMENT (low #6 to the last
-// marked candidate — R10). Derived
-// artifacts are computed at render time only — these tests pin how the
-// artifacts of lib/domain/evaluation.dart surface on the chart.
+// CANDIDATE: arrows at or before the peak day, circles strictly after —
+// „Höhere Messung“ vs „Pfeilmessung“), the solid peak dot in its own
+// in-plot row, the 1–6 low numbering inside the plot's bottom edge and the
+// baseline SEGMENT (low #6 to the last marked candidate — app convention
+// "baseline line extent"). Derived artifacts are computed at render time
+// only — these tests pin how the artifacts of lib/domain/evaluation.dart
+// surface on the chart.
 //
 
 // 2026-09-03 is a Thursday, so this sequence runs Sun (9/6) .. Wed (9/16).
@@ -41,10 +42,11 @@ final _evaluationEntries = evaluationScenarioEntries();
 
 final _marks = evaluationScenarioMarks();
 
-/// The baseline segment bars (R10): the dashed two-spot bars drawn in the
-/// baseline color (secondary) — one per evaluated cycle with a marked
-/// candidate. Horizontal by construction, so the vertical SUZ bars (same
-/// secondary color) are excluded here.
+/// The baseline segment bars (app convention "baseline line extent"): the
+/// dashed two-spot bars drawn in the baseline color (secondary) — one per
+/// evaluated cycle with a marked candidate. Horizontal by construction, so
+/// the vertical „Sicher unfruchtbare Zeit“ bars (same secondary color) are
+/// excluded here.
 List<LineChartBarData> _baselineBars(WidgetTester tester) => chartData(tester)
     .lineBarsData
     .where(
@@ -54,9 +56,10 @@ List<LineChartBarData> _baselineBars(WidgetTester tester) => chartData(tester)
     )
     .toList();
 
-/// The SUZ bars: vertical two-spot bars in the secondary color (one per
-/// user-placed SUZ mark) — the same evaluation-family color as the baseline
-/// segment, distinguished by orientation.
+/// The „Sicher unfruchtbare Zeit“ bars: vertical two-spot bars in the
+/// secondary color (one per user-placed „Sicher unfruchtbare Zeit“ mark) —
+/// the same evaluation-family color as the baseline segment, distinguished
+/// by orientation.
 List<LineChartBarData> _suzBars(WidgetTester tester) => chartData(tester)
     .lineBarsData
     .where(
@@ -66,8 +69,9 @@ List<LineChartBarData> _suzBars(WidgetTester tester) => chartData(tester)
     )
     .toList();
 
-/// The SUZ arrow: the spot + painter of the SUZ arrow glyph, or null when
-/// no user SUZ mark renders an arrow.
+/// The „Sicher unfruchtbare Zeit“ arrow: the spot + painter of the arrow
+/// glyph, or null when no user „Sicher unfruchtbare Zeit“ mark renders an
+/// arrow.
 (FlSpot, FlDotPainter)? _suzArrowSpot(WidgetTester tester) {
   for (final bar in dotBars(tester)) {
     for (var i = 0; i < bar.spots.length; i++) {
@@ -86,8 +90,8 @@ bool _sameDay(DailyEntry entry, DateTime day) =>
     entry.date.day == day.day;
 
 void main() {
-  group('R6 — the peak renders as a solid dot inside the plot, not on '
-      'the curve', () {
+  group('„Höhepunkt“ / app convention "peak marker" — the peak renders as '
+      'a solid dot inside the plot, not on the curve', () {
     testWidgets('the peak day keeps a plain temperature dot — no ring on '
         'the curve', (tester) async {
       await pumpChart(
@@ -96,7 +100,7 @@ void main() {
       );
 
       // 9/12 (idx 6) carries the mucus-peak mark: the curve dot there is
-      // an ORDINARY temperature dot, no ring (R6).
+      // an ORDINARY temperature dot, no ring („Höhepunkt“).
       final painter = dotPainter(tester, 6);
       expect(
         painter,
@@ -118,11 +122,13 @@ void main() {
       // A ring appears exactly on the three circled candidates (idx
       // 8..10), never on the peak day (idx 6).
       final rings = candidateKinds(tester).rings;
-      expect(rings, {
-        8,
-        9,
-        10,
-      }, reason: 'rings wrap only the circled candidates (R6/R1)');
+      expect(
+        rings,
+        {8, 9, 10},
+        reason:
+            'rings wrap only the circled candidates („Höhepunkt“ / '
+            '„Höhere Messung“)',
+      );
       for (final index in rings) {
         final painter = dotPainter(tester, index) as RingDotPainter;
         expect(
@@ -196,9 +202,11 @@ void main() {
     });
   });
 
-  group('R1/R4 — candidate circles and arrows follow the new decision', () {
+  group('„Höhere Messung“ / „Pfeilmessung“ — candidate circles and arrows '
+      'follow the per-candidate decision', () {
     testWidgets('circled candidates: every measured day above the baseline '
-        'from the rise onward, capped and ended by rule D', (tester) async {
+        'from the rise onward, capped and ended by „Sicher unfruchtbare Zeit '
+        'am Abend“', (tester) async {
       await pumpChart(
         tester,
         chartHarness(entries: _evaluationEntries, marks: _marks),
@@ -219,19 +227,21 @@ void main() {
         );
       }
       // ... the pre-rise rise (idx 0, 36.9 above the baseline 36.4) is NOT
-      // a candidate (R3) — an ordinary dot.
+      // a candidate (app convention "latest-mark anchor") — an ordinary dot.
       expect(dotPainter(tester, 0), isNot(isA<RingDotPainter>()));
       expect(dotPainter(tester, 0), isNot(isA<ArrowUpDotPainter>()));
     });
 
     testWidgets('the four-cap: four arrows carry ordinals; the beyond-cap '
         'arrow STAYS in the sequence — unnumbered, but still an arrow '
-        '(R4: a late sequence is not cut off at the cap)', (tester) async {
-      // Peak unmarked: every candidate (R4) becomes an arrow. Five
-      // above-baseline days exist (9/14..9/18) and all five render — the
-      // 5th is beyond its kind's cap, so it carries no ordinal, but it
-      // stays part of the connected sequence (R4): the sequence only ends
-      // at a SUZ trigger or a break, and arrows never trigger a SUZ.
+        '(app convention "per-kind cap": a late sequence is not cut off at '
+        'the cap)', (tester) async {
+      // Peak unmarked: every candidate („Pfeilmessung“) becomes an arrow.
+      // Five above-baseline days exist (9/14..9/18) and all five render —
+      // the 5th is beyond its kind's cap, so it carries no ordinal, but it
+      // stays part of the connected sequence (app convention "per-kind
+      // cap"): the sequence only ends at a „Sicher unfruchtbare Zeit“
+      // trigger or a break, and arrows never trigger it.
       final entries = [..._evaluationEntries];
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 36.5));
@@ -245,7 +255,7 @@ void main() {
           dotPainter(tester, index),
           isA<ArrowUpDotPainter>(),
           reason:
-              'no peak -> arrow at $index (R4; the '
+              'no peak -> arrow at $index („Pfeilmessung“; the '
               'beyond-cap candidate renders unnumbered)',
         );
       }
@@ -253,11 +263,13 @@ void main() {
       expect(candidateKinds(tester).rings, isEmpty);
     });
 
-    testWidgets('the 4th CIRCLED candidate renders when rule E fires '
+    testWidgets('the 4th CIRCLED candidate renders when the „Erster '
+        'Sonderfall“ fires '
         '(the 3rd stays below the 0.2 K margin)', (tester) async {
       // 9/14..9/17 all 36.5 (+0.1 above the baseline): the 3rd candidate is
-      // below the rule-D margin, so the 4th candidate triggers rule E —
-      // and all four render as circles. The 5th (9/18) stays unmarked.
+      // below the „Sicher unfruchtbare Zeit am Abend“ margin, so the 4th
+      // candidate triggers the „Erster Sonderfall“ (vierte höhere Messung)
+      // — and all four render as circles. The 5th (9/18) stays unmarked.
       final entries = [
         ..._evaluationEntries.take(8),
         DailyEntry(date: _mon14, bbtC: 36.5),
@@ -272,25 +284,26 @@ void main() {
         expect(
           dotPainter(tester, index),
           isA<RingDotPainter>(),
-          reason: 'the 4th circled candidate exists under rule E',
+          reason: 'the 4th circled candidate exists under „Erster Sonderfall“',
         );
       }
       expect(dotPainterOrNull(tester, 12), isNotNull);
       expect(
         dotPainter(tester, 12),
         isNot(isA<RingDotPainter>()),
-        reason: 'the sequence ended at the rule-E trigger',
+        reason: 'the sequence ended at the „Erster Sonderfall“ trigger',
       );
     });
 
     testWidgets('a MIXED sequence: the peak-day candidate is an arrow and '
-        'circles follow it chronologically (R4 per candidate)', (tester) async {
+        'circles follow it chronologically („Höhere Messung“ vs '
+        '„Pfeilmessung“ per candidate)', (tester) async {
       // The peak mark sits ON 9/15 (idx 9), between the marked rise (9/14)
       // and the later candidates: 9/14 and the peak day's own candidate are
       // ARROWS; everything strictly after the peak (9/16..9/18) is
       // CIRCLED, with the circle ordinals restarting at 1 (the 3rd circle,
-      // 9/18 at 37.0, is >= 0.2 K above the baseline -> rule D fires and
-      // ends the sequence there).
+      // 9/18 at 37.0, is >= 0.2 K above the baseline -> „Sicher unfruchtbare
+      // Zeit am Abend“ fires and ends the sequence there).
       final entries = [..._evaluationEntries];
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 37.0));
@@ -308,7 +321,7 @@ void main() {
         arrows,
         {8, 9},
         reason:
-            'candidates at or before the peak are arrows (R4) — '
+            'candidates at or before the peak are arrows („Pfeilmessung“) — '
             'the peak day itself included',
       );
       // Strictly after the peak (9/16..9/18): circles.
@@ -316,12 +329,12 @@ void main() {
         10,
         11,
         12,
-      }, reason: 'candidates after the peak are circles (R4)');
+      }, reason: 'candidates after the peak are circles („Höhere Messung“)');
       // Chronological arrows-then-circles — no interleaving.
       expect(
         arrows.every((a) => circles.every((c) => a < c)),
         isTrue,
-        reason: 'arrows precede circles (R4)',
+        reason: 'arrows precede circles (per-candidate decision)',
       );
     });
   });
@@ -422,7 +435,7 @@ void main() {
     });
   });
 
-  group('baseline — R10 segment', () {
+  group('baseline — app convention "baseline line extent" segment', () {
     testWidgets('the baseline draws as a SEGMENT: from the left edge of '
         'low #6\'s column to the last marked candidate (+ half a day), '
         'clamped to the plot bounds', (tester) async {
@@ -446,7 +459,8 @@ void main() {
       );
       // START: the left edge of low #6's column — low #6 is 9/8 (idx 2),
       // so the segment begins at x 1.5.
-      // END: the last marked candidate (9/16, idx 10 — the rule-D trigger)
+      // END: the last marked candidate (9/16, idx 10 — the „Sicher
+      // unfruchtbare Zeit am Abend“ trigger)
       // plus half a day = x 10.5 — the domain extends half a column past
       // the last day, so the clamp does not bite here.
       final first = bar.spots.first;
@@ -470,8 +484,9 @@ void main() {
     testWidgets('the segment ends half a day past the last candidate\'s '
         'column when recorded days continue past it', (tester) async {
       // 9/17 sits AT the baseline (36.4): a gap day, not a candidate — the
-      // sequence ended at the rule-D trigger on 9/16, so the R10 segment
-      // ends at 9/16's day column + half a day = x 10.5 (no clamp needed).
+      // sequence ended at the „Sicher unfruchtbare Zeit am Abend“ trigger
+      // on 9/16, so the baseline segment ends at 9/16's day column + half a
+      // day = x 10.5 (no clamp needed).
       final entries = [
         ..._evaluationEntries,
         DailyEntry(date: _thu17, bbtC: 36.4),
@@ -502,9 +517,9 @@ void main() {
       );
       expect(_baselineBars(tester), isEmpty);
 
-      // First higher marked, but every day from the rise on sits AT or
-      // below the baseline: no marked candidate exists, so R10 draws no
-      // segment at all (not even a partial one through the low window).
+      // First higher marked, but every day from the rise on sits AT or below
+      // the baseline: no marked candidate exists, so no baseline segment at
+      // all (not even a partial one through the low window).
       final flat = [
         for (final e in _evaluationEntries)
           e.date.isAfter(_sun13) ? DailyEntry(date: e.date, bbtC: 36.4) : e,
@@ -516,13 +531,15 @@ void main() {
       expect(
         _baselineBars(tester),
         isEmpty,
-        reason: 'R10: a cycle with no marked candidate draws no segment',
+        reason:
+            'app convention "baseline line extent": a cycle with no marked '
+            'candidate draws no segment',
       );
     });
   });
 
-  group('R2 — the ring set and the baseline end follow the run\'s gap '
-      'budget', () {
+  group('app convention "gap tolerance" — the ring set and the baseline end '
+      'follow the run\'s gap budget', () {
     testWidgets(
       'a second gap day stops the run: the next above-baseline day stays a '
       'plain dot and the segment ends at the last circle',
@@ -640,7 +657,7 @@ void main() {
     });
   });
 
-  group('SUZ marks render (user-placed only)', () {
+  group('„Sicher unfruchtbare Zeit“ marks render (user-placed only)', () {
     // The glyph's top anchoring: the bar hangs DOWN from the chart's top
     // border and the arrow anchors inside the hung band, so the whole glyph
     // sits inside the top rows of the plot. The drop/inset sizes are
@@ -663,7 +680,11 @@ void main() {
 
       final data = chartData(tester);
       final bars = _suzBars(tester);
-      expect(bars, hasLength(1), reason: 'one user SUZ mark -> one bar');
+      expect(
+        bars,
+        hasLength(1),
+        reason: 'one user „Sicher unfruchtbare Zeit“ mark -> one bar',
+      );
       final bar = bars.single;
       // suzEvening anchors the bar at the day column's MIDDLE (x = day
       // index); the bar hangs DOWN from the chart's top border by a fixed
@@ -695,14 +716,18 @@ void main() {
         bar.color,
         chartScheme(tester).secondary,
         reason:
-            'the SUZ bar shares the baseline\'s evaluation-family '
-            'color role (secondary)',
+            'the „Sicher unfruchtbare Zeit“ bar shares the baseline\'s '
+            'evaluation-family color role (secondary)',
       );
 
       // The right-pointing arrow: base at the bar, anchored inside the
       // hung band — not at the cycle's baseline.
       final arrow = _suzArrowSpot(tester);
-      expect(arrow, isNotNull, reason: 'the SUZ arrow renders with the bar');
+      expect(
+        arrow,
+        isNotNull,
+        reason: 'the „Sicher unfruchtbare Zeit“ arrow renders with the bar',
+      );
       final (spot, painter) = arrow!;
       expect(spot.x, 10.0, reason: 'the arrow base starts at the bar');
       expect(
@@ -719,7 +744,9 @@ void main() {
       expect(
         (painter as SuzArrowDotPainter).color,
         chartScheme(tester).secondary,
-        reason: 'the SUZ arrow shares the evaluation-family color role',
+        reason:
+            'the „Sicher unfruchtbare Zeit“ arrow shares the '
+            'evaluation-family color role',
       );
     });
 
@@ -787,22 +814,28 @@ void main() {
       },
     );
 
-    testWidgets('no SUZ glyph renders without a user mark — the computed '
-        'suzBegins suggests only, it never renders', (tester) async {
-      // The main scenario's arithmetic fires rule D on 9/16 — but no user
-      // SUZ mark exists, so the chart draws no SUZ bar and no arrow.
-      await pumpChart(
-        tester,
-        chartHarness(entries: _evaluationEntries, marks: _marks),
-      );
+    testWidgets(
+      'no „Sicher unfruchtbare Zeit“ glyph renders without a user mark — '
+      'the computed suzBegins suggests only, it never renders',
+      (tester) async {
+        // The main scenario's arithmetic fires „Sicher unfruchtbare Zeit am
+        // Abend“ on 9/16 — but no user mark exists, so the chart draws no
+        // „Sicher unfruchtbare Zeit“ bar and no arrow.
+        await pumpChart(
+          tester,
+          chartHarness(entries: _evaluationEntries, marks: _marks),
+        );
 
-      expect(
-        _suzBars(tester),
-        isEmpty,
-        reason: 'the computed SUZ never renders on the chart',
-      );
-      expect(_suzArrowSpot(tester), isNull);
-    });
+        expect(
+          _suzBars(tester),
+          isEmpty,
+          reason:
+              'the computed „Sicher unfruchtbare Zeit“ never renders on '
+              'the chart',
+        );
+        expect(_suzArrowSpot(tester), isNull);
+      },
+    );
   });
 
   group('latest-rise anchor renders in the UI (re-marking supersedes)', () {
@@ -811,11 +844,12 @@ void main() {
       'rise day renders no candidate',
       (tester) async {
         // Two firstHigher marks: 9/14 and 9/15. The LATER mark (9/15) anchors
-        // the evaluation — and re-derives the six-low window with it (R9):
-        // the lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
+        // the evaluation — and re-derives the six-low window with it: the
+        // lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
         // 36.9 (the earlier rise mark's day itself becomes a low!). From the
         // walk start 9/15: 9/15 sits AT the new baseline (gap day, no
-        // candidate), 9/16 (37.0) is circle #1 — no SUZ with a single circle.
+        // candidate), 9/16 (37.0) is circle #1 — no „Sicher unfruchtbare
+        // Zeit“ with a single circle.
         // Under the old earliest-anchor semantics the circles would be
         // {8, 9, 10} against the 36.4 baseline; the later mark wins instead.
         await pumpChart(

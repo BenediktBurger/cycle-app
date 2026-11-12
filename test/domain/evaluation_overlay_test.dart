@@ -1,16 +1,16 @@
 // Domain tests of the evaluation overlay (lib/domain/evaluation_overlay.dart):
 // the derived per-day artifacts the cycle chart and the PDF export both
 // draw — mucus peaks, circled/arrowed higher measurements, the 1–6 low
-// numbering, the baseline segment, user SUZ marks — plus the ignored-day
-// indexes of the temperature-ignore marks. Pure Dart — imports only
-// lib/domain, runs on the host VM.
+// numbering, the baseline segment, user „Sicher unfruchtbare Zeit“ marks —
+// plus the ignored-day indexes of the temperature-ignore marks. Pure Dart —
+// imports only lib/domain, runs on the host VM.
 //
 // The fixture carries two mark-opened cycle groups: cycle 1 exercises the
 // full artifact family (duplicated peak, arrow/circle split, six lows,
-// baseline span, user SUZ from a morning), cycle 2 stays plain so it only
-// exercises attribution (an evening SUZ mark inside ITS window while the
-// call sees the whole evaluation list) and no half-open window leakage
-// across cycle boundaries.
+// baseline span, user „Sicher unfruchtbare Zeit“ from a morning), cycle 2
+// stays plain so it only exercises attribution (an evening „Sicher
+// unfruchtbare Zeit“ mark inside ITS window while the call sees the whole
+// evaluation list) and no half-open window leakage across cycle boundaries.
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cycle_app/domain/cycle_grouping.dart';
@@ -96,12 +96,13 @@ void main() {
         (5, 4),
         (6, 3),
       ]);
-      expect(first.higherMeasurements.map((h) => (h.date.day, h.markKind)), [
+      expect(first.candidateMeasurements.map((h) => (h.date.day, h.markKind)), [
         (9, MarkKind.arrow),
         (10, MarkKind.arrow),
         (11, MarkKind.circle),
       ]);
-      // R10: the segment runs to the last marked candidate (Mar 11).
+      // App convention "baseline line extent": the segment runs to the last
+      // marked candidate (Mar 11).
       expect(first.baselineSpan!.endDay.day, 11);
     });
   });
@@ -127,7 +128,7 @@ void main() {
       expect(overlay.numbersByIndex, {6: 1, 5: 2, 4: 3, 3: 4, 2: 5, 1: 6});
     });
 
-    test('the baseline segment maps the R10 span, null for candidate-free '
+    test('the baseline segment maps the span, null for candidate-free '
         'cycles', () {
       final overlay = wholeRangeOverlay();
       expect(
@@ -141,8 +142,8 @@ void main() {
       expect(segment.value, 36.4);
     });
 
-    test('SUZ marks anchor morning at the column start, evening at the '
-        'middle', () {
+    test('„Sicher unfruchtbare Zeit“ marks anchor morning at the column start, '
+        'evening at the middle', () {
       final overlay = wholeRangeOverlay();
       final suz = overlay.suzMarks
           .map((m) => (dayIndex: m.dayIndex, barX: m.barX, morning: m.morning))
@@ -156,8 +157,8 @@ void main() {
     });
   });
 
-  group('rule R2 — the circled set and the baseline span stop at the last '
-      'connected candidate', () {
+  group('app convention "gap tolerance" — the circled set and the baseline '
+      'span stop at the last connected candidate', () {
     final entries = <DailyEntry>[
       d(2026, 3, 2, bleeding: Bleeding.medium), // cycle onset, unmeasured
       d(2026, 3, 3, t: 36.2),

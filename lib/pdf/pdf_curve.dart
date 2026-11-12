@@ -29,15 +29,16 @@
 // day list), the tests pin it.
 //
 // OUTPUT COORDINATES (column space, window-relative): window day i's
-// column spans [i, i+1] — measured dots, the computed-SUZ line and row
-// cells center at i + 0.5; a user morning SUZ bar rides the column's left
-// edge (x = i), an evening bar the column middle (x = i + 0.5); the R10
-// baseline runs from a low column's left edge to half a column past its
-// end day. Line pieces carry fractional x at range-boundary crossings;
-// cross-window pieces clip at the window edges. The arrow glyph's vertical
-// placement is solved at DRAW-LIST time in pt (PdfArrowMark.tipDropPt —
-// the dot radius plus the clearance gap, see the constants), so its
-// "clear of the dot" semantics are pin-able without the pdf package.
+// column spans [i, i+1] — measured dots and row cells center at i + 0.5; a
+// user morning start bar rides the column's left edge (x = i), an evening
+// bar the column middle (x = i + 0.5); the baseline segment runs from a low
+// column's left edge to half a column past its end day. Line pieces carry
+// fractional x at range-boundary crossings; cross-window pieces clip at the
+// window edges.
+// The arrow glyph's vertical placement is solved at DRAW-LIST time in pt
+// (PdfArrowMark.tipDropPt — the dot radius plus the clearance gap, see the
+// constants), so its "clear of the dot" semantics are pin-able without the
+// pdf package.
 import '../domain/cycle_grouping.dart';
 import '../domain/date_only.dart';
 import '../domain/evaluation.dart';
@@ -82,9 +83,10 @@ final class PdfCurvePiece {
   final bool ignored;
 }
 
-/// One drawable R10 baseline piece: the dashed line through the baseline's
-/// y-value, clipped to the page window (the segment may open on an
-/// earlier page and/or continue on the next).
+/// One drawable baseline segment piece (app convention "baseline line
+/// extent"): the dashed line through the baseline's y-value, clipped to the
+/// page window (the segment may open on an earlier page and/or continue on
+/// the next).
 final class PdfBaselinePiece {
   const PdfBaselinePiece(this.startX, this.endX, this.value);
 
@@ -97,10 +99,11 @@ final class PdfBaselinePiece {
   final double value;
 }
 
-/// One user-placed SUZ bar (sicher unfruchtbare Zeit): its x anchor
+/// One user-placed „Sicher unfruchtbare Zeit“ bar: its x anchor
 /// (column start for a morning, column middle for an evening mark) and
 /// the variant. The painter draws the bar hanging from the plot's top
-/// edge plus its right-pointing arrow — the chart's SUZ glyph pair.
+/// edge plus its right-pointing arrow — the chart's „Sicher unfruchtbare
+/// Zeit“ glyph pair.
 final class PdfSuzBar {
   const PdfSuzBar(this.x, this.morning);
 
@@ -145,26 +148,6 @@ const double pdfCurveDotRadiusPt = 1.5;
 /// must not touch the dot it marks.
 const double pdfArrowClearanceBelowDotPt = 2.5;
 
-/// One computed-SUZ artifact: a thin vertical line at the `suzBegins`
-/// day's column middle plus the rule letter (D/E) — visually distinct
-/// from the user-placed SUZ bars by shape and stroke.
-final class PdfSuzLine {
-  const PdfSuzLine(this.x, this.ruleLetter);
-
-  /// Column-space x (the `suzBegins` column's middle). Clamped to the
-  /// window's RIGHT edge when the day sits beyond this page (the line
-  /// continues on the next one); absent when its column lies BEHIND the
-  /// window — the line rides one specific column, so it never shifts onto
-  /// a neighboring one.
-  final double x;
-
-  /// The rule letter ("D" / "E"), or null when the caller carried no
-  /// rule. Pinned: a SUZ without a rule letter is still drawn — null
-  /// renders as the letter "S" (the painter's fallback here, not a
-  /// behavior to change).
-  final String? ruleLetter;
-}
-
 /// The complete draw list of one page's curve block. Window-relative
 /// column coordinates; the painter maps them onto pt with the pdf_axis
 /// geometry.
@@ -178,7 +161,6 @@ final class PdfCurveDrawing {
     required this.arrows,
     required this.lowNumbers,
     required this.peakIndexes,
-    required this.suzLine,
   });
 
   /// The measured, in-window temperature dots (sorted by column index).
@@ -187,10 +169,10 @@ final class PdfCurveDrawing {
   /// The drawable line pieces (range-clipped spans).
   final List<PdfCurvePiece> pieces;
 
-  /// The R10 baseline pieces, window-clipped.
+  /// The baseline segment pieces, window-clipped.
   final List<PdfBaselinePiece> baseline;
 
-  /// The user-placed SUZ bars.
+  /// The user-placed „Sicher unfruchtbare Zeit“ bars.
   final List<PdfSuzBar> suzBars;
 
   /// The circled higher measurements (rings around their dots).
@@ -206,10 +188,6 @@ final class PdfCurveDrawing {
   /// dots in their own in-plot row above the mucus letters row — a
   /// data-less column draws the dot without a mucus glyph).
   final Set<int> peakIndexes;
-
-  /// The computed-SUZ line, or null when the cycle has none (or the day
-  /// falls behind this window).
-  final PdfSuzLine? suzLine;
 }
 
 /// Builds one page window's curve/overlay draw list.
@@ -217,16 +195,13 @@ final class PdfCurveDrawing {
 /// [cycle] and [overlay] must reference the SAME cycle (as the export
 /// model guarantees: `overlays[i]` draws over `cycles[i]`). The window is
 /// the calendar-day-list slice `[windowFirstIndex, windowFirstIndex +
-/// windowDayCount)` of the cycle. [computedSuz] carries the evaluation's
-/// already-computed `suzBegins`/`suzRule` — the PDF draws them, it does
-/// not re-derive the rules.
+/// windowDayCount)` of the cycle.
 PdfCurveDrawing pdfCurveDrawing({
   required CycleEvaluation cycle,
   required PdfCycleOverlay overlay,
   required TemperatureRange range,
   required int windowFirstIndex,
   required int windowDayCount,
-  required ({DateTime? suzBegins, SuzRule? suzRule}) computedSuz,
 }) {
   final days = cycleCalendarDays(cycle.cycle);
   final cycleStart = DateOnly.normalize(cycle.cycle.startDate);
@@ -310,7 +285,7 @@ PdfCurveDrawing pdfCurveDrawing({
       ),
   ];
 
-  // --- the R10 baseline, clipped to the window.
+  // --- the baseline segment, clipped to the window.
   final baseline = <PdfBaselinePiece>[];
   for (final segment in overlay.baselineSegments) {
     final startPos = spanPositions[segment.startIndex];
@@ -337,9 +312,9 @@ PdfCurveDrawing pdfCurveDrawing({
     );
   }
 
-  // --- the user-placed SUZ bars: their bar rides the marked day's own
-  // column (start for morning, middle for evening), so only days of THIS
-  // window render.
+  // --- the user-placed „Sicher unfruchtbare Zeit“ bars: their bar rides
+  // the marked day's own column (start for morning, middle for evening),
+  // so only days of THIS window render.
   final suzBars = [
     for (final mark in overlay.suzMarks)
       if (spanPositions[mark.dayIndex] case final pos?
@@ -349,25 +324,6 @@ PdfCurveDrawing pdfCurveDrawing({
           mark.morning,
         ),
   ];
-
-  // --- the computed-SUZ artifact (carried from the evaluation, never
-  // re-derived here).
-  PdfSuzLine? suzLine;
-  if (computedSuz.suzBegins case final begins?) {
-    final offset = DateOnly.daysBetween(DateOnly.normalize(begins), cycleStart);
-    if (spanPositions[offset] case final pos? when pos >= windowFirstIndex) {
-      final x = (pos + 0.5).clamp(
-        windowFirstIndex.toDouble(),
-        windowEnd.toDouble(),
-      ); // right-edge clamp for page continuation
-      final letter = switch (computedSuz.suzRule) {
-        null => null,
-        SuzRule.d => 'D',
-        SuzRule.e => 'E',
-      };
-      suzLine = PdfSuzLine(x - windowFirstIndex, letter);
-    }
-  }
 
   // --- the remaining candidate/mark artifacts, mapped + window-filtered.
   // CHART PARITY: a candidate without a MEASURED IN-RANGE temperature draws
@@ -409,6 +365,5 @@ PdfCurveDrawing pdfCurveDrawing({
     arrows: arrows,
     lowNumbers: lowNumbers,
     peakIndexes: peaks,
-    suzLine: suzLine,
   );
 }

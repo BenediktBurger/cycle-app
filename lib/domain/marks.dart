@@ -42,14 +42,16 @@ abstract final class CycleMarkTypes {
   /// exclude_* keys) derive it with author 'import'.
   static const ignoreTemperature = 'ignoreTemperature';
 
-  /// The user-placed start of the sicher unfruchtbare Zeit (SUZ) from a
-  /// MORNING (the SUZ bar renders at the day column's start). The computed
-  /// SUZ (rules D/E in lib/domain/evaluation.dart) is suggestion-only —
-  /// manual SUZ marks never alter the arithmetic (ADR-0001).
+  /// The user-placed start of the „Sicher unfruchtbare Zeit“ from a
+  /// MORNING (the bar renders at the day column's start). The morning start
+  /// follows from the waking-temperature measurement of the 4th higher
+  /// measurement (docs/NER/app-conventions.md); the computed „Sicher
+  /// unfruchtbare Zeit“ (see lib/domain/evaluation.dart) is suggestion-only
+  /// — the manual marks never alter the arithmetic (ADR-0001).
   static const suzMorning = 'suzMorning';
 
-  /// The user-placed SUZ start from an EVENING (the SUZ bar renders at the
-  /// day column's middle).
+  /// The user-placed start of the „Sicher unfruchtbare Zeit“ from an
+  /// EVENING (the bar renders at the day column's middle).
   static const suzEvening = 'suzEvening';
 
   /// The user-placed start of a menstrual cycle. The AUTHORITATIVE cycle
