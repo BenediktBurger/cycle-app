@@ -8,7 +8,7 @@ const bool canPickFile = false;
 
 Future<bool> saveFile(String filename, String content) async => false;
 
-// Never called in production (both capability flags are false so every
+// Never called in production (every capability flag is false, so every
 // file button stays hidden); it exists only so all implementations of the
 // conditional export compile with the same surface.
 Future<bool> shareFile(String filename, String content) async => false;

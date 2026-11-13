@@ -25,7 +25,7 @@ import 'package:cycle_app/pdf/cycle_pdf.dart'
     show PdfExportOptions, pdfExportFileName;
 import 'package:cycle_app/providers.dart';
 import 'package:cycle_app/ui/file_transfer_io.dart'
-    show saveFileBytesOverride, shareFileBytesOverride;
+    show canShareFileOverride, saveFileBytesOverride, shareFileBytesOverride;
 import 'package:cycle_app/ui/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,6 +79,11 @@ class CapturedRun {
 }
 
 void main() {
+  // The suite models a share-capable native host, independent of the Linux
+  // host VM.
+  setUp(() => canShareFileOverride = true);
+  tearDown(() => canShareFileOverride = null);
+
   // The settings pane is one scroll list; the export card sits low, so the
   // tests render the full pane height in one viewport.
   Future<void> enlargeViewport(WidgetTester tester) async {
@@ -797,6 +802,23 @@ void main() {
         lessThan(tester.getRect(pdfExportShareButton()).left),
         reason: 'save is the primary hand-off and renders first (left)',
       );
+    },
+  );
+
+  testWidgets(
+    'without a share-capable platform the card keeps the save button and '
+    'drops the share button',
+    (WidgetTester tester) async {
+      await enlargeViewport(tester);
+      canShareFileOverride = false;
+      await pumpCard(
+        tester,
+        harness(entries: cardEntries(), marks: cardMarks()),
+      );
+
+      expect(pdfExportButton(), findsOneWidget);
+      expect(pdfExportShareButton(), findsNothing);
+      expect(find.text('Share'), findsNothing);
     },
   );
 

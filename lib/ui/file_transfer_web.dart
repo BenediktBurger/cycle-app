@@ -1,5 +1,6 @@
 // Web implementation: browser downloads for exports, the share sheet for JSON
-// exports, and a file input for importing a previously saved export.
+// and PDF exports where `navigator.canShare` accepts the type, and a file
+// input for importing a previously saved export.
 //
 // ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 //
@@ -14,14 +15,15 @@ import 'web_share.dart';
 import 'web_share_outcome.dart';
 
 const bool canSaveFile = true;
-// The PDF hand-off stays the browser download on web; only the JSON export
-// uses the share sheet (see [canShareJsonFile]).
-const bool canShareFile = false;
 const bool canPickFile = true;
+
+/// The PDF export's share hand-off: the browser share sheet where it accepts
+/// a PDF file; the anchored browser download stays the separate save action.
+bool get canShareFile => canShareBrowserFiles('application/pdf');
 
 /// JSON exports go through the browser share sheet where it accepts a file;
 /// the runtime probe keeps the share button hidden where it does not.
-bool get canShareJsonFile => canShareJsonFiles;
+bool get canShareJsonFile => canShareBrowserFiles('application/json');
 
 /// Triggers a browser download of [content] as [filename] (anchor + Blob).
 /// Returns true when the click was sent — browsers may still ask the user
@@ -54,13 +56,29 @@ Future<bool> _triggerDownload(String filename, html.Blob blob) async {
 /// share API is false. The browser download stays the separate save action.
 Future<bool> shareFile(String filename, String content) async {
   if (!canShareJsonFile) return false;
-  return webShareCompleted(await shareJsonFiles(filename, content));
+  return webShareCompleted(
+    await shareBrowserFile(
+      filename,
+      utf8.encode(content),
+      mimeType: 'application/json',
+    ),
+  );
 }
 
-/// Binary share variant for the PDF export document: dead on web, where the
-/// browser download is the PDF hand-off; kept only for the conditional
-/// export's equal surface.
-Future<bool> shareFileBytes(String filename, List<int> bytes) async => false;
+/// Hands the PDF document to the browser share sheet where it accepts a PDF
+/// file; the browser download stays the separate save action. A dismissed or
+/// unavailable sheet is false.
+///
+/// Limitation (accepted): the card generates the document before this call,
+/// so the tap's transient activation may already be spent and the browser
+/// rejects with `NotAllowedError` — classified as unsupported, i.e. the
+/// failure snackbar.
+Future<bool> shareFileBytes(String filename, List<int> bytes) async {
+  if (!canShareFile) return false;
+  return webShareCompleted(
+    await shareBrowserFile(filename, bytes, mimeType: 'application/pdf'),
+  );
+}
 
 /// Opens a file picker filtered by [accept] (an HTML accept list such as
 /// `application/json,.json` or `.csv,text/csv`) and reads the chosen file's

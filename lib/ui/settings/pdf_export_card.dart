@@ -125,9 +125,8 @@ final class _PdfExportCardState extends ConsumerState<PdfExportCard> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             // ONE generation run serves both hand-offs: the document goes
-            // through the save-as dialog or the system share sheet (web
-            // has no share sheet — its browser download stays the
-            // hand-off).
+            // through the save-as dialog or the share sheet where the
+            // platform offers one (see canShareFile).
             Wrap(
               spacing: 8,
               runSpacing: 8,
