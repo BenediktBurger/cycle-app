@@ -63,9 +63,9 @@ List<CycleMark> threeCycleStarts() => [
   start(2026, 5, 25),
 ];
 
-/// [threeCycleData] with a measured low, a measured rise and a preceding
-/// peak in each cycle: rise marks on Mar 20 (cycle day 19), Apr 6 (day 8)
-/// and May 1 (day 5) produce circles.
+/// [threeCycleData] with a measured low and a measured rise in each cycle:
+/// Mar 19/20 (cycle day 19), Apr 5/6 (day 8), Apr 30/May 1 (day 5).
+/// Tests add the peak and rise marks that turn those rises into circles.
 List<DailyEntry> circledThreeCycleData() => [
   d(2026, 3, 2, bleeding: Bleeding.medium),
   d(2026, 3, 3, bleeding: Bleeding.medium),

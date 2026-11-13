@@ -49,13 +49,12 @@ List<CycleMark> screenMarks() => [
   CycleMark(date: m(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
 ];
 
-/// Variant of [screenMarks] adding a first-higher mark ON cycle 2's first
-/// day (Mar 29, cycle day 1) with the peak on the SAME day: the "over all
-/// cycles" variant drops to minimum cycle day 1. Cycle 2 produces no
-/// measured circle of its own — a rise inside a cycle's first six days
-/// has its six-low window truncated at the cycle's own tracked days, so
-/// no baseline and no candidate exist there — and the real (umrandete
-/// Messung) variant keeps cycle 1's first circle, cycle day 14.
+/// Variant of [screenMarks] adding a rise mark ON cycle 2's first day
+/// (Mar 29, cycle day 1) with the peak on the SAME day: the mark pins a
+/// rise that never becomes a circle. A rise inside a cycle's first six
+/// days has its six-low window truncated at the cycle's own tracked days,
+/// so no baseline and no candidate exist there. Cycle 1 keeps its circled
+/// day 14; cycle 2 contributes none.
 List<CycleMark> divergentMarks() => [
   ...screenMarks(),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.mucusPeakDay),
@@ -433,11 +432,10 @@ void main() {
     expect(find.byKey(const ValueKey('statisticsRowStart-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('statisticsRowStart-2')), findsNothing);
 
-    // Column headers: cycle start, bleeding days, first higher, length.
     for (final header in [
       'Cycle start',
       'Bleeding days',
-      'First higher measurement',
+      'Circled higher measurement',
       'Length',
     ]) {
       expect(
@@ -544,13 +542,10 @@ void main() {
       findsOneWidget,
       reason: 'exactly one figure: the verified in-app day',
     );
-    // The marked-rise variant appears NOWHERE — not even as a label.
-    expect(find.textContaining('after the mucus peak'), findsNothing);
-    expect(find.textContaining('over all cycles'), findsNothing);
   });
 
-  testWidgets('a divergent record keeps the one true figure on the summary '
-      'card — the marked rise appears nowhere', (tester) async {
+  testWidgets('a divergent record keeps the one circled figure on the '
+      'summary card', (tester) async {
     await pumpStats(tester, entries: screenEntries(), marks: divergentMarks());
 
     expect(
@@ -563,8 +558,7 @@ void main() {
     );
     expect(summaryEarliest, findsOneWidget);
     // Cycle 1's first circle is the true (umrandete) figure — cycle day
-    // 14 — and cycle 2 adds no better one: its day-1 rise stays a
-    // marked-rise variant figure only.
+    // 14 — and cycle 2 adds none: its rise has no measurable circle.
     final figures = tester
         .widgetList<Text>(
           find.descendant(
@@ -577,6 +571,28 @@ void main() {
     expect(figures, [
       'cycle day 14',
     ], reason: 'the single figure is the true one alone');
+  });
+
+  testWidgets('a rise without a measurable circle dashes in the table and '
+      'feeds no metric value', (tester) async {
+    await pumpStats(tester, entries: screenEntries(), marks: divergentMarks());
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('statisticsRowFirstHigher-1')),
+        matching: find.text('—'),
+      ),
+      findsOneWidget,
+      reason: 'cycle 2 marks a peak and a rise on one day — no circle exists',
+    );
+    expect(
+      find.descendant(
+        of: metricCard('firstHigher'),
+        matching: find.text(enL10n.statisticsMetricFromCycles(1)),
+      ),
+      findsOneWidget,
+      reason: 'only cycle 1 contributes a circled cycle day',
+    );
   });
 
   testWidgets('the German wording renders on the de surface', (tester) async {
@@ -595,16 +611,17 @@ void main() {
       'Zykluslänge (Tage)',
       'Blutungsdauer (Tage)',
       'Dauer der Hochlage (Tage)',
-      'Erste höhere Messung (Zyklustag)',
+      'Erste umrandete höhere Messung (Zyklustag)',
+      'Umrandete höhere Messung',
       'Standardabweichung',
-      'Früheste erste höhere Messung',
+      'Früheste umrandete höhere Messung',
       'Zyklustag 14',
     ]) {
       expect(find.textContaining(label), findsWidgets, reason: 'de: "$label"');
     }
     // The unit lives only in the card headers: the bare titles are gone
-    // (the table header still renders "Erste höhere Messung" exactly, so
-    // that one is not asserted gone).
+    // (the table header spells the circled measurement out, so that one
+    // is not asserted gone).
     expect(find.text('Zykluslänge'), findsNothing);
     expect(find.text('Blutungsdauer'), findsNothing);
     expect(find.text('Dauer der Hochlage'), findsNothing);
@@ -940,7 +957,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('Earliest first higher measurement'),
+        matching: find.text('Earliest circled higher measurement'),
       ),
       findsOneWidget,
     );
@@ -962,8 +979,6 @@ void main() {
       findsOneWidget,
       reason: 'the paper figure lives on the outside line',
     );
-    expect(find.textContaining('after the mucus peak'), findsNothing);
-    expect(find.textContaining('over all cycles'), findsNothing);
     expect(
       find.textContaining('figures in parentheses'),
       findsNothing,
@@ -983,7 +998,7 @@ void main() {
     expect(
       find.descendant(
         of: summaryEarliest,
-        matching: find.text('Earliest first higher measurement'),
+        matching: find.text('Earliest circled higher measurement'),
       ),
       findsOneWidget,
     );
@@ -1034,7 +1049,7 @@ void main() {
       reason: 'the summary card is the single earliest surface',
     );
     expect(
-      find.text('Earliest first higher measurement'),
+      find.text('Earliest circled higher measurement'),
       findsOneWidget,
       reason: 'one on-screen card carries the earliest title',
     );
@@ -1084,11 +1099,6 @@ void main() {
       reason: 'the single figure: the true in-app day',
     );
     expect(
-      find.descendant(of: summaryEarliest, matching: find.text('cycle day 1')),
-      findsNothing,
-      reason: 'the marked rise leaves the summary row',
-    );
-    expect(
       find.descendant(
         of: summaryEarliest,
         matching: find.text(enL10n.statisticsFirstHigherOutsideApp(5)),
@@ -1123,11 +1133,6 @@ void main() {
       findsNothing,
       reason: 'the summary card is the single earliest surface',
     );
-    expect(
-      find.textContaining('no first higher measurement'),
-      findsNothing,
-      reason: 'the real variant stays unqualified on the screen',
-    );
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),
     );
@@ -1138,11 +1143,6 @@ void main() {
       reason:
           'the single figure dashes — the rise has no marked peak, so it '
           'is never an umrandete Messung in-app',
-    );
-    expect(
-      find.descendant(of: summaryEarliest, matching: find.text('cycle day 3')),
-      findsNothing,
-      reason: 'the marked rise appears nowhere on the card',
     );
     expect(
       find.descendant(of: summaryEarliest, matching: find.text('cycle day 5')),
@@ -1181,11 +1181,6 @@ void main() {
       findsNothing,
       reason: 'the summary card is the single earliest surface',
     );
-    expect(
-      find.textContaining('no first higher measurement'),
-      findsNothing,
-      reason: 'the screen states nothing about the real variant',
-    );
     final summaryEarliest = find.byKey(
       const ValueKey('statisticsCard-earliest'),
     );
@@ -1196,11 +1191,6 @@ void main() {
       reason:
           'the single figure dashes — the rise has no marked peak, so it '
           'is never an umrandete Messung in-app',
-    );
-    expect(
-      find.descendant(of: summaryEarliest, matching: find.text('cycle day 3')),
-      findsNothing,
-      reason: 'the marked rise appears nowhere on the card',
     );
     expect(
       find.descendant(

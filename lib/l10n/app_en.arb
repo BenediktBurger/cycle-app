@@ -14,7 +14,7 @@
   "termCervixPosition": "Cervix position",
   "termCervixFirmness": "Cervix firmness",
   "termMeasurementTime": "Measurement time",
-  "termFirstHigher": "First higher measurement",
+  "termFirstHigher": "Temperature rise",
   "termCycleStart": "Cycle start",
   "@termCycleStart": {
     "description": "Name of the cycleStart mark (the day panel's first chip) and, at the same time, the \"Cycle start\" column header of the statistics table — one string on both surfaces so the two names cannot drift."
@@ -213,7 +213,7 @@
   "cycleLegendBaseline": "Baseline",
   "cycleNoData": "Enter observations or measurements to see the cycle.",
   "cycleJumpToDate": "Jump to date",
-  "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the first higher measurement; numbering, baseline and circles are computed for display only — no fertility statement.",
+  "cycleArithmeticNote": "Evaluation marks: you place the mucus peak and the temperature rise; numbering, baseline and circles are computed for display only — no fertility statement.",
   "cycleSheetEditDay": "Edit day",
   "cycleSheetSuzEveningLabel": "SUZ from this evening",
   "@cycleSheetSuzEveningLabel": {
@@ -223,7 +223,7 @@
   "@cycleSheetSuzMorningLabel": {
     "description": "Static label of the definitely infertile time morning chip (the chip state, not the label, carries set/remove). TODO(user-review): see the evening label — the wording is pending the expert review."
   },
-  "cycleSheetRemoveFirstHigher": "Remove first higher measurement",
+  "cycleSheetRemoveFirstHigher": "Remove temperature rise",
   "cycleSheetBaselineInfo": "Baseline: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {
@@ -257,7 +257,7 @@
     },
     "description": "The difference of a circled/arrowed higher measurement to the baseline (app convention \"baseline difference\"); the value is pre-formatted with the locale's decimal style."
   },
-  "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the first higher measurement again at the next higher measurement.",
+  "cycleSheetEvaluationStopped": "The automatic evaluation has stopped — set the temperature rise again at the next higher measurement.",
   "cycleSheetRiseConsistencyBelow": "{value} °C on the marked day is not above the baseline {baseline} °C.",
   "@cycleSheetRiseConsistencyBelow": {
     "placeholders": {
@@ -300,18 +300,22 @@
   "statisticsNoData": "Statistics appear once a first cycle start is recorded.",
   "statisticsMetricCycleLength": "Cycle length (days)",
   "statisticsBleedingDays": "Bleeding days",
-  "statisticsMetricFirstHigherDay": "First higher measurement (cycle day)",
+  "statisticsTableCircledHigher": "Circled higher measurement",
+  "@statisticsTableCircledHigher": {
+    "description": "Column header of the cycle table's circled-measurement column."
+  },
+  "statisticsMetricFirstHigherDay": "First circled higher measurement (cycle day)",
   "@statisticsMetricFirstHigherDay": {
-    "description": "Card title of the first-higher metric card: the per-cycle first higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
+    "description": "Card title of the first-higher metric card: the per-cycle first circled higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
   },
   "statisticsMetricFirstHigherUntilEnd": "Duration of the higher phase (days)",
   "@statisticsMetricFirstHigherUntilEnd": {
-    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first higher measurement to the cycle's end (the first-higher day counts as one)."
+    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first circled higher measurement to the cycle's end (that day counts as one)."
   },
   "statisticsMinimum": "Minimum",
   "statisticsAverage": "Average",
   "statisticsMaximum": "Maximum",
-  "statisticsEarliestFirstHigher": "Earliest first higher measurement",
+  "statisticsEarliestFirstHigher": "Earliest circled higher measurement",
   "statisticsFirstHigherDayOfCycle": "Cycle day {n}",
   "@statisticsFirstHigherDayOfCycle": {
     "placeholders": {
@@ -319,7 +323,7 @@
         "type": "int"
       }
     },
-    "description": "A cycle's first higher measurement as a day-of-cycle number: the earliest entry among all cycles in the metrics block, and the first-higher column of the cycle table."
+    "description": "A cycle's first circled higher measurement as a day-of-cycle number: the earliest entry among all cycles in the metrics block, and the circled-measurement column of the cycle table."
   },
   "statisticsCycleTable": "Cycle table",
   "statisticsTableLength": "Length",
@@ -367,7 +371,7 @@
         "type": "int"
       }
     },
-    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+    "description": "The cycle-day number of a circled higher measurement (the cycle's marked start day is day 1)."
   },
   "statisticsShortestOutsideApp": "outside: {n}",
   "@statisticsShortestOutsideApp": {
@@ -385,7 +389,7 @@
         "type": "int"
       }
     },
-    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT the same sense as the card's figure (the earliest umrandete Messung across in-app cycles). Capitalization matches statisticsCycleDay."
+    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. Capitalization matches statisticsCycleDay."
   },
   "statisticsHelpShow": "Show statistics help",
   "@statisticsHelpShow": {
@@ -431,11 +435,11 @@
   "@statisticsHelpBleedingDuration": {
     "description": "Body under the `statisticsMetricBleedingDuration` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherDay": "The cycle day of this cycle's first circled higher measurement; when no measurement is circled, the marked first higher measurement counts instead.",
+  "statisticsHelpFirstHigherDay": "The cycle day of this cycle's first circled higher measurement.",
   "@statisticsHelpFirstHigherDay": {
     "description": "Body under the `statisticsMetricFirstHigherDay` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherUntilEnd": "From the first higher measurement through the cycle end; the first day counts.",
+  "statisticsHelpFirstHigherUntilEnd": "From the first circled higher measurement through the cycle end; the first day counts.",
   "@statisticsHelpFirstHigherUntilEnd": {
     "description": "Body under the `statisticsMetricFirstHigherUntilEnd` entry; the title comes from that key."
   },
@@ -463,7 +467,7 @@
   "@statisticsHelpMetricCount": {
     "description": "Body-only paragraph in the statistics help sheet explaining the `statisticsMetricFromCycles` caption; that key carries a plural placeholder and serves as no entry title."
   },
-  "statisticsHelpCycleTable": "One row per cycle with start, bleeding days, first higher measurement and length — so the card numbers can be traced.",
+  "statisticsHelpCycleTable": "One row per cycle with start, bleeding days, circled higher measurement and length — so the card numbers can be traced.",
   "@statisticsHelpCycleTable": {
     "description": "Body under the `statisticsCycleTable` entry; the title comes from that key."
   },

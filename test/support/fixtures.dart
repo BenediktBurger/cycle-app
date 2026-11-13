@@ -57,7 +57,7 @@ List<DailyEntry> evaluationScenarioEntries() => [
 ];
 
 /// The evaluation scenario's user marks: the mucus peak (9/12) LIES BEFORE
-/// the first higher measurement (9/14), so the candidates render CIRCLED.
+/// the temperature rise (9/14), so the candidates render CIRCLED.
 List<CycleMark> evaluationScenarioMarks() => [
   CycleMark(date: DateTime.utc(2026, 9, 12), type: CycleMarkTypes.mucusPeakDay),
   CycleMark(

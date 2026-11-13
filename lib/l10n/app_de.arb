@@ -11,7 +11,7 @@
   "termCervixPosition": "Muttermund-Position",
   "termCervixFirmness": "Muttermund-Festigkeit",
   "termMeasurementTime": "Messzeitpunkt",
-  "termFirstHigher": "Erste höhere Messung",
+  "termFirstHigher": "Temperaturanstieg",
   "termCycleStart": "Zyklusbeginn",
   "@termCycleStart": {
     "description": "Name des Zyklusbeginn-Marks (der erste Chip im Tag-Panel) und zugleich Spaltentitel „Zyklusbeginn“ in der Zyklen-Tabelle der Statistik — eine Zeichenkette auf beiden Flächen, damit die beiden Namen nicht auseinanderlaufen."
@@ -184,11 +184,11 @@
   "cycleLegendBaseline": "Basislinie",
   "cycleNoData": "Trage Beobachtungen oder Messwerte ein, um den Zyklus zu sehen.",
   "cycleJumpToDate": "Zum Datum springen",
-  "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
+  "cycleArithmeticNote": "Auswertungsmarkierungen: Schleimhöhepunkt und Temperaturanstieg setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die Anzeige berechnet — keine Fruchtbarkeitsangabe.",
   "cycleSheetEditDay": "Tag bearbeiten",
   "cycleSheetSuzEveningLabel": "SUZ ab diesem Abend",
   "cycleSheetSuzMorningLabel": "SUZ ab diesem Morgen",
-  "cycleSheetRemoveFirstHigher": "Erste höhere Messung entfernen",
+  "cycleSheetRemoveFirstHigher": "Temperaturanstieg entfernen",
   "cycleSheetBaselineInfo": "Basislinie: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {
@@ -222,7 +222,7 @@
     },
     "description": "Die Differenz einer umrandeten/als Pfeil markierten höheren Messung zur Basislinie (App-Konvention \"baseline difference\"); der Wert ist bereits im Gebietsschema formatiert."
   },
-  "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze die erste höhere Messung bei der nächsten höheren Messung neu.",
+  "cycleSheetEvaluationStopped": "Die automatische Auswertung ist abgebrochen — setze den Temperaturanstieg bei der nächsten höheren Messung neu.",
   "cycleSheetRiseConsistencyBelow": "{value} °C am markierten Tag liegt nicht über der Basislinie {baseline} °C.",
   "cycleSheetRiseConsistencyNoValue": "Am markierten Tag ist keine verwertbare Temperatur erfasst (ungemessen oder unterbrochen).",
   "cycleSheetRiseConsistencyKeep": "Behalten",
@@ -240,18 +240,22 @@
   "statisticsNoData": "Sobald ein erster Zyklusbeginn erfasst ist, erscheinen hier Statistiken.",
   "statisticsMetricCycleLength": "Zykluslänge (Tage)",
   "statisticsBleedingDays": "Blutungstage",
-  "statisticsMetricFirstHigherDay": "Erste höhere Messung (Zyklustag)",
+  "statisticsTableCircledHigher": "Umrandete höhere Messung",
+  "@statisticsTableCircledHigher": {
+    "description": "Column header of the cycle table's circled-measurement column."
+  },
+  "statisticsMetricFirstHigherDay": "Erste umrandete höhere Messung (Zyklustag)",
   "@statisticsMetricFirstHigherDay": {
-    "description": "Card title of the first-higher metric card: the per-cycle first higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
+    "description": "Card title of the first-higher metric card: the per-cycle first circled higher measurements shown as their cycle-day numbers (the cycle's marked start day is day 1)."
   },
   "statisticsMetricFirstHigherUntilEnd": "Dauer der Hochlage (Tage)",
   "@statisticsMetricFirstHigherUntilEnd": {
-    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first higher measurement to the cycle's end (the first-higher day counts as one)."
+    "description": "Card title of the metric card for the duration of the higher phase: the days from a cycle's first circled higher measurement to the cycle's end (that day counts as one)."
   },
   "statisticsMinimum": "Minimum",
   "statisticsAverage": "Durchschnitt",
   "statisticsMaximum": "Maximum",
-  "statisticsEarliestFirstHigher": "Früheste erste höhere Messung",
+  "statisticsEarliestFirstHigher": "Früheste umrandete höhere Messung",
   "statisticsFirstHigherDayOfCycle": "Zyklustag {n}",
   "@statisticsFirstHigherDayOfCycle": {
     "placeholders": {
@@ -259,7 +263,7 @@
         "type": "int"
       }
     },
-    "description": "Die erste höhere Messung eines Zyklus als Zyklustag-Nummer: der früheste Schwellenwert-Eintrag unter allen Zyklen im Metrik-Kasten und die erste-höhere-Spalte in der Zyklen-Tabelle."
+    "description": "Die Zyklustag-Nummer der ersten umrandeten höheren Messung eines Zyklus: der früheste Eintrag unter allen Zyklen im Metrik-Kasten und die umrandete Spalte in der Zyklentabelle."
   },
   "statisticsCycleTable": "Zyklen-Tabelle",
   "statisticsTableLength": "Länge",
@@ -307,7 +311,7 @@
         "type": "int"
       }
     },
-    "description": "The cycle-day number of a first higher measurement (the cycle's marked start day is day 1)."
+    "description": "The cycle-day number of a circled higher measurement (the cycle's marked start day is day 1)."
   },
   "statisticsShortestOutsideApp": "außerhalb: {n}",
   "@statisticsShortestOutsideApp": {
@@ -325,7 +329,7 @@
         "type": "int"
       }
     },
-    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. NOT the same sense as the card's figure (the earliest umrandete Messung across in-app cycles). Capitalization matches statisticsCycleDay."
+    "description": "Earliest-card caption line naming the earliest first-higher cycle day across ALL paper cycles (the settings value), shown when it has a value. Capitalization matches statisticsCycleDay."
   },
   "statisticsHelpShow": "Statistik-Hilfe anzeigen",
   "@statisticsHelpShow": {
@@ -371,11 +375,11 @@
   "@statisticsHelpBleedingDuration": {
     "description": "Body under the `statisticsMetricBleedingDuration` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherDay": "Der Zyklustag der ersten umrandeten höheren Messung dieses Zyklus; ist keine Messung umrandet, zählt stattdessen die markierte erste höhere Messung.",
+  "statisticsHelpFirstHigherDay": "Der Zyklustag der ersten umrandeten höheren Messung dieses Zyklus.",
   "@statisticsHelpFirstHigherDay": {
     "description": "Body under the `statisticsMetricFirstHigherDay` entry; the title comes from that key."
   },
-  "statisticsHelpFirstHigherUntilEnd": "Von der ersten höheren Messung bis zum Zyklusende; der erste Tag zählt mit.",
+  "statisticsHelpFirstHigherUntilEnd": "Von der ersten umrandeten höheren Messung bis zum Zyklusende; der erste Tag zählt mit.",
   "@statisticsHelpFirstHigherUntilEnd": {
     "description": "Body under the `statisticsMetricFirstHigherUntilEnd` entry; the title comes from that key."
   },
@@ -403,7 +407,7 @@
   "@statisticsHelpMetricCount": {
     "description": "Body-only paragraph in the statistics help sheet explaining the `statisticsMetricFromCycles` caption; that key carries a plural placeholder and serves as no entry title."
   },
-  "statisticsHelpCycleTable": "Je Zyklus eine Zeile mit Beginn, Blutungstagen, erster höherer Messung und Länge — so lassen sich die Zahlen der Karten nachvollziehen.",
+  "statisticsHelpCycleTable": "Je Zyklus eine Zeile mit Beginn, Blutungstagen, umrandeter höherer Messung und Länge — so lassen sich die Zahlen der Karten nachvollziehen.",
   "@statisticsHelpCycleTable": {
     "description": "Body under the `statisticsCycleTable` entry; the title comes from that key."
   },
