@@ -63,6 +63,27 @@ List<CycleMark> threeCycleStarts() => [
   start(2026, 5, 25),
 ];
 
+/// [threeCycleData] with a measured low, a measured rise and a preceding
+/// peak in each cycle: rise marks on Mar 20 (cycle day 19), Apr 6 (day 8)
+/// and May 1 (day 5) produce circles.
+List<DailyEntry> circledThreeCycleData() => [
+  d(2026, 3, 2, bleeding: Bleeding.medium),
+  d(2026, 3, 3, bleeding: Bleeding.medium),
+  d(2026, 3, 4),
+  d(2026, 3, 19, bbtC: 36.4),
+  d(2026, 3, 20, bbtC: 36.7),
+  d(2026, 3, 30, bleeding: Bleeding.medium),
+  d(2026, 4, 1),
+  d(2026, 4, 5, bbtC: 36.4),
+  d(2026, 4, 6, bbtC: 36.7),
+  d(2026, 4, 10, bleeding: Bleeding.spotting),
+  d(2026, 4, 27, bleeding: Bleeding.medium),
+  d(2026, 4, 30, bbtC: 36.4),
+  d(2026, 5, 1, bbtC: 36.7),
+  d(2026, 5, 25, bleeding: Bleeding.medium),
+  d(2026, 5, 26, bleeding: Bleeding.medium),
+];
+
 void main() {
   group('cycleLengthsInDays', () {
     test('counts days between consecutive marked cycle starts', () {
@@ -260,17 +281,16 @@ void main() {
       }
     });
 
-    test('marked first-higher day (no peak) is the fallback truth', () {
-      // No mucus peak and no measured temperatures in the low window: no
-      // candidates can exist, so the user-placed mark day IS the first
-      // higher fact (arithmetic fallback, no interpretation).
+    test('a marked temperature rise without a circled measurement leaves '
+        'the first-higher facts null', () {
+      // No mucus peak and no measured temperatures: no candidate can exist,
+      // so the user-placed rise mark is not a statistic.
       final facts = cycleFacts(threeCycleData(), [
         ...threeCycleStarts(),
         firstHigher(2026, 3, 20),
       ]);
-      expect(facts[0].firstHigherDay, DateTime.utc(2026, 3, 20));
-      // Cycle end exclusive is the next start (Mar 30): Mar 30 - Mar 20.
-      expect(facts[0].firstHigherUntilCycleEndDays, 10);
+      expect(facts[0].firstHigherDay, isNull);
+      expect(facts[0].firstHigherUntilCycleEndDays, isNull);
       // The other cycles are untouched.
       expect(facts[1].firstHigherDay, isNull);
       expect(facts[3].firstHigherDay, isNull);
@@ -300,10 +320,9 @@ void main() {
     });
 
     test('a data-less trailing cycle observes no end — the fact row keeps '
-        'its start and mark day, the span facts stay null', () {
-      // The fresh May 10 mark opens a cycle with no tracked day after it;
-      // its first-higher MARK still resolves (May 15), but with no last
-      // tracked day there is no observed end to count the span against.
+        'its start, the span facts stay null', () {
+      // The fresh May 10 mark opens a cycle with no tracked day after it:
+      // nothing to measure against and no observed end.
       final entries = [d(2026, 3, 2, bleeding: Bleeding.medium), d(2026, 3, 3)];
       final facts = cycleFacts(entries, [
         start(2026, 3, 2),
@@ -312,7 +331,7 @@ void main() {
       ]);
       expect(facts, hasLength(2));
       expect(facts[1].cycleStart, DateTime.utc(2026, 5, 10));
-      expect(facts[1].firstHigherDay, DateTime.utc(2026, 5, 15));
+      expect(facts[1].firstHigherDay, isNull);
       expect(facts[1].lengthDays, isNull);
       expect(facts[1].firstHigherUntilCycleEndDays, isNull);
       expect(facts[1].bleedingDays, 0);
@@ -322,7 +341,7 @@ void main() {
         'fresh mark', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
-        d(2026, 3, 30),
+        d(2026, 3, 30, bbtC: 36.4),
         d(2026, 3, 31, bbtC: 36.8),
       ];
       final marks = [
@@ -330,13 +349,16 @@ void main() {
         start(2026, 3, 30),
         start(2026, 5, 10),
         firstHigher(2026, 3, 5),
+        mucusPeak(2026, 3, 30),
         firstHigher(2026, 3, 31),
       ];
       final facts = cycleFacts(entries, marks);
-      // Cycle 2: rise Mar 31, the fresh May 10 start is its observed
-      // cycle end exclusive -> Mar 31..May 9 inclusive = 40 days.
+      // Cycle 2: Mar 30 is its measured low and its peak, Mar 31 the rise
+      // above it — a circle on Mar 31; the fresh May 10 start is its
+      // observed cycle end exclusive -> Mar 31..May 9 inclusive = 40 days.
+      expect(facts[1].firstHigherDay, DateTime.utc(2026, 3, 31));
       expect(facts[1].firstHigherUntilCycleEndDays, 40);
-      // The fresh data-less cycle itself: no rise, no span.
+      // The fresh data-less cycle itself: no circle, no span.
       expect(facts[2].firstHigherDay, isNull);
       expect(facts[2].firstHigherUntilCycleEndDays, isNull);
     });
@@ -364,8 +386,9 @@ void main() {
     });
 
     test('aggregates min/max/avg/population std over the metrics', () {
-      final stats = cycleStatistics(threeCycleData(), [
+      final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
+        mucusPeak(2026, 3, 15),
         firstHigher(2026, 3, 20),
       ]);
       expect(stats.cycleCount, 4);
@@ -390,7 +413,8 @@ void main() {
       expect(stats.bleedingDays.average, closeTo(1.75, 0.0001));
       expect(stats.bleedingDays.stdDev, closeTo(0.4330127, 0.0001));
 
-      // First higher until cycle end: only cycle 1 has one (10 days).
+      // First higher until cycle end: only cycle 1 carries a circle
+      // (Mar 20 to the next start Mar 30 = 10 days).
       expect(stats.firstHigherUntilCycleEnd.min, 10);
       expect(stats.firstHigherUntilCycleEnd.max, 10);
       expect(stats.firstHigherUntilCycleEnd.average, closeTo(10.0, 0.0001));
@@ -398,11 +422,13 @@ void main() {
     });
 
     test('earliest first higher prefers the smallest day-of-cycle offset', () {
-      // Cycle 1: mark Mar 20, start Mar 2 -> cycle day 19; cycle 3
-      // (Apr 27..): mark May 1 -> cycle day 5 — the fifth day wins.
-      final stats = cycleStatistics(threeCycleData(), [
+      // Cycle 1: circle Mar 20, start Mar 2 -> cycle day 19; cycle 3
+      // (Apr 27..): circle May 1 -> cycle day 5 — the fifth day wins.
+      final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
+        mucusPeak(2026, 3, 15),
         firstHigher(2026, 3, 20),
+        mucusPeak(2026, 4, 28),
         firstHigher(2026, 5, 1),
       ]);
       expect(stats.firstHigherCycleDays.min, 5);
@@ -413,13 +439,16 @@ void main() {
 
     test('a three-cycle first-higher day distribution: min, max, mean, '
         'std', () {
-      // Cycle 1 (start Mar 2): mark Mar 20 -> day 19; cycle 2 (start
-      // Mar 30): mark Apr 6 -> day 8; cycle 3 (start Apr 27): mark May 1
-      // -> day 5. Mean 32/3; population std = sqrt(36.2222...).
-      final stats = cycleStatistics(threeCycleData(), [
+      // Cycle 1 (start Mar 2): circle Mar 20 -> day 19; cycle 2 (start
+      // Mar 30): circle Apr 6 -> day 8; cycle 3 (start Apr 27): circle
+      // May 1 -> day 5. Mean 32/3; population std = sqrt(36.2222...).
+      final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
+        mucusPeak(2026, 3, 15),
         firstHigher(2026, 3, 20),
+        mucusPeak(2026, 4, 1),
         firstHigher(2026, 4, 6),
+        mucusPeak(2026, 4, 28),
         firstHigher(2026, 5, 1),
       ]);
       expect(stats.firstHigherCycleDays.min, 5);
@@ -616,23 +645,17 @@ void main() {
   });
 
   group('earliestFirstHigherCycleDay', () {
-    test('cycle-day minimum, both variants (any and after the mucus peak)', () {
+    test('cycle-day minimum over the first circled candidates', () {
       // Cycle 1: the rise mark Mar 14 IS the first circle (measured 36.7
       // above the 36.4 low baseline, after the peak Mar 12) — cycle day
       // 14. Cycle 2: the rise mark Mar 31 IS the first circle (measured
       // 36.7 above the 36.4 low, after the peak Mar 30) — cycle day 3.
       final earliest = earliestFirstHigherCycleDay(perCycleEvaluations());
-      expect(earliest.any, 3, reason: 'the minimum over the marked rises');
-      expect(
-        earliest.afterMucusPeak,
-        3,
-        reason: 'the minimum over the first circled candidates',
-      );
+      expect(earliest, 3, reason: 'the minimum over the first circles');
     });
 
-    test('both variants differ: a rise at/before the mucus peak qualifies '
-        'at the first measured above-baseline day after it '
-        '(umrandete Messung)', () {
+    test('a rise at/before the mucus peak qualifies at the first measured '
+        'above-baseline day after it (umrandete Messung)', () {
       // Cycle 1: rise mark Mar 4 (cycle day 4), peak Mar 6 — the first
       // measured above-baseline day after the peak is Mar 7 (36.8 above
       // the 36.4 low), so the first circle is cycle day 7 while the mark
@@ -660,9 +683,8 @@ void main() {
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
       );
-      expect(earliest.any, 4, reason: 'the minimum over the marked rises');
       expect(
-        earliest.afterMucusPeak,
+        earliest,
         7,
         reason:
             'the minimum over the first circled candidates: Mar 7 '
@@ -671,8 +693,8 @@ void main() {
       );
     });
 
-    test('on-peak, after-peak and gap-stopped rises keep the statistics '
-        'variants in step with the evaluation rule', () {
+    test('on-peak, after-peak and gap-stopped rises follow the '
+        "evaluation's circles", () {
       // The arrow/circle rule matrix lives in the evaluation tests; this
       // guard only pins the three rule outcomes on the statistics side.
       var earliest = earliestFirstHigherCycleDay(
@@ -687,11 +709,10 @@ void main() {
       // The rise mark sits ON the peak day: the marked day itself is
       // unmeasured, so the first circle is the measured day after the
       // peak (Mar 7, cycle day 7).
-      expect(earliest.any, 6);
-      expect(earliest.afterMucusPeak, 7);
+      expect(earliest, 7);
 
       // Rise fully after the peak with its marked day measured: the rise
-      // day is itself the first circle — both variants agree.
+      // day is itself the first circle.
       earliest = earliestFirstHigherCycleDay(
         evaluateCycles(
           [
@@ -701,12 +722,10 @@ void main() {
           [start(2026, 3, 1), mucusPeak(2026, 3, 6), firstHigher(2026, 3, 8)],
         ),
       );
-      expect(earliest.any, 8);
-      expect(earliest.afterMucusPeak, 8);
+      expect(earliest, 8);
 
       // App convention "gap tolerance" gap-stopped evaluation: no candidate
-      // after the peak exists — the real variant qualifies nowhere, the
-      // "any" variant keeps the marked rise day.
+      // after the peak exists, so the cycle carries no circle.
       final stopped = evaluateCycles(
         [
           for (var day = 1; day <= 4; day++) d(2026, 3, day, bbtC: 36.4),
@@ -716,12 +735,11 @@ void main() {
         [start(2026, 3, 1), mucusPeak(2026, 3, 20), firstHigher(2026, 3, 5)],
       );
       earliest = earliestFirstHigherCycleDay(stopped);
-      expect(earliest.any, 5);
-      expect(earliest.afterMucusPeak, isNull);
+      expect(earliest, isNull);
       expect(
         stopped.single.evaluationStopped,
         isTrue,
-        reason: 'the qualifying variant outcomes ride on the stop itself',
+        reason: 'the null outcome rides on the stop itself',
       );
     });
 
@@ -748,9 +766,8 @@ void main() {
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
       );
-      expect(earliest.any, 3);
       expect(
-        earliest.afterMucusPeak,
+        earliest,
         5,
         reason:
             "the day before the next cycle's start is still this "
@@ -775,15 +792,13 @@ void main() {
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
       );
-      expect(earliest.any, 5);
-      expect(earliest.afterMucusPeak, 8);
+      expect(earliest, 8);
     });
 
-    test('no measured above-baseline day after the peak: the cycle '
-        'qualifies nowhere for the real variant', () {
+    test('no measured above-baseline day after the peak: no circle', () {
       // The same mark shape as the fixture above, but nothing is ever
-      // measured above the baseline after the peak: no circle exists, so
-      // the cycle contributes to the "any" variant only.
+      // measured above the baseline after the peak: the cycle carries no
+      // circle.
       final entries = [
         for (var day = 1; day <= 4; day++) d(2026, 3, day, bbtC: 36.4),
       ];
@@ -795,8 +810,7 @@ void main() {
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
       );
-      expect(earliest.any, 5);
-      expect(earliest.afterMucusPeak, isNull);
+      expect(earliest, isNull);
     });
 
     test('a rise after the peak whose marked day carries no above-baseline '
@@ -816,27 +830,24 @@ void main() {
       final evaluations = evaluateCycles(entries, marks);
       expect(evaluations.single.riseMarkConsistent, isFalse);
       final earliest = earliestFirstHigherCycleDay(evaluations);
-      expect(earliest.any, 8);
-      expect(earliest.afterMucusPeak, 9);
+      expect(earliest, 9);
     });
 
-    test('null variants when nothing qualifies', () {
-      // No first-higher marks at all: both variants null.
+    test('null when nothing qualifies', () {
+      // No first-higher marks at all.
       var earliest = earliestFirstHigherCycleDay(
         evaluateCycles(threeCycleData(), threeCycleStarts()),
       );
-      expect(earliest.any, isNull);
-      expect(earliest.afterMucusPeak, isNull);
+      expect(earliest, isNull);
 
-      // A rise but no marked peak in the cycle: any stays, real null.
+      // A rise but no marked peak: the candidate walk yields arrows only.
       earliest = earliestFirstHigherCycleDay(
         evaluateCycles(
           [DailyEntry(date: DateTime(2026, 3, 1))],
           [start(2026, 3, 1), firstHigher(2026, 3, 3)],
         ),
       );
-      expect(earliest.any, 3);
-      expect(earliest.afterMucusPeak, isNull);
+      expect(earliest, isNull);
     });
 
     test('the leading pre-mark group is ignored', () {
@@ -851,8 +862,7 @@ void main() {
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
       );
-      expect(earliest.any, isNull);
-      expect(earliest.afterMucusPeak, isNull);
+      expect(earliest, isNull);
     });
   });
 

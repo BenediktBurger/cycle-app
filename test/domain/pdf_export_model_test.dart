@@ -639,12 +639,31 @@ void main() {
         final prefix = evaluations.sublist(0, model.markOpenedIndexes[i] + 1);
         expect(
           model.earliestFirstHigherCycleDays[i],
-          earliestFirstHigherCycleDay(prefix).afterMucusPeak,
+          earliestFirstHigherCycleDay(prefix),
           reason:
               'page ${i + 1}: the shared helper over the record up to '
               'that cycle, never over more',
         );
       }
+    });
+
+    test('a cycle with rise marks but no circle contributes no fact', () {
+      // The same record with only the rise marks: no mucus peak means the
+      // candidate walk yields arrows, so no cycle carries a circle and
+      // every page stays at "—".
+      final marks = [
+        CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
+        CycleMark(date: d(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: d(3, 29), type: CycleMarkTypes.cycleStart),
+        CycleMark(date: d(4, 26), type: CycleMarkTypes.cycleStart),
+      ];
+      final model = buildPdfExportModel(entries: modelEntries(), marks: marks);
+      expect(model.earliestFirstHigherCycleDays, [null, null, null]);
+      expect(
+        earliestFirstHigherCycleDay(evaluateCycles(modelEntries(), marks)),
+        isNull,
+        reason: 'the shared helper reports the first circled measurement only',
+      );
     });
   });
 

@@ -196,14 +196,13 @@ final class PdfExportModel {
   final List<int?> shortestCycleLengths;
 
   /// The per-cycle earliest-first-higher fact, PARALLEL to [cycles]: the
-  /// cycle-day number of the earliest TRUE first higher measurement (the
-  /// umrandete Messung — the `afterMucusPeak` variant of
-  /// [earliestFirstHigherCycleDay], lib/domain/statistics.dart) computed
-  /// over the evaluation list truncated AT `cycles[i]` (its own rise
-  /// INCLUDED — from that cycle's point of view its rise is part of its
-  /// own observation, and its marks exist in the record whenever it is
-  /// printed); null when no cycle in the prefix carries a qualifying
-  /// (circled) candidate.
+  /// cycle-day number of the earliest circled higher measurement (the
+  /// umrandete Messung, [earliestFirstHigherCycleDay] in
+  /// lib/domain/statistics.dart) computed over the evaluation list
+  /// truncated AT `cycles[i]` (its own rise INCLUDED — from that cycle's
+  /// point of view its rise is part of its own observation, and its marks
+  /// exist in the record whenever it is printed); null when no cycle in the
+  /// prefix carries a qualifying (circled) candidate.
   ///
   /// The paper-history earliest first higher (the paper form saw the rise
   /// but did not record its mucus-peak relation as data) min-combines into
@@ -385,14 +384,13 @@ PdfExportModel buildPdfExportModel({
   //   completed earlier cycle and carries null (the renderer's "—").
   //
   // - Earliest first higher (INCLUSIVE of the running cycle): the
-  //   umrandete figure (the `afterMucusPeak` variant of
-  //   [earliestFirstHigherCycleDay]) over the evaluation PREFIX — `all`
-  //   truncated at the cycle's own position (a slice of the already-built
-  //   list, so the per-cycle anchored fields are the identical objects).
-  //   The helper's own rules (skip non-mark-opened, ignore the leading
-  //   pre-mark group) keep applying on the slice; unexported earlier
-  //   cycles count too — the paper form counted them. The paper constant
-  //   folds in through [minRecordedFact].
+  //   umrandete figure ([earliestFirstHigherCycleDay]) over the evaluation
+  //   PREFIX — `all` truncated at the cycle's own position (a slice of the
+  //   already-built list, so the per-cycle anchored fields are the
+  //   identical objects). The helper's own rules (skip non-mark-opened,
+  //   ignore the leading pre-mark group) keep applying on the slice;
+  //   unexported earlier cycles count too — the paper form counted them.
+  //   The paper constant folds in through [minRecordedFact].
   final shortestCycleLengths = <int?>[];
   final earliestFirstHigherCycleDays = <int?>[];
   final measurementMethods =
@@ -415,10 +413,7 @@ PdfExportModel buildPdfExportModel({
     );
     final inAppFirstHigher = earliestFirstHigherCycleDay(all.sublist(0, i + 1));
     earliestFirstHigherCycleDays.add(
-      minRecordedFact(
-        inAppFirstHigher.afterMucusPeak,
-        earliestFirstHigherCycleDayOutsideApp,
-      ),
+      minRecordedFact(inAppFirstHigher, earliestFirstHigherCycleDayOutsideApp),
     );
     final firstTempDay = _firstTemperatureDay(all[i].cycle);
     final method = firstTempDay == null
