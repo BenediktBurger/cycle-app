@@ -161,7 +161,7 @@ final class PersistedSettings {
   /// The earliest first higher measurement's cycle-day number (>= 1,
   /// counting from 1) observed outside this app, or null when not given.
   /// One recorded paper fact — statistics and the PDF export min-combine
-  /// it with the in-app figures (both documented variants).
+  /// it with the in-app circled measurement's cycle day.
   final int? earliestFirstHigherCycleDayOutsideApp;
 
   /// Whether the onboarding page has been confirmed ("Weiter" tapped at

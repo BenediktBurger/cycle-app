@@ -1,7 +1,7 @@
 // Chart painters for the computed evaluation marks (Mode M, ADR-0001).
 //
-// The USER places the mucus peak, the first higher measurement and the
-// start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
+// The USER places the mucus peak, the temperature rise („Temperaturanstieg“)
+// and the start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
 // evening). The DERIVATION of what the chart paints lives in
 // lib/domain/evaluation_overlay.dart — shared with the PDF export so both
 // draw layers can never drift — and arrives here as an [EvaluationOverlay];

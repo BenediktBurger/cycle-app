@@ -7,8 +7,8 @@
 // persisted: a render-time mapping of already-computed artifacts onto a
 // day-index space, with no interpretation of its own.
 //
-// The USER places the mucus peak, the first higher measurement and the
-// start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
+// The USER places the mucus peak, the temperature rise ("Temperaturanstieg")
+// and the start of the „Sicher unfruchtbare Zeit“ (from a morning or from an
 // evening). Derived at render time: the rings around the circled higher
 // measurements (candidates strictly AFTER the mucus peak day), the arrow-up
 // glyph for the arrow-marked candidates (candidate day at or before the
