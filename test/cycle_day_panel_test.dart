@@ -25,7 +25,7 @@ void main() {
       final (db, _) = await pumpCycleList(
         tester,
         entries: scenarioEntries,
-        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
       );
 
       await tapCycleDay(tester, 4); // 9/10: "A"
@@ -48,7 +48,7 @@ void main() {
         'mucusPeakDay',
       ], reason: 'A-adjacent seeded marks are untouched');
       expect(await storedMarkTypes(db, scenarioDay(14)), [
-        'firstHigherMeasurement',
+        'temperatureRise',
       ], reason: 'B\'s own seeded mark is untouched');
       expect(
         dotPainterOrNull(tester, 8),
@@ -89,11 +89,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(await storedMarkTypes(db, scenarioDay(12)), ['mucusPeakDay']);
 
-      // Without closing anything, mark 9/13 with the first higher mark. The
+      // Without closing anything, mark 9/13 with the temperature-rise mark. The
       // placement is INCONSISTENT there (36.30 below the baseline 36.40), so
       // the owner warning pops — Keep keeps the just-placed mark.
       await tapCycleDay(tester, 7);
-      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+      await tester.tap(cycleSheetChip('temperatureRise'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       await tester.tap(cycleSheetRiseKeepButton());
@@ -106,7 +106,7 @@ void main() {
             'modal dismissal, moves the options',
       );
       expect(await storedMarkTypes(db, scenarioDay(13)), [
-        'firstHigherMeasurement',
+        'temperatureRise',
       ], reason: 'the second mark is written through the same panel');
     },
   );
@@ -116,7 +116,7 @@ void main() {
     await pumpCycleList(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+      seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
     );
 
     final tappedCell = find.byKey(const ValueKey('bleedingCell-4'));
@@ -150,7 +150,7 @@ void main() {
       await pumpCycleList(
         tester,
         entries: scenarioEntries,
-        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
       );
 
       final tappedCell = find.byKey(const ValueKey('bleedingCell-8'));

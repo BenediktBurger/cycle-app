@@ -39,8 +39,8 @@ It is crucial that the woman / the couple remains in control and takes
 conscious decisions — there should be no unwanted pregnancy because
 someone trusted this app without knowing what they do. The app may compute
 derived values (temperature differences, baseline shifts) and may surface
-warnings about arithmetic/record anomalies (e.g. a first higher
-measurement placed on a day below the baseline) — that is app behavior,
+warnings about arithmetic/record anomalies (e.g. a temperature-rise
+mark placed on a day below the baseline) — that is app behavior,
 not interpretation. A fertility verdict is never the app's output: the
 user/couple stays the authority. Knowing the method itself (via book or
 course) — proper observation of temperature and mucus, and analysis — is
@@ -57,7 +57,7 @@ the schema assumes a specific mode), but no S/A functionality is built.
 
 - The app UI and domain layer only *compute*, never *interpret*: statistics
   show arithmetic only, no status conclusions. Arithmetic and anomaly
-  warnings (e.g. a flagged first-higher-measurement below the baseline,
+  warnings (e.g. a flagged temperature-rise mark below the baseline,
   computed temperature differences) are legitimate compute-only app
   behavior; a fertility verdict is not — the user/couple stays the
   authority.

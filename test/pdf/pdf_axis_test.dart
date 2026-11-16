@@ -52,7 +52,7 @@ List<CycleMark> cycleMarks() => [
   CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: day(3), type: CycleMarkTypes.ignoreTemperature),
   CycleMark(date: day(10), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: day(11), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: day(11), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: day(4), type: CycleMarkTypes.suzMorning),
   CycleMark(date: day(6), type: CycleMarkTypes.suzEvening),
 ];
@@ -284,10 +284,7 @@ void main() {
           entries: arrowFixture,
           marks: [
             CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
-            CycleMark(
-              date: day(6),
-              type: CycleMarkTypes.firstHigherMeasurement,
-            ),
+            CycleMark(date: day(6), type: CycleMarkTypes.temperatureRise),
           ],
         );
         final drawing = pdfCurveDrawing(

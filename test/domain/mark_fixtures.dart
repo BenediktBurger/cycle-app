@@ -1,7 +1,7 @@
 // Domain-test mark fixtures: the typed CycleMark constructions several
 // domain suites kept copy-pasting — one definition each here, identical
 // bodies. Deliberately minimal: suites with extra fixtures of their own
-// (e.g. evaluation's mucus-peak/first-higher pairs) keep their locals.
+// (e.g. evaluation's mucus-peak/temperature-rise pairs) keep their locals.
 import 'package:cycle_app/domain/marks.dart';
 
 /// A user-placed cycleStart mark on (year, month, day) — the authoritative

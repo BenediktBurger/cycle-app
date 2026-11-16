@@ -24,7 +24,7 @@
 // Anchors (owner-confirmed): the MOST RECENT mark of each type inside a
 // cycle drives the evaluation — the latest mucus-peak mark ("Höhepunkt =
 // letzter Tag mit der besten Qualität"; multiple peaks arise from delayed
-// ovulation) and the latest first-higher-measurement mark (re-marking
+// ovulation) and the latest temperature-rise mark (re-marking
 // supersedes). Earlier duplicate marks stay stored and render no candidate
 // (see the "multiple marks" group below).
 
@@ -63,10 +63,10 @@ CycleMark peak(int year, int month, int day) => CycleMark(
   type: CycleMarkTypes.mucusPeakDay,
 );
 
-/// A user-placed first-higher-measurement mark on (year, month, day).
+/// A user-placed temperature-rise mark on (year, month, day).
 CycleMark rise(int year, int month, int day) => CycleMark(
   date: DateTime(year, month, day),
-  type: CycleMarkTypes.firstHigherMeasurement,
+  type: CycleMarkTypes.temperatureRise,
 );
 
 // start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).
@@ -160,7 +160,7 @@ void main() {
         final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
         expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 10)));
-        expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+        expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
         // Number 1 is the low immediately before the first higher: numbers
         // are calendar offsets (rise−1 carries #1). The peak day itself is
         // measured, so it carries #1 — its mucus role does not matter here.
@@ -621,7 +621,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 9)));
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 20)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 20)));
       expect(e.numberedLows.map((l) => (l.number, l.date.day)), [
         (1, 19),
         (2, 18),
@@ -653,7 +653,7 @@ void main() {
 
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       expect(
         e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [(11, MarkKind.circle, 1)],
@@ -873,7 +873,7 @@ void main() {
     // NOTE: rendering ALL mucus-peak marks of a cycle is chart/UI scope
     // (see the all-peaks rendering in lib/ui/cycle_marks.dart). The
     // domain only picks the ANCHORS: the latest mucus-peak mark and the
-    // latest first-higher-measurement mark drive the evaluation; earlier
+    // latest temperature-rise mark drive the evaluation; earlier
     // duplicates stay STORED (their removal is the sheet toggle's concern)
     // and simply stop anchoring.
 
@@ -906,7 +906,7 @@ void main() {
       // appears), so the latest peak is the ovulation that counts for the
       // per-candidate decision.
       expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 12)));
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       expect(
         e.candidateMeasurements.map((h) => (h.date.day, h.markKind, h.ordinal)),
         [
@@ -1025,7 +1025,7 @@ void main() {
 
       // The later mark supersedes: re-marking the rise (after a broken
       // Hochlage or a delayed second peak) moves the whole evaluation.
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 13)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 13)));
       // The six-low window re-anchors to the LATER mark: the six calendar
       // days before Mar 13.
       expect(e.numberedLows.map((l) => (l.number, l.date.day)), [
@@ -1750,7 +1750,7 @@ void main() {
     test('true when the marked day lies strictly above the baseline', () {
       final e = evalFor(baseEntries, riseMark, DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
       expect(e.baseline!.value, 36.4);
       expect(e.riseMarkConsistent, isTrue);
     });
@@ -1779,7 +1779,7 @@ void main() {
       ];
       final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
       expect(e.baseline!.value, 36.4);
       expect(e.riseMarkConsistent, isFalse);
     });
@@ -1788,7 +1788,7 @@ void main() {
       final entries = [...baseEntries.take(7)];
       final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
       expect(e.baseline!.value, 36.4);
       expect(e.riseMarkConsistent, isFalse);
     });
@@ -1827,10 +1827,10 @@ void main() {
       );
     });
 
-    test('null when no first-higher mark exists', () {
+    test('null when no temperature-rise mark exists', () {
       final e = evalFor(baseEntries, [peak(2026, 3, 9)], DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, isNull);
+      expect(e.riseDay, isNull);
       expect(e.riseMarkConsistent, isNull);
     });
 
@@ -1844,7 +1844,7 @@ void main() {
       ];
       final e = evalFor(entries, riseMark, DateTime(2026, 3, 2));
 
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
       expect(e.baseline, isNull);
       expect(e.riseMarkConsistent, isNull);
     });
@@ -1867,7 +1867,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.mucusPeakDay, isNull);
-      expect(e.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 10)));
+      expect(e.riseDay, DateOnly.normalize(DateTime(2026, 3, 10)));
       // Mar 9 is untracked — its calendar position (rise−1) carries no
       // number, so the numbering starts at #2 and NO number stretches the
       // window back to Mar 3 (the old arithmetic numbered Mar 3 as #6).
@@ -1888,8 +1888,8 @@ void main() {
       expect(e.evaluationStopped, isFalse);
     });
 
-    test('missing first-higher mark: only the peak is known, nothing else '
-        'can be derived', () {
+    test('missing temperature-rise mark: only the peak is known, nothing '
+        'else can be derived', () {
       final entries = [
         d(2026, 3, 2, bleeding: Bleeding.medium),
         d(2026, 3, 3, t: 36.2),
@@ -1906,7 +1906,7 @@ void main() {
       final e = evalFor(entries, marks, DateTime(2026, 3, 2));
 
       expect(e.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 9)));
-      expect(e.firstHigherDay, isNull);
+      expect(e.riseDay, isNull);
       expect(e.numberedLows, isEmpty);
       expect(e.baseline, isNull);
       expect(e.candidateMeasurements, isEmpty);
@@ -1958,7 +1958,7 @@ void main() {
 
       final a = evalFor(entries, marks, DateTime(2026, 3, 2));
       expect(a.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 10)));
-      expect(a.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 11)));
+      expect(a.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
       expect(a.baseline!.value, 36.4);
       expect(a.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 5)));
       expect(
@@ -1975,7 +1975,7 @@ void main() {
 
       final b = evalFor(entries, marks, DateTime(2026, 4, 6));
       expect(b.mucusPeakDay, DateOnly.normalize(DateTime(2026, 4, 13)));
-      expect(b.firstHigherDay, DateOnly.normalize(DateTime(2026, 4, 14)));
+      expect(b.riseDay, DateOnly.normalize(DateTime(2026, 4, 14)));
       expect(b.baseline!.value, 36.4);
       expect(b.baseline!.date, DateOnly.normalize(DateTime(2026, 4, 9)));
       expect(b.suzBegins, DateOnly.normalize(DateTime(2026, 4, 16)));
@@ -2025,7 +2025,7 @@ void main() {
         isFalse,
         reason: 'the leading group predates the first cycleStart mark',
       );
-      expect(a.firstHigherDay, DateOnly.normalize(DateTime(2026, 3, 8)));
+      expect(a.riseDay, DateOnly.normalize(DateTime(2026, 3, 8)));
       expect(a.mucusPeakDay, DateOnly.normalize(DateTime(2026, 3, 5)));
       expect(a.baseline!.value, 36.4);
       expect(a.baseline!.date, DateOnly.normalize(DateTime(2026, 3, 5)));
@@ -2037,7 +2037,7 @@ void main() {
         reason: 'the mark-driven group opens at the marked day',
       );
       expect(
-        b.firstHigherDay,
+        b.riseDay,
         DateOnly.normalize(DateTime(2026, 3, 17)),
         reason:
             'the window 1 rise (Mar 8) lies before window 2 and does '
@@ -2080,7 +2080,7 @@ void main() {
       final evaluations = evaluateCycles(entries, marks);
       expect(evaluations, hasLength(1));
       expect(
-        evaluations.single.firstHigherDay,
+        evaluations.single.riseDay,
         DateOnly.normalize(DateTime(2026, 3, 17)),
         reason: 'the most-recent rise mark anchors the single group',
       );
@@ -2135,7 +2135,7 @@ void main() {
         for (final e in trackedMarked.cycle.days) e.date,
       ]);
       for (final (a, b) in [
-        (gapMarked.firstHigherDay, trackedMarked.firstHigherDay),
+        (gapMarked.riseDay, trackedMarked.riseDay),
         (gapMarked.mucusPeakDay, trackedMarked.mucusPeakDay),
         (gapMarked.baseline?.date, trackedMarked.baseline?.date),
         (gapMarked.baseline?.value, trackedMarked.baseline?.value),
@@ -2167,10 +2167,7 @@ void main() {
         expect(a, b);
       }
       expect(gapMarked.baseline!.value, 36.4);
-      expect(
-        gapMarked.firstHigherDay,
-        DateOnly.normalize(DateTime(2026, 3, 11)),
-      );
+      expect(gapMarked.riseDay, DateOnly.normalize(DateTime(2026, 3, 11)));
     });
   });
 

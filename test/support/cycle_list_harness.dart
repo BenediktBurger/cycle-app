@@ -34,7 +34,7 @@ DateTime scenarioDay(int day) => DateTime.utc(2026, 9, day);
 final List<DailyEntry> scenarioEntries = evaluationScenarioEntries();
 
 final CycleMark scenarioPeakMark = evaluationScenarioMarks()[0];
-final CycleMark scenarioFirstHigherMark = evaluationScenarioMarks()[1];
+final CycleMark scenarioTemperatureRiseMark = evaluationScenarioMarks()[1];
 
 /// The cycle screen's list (chart, non-modal day-options panel)
 /// pumped over an in-memory database whose real MarksDao

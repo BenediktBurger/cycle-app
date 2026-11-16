@@ -60,7 +60,7 @@ final overlayMarks = <CycleMark>[
   // MARKS STREAM still renders every placed peak.
   mark(2026, 3, 4, CycleMarkTypes.mucusPeakDay),
   mark(2026, 3, 10, CycleMarkTypes.mucusPeakDay),
-  mark(2026, 3, 9, CycleMarkTypes.firstHigherMeasurement),
+  mark(2026, 3, 9, CycleMarkTypes.temperatureRise),
   mark(2026, 3, 12, CycleMarkTypes.suzMorning),
   mark(2026, 3, 16, CycleMarkTypes.cycleStart),
   mark(2026, 3, 20, CycleMarkTypes.suzEvening),
@@ -176,7 +176,7 @@ void main() {
     ];
     final marks = <CycleMark>[
       mark(2026, 3, 9, CycleMarkTypes.mucusPeakDay),
-      mark(2026, 3, 10, CycleMarkTypes.firstHigherMeasurement),
+      mark(2026, 3, 10, CycleMarkTypes.temperatureRise),
     ];
 
     EvaluationOverlay overlay() => buildEvaluationOverlay(

@@ -97,7 +97,7 @@ void main() {
       final (_, _) = await _pump(
         tester,
         entries: scenarioEntries,
-        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
       );
 
       await tapCycleDay(tester, 4); // 9/10, a numbered low (4)
@@ -123,14 +123,15 @@ void main() {
         reason: 'the day carries no peak mark -> the unselected chip',
       );
       expect(
-        cycleSheetChip('firstHigherMeasurement'),
+        cycleSheetChip('temperatureRise'),
         findsOneWidget,
-        reason: 'the day carries no first-higher mark -> the unselected chip',
+        reason:
+            'the day carries no temperature-rise mark -> the unselected chip',
       );
       expect(
         find.text('Low measurement 4'),
         findsOneWidget,
-        reason: '9/10 is the 4th low of the six before the first higher',
+        reason: '9/10 is the 4th low of the six before the rise',
       );
       expect(
         find.byType(LineChart),
@@ -205,7 +206,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+      seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
     );
 
     await tapCycleDay(tester, 3); // 9/9: highest of the six lows = baseline
@@ -227,7 +228,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+      seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
     );
 
     await tapCycleDay(tester, 8); // 9/14: circled candidate #1, +0.50 K
@@ -252,7 +253,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioFirstHigherMark],
+      seedMarks: [scenarioTemperatureRiseMark],
     );
 
     await tapCycleDay(tester, 8); // 9/14: arrowed candidate #1, +0.50 K
@@ -287,7 +288,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: entries,
-      seedMarks: [scenarioFirstHigherMark],
+      seedMarks: [scenarioTemperatureRiseMark],
     );
 
     await tapCycleDay(tester, 12); // 9/18: beyond-cap arrow, +0.10 K
@@ -323,7 +324,7 @@ void main() {
       entries: entries,
       seedMarks: [
         CycleMark(date: scenarioDay(15), type: CycleMarkTypes.mucusPeakDay),
-        scenarioFirstHigherMark,
+        scenarioTemperatureRiseMark,
       ],
     );
 
@@ -503,13 +504,13 @@ void main() {
     );
 
     await tapCycleDay(tester, 6);
-    // The day already carries the peak; the first-higher mark is addable
+    // The day already carries the peak; the temperature-rise mark is addable
     // on the same day (two independent chips).
-    await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+    await tester.tap(cycleSheetChip('temperatureRise'));
     await tester.pumpAndSettle();
     expect(
       await storedMarkTypes(db, scenarioDay(12)),
-      unorderedEquals(['mucusPeakDay', 'firstHigherMeasurement']),
+      unorderedEquals(['mucusPeakDay', 'temperatureRise']),
       reason: 'both marks may live on one day',
     );
     // The placement leaves the mark inconsistent (36.20 on 9/12 lies
@@ -520,7 +521,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Removing the second mark keeps the first one untouched.
-    await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+    await tester.tap(cycleSheetChip('temperatureRise'));
     await tester.pumpAndSettle();
     expect(await storedMarkTypes(db, scenarioDay(12)), [
       'mucusPeakDay',
@@ -531,11 +532,9 @@ void main() {
       reason: 'the peak chip is unaffected',
     );
     expect(
-      tester
-          .widget<FilterChip>(cycleSheetChip('firstHigherMeasurement'))
-          .selected,
+      tester.widget<FilterChip>(cycleSheetChip('temperatureRise')).selected,
       isFalse,
-      reason: 'the first-higher chip deselected after the removal',
+      reason: 'the rise chip deselected after the removal',
     );
   });
 
@@ -573,7 +572,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+      seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
     );
 
     // warnIfMissed: false — the tap point may fall on the cell's fixed-height
@@ -624,7 +623,7 @@ void main() {
       entries: entries,
       seedMarks: [
         CycleMark(date: scenarioDay(12), type: CycleMarkTypes.mucusPeakDay),
-        scenarioFirstHigherMark,
+        scenarioTemperatureRiseMark,
       ],
     );
 
@@ -645,7 +644,7 @@ void main() {
     final (_, _) = await _pump(
       tester,
       entries: scenarioEntries,
-      seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+      seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
     );
 
     await tapCycleDay(tester, 0); // 9/6: before the six-low window
@@ -825,10 +824,10 @@ void main() {
     testWidgets(
       'all six chips — the five mark chips AND the exclusion chip — share '
       'ONE equal-width grid in the reading order cycle start, mucus peak, '
-      'exclusion, first higher, „Sicher unfruchtbare Zeit“ evening, '
+      'exclusion, temperature rise, „Sicher unfruchtbare Zeit“ evening, '
       '„Sicher unfruchtbare Zeit“ morning: on a narrow surface the last row '
       'completes evenly with the „Sicher unfruchtbare Zeit“ variants and '
-      'the exclusion sits directly before first higher',
+      'the exclusion sits directly before the rise chip',
       (tester) async {
         final (_, _) = await _pumpAt(
           tester,
@@ -841,27 +840,27 @@ void main() {
             tester.getRect(cycleSheetChip(markType));
         final cycleStart = chipRect('cycleStart');
         final peak = chipRect('mucusPeakDay');
-        final firstHigher = chipRect('firstHigherMeasurement');
+        final rise = chipRect('temperatureRise');
         final suzEvening = chipRect('suzEvening');
         final suzMorn = chipRect('suzMorning');
         final ignore = chipRect('ignoreTemperature');
 
         // The grid rows (two columns): cycle start + mucus peak, exclusion
-        // + first higher (the exclusion sits directly BEFORE first higher,
-        // per the evaluation-based reading order), then the „Sicher
-        // unfruchtbare Zeit“ variants.
+        // + the rise chip (the exclusion sits directly BEFORE it, per the
+        // evaluation-based reading order), then the „Sicher unfruchtbare
+        // Zeit“ variants.
         expect(
           (cycleStart.top - peak.top).abs(),
           lessThan(4),
           reason: 'the first grid row carries the first two chips',
         );
         expect(
-          (firstHigher.top - ignore.top).abs(),
+          (rise.top - ignore.top).abs(),
           lessThan(4),
           reason:
               'the second grid row carries the exclusion chip (left) '
-              'and first higher (right) — the exclusion sits directly '
-              'before the first-higher chip',
+              'and the rise chip (right) — the exclusion sits directly '
+              'before it',
         );
         expect(
           (suzEvening.top - suzMorn.top).abs(),
@@ -884,9 +883,9 @@ void main() {
               'SURVIVES on the chip cell inside the grid)',
         );
         expect(
-          firstHigher.left,
+          rise.left,
           closeTo(peak.left, 4),
-          reason: 'the first-higher chip occupies the second column',
+          reason: 'the rise chip occupies the second column',
         );
         expect(
           suzMorn.left,
@@ -897,10 +896,10 @@ void main() {
         );
         expect(
           suzMorn.top,
-          greaterThan(firstHigher.bottom),
+          greaterThan(rise.bottom),
           reason:
               'the „Sicher unfruchtbare Zeit“ variants wrap BELOW the '
-              'exclusion/first-higher row',
+              'exclusion/rise row',
         );
         expect(
           excludeGroup,
@@ -912,7 +911,7 @@ void main() {
         final columnWidth = cycleStart.width;
         for (final (name, rect) in [
           ('mucus peak', peak),
-          ('first higher measurement', firstHigher),
+          ('temperature rise', rise),
           ('„Sicher unfruchtbare Zeit“ evening', suzEvening),
           ('„Sicher unfruchtbare Zeit“ morning', suzMorn),
           ('temperature exclusion', ignore),
@@ -942,7 +941,7 @@ void main() {
             tester.getRect(cycleSheetChip(markType));
         final cycleStart = chipRect('cycleStart');
         final peak = chipRect('mucusPeakDay');
-        final firstHigher = chipRect('firstHigherMeasurement');
+        final rise = chipRect('temperatureRise');
         final suzEvening = chipRect('suzEvening');
         final suzMorn = chipRect('suzMorning');
         final ignore = chipRect('ignoreTemperature');
@@ -960,17 +959,17 @@ void main() {
               'directly after the mucus-peak chip in the reading order',
         );
         expect(
-          firstHigher.top,
+          rise.top,
           greaterThan(ignore.bottom),
           reason:
-              'the first-higher chip starts the SECOND row — the '
+              'the rise chip starts the SECOND row — the '
               'exclusion sits directly before it on the first row',
         );
         expect(
-          (suzEvening.top - firstHigher.top).abs(),
+          (suzEvening.top - rise.top).abs(),
           lessThan(4),
           reason:
-              'the second wide row continues with first higher and the '
+              'the second wide row continues with the rise chip and the '
               '„Sicher unfruchtbare Zeit“ variants',
         );
         expect((suzEvening.top - suzMorn.top).abs(), lessThan(4));
@@ -1011,9 +1010,7 @@ void main() {
 
         final cycleStart = tester.getRect(cycleSheetChip('cycleStart'));
         final peak = tester.getRect(cycleSheetChip('mucusPeakDay'));
-        final firstHigher = tester.getRect(
-          cycleSheetChip('firstHigherMeasurement'),
-        );
+        final rise = tester.getRect(cycleSheetChip('temperatureRise'));
         expect(
           peak.left - cycleStart.right,
           lessThan(12),
@@ -1022,7 +1019,7 @@ void main() {
               'for a third column',
         );
         expect(
-          firstHigher.top,
+          rise.top,
           greaterThan(cycleStart.bottom),
           reason:
               'each chip spans about half the line — the third mark '
@@ -1039,7 +1036,7 @@ void main() {
         final (_, _) = await _pump(
           tester,
           entries: scenarioEntries,
-          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+          seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
         );
         await tapCycleDay(tester, 4); // 9/10: peak unmarked, arbitrary day
 
@@ -1074,7 +1071,7 @@ void main() {
         final (_, _) = await _pump(
           tester,
           entries: scenarioEntries,
-          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+          seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
         );
 
         await tapCycleDay(tester, 3); // 9/9: baseline day — two facts
@@ -1266,8 +1263,8 @@ void main() {
     });
 
     testWidgets(
-      'the consistency dialog covers the mark-excluded branch: placing a '
-      'first higher on a mark-EXCLUDED (but measured) day warns with the '
+      'the consistency dialog covers the mark-excluded branch: placing '
+      'the rise mark on a mark-EXCLUDED (but measured) day warns with the '
       'no-usable-temperature wording',
       (tester) async {
         // 9/14 is measured (36.90, ABOVE the baseline 36.40) — with the
@@ -1287,7 +1284,7 @@ void main() {
         );
 
         await tapCycleDay(tester, 8); // 9/14: measured above the baseline
-        await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+        await tester.tap(cycleSheetChip('temperatureRise'));
         await tester.pumpAndSettle();
 
         expect(
@@ -1344,9 +1341,9 @@ void main() {
             'renders for a peak („Höhepunkt“)',
       );
       expect(
-        chipIcon('firstHigherMeasurement', Icons.adjust),
+        chipIcon('temperatureRise', Icons.adjust),
         findsOneWidget,
-        reason: 'the first-higher chip keeps its circled-dot glyph',
+        reason: 'the rise chip keeps its circled-dot glyph',
       );
       expect(
         chipIcon('suzEvening', Icons.nightlight_outlined),
@@ -1578,7 +1575,7 @@ void main() {
         final (_, _) = await _pump(
           tester,
           entries: scenarioEntries,
-          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+          seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
         );
 
         await tapCycleDay(tester, 10); // 9/16: the computed suzBegins
@@ -1626,7 +1623,7 @@ void main() {
         final (_, _) = await _pump(
           tester,
           entries: entries,
-          seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+          seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
         );
 
         await tapCycleDay(tester, 11); // 9/17: the computed suzBegins
@@ -1661,7 +1658,7 @@ void main() {
         entries: scenarioEntries,
         seedMarks: [
           scenarioPeakMark,
-          scenarioFirstHigherMark,
+          scenarioTemperatureRiseMark,
           CycleMark(date: scenarioDay(13), type: CycleMarkTypes.suzMorning),
         ],
       );
@@ -1682,7 +1679,7 @@ void main() {
       final (_, _) = await _pump(
         tester,
         entries: scenarioEntries,
-        seedMarks: [scenarioPeakMark, scenarioFirstHigherMark],
+        seedMarks: [scenarioPeakMark, scenarioTemperatureRiseMark],
       );
 
       await tapCycleDay(
@@ -1762,7 +1759,7 @@ void main() {
         entries: scenarioEntries,
         seedMarks: [
           scenarioPeakMark,
-          scenarioFirstHigherMark,
+          scenarioTemperatureRiseMark,
           CycleMark(date: scenarioDay(12), type: CycleMarkTypes.suzEvening),
         ],
       );
@@ -1790,10 +1787,8 @@ void main() {
     // The six-previous-calendar-day window of a mark on 9/13 is 9/7..9/12,
     // whose baseline is 36.40 (9/9); the marked day itself carries 36.30 —
     // NOT strictly above the baseline, so the placement is inconsistent.
-    CycleMark markOn13() => CycleMark(
-      date: scenarioDay(13),
-      type: CycleMarkTypes.firstHigherMeasurement,
-    );
+    CycleMark markOn13() =>
+        CycleMark(date: scenarioDay(13), type: CycleMarkTypes.temperatureRise);
 
     testWidgets('placing an inconsistent mark warns with the arithmetic and '
         'Keep keeps the mark', (tester) async {
@@ -1805,13 +1800,13 @@ void main() {
       await tapCycleDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
       expect(
         find.descendant(
-          of: cycleSheetChip('firstHigherMeasurement'),
+          of: cycleSheetChip('temperatureRise'),
           matching: find.text('Temperature rise'),
         ),
         findsOneWidget,
         reason: 'the chip label names the mark',
       );
-      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+      await tester.tap(cycleSheetChip('temperatureRise'));
       await tester.pumpAndSettle();
 
       expect(
@@ -1847,7 +1842,7 @@ void main() {
       );
       expect(
         await storedMarkTypes(db, scenarioDay(13)),
-        contains('firstHigherMeasurement'),
+        contains('temperatureRise'),
         reason: 'Keep keeps the just-placed mark',
       );
       expect(
@@ -1856,9 +1851,7 @@ void main() {
         reason: 'the panel stays open across the warning',
       );
       expect(
-        tester
-            .widget<FilterChip>(cycleSheetChip('firstHigherMeasurement'))
-            .selected,
+        tester.widget<FilterChip>(cycleSheetChip('temperatureRise')).selected,
         isTrue,
         reason: 'the chip reflects the kept mark',
       );
@@ -1870,7 +1863,7 @@ void main() {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
 
       await tapCycleDay(tester, 7);
-      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+      await tester.tap(cycleSheetChip('temperatureRise'));
       await tester.pumpAndSettle();
 
       // The dialog's Remove choice is keyed — like the Keep choice, the
@@ -1885,9 +1878,7 @@ void main() {
         reason: 'Remove undoes the placement through the toggle path',
       );
       expect(
-        tester
-            .widget<FilterChip>(cycleSheetChip('firstHigherMeasurement'))
-            .selected,
+        tester.widget<FilterChip>(cycleSheetChip('temperatureRise')).selected,
         isFalse,
         reason: 'the chip deselected after the removal',
       );
@@ -1897,7 +1888,7 @@ void main() {
       final (db, _) = await _pump(tester, entries: scenarioEntries);
 
       await tapCycleDay(tester, 8); // 9/14: 36.90 above the baseline 36.40
-      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+      await tester.tap(cycleSheetChip('temperatureRise'));
       await tester.pumpAndSettle();
 
       expect(
@@ -1907,7 +1898,7 @@ void main() {
       );
       expect(
         await storedMarkTypes(db, scenarioDay(14)),
-        contains('firstHigherMeasurement'),
+        contains('temperatureRise'),
         reason: 'the consistent mark is placed without the choice',
       );
     });
@@ -1922,7 +1913,7 @@ void main() {
       final (_, _) = await _pump(tester, entries: entries);
 
       await tapCycleDay(tester, 7); // 9/13: the unmeasured day (baseline 36.40)
-      await tester.tap(cycleSheetChip('firstHigherMeasurement'));
+      await tester.tap(cycleSheetChip('temperatureRise'));
       await tester.pumpAndSettle();
 
       expect(
@@ -1978,7 +1969,7 @@ void main() {
         final (_, _) = await _pump(
           tester,
           entries: entries,
-          seedMarks: [scenarioFirstHigherMark],
+          seedMarks: [scenarioTemperatureRiseMark],
         );
 
         await tapCycleDay(tester, 8); // 9/14: the marked day
@@ -1995,7 +1986,7 @@ void main() {
       final (_, _) = await _pump(
         tester,
         entries: scenarioEntries,
-        seedMarks: [scenarioFirstHigherMark],
+        seedMarks: [scenarioTemperatureRiseMark],
       );
 
       await tapCycleDay(tester, 8); // 9/14: 36.90 above the baseline 36.40

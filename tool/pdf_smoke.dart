@@ -34,7 +34,7 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 /// cycle): cycle 2 tracks its 28 days up to the next start.
 ///
 /// The first (28-day) cycle carries the render-relevant material the
-/// symbol/overlay rows draw: a mucus peak, a first higher measurement, a
+/// symbol/overlay rows draw: a mucus peak, a temperature-rise mark, a
 /// user-placed SUZ morning mark and an ignoreTemperature day; one dense
 /// day carries mucus with quality, sex, a measurement time and disturbance
 /// flags. The document generation reads all of it through the (unmodified)
@@ -62,7 +62,7 @@ List<CycleMark> fixtureMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 14), type: CycleMarkTypes.ignoreTemperature),
   CycleMark(date: d(3, 16), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: d(3, 17), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 17), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: d(3, 18), type: CycleMarkTypes.suzMorning),
   // Cycles 2 and 3: bare starts.
   CycleMark(date: d(3, 29), type: CycleMarkTypes.cycleStart),
@@ -174,7 +174,7 @@ Future<void> main() async {
   );
   check(
     overlay.circledIndexes.isNotEmpty || overlay.arrowIndexes.isNotEmpty,
-    'the first-higher mark derives a candidate mark',
+    'the temperature-rise mark derives a candidate mark',
   );
 
   final plan = planCyclePages(

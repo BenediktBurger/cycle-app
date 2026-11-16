@@ -1,4 +1,4 @@
-// The app's drift database (schema version 14, profile-free).
+// The app's drift database (schema version 15, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // measurement_methods_dao.dart, settings_dao.dart) are
@@ -58,7 +58,7 @@ class CycleDatabase extends _$CycleDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,11 +102,12 @@ class CycleDatabase extends _$CycleDatabase {
       }
 
       // Each future schema-version bump adds its own guarded block here
-      // (e.g. `if (from < 14) { ... }`), using Migrator helpers only
-      // (createTable, addColumn, customStatement, …); disruptive table
-      // shape changes copy data into the new table instead of dropping
-      // anything. Skipped steps (from several versions behind) run every
-      // missing block in order, so any distance migrates step-wise.
+      // (e.g. `if (from < N) { ... }`), using Migrator helpers
+      // (createTable, addColumn, alterTable, …) or a raw `customStatement`
+      // for data rewrites; disruptive table shape changes copy data into
+      // the new table instead of dropping anything. Skipped steps (from
+      // several versions behind) run every missing block in order, so any
+      // distance migrates step-wise.
 
       if (from < 13) {
         // The methods snapshot table is NEW in v13 (no SELECT data is
@@ -123,6 +124,26 @@ class CycleDatabase extends _$CycleDatabase {
       // a pre-v12 file already gains it with the table recreation above.
       if (from >= 12 && from < 14) {
         await m.addColumn(cycleEntries, cycleEntries.customMarks);
+      }
+
+      // v15 rewrites the temperature-rise mark token. The literals are
+      // deliberate: a migration describes the bytes that were on disk, so
+      // it must not follow the current constants.
+      if (from < 15) {
+        // Both spellings on one day are one mark; dropping the legacy twin
+        // keeps the rename from colliding.
+        await customStatement(
+          "DELETE FROM user_marks "
+          "WHERE mark_type = 'firstHigherMeasurement' "
+          "AND entry_date IN ("
+          "SELECT entry_date FROM user_marks "
+          "WHERE mark_type = 'temperatureRise'"
+          ")",
+        );
+        await customStatement(
+          "UPDATE user_marks SET mark_type = 'temperatureRise' "
+          "WHERE mark_type = 'firstHigherMeasurement'",
+        );
       }
     },
     // SQLite only enforces FOREIGN KEY constraints when the pragma is

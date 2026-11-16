@@ -12,7 +12,7 @@ import 'support/finders.dart';
 import 'support/fixtures.dart';
 
 // Widget tests of the computed evaluation marks on the cycle chart (Mode M,
-// ADR-0001): the user places the mucus-peak and first-higher marks; the UI
+// ADR-0001): the user places the mucus-peak and temperature-rise marks; the UI
 // derives and renders the candidate circles/arrows (kind decided PER
 // CANDIDATE: arrows at or before the peak day, circles strictly after —
 // „Höhere Messung“ vs „Pfeilmessung“), the solid peak dot in its own
@@ -246,7 +246,7 @@ void main() {
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 36.5));
       final marks = [
-        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
       ];
       await pumpChart(tester, chartHarness(entries: entries, marks: marks));
 
@@ -309,7 +309,7 @@ void main() {
       entries.add(DailyEntry(date: _fri18, bbtC: 37.0));
       final marks = [
         CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
-        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
       ];
       await pumpChart(tester, chartHarness(entries: entries, marks: marks));
 
@@ -507,7 +507,7 @@ void main() {
     });
 
     testWidgets('no marked candidate -> no baseline segment', (tester) async {
-      // Peak only: no first-higher mark, so no low window and no segment.
+      // Peak only: no temperature-rise mark, so no low window and no segment.
       await pumpChart(
         tester,
         chartHarness(
@@ -610,7 +610,7 @@ void main() {
         'when no evaluation exists, and still alongside a full evaluation', (
       tester,
     ) async {
-      // ONLY peak marks: without a first-higher mark no evaluation can
+      // ONLY peak marks: without a temperature-rise mark no evaluation can
       // exist, yet every placed peak must render — the dots come from the
       // MARKS STREAM, not from the single domain-anchored peak.
       await pumpChart(
@@ -843,9 +843,9 @@ void main() {
       'two rise marks: the LATER one drives the evaluation; the earlier '
       'rise day renders no candidate',
       (tester) async {
-        // Two firstHigher marks: 9/14 and 9/15. The LATER mark (9/15) anchors
-        // the evaluation — and re-derives the six-low window with it: the
-        // lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
+        // Two temperature-rise marks: 9/14 and 9/15. The LATER mark (9/15)
+        // anchors the evaluation — and re-derives the six-low window with it:
+        // the lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
         // 36.9 (the earlier rise mark's day itself becomes a low!). From the
         // walk start 9/15: 9/15 sits AT the new baseline (gap day, no
         // candidate), 9/16 (37.0) is circle #1 — no „Sicher unfruchtbare
@@ -858,14 +858,8 @@ void main() {
             entries: _evaluationEntries,
             marks: [
               CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-              CycleMark(
-                date: _mon14,
-                type: CycleMarkTypes.firstHigherMeasurement,
-              ),
-              CycleMark(
-                date: _tue15,
-                type: CycleMarkTypes.firstHigherMeasurement,
-              ),
+              CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
+              CycleMark(date: _tue15, type: CycleMarkTypes.temperatureRise),
             ],
           ),
         );

@@ -22,7 +22,7 @@ abstract final class CycleMarkTypes {
 
   /// The temperature rise ("Temperaturanstieg"): the placed anchor from
   /// which the evaluation classifies measured days into arrows and circles.
-  static const firstHigherMeasurement = 'firstHigherMeasurement';
+  static const temperatureRise = 'temperatureRise';
 
   /// The temperature-ignore mark ("Temperatur ignorieren"): a marked
   /// day's temperature is EXCLUDED FROM THE TEMPERATURE EVALUATION — the

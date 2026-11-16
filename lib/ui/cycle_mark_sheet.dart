@@ -121,13 +121,13 @@ final class CycleDayPanel extends ConsumerWidget {
     return true;
   }
 
-  /// The first-higher mark-writing action with the owner consistency
+  /// The temperature-rise mark-writing action with the owner consistency
   /// warning (owner decision 2026-09-17): placing a mark that is
   /// INCONSISTENT — the day carries no measured, not-excluded temperature
   /// strictly above the baseline — pops a NON-BLOCKING Keep/Remove dialog
   /// stating the arithmetic fact only, never a verdict (wording
   /// TODO(user-review)).
-  Future<void> _writeFirstHigherMark(
+  Future<void> _writeTemperatureRiseMark(
     BuildContext context,
     WidgetRef ref, {
     required bool remove,
@@ -140,7 +140,7 @@ final class CycleDayPanel extends ConsumerWidget {
     final written = await _writeMark(
       context,
       ref,
-      type: CycleMarkTypes.firstHigherMeasurement,
+      type: CycleMarkTypes.temperatureRise,
       remove: remove,
     );
     // Nothing to check when the write failed (reported by [_writeMark]).
@@ -150,7 +150,7 @@ final class CycleDayPanel extends ConsumerWidget {
     // the placed mark added to the current marks instead of racing it.
     final placed = [
       ...marks,
-      CycleMark(date: day, type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: day, type: CycleMarkTypes.temperatureRise),
     ];
     final evaluations = evaluateCycles(entries, placed);
     for (var i = 0; i < evaluations.length; i++) {
@@ -158,7 +158,7 @@ final class CycleDayPanel extends ConsumerWidget {
       if (!isDayInCycleWindow(evaluations, i, day)) continue;
       // Only the ANCHORING mark is checked (app convention "latest-mark
       // anchor"): a superseded earlier mark defines no baseline of its own.
-      final anchor = evaluation.firstHigherDay;
+      final anchor = evaluation.riseDay;
       if (anchor == null || !DateOnly.sameDay(anchor, day)) continue;
       if (evaluation.riseMarkConsistent != false) return;
 
@@ -190,7 +190,7 @@ final class CycleDayPanel extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.termFirstHigher),
+          title: Text(l10n.termTemperatureRise),
           content: Text(body),
           actions: [
             TextButton(
@@ -205,11 +205,11 @@ final class CycleDayPanel extends ConsumerWidget {
                 await _writeMark(
                   context,
                   ref,
-                  type: CycleMarkTypes.firstHigherMeasurement,
+                  type: CycleMarkTypes.temperatureRise,
                   remove: true,
                 );
               },
-              child: Text(l10n.cycleSheetRemoveFirstHigher),
+              child: Text(l10n.cycleSheetRemoveTemperatureRise),
             ),
           ],
         ),
@@ -350,10 +350,10 @@ final class CycleDayPanel extends ConsumerWidget {
       // 2026-09-17), recomputed at render time so later data edits keep
       // it in sync.
       // TODO(user-review): the exact wording is pending the expert review.
-      final firstHigher = evaluation.firstHigherDay;
+      final riseDay = evaluation.riseDay;
       if (evaluation.riseMarkConsistent == false &&
-          firstHigher != null &&
-          DateOnly.sameDay(firstHigher, day)) {
+          riseDay != null &&
+          DateOnly.sameDay(riseDay, day)) {
         lines.add((
           l10n.cycleSheetRiseInconsistent(
             _formatValue(locale, evaluation.baseline!.value),
@@ -380,10 +380,7 @@ final class CycleDayPanel extends ConsumerWidget {
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
     final hasExcluded = _hasMark(marks, CycleMarkTypes.ignoreTemperature);
-    final hasFirstHigher = _hasMark(
-      marks,
-      CycleMarkTypes.firstHigherMeasurement,
-    );
+    final hasTemperatureRise = _hasMark(marks, CycleMarkTypes.temperatureRise);
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
     final hasSuzMorning = _hasMark(marks, CycleMarkTypes.suzMorning);
     final hasCycleStart = _hasMark(marks, CycleMarkTypes.cycleStart);
@@ -592,13 +589,13 @@ final class CycleDayPanel extends ConsumerWidget {
                           // Placement goes through the consistency dialog
                           // check; deselect removes directly.
                           gridChip(
-                            l10n.termFirstHigher,
-                            hasFirstHigher,
+                            l10n.termTemperatureRise,
+                            hasTemperatureRise,
                             icon: Icons.adjust,
                             key: const ValueKey(
-                              'cycleSheetChip-firstHigherMeasurement',
+                              'cycleSheetChip-temperatureRise',
                             ),
-                            (wanted) => _writeFirstHigherMark(
+                            (wanted) => _writeTemperatureRiseMark(
                               context,
                               ref,
                               remove: !wanted,

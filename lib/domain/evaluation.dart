@@ -131,7 +131,7 @@ final class CycleEvaluation {
   const CycleEvaluation({
     required this.cycle,
     required this.mucusPeakDay,
-    required this.firstHigherDay,
+    required this.riseDay,
     required this.numberedLows,
     required this.baseline,
     required this.candidateMeasurements,
@@ -150,14 +150,14 @@ final class CycleEvaluation {
 
   /// The user-placed temperature rise (the marked anchor), or null when
   /// unmarked.
-  final DateTime? firstHigherDay;
+  final DateTime? riseDay;
 
-  /// Up to six numbered low measurements before the first higher
-  /// measurement, ordered by number (1 = closest to the first higher).
+  /// Up to six numbered low measurements before the rise mark, ordered by
+  /// number (1 = closest to the rise).
   final List<NumberedLow> numberedLows;
 
   /// Baseline through the highest of the six lows, or null when no usable
-  /// low measurement exists (no first-higher mark, or none measured).
+  /// low measurement exists (no temperature-rise mark, or none measured).
   final BaselinePoint? baseline;
 
   /// The marked candidate sequence, chronological: the measured days
@@ -183,7 +183,7 @@ final class CycleEvaluation {
   /// „Sicher unfruchtbare Zeit“ is not determined.
   final SuzRule? suzRule;
 
-  /// Whether the marked first-higher day carries a measured,
+  /// Whether the marked rise day carries a measured,
   /// not-marked-excluded temperature STRICTLY above the baseline (owner
   /// decision 2026-09-17: when not, the UI warns the user may have chosen
   /// a wrong day; the wording states the arithmetic fact, never a verdict).
@@ -302,18 +302,18 @@ DateTime? _latestMarkOf(
 /// start).
 final class _LowWindow {
   const _LowWindow({
-    required this.firstHigherDay,
+    required this.riseDay,
     required this.numberedLows,
     required this.baseline,
   });
 
   static const empty = _LowWindow(
-    firstHigherDay: null,
+    riseDay: null,
     numberedLows: [],
     baseline: null,
   );
 
-  final DateTime? firstHigherDay;
+  final DateTime? riseDay;
   final List<NumberedLow> numberedLows;
   final BaselinePoint? baseline;
 
@@ -335,13 +335,13 @@ _LowWindow _lowWindowFor(
   Set<DateTime> excludedDays,
   DateTime? nextCycleStart,
 ) {
-  final firstHigherDay = _latestMarkOf(
+  final riseDay = _latestMarkOf(
     cycle,
     marks,
-    CycleMarkTypes.firstHigherMeasurement,
+    CycleMarkTypes.temperatureRise,
     nextCycleStart,
   );
-  if (firstHigherDay == null) return _LowWindow.empty;
+  if (riseDay == null) return _LowWindow.empty;
 
   // The six-low window is the six previous calendar days before the marked
   // rise, intersected with the group's tracked days; numbering belongs to
@@ -351,7 +351,7 @@ _LowWindow _lowWindowFor(
   final byDay = {for (final e in cycle.days) DateOnly.normalize(e.date): e};
   final lows = <NumberedLow>[];
   for (var offset = 1; offset <= 6; offset++) {
-    final day = DateOnly.addDays(firstHigherDay, -offset);
+    final day = DateOnly.addDays(riseDay, -offset);
     final entry = byDay[day];
     // The day occupies its calendar position but contributes nothing.
     if (entry == null || entry.bbtC == null || excludedDays.contains(day)) {
@@ -371,7 +371,7 @@ _LowWindow _lowWindowFor(
   }
 
   return _LowWindow(
-    firstHigherDay: firstHigherDay,
+    riseDay: riseDay,
     numberedLows: List.unmodifiable(lows),
     baseline: baseline,
   );
@@ -436,7 +436,7 @@ CycleEvaluation _evaluateCycle(
 
   final numberedLows = lowWindow.numberedLows;
   final baseline = lowWindow.baseline;
-  final firstHigherDay = lowWindow.firstHigherDay;
+  final riseDay = lowWindow.riseDay;
 
   // Walk CALENDAR days from the marked rise so untracked days count as the
   // gaps they are. Unmeasured, mark-excluded and at/below-baseline days form
@@ -454,10 +454,9 @@ CycleEvaluation _evaluateCycle(
   final byDay = {for (final e in cycle.days) DateOnly.normalize(e.date): e};
   bool? riseMarkConsistent;
 
-  if (baseline != null && firstHigherDay != null) {
+  if (baseline != null && riseDay != null) {
     riseMarkConsistent =
-        _candidateValue(byDay, firstHigherDay, excludedDays, baseline.value) !=
-        null;
+        _candidateValue(byDay, riseDay, excludedDays, baseline.value) != null;
     final lastDay = DateOnly.normalize(cycle.endDate);
 
     var sequenceStarted = false;
@@ -466,7 +465,7 @@ CycleEvaluation _evaluateCycle(
     var circleCount = 0;
 
     for (
-      var day = firstHigherDay;
+      var day = riseDay;
       !day.isAfter(lastDay);
       day = DateOnly.addDays(day, 1)
     ) {
@@ -547,7 +546,7 @@ CycleEvaluation _evaluateCycle(
   return CycleEvaluation(
     cycle: cycle,
     mucusPeakDay: peakDay,
-    firstHigherDay: firstHigherDay,
+    riseDay: riseDay,
     numberedLows: numberedLows,
     baseline: baseline,
     candidateMeasurements: List.unmodifiable(candidateMeasurements),

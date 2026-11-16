@@ -21,7 +21,7 @@ DateTime m(int month, int day) => DateTime.utc(2026, month, day);
 
 /// Two marked cycles, 2026:
 ///   cycle 1: start Mar 1 — bleeding Mar 1-3 (span 3), six measured low
-///            days 36.4 from Mar 4, mucus-peak mark Mar 12, first-higher
+///            days 36.4 from Mar 4, mucus-peak mark Mar 12, temperature-rise
 ///            mark Mar 14 (measured 36.7 Mar 14-16), cycle 2 starts Mar 29
 ///            -> rise span Mar 14..Mar 28 = 15 days; length 28
 ///   cycle 2: start Mar 29 — bleeding Mar 29-30 (span 2), open (no
@@ -46,7 +46,7 @@ List<CycleMark> screenMarks() => [
   CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
   CycleMark(date: m(3, 12), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: m(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: m(3, 14), type: CycleMarkTypes.temperatureRise),
 ];
 
 /// Variant of [screenMarks] adding a rise mark ON cycle 2's first day
@@ -58,7 +58,7 @@ List<CycleMark> screenMarks() => [
 List<CycleMark> divergentMarks() => [
   ...screenMarks(),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: m(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: m(3, 29), type: CycleMarkTypes.temperatureRise),
 ];
 
 Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
@@ -1123,7 +1123,7 @@ void main() {
       ],
       marks: [
         CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
       ],
       paperEarliestFirstHigherCycleDay: 5,
@@ -1172,7 +1172,7 @@ void main() {
       ],
       marks: [
         CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
       ],
     );

@@ -277,8 +277,8 @@ scaffolding, and the analyze/test/build commands — notably
 
 Working app: Tagebuch / Zyklus / Statistik / Einstellungen on a local drift
 database, with JSON export/import; the UI is German-first with an English
-switch, including the Mode-M marking UI (first higher measurement, mucus
-peak, sicher unfruchtbare Zeit). Open work is tracked in
+switch, including the Mode-M marking UI (temperature-rise mark, mucus peak,
+sicher unfruchtbare Zeit). Open work is tracked in
 [docs/roadmap.md](docs/roadmap.md).
 
 ## License

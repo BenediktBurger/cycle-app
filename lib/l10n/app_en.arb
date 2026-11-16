@@ -14,7 +14,7 @@
   "termCervixPosition": "Cervix position",
   "termCervixFirmness": "Cervix firmness",
   "termMeasurementTime": "Measurement time",
-  "termFirstHigher": "Temperature rise",
+  "termTemperatureRise": "Temperature rise",
   "termCycleStart": "Cycle start",
   "@termCycleStart": {
     "description": "Name of the cycleStart mark (the day panel's first chip) and, at the same time, the \"Cycle start\" column header of the statistics table — one string on both surfaces so the two names cannot drift."
@@ -223,7 +223,7 @@
   "@cycleSheetSuzMorningLabel": {
     "description": "Static label of the definitely infertile time morning chip (the chip state, not the label, carries set/remove). TODO(user-review): see the evening label — the wording is pending the expert review."
   },
-  "cycleSheetRemoveFirstHigher": "Remove temperature rise",
+  "cycleSheetRemoveTemperatureRise": "Remove temperature rise",
   "cycleSheetBaselineInfo": "Baseline: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {
@@ -279,7 +279,7 @@
         "type": "String"
       }
     },
-    "description": "Persistent info-line warning shown on the marked day while the first-higher-measurement mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
+    "description": "Persistent info-line warning shown on the marked day while the temperature-rise mark stands inconsistent (later data edits are covered — the line is recomputed at render time). States the arithmetic fact only. TODO(user-review): the exact wording is pending the expert review."
   },
   "cycleLegendSuz": "Definitely infertile time (SUZ)",
   "cycleSheetSuzSuggestionEvening": "Suggested: the infertile time begins this evening",

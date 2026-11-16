@@ -130,6 +130,47 @@ void main() {
       expect(await db.marksDao.allMarks(), hasLength(1));
     });
 
+    test('a legacy document imports its rise mark as temperatureRise '
+        'and re-exports it', () async {
+      final legacyDoc = buildExportJson(
+        ExportBlob(
+          exportedAt: DateTime.utc(2026, 4, 1),
+          entries: const [
+            {'date': '2026-04-02', 'bleeding': 'period'},
+          ],
+          marks: const [
+            {
+              'entry_date': '2026-04-03',
+              'mark_type': 'firstHigherMeasurement',
+              'author': 'user',
+            },
+          ],
+        ),
+      );
+
+      final first = await importJsonToDatabase(db, legacyDoc);
+      expect(first.marksNew, 1);
+      expect(first.marksSkipped, 0);
+      final stored = (await db.marksDao.allMarks()).single;
+      expect(stored.markType, 'temperatureRise');
+      expect(stored.author, 'user');
+
+      // The re-import counts must match the write gate: both key on the
+      // canonical token, so the second pass skips instead of re-writing.
+      final second = await importJsonToDatabase(db, legacyDoc);
+      expect(second.marksNew, 0);
+      expect(second.marksSkipped, 1);
+      expect(await db.marksDao.allMarks(), hasLength(1));
+
+      final exported =
+          jsonDecode(await exportDatabaseToJson(db)) as Map<String, Object?>;
+      expect(
+        ((exported['marks']! as List).single as Map)['mark_type'],
+        'temperatureRise',
+        reason: 'the exporter writes the stored token verbatim',
+      );
+    });
+
     test('old-document exclude_* keys derive an ignoreTemperature mark '
         "(author 'import')", () async {
       // The old-document translation (inside the import transaction):

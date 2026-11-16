@@ -26,7 +26,7 @@ override) **and A** (automatic) are explicitly deferred.
    (the cheat sheet's fertility-sign vocabulary: t / Ø / f / S, with
    superscript quality qualifiers on S), optional cervix, plus
    pain/mood/desire/sexual intercourse/notes.
-2. **Assisted marking tools for NER evaluation** (first-higher-measurement,
+2. **Assisted marking tools for NER evaluation** (temperature-rise mark,
    baseline/coverline from six prior low measurements, mucus peak day, calendar
    fertile window, interruptions) — **data-model-ready in M1, UI deferred**.
 3. **Generated statistics** (cycle lengths, phase lengths, distributions) —

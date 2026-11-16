@@ -30,7 +30,7 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 /// carries the full observation surface the PDF's per-cycle overlay maps
 /// from: mucus (with a quality on the S day), a measurement time, a raw
 /// disturbance flag, a temperature-ignore mark, the mucus-peak and
-/// first-higher marks, and one „Sicher unfruchtbare Zeit“ mark of each
+/// temperature-rise marks, and one „Sicher unfruchtbare Zeit“ mark of each
 /// variant (the cycle's plain record rows the export renders verbatim;
 /// cycles 2 and 3 stay almost plain so a mark-free cycle's empty overlay
 /// is asserted too).
@@ -90,7 +90,7 @@ List<DailyEntry> modelEntries() => [
 List<CycleMark> modelMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 12), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: d(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 14), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: d(3, 15), type: CycleMarkTypes.suzMorning),
   CycleMark(date: d(3, 10), type: CycleMarkTypes.suzEvening),
   CycleMark(date: d(3, 9), type: CycleMarkTypes.ignoreTemperature),
@@ -572,7 +572,7 @@ void main() {
 
   group('earliest first higher cycle day', () {
     /// Marks fixture: cycle 2 (start Mar 29) carries a peak AND a
-    /// first-higher mark on the SAME day (its marked rise is cycle day 1).
+    /// temperature-rise mark on the SAME day (its marked rise is cycle day 1).
     /// Cycle 2 produces no measured circle of its own — a rise inside a
     /// cycle's first six days has its six-low window truncated at the
     /// cycle's own tracked days, so no baseline and no candidate exist
@@ -581,7 +581,7 @@ void main() {
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
-      CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.temperatureRise),
     ];
 
     test('computed per cycle over the record prefix truncated AT the '
@@ -653,7 +653,7 @@ void main() {
       // every page stays at "—".
       final marks = [
         CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: d(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: d(3, 14), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: d(3, 29), type: CycleMarkTypes.cycleStart),
         CycleMark(date: d(4, 26), type: CycleMarkTypes.cycleStart),
       ];
@@ -675,7 +675,7 @@ void main() {
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
-      CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.temperatureRise),
     ];
 
     test('the paper shortest is the every-page minimum against the prefix '
@@ -957,13 +957,13 @@ void main() {
             // window (rise−1 … rise−6) reaches no tracked day at all —
             // the window day May 4–9 days are all data-less.
             date: d(5, 10),
-            type: CycleMarkTypes.firstHigherMeasurement,
+            type: CycleMarkTypes.temperatureRise,
           ),
         ],
         today: d(5, 20),
       );
       final last = model.cycles.last;
-      expect(last.firstHigherDay, DateOnly.normalize(d(5, 10)));
+      expect(last.riseDay, DateOnly.normalize(d(5, 10)));
       expect(last.baseline, isNull);
       expect(last.candidateMeasurements, isEmpty);
       expect(last.numberedLows, isEmpty);
