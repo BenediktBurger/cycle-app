@@ -283,7 +283,7 @@ List<DailyEntry> numberFixtureEntries() => [
 
 List<CycleMark> numberFixtureMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
-  CycleMark(date: d(3, 7), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 7), type: CycleMarkTypes.temperatureRise),
 ];
 
 PdfExportModel numberFixtureModel({TemperatureRange? range}) =>
@@ -324,7 +324,7 @@ List<DailyEntry> computedSuzEntries() => [
 List<CycleMark> computedSuzMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 5), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: d(3, 7), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 7), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: d(3, 11), type: CycleMarkTypes.suzMorning),
 ];
 

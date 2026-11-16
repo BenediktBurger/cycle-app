@@ -509,7 +509,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       await storedMarkTypes(db, scenarioDay(12)),
-      unorderedEquals(['mucusPeakDay', 'firstHigherMeasurement']),
+      unorderedEquals(['mucusPeakDay', 'temperatureRise']),
       reason: 'both marks may live on one day',
     );
     // The placement leaves the mark inconsistent (36.20 on 9/12 lies
@@ -1790,10 +1790,8 @@ void main() {
     // The six-previous-calendar-day window of a mark on 9/13 is 9/7..9/12,
     // whose baseline is 36.40 (9/9); the marked day itself carries 36.30 —
     // NOT strictly above the baseline, so the placement is inconsistent.
-    CycleMark markOn13() => CycleMark(
-      date: scenarioDay(13),
-      type: CycleMarkTypes.firstHigherMeasurement,
-    );
+    CycleMark markOn13() =>
+        CycleMark(date: scenarioDay(13), type: CycleMarkTypes.temperatureRise);
 
     testWidgets('placing an inconsistent mark warns with the arithmetic and '
         'Keep keeps the mark', (tester) async {
@@ -1847,7 +1845,7 @@ void main() {
       );
       expect(
         await storedMarkTypes(db, scenarioDay(13)),
-        contains('firstHigherMeasurement'),
+        contains('temperatureRise'),
         reason: 'Keep keeps the just-placed mark',
       );
       expect(
@@ -1907,7 +1905,7 @@ void main() {
       );
       expect(
         await storedMarkTypes(db, scenarioDay(14)),
-        contains('firstHigherMeasurement'),
+        contains('temperatureRise'),
         reason: 'the consistent mark is placed without the choice',
       );
     });

@@ -80,6 +80,42 @@ void main() {
       expect(doc.marks.single['mark_type'], 'baseline');
     });
 
+    String markDocument(String markType, {String author = 'user'}) =>
+        jsonEncode(<String, Object?>{
+          'schema_version': 6,
+          'exported_at': '2026-09-15T00:00:00Z',
+          'entries': <Object?>[],
+          'marks': <Object?>[
+            {
+              'entry_date': '2026-09-02',
+              'mark_type': markType,
+              'author': author,
+            },
+          ],
+        });
+
+    test('parseExportJson translates the pre-rename rise token', () {
+      final doc = parseExportJson(markDocument('firstHigherMeasurement'));
+
+      expect(doc.marks.single['mark_type'], 'temperatureRise');
+      expect(
+        doc.marks.single['author'],
+        'user',
+        reason: 'the other row keys ride through the translation untouched',
+      );
+    });
+
+    test('parseExportJson keeps genuinely unknown mark tokens verbatim', () {
+      final doc = parseExportJson(markDocument('futureMark', author: 'import'));
+
+      expect(
+        doc.marks.single['mark_type'],
+        'futureMark',
+        reason:
+            'the mark vocabulary is open: only the renamed token is translated',
+      );
+    });
+
     test('parseExportJson validates the exported-at timestamp', () {
       expect(
         () => parseExportJson(

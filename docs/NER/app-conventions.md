@@ -31,8 +31,7 @@ every rule detail of the book has been audited page by page.
   „Pfeilmessung“ (S. 58) calls the rising values before the peak
   „Pfeilmessungen“, and the cheatsheet asks for the „**erste** höhere Messung
   **nach** dem \*“, so “higher measurement” names a measured, circled value,
-  not the mark. The persisted token `firstHigherMeasurement` keeps its name
-  for storage stability.
+  not the mark. The persisted token is `temperatureRise`.
 - **Candidate walk**: from the marked rise onward, every measured day
   strictly above the baseline is a candidate. The 0.2 °C margin decides only
   which of the two book cases applies: at least 0.2 °C starts the „sicher

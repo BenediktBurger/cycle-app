@@ -90,7 +90,7 @@ List<DailyEntry> modelEntries() => [
 List<CycleMark> modelMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 12), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: d(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 14), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: d(3, 15), type: CycleMarkTypes.suzMorning),
   CycleMark(date: d(3, 10), type: CycleMarkTypes.suzEvening),
   CycleMark(date: d(3, 9), type: CycleMarkTypes.ignoreTemperature),
@@ -581,7 +581,7 @@ void main() {
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
-      CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.temperatureRise),
     ];
 
     test('computed per cycle over the record prefix truncated AT the '
@@ -653,7 +653,7 @@ void main() {
       // every page stays at "—".
       final marks = [
         CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: d(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: d(3, 14), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: d(3, 29), type: CycleMarkTypes.cycleStart),
         CycleMark(date: d(4, 26), type: CycleMarkTypes.cycleStart),
       ];
@@ -675,7 +675,7 @@ void main() {
     List<CycleMark> divergentMarks() => [
       ...modelMarks(),
       CycleMark(date: d(3, 29), type: CycleMarkTypes.mucusPeakDay),
-      CycleMark(date: d(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: d(3, 29), type: CycleMarkTypes.temperatureRise),
     ];
 
     test('the paper shortest is the every-page minimum against the prefix '
@@ -957,7 +957,7 @@ void main() {
             // window (rise−1 … rise−6) reaches no tracked day at all —
             // the window day May 4–9 days are all data-less.
             date: d(5, 10),
-            type: CycleMarkTypes.firstHigherMeasurement,
+            type: CycleMarkTypes.temperatureRise,
           ),
         ],
         today: d(5, 20),

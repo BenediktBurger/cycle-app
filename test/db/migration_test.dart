@@ -24,15 +24,15 @@ void main() {
     addTearDown(db.close);
   });
 
-  test('the schema version is 14 (the custom_marks column)', () async {
+  test('the schema version is 15 (the mark-token rewrite)', () async {
     final version = await db.customSelect('PRAGMA user_version').getSingle();
     expect(
       version.data['user_version'],
-      14,
+      15,
       reason:
-          'v14 adds the custom_marks column to cycle_entries; an '
-          'existing install gains it through the incremental addColumn, '
-          'so the step is a real migration',
+          'v15 rewrites the stored temperature-rise mark token with one '
+          'UPDATE; the mark column stays open TEXT, so no DDL changes '
+          'with it',
     );
   });
   group('incremental upgrade from an older schemaVersion', () {
@@ -103,6 +103,7 @@ void main() {
       int from, {
       required bool withAppSettings,
       int seedBleeding = 4,
+      bool seedLegacyMark = false,
     }) async {
       // Pre-v14 files carry no custom_marks column: it is stripped from
       // the replayed DDL so the migration's addColumn is the step that
@@ -151,6 +152,12 @@ void main() {
           "INSERT INTO user_marks (entry_date, mark_type, author) "
           "VALUES (20001, 'cycleStart', 'user')",
         );
+        if (seedLegacyMark) {
+          raw.execute(
+            "INSERT INTO user_marks (entry_date, mark_type, author) "
+            "VALUES (20002, 'firstHigherMeasurement', 'user')",
+          );
+        }
         raw.execute('PRAGMA user_version = $from;');
       } finally {
         raw.close();
@@ -353,6 +360,33 @@ void main() {
       );
       final row = (await db.entriesDao.entryFor(DateTime(2024, 10, 4)))!;
       expect(dailyEntryFromDrift(row).customMarks, marks);
+    });
+
+    test('a v14 file migrates the legacy mark token in place', () async {
+      final db = await openMigrationFixture(
+        14,
+        withAppSettings: true,
+        seedLegacyMark: true,
+      );
+      await expectPreserved(db);
+
+      final riseMarks = await db.marksDao.marksForDay(DateTime(2024, 10, 6));
+      expect(
+        riseMarks,
+        hasLength(1),
+        reason: 'the seeded mark row survives the upgrade',
+      );
+      expect(riseMarks.single.markType, 'temperatureRise');
+      expect(riseMarks.single.author, 'user');
+
+      final markRows = await db
+          .customSelect('SELECT COUNT(*) AS n FROM user_marks')
+          .getSingle();
+      expect(
+        markRows.data['n'],
+        2,
+        reason: 'the step is one UPDATE — no row is added, split or dropped',
+      );
     });
 
     test('a pre-existing out-of-range bleeding row fails the migration '

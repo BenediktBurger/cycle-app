@@ -892,7 +892,7 @@ void main() {
         final afternoon = DateTime(2026, 3, 12, 17, 30);
         final stored = await db.marksDao.addMark(
           afternoon,
-          CycleMarkTypes.firstHigherMeasurement,
+          CycleMarkTypes.temperatureRise,
         );
         final mapped = cycleMarkFromDrift(stored);
 
@@ -909,7 +909,7 @@ void main() {
         // no duplicate (uniqueness is on the normalized day).
         await db.marksDao.addMark(
           afternoon.toUtc().add(const Duration(hours: 2)),
-          CycleMarkTypes.firstHigherMeasurement,
+          CycleMarkTypes.temperatureRise,
         );
         expect(await db.marksDao.marksForDay(day), hasLength(1));
       },
@@ -935,10 +935,7 @@ void main() {
       // duplicated into CycleMarkTypes — this test is the tripwire keeping
       // the two definitions in sync.
       expect(CycleMarkTypes.mucusPeakDay, MarkTypes.mucusPeakDay);
-      expect(
-        CycleMarkTypes.firstHigherMeasurement,
-        MarkTypes.firstHigherMeasurement,
-      );
+      expect(CycleMarkTypes.temperatureRise, MarkTypes.temperatureRise);
       // The temperature-ignore mark (the NER-aligned replacement of the
       // old exclude_* raw flags) is part of the shared vocabulary too.
       expect(CycleMarkTypes.ignoreTemperature, MarkTypes.ignoreTemperature);
@@ -978,10 +975,7 @@ void main() {
         ], reason: 'initial snapshot of an empty mark table');
 
         final otherDay = DateTime(2026, 3, 13);
-        await db.marksDao.addMark(
-          otherDay,
-          CycleMarkTypes.firstHigherMeasurement,
-        );
+        await db.marksDao.addMark(otherDay, CycleMarkTypes.temperatureRise);
         await db.marksDao.addMark(day, CycleMarkTypes.mucusPeakDay);
         await Future<void>.delayed(Duration.zero);
 
@@ -997,7 +991,7 @@ void main() {
         );
         expect(
           [for (final m in events.last) m.markType],
-          [CycleMarkTypes.mucusPeakDay, CycleMarkTypes.firstHigherMeasurement],
+          [CycleMarkTypes.mucusPeakDay, CycleMarkTypes.temperatureRise],
           reason: 'ordered by day, then type',
         );
         expect(
@@ -1005,10 +999,7 @@ void main() {
           isTrue,
         );
 
-        await db.marksDao.deleteMark(
-          otherDay,
-          CycleMarkTypes.firstHigherMeasurement,
-        );
+        await db.marksDao.deleteMark(otherDay, CycleMarkTypes.temperatureRise);
         await Future<void>.delayed(Duration.zero);
         expect(events.last.single.markType, CycleMarkTypes.mucusPeakDay);
       },

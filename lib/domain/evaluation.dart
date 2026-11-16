@@ -338,7 +338,7 @@ _LowWindow _lowWindowFor(
   final firstHigherDay = _latestMarkOf(
     cycle,
     marks,
-    CycleMarkTypes.firstHigherMeasurement,
+    CycleMarkTypes.temperatureRise,
     nextCycleStart,
   );
   if (firstHigherDay == null) return _LowWindow.empty;

@@ -519,7 +519,7 @@ void main() {
         ),
         CycleMark(
           date: DateTime(2026, 3, 3),
-          type: CycleMarkTypes.firstHigherMeasurement,
+          type: CycleMarkTypes.temperatureRise,
         ),
         CycleMark(date: DateTime(2026, 3, 3), type: CycleMarkTypes.suzEvening),
       ];

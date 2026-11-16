@@ -140,7 +140,7 @@ final class CycleDayPanel extends ConsumerWidget {
     final written = await _writeMark(
       context,
       ref,
-      type: CycleMarkTypes.firstHigherMeasurement,
+      type: CycleMarkTypes.temperatureRise,
       remove: remove,
     );
     // Nothing to check when the write failed (reported by [_writeMark]).
@@ -150,7 +150,7 @@ final class CycleDayPanel extends ConsumerWidget {
     // the placed mark added to the current marks instead of racing it.
     final placed = [
       ...marks,
-      CycleMark(date: day, type: CycleMarkTypes.firstHigherMeasurement),
+      CycleMark(date: day, type: CycleMarkTypes.temperatureRise),
     ];
     final evaluations = evaluateCycles(entries, placed);
     for (var i = 0; i < evaluations.length; i++) {
@@ -205,7 +205,7 @@ final class CycleDayPanel extends ConsumerWidget {
                 await _writeMark(
                   context,
                   ref,
-                  type: CycleMarkTypes.firstHigherMeasurement,
+                  type: CycleMarkTypes.temperatureRise,
                   remove: true,
                 );
               },
@@ -380,10 +380,7 @@ final class CycleDayPanel extends ConsumerWidget {
 
     final hasPeak = _hasMark(marks, CycleMarkTypes.mucusPeakDay);
     final hasExcluded = _hasMark(marks, CycleMarkTypes.ignoreTemperature);
-    final hasFirstHigher = _hasMark(
-      marks,
-      CycleMarkTypes.firstHigherMeasurement,
-    );
+    final hasFirstHigher = _hasMark(marks, CycleMarkTypes.temperatureRise);
     final hasSuzEvening = _hasMark(marks, CycleMarkTypes.suzEvening);
     final hasSuzMorning = _hasMark(marks, CycleMarkTypes.suzMorning);
     final hasCycleStart = _hasMark(marks, CycleMarkTypes.cycleStart);

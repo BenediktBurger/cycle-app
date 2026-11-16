@@ -1,4 +1,4 @@
-// The app's drift database (schema version 14, profile-free).
+// The app's drift database (schema version 15, profile-free).
 //
 // File organization: the DAO files (entries_dao.dart, marks_dao.dart,
 // measurement_methods_dao.dart, settings_dao.dart) are
@@ -58,7 +58,7 @@ class CycleDatabase extends _$CycleDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -123,6 +123,16 @@ class CycleDatabase extends _$CycleDatabase {
       // a pre-v12 file already gains it with the table recreation above.
       if (from >= 12 && from < 14) {
         await m.addColumn(cycleEntries, cycleEntries.customMarks);
+      }
+
+      // v15 rewrites the temperature-rise mark token. The literals are
+      // deliberate: a migration describes the bytes that were on disk, so
+      // it must not follow the current constants.
+      if (from < 15) {
+        await customStatement(
+          "UPDATE user_marks SET mark_type = 'temperatureRise' "
+          "WHERE mark_type = 'firstHigherMeasurement'",
+        );
       }
     },
     // SQLite only enforces FOREIGN KEY constraints when the pragma is

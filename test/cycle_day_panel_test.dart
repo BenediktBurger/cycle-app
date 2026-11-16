@@ -48,7 +48,7 @@ void main() {
         'mucusPeakDay',
       ], reason: 'A-adjacent seeded marks are untouched');
       expect(await storedMarkTypes(db, scenarioDay(14)), [
-        'firstHigherMeasurement',
+        'temperatureRise',
       ], reason: 'B\'s own seeded mark is untouched');
       expect(
         dotPainterOrNull(tester, 8),
@@ -106,7 +106,7 @@ void main() {
             'modal dismissal, moves the options',
       );
       expect(await storedMarkTypes(db, scenarioDay(13)), [
-        'firstHigherMeasurement',
+        'temperatureRise',
       ], reason: 'the second mark is written through the same panel');
     },
   );

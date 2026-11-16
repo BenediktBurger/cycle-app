@@ -46,10 +46,7 @@ List<DailyEntry> _numberedTailEntries() => [
 
 /// The first-higher mark that anchors _numberedTailEntries's low window.
 final _numberedTailMarks = <CycleMark>[
-  CycleMark(
-    date: longRangeDay(148),
-    type: CycleMarkTypes.firstHigherMeasurement,
-  ),
+  CycleMark(date: longRangeDay(148), type: CycleMarkTypes.temperatureRise),
 ];
 
 Finder _bleedingCell(int index) => find.byKey(ValueKey('bleedingCell-$index'));

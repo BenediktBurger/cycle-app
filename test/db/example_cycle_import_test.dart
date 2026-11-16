@@ -78,6 +78,14 @@ void main() {
       )).where((m) => m.markType == 'mucusPeakDay');
       expect(mucusPeakDay, hasLength(1));
       expect(mucusPeakDay.single.author, 'user');
+
+      // The fixture still spells the temperature-rise mark with the
+      // pre-rename token; the import translates it.
+      final riseDay = (await db.marksDao.marksForDay(
+        DateTime(2026, 9, 2),
+      )).where((m) => m.markType == 'temperatureRise');
+      expect(riseDay, hasLength(1));
+      expect(riseDay.single.author, 'user');
     });
 
     test('the gap day 2026-09-11 stays absent from the stored dates', () async {

@@ -275,6 +275,10 @@ String buildExportJson(ExportBlob blob) {
   });
 }
 
+/// Pre-rename spellings of the stored mark tokens that documents still
+/// carry: an old backup's mark must keep anchoring the evaluation.
+const _legacyMarkTokens = {'firstHigherMeasurement': 'temperatureRise'};
+
 /// Validates and decodes the export document into the same [ExportBlob]
 /// shape the builder produces.
 ///
@@ -318,7 +322,15 @@ ExportBlob parseExportJson(String raw) {
   return ExportBlob(
     exportedAt: exported,
     entries: _listOfMaps(decoded['entries'], 'entries'),
-    marks: _listOfMaps(decoded['marks'], 'marks'),
+    // Canonicalizing here (not in the adapter's writer) is what keeps the
+    // planner's New/Skipped counts agreeing with the rows addMark sees.
+    marks: [
+      for (final row in _listOfMaps(decoded['marks'], 'marks'))
+        if (_legacyMarkTokens[row['mark_type']] case final renamed?)
+          {...row, 'mark_type': renamed}
+        else
+          row,
+    ],
     // Absent key = no snapshots (old documents and snapshot-free exports).
     // A PRESENT key goes through the same list gate as the other tables: a
     // broken value is a document error, never silently swallowed data.

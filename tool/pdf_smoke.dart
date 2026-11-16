@@ -62,7 +62,7 @@ List<CycleMark> fixtureMarks() => [
   CycleMark(date: d(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: d(3, 14), type: CycleMarkTypes.ignoreTemperature),
   CycleMark(date: d(3, 16), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: d(3, 17), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: d(3, 17), type: CycleMarkTypes.temperatureRise),
   CycleMark(date: d(3, 18), type: CycleMarkTypes.suzMorning),
   // Cycles 2 and 3: bare starts.
   CycleMark(date: d(3, 29), type: CycleMarkTypes.cycleStart),

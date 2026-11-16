@@ -62,7 +62,7 @@ List<CycleMark> evaluationScenarioMarks() => [
   CycleMark(date: DateTime.utc(2026, 9, 12), type: CycleMarkTypes.mucusPeakDay),
   CycleMark(
     date: DateTime.utc(2026, 9, 14),
-    type: CycleMarkTypes.firstHigherMeasurement,
+    type: CycleMarkTypes.temperatureRise,
   ),
 ];
 

@@ -246,7 +246,7 @@ void main() {
       entries.add(DailyEntry(date: _thu17, bbtC: 36.5));
       entries.add(DailyEntry(date: _fri18, bbtC: 36.5));
       final marks = [
-        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
       ];
       await pumpChart(tester, chartHarness(entries: entries, marks: marks));
 
@@ -309,7 +309,7 @@ void main() {
       entries.add(DailyEntry(date: _fri18, bbtC: 37.0));
       final marks = [
         CycleMark(date: _tue15, type: CycleMarkTypes.mucusPeakDay),
-        CycleMark(date: _mon14, type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
       ];
       await pumpChart(tester, chartHarness(entries: entries, marks: marks));
 
@@ -858,14 +858,8 @@ void main() {
             entries: _evaluationEntries,
             marks: [
               CycleMark(date: _sat12, type: CycleMarkTypes.mucusPeakDay),
-              CycleMark(
-                date: _mon14,
-                type: CycleMarkTypes.firstHigherMeasurement,
-              ),
-              CycleMark(
-                date: _tue15,
-                type: CycleMarkTypes.firstHigherMeasurement,
-              ),
+              CycleMark(date: _mon14, type: CycleMarkTypes.temperatureRise),
+              CycleMark(date: _tue15, type: CycleMarkTypes.temperatureRise),
             ],
           ),
         );

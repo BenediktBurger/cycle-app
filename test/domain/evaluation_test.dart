@@ -66,7 +66,7 @@ CycleMark peak(int year, int month, int day) => CycleMark(
 /// A user-placed first-higher-measurement mark on (year, month, day).
 CycleMark rise(int year, int month, int day) => CycleMark(
   date: DateTime(year, month, day),
-  type: CycleMarkTypes.firstHigherMeasurement,
+  type: CycleMarkTypes.temperatureRise,
 );
 
 // start/excludedDay: the shared domain mark fixtures (mark_fixtures.dart).

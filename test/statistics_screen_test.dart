@@ -46,7 +46,7 @@ List<CycleMark> screenMarks() => [
   CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
   CycleMark(date: m(3, 12), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: m(3, 14), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: m(3, 14), type: CycleMarkTypes.temperatureRise),
 ];
 
 /// Variant of [screenMarks] adding a rise mark ON cycle 2's first day
@@ -58,7 +58,7 @@ List<CycleMark> screenMarks() => [
 List<CycleMark> divergentMarks() => [
   ...screenMarks(),
   CycleMark(date: m(3, 29), type: CycleMarkTypes.mucusPeakDay),
-  CycleMark(date: m(3, 29), type: CycleMarkTypes.firstHigherMeasurement),
+  CycleMark(date: m(3, 29), type: CycleMarkTypes.temperatureRise),
 ];
 
 Finder countCard() => find.byKey(const ValueKey('statisticsCard-cyclesCount'));
@@ -1123,7 +1123,7 @@ void main() {
       ],
       marks: [
         CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
       ],
       paperEarliestFirstHigherCycleDay: 5,
@@ -1172,7 +1172,7 @@ void main() {
       ],
       marks: [
         CycleMark(date: m(3, 1), type: CycleMarkTypes.cycleStart),
-        CycleMark(date: m(3, 3), type: CycleMarkTypes.firstHigherMeasurement),
+        CycleMark(date: m(3, 3), type: CycleMarkTypes.temperatureRise),
         CycleMark(date: m(3, 29), type: CycleMarkTypes.cycleStart),
       ],
     );

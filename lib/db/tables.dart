@@ -199,7 +199,7 @@ class UserMarks extends Table {
 abstract final class MarkTypes {
   /// The temperature rise ("Temperaturanstieg"): the placed anchor from
   /// which the evaluation classifies measured days into arrows and circles.
-  static const firstHigherMeasurement = 'firstHigherMeasurement';
+  static const temperatureRise = 'temperatureRise';
   static const mucusPeakDay = 'mucusPeakDay';
 
   /// The temperature-ignore mark ("Temperatur ignorieren"): a marked day's

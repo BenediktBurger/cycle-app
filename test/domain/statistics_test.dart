@@ -38,7 +38,7 @@ CycleMark mucusPeak(int year, int month, int day) => CycleMark(
 /// A user-placed first-higher-measurement mark on (year, month, day).
 CycleMark firstHigher(int year, int month, int day) => CycleMark(
   date: DateTime(year, month, day),
-  type: CycleMarkTypes.firstHigherMeasurement,
+  type: CycleMarkTypes.temperatureRise,
 );
 
 /// Three clean cycles: marked starts Mar 2 / Mar 30 / Apr 27 / May 25.
