@@ -11,7 +11,7 @@
   "termCervixPosition": "Muttermund-Position",
   "termCervixFirmness": "Muttermund-Festigkeit",
   "termMeasurementTime": "Messzeitpunkt",
-  "termFirstHigher": "Temperaturanstieg",
+  "termTemperatureRise": "Temperaturanstieg",
   "termCycleStart": "Zyklusbeginn",
   "@termCycleStart": {
     "description": "Name des Zyklusbeginn-Marks (der erste Chip im Tag-Panel) und zugleich Spaltentitel „Zyklusbeginn“ in der Zyklen-Tabelle der Statistik — eine Zeichenkette auf beiden Flächen, damit die beiden Namen nicht auseinanderlaufen."
@@ -188,7 +188,7 @@
   "cycleSheetEditDay": "Tag bearbeiten",
   "cycleSheetSuzEveningLabel": "SUZ ab diesem Abend",
   "cycleSheetSuzMorningLabel": "SUZ ab diesem Morgen",
-  "cycleSheetRemoveFirstHigher": "Temperaturanstieg entfernen",
+  "cycleSheetRemoveTemperatureRise": "Temperaturanstieg entfernen",
   "cycleSheetBaselineInfo": "Basislinie: {value}",
   "@cycleSheetBaselineInfo": {
     "placeholders": {

@@ -190,7 +190,7 @@ final class CycleDayPanel extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.termFirstHigher),
+          title: Text(l10n.termTemperatureRise),
           content: Text(body),
           actions: [
             TextButton(
@@ -209,7 +209,7 @@ final class CycleDayPanel extends ConsumerWidget {
                   remove: true,
                 );
               },
-              child: Text(l10n.cycleSheetRemoveFirstHigher),
+              child: Text(l10n.cycleSheetRemoveTemperatureRise),
             ),
           ],
         ),
@@ -589,7 +589,7 @@ final class CycleDayPanel extends ConsumerWidget {
                           // Placement goes through the consistency dialog
                           // check; deselect removes directly.
                           gridChip(
-                            l10n.termFirstHigher,
+                            l10n.termTemperatureRise,
                             hasTemperatureRise,
                             icon: Icons.adjust,
                             key: const ValueKey(
