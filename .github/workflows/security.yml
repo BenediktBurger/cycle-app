@@ -29,7 +29,7 @@ permissions:
 jobs:
   dependency-vulnerabilities-osv:
     name: Dependency vulnerabilities (OSV)
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.0"
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.7.1"
     with:
       fail-on-vuln: true
       upload-sarif: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || inputs.upload-sarif }}
