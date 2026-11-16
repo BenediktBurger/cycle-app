@@ -130,6 +130,16 @@ class CycleDatabase extends _$CycleDatabase {
       // deliberate: a migration describes the bytes that were on disk, so
       // it must not follow the current constants.
       if (from < 15) {
+        // Both spellings on one day are one mark; dropping the legacy twin
+        // keeps the rename from colliding.
+        await customStatement(
+          "DELETE FROM user_marks "
+          "WHERE mark_type = 'firstHigherMeasurement' "
+          "AND entry_date IN ("
+          "SELECT entry_date FROM user_marks "
+          "WHERE mark_type = 'temperatureRise'"
+          ")",
+        );
         await customStatement(
           "UPDATE user_marks SET mark_type = 'temperatureRise' "
           "WHERE mark_type = 'firstHigherMeasurement'",
