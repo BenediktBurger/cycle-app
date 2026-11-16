@@ -14,6 +14,13 @@
     }
   ],
   "lockFileMaintenance": {
+    "description": "Enabled globally; pub is the only lock file in this repo and is excluded below on purpose — see the pub block for why",
     "enabled": true
+  },
+  "pub": {
+    "description": "Renovate resolves lock files with its own toolchain, not the Flutter SDK pinned in tool/flutter-version, so a lock it writes cannot be installed under the pin; direct-dependency PRs still re-resolve transitives",
+    "lockFileMaintenance": {
+      "enabled": false
+    }
   }
 }
