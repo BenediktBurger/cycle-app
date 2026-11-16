@@ -244,9 +244,9 @@ PdfCurveDrawing pdfCurveDrawing({
   // an untracked gap day sits in the key set but carries no temperature,
   // so an interior gap splits the line exactly as the chart renders it
   // across its recorded range. The keys map back to window-relative
-  // columns afterwards (see below); the ignoredDayIndexes stay
-  // offset-keyed like the overlay indexes (they key the lighter
-  // rendering, never the connectivity).
+  // columns afterwards (see below); the ignoredDayIndexes and the
+  // method-change break keys are offset-keyed like the overlay indexes,
+  // so no conversion is needed.
   final windowRuns = curveRuns(
     {
       for (final MapEntry(key: offset, value: position)
@@ -256,6 +256,10 @@ PdfCurveDrawing pdfCurveDrawing({
     },
     ignoredDayIndexes: {
       for (final index in overlay.ignoredIndexes)
+        if (windowPositionOf(index) != null) index,
+    },
+    breakBeforeDayIndexes: {
+      for (final index in overlay.methodChanges.keys)
         if (windowPositionOf(index) != null) index,
     },
   );

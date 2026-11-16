@@ -416,6 +416,7 @@ final class _CycleChartState extends State<_CycleChart> {
         final winRuns = curveRuns(
           winByIndex,
           ignoredDayIndexes: _days.ignoredDayIndexes,
+          breakBeforeDayIndexes: _days.methodSnapshotDayIndexes,
         );
         final winSegments = curveSegments(winRuns);
         final interruptedByIndex = <int, bool>{

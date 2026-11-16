@@ -90,20 +90,21 @@ every rule detail of the book has been audited page by page.
 
 ## Implementation map
 
-| Convention                                  | Current code                                                                         |
-|---------------------------------------------|--------------------------------------------------------------------------------------|
-| candidate walk                              | `_evaluateCycle` / `_candidateValue` / `candidateMeasurements`                       |
-| latest-mark anchor                          | `_latestMarkOf`                                                                      |
-| temperature-ignore exclusion                | `excludedDays` / `ignoredDayIndexes`                                                 |
-| gap tolerance                               | `gapDays` / `evaluationStopped`                                                      |
-| low-window numbering                        | `NumberedLow.number` / `_LowWindow.numberedLows`                                     |
-| per-kind cap                                | `_marksPerKindCap` / `MarkKind` / `ordinal`                                          |
-| peak marker                                 | `EvaluationOverlay.peakIndexes` / `peakDotCenterOffsetK`                             |
-| baseline difference                         | `CandidateMeasurement.differenceK` / `cycleSheetDifferenceInfo`                      |
-| baseline line extent                        | `BaselineSpan` / `baselineSpan` / `BaselineSegment` / `PdfBaselinePiece`             |
-| rise consistency check                      | `riseMarkConsistent`                                                                 |
-| computed „sicher unfruchtbare Zeit“ trigger | `suzBegins` / `cycleSheetSuzSuggestion*`                                             |
-| statistics earliest first higher            | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay`                          |
+| Convention                                  | Current code                                                                                                |
+|---------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| candidate walk                              | `_evaluateCycle` / `_candidateValue` / `candidateMeasurements`                                              |
+| latest-mark anchor                          | `_latestMarkOf`                                                                                             |
+| temperature-ignore exclusion                | `excludedDays` / `ignoredDayIndexes`                                                                        |
+| measurement-method curve break              | `curveRuns.breakBeforeDayIndexes` / `_ChartDays.methodSnapshotDayIndexes` / `PdfCycleOverlay.methodChanges` |
+| gap tolerance                               | `gapDays` / `evaluationStopped`                                                                             |
+| low-window numbering                        | `NumberedLow.number` / `_LowWindow.numberedLows`                                                            |
+| per-kind cap                                | `_marksPerKindCap` / `MarkKind` / `ordinal`                                                                 |
+| peak marker                                 | `EvaluationOverlay.peakIndexes` / `peakDotCenterOffsetK`                                                    |
+| baseline difference                         | `CandidateMeasurement.differenceK` / `cycleSheetDifferenceInfo`                                             |
+| baseline line extent                        | `BaselineSpan` / `baselineSpan` / `BaselineSegment` / `PdfBaselinePiece`                                    |
+| rise consistency check                      | `riseMarkConsistent`                                                                                        |
+| computed „sicher unfruchtbare Zeit“ trigger | `suzBegins` / `cycleSheetSuzSuggestion*`                                                                    |
+| statistics earliest first higher            | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay`                                                  |
 
 ## Settled interpretations
 
@@ -141,6 +142,18 @@ Owner decisions on record granularity (2026-11-12):
   tolerance („die Hälfte von 0,1 °C“, rules.md, S. 30) is therefore
   equivalent to „higher“ — the strictly-above candidate walk is
   book-consistent and needs no tolerance logic of its own.
+
+Owner decision on measurement-method curve breaks (2026-11-16):
+
+- Every day carrying a measurement-method snapshot starts a new
+  temperature-curve run, whatever the snapshot's content (same route,
+  same thermometer name, route-only change, a re-statement). The day keeps
+  its dot and its thermometer glyph but has no incoming line segment, so
+  it does not connect to the previous measured day; it still connects
+  forward to the next measured day. The thermometer glyph marks the
+  rupture. Motivation: rules.md, „Aufwachtemperatur“ — „Es gilt dasselbe
+  Thermometer und eine beständige Messart“ (S. 18 f.): a thermometer or
+  route change starts a different measurement series.
 
 ### Book-verified, kept as app conventions
 

@@ -15,13 +15,13 @@ import 'support/viewport.dart';
 
 // Widget tests of the temperature curve's connectivity and interruption
 // rendering: the line connects two temperatures ONLY when their calendar
-// days are adjacent; ignored temperatures (a day carrying the
-// ignoreTemperature MARK — the rendering is keyed to the mark, NOT to the
-// raw disturbance mask, owner decision 2026-09-19) count as measured
-// days, keep the line continuous, but render lighter (dot AND touching
-// segments). The mark makes the state visible on the graph: a marked day
-// without flags renders lighter, and an unmarked flagged day renders at
-// full weight.
+// days are adjacent AND no caller-supplied break separates them; ignored
+// temperatures (a day carrying the ignoreTemperature MARK — the rendering
+// is keyed to the mark, NOT to the raw disturbance mask, owner decision
+// 2026-09-19) count as measured days, keep the line continuous, but render
+// lighter (dot AND touching segments). The mark makes the state visible on
+// the graph: a marked day without flags renders lighter, and an unmarked
+// flagged day renders at full weight.
 
 // 2026-09-03 is a Thursday: Thu..Sun as a compact adjacent-day strip.
 final _temperatureThu = septThreeDay(0);
@@ -63,10 +63,12 @@ ThemeData _themeOf(WidgetTester tester) =>
 Widget _temperatureHarness({
   required List<DailyEntry> entries,
   List<CycleMark> marks = const [],
+  List<MeasurementMethodSnapshot> methodSnapshots = const [],
   TemperatureRange? range,
 }) => chartHarness(
   entries: entries,
   marks: marks,
+  methodSnapshots: methodSnapshots,
   darkTheme: true,
   scopeInsideMaterialApp: true,
   temperatureRange: range,
@@ -132,6 +134,95 @@ void main() {
         _connects(tester, 2, 3),
         isTrue,
         reason: 'adjacent readings after the gap still connect',
+      );
+    });
+  });
+
+  group('measurement-method snapshot days break the incoming curve', () {
+    final adjacent = <DailyEntry>[
+      DailyEntry(date: _temperatureThu, bbtC: 36.5),
+      DailyEntry(date: _temperatureFri, bbtC: 36.6),
+      DailyEntry(date: _temperatureSat, bbtC: 36.7),
+    ];
+
+    testWidgets('a snapshot day starts a new run: no incoming segment, dot '
+        'and thermometer glyph stay, the line connects forward', (
+      tester,
+    ) async {
+      await pumpChart(
+        tester,
+        _temperatureHarness(
+          entries: adjacent,
+          methodSnapshots: [
+            MeasurementMethodSnapshot(
+              date: _temperatureFri,
+              route: MeasurementRoute.vaginal,
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        _connects(tester, 0, 1),
+        isFalse,
+        reason:
+            'the day with the new thermometer does not connect back to '
+            'the previous measured day',
+      );
+      expect(
+        _connects(tester, 1, 2),
+        isTrue,
+        reason: 'the snapshot day still connects forward',
+      );
+      expect(
+        _segmentBars(tester),
+        hasLength(1),
+        reason: 'exactly the forward segment of the snapshot day is drawn',
+      );
+      for (final index in [0, 1, 2]) {
+        expect(
+          dotPainterOrNull(tester, index),
+          isNotNull,
+          reason: 'day $index keeps its measured dot across the rupture',
+        );
+      }
+      expect(
+        find.byKey(const ValueKey('inPlotMethodGlyph-1')),
+        findsOneWidget,
+        reason: 'the thermometer glyph marks the rupture',
+      );
+    });
+
+    testWidgets('a re-statement snapshot on an adjacent day breaks the line '
+        'even when route and thermometer name are unchanged', (tester) async {
+      await pumpChart(
+        tester,
+        _temperatureHarness(
+          entries: adjacent,
+          methodSnapshots: [
+            MeasurementMethodSnapshot(
+              date: _temperatureThu,
+              route: MeasurementRoute.vaginal,
+              thermometer: 'Thermo A',
+            ),
+            MeasurementMethodSnapshot(
+              date: _temperatureFri,
+              route: MeasurementRoute.vaginal,
+              thermometer: 'Thermo A',
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        _connects(tester, 0, 1),
+        isFalse,
+        reason: 'every stored snapshot row breaks, not only a content change',
+      );
+      expect(
+        _connects(tester, 1, 2),
+        isTrue,
+        reason: 'the re-stated day still connects forward',
       );
     });
   });

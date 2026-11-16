@@ -152,6 +152,73 @@ void main() {
     });
   });
 
+  group('curveRuns — caller-supplied break points', () {
+    Map<int, DailyEntry> threeAdjacent() => {
+      0: _entry(0, bbt: 36.5),
+      1: _entry(1, bbt: 36.6),
+      2: _entry(2, bbt: 36.7),
+    };
+
+    test('a break point on the second of three adjacent days splits the run '
+        'and drops only the incoming segment', () {
+      final runs = curveRuns(threeAdjacent(), breakBeforeDayIndexes: {1});
+      expect(runs, hasLength(2));
+      expect([for (final p in runs[0].points) p.dayIndex], [0]);
+      expect([for (final p in runs[1].points) p.dayIndex], [1, 2]);
+      expect(
+        [
+          for (final s in curveSegments(runs))
+            '${s.a.dayIndex}->${s.b.dayIndex}',
+        ],
+        ['1->2'],
+        reason: 'the day after a break connects forward to its successor',
+      );
+    });
+
+    test('a break point on the first measured day is a no-op', () {
+      final runs = curveRuns(threeAdjacent(), breakBeforeDayIndexes: {0});
+      expect(runs, hasLength(1));
+      expect([for (final p in runs.single.points) p.dayIndex], [0, 1, 2]);
+    });
+
+    test('the break set and the ignored set act independently: the run '
+        'splits and the point stays excluded', () {
+      final runs = curveRuns(
+        threeAdjacent(),
+        ignoredDayIndexes: {1},
+        breakBeforeDayIndexes: {1},
+      );
+      expect(runs, hasLength(2));
+      final byIndex = {
+        for (final run in runs)
+          for (final point in run.points) point.dayIndex: point,
+      };
+      expect(
+        byIndex[1]!.excluded,
+        isTrue,
+        reason: 'the ignored set alone drives the lighter rendering',
+      );
+      expect(byIndex[0]!.excluded, isFalse);
+      expect(byIndex[2]!.excluded, isFalse);
+    });
+
+    test('a break point naming a temperature-less day changes nothing — the '
+        'measurement gap already splits the run', () {
+      final runs = curveRuns(
+        {0: _entry(0, bbt: 36.5), 2: _entry(2, bbt: 36.7)},
+        breakBeforeDayIndexes: {1},
+      );
+      expect(runs, hasLength(2));
+      expect([for (final run in runs) run.points.single.dayIndex], [0, 2]);
+    });
+
+    test('an explicit empty break set behaves like the default', () {
+      final runs = curveRuns(threeAdjacent(), breakBeforeDayIndexes: const {});
+      expect(runs, hasLength(1));
+      expect([for (final p in runs.single.points) p.dayIndex], [0, 1, 2]);
+    });
+  });
+
   group('curveSegments — lighter rendering of interrupted segments', () {
     test('segments only exist between adjacent run points', () {
       final segments = curveSegments([
