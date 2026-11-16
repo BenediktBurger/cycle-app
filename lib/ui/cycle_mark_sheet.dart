@@ -509,7 +509,7 @@ final class CycleDayPanel extends ConsumerWidget {
               // for it.
               //
               // Reading order: cycle start, mucus peak, temperature
-              // exclusion, first higher measurement, „Sicher unfruchtbare
+              // exclusion, „Temperaturanstieg“, „Sicher unfruchtbare
               // Zeit“ evening, „Sicher unfruchtbare Zeit“ morning.
               if (marksAsync.hasError)
                 Padding(

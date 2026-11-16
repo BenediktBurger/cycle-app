@@ -68,14 +68,14 @@ const _glossaryDe = [
 ];
 
 const _arithmeticNoteEn =
-    'Evaluation marks: you place the mucus peak and the first higher '
-    'measurement; numbering, baseline and circles are computed for display '
-    'only — no fertility statement.';
+    'Evaluation marks: you place the mucus peak and the temperature rise; '
+    'numbering, baseline and circles are computed for display only — no '
+    'fertility statement.';
 
 const _arithmeticNoteDe =
-    'Auswertungsmarkierungen: Schleimhöhepunkt und erste höhere Messung '
-    'setzt du selbst; Nummerierung, Basislinie und Umrandungen werden nur '
-    'für die Anzeige berechnet — keine Fruchtbarkeitsangabe.';
+    'Auswertungsmarkierungen: Schleimhöhepunkt und Temperaturanstieg setzt '
+    'du selbst; Nummerierung, Basislinie und Umrandungen werden nur für die '
+    'Anzeige berechnet — keine Fruchtbarkeitsangabe.';
 
 Widget _helpSheetHarness({
   required List<DailyEntry> entries,

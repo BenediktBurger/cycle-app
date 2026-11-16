@@ -20,7 +20,8 @@ abstract final class CycleMarkTypes {
   /// Mucus peak day ("Schleimhöhepunkt") placed by the user.
   static const mucusPeakDay = 'mucusPeakDay';
 
-  /// First higher measurement after the peak ("erste höhere Messung").
+  /// The temperature rise ("Temperaturanstieg"): the placed anchor from
+  /// which the evaluation classifies measured days into arrows and circles.
   static const firstHigherMeasurement = 'firstHigherMeasurement';
 
   /// The temperature-ignore mark ("Temperatur ignorieren"): a marked

@@ -372,9 +372,8 @@ class ShortestCycleLengthOutsideAppNotifier
 
 /// The earliest first higher measurement's CYCLE-DAY NUMBER (>= 1,
 /// counting from 1) observed outside this app; null means "not given".
-/// Statistics (both documented variants) and the PDF export min-combine
-/// it with the in-app figures like
-/// [shortestCycleLengthOutsideAppProvider].
+/// Statistics and the PDF export min-combine it with the in-app circled
+/// day, like [shortestCycleLengthOutsideAppProvider].
 ///
 /// Persisted exactly as [localeProvider] (registrar-table entry below).
 @Riverpod(keepAlive: true)

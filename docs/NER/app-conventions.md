@@ -26,6 +26,13 @@ every rule detail of the book has been audited page by page.
 
 ## App conventions
 
+- **Mark naming**: the user-placed mark is the „Temperaturanstieg“; only the
+  computed post-peak circles are „umrandete höhere Messungen“. rules.md
+  „Pfeilmessung“ (S. 58) calls the rising values before the peak
+  „Pfeilmessungen“, and the cheatsheet asks for the „**erste** höhere Messung
+  **nach** dem \*“, so “higher measurement” names a measured, circled value,
+  not the mark. The persisted token `firstHigherMeasurement` keeps its name
+  for storage stability.
 - **Candidate walk**: from the marked rise onward, every measured day
   strictly above the baseline is a candidate. The 0.2 °C margin decides only
   which of the two book cases applies: at least 0.2 °C starts the „sicher
@@ -76,10 +83,11 @@ every rule detail of the book has been audited page by page.
 - **Rise consistency check**: the marked rise day's measured value is
   compared with the baseline; an inconsistent mark produces the persistent
   warning on that day, recomputed at render time.
-- **Statistics earliest first higher**: the statistics report two variants,
-  `any` and `afterMucusPeak`. `afterMucusPeak` uses the first circled
-  candidate — the book's „umrandete höhere Messung“ — not the bare marked
-  rise; see “Statistics ruling” below.
+- **Statistics earliest first higher**: one sense — the first circled
+  candidate (`firstCircledCandidateDay`), the book's „umrandete höhere
+  Messung“. A cycle without a circle renders „—“ and feeds no metric card;
+  the „Temperaturanstieg“ mark is not a statistic. See “Statistics ruling”
+  below.
 
 ## Implementation map
 
@@ -96,7 +104,7 @@ every rule detail of the book has been audited page by page.
 | baseline line extent                        | `BaselineSpan` / `baselineSpan` / `BaselineSegment` / `PdfBaselinePiece`             |
 | rise consistency check                      | `riseMarkConsistent`                                                                 |
 | computed „sicher unfruchtbare Zeit“ trigger | `suzBegins` / `cycleSheetSuzSuggestion*`                                             |
-| statistics earliest first higher            | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay` / `_resolveFirstHigher`   |
+| statistics earliest first higher            | `earliestFirstHigherCycleDay` / `firstCircledCandidateDay`                          |
 
 ## Settled interpretations
 
@@ -109,11 +117,11 @@ Owner-confirmed on 2026-09-17:
   measurements. Arrows are „Pfeilmessungen“, not „höhere Messungen“ in the
   sense of the evaluation, and circles exist only after the peak day, so an
   arrow-only sequence never yields a trigger.
-- The user is assumed to follow the rules (Mode M), so the user-marked first
-  higher measurement is taken verbatim for the six-low window and the
-  baseline, even when the marked day itself is not above the baseline; the
-  candidate search then starts at the next strictly-above measurement from
-  the mark onward.
+- The user is assumed to follow the rules (Mode M), so the user-placed
+  „Temperaturanstieg“ is taken verbatim as the anchor for the six-low
+  window, the baseline and the candidate search, even when the marked day
+  itself is not above the baseline; the search starts at the next
+  strictly-above measurement from the mark onward.
 - Multiple peak and rise marks inside one cycle are expected, not a
   user-data problem. The most recent mark of each type anchors the
   evaluation; earlier duplicates stay stored until removed through the
@@ -177,6 +185,10 @@ Owner decisions on record granularity (2026-11-12):
   or after a connectedness break render as ordinary temperature dots. The
   domain lists exactly the marked candidates; there is no automatic
   continuation — the user re-marks the rise.
+- „Hochlage“ start: whether the higher phase begins at the
+  „Temperaturanstieg“ (the placed mark) or only at the first circled higher
+  measurement. The app counts „Dauer der Hochlage“ from the circled day; an
+  INER-expert question, not a settled rule.
 - Persisted `CycleMarkTypes.suzEvening` / `suzMorning`: the two chips, their
   DB tokens, labels and chart placement (column start vs. column middle)
   predate this audit. The morning rule semantics are settled by the owner
@@ -186,36 +198,34 @@ Owner decisions on record granularity (2026-11-12):
 
 ## Statistics ruling
 
-`earliestFirstHigherCycleDay` folds two variants over the mark-driven cycles,
-both reported as cycle-day numbers (the cycle's marked start day is day 1):
+`earliestFirstHigherCycleDay` reports one sense over the mark-driven cycles:
+the minimum cycle-day number (the cycle's marked start day is day 1) of the
+cycles' first circled candidate — `firstCircledCandidateDay()`, the book's
+„umrandete höhere Messung“. The chart's and PDF's rings draw from the same
+circle definition, the cycle's evaluated candidate sequence
+(`CycleEvaluation.candidateMeasurements`) filtered to `MarkKind.circle`; the
+statistics layer and the PDF per-cycle header line run the helper over their
+cycles and truncated record prefixes, so screen statistics and PDF statistics
+share one evaluated candidate sequence. There is no `any` variant and no mark
+fallback: a cycle without a circle renders „—“ on the statistics surfaces and
+feeds no metric card.
 
-- `any`: the minimum cycle-day number of the marked first-higher rise,
-  wherever it sits relative to the mucus peak. Mark-position only.
-- `afterMucusPeak` (the „umrandete Messung“): the minimum cycle-day number of
-  the cycles' first circled candidate — `firstCircledCandidateDay()`. The
-  same function behind the chart's and PDF's rings and the fact rows'
-  first-higher resolution (`marked day` fallback), so rendering and
-  statistics refer to one domain definition. The PDF per-cycle header line
-  shares the helper over its truncated record prefixes.
+The NER analysis rules are the official ones; the first circled line is a
+consequence of them, and that measured day is the first higher measurement
+the statistics analyze. The term is book-anchored: the modifizierte
+Döring-Regel searches all cycles for „der Tag der frühesten eingetretenen
+ersten umrandeten höheren Messung“ (rules.md, S. 37).
 
-The ruling behind the real variant: the NER analysis rules are the official
-ones; the first circled line is a consequence of them, and that
-marked-and-measured day is the first higher measurement the statistics
-analyze. The variant's term is now book-anchored: the modifizierte
-Döring-Regel speaks of the „früheste eingetretene 1. umrandete höhere
-Messung“ (rules.md, S. 37). A mark-only reading (“the marked rise, else
-peak + 1, without a temperature”) differs from it exactly where the
-measurement is absent:
+| Situation                                                 | Outcome                                                |
+|-----------------------------------------------------------|--------------------------------------------------------|
+| a marked „Temperaturanstieg“ without a measured circle    | no statistic — the cycle renders „—“                   |
+| rise strictly after peak, measured above the baseline     | first circle = rise day                                |
+| rise at/before peak, peak + 1 measured above the baseline | first circle = peak + 1                                |
+| rise at/before peak, peak + 1 unmeasured or ≤ baseline    | first circle later, or the cycle does not qualify      |
+| rise after peak, marked day itself not above the baseline | first circle later, or the cycle does not qualify      |
+| sequence gap-stopped before any circle                    | no circle — the cycle does not qualify                 |
+| no marked peak                                            | arrows only — no circle, so the cycle does not qualify |
 
-| Situation                                                 | mark-only reading                | first circle (implemented)                             |
-|-----------------------------------------------------------|----------------------------------|--------------------------------------------------------|
-| rise strictly after peak, measured above the baseline     | rise day                         | first circle = rise day                                |
-| rise at/before peak, peak + 1 measured above the baseline | peak + 1                         | first circle = peak + 1                                |
-| rise at/before peak, peak + 1 unmeasured or ≤ baseline    | peak + 1 (no temperature needed) | first circle later, or the cycle does not qualify      |
-| rise after peak, marked day itself not above the baseline | the marked day                   | first circle later, or the cycle does not qualify      |
-| sequence gap-stopped before any circle                    | peak + 1 qualifies               | no circle — the cycle does not qualify                 |
-| no marked peak                                            | real variant null                | arrows only — no circle, so the cycle does not qualify |
-
-Both variants' day numbers lie inside their cycle's window by construction
-(marks attach within a cycle window; the candidate walk ends at the cycle's
-own end), so no extra window guard is needed.
+The day numbers lie inside their cycle's window by construction (marks attach
+within a cycle window; the candidate walk ends at the cycle's own end), so no
+extra window guard is needed.

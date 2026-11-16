@@ -197,6 +197,8 @@ class UserMarks extends Table {
 
 /// Well-known initial mark types (Mode M tools; UI on the cycle-day sheet).
 abstract final class MarkTypes {
+  /// The temperature rise ("Temperaturanstieg"): the placed anchor from
+  /// which the evaluation classifies measured days into arrows and circles.
   static const firstHigherMeasurement = 'firstHigherMeasurement';
   static const mucusPeakDay = 'mucusPeakDay';
 

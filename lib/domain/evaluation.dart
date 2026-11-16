@@ -6,7 +6,7 @@
 // HARD RULE (ADR-0001, Mode M): the user places marks, the app computes,
 // never interprets. Everything is COMPUTED ONLY at render time — nothing is
 // persisted (no drift types, no Flutter imports). User-placed inputs: the
-// mucus peak and the first higher measurement; the 1–6 numbering, the
+// mucus peak and the temperature rise; the 1–6 numbering, the
 // baseline, the circled/arrowed candidates, the baseline segment and the
 // „Sicher unfruchtbare Zeit“ start are derived.
 //
@@ -148,7 +148,8 @@ final class CycleEvaluation {
   /// The user-placed mucus peak day, or null when unmarked.
   final DateTime? mucusPeakDay;
 
-  /// The user-placed first higher measurement, or null when unmarked.
+  /// The user-placed temperature rise (the marked anchor), or null when
+  /// unmarked.
   final DateTime? firstHigherDay;
 
   /// Up to six numbered low measurements before the first higher

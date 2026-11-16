@@ -17,10 +17,10 @@
 // not a settled rule. No cap, no exclusion is applied in this layer.
 //
 // The per-cycle facts below REUSE [evaluateCycles]
-// (lib/domain/evaluation.dart) for the first-higher truth: the evaluated
-// candidates are arithmetic render-time artifacts, and picking the earliest
-// candidate strictly after the peak (with the marked-day fallback) is a
-// selection, not a statement — the file stays free of any fertility claim.
+// (lib/domain/evaluation.dart) for the first circled candidate: the
+// evaluated candidates are arithmetic render-time artifacts, and walking
+// them to the first circle is a selection, not a statement — the file
+// stays free of any fertility claim.
 
 import 'dart:math' as math;
 
@@ -216,54 +216,35 @@ List<int?> cycleBleedingDurationsInDays(List<CycleEvaluation> evaluations) => [
       bleedingSpanInDays(evaluation.cycle.days),
 ];
 
-/// The earliest (minimum) cycle-day number of the cycle's first higher
-/// measurement across all mark-driven cycles, as a record of TWO
-/// documented variants:
+/// The earliest (minimum) cycle-day number of the first circled higher
+/// measurement ([firstCircledCandidateDay] — the book's „umrandete höhere
+/// Messung“, app convention "statistics earliest first higher": a measured
+/// temperature strictly above the baseline, from the marked rise onward,
+/// strictly after the marked mucus peak day) across all mark-driven cycles.
+/// A cycle qualifies only when its candidate sequence carries such a
+/// circle: no marked peak (arrows only), no measurable candidate, and a
+/// gap-stopped sequence (app convention "gap tolerance") all leave the
+/// cycle out. Null when no cycle qualifies.
 ///
-/// - `any`: the minimum over every mark-driven cycle that carries a
-///   first-higher mark, wherever it sits relative to the mucus peak;
-/// - `afterMucusPeak`: the minimum over the cycle-day numbers of the
-///   mark-driven cycles' FIRST CIRCLED candidates
-///   ([firstCircledCandidateDay] — the book's „umrandete höhere Messung“,
-///   app convention "statistics earliest first higher": a measured
-///   temperature strictly above the baseline, from the marked rise
-///   onward, strictly after the marked mucus peak day). A cycle
-///   qualifies only when its candidate sequence carries such a circle:
-///   no marked peak (arrows only), no measurable candidate, and a
-///   gap-stopped sequence (app convention "gap tolerance") all leave the
-///   cycle out.
-///
-/// Both variants' day numbers lie inside their cycle's window by
-/// construction: marks attach within [Cycle.startDate, next cycle start),
-/// and the candidate walk stops at the cycle's own end. The cycle-day
-/// number is `(day - cycleStart) + 1` (the cycle's marked start day is
-/// day 1 — DST-free via [DateOnly]). A first-higher mark inside the
-/// LEADING pre-mark group has no cycle start to count from and is
-/// ignored. Pure arithmetic over [evaluateCycles] output (the
-/// [CycleEvaluation] marks plus its evaluated candidates; ADR-0001:
-/// render-time computation, nothing persisted).
-({int? any, int? afterMucusPeak}) earliestFirstHigherCycleDay(
-  List<CycleEvaluation> evaluations,
-) {
-  int? earliestAny;
-  int? earliestAfterPeak;
+/// The day number lies inside its cycle's window by construction: marks
+/// attach within [Cycle.startDate, next cycle start), and the candidate
+/// walk stops at the cycle's own end. The cycle-day number is
+/// `(day - cycleStart) + 1` (the cycle's marked start day is day 1 —
+/// DST-free via [DateOnly]). A rise mark inside the LEADING pre-mark group
+/// has no cycle start to count from and is ignored. Pure arithmetic over
+/// [evaluateCycles] output (the [CycleEvaluation] marks plus its evaluated
+/// candidates; ADR-0001: render-time computation, nothing persisted).
+int? earliestFirstHigherCycleDay(List<CycleEvaluation> evaluations) {
+  int? earliest;
   for (final evaluation in evaluations) {
     if (!evaluation.cycle.startsAtMark) continue;
-    final rise = evaluation.firstHigherDay;
-    if (rise == null) continue;
-    final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
-    final anyDayNumber = DateOnly.daysBetween(rise, cycleStart) + 1;
-    if (earliestAny == null || anyDayNumber < earliestAny) {
-      earliestAny = anyDayNumber;
-    }
     final circled = firstCircledCandidateDay(evaluation);
     if (circled == null) continue;
-    final circledDayNumber = DateOnly.daysBetween(circled, cycleStart) + 1;
-    if (earliestAfterPeak == null || circledDayNumber < earliestAfterPeak) {
-      earliestAfterPeak = circledDayNumber;
-    }
+    final cycleStart = DateOnly.normalize(evaluation.cycle.startDate);
+    final dayNumber = DateOnly.daysBetween(circled, cycleStart) + 1;
+    if (earliest == null || dayNumber < earliest) earliest = dayNumber;
   }
-  return (any: earliestAny, afterMucusPeak: earliestAfterPeak);
+  return earliest;
 }
 
 /// The smaller of two optional recorded facts, or null when both are:
@@ -400,7 +381,7 @@ List<CycleLengthBucket> cycleLengthDistribution(List<int> lengths) {
 // and the evaluated candidate sequence.
 
 /// One per-cycle fact row of the statistics screen's table: start date,
-/// bleeding-day count, first higher measurement, cycle length.
+/// bleeding-day count, first circled higher measurement, cycle length.
 final class CycleFact {
   const CycleFact({
     required this.cycleStart,
@@ -422,16 +403,11 @@ final class CycleFact {
   /// presentation arithmetic).
   final int bleedingDays;
 
-  /// The resolved first higher measurement of this cycle, or null when the
-  /// user marked neither a peak nor a first higher measurement.
-  ///
-  /// Resolution (arithmetic selection): the earliest evaluated candidate
-  /// STRICTLY AFTER the mucus peak when one exists — the "real" first
-  /// higher measurement (after the peak, per CHEAT SHEET rules) — otherwise
-  /// the user-placed firstHigherMeasurement mark day
-  /// ([CycleEvaluation.firstHigherDay]). No candidates and no mark → null.
-  /// The chosen day stays a fact picked from the tracked/evaluated data;
-  /// nothing here claims anything about fertility.
+  /// The cycle's first circled higher measurement
+  /// ([firstCircledCandidateDay]), or null when the cycle carries no
+  /// circle: no marked peak (arrows only), no measurable candidate, or a
+  /// gap-stopped sequence. The chosen day is a fact picked from the
+  /// evaluated data; nothing here claims anything about fertility.
   final DateTime? firstHigherDay;
 
   /// Days from the cycle start until the NEXT mark-opened start. Null for
@@ -440,11 +416,11 @@ final class CycleFact {
   /// marked start.
   final int? lengthDays;
 
-  /// Days from the cycle's first higher measurement to the cycle's END,
+  /// Days from the cycle's first circled measurement to the cycle's END,
   /// inclusively counted (the first-higher day itself counts as one): the
   /// cycle end exclusive is the NEXT marked start, or — for the trailing
   /// cycle, whose end is merely observed — one day past the last tracked
-  /// day. Null when the cycle has no resolved first higher measurement.
+  /// day. Null when the cycle carries no circle.
   final int? firstHigherUntilCycleEndDays;
 }
 
@@ -490,10 +466,10 @@ List<CycleFact> cycleFactsFromCycles(
     }
 
     // The evaluation the row pairs with; a row beyond the evaluation list
-    // keeps its data-only facts (no first-higher resolution without its
+    // keeps its data-only facts (no first-higher fact without its
     // evaluation).
     final firstHigher = i < evaluations.length
-        ? _resolveFirstHigher(evaluations[i])
+        ? firstCircledCandidateDay(evaluations[i])
         : null;
     // Two end notions share this spot, both anchored in their owner rules:
     // a cycle WITH a follow-up start ends at that start (the mark-driven
@@ -526,11 +502,6 @@ List<CycleFact> cycleFactsFromCycles(
   }
   return facts;
 }
-
-/// The fact-row first higher: the earliest circled candidate („Höhere
-/// Messung“, [firstCircledCandidateDay]), else the user-placed mark day.
-DateTime? _resolveFirstHigher(CycleEvaluation evaluation) =>
-    firstCircledCandidateDay(evaluation) ?? evaluation.firstHigherDay;
 
 /// Min/max/average/population standard deviation over one metric, or all
 /// null when the metric has no data at all. Population std dev (÷ n, not
@@ -600,19 +571,17 @@ final class CycleStatistic {
   final MetricSummary bleedingDays;
   final MetricSummary firstHigherUntilCycleEnd;
 
-  /// The per-cycle first higher measurements as 1-based day-of-cycle
+  /// The per-cycle first circled measurements as 1-based day-of-cycle
   /// numbers (daysBetween(firstHigherDay, cycleStart) + 1, like the
-  /// chart). One single sense — the cycle's resolved fact
-  /// ([CycleFact.firstHigherDay]) — unlike the two senses of
-  /// [earliestFirstHigherCycleDay]; this summary's `min` is therefore
-  /// THE earliest first-higher cycle day.
+  /// chart), one value per cycle that carries a circle; this summary's
+  /// `min` is THE earliest circled cycle day.
   final MetricSummary firstHigherCycleDays;
 }
 
 /// Aggregates the per-cycle facts of [cycleFacts] into the screen's
 /// numbers. Pure arithmetic over the facts — the aggregates SKIP
-/// facts whose metric is absent (trailing cycle length, missing first
-/// higher) rather than treating them as zeros.
+/// facts whose metric is absent (trailing cycle length, missing circle)
+/// rather than treating them as zeros.
 CycleStatistic cycleStatistics(
   List<DailyEntry> entries,
   List<CycleMark> marks,

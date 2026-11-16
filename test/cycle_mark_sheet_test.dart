@@ -1803,6 +1803,14 @@ void main() {
       ); // no marks yet
 
       await tapCycleDay(tester, 7); // 9/13: 36.30 below the baseline 36.40
+      expect(
+        find.descendant(
+          of: cycleSheetChip('firstHigherMeasurement'),
+          matching: find.text('Temperature rise'),
+        ),
+        findsOneWidget,
+        reason: 'the chip label names the mark',
+      );
       await tester.tap(cycleSheetChip('firstHigherMeasurement'));
       await tester.pumpAndSettle();
 
@@ -1814,12 +1822,10 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.text('First higher measurement'),
+          matching: find.text('Temperature rise'),
         ),
         findsOneWidget,
-        reason:
-            'the dialog title names the mark, never a verdict (the '
-            'chip label equals the title — scoped to the dialog)',
+        reason: 'the dialog title names the mark, never a verdict',
       );
       expect(
         find.text(

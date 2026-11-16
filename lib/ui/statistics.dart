@@ -16,6 +16,7 @@ import '../domain/decimal_display.dart';
 import '../domain/statistics.dart';
 import '../l10n/app_localizations.dart';
 import '../providers.dart';
+import 'statistics_help_sheet.dart';
 import 'stream_error.dart';
 
 /// The shared missing-value marker of this screen — a neutral glyph, not
@@ -31,7 +32,17 @@ class StatistikScreen extends ConsumerWidget {
     final entriesAsync = ref.watch(dailyEntriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.navStatistics)),
+      appBar: AppBar(
+        title: Text(l10n.navStatistics),
+        actions: [
+          IconButton(
+            key: const ValueKey('statisticsHelpAction'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: l10n.statisticsHelpShow,
+            onPressed: () => showStatisticsHelpSheet(context),
+          ),
+        ],
+      ),
       body: entriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => StreamLoadError(
@@ -75,8 +86,8 @@ class StatistikScreen extends ConsumerWidget {
     );
 
     // A cycle contributing no value to a card's metric (no bleeding day,
-    // no rise mark, an open cycle) simply does not feed the aggregate —
-    // the "—" rows are for the all-empty case.
+    // no circled measurement, an open cycle) simply does not feed the
+    // aggregate — the "—" rows are for the all-empty case.
     final evaluations = derived.evaluations;
     final lengthDetail = summarizeInts(lengths);
     final bleedingDetail = summarizeInts(
@@ -210,7 +221,7 @@ Widget _countCard(
 Widget _summaryRow(
   BuildContext context,
   CycleLengthSummary summary, {
-  required ({int? any, int? afterMucusPeak}) earliest,
+  required int? earliest,
   required int? paperEarliest,
   required int? paperShortest,
 }) {
@@ -237,7 +248,7 @@ Widget _summaryRow(
           key: const ValueKey('statisticsCard-earliest'),
           title: l10n.statisticsEarliestFirstHigher,
           child: _SummaryFigure(
-            value: cycleDay(earliest.afterMucusPeak),
+            value: cycleDay(earliest),
             outside: paperEarliest == null
                 ? null
                 : l10n.statisticsFirstHigherOutsideApp(paperEarliest),
@@ -416,7 +427,7 @@ DescriptiveSummary _descriptiveDetail(MetricSummary summary) =>
 
 /// The per-cycle table card: a bordered table of equal-width columns
 /// (headers wrap) with the four columns: cycle start, bleeding days,
-/// first higher measurement, length.
+/// circled higher measurement, length.
 final class _CycleTableCard extends StatelessWidget {
   const _CycleTableCard({super.key, required this.facts, required this.day});
 
@@ -459,7 +470,7 @@ final class _CycleTableCard extends StatelessWidget {
               _cell(
                 context,
                 Text(
-                  l10n.termFirstHigher,
+                  l10n.statisticsTableCircledHigher,
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
