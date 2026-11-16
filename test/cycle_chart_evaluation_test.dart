@@ -12,7 +12,7 @@ import 'support/finders.dart';
 import 'support/fixtures.dart';
 
 // Widget tests of the computed evaluation marks on the cycle chart (Mode M,
-// ADR-0001): the user places the mucus-peak and first-higher marks; the UI
+// ADR-0001): the user places the mucus-peak and temperature-rise marks; the UI
 // derives and renders the candidate circles/arrows (kind decided PER
 // CANDIDATE: arrows at or before the peak day, circles strictly after —
 // „Höhere Messung“ vs „Pfeilmessung“), the solid peak dot in its own
@@ -507,7 +507,7 @@ void main() {
     });
 
     testWidgets('no marked candidate -> no baseline segment', (tester) async {
-      // Peak only: no first-higher mark, so no low window and no segment.
+      // Peak only: no temperature-rise mark, so no low window and no segment.
       await pumpChart(
         tester,
         chartHarness(
@@ -610,7 +610,7 @@ void main() {
         'when no evaluation exists, and still alongside a full evaluation', (
       tester,
     ) async {
-      // ONLY peak marks: without a first-higher mark no evaluation can
+      // ONLY peak marks: without a temperature-rise mark no evaluation can
       // exist, yet every placed peak must render — the dots come from the
       // MARKS STREAM, not from the single domain-anchored peak.
       await pumpChart(

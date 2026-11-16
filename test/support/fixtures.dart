@@ -36,10 +36,10 @@ DateTime septSevenDay(int index) =>
 ///    anchors), renders as an ordinary temperature dot;
 ///  - 9/7 (idx 1): a 7th-low day outside the six-low window -> no number;
 ///  - 9/8..9/13 (idx 2..7): the six low measurements, numbered 6..1 counting
-///    back from the first higher;
+///    back from the rise;
 ///  - 9/9 (idx 3, 36.4): the HIGHEST of the six lows -> baseline 36.4;
 ///  - 9/12 (idx 6): mucus-peak mark;
-///  - 9/14 (idx 8): first-higher mark (36.9) -> first candidate;
+///  - 9/14 (idx 8): temperature-rise mark (36.9) -> first candidate;
 ///  - 9/15 (idx 9): 36.9, 9/16 (idx 10): 37.0 (>= +0.2 K -> „Sicher
 ///    unfruchtbare Zeit am Abend“).
 List<DailyEntry> evaluationScenarioEntries() => [

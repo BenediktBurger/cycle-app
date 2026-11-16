@@ -9,10 +9,10 @@ replaces the matching days. Export first, or import into an empty profile.
 
 Import via the Import button in the settings screen.
 
-- [`example-cycle.json`](example-cycle.json) — one complete cycle as a
-  schema-v6 document: the legacy canary for the importer, still carrying the
-  pre-rename temperature-rise mark token that import translates. With BBT,
-  mucus, cervix and marks.
+- [`example-cycle.json`](example-cycle.json) — one complete cycle with BBT,
+  mucus, cervix and marks, as a schema-v6 document: the importer's legacy
+  canary, still carrying the pre-rename temperature-rise mark token that
+  import translates.
 - [`pregnancy-cycles.json`](pregnancy-cycles.json) — a multi-cycle series
   in the same JSON format: an anovulatory pregnancy gap and the
   postpartum return while breastfeeding (three `cycleStart` marks).

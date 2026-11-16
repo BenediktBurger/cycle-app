@@ -102,11 +102,12 @@ class CycleDatabase extends _$CycleDatabase {
       }
 
       // Each future schema-version bump adds its own guarded block here
-      // (e.g. `if (from < 14) { ... }`), using Migrator helpers only
-      // (createTable, addColumn, customStatement, …); disruptive table
-      // shape changes copy data into the new table instead of dropping
-      // anything. Skipped steps (from several versions behind) run every
-      // missing block in order, so any distance migrates step-wise.
+      // (e.g. `if (from < 14) { ... }`), using Migrator helpers
+      // (createTable, addColumn, alterTable, …) or a raw `customStatement`
+      // for data rewrites; disruptive table shape changes copy data into
+      // the new table instead of dropping anything. Skipped steps (from
+      // several versions behind) run every missing block in order, so any
+      // distance migrates step-wise.
 
       if (from < 13) {
         // The methods snapshot table is NEW in v13 (no SELECT data is

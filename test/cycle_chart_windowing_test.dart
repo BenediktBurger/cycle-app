@@ -44,7 +44,8 @@ List<DailyEntry> _numberedTailEntries() => [
   DailyEntry(date: longRangeDay(148), bbtC: 36.5),
 ];
 
-/// The first-higher mark that anchors _numberedTailEntries's low window.
+/// The temperature-rise mark that anchors _numberedTailEntries's low
+/// window.
 final _numberedTailMarks = <CycleMark>[
   CycleMark(date: longRangeDay(148), type: CycleMarkTypes.temperatureRise),
 ];

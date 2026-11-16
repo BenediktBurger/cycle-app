@@ -163,7 +163,7 @@ Finder measuredTimeField() => find.byKey(const ValueKey('measuredTimeField'));
 Finder diarySaveButton() => find.byKey(const ValueKey('diarySaveButton'));
 
 /// A mark chip in the day options panel: [markType] is the mark-type token
-/// (`cycleStart`, `mucusPeakDay`, `firstHigherMeasurement`, `suzEvening`,
+/// (`cycleStart`, `mucusPeakDay`, `temperatureRise`, `suzEvening`,
 /// `suzMorning`, `ignoreTemperature`) — the panel keys every chip
 /// `cycleSheetChip-<token>`, so the finder argument follows the domain's
 /// mark vocabulary instead of the chip's static label. The
@@ -180,12 +180,12 @@ Finder cycleSheetChip(String markType) =>
     find.byKey(ValueKey('cycleSheetChip-$markType'));
 
 /// The rise-consistency dialog's Keep choice (keeps the just-placed,
-/// inconsistent first-higher mark standing — same effect as dismissing).
+/// inconsistent temperature-rise mark standing — same effect as dismissing).
 Finder cycleSheetRiseKeepButton() =>
     find.byKey(const ValueKey('cycleSheetRiseKeepButton'));
 
 /// The rise-consistency dialog's Remove choice (removes the just-placed
-/// first-higher mark through the toggle path).
+/// temperature-rise mark through the toggle path).
 Finder cycleSheetRiseRemoveButton() =>
     find.byKey(const ValueKey('cycleSheetRiseRemoveButton'));
 

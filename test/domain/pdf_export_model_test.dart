@@ -30,7 +30,7 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 /// carries the full observation surface the PDF's per-cycle overlay maps
 /// from: mucus (with a quality on the S day), a measurement time, a raw
 /// disturbance flag, a temperature-ignore mark, the mucus-peak and
-/// first-higher marks, and one „Sicher unfruchtbare Zeit“ mark of each
+/// temperature-rise marks, and one „Sicher unfruchtbare Zeit“ mark of each
 /// variant (the cycle's plain record rows the export renders verbatim;
 /// cycles 2 and 3 stay almost plain so a mark-free cycle's empty overlay
 /// is asserted too).
@@ -572,7 +572,7 @@ void main() {
 
   group('earliest first higher cycle day', () {
     /// Marks fixture: cycle 2 (start Mar 29) carries a peak AND a
-    /// first-higher mark on the SAME day (its marked rise is cycle day 1).
+    /// temperature-rise mark on the SAME day (its marked rise is cycle day 1).
     /// Cycle 2 produces no measured circle of its own — a rise inside a
     /// cycle's first six days has its six-low window truncated at the
     /// cycle's own tracked days, so no baseline and no candidate exist
@@ -963,7 +963,7 @@ void main() {
         today: d(5, 20),
       );
       final last = model.cycles.last;
-      expect(last.firstHigherDay, DateOnly.normalize(d(5, 10)));
+      expect(last.riseDay, DateOnly.normalize(d(5, 10)));
       expect(last.baseline, isNull);
       expect(last.candidateMeasurements, isEmpty);
       expect(last.numberedLows, isEmpty);

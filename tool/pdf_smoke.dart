@@ -174,7 +174,7 @@ Future<void> main() async {
   );
   check(
     overlay.circledIndexes.isNotEmpty || overlay.arrowIndexes.isNotEmpty,
-    'the first-higher mark derives a candidate mark',
+    'the temperature-rise mark derives a candidate mark',
   );
 
   final plan = planCyclePages(

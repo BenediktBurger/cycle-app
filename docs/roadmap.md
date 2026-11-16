@@ -30,18 +30,4 @@ the sections above track planned work, git history keeps the record (see
 
 ### Convenience
 
-- [ ] **Rename the Dart identifiers for the mark.**
-  Footprint: `CycleMarkTypes.firstHigherMeasurement` →
-  `temperatureRise` (`lib/domain/marks.dart`),
-  `MarkTypes.firstHigherMeasurement` → `temperatureRise`
-  (`lib/db/tables.dart`), `CycleEvaluation.firstHigherDay` → `riseDay`,
-  the mark chip's widget key `cycleSheetChip-firstHigherMeasurement`
-  together with the test keys that mirror it, and the mark fixture in
-  `tool/pdf_smoke.dart`;
-  `test/db/cycle_database_test.dart` pins `CycleMarkTypes` and
-  `MarkTypes` in sync.
-  Unchanged: `CycleFact.firstHigherDay`, `firstCircledCandidateDay` and
-  `earliestFirstHigherCycleDay` keep their names — they mean the circled
-  measurement and are correct.
-
 ### Deferred for later

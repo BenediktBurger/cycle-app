@@ -35,8 +35,8 @@ CycleMark mucusPeak(int year, int month, int day) => CycleMark(
   type: CycleMarkTypes.mucusPeakDay,
 );
 
-/// A user-placed first-higher-measurement mark on (year, month, day).
-CycleMark firstHigher(int year, int month, int day) => CycleMark(
+/// A user-placed temperature-rise mark on (year, month, day).
+CycleMark riseMark(int year, int month, int day) => CycleMark(
   date: DateTime(year, month, day),
   type: CycleMarkTypes.temperatureRise,
 );
@@ -273,7 +273,7 @@ void main() {
       expect(facts.first.cycleStart, DateTime.utc(2026, 3, 2));
     });
 
-    test('first higher facts are null without first-higher marks', () {
+    test('first higher facts are null without temperature-rise marks', () {
       final facts = cycleFacts(threeCycleData(), threeCycleStarts());
       for (final fact in facts) {
         expect(fact.firstHigherDay, isNull);
@@ -287,7 +287,7 @@ void main() {
       // so the user-placed rise mark is not a statistic.
       final facts = cycleFacts(threeCycleData(), [
         ...threeCycleStarts(),
-        firstHigher(2026, 3, 20),
+        riseMark(2026, 3, 20),
       ]);
       expect(facts[0].firstHigherDay, isNull);
       expect(facts[0].firstHigherUntilCycleEndDays, isNull);
@@ -300,13 +300,13 @@ void main() {
         'the marked day', () {
       // The shared evaluation scenario (test/support/fixtures.dart),
       // September 2026, with a cycle-start mark on its first tracked day:
-      // the first-higher MARK sits on Sep 14 BEFORE the peak on Sep 15, so
+      // the temperature-rise mark sits on Sep 14 BEFORE the peak on Sep 15, so
       // the first candidate is an arrow; the earliest CIRCLE (a candidate
       // strictly after the peak) is Sep 16 — the resolved first higher.
       final facts = cycleFacts(evaluationScenarioEntries(), [
         start(2026, 9, 6),
         mucusPeak(2026, 9, 15),
-        firstHigher(2026, 9, 14),
+        riseMark(2026, 9, 14),
       ]);
       expect(facts, hasLength(1));
       expect(facts.single.cycleStart, DateTime.utc(2026, 9, 6));
@@ -327,7 +327,7 @@ void main() {
       final facts = cycleFacts(entries, [
         start(2026, 3, 2),
         start(2026, 5, 10),
-        firstHigher(2026, 5, 15),
+        riseMark(2026, 5, 15),
       ]);
       expect(facts, hasLength(2));
       expect(facts[1].cycleStart, DateTime.utc(2026, 5, 10));
@@ -348,9 +348,9 @@ void main() {
         start(2026, 3, 2),
         start(2026, 3, 30),
         start(2026, 5, 10),
-        firstHigher(2026, 3, 5),
+        riseMark(2026, 3, 5),
         mucusPeak(2026, 3, 30),
-        firstHigher(2026, 3, 31),
+        riseMark(2026, 3, 31),
       ];
       final facts = cycleFacts(entries, marks);
       // Cycle 2: Mar 30 is its measured low and its peak, Mar 31 the rise
@@ -389,7 +389,7 @@ void main() {
       final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
         mucusPeak(2026, 3, 15),
-        firstHigher(2026, 3, 20),
+        riseMark(2026, 3, 20),
       ]);
       expect(stats.cycleCount, 4);
 
@@ -427,9 +427,9 @@ void main() {
       final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
         mucusPeak(2026, 3, 15),
-        firstHigher(2026, 3, 20),
+        riseMark(2026, 3, 20),
         mucusPeak(2026, 4, 28),
-        firstHigher(2026, 5, 1),
+        riseMark(2026, 5, 1),
       ]);
       expect(stats.firstHigherCycleDays.min, 5);
       expect(stats.firstHigherCycleDays.max, 19);
@@ -445,11 +445,11 @@ void main() {
       final stats = cycleStatistics(circledThreeCycleData(), [
         ...threeCycleStarts(),
         mucusPeak(2026, 3, 15),
-        firstHigher(2026, 3, 20),
+        riseMark(2026, 3, 20),
         mucusPeak(2026, 4, 1),
-        firstHigher(2026, 4, 6),
+        riseMark(2026, 4, 6),
         mucusPeak(2026, 4, 28),
-        firstHigher(2026, 5, 1),
+        riseMark(2026, 5, 1),
       ]);
       expect(stats.firstHigherCycleDays.min, 5);
       expect(stats.firstHigherCycleDays.max, 19);
@@ -457,11 +457,11 @@ void main() {
       expect(stats.firstHigherCycleDays.stdDev, closeTo(6.0184877, 0.0001));
     });
 
-    test('a first-higher mark in the leading pre-mark group contributes '
+    test('a temperature-rise mark in the leading pre-mark group contributes '
         'no day number', () {
       final entries = [d(2026, 2, 20), ...threeCycleData()];
       final stats = cycleStatistics(entries, [
-        firstHigher(2026, 2, 25),
+        riseMark(2026, 2, 25),
         ...threeCycleStarts(),
       ]);
       // The mark sits inside the leading group (no cycle start to count
@@ -473,14 +473,14 @@ void main() {
 
   // The per-cycle statistics scenario: three marked cycles
   //   cycle 1: start Mar 1 — bleeding Mar 1-4 with an interruption on Mar 3
-  //            (4 bleeding-window days, interruption counts through), first
-  //            higher Mar 14, mucus peak Mar 12; six measured lows Mar 8-13
+  //            (4 bleeding-window days, interruption counts through), rise
+  //            mark Mar 14, mucus peak Mar 12; six measured lows Mar 8-13
   //            at 36.4 and the rise day Mar 14 at 36.7 — a circle on the
   //            rise day
-  //   cycle 2: start Mar 29 — no bleeding day, first higher Mar 31, mucus
+  //   cycle 2: start Mar 29 — no bleeding day, rise mark Mar 31, mucus
   //            peak Mar 30; one measured low Mar 29 (36.4) and the rise day
   //            Mar 31 at 36.7 — a circle on the rise day
-  //   cycle 3: start Apr 27 — bleeding Apr 27-28, no first-higher mark
+  //   cycle 3: start Apr 27 — bleeding Apr 27-28, no temperature-rise mark
   // (Mar 3 clear: shows the interruption counting through the span.)
   List<DailyEntry> perCycleEntries() => [
     d(2026, 3, 1, bleeding: Bleeding.heavy),
@@ -505,9 +505,9 @@ void main() {
     start(2026, 3, 29),
     start(2026, 4, 27),
     mucusPeak(2026, 3, 12),
-    firstHigher(2026, 3, 14),
+    riseMark(2026, 3, 14),
     mucusPeak(2026, 3, 30),
-    firstHigher(2026, 3, 31),
+    riseMark(2026, 3, 31),
   ];
 
   List<CycleEvaluation> perCycleEvaluations() => evaluateCycles(
@@ -676,9 +676,9 @@ void main() {
         start(2026, 3, 1),
         start(2026, 3, 29),
         mucusPeak(2026, 3, 6),
-        firstHigher(2026, 3, 4),
+        riseMark(2026, 3, 4),
         mucusPeak(2026, 4, 2),
-        firstHigher(2026, 4, 6),
+        riseMark(2026, 4, 6),
       ];
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
@@ -703,7 +703,7 @@ void main() {
             for (var day = 1; day <= 5; day++) d(2026, 3, day, bbtC: 36.4),
             d(2026, 3, 7, bbtC: 36.8),
           ],
-          [start(2026, 3, 1), mucusPeak(2026, 3, 6), firstHigher(2026, 3, 6)],
+          [start(2026, 3, 1), mucusPeak(2026, 3, 6), riseMark(2026, 3, 6)],
         ),
       );
       // The rise mark sits ON the peak day: the marked day itself is
@@ -719,7 +719,7 @@ void main() {
             for (var day = 2; day <= 7; day++) d(2026, 3, day, bbtC: 36.4),
             d(2026, 3, 8, bbtC: 36.7),
           ],
-          [start(2026, 3, 1), mucusPeak(2026, 3, 6), firstHigher(2026, 3, 8)],
+          [start(2026, 3, 1), mucusPeak(2026, 3, 6), riseMark(2026, 3, 8)],
         ),
       );
       expect(earliest, 8);
@@ -732,7 +732,7 @@ void main() {
           d(2026, 3, 5, bbtC: 36.7),
           d(2026, 3, 8, bbtC: 36.7),
         ],
-        [start(2026, 3, 1), mucusPeak(2026, 3, 20), firstHigher(2026, 3, 5)],
+        [start(2026, 3, 1), mucusPeak(2026, 3, 20), riseMark(2026, 3, 5)],
       );
       earliest = earliestFirstHigherCycleDay(stopped);
       expect(earliest, isNull);
@@ -761,7 +761,7 @@ void main() {
         start(2026, 3, 1),
         start(2026, 3, 6),
         mucusPeak(2026, 3, 4),
-        firstHigher(2026, 3, 3),
+        riseMark(2026, 3, 3),
       ];
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
@@ -787,7 +787,7 @@ void main() {
       final marks = [
         start(2026, 3, 1),
         mucusPeak(2026, 3, 6),
-        firstHigher(2026, 3, 5),
+        riseMark(2026, 3, 5),
       ];
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
@@ -805,7 +805,7 @@ void main() {
       final marks = [
         start(2026, 3, 1),
         mucusPeak(2026, 3, 6),
-        firstHigher(2026, 3, 5),
+        riseMark(2026, 3, 5),
       ];
       final earliest = earliestFirstHigherCycleDay(
         evaluateCycles(entries, marks),
@@ -825,7 +825,7 @@ void main() {
       final marks = [
         start(2026, 3, 1),
         mucusPeak(2026, 3, 6),
-        firstHigher(2026, 3, 8),
+        riseMark(2026, 3, 8),
       ];
       final evaluations = evaluateCycles(entries, marks);
       expect(evaluations.single.riseMarkConsistent, isFalse);
@@ -834,7 +834,7 @@ void main() {
     });
 
     test('null when nothing qualifies', () {
-      // No first-higher marks at all.
+      // No temperature-rise marks at all.
       var earliest = earliestFirstHigherCycleDay(
         evaluateCycles(threeCycleData(), threeCycleStarts()),
       );
@@ -844,7 +844,7 @@ void main() {
       earliest = earliestFirstHigherCycleDay(
         evaluateCycles(
           [DailyEntry(date: DateTime(2026, 3, 1))],
-          [start(2026, 3, 1), firstHigher(2026, 3, 3)],
+          [start(2026, 3, 1), riseMark(2026, 3, 3)],
         ),
       );
       expect(earliest, isNull);
@@ -853,10 +853,10 @@ void main() {
     test('the leading pre-mark group is ignored', () {
       final entries = [d(2026, 2, 20), d(2026, 3, 1)];
       final marks = [
-        // A first-higher mark BEFORE the first cycleStart mark belongs to
+        // A temperature-rise mark BEFORE the first cycleStart mark belongs to
         // the leading group (it does not start at a mark): no cycle day,
         // so it must not contribute (the cycle day would be undefined).
-        firstHigher(2026, 2, 25),
+        riseMark(2026, 2, 25),
         start(2026, 3, 1),
       ];
       final earliest = earliestFirstHigherCycleDay(
@@ -900,16 +900,12 @@ void main() {
         (threeCycleData(), threeCycleStarts()),
         (
           threeCycleData(),
-          [
-            ...threeCycleStarts(),
-            firstHigher(2026, 3, 20),
-            firstHigher(2026, 5, 1),
-          ],
+          [...threeCycleStarts(), riseMark(2026, 3, 20), riseMark(2026, 5, 1)],
         ),
         (perCycleEntries(), perCycleMarks()),
         (
           evaluationScenarioEntries(),
-          [start(2026, 9, 6), mucusPeak(2026, 9, 15), firstHigher(2026, 9, 14)],
+          [start(2026, 9, 6), mucusPeak(2026, 9, 15), riseMark(2026, 9, 14)],
         ),
       ]) {
         final derived = deriveCycleData(entries, marks, today: perCycleToday);
