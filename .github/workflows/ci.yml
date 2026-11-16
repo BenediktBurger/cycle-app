@@ -85,8 +85,10 @@ jobs:
           # enabling the action's pub caching.
           pub-cache: 'false'
 
+      # The committed lock must be a resolution of the pinned SDK, so a
+      # drifted lock fails here instead of being silently re-resolved.
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       # Regenerate the committed .g.dart outputs (drift_dev +
       # riverpod_generator; why committed: CONTRIBUTING.md, "Codegen and
@@ -198,7 +200,7 @@ jobs:
           pub-cache: 'false'
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Test
         run: >

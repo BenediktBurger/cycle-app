@@ -190,7 +190,9 @@ jobs:
           case $rc in
             0)
               auth_git fetch --depth 1 origin gh-pages
-              git checkout -q --detach FETCH_HEAD
+              # -f discards build-side edits to tracked files (pub get rewrites
+              # pubspec.lock); untracked build/ is not in the site tree.
+              git checkout -q -f --detach FETCH_HEAD
               ;;
             2)
               # gh-pages is absent: the branch deploy creates the site
