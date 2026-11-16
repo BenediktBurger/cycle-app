@@ -275,7 +275,7 @@ String buildExportJson(ExportBlob blob) {
   });
 }
 
-/// Pre-rename spellings of the stored mark tokens that documents still
+/// Legacy spellings of the stored mark tokens that older documents still
 /// carry: an old backup's mark must keep anchoring the evaluation.
 const _legacyMarkTokens = {'firstHigherMeasurement': 'temperatureRise'};
 

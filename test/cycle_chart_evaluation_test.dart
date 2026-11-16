@@ -843,9 +843,9 @@ void main() {
       'two rise marks: the LATER one drives the evaluation; the earlier '
       'rise day renders no candidate',
       (tester) async {
-        // Two firstHigher marks: 9/14 and 9/15. The LATER mark (9/15) anchors
-        // the evaluation — and re-derives the six-low window with it: the
-        // lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
+        // Two temperature-rise marks: 9/14 and 9/15. The LATER mark (9/15)
+        // anchors the evaluation — and re-derives the six-low window with it:
+        // the lows before 9/15 are 9/9..9/14, so the baseline moves to 9/14's
         // 36.9 (the earlier rise mark's day itself becomes a low!). From the
         // walk start 9/15: 9/15 sits AT the new baseline (gap day, no
         // candidate), 9/16 (37.0) is circle #1 — no „Sicher unfruchtbare

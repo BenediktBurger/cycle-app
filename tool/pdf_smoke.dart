@@ -34,7 +34,7 @@ DateTime d(int month, int day) => DateTime.utc(2026, month, day);
 /// cycle): cycle 2 tracks its 28 days up to the next start.
 ///
 /// The first (28-day) cycle carries the render-relevant material the
-/// symbol/overlay rows draw: a mucus peak, a first higher measurement, a
+/// symbol/overlay rows draw: a mucus peak, a temperature-rise mark, a
 /// user-placed SUZ morning mark and an ignoreTemperature day; one dense
 /// day carries mucus with quality, sex, a measurement time and disturbance
 /// flags. The document generation reads all of it through the (unmodified)

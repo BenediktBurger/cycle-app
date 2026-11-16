@@ -31,7 +31,7 @@ DateTime septSevenDay(int index) =>
 /// the write-through): days
 /// 2026-09-06..16 with
 ///
-///  - 9/6 (idx 0): the rise BEFORE the marked first higher — never a
+///  - 9/6 (idx 0): the rise BEFORE the marked rise day — never a
 ///    candidate (app convention "latest-mark anchor": only the marked rise
 ///    anchors), renders as an ordinary temperature dot;
 ///  - 9/7 (idx 1): a 7th-low day outside the six-low window -> no number;

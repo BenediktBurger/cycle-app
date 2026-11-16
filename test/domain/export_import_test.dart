@@ -94,7 +94,7 @@ void main() {
           ],
         });
 
-    test('parseExportJson translates the pre-rename rise token', () {
+    test('parseExportJson translates the legacy rise token', () {
       final doc = parseExportJson(markDocument('firstHigherMeasurement'));
 
       expect(doc.marks.single['mark_type'], 'temperatureRise');

@@ -130,7 +130,7 @@ void main() {
       expect(await db.marksDao.allMarks(), hasLength(1));
     });
 
-    test('a pre-rename document imports its rise mark as temperatureRise '
+    test('a legacy document imports its rise mark as temperatureRise '
         'and re-exports it', () async {
       final legacyDoc = buildExportJson(
         ExportBlob(

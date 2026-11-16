@@ -1263,7 +1263,7 @@ void main() {
     });
 
     testWidgets(
-      'the consistency dialog covers the mark-excluded branch: placing a '
+      'the consistency dialog covers the mark-excluded branch: placing '
       'the rise mark on a mark-EXCLUDED (but measured) day warns with the '
       'no-usable-temperature wording',
       (tester) async {

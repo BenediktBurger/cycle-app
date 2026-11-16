@@ -102,7 +102,7 @@ class CycleDatabase extends _$CycleDatabase {
       }
 
       // Each future schema-version bump adds its own guarded block here
-      // (e.g. `if (from < 14) { ... }`), using Migrator helpers
+      // (e.g. `if (from < N) { ... }`), using Migrator helpers
       // (createTable, addColumn, alterTable, …) or a raw `customStatement`
       // for data rewrites; disruptive table shape changes copy data into
       // the new table instead of dropping anything. Skipped steps (from

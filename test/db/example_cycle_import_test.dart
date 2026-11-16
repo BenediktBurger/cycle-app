@@ -79,8 +79,8 @@ void main() {
       expect(mucusPeakDay, hasLength(1));
       expect(mucusPeakDay.single.author, 'user');
 
-      // The fixture still spells the temperature-rise mark with the
-      // pre-rename token; the import translates it.
+      // The fixture spells the temperature-rise mark with the legacy token;
+      // the import translates it.
       final riseDay = (await db.marksDao.marksForDay(
         DateTime(2026, 9, 2),
       )).where((m) => m.markType == 'temperatureRise');
