@@ -6,6 +6,7 @@ import 'package:cycle_app/domain/date_only.dart';
 import 'package:cycle_app/domain/disturbances.dart';
 import 'package:cycle_app/domain/evaluation_overlay.dart';
 import 'package:cycle_app/domain/marks.dart';
+import 'package:cycle_app/domain/measurement_method.dart';
 import 'package:cycle_app/domain/models.dart';
 import 'package:cycle_app/domain/pdf_export_model.dart';
 import 'package:cycle_app/domain/temperature_range.dart';
@@ -223,6 +224,78 @@ void main() {
       final dot = drawing.dots.firstWhere((d) => d.index == 2);
       expect(dot.ignored, isTrue);
       expect(drawing.dots.firstWhere((d) => d.index == 3).ignored, isFalse);
+    });
+  });
+
+  group('measurement-method snapshots break the PDF curve', () {
+    List<DailyEntry> entries() => [
+      DailyEntry(date: day(1), bbtC: 36.4),
+      DailyEntry(date: day(2), bbtC: 36.5),
+      DailyEntry(date: day(3), bbtC: 36.6),
+    ];
+
+    List<CycleMark> marks() => [
+      CycleMark(date: day(1), type: CycleMarkTypes.cycleStart),
+    ];
+
+    /// The export model plus the draw list of the whole three-day cycle.
+    (PdfExportModel, PdfCurveDrawing) build({
+      required List<MeasurementMethodSnapshot> snaps,
+    }) {
+      final model = buildPdfExportModel(
+        entries: entries(),
+        marks: marks(),
+        measurementSnapshots: snaps,
+        today: day(3),
+      );
+      return (
+        model,
+        pdfCurveDrawing(
+          cycle: model.cycles[0],
+          overlay: model.overlays[0],
+          range: _range,
+          windowFirstIndex: 0,
+          windowDayCount: 3,
+        ),
+      );
+    }
+
+    test('the snapshot day drops the incoming piece but keeps its dot and '
+        'connects forward', () {
+      final (model, drawing) = build(
+        snaps: [
+          MeasurementMethodSnapshot(
+            date: _d(2, 20),
+            route: MeasurementRoute.vaginal,
+          ),
+          MeasurementMethodSnapshot(
+            date: day(2),
+            route: MeasurementRoute.rectal,
+          ),
+        ],
+      );
+      expect(model.overlays[0].methodChanges.keys, {
+        1,
+      }, reason: 'the change sits on the day whose incoming piece must vanish');
+      expect(
+        [for (final p in drawing.pieces) (p.startX, p.endX)],
+        [(1.0, 2.0)],
+        reason: 'no 0→1 piece runs into the snapshot day; only 1→2 is drawn',
+      );
+      expect(drawing.dots.map((d) => d.index), [
+        0,
+        1,
+        2,
+      ], reason: 'every measured day still draws its dot');
+    });
+
+    test('without snapshots the identical fixture draws both pieces', () {
+      final (_, drawing) = build(snaps: const []);
+      expect(
+        [for (final p in drawing.pieces) (p.startX, p.endX)],
+        [(0.0, 1.0), (1.0, 2.0)],
+        reason: 'the piece delta comes from the snapshots alone',
+      );
     });
   });
 

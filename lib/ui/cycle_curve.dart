@@ -1,10 +1,11 @@
 // Pure curve-structure helpers for the Zyklus temperature chart: which
-// days form drawable line runs (adjacent-day connectivity), which
-// segments are interrupted (ignored) and must render lighter, and which
-// portions of a segment lie inside the chart's visible value range.
-// CurvePoints keep the RAW measured temperature: whether a point or a
-// piece of a line is visible is decided by the value-range helpers below,
-// never by rewriting the measured value. No Flutter or chart types here —
+// days form drawable line runs (adjacent-day connectivity plus the
+// caller-supplied break points), which segments are interrupted (ignored)
+// and must render lighter, and which portions of a segment lie inside the
+// chart's visible value range. CurvePoints keep the RAW measured
+// temperature: whether a point or a piece of a line is visible is decided
+// by the value-range helpers below, never by rewriting the measured
+// value. No Flutter or chart types here —
 // the widget layer (lib/ui/cycle.dart) maps these onto fl_chart bars;
 // tests assert the rule set directly.
 import '../domain/models.dart';
@@ -43,9 +44,10 @@ final class CurvePoint {
   final bool excluded;
 }
 
-/// A maximal run of adjacent measured days. The line is drawn WITHIN runs
-/// only: a day without a temperature (no entry, or entry without bbtC)
-/// starts a new run, so no line segment ever spans such a day.
+/// A maximal run of adjacent measured days that no caller-supplied break
+/// separates. The line is drawn WITHIN runs only: a day without a
+/// temperature (no entry, or entry without bbtC) starts a new run, so no
+/// line segment ever spans such a day.
 final class CurveRun {
   const CurveRun(this.points);
 
@@ -174,7 +176,8 @@ double _xAt(CurveSegment segment, double t) =>
 double _yAt(CurveSegment segment, double t) =>
     segment.a.bbtC + t * (segment.b.bbtC - segment.a.bbtC);
 
-/// Splits the recorded days into maximal runs of adjacent-day measurements.
+/// Splits the recorded days into maximal runs of adjacent-day measurements,
+/// ended early by a caller-supplied break.
 ///
 /// [entriesByDayIndex] maps day index -> entry over the chart range (see
 /// _ChartDays). Days WITHOUT a temperature — no entry at all, or an entry
@@ -183,18 +186,25 @@ double _yAt(CurveSegment segment, double t) =>
 /// the chart's day indexes whose temperature is IGNORED (computed by the
 /// chart from the ignoreTemperature marks — owner decision 2026-09-19:
 /// the mark is the rendering key). A marked day renders lighter whether
-/// or not it
-/// carries raw disturbance flags; a flagged day whose mark was removed
-/// renders normally (the mask is the diary badge's input, not the
+/// or not it carries raw disturbance flags; a flagged day whose mark was
+/// removed renders normally (the mask is the diary badge's input, not the
 /// curve's).
 ///
 /// Every point keeps its RAW measured value — an out-of-range reading is
-/// not rewritten here. Connectivity (adjacency) is decided by the calendar
-/// days alone, so such a day still joins its neighbors into one run; what
-/// becomes drawable of it is decided later by [visibleCurveSegments].
+/// not rewritten here. A measured day whose calendar neighbours are
+/// adjacent still joins them into one run unless [breakBeforeDayIndexes]
+/// names it; what becomes drawable of it is decided later by
+/// [visibleCurveSegments].
+///
+/// [breakBeforeDayIndexes] names day indexes that always START a new run,
+/// even when calendar-adjacent to the previous point: the caller decides
+/// what constitutes a break (both renderers pass their measurement-method
+/// snapshot days), the helper knows nothing about it. Such a point keeps
+/// its dot and still connects forward.
 List<CurveRun> curveRuns(
   Map<int, DailyEntry> entriesByDayIndex, {
   Set<int> ignoredDayIndexes = const {},
+  Set<int> breakBeforeDayIndexes = const {},
 }) {
   final measured = <CurvePoint>[
     for (final MapEntry(:key, value: entry) in entriesByDayIndex.entries)
@@ -209,7 +219,9 @@ List<CurveRun> curveRuns(
   final runs = <CurveRun>[];
   final run = <CurvePoint>[];
   for (final point in measured) {
-    if (run.isNotEmpty && point.dayIndex != run.last.dayIndex + 1) {
+    if (run.isNotEmpty &&
+        (point.dayIndex != run.last.dayIndex + 1 ||
+            breakBeforeDayIndexes.contains(point.dayIndex))) {
       runs.add(CurveRun(List.unmodifiable(run)));
       run.clear();
     }
