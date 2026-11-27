@@ -131,6 +131,14 @@ jobs:
       - name: Format
         run: dart format --output=none --set-exit-if-changed .
 
+      # Module boundaries and file-size guard rails from AGENTS.md. They
+      # fail on new violations only: grandfathered entries may shrink, not
+      # grow, so the debt ratchets down without a big-bang rewrite.
+      - name: Layering and file size
+        run: |
+          dart run tool/check_layering.dart
+          dart run tool/check_file_sizes.dart
+
       # No system sqlite3 install needed: the host-VM database tests use the
       # SQLite engine bundled by the sqlite3 package's build hook (the
       # `sqlite3mc` user-define in pubspec.yaml — see CONTRIBUTING.md,

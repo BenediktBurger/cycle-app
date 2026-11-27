@@ -45,6 +45,45 @@ itself the contract (privacy, permission, or no-network guarantee). Layer
 choice and harness precedents: [CONTRIBUTING.md](CONTRIBUTING.md),
 "Test layers".
 
+Tests own behavior, not structure. A test name states the scenario and the
+user-visible outcome; a failure names a behavior, not a widget or function.
+Mount the feature with its real providers and
+in-memory database; do not assert on private widgets, call counts, or
+exact widget trees. Doubles are allowed only at a real I/O boundary
+(platform channel, clock, network). Before writing a new `pumpWidget`,
+extend the harness in `test/support/` instead of inlining another setup.
+
+Never change an expectation and the implementation in the same commit
+unless the expectation itself is the bug.
+
+## Refactoring
+
+A change either alters behavior or structure, never both. A structure-only
+change passes without editing an existing assertion: it may add tests, but
+adjusted expectations mean the change was behavioral. Keep the two in
+separate commits, and split mixed PRs.
+
+Name the cost before refactoring — a recurring bug class, a file every
+change grows, or behavior reachable only through a full pump. A refactor
+without a named cost is cosmetic; leave it. One seam per change, no
+drive-by renames, and extracted logic moves to `lib/domain`, not to a
+private helper in the widget file. Before restructuring a stateful screen,
+pin today's behavior in characterization tests, quirks included.
+
+## Module boundaries
+
+- `lib/domain` is pure: no Flutter, `db`, `ui`, or `platform` imports.
+- `lib/db` may import `domain`, never `ui`.
+- `lib/ui` reaches persistence through providers, not `db` directly.
+- `lib/pdf` reads `domain` models only.
+- `lib/platform` hides plugin and OS seams behind stubs.
+
+Files past roughly 800 lines need a cohesive reason to keep growing; past
+roughly 1200, split by seam before adding to them. These are guard rails
+against append-only agent growth, not style targets. Both rules are
+enforced by `tool/check_layering.dart` and `tool/check_file_sizes.dart`;
+their allowlists cover existing debt and may only shrink.
+
 ## Improvement notes: three destinations, never lost
 
 Issues, dislikes, and improvement ideas go where they can actually take
@@ -117,7 +156,9 @@ failures only surface in a summary at the end. Instead:
 - **Full gate** before "done": run `flutter analyze`, then
   `dart format --output=none --set-exit-if-changed .`, then
   `flutter test --no-pub -r expanded` — drop `--fail-fast` here so the whole
-  suite still runs. All three are judged by exit code only
+  suite still runs. Add `dart run tool/check_layering.dart` and
+  `dart run tool/check_file_sizes.dart`; they are cheap and catch the
+  boundary and size rules below. All of these are judged by exit code only
   (the format check exits non-zero when any file would be reformatted).
   Before declaring done, also do the **comment self-review**: list every
   comment added in the change and name the misunderstanding it prevents (see
